@@ -101,7 +101,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `tryDecompressSections`, `encodeBase64Unicode`, `generateId` |
 | `public/state/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
 | `public/state/state-hydration.ts` | v1's reading rules, kept for v2's v1 import (#1274); v1's own load/save layer went in #1424. | `validateSections`, `sanitizeDisplayString`, `clamp` |
-| `public/state/history.ts` | Session history and undo/redo logic. | `pushHistory`, `undo` |
 
 ## Songbook Document Boundary
 
@@ -141,7 +140,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | :--- | :--- | :--- |
 | `public/engine/chords-styles.ts` | Chord intervals and rootless-voicing choices for the parsed progression. | `getIntervals` |
 | `public/engine/voicing-policy.ts` | Rootless-voicing rules and voice-leading cost for the parsed progression. | `shouldUseRootlessVoicing`, `getNearestVoiceLeadingCost` |
-| `public/engine/soloist-config.ts` | The soloist voice's per-style timbre settings. | `STYLE_CONFIG`, `resolveSoloistStyle` |
+| `public/engine/soloist-config.ts` | The soloist voice's per-style timbre settings. | `STYLE_CONFIG` |
 
 ## Engine Core (Internal)
 
@@ -193,7 +192,7 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 
 | Path | Responsibility |
 | :--- | :--- |
-| `public/controllers/arranger-controller.ts` | High-level song structure manipulation. |
+| `public/controllers/arranger-controller.ts` | Transpose the chart's key (`transposeKey`), the one entry the stand's runtime uses. |
 | `public/controllers/instrument-controller.ts` | Per-instrument state and preset routing. |
 | `public/controllers/practice-controller.ts` | Section practice — a section's step bounds, for start-from-here (#1016). |
 | `public/export/detached-generation-state.ts` | Offline-render state clone (the band's WAV export and the listening-gate tools): preserves generation settings while stripping live handles and runtime buffers. |

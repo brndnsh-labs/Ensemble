@@ -160,7 +160,7 @@ function resolveDocLink(rawPath) {
  * The repo-root prefix allowlist is the primary test, and it stays the ONLY test
  * for root-level docs — widening it there would start checking incidental spans
  * like `dist/assets/index.js`. The dir-scoped agent docs (#1153) additionally
- * cite paths relative to their OWN directory (`state/history.ts` in
+ * cite paths relative to their OWN directory (`state/share-codec.ts` in
  * `public/CLAUDE.md`, `../coordination-engine.ts` in the grooves one), so for
  * those a second, self-limiting test applies: an explicit `./`/`../`, or a first
  * segment that is a real subdirectory of the doc. A span that matches neither

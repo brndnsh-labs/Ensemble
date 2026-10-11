@@ -754,62 +754,6 @@ export function getBestInversion(
 }
 
 /**
- * Mutates an existing progression string by subtly changing one or more chords.
- */
-export function mutateProgression(progressionStr: string): {
-    value: string;
-    mutatedIndex: number;
-} {
-    if (!progressionStr?.trim()) {
-        return { value: progressionStr, mutatedIndex: -1 };
-    }
-    const parts = progressionStr.split('|').map((p) => p.trim());
-
-    // Pick 1 random index to mutate
-    const mutatedParts: string[] = [...parts];
-    const idx = Math.floor(Math.random() * parts.length);
-    const original = parts[idx];
-
-    // Simple substitutions based on common harmonic functions
-    const substitutions: Record<string, string[]> = {
-        I: ['vi', 'IV', 'Imaj7'],
-        IV: ['ii', 'IVmaj7', 'iv'],
-        V: ['V7', 'viio', 'bVII'],
-        vi: ['I', 'iii', 'IV'],
-        ii: ['IV', 'ii7', 'bIImaj7'],
-        1: ['6-', '4', '1maj7'],
-        4: ['2-', '4maj7', '4m'],
-        5: ['57', '7o', 'b7'],
-        '6-': ['1', '3-', '4'],
-    };
-
-    // If we have a known substitution, use it.
-    // #1266 — `Object.hasOwn`, not `|| []`. `original` is a `|`-delimited token off
-    // `arranger.sections[].value`, which is untrusted (a persisted chart, or `?prog=`)
-    // and is only stripped/capped, never allowlisted. On this plain literal the
-    // arity-1 inherited members ('constructor', 'hasOwnProperty', 'isPrototypeOf',
-    // 'propertyIsEnumerable') return a FUNCTION: truthy, so it defeated the `|| []`,
-    // and `Function.length === 1` then defeated the `length > 0` guard — so
-    // `choices[0]` was `undefined` and the literal token "undefined" got written back
-    // into the chart and persisted.
-    const choices = Object.hasOwn(substitutions, original) ? substitutions[original] : [];
-    if (choices.length > 0) {
-        mutatedParts[idx] = choices[Math.floor(Math.random() * choices.length)];
-    } else {
-        // Just change the extension if it's a simple chord
-        if (!original.includes('7') && !original.includes('maj')) {
-            mutatedParts[idx] = original + (Math.random() > 0.5 ? 'maj7' : '7');
-        } else {
-            // Re-randomize just this one spot from a general pool
-            const pool = ['I', 'ii', 'iii', 'IV', 'V', 'vi'];
-            mutatedParts[idx] = pool[Math.floor(Math.random() * pool.length)];
-        }
-    }
-
-    return { value: mutatedParts.join(' | '), mutatedIndex: idx };
-}
-
-/**
  * Intelligent transposition for relative major/minor toggles.
  * Rewrites the progression string while maintaining original pitches.
  */

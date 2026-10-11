@@ -1,5 +1,3 @@
-import { resolveGenre, SMART_GENRES } from '../data/smart-genres.js';
-
 export interface SeedTriplets {
     enabled: boolean;
     cellBias: number;
@@ -429,33 +427,6 @@ export const STYLE_CONFIG: Record<string, StyleConfig> = Object.keys(STYLE_OVERR
     Object.create(null) as Record<string, StyleConfig>,
 );
 
-/**
- * genreFeel → soloist profile, the fallback when a genre declares no `soloist`
- * (or declares one this file has no STYLE_CONFIG for). NOT derived from
- * `GENRE_OVERRIDES[*].soloist`: this table speaks STYLE_CONFIG keys, and one
- * genre's declared style is a UI-facing alias of a different profile name
- * (Ska-Punk declares 'ska-horns', which aliases to the 'ska' profile).
- *
- * Keys are FEELS. The two that diverge from their picker name ('Bossa Nova',
- * 'Ska') are reconciled by the naming authority in `data/smart-genres.ts` — see
- * the GENRE-NAMING AUTHORITY block there rather than restating the alias here.
- */
-const GENRE_STYLE_MAPPING: Record<string, string> = {
-    Rock: 'rock',
-    Jazz: 'jazz',
-    Funk: 'funk',
-    Blues: 'blues',
-    'Neo-Soul': 'neo',
-    'Hip Hop': 'hiphop',
-    Disco: 'disco',
-    'Bossa Nova': 'bossa',
-    Acoustic: 'acoustic',
-    Reggae: 'reggae',
-    Country: 'country',
-    Ska: 'ska',
-    Metal: 'metal',
-};
-
 // INFLUENCE_POOLS (per-genre "channeled greats" pools) removed in epic #10 — it
 // was read only by the retired legacy soloist engine. Phrase-first does not model
 // per-section influence channeling.
@@ -463,88 +434,3 @@ const GENRE_STYLE_MAPPING: Record<string, string> = {
 // SoloistIntent + SOLOIST_INTENTS (intensity→"intention" behavior table) removed in
 // epic #10/#866 — read only by the retired legacy picker (selectPitchAndDevices).
 // Phrase-first drives intensity through its own arc/development model.
-
-const REGISTER_PROFILE_ALIASES: Record<string, string> = {
-    armstrong: 'jazz',
-    beck: 'rock',
-    coltrane: 'bird',
-    evans: 'jazz',
-    // why (#628): `evh` aliased to the retired `shred` register profile; now
-    // points to `rock` (Shred was always a Metal/Rock-family alias, never live).
-    evh: 'rock',
-    gilmour: 'rock',
-    hendrix: 'rock',
-    miles: 'jazz',
-    monk: 'jazz',
-    slash: 'rock',
-    srv: 'blues',
-};
-
-const SOLOIST_STYLE_ALIASES: Record<string, string> = {
-    ...REGISTER_PROFILE_ALIASES,
-    'ska-horns': 'ska',
-};
-
-function getSmartGenreSoloistStyle(genreFeel: string | undefined): string | null {
-    // why (#1177): SMART_GENRES is keyed by canon genre NAME while this function is
-    // handed a FEEL, so before the authority existed the lookup silently missed for
-    // the two genres whose feel ≠ name (Bossa → 'Bossa Nova', Ska-Punk → 'Ska') and
-    // they reached their profile only via the GENRE_STYLE_MAPPING fallback below.
-    // `resolveGenre` normalizes EITHER keyspace to the canon name, which keeps the
-    // old accidental name-tolerance (callers/harnesses that pass a picker name here)
-    // while making the feel path a deliberate hit. Behavior-frozen: all 13 genres
-    // converged to the same profile either way — pinned by
-    // tests/standards/soloist-routing-guard.test.ts.
-    const genreName = resolveGenre(genreFeel)?.name;
-    if (!genreName || !Object.hasOwn(SMART_GENRES, genreName)) {
-        return null;
-    }
-
-    const config = Reflect.get(SMART_GENRES, genreName);
-    if (
-        !config ||
-        typeof config !== 'object' ||
-        !('soloist' in config) ||
-        typeof config.soloist !== 'string'
-    ) {
-        return null;
-    }
-
-    return config.soloist;
-}
-
-function getGenreMappedSoloistStyle(genreFeel: string | undefined): string {
-    if (!genreFeel || !Object.hasOwn(GENRE_STYLE_MAPPING, genreFeel)) {
-        return 'scalar';
-    }
-
-    return GENRE_STYLE_MAPPING[genreFeel];
-}
-
-/**
- * Resolve the effective soloist style for smart-mode playback.
- * The active Studio genre feel should be the source of truth for smart instruments,
- * while a few legacy UI-only style ids still need lightweight aliasing.
- */
-export function resolveSoloistStyle(
-    style: string | undefined,
-    genreFeel: string | undefined,
-): string {
-    if (!style || style === 'smart') {
-        const smartStyle = getSmartGenreSoloistStyle(genreFeel);
-        if (smartStyle && smartStyle !== 'smart') {
-            return resolveSoloistStyle(smartStyle, genreFeel);
-        }
-        return getGenreMappedSoloistStyle(genreFeel);
-    }
-
-    if (Object.hasOwn(STYLE_CONFIG, style)) {
-        return style;
-    }
-
-    if (Object.hasOwn(SOLOIST_STYLE_ALIASES, style)) {
-        return SOLOIST_STYLE_ALIASES[style];
-    }
-
-    return getGenreMappedSoloistStyle(genreFeel);
-}
