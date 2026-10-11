@@ -290,9 +290,18 @@ jobs:
         run: npm run check:bundle --prefix prototypes/v2
 
       - name: Run the v2 Playwright suite
-        run: npm run test:e2e --prefix prototypes/v2 -- --project=${{ matrix.project }}
+        run: npm run test:e2e --prefix prototypes/v2 -- --project=${{ matrix.project }} --reporter=dot,json
         env:
           V2_SHARD: ${{ matrix.shard }}/${{ matrix.of }}
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/v2-shard-report.json
+
+      # Each spec's seconds as this runner measured them: what `npm run shard:weights`
+      # rebalances the legs from (see its header). A few hundred kilobytes a leg.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: v2-shard-report-${{ matrix.shard }}-${{ matrix.project }}
+          path: ${{ runner.temp }}/v2-shard-report.json
+          retention-days: 14
 
       - uses: actions/upload-artifact@v7
         if: failure()

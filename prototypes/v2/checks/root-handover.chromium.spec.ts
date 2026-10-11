@@ -10,7 +10,7 @@ import { BASE, expect, seedStarters, songLink, test } from './fixtures';
  * cover the cutover. Chromium only, deliberately: every assertion here
  * turns on service-worker lifecycle — a conditional `skipWaiting`, `clients.claim`,
  * `WindowClient.navigate`, `registration.unregister` — plus a real offline transition, and
- * WebKit's emulation of the last of those is already known-broken in `foundation.spec.ts`.
+ * WebKit's emulation of the last of those is already known-broken in `foundation-helpers.ts`.
  *
  * The browser's prior state is staged by `scripts/serve.mjs`'s `/__test/legacy` stand-ins: a
  * minimal v1 at `/` and a minimal preview at `/v2/`, each faithful in its cache NAMES and its

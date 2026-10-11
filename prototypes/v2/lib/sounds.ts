@@ -258,7 +258,7 @@ const FETCH_CONCURRENCY = 6;
  * **Defaults to serial (`concurrency: 1`) on purpose.** Only the explicit install-all
  * gesture opts into the pool — see `installAllSounds`. Feel preparation and the
  * offline-readiness checks stay one-at-a-time because observers of those paths, including
- * `checks/foundation.spec.ts`'s Stop-during-preparation harness, pin the app by holding a
+ * `checks/foundation-sounds.spec.ts`'s Stop-during-preparation harness, pin the app by holding a
  * single in-flight request. With several outstanding, holding one no longer stops
  * preparation and the rollback/Stop assertions stop proving what they claim.
  */
