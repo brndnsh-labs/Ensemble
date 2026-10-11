@@ -54,8 +54,7 @@ export const INTERVAL_TO_ROMAN = {
  * (Ensemble briefly used a dotted-quarter BPM unit for compound meters —
  * epic-1-compound-meter S1 — but reverted to quarter-universal for DAW parity.)
  *
- * Internal step granularity is a 16th note in all meters (`getStepsPerMeasure`
- * returns 16 for 4/4, 12 for 6/8, etc.); see `secondsPerStepFor` in `public/utils.ts`.
+ * Internal step granularity is a 16th note in all meters (a 4/4 bar is 16 steps, a 6/8 bar 12).
  */
 export interface TimeSignatureConfig {
     beats: number;

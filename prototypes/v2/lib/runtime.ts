@@ -921,12 +921,10 @@ function applyGenre(name: string): void {
 
 function apply(content: DocumentContent): void {
     const score = 'score' in content ? clone(content.score) : null;
-    // A score is drawn from the band's own timeline; the old engine's plan, which would refuse
-    // holds, N.C., fermatas and off-grid lengths, is never built. With no plan the old engine's
-    // maps derive empty (`rebuild`), so nothing stale answers for this chart.
+    // A score is drawn from the band's own timeline; the old engine's maps derive empty for it
+    // (`rebuild`), so nothing stale answers for this chart.
     const view = score ? bandChart(score, compileTimeline(score)) : null;
     const arrangement = score ? scoreArrangementView(score) : (content as ChartContent).arrangement;
-    param('arranger', 'scorePlan', null);
     currentScore = score;
     bandView = view;
     // By name, like the band below: an old chart's legacy `lastChordPreset` is read by nothing.

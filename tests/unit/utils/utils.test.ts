@@ -1,6 +1,5 @@
 /* eslint-disable */
 import { describe, expect, it } from 'vitest';
-import { TIME_SIGNATURES } from '../../../public/config.js';
 import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
 import { compressSections, tryDecompressSections } from '../../../public/state/share-codec.js';
 
@@ -10,10 +9,8 @@ const decompressSections = (str: string) => tryDecompressSections(str) ?? [];
 import {
     getFrequency,
     getMidi,
-    getStepInfo,
     keyDistance,
     normalizeKey,
-    secondsPerStepFor,
     transposeKeyName,
 } from '../../../public/utils.js';
 
@@ -44,81 +41,6 @@ describe('Utility Functions', () => {
         });
     });
 
-    describe('getStepInfo', () => {
-        const ts44 = TIME_SIGNATURES['4/4'];
-
-        it('should identify beat starts and offbeats in 4/4', () => {
-            const info0 = getStepInfo(0, ts44, [], TIME_SIGNATURES);
-            const info2 = getStepInfo(2, ts44, [], TIME_SIGNATURES);
-            const info4 = getStepInfo(4, ts44, [], TIME_SIGNATURES);
-
-            expect(info0.isBeatStart).toBe(true);
-            expect(info0.isOffbeat).toBe(false);
-
-            expect(info2.isBeatStart).toBe(false);
-            expect(info2.isOffbeat).toBe(true);
-
-            expect(info4.isBeatStart).toBe(true);
-            expect(info4.isOffbeat).toBe(false);
-        });
-
-        it('should identify e and a of the beat in 4/4', () => {
-            const info1 = getStepInfo(1, ts44, [], TIME_SIGNATURES);
-            const info3 = getStepInfo(3, ts44, [], TIME_SIGNATURES);
-
-            expect(info1.isEOfBeat).toBe(true);
-            expect(info3.isAOfBeat).toBe(true);
-        });
-
-        it('should identify backbeats in 4/4', () => {
-            const info4 = getStepInfo(4, ts44, [], TIME_SIGNATURES); // Beat 2
-            const info12 = getStepInfo(12, ts44, [], TIME_SIGNATURES); // Beat 4
-            expect(info4.isBackbeat).toBe(true);
-            expect(info12.isBackbeat).toBe(true);
-        });
-    });
-
-    // BPM is quarter-notes/min for every meter (DAW/MIDI convention). Lock in:
-    //   - secondsPerStepFor(bpm) = (60/bpm)/4 — one 16th — in ALL meters.
-    describe('secondsPerStepFor (quarter-note BPM)', () => {
-        const bpm = 120;
-        const FLOAT_TOL = 1e-9;
-
-        it('step duration is one 16th = (60/bpm)/4 regardless of meter', () => {
-            // Step duration no longer depends on time signature at all.
-            expect(secondsPerStepFor(bpm)).toBeCloseTo(60 / bpm / 4, 12);
-        });
-
-        it('matches the All-Blues 6/8 felt pulse: ~0.667s per dotted-quarter at bpm=90', () => {
-            // The All Blues preset is now bpm=90 (quarter-notes/min). The felt
-            // dotted-quarter pulse = 6 steps (= 6 sixteenths = 1.5 quarters).
-            const stepSec = secondsPerStepFor(90);
-            const pulseSec = stepSec * 6;
-            expect(pulseSec).toBeCloseTo(1.5 * (60 / 90), 6); // = 1.0s
-            expect(pulseSec).toBeCloseTo(1.0, 6);
-        });
-
-        it('keeps 4/4 step duration identical to the canonical formula', () => {
-            // why: regression guard — 4/4 critique tests rely on 0.25 * (60/bpm).
-            const oldFormula = 0.25 * (60 / bpm);
-            expect(secondsPerStepFor(bpm)).toBeCloseTo(oldFormula, FLOAT_TOL);
-        });
-
-        it('keeps the bar shape: total bar duration = stepsPerBar × stepSec', () => {
-            // Under quarter-note BPM a step is (60/bpm)/4 in every meter, so a
-            // bar's clock length = (16ths per bar) × that.
-            // 4/4 (16 steps) = 4 quarters
-            expect(16 * secondsPerStepFor(bpm)).toBeCloseTo(4 * (60 / bpm), 9);
-            // 6/8 (12 steps) = 3 quarters of clock time (= 2 dotted-quarters)
-            expect(12 * secondsPerStepFor(bpm)).toBeCloseTo(3 * (60 / bpm), 9);
-            // 12/8 (24 steps) = 6 quarters (= 4 dotted-quarters)
-            expect(24 * secondsPerStepFor(bpm)).toBeCloseTo(6 * (60 / bpm), 9);
-            // 3/4 (12 steps) = 3 quarters
-            expect(12 * secondsPerStepFor(bpm)).toBeCloseTo(3 * (60 / bpm), 9);
-            // 7/8 (14 steps) = 3.5 quarters (7 eighths)
-            expect(14 * secondsPerStepFor(bpm)).toBeCloseTo(3.5 * (60 / bpm), 9);
-        });
-    });
     describe('normalizeKey', () => {
         it('should normalize C# to its enharmonic equivalent Db for consistent internal key representation', () => {
             expect(normalizeKey('C#')).toBe('Db');

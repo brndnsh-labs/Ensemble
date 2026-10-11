@@ -37,7 +37,6 @@ export function resetAllStateForTest(): void {
     p.masterVolume = 0.4;
 
     const a = arranger as Mutable<ArrangerState>;
-    a.scorePlan = null;
     a.sections = [{ id: 's1', label: 'Intro', value: 'I | V | vi | IV', repeat: 1 }];
     a.key = 'C';
     a.timeSignature = '4/4';

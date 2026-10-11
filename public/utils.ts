@@ -1,14 +1,12 @@
 import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
-import type { StepInfo } from './types.js';
 
 /**
  * utils.ts — shared musical/math primitives, DOM- and Web-Audio-free so the
  * logic worker can import it freely.
  *
  * What belongs here: pitch/frequency conversion (`getFrequency`, `getMidi`)
- * and the step/meter timing core
- * (`getStepInfo`, `secondsPerStepFor`, `getStepsPerMeasure`, `binarySearchMap`,
- * `normalizeKey`) — the things every lane's generator needs.
+ * and the step-map lookup (`binarySearchMap`, `normalizeKey`) — the things every
+ * lane's generator needs.
  *
  * What does NOT belong here (#1179 split): seeded RNG/hashing lives in
  * `engine/hash-utils.ts`; share-URL and preset encoding lives in
@@ -102,49 +100,8 @@ export function getMidi(freq: number): number | null {
 }
 
 /**
- * Returns the duration, in seconds, of one internal step (always a 16th)
- * given the displayed BPM.
- *
- * BPM is quarter-notes/min for every meter (DAW/MIDI convention), and an
- * internal step is a 16th in all meters, so a step is always one quarter of
- * a beat: `stepSec = (60/bpm) / 4`. This holds for compound meters too — a
- * 6/8 bar is 12 sixteenths = 3 quarters' worth of clock time.
- */
-export function secondsPerStepFor(bpm: number): number {
-    return 60.0 / bpm / 4;
-}
-
-/**
- * Calculates the number of 16th-note (or equivalent) steps per measure for a given time signature.
- */
-export function getStepsPerMeasure(ts: string): number {
-    if (ts === '2/4') {
-        return 8;
-    }
-    if (ts === '3/4') {
-        return 12;
-    }
-    if (ts === '6/8') {
-        return 12;
-    }
-    if (ts === '7/8') {
-        return 14;
-    }
-    if (ts === '5/4') {
-        return 20;
-    }
-    if (ts === '7/4') {
-        return 28;
-    }
-    if (ts === '12/8') {
-        return 24;
-    }
-    return 16;
-}
-
-/**
  * Optimized binary search for arrays containing objects with `start` and `end` properties.
- * Useful for fast O(log N) lookups in `arranger.stepMap`, `sectionMap`, and `measureMap`.
+ * Useful for fast O(log N) lookups in `arranger.stepMap` and `sectionMap`.
  */
 function binarySearchMapIndex(
     mapArray: Array<{ start: number; end: number }>,
@@ -176,170 +133,6 @@ export function binarySearchMap<T extends { start: number; end: number }>(
 ): T | null {
     const index = binarySearchMapIndex(mapArray, step);
     return index !== -1 ? mapArray[index] : null;
-}
-
-/**
- * Returns detailed structural information about a specific step in a measure.
- */
-export function getStepInfo(
-    step: number,
-    tsConfig: any,
-    measureMap?: any[],
-    allTSConfigs?: any,
-): StepInfo {
-    let currentTS = typeof tsConfig === 'object' ? tsConfig : null;
-    const allTS = allTSConfigs || {};
-
-    if (typeof tsConfig === 'string') {
-        currentTS = allTS[tsConfig] || allTS['4/4'];
-    } else if (currentTS && !currentTS.beats && currentTS.tsName) {
-        currentTS = allTS[currentTS.tsName] || allTS['4/4'];
-    }
-
-    if (!currentTS) {
-        currentTS = allTS['4/4'] || { beats: 4, stepsPerBeat: 4, grouping: [4], backbeat: [1, 3] };
-    }
-
-    if (!currentTS.grouping) {
-        currentTS.grouping = [currentTS.beats];
-    }
-    if (!currentTS.backbeat) {
-        currentTS.backbeat = currentTS.beats === 4 ? [1, 3] : [1];
-    }
-
-    let tsName =
-        currentTS.tsName ||
-        (typeof tsConfig === 'string'
-            ? tsConfig
-            : `${currentTS.beats}/${currentTS.stepsPerBeat === 4 ? 4 : 8}`);
-    let mStep = step;
-    let isMeasureStart = false;
-
-    if (measureMap && measureMap.length > 0) {
-        // Binary search for O(log N) lookup instead of O(N) find
-        const measure = binarySearchMap(measureMap, step);
-
-        if (measure) {
-            tsName = measure.ts || tsName;
-            currentTS = allTSConfigs?.[tsName]
-                ? allTSConfigs[tsName]
-                : typeof tsConfig === 'object'
-                  ? tsConfig
-                  : currentTS;
-            if (!currentTS) {
-                currentTS = allTSConfigs?.['4/4']
-                    ? allTSConfigs['4/4']
-                    : { beats: 4, stepsPerBeat: 4 };
-            }
-            // Semantic playback compiles the resolved meter/grouping once per bar.
-            // All threads consume that same derived config, with no per-tick allocation
-            // or change to legacy maps (which have no config field).
-            currentTS = measure.config ?? currentTS;
-            mStep = step - measure.start;
-            if (mStep === 0) {
-                isMeasureStart = true;
-            }
-        } else {
-            // Fallback for steps beyond the map
-            const spm = getStepsPerMeasure(tsName);
-            mStep = ((step % spm) + spm) % spm;
-            isMeasureStart = mStep === 0;
-        }
-    } else {
-        const spm = getStepsPerMeasure(tsName);
-        mStep = ((step % spm) + spm) % spm;
-        isMeasureStart = mStep === 0;
-    }
-
-    if (!currentTS) {
-        currentTS = allTSConfigs?.['4/4'] ? allTSConfigs['4/4'] : { beats: 4, stepsPerBeat: 4 };
-    }
-    const grouping = currentTS.grouping || [currentTS.beats];
-    const stepsPerBeat = currentTS.stepsPerBeat;
-
-    let accumulatedSteps = 0;
-    let isGroupStart = false;
-    let groupIndex = -1;
-    let stepInGroup = -1;
-
-    for (let i = 0; i < grouping.length; i++) {
-        const groupBeats = grouping[i];
-        const groupSteps = groupBeats * stepsPerBeat;
-
-        if (mStep >= accumulatedSteps && mStep < accumulatedSteps + groupSteps) {
-            groupIndex = i;
-            stepInGroup = mStep - accumulatedSteps;
-            if (stepInGroup === 0) {
-                isGroupStart = true;
-            }
-            break;
-        }
-        accumulatedSteps += groupSteps;
-    }
-
-    const isBeatStart = mStep % stepsPerBeat === 0;
-    const beatIndex = Math.floor(mStep / stepsPerBeat);
-    const isCompound = !!currentTS.isCompound;
-
-    let isBackbeat = false;
-    const backbeatArray = currentTS.backbeat || [];
-    if (isCompound) {
-        if (isGroupStart && backbeatArray.includes(groupIndex)) {
-            isBackbeat = true;
-        }
-    } else {
-        if (isBeatStart && backbeatArray.includes(beatIndex)) {
-            isBackbeat = true;
-        }
-    }
-
-    // Semantic Timing Flags
-    const stepInBeat = ((mStep % stepsPerBeat) + stepsPerBeat) % stepsPerBeat;
-    // why: midpoint of a beat — works for any stepsPerBeat value (floor(4/2)=2 for 16th-grid,
-    // floor(2/2)=1 for 8th-grid, floor(3/2)=1 for any future triplet-grid, etc.)
-    // Previously hard-coded `stepsPerBeat === 4 ? stepInBeat === 2 : stepInBeat === 1` which
-    // silently mislabels offbeats for any stepsPerBeat other than 2 or 4.
-    const isOffbeat = stepInBeat === Math.floor(stepsPerBeat / 2); // 8th note offbeat
-    // why: epic-1-compound-meter S2 — "every eighth-note boundary" flag. An eighth
-    // note is half a beat, so a step is an eighth boundary iff its position is an
-    // integer multiple of half a beat: `(2 * mStep) % stepsPerBeat === 0`. This is
-    // correct for every grid:
-    //   16th grid (spb=4) → mStep % 2 === 0 (every other step);
-    //   8th grid (spb=2: 6/8, 7/8, 12/8) → always true (each step IS an eighth);
-    //   triplet grid (spb=3) → only beat-starts (mStep 0,3,6…), since triplet
-    //     partials don't land on eighth boundaries.
-    // epic-1-compound-meter S2 follow-up (2026-05-28): generalized from the old
-    // `stepsPerBeat >= 4 ? mStep % 2 === 0 : true`, which silently mislabelled
-    // every step of a triplet grid as an eighth boundary. Behavior is byte-
-    // identical for the shipped meters (spb 2 and 4); the change only fixes the
-    // hypothetical triplet-grid case (locked in by meter-integrity.test.ts).
-    const isEighthBoundary = (2 * mStep) % stepsPerBeat === 0;
-    const isEOfBeat = stepsPerBeat === 4 && stepInBeat === 1;
-    const isAOfBeat = stepsPerBeat === 4 && stepInBeat === 3;
-
-    const isPulse = currentTS.pulse ? currentTS.pulse.includes(mStep) : isBeatStart;
-    const isPulseStart = isGroupStart;
-
-    return {
-        isMeasureStart,
-        isDownbeat: isMeasureStart,
-        isGroupStart,
-        isBeatStart,
-        isPulse,
-        isPulseStart,
-        isBackbeat,
-        isOffbeat,
-        isEighthBoundary,
-        isEOfBeat,
-        isAOfBeat,
-        isCompound,
-        groupIndex,
-        stepInGroup,
-        beatIndex,
-        mStep,
-        tsName,
-        tsConfig: currentTS,
-    };
 }
 
 // safeDisconnect / createSoftClipCurve / clampFreq live in

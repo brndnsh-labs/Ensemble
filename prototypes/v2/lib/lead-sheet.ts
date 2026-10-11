@@ -1,9 +1,5 @@
-import type {
-    LeadSheetMeasure,
-    LeadSheetSectionBlock,
-} from '../../../public/song/lead-sheet-model';
 import type { SemanticScore } from '../../../public/songbook/score-types';
-import type { ArrangerState, FormattedChordNames } from '../../../public/types';
+import type { FormattedChordNames } from '../../../public/types';
 
 /**
  * What the chart sheet draws for one written event. The old engine's `LeadSheetChord` satisfies
@@ -40,61 +36,6 @@ export interface ChartBlock {
     id?: string;
     label?: string;
     measures: ChartMeasure[];
-}
-
-/** Written order stays stable; chord lengths/voicings come from the exact performed map. */
-export function scoreLeadSheet(
-    arranger: ArrangerState,
-    score: SemanticScore,
-    written?: ArrangerState,
-): LeadSheetSectionBlock[] {
-    const unplayed = written
-        ? new Map(
-              scoreLeadSheet(written, score)
-                  .flatMap((block) => block.measures)
-                  .map((measure) => [
-                      measure.chords[0]?.measureId,
-                      {
-                          ...measure,
-                          chords: measure.chords.map((chord) => ({
-                              ...chord,
-                              globalIndex: -1 - chord.globalIndex,
-                          })),
-                      },
-                  ]),
-          )
-        : new Map<string, LeadSheetMeasure>();
-    let eventIndex = 0;
-    const firstVisits = new Map<string, LeadSheetMeasure>();
-    for (const measure of arranger.measureMap) {
-        const first = arranger.stepMap[eventIndex]?.chord;
-        const chords = [];
-        while (
-            eventIndex < arranger.stepMap.length &&
-            arranger.stepMap[eventIndex].start < measure.end
-        ) {
-            const event = arranger.stepMap[eventIndex];
-            if (first?.measureId && !firstVisits.has(first.measureId)) {
-                chords.push({
-                    ...event.chord,
-                    start: event.start,
-                    end: event.end,
-                    globalIndex: eventIndex,
-                });
-            }
-            eventIndex++;
-        }
-        if (first?.measureId && !firstVisits.has(first.measureId)) {
-            firstVisits.set(first.measureId, {
-                chords,
-                sectionId: first.sectionId,
-                sectionLabel: first.sectionLabel,
-                startsSection: false,
-                isSeamlessStart: false,
-            });
-        }
-    }
-    return writtenBlocks(score, (id) => firstVisits.get(id) ?? unplayed.get(id));
 }
 
 /**
@@ -153,31 +94,4 @@ export function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> 
         }
     }
     return map;
-}
-
-/** Map every performed event to the first visit of its written bar/event slot. */
-export function scoreDisplayIndices(arranger: ArrangerState): number[] {
-    const firstVisits = new Map<string, number>();
-    let barStart = 0;
-    let previousId: string | undefined;
-    let measureIndex = 0;
-    return arranger.stepMap.map((event, index) => {
-        while (
-            measureIndex + 1 < arranger.measureMap.length &&
-            event.start >= arranger.measureMap[measureIndex].end
-        ) {
-            measureIndex++;
-            previousId = undefined;
-        }
-        const id = event.chord.measureId;
-        if (id !== previousId) {
-            previousId = id;
-            barStart = index;
-        }
-        const key = `${id}:${index - barStart}`;
-        if (!firstVisits.has(key)) {
-            firstVisits.set(key, index);
-        }
-        return firstVisits.get(key)!;
-    });
 }

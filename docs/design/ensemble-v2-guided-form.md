@@ -19,7 +19,7 @@ pass assignments remain under **Advanced · per-bar repeat and ending markers**.
 Before Apply, the guide labels the written repeat boundaries and ending brackets and displays
 the whole-chart itinerary from `compileScoreForm`. A four-bar study reads
 `1–2–3 → 1–2–4`. Section repeats and navigation participate in this same compiler-derived
-route. `prepareScorePlayback` also checks supported chord, duration and reference semantics
+route. `validateSemanticScore` and `compileScoreForm` also check chord, duration and reference semantics
 before Apply becomes available. Errors stay beside the selected ranges.
 
 Each recognized group offers Edit to change its ranges/count or preview removing its form

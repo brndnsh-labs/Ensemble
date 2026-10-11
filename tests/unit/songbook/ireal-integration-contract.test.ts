@@ -1,23 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { describe, expect, it, vi } from 'vitest';
-import { scoreDisplayIndices, scoreLeadSheet } from '../../../prototypes/v2/lib/lead-sheet.js';
-import {
-    registerScorePlaybackRenderer,
-    validateProgression,
-} from '../../../public/engine/chords-engine.js';
-import { cloneStateForDetachedGeneration } from '../../../public/export/detached-generation-state.js';
+import { describe, expect, it } from 'vitest';
 import { parseIRealImport } from '../../../public/songbook/ireal-import.js';
-import {
-    prepareScorePlayback,
-    renderScorePlayback,
-    scoreArrangement,
-} from '../../../public/songbook/score-playback.js';
+import { compileScoreForm } from '../../../public/songbook/score-form.js';
+import { resolveScoreMeasureEvents } from '../../../public/songbook/score-measure-events.js';
 import { parseChordBar } from '../../../public/songbook/score-text.js';
 import type { ScoreMeasure, SemanticScore } from '../../../public/songbook/score-types.js';
-import { buildArrangerSyncPayload, getState } from '../../../public/state.js';
-import { ACTIONS } from '../../../public/types.js';
-
-registerScorePlaybackRenderer(renderScorePlayback);
 
 function bar(id: string, text: string, context: Partial<ScoreMeasure> = {}): ScoreMeasure {
     const parsed = parseChordBar(text, context.meter ?? '4/4');
@@ -38,16 +25,26 @@ function score(measures: ScoreMeasure[]): SemanticScore {
     };
 }
 
-function render(candidate: SemanticScore) {
+/**
+ * The performed order of a score: each visit's written bar id and its events, from the form
+ * compiler and the measure-event resolver (a measure repeat resolves to its destination's
+ * events). It is the global order the band performs, never regrouped by section.
+ */
+function performed(candidate: SemanticScore) {
     const untouched = structuredClone(candidate);
-    const state = cloneStateForDetachedGeneration(getState());
-    const scorePlan = prepareScorePlayback(candidate);
-    state.arranger = { ...state.arranger, ...scoreArrangement(candidate, scorePlan), scorePlan };
-    const notify = vi.fn();
-    validateProgression(state, notify);
-    expect(notify).toHaveBeenCalledExactlyOnceWith(ACTIONS.PROG_VALIDATED);
+    const events = resolveScoreMeasureEvents(candidate);
+    const visits = compileScoreForm(candidate).map(({ sectionIndex, measureIndex }) => ({
+        id: candidate.sections[sectionIndex].measures[measureIndex].id,
+        events: events[sectionIndex][measureIndex],
+    }));
     expect(candidate).toEqual(untouched);
-    return state;
+    return {
+        ids: visits.map((visit) => visit.id),
+        symbols: visits.map((visit) =>
+            visit.events.flatMap((event) => (event.kind === 'chord' ? [event.symbol] : [])),
+        ),
+        events: visits.map((visit) => visit.events),
+    };
 }
 
 function openProtocol(body: string, title = 'Original import study') {
@@ -69,7 +66,7 @@ function importedScore(source: string): SemanticScore {
     return candidate;
 }
 
-describe('iReal integration contracts: source to the production playback adapter', () => {
+describe('iReal integration contracts: source to the performed order', () => {
     it('plays the sanitized modern blues without transposing or expanding its written repeats', () => {
         // This is the checked-in sanitized derivative, never the private original HTML.
         const fixture = JSON.parse(
@@ -97,75 +94,49 @@ describe('iReal integration contracts: source to the production playback adapter
             'events',
             'events',
         ]);
-        const state = render(candidate);
-        expect(state.arranger.progression.map((chord) => chord.absName)).toEqual([
-            'C7',
-            'F7',
-            'C7',
-            'C7',
-            'F7',
-            'F7',
-            'C7',
-            'C7',
-            'G7',
-            'F7',
-            'C7',
-            'G7',
+        const order = performed(candidate);
+        expect(order.symbols).toEqual([
+            ['C7'],
+            ['F7'],
+            ['C7'],
+            ['C7'],
+            ['F7'],
+            ['F7'],
+            ['C7'],
+            ['C7'],
+            ['G7'],
+            ['F7'],
+            ['C7'],
+            ['G7'],
         ]);
-        expect(state.arranger.progression.map((chord) => chord.measureId)).toEqual(
-            written.map((measure) => measure.id),
-        );
-        expect(state.arranger.totalSteps).toBe(192);
-        expect(
-            scoreLeadSheet(state.arranger, candidate).flatMap((block) => block.measures),
-        ).toHaveLength(12);
-        expect(scoreDisplayIndices(state.arranger)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]);
-        const sync = buildArrangerSyncPayload(state.arranger);
-        expect(sync.stepMap).toEqual(state.arranger.stepMap);
-        expect(sync).not.toHaveProperty('scorePlan');
-        expect(sync).not.toHaveProperty('score');
+        expect(order.ids).toEqual(written.map((measure) => measure.id));
     });
 
     it('retains explicit 2+1+1 cell spacing through imported score and actual chord timing', () => {
         // Original four-cell bar: C, an empty continuation cell, Dm, G7.
         const candidate = importedScore(openProtocol('T44[C ,Dm,G7|F   Z'));
-        const state = render(candidate);
-        expect(state.arranger.progression.map((chord) => chord.absName)).toEqual([
-            'C',
-            'Dm',
-            'G7',
-            'F',
+        const order = performed(candidate);
+        expect(order.symbols).toEqual([['C', 'Dm', 'G7'], ['F']]);
+        // Quarter notes: the 2+1+1 split of the first bar, then a whole-bar F.
+        expect(
+            order.events.map((events) =>
+                events.map((event) => (event.kind === 'chord' ? event.duration : null)),
+            ),
+        ).toEqual([
+            [
+                [2, 1],
+                [1, 1],
+                [1, 1],
+            ],
+            [[4, 1]],
         ]);
-        expect(state.arranger.stepMap.map(({ start, end }) => [start, end])).toEqual([
-            [0, 8],
-            [8, 12],
-            [12, 16],
-            [16, 32],
-        ]);
-        expect(state.arranger.measureMap.map(({ start, end, ts }) => [start, end, ts])).toEqual([
-            [0, 16, '4/4'],
-            [16, 32, '4/4'],
-        ]);
-        expect(state.arranger.totalSteps).toBe(32);
     });
 
-    it('carries a plain D.C. al Fine import through navigation and compact written highlighting', () => {
+    it('carries a plain D.C. al Fine import through navigation', () => {
         // Original three-bar exercise: play C, Dm, G7; return to C and stop after Dm.
         const candidate = importedScore(openProtocol('T44[C   |Dm   <Fine>|G7   <D.C. al Fine>Z'));
-        const state = render(candidate);
-        expect(state.arranger.progression.map((chord) => chord.absName)).toEqual([
-            'C',
-            'Dm',
-            'G7',
-            'C',
-            'Dm',
-        ]);
-        expect(state.arranger.totalSteps).toBe(80);
+        expect(performed(candidate).symbols).toEqual([['C'], ['Dm'], ['G7'], ['C'], ['Dm']]);
         expect(candidate.sections.flatMap((section) => section.measures)).toHaveLength(3);
-        expect(scoreDisplayIndices(state.arranger)).toEqual([0, 1, 2, 0, 1]);
-        expect(
-            scoreLeadSheet(state.arranger, candidate).flatMap((block) => block.measures),
-        ).toHaveLength(3);
     });
 
     it.each([
@@ -204,7 +175,7 @@ describe('iReal integration contracts: source to the production playback adapter
 });
 
 describe('iReal navigation integration contracts: performed order is never grouped by section', () => {
-    it('plays D.C. al Fine across sections with written meter/key restored on return', () => {
+    it('plays D.C. al Fine across sections, back through the first section', () => {
         const candidate = score([
             bar('a1', 'C'),
             bar('a2', 'I', { meter: '3/4', key: 'D', end: [{ kind: 'fine', label: 'finish' }] }),
@@ -228,46 +199,12 @@ describe('iReal navigation integration contracts: performed order is never group
                 }),
             ],
         });
-        const state = render(candidate);
-        expect(state.arranger.progression.map((chord) => chord.measureId)).toEqual([
-            'a1',
-            'a2',
-            'b1',
-            'b2',
-            'a1',
-            'a2',
-        ]);
-        expect(state.arranger.progression.map((chord) => chord.absName)).toEqual([
-            'C',
-            'D',
-            'E',
-            'Am',
-            'C',
-            'D',
-        ]);
-        expect(state.arranger.stepMap.map(({ start, end }) => [start, end])).toEqual([
-            [0, 16],
-            [16, 28],
-            [28, 44],
-            [44, 60],
-            [60, 76],
-            [76, 88],
-        ]);
-        expect(state.arranger.sectionMap).toEqual([
-            { id: 'a', label: 'A', start: 0, end: 28 },
-            { id: 'b', label: 'B', start: 28, end: 60 },
-            { id: 'a', label: 'A', start: 60, end: 88 },
-        ]);
-        expect(scoreDisplayIndices(state.arranger)).toEqual([0, 1, 2, 3, 0, 1]);
-        expect(
-            scoreLeadSheet(state.arranger, candidate).flatMap((block) =>
-                block.measures.map((measure) => measure.chords[0].measureId),
-            ),
-        ).toEqual(['a1', 'a2', 'b1', 'b2']);
-        expect(state.arranger.totalSteps).toBe(88);
+        const order = performed(candidate);
+        expect(order.ids).toEqual(['a1', 'a2', 'b1', 'b2', 'a1', 'a2']);
+        expect(order.symbols).toEqual([['C'], ['I'], ['I'], ['Am'], ['C'], ['I']]);
     });
 
-    it('activates To Coda only after D.S. and maps the second visit to the original written bars', () => {
+    it('activates To Coda only after D.S. and revisits the original written bars', () => {
         const candidate = score([
             bar('a1', 'C'),
             bar('a2', 'Dm', { start: [{ kind: 'segno', label: 'return' }] }),
@@ -301,43 +238,9 @@ describe('iReal navigation integration contracts: performed order is never group
                 bar('c2', 'G7'),
             ],
         });
-        const state = render(candidate);
-        expect(state.arranger.progression.map((chord) => chord.measureId)).toEqual([
-            'a1',
-            'a2',
-            'a3',
-            'b1',
-            'b2',
-            'a2',
-            'a3',
-            'c1',
-            'c2',
-        ]);
-        expect(state.arranger.progression.map((chord) => chord.absName)).toEqual([
-            'C',
-            'Dm',
-            'E7',
-            'F',
-            'G',
-            'Dm',
-            'E7',
-            'Am',
-            'G7',
-        ]);
-        expect(state.arranger.sectionMap).toEqual([
-            { id: 'a', label: 'A', start: 0, end: 48 },
-            { id: 'b', label: 'B', start: 48, end: 80 },
-            { id: 'a', label: 'A', start: 80, end: 112 },
-            { id: 'c', label: 'Coda', start: 112, end: 144 },
-        ]);
-        expect(scoreDisplayIndices(state.arranger)).toEqual([0, 1, 2, 3, 4, 1, 2, 7, 8]);
-        expect(
-            scoreLeadSheet(state.arranger, candidate).flatMap((block) => block.measures),
-        ).toHaveLength(7);
-        const detached = cloneStateForDetachedGeneration(state);
-        validateProgression(detached);
-        expect(detached.arranger.stepMap).toEqual(state.arranger.stepMap);
-        expect(state.arranger.totalSteps).toBe(144);
+        const order = performed(candidate);
+        expect(order.ids).toEqual(['a1', 'a2', 'a3', 'b1', 'b2', 'a2', 'a3', 'c1', 'c2']);
+        expect(order.symbols.flat()).toEqual(['C', 'Dm', 'E7', 'F', 'G', 'Dm', 'E7', 'Am', 'G7']);
     });
 
     it('resolves chained one/two-bar repeats while preserving each destination identity', () => {
@@ -351,50 +254,16 @@ describe('iReal navigation integration contracts: performed order is never group
             { id: 'a4', content: { kind: 'repeat', measureId: 'a2', display: 'two-bar-end' } },
             { id: 'a5', content: { kind: 'repeat', measureId: 'a3', display: 'one-bar' } },
         ]);
-        const state = render(candidate);
-        expect(state.arranger.progression.map((chord) => chord.absName)).toEqual([
-            'C',
-            'G',
-            'F',
-            'Am',
-            'C',
-            'G',
-            'F',
-            'Am',
-            'C',
-            'G',
-            'F',
-        ]);
-        expect(state.arranger.progression.map((chord) => chord.measureId)).toEqual([
-            'a1',
-            'a1',
-            'a1',
-            'a2',
-            'a3',
-            'a3',
-            'a3',
-            'a4',
-            'a5',
-            'a5',
-            'a5',
-        ]);
-        expect(state.arranger.stepMap.map(({ start, end }) => [start, end])).toEqual([
-            [0, 8],
-            [8, 12],
-            [12, 16],
-            [16, 32],
-            [32, 40],
-            [40, 44],
-            [44, 48],
-            [48, 64],
-            [64, 72],
-            [72, 76],
-            [76, 80],
-        ]);
-        expect(
-            scoreLeadSheet(state.arranger, candidate).flatMap((block) => block.measures),
-        ).toHaveLength(5);
-        expect(scoreDisplayIndices(state.arranger)).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+        const order = performed(candidate);
+        expect(order.ids).toEqual(['a1', 'a2', 'a3', 'a4', 'a5']);
+        // Every repeat resolves to its destination's events, however long the chain.
+        const oneTwoFour = [
+            { kind: 'chord', symbol: 'I', duration: [2, 1] },
+            { kind: 'chord', symbol: 'V', duration: [1, 1] },
+            { kind: 'chord', symbol: 'IV', duration: [1, 1] },
+        ];
+        const am = [{ kind: 'chord', symbol: 'Am', duration: [4, 1] }];
+        expect(order.events).toEqual([oneTwoFour, am, oneTwoFour, am, oneTwoFour]);
         expect(candidate.sections[0].measures[2].content).toEqual({
             kind: 'repeat',
             measureId: 'a1',
@@ -414,15 +283,12 @@ describe('iReal navigation integration contracts: performed order is never group
                 },
             ]);
             const untouched = structuredClone(candidate);
-            expect(() => prepareScorePlayback(candidate)).toThrow();
+            expect(() => resolveScoreMeasureEvents(candidate)).toThrow();
             expect(candidate).toEqual(untouched);
         },
     );
 
-    it('rejects an unreachable navigation goal before replacing prepared music', () => {
-        const playable = score([bar('a1', 'C'), bar('a2', 'G7')]);
-        const state = render(playable);
-        const before = structuredClone(state.arranger);
+    it('rejects an unreachable navigation goal', () => {
         const invalid = score([
             bar('intro', 'C', { end: [{ kind: 'fine', label: 'before-segno' }] }),
             bar('return', 'Dm', { start: [{ kind: 'segno', label: 'segno' }] }),
@@ -438,7 +304,6 @@ describe('iReal navigation integration contracts: performed order is never group
                 ],
             }),
         ]);
-        expect(() => prepareScorePlayback(invalid)).toThrow();
-        expect(state.arranger).toEqual(before);
+        expect(() => compileScoreForm(invalid)).toThrow();
     });
 });

@@ -6,7 +6,6 @@ import { ACTIONS } from '../types.js';
 export type { ArrangerState, Section };
 
 export const arranger = deepSignal<ArrangerState>({
-    scorePlan: null,
     sections: [{ id: 's1', label: 'Intro', value: 'I | V | vi | IV', repeat: 1 }],
     progression: [],
     key: 'C',
@@ -16,7 +15,6 @@ export const arranger = deepSignal<ArrangerState>({
     notation: 'roman',
     totalSteps: 0,
     stepMap: [],
-    measureMap: [],
     sectionMap: [],
     seed: '',
     randomizeSeed: true,

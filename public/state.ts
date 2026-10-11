@@ -3,7 +3,7 @@ import { groove, grooveReducer } from './state/groove.js';
 import { bass, chords, instrumentReducer, soloist } from './state/instruments.js';
 // Import Modular State Slices
 import { playback, playbackReducer } from './state/playback.js';
-import type { Action, ActionPayloadMap, ArrangerState, Dispatch, EnsembleState } from './types.js';
+import type { Action, ActionPayloadMap, Dispatch, EnsembleState } from './types.js';
 
 export const stateMap: EnsembleState = {
     playback,
@@ -21,25 +21,6 @@ export const stateMap: EnsembleState = {
  */
 export function getState(): EnsembleState {
     return stateMap;
-}
-
-// The arranger's wire snapshot, as the old engine's worker received it. No app caller is
-// left (#1404); the score-plan tests still read it, and it goes with the old score plan.
-
-export function buildArrangerSyncPayload(arranger: ArrangerState) {
-    return {
-        progression: arranger.progression,
-        stepMap: arranger.stepMap,
-        sectionMap: arranger.sectionMap,
-        totalSteps: arranger.totalSteps,
-        key: arranger.key,
-        isMinor: arranger.isMinor,
-        timeSignature: arranger.timeSignature,
-        grouping: arranger.grouping,
-        sections: arranger.sections,
-        measureMap: arranger.measureMap,
-        seed: arranger.seed,
-    };
 }
 
 // --- Event Bus / State Manager ---

@@ -10,7 +10,7 @@ import {
     parseIRealImport,
     parseIRealImportInSteps,
 } from '../../../public/songbook/ireal-import.js';
-import { prepareScorePlayback } from '../../../public/songbook/score-playback.js';
+import { compileScoreForm } from '../../../public/songbook/score-form.js';
 
 function open(body: string, title = 'Original fixture', key = 'C'): string {
     return `irealbook://${encodeURIComponent([title, 'Ensemble', 'Swing', key, 'n', body].join('='))}`;
@@ -109,14 +109,19 @@ describe('bounded source-preserving iReal import', () => {
         ['Csus', 'Csus4'],
         ['C2', 'Csus2'],
     ])(
-        'maps equivalent iReal shorthand %s into playable %s without dropping extensions',
+        'maps equivalent iReal shorthand %s into %s without dropping extensions',
         (written, canonical) => {
             const source = open(`T44[${written}   Z`);
             const parsed = parseIRealImport(source);
             expect(parsed.source).toBe(source);
             expect(parsed.songs[0].score).toBeDefined();
-            const plan = prepareScorePlayback(parsed.songs[0].score);
-            expect(plan.sections[0].measures[0].symbols).toEqual([canonical]);
+            const content = parsed.songs[0].score!.sections[0].measures[0].content;
+            expect(content.kind).toBe('events');
+            expect(
+                content.kind === 'events'
+                    ? content.events.map((event) => ('symbol' in event ? event.symbol : null))
+                    : [],
+            ).toEqual([canonical]);
         },
     );
 
@@ -702,7 +707,7 @@ describe('bounded source-preserving iReal import', () => {
                 'The stored key is used. iReal style is preserved as text, not applied as an Ensemble genre.',
             ]);
             const order = (choruses?: number) =>
-                prepareScorePlayback({ ...result, ...(choruses ? { choruses } : {}) }).visits.map(
+                compileScoreForm({ ...result, ...(choruses ? { choruses } : {}) }).map(
                     ({ chorus, measureIndex }) => `${chorus}:${measureIndex + 1}`,
                 );
             // Uncounted, the coda is never reached; counted, only the last chorus takes it.
@@ -729,7 +734,7 @@ describe('bounded source-preserving iReal import', () => {
                 'The stored key is used. iReal style is preserved as text, not applied as an Ensemble genre.',
             ]);
             const order = (choruses?: number) =>
-                prepareScorePlayback({ ...result, ...(choruses ? { choruses } : {}) }).visits.map(
+                compileScoreForm({ ...result, ...(choruses ? { choruses } : {}) }).map(
                     ({ chorus, measureIndex }) => `${chorus}:${measureIndex + 1}`,
                 );
             expect(order()).toEqual(['0:1', '0:2']);
@@ -867,11 +872,9 @@ describe('bounded source-preserving iReal import', () => {
         const parsed = parseIRealImport(open(body));
         const song = parsed.songs[0];
         expect(song.diagnostics.filter((entry) => entry.severity === 'error')).toEqual([]);
-        const plan = prepareScorePlayback(song.score);
+        const visits = compileScoreForm(song.score);
         // C F | C G | E7 A7 | D.C.: C G, Fine.
-        expect(plan.visits.map(({ measureIndex }) => measureIndex)).toEqual([
-            0, 1, 0, 2, 3, 4, 0, 2,
-        ]);
+        expect(visits.map(({ measureIndex }) => measureIndex)).toEqual([0, 1, 0, 2, 3, 4, 0, 2]);
     });
 
     it.each([

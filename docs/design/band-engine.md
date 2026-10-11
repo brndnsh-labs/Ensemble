@@ -15,7 +15,7 @@ Their document fields are kept as written. Live MIDI out was not a cutover item,
 
 The old engine grew around a one-sixteenth-at-a-time generator split across the main thread
 and a worker. v2's semantic score outgrew it: holds, N.C., fermatas, alternates and off-grid
-durations are rejected by `prepareScorePlayback` because the engine can't express them. The
+durations were rejected by the old engine's score playback (since deleted) because that engine couldn't express them. The
 same generation ran three times (live, `.mid`, WAV), the conductor existed twice, and drums were
 generated twice. Rather than keep patching, v0 rebuilds the rhythm section from the ground up and
 ports the old engine's *lessons*, not its code.
@@ -468,11 +468,10 @@ the song once through with its ending, a lead track only when the lead played.
 **The chart sheet** draws a score from the score and its timeline (`prototypes/v2/lib/band-chart.ts`),
 not from the old engine's plan, so any chart the timeline compiles opens, edits and plays:
 holds show as `/`, N.C. as `N.C.`, a fermata sits over its chord, and off-grid lengths keep
-their exact widths. The old engine is given no plan for such a score, so its `arranger` maps
+their exact widths. The old engine builds nothing from such a score, so its `arranger` maps
 derive empty and its worker idles. Every path that lets a chart onto the stand (open, edit,
 import, the guided form) asks `checkPlayable` in `lib/engine-mode.ts`: on the band engine
-that is `validateSemanticScore` plus `compileTimeline`, and on the old engine it is still
-`prepareScorePlayback`. A measure-less (v1) chart is still drawn from the old maps. On the
+that is `validateSemanticScore` plus `compileTimeline`. A measure-less (v1) chart is still drawn from the old maps. On the
 band engine the measure editor can put a fermata on (or take it off) a bar's last event: the flag is
 editor state carried across the bar's text round-trip, never encoded in chord text.
 
