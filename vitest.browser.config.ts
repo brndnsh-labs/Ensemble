@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
+import { SYNC_FILES } from './vitest.sync.config.js';
 
 // Browser-mode Vitest — for the handful of engine tests that need a REAL Web
 // Audio graph (`OfflineAudioContext`), which happy-dom/jsdom don't implement.
@@ -18,15 +19,17 @@ export default defineConfig({
     // static-assets dir and emit "served at the root path" noise for every
     // engine module. We serve no static assets here, so disable it.
     publicDir: false,
-    // The glob below also picks up the account-storage tests `vitest.sync.config.ts` lists, so
-    // this config needs what they need: the preview's engine alias and Next's inlined base path
-    // (see that config).
+    // A browser test that reaches the preview's modules needs its engine alias and Next's inlined
+    // base path (see `vitest.sync.config.ts`).
     resolve: {
         alias: { '@engine': fileURLToPath(new URL('./public', import.meta.url)) },
     },
     define: { 'process.env.NEXT_PUBLIC_BASE_PATH': JSON.stringify('/v2') },
     test: {
         include: ['tests/browser/**/*.test.ts'],
+        // `npm run test:sync` runs these in Chromium and WebKit; here they would run in Chromium a
+        // second time in the same CI job.
+        exclude: SYNC_FILES,
         browser: {
             enabled: true,
             provider: playwright(),

@@ -1,6 +1,5 @@
 /**
- * #1472: a chart's chorus count and its last-chorus coda in the score form. The before/after
- * proof that an uncounted chart is unchanged lives in `score-form-differential.test.ts`.
+ * #1472: a chart's chorus count and its last-chorus coda in the score form.
  */
 import { describe, expect, it } from 'vitest';
 import { compileTimeline } from '../../../band/form/timeline.js';
@@ -139,7 +138,7 @@ describe('chorus count (#1472)', () => {
         expect(() => compileScoreForm(form(257))).toThrow(
             'This chart expands beyond the playback limit of 16,384 measures. Reduce repeats or choruses.',
         );
-        // An uncounted chart's message is the one it always had (the differential compares it).
+        // An uncounted chart's message is the one it always had.
         const { choruses: _, ...uncounted } = form(257);
         uncounted.sections[0].measures[0].start = [{ kind: 'repeat-start' }];
         uncounted.sections[0].measures[256].end = [{ kind: 'repeat-end', times: 64 }];
