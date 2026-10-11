@@ -22,6 +22,7 @@ import { UKULELE_LOW_G } from './instruments';
 import { keyRoot } from './test/keys';
 import { QUALITIES } from './theory';
 import type { Quality } from './types';
+import { allowedShapes, buildAt, rootFrets } from './voicing';
 
 const tab = (inst: InstrumentDef, v: Voicing) => {
     const m = new Map(v.notes.map((n) => [n.string, n.fret]));
@@ -186,6 +187,187 @@ describe('grips', () => {
     it('fingers follow standard teaching (R–3–7: 2-1-3)', () => {
         const v = build(GUITAR, shape(GUITAR, '6B'), R('G'), 'maj7')!;
         expect(v.notes.map((n) => n.finger)).toEqual([2, 1, 3]);
+    });
+});
+
+describe('the tone that names the chord (#1606)', () => {
+    /** The two shells whose 5th is the point: an m7♭5 without it is an m7, a °7 without it a m6. */
+    const NAMED_BY_FIVE: Quality[] = ['m7b5', 'dim7'];
+    const SETUPS: [InstrumentDef, number[] | undefined][] = [
+        [GUITAR, undefined],
+        [GUITAR, [6, 5]],
+        [UKULELE, undefined],
+    ];
+    const degrees = (v: Voicing) => v.notes.map((n) => n.degree);
+    /** Every grip the shapes can build, before `allPositions` drops the incomplete ones. */
+    const built = (
+        inst: InstrumentDef,
+        root: string,
+        quality: Quality,
+        rootStrings?: number[],
+    ): Voicing[] =>
+        allowedShapes(inst, rootStrings, quality).flatMap((sh) =>
+            rootFrets(inst, sh, R(root))
+                .map((r) => buildAt(inst, sh, R(root), quality, r))
+                .filter((v): v is Voicing => v !== null),
+        );
+    /** A guitar with only these shell shapes, to reach grips the full shape set never leaves alone. */
+    const guitarWith = (...ids: string[]): InstrumentDef => ({
+        ...GUITAR,
+        shapes: ids.map((id) => shape(GUITAR, id)),
+    });
+
+    it('`buildAt` reports a grip with no room for the ♭5 (guitar R–3–7 on the 4th string)', () => {
+        // x x 10 8 11 x: the ♭5 would sit four frets above the root on the 1st string.
+        const v = buildAt(GUITAR, shape(GUITAR, '4B'), R('C'), 'm7b5', 10)!;
+        expect(tab(GUITAR, v)).toBe('x x 10 8 11 x');
+        expect(v.missing).toEqual(['b5']);
+        expect(degrees(v)).not.toContain('b5');
+    });
+    it('every m7♭5 and °7 grip on offer has its root, ♭3, 7th and ♭5', () => {
+        for (const [inst, rootStrings] of SETUPS) {
+            for (const root of ROOTS) {
+                for (const q of NAMED_BY_FIVE) {
+                    const grips = allPositions(inst, root, q, { rootStrings });
+                    expect(grips.length, `${inst.name} ${root.name}${q}`).toBeGreaterThan(0);
+                    for (const v of grips) {
+                        const where = `${inst.name} ${v.symbol} ${tab(inst, v)}`;
+                        expect(v.missing, where).toEqual([]);
+                        expect(degrees(v), where).toEqual(
+                            expect.arrayContaining(['R', 'b3', QUALITIES[q].seventh, 'b5']),
+                        );
+                    }
+                }
+            }
+        }
+    });
+    it('a complete grip is preferred: the incomplete ones are dropped, the rest untouched', () => {
+        const all = built(GUITAR, 'C', 'm7b5');
+        expect(all.filter((v) => v.missing.length).map((v) => tab(GUITAR, v))).toEqual([
+            'x x 10 8 11 x',
+        ]);
+        expect(allPositions(GUITAR, R('C'), 'm7b5').map((v) => tab(GUITAR, v))).toEqual(
+            all.filter((v) => !v.missing.length).map((v) => tab(GUITAR, v)),
+        );
+        // Per chord, not per shape: Em7♭5 on the 4th string has room at the nut (the open G
+        // string is its ♭3) and none at the 14th fret, so only the first is offered.
+        const fourth = guitarWith('4B');
+        expect(built(fourth, 'E', 'm7b5').map((v) => v.missing)).toEqual([[], ['b5']]);
+        expect(allPositions(fourth, R('E'), 'm7b5').map((v) => tab(fourth, v))).toEqual([
+            'x x 2 0 3 6',
+        ]);
+    });
+    it('the last resort still voices the chord: with no complete grip, the incomplete one plays', () => {
+        const fourth = guitarWith('4B');
+        const only = allPositions(fourth, R('C'), 'm7b5');
+        expect(only.map((v) => tab(fourth, v))).toEqual(['x x 10 8 11 x']);
+        expect(only[0].missing).toEqual(['b5']);
+        const voiced = voiceChart(
+            [
+                { root: R('C'), quality: 'm7b5' },
+                { root: R('F'), quality: 'dom7' },
+            ],
+            { instrument: fourth, home: [8, 13] },
+        );
+        expect(voiced.map((v) => v.symbol)).toEqual(['Cm7♭5', 'F7']);
+        expect(tab(fourth, voiced[0])).toBe('x x 10 8 11 x');
+    });
+    it('complete comes before in-window: the hand leaves the window rather than play an m7', () => {
+        // Frets 8–11 hold the 4th-string grip (no ♭5) and not the 5th-string one (x 3 4 3 4 x).
+        const two = guitarWith('4B', '5A');
+        const [v] = voiceChart([{ root: R('C'), quality: 'm7b5' }], {
+            instrument: two,
+            home: [8, 11],
+        });
+        expect(tab(two, v)).toBe('x 3 4 3 4 x');
+        expect(degrees(v)).toContain('b5');
+    });
+    it('the six-fret window never has to choose: where any grip fits, a complete one fits', () => {
+        // So in the app (its windows are six frets) the order above is never called on. A window
+        // that holds no grip of the chord at all (classic roots, the root at the window's edge:
+        // Gm7♭5 in frets 3–8) offers every complete grip, as it always offered every grip.
+        for (const [inst, rootStrings] of SETUPS) {
+            for (let w = 1; w <= 10; w++) {
+                for (const root of ROOTS) {
+                    for (const q of NAMED_BY_FIVE) {
+                        const inside = built(inst, root.name, q, rootStrings).filter((v) =>
+                            inHome(v, [w, w + 5]),
+                        );
+                        expect(
+                            !inside.length || inside.some((v) => !v.missing.length),
+                            `${inst.name} ${rootStrings ?? 'all'} ${root.name}${q} in frets ${w}-${w + 5}`,
+                        ).toBe(true);
+                    }
+                }
+            }
+        }
+    });
+    it('guitar °7 is the four-note grip on each root string, a finger per note', () => {
+        const grip = (id: string, root: string) =>
+            build(GUITAR, shape(GUITAR, id), R(root), 'dim7')!;
+        const fingers = (v: Voicing) => v.notes.map((n) => n.finger);
+        // 6th string: G°7 3 x 2 3 2 x (G F♭ B♭ D♭).
+        expect(tab(GUITAR, grip('6A', 'G'))).toBe('3 x 2 3 2 x');
+        // 5th string: C°7 x 3 4 2 4 x, the ♭5 on the string the shell skips.
+        expect(tab(GUITAR, grip('5A', 'C'))).toBe('x 3 4 2 4 x');
+        expect(fingers(grip('5A', 'C'))).toEqual([2, 3, 1, 4]);
+        expect(
+            grip('5A', 'C')
+                .notes.map((n) => spellDegree(R('C'), n.degree))
+                .join(' '),
+        ).toBe('C G♭ B♭♭ E♭');
+        // 4th string: E♭°7 x x 1 2 1 2, the top-four-strings diminished.
+        expect(tab(GUITAR, grip('4A', 'E♭'))).toBe('x x 1 2 1 2');
+        expect(fingers(grip('4A', 'E♭'))).toEqual([1, 3, 2, 4]);
+        // No shell is barred: every fretted note has its own finger.
+        for (const root of ROOTS) {
+            for (const v of allPositions(GUITAR, root, 'dim7')) {
+                expect(barres(v.notes), `${v.symbol} ${tab(GUITAR, v)}`).toEqual([]);
+            }
+        }
+    });
+    it('where the added tone goes: narrowest, then fretted over open, then the easier fingering', () => {
+        const grip = (id: string, root: string, quality: Quality) =>
+            tab(GUITAR, build(GUITAR, shape(GUITAR, id), R(root), quality)!);
+        // Fretted over open: both are one fret wide, and x 1 x 1 2 0 works for B♭ only.
+        expect(grip('5A', 'B♭', 'm7b5')).toBe('x 1 2 1 2 x');
+        expect(grip('5A', 'B♭', 'dim7')).toBe('x 1 2 0 2 x');
+        // Easier fingering: C°7's x 3 x 2 4 2 is as narrow, with the root under the ring finger.
+        expect(grip('5A', 'C', 'dim7')).toBe('x 3 4 2 4 x');
+        // A tie all the way down keeps the higher string: Cm7♭5 is 8 x 8 8 7 x, not 8 9 8 8 x x.
+        expect(grip('6A', 'C', 'm7b5')).toBe('8 x 8 8 7 x');
+        // Narrower still wins outright, open string or not: E♭m7♭5's open A string is its ♭5.
+        expect(grip('6A', 'E♭', 'm7b5')).toBe('11 0 11 11 x x');
+    });
+    it('a passing °7 keeps its ♭5 in a chart, on every setup', () => {
+        const chart: { root: ReturnType<typeof R>; quality: Quality }[] = [
+            { root: R('C'), quality: 'maj7' },
+            { root: R('C♯'), quality: 'dim7' },
+            { root: R('D'), quality: 'm7' },
+            { root: R('G'), quality: 'dom7' },
+        ];
+        for (const [instrument, rootStrings] of SETUPS) {
+            const v = voiceChart(chart, { instrument, home: [1, 6], rootStrings });
+            expect(degrees(v[1]), `${instrument.name} ${tab(instrument, v[1])}`).toContain('b5');
+        }
+        const guitar = voiceChart(chart, { instrument: GUITAR, home: [1, 6] });
+        expect(tab(GUITAR, guitar[1])).toBe('x 4 5 3 5 x');
+    });
+    it('triads and power chords are not touched: none requires a tone, so none is dropped', () => {
+        for (const inst of [GUITAR, UKULELE]) {
+            for (const q of Object.keys(QUALITIES) as Quality[]) {
+                if (QUALITIES[q].kind === 'shell') {
+                    continue;
+                }
+                expect(QUALITIES[q].required, q).toEqual([]);
+                for (const root of ROOTS) {
+                    expect(
+                        allPositions(inst, root, q).map((v) => tab(inst, v)),
+                        `${inst.name} ${root.name}${q}`,
+                    ).toEqual(built(inst, root.name, q).map((v) => tab(inst, v)));
+                }
+            }
+        }
     });
 });
 

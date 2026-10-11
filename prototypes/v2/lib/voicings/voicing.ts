@@ -7,11 +7,13 @@
  * charts it lists: all six shell qualities (maj7, 7, m7, m7♭5, °7 and 6) on guitar (both
  * root-string limits) and ukulele (high G, and two low-G charts), with and without a hand
  * window. A change to a shell cost here or in `fingering.ts` (`unaryCost`,
- * `transCost`, `handCost`, `fingerTransCost`) moves it; so does letting a newer rule reach a
- * shell, which is why triad rules are gated by `kind`. If the change is meant, regenerate the
- * fixture in the same commit (the test's header says how) and review its diff.
+ * `transCost`, `handCost`, `fingerTransCost`) moves it; so does a change to which grips a
+ * chord is offered (`allPositions`, a quality's `required` tones, where `buildAt` puts one), and
+ * so does letting a newer rule reach a shell, which is why triad rules are gated by `kind`. If
+ * the change is meant, regenerate the fixture in the same commit (the test's header says how)
+ * and review its diff.
  */
-import { assignFingers, fingerSequence } from './fingering';
+import { assignFingers, fingerOptions, fingerSequence } from './fingering';
 import { DEGREES, mod, QUALITIES } from './theory';
 import type {
     ChartChord,
@@ -120,11 +122,20 @@ export function buildAt(
         return null;
     }
 
-    // A required tone (m7♭5's ♭5) goes on a free string — unless a helper (F) note already plays it.
+    // A required tone (the ♭5 of an m7♭5 or a °7) goes on a free string — unless a helper (F)
+    // note already plays it. One that fits nowhere within reach is reported in `missing`;
+    // `allPositions` decides what becomes of the grip.
     const missing: Degree[] = [];
     const extras: Degree[] = notes.some((n) => n.role === 'F') ? [] : [...q.required];
     for (const deg of extras) {
         const used = new Set(notes.map((n) => n.string));
+        // How hard the grip is to finger with the tone at fret `f` of string `s`: the fingering
+        // planner's own cost for its best fingering (`handCost`).
+        const effort = (s: number, f: number): number =>
+            fingerOptions(
+                [...notes, { string: s, fret: f, degree: deg, role: `X${deg}`, finger: null }],
+                { barre: mayBarre(shape) },
+            )[0].cost;
         let best: { s: number; f: number; span: number } | null = null;
         for (let s = 1; s < shape.rootString; s++) {
             if (used.has(s)) {
@@ -139,7 +150,27 @@ export function buildAt(
                 if (span > MAX_SPAN) {
                     continue;
                 }
-                if (!best || span < best.span || (span === best.span && s < best.s)) {
+                // The narrowest grip wins. Of two as narrow:
+                // - a fretted tone beats an open string. The fretted grip is the movable shape
+                //   being learned; the open string is a one-off that works for this root only
+                //   (B♭°7 is x-1-2-0-2-x, not x-1-x-0-2-0), and `center` would read it as the
+                //   hand gone to the nut and pull the next chords down after it;
+                // - then the grip that is easier to finger. C°7 can take its ♭5 on the 4th string
+                //   (x-3-4-2-4-x) or the 1st (x-3-x-2-4-2), both three frets wide: the first is
+                //   the grip the method books print, a finger per fret with the root under the
+                //   middle finger; the second puts the root under the ring finger and splits two
+                //   fingers around a string the hand must also mute;
+                // - still a tie (Cm7♭5 on the 6th string), the higher string keeps the tone: up
+                //   there it is heard, and stays clear of the root in the bass.
+                const tied = best !== null && span === best.span;
+                const better =
+                    !best ||
+                    span < best.span ||
+                    (tied && f > 0 && best.f === 0) ||
+                    (tied &&
+                        f > 0 === best.f > 0 &&
+                        effort(s, f) < effort(best.s, best.f) - COST_NOISE);
+                if (better) {
                     best = { s, f, span };
                 }
             }
@@ -210,7 +241,21 @@ export function build(
     return null;
 }
 
-/** Every grip (all allowed shapes, both octaves) for a chord. */
+/**
+ * Every grip a chord may take: all allowed shapes, both octaves — less the ones that cannot say
+ * the chord.
+ *
+ * This is the one place a quality's `required` tones are enforced (`QualityDef.required`).
+ * `buildAt` reports a grip that has no room for one in `missing`; such a grip is dropped here
+ * whenever the chord has a complete grip on these shapes, because without the tone it is another
+ * chord: an m7♭5 with no ♭5 is the plain m7 shell, and a °7 with none is the same three notes as
+ * a m6. It is kept only when every grip is missing one — a wrong colour is still better than a
+ * chord left off the neck, so no chord ever goes unvoiced.
+ *
+ * Complete comes before in-window: the hand window is applied afterwards (`candidates`), so a
+ * complete grip outside the window is preferred to an incomplete one inside it. Leaving the
+ * position for one chord is a shift; staying put on the wrong chord teaches the wrong chord.
+ */
 export function allPositions(
     inst: InstrumentDef,
     root: Spelled,
@@ -226,7 +271,8 @@ export function allPositions(
             }
         }),
     );
-    return out;
+    const complete = out.filter((v) => !v.missing.length);
+    return complete.length ? complete : out;
 }
 
 // ---------- voicing a chart ----------
