@@ -18,21 +18,13 @@ are separate from the implementation described here.
   buffers; successful adoption retires them before a subsequent transpose. Revert clears them
   explicitly. Checked edits use the same writer-scoped recovery and revision-aware saves as v1.
 - Linear sections, whole-section repeats, nested repeat barlines and alternate endings,
-  unequal exact-grid chord lengths, and sticky bar
-  key/mode/meter/grouping contexts compile to one bounded performance plan. The existing
-  voicer consumes complete supported symbols without re-dividing their durations. The chart
-  reads the resulting step/measure maps directly, placing each written bar once and mapping
-  all subsequent visits back to its written event slots; the worker receives those same maps, including
-  each bar's resolved meter config. Detached renders rebuild from the same prepared input.
-- `arranger.scorePlan` is **runtime-derived**, not authored/persisted state and not a worker
-  field. The preview host owns the validated authored score. V1 loads clear the plan. Only
-  derived progression/maps cross the ordinary full snapshot; sync precedes buffer flush.
-  The host registers its renderer at boot; v1 startup does not import that implementation.
-  A host without a semantic renderer fails explicitly if handed a prepared semantic chart.
-- Playback is bounded to 65,536 events, 16,384 performed measures and 1,048,576 steps. The
-  wider authored codec remains separate. Unsupported meters, off-grid divisions, qualities
-  beyond the existing voicer, ambiguous navigation, N.C., holds, alternates
-  and fermatas fail visibly before runtime adoption. They are not stripped or played as tonic.
+  unequal exact-grid chord lengths, and sticky bar key/mode/meter/grouping contexts compile
+  (`compileScoreForm`, `resolveScoreContext`) to the band's timeline, which the band performs
+  and the chart draws (`lib/band-chart.ts`). The old engine's score playback
+  (`prepareScorePlayback`, `arranger.scorePlan`) is gone: it refused holds, N.C., alternates,
+  fermatas and off-grid lengths, all of which the band plays. A performed form is bounded to
+  16,384 measures by `compileScoreForm`; the wider authored codec remains separate, and
+  ambiguous navigation fails visibly before adoption.
 - Older preview clients reject v2 records and may fail to enumerate a mixed-version library.
   Keeping a v1 source protects its data, **not** cross-version simultaneous editing. Export
   valuable work and prefer a corrective preview release; production migration/coexistence

@@ -7,7 +7,6 @@ import {
     ROMAN_VALS,
     TIME_SIGNATURES,
 } from '../config.js';
-import type { renderScorePlayback } from '../songbook/score-playback.js';
 import type { Chord, ChordDensity, Dispatch, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
@@ -43,13 +42,6 @@ const COMP_DENSITY: ChordDensity = 'standard';
  */
 function looksLikeChordRoot(part: string): boolean {
     return ROMAN_REGEX.test(part) || NNS_REGEX.test(part) || NOTE_REGEX.test(part);
-}
-
-// The optional semantic host supplies this adapter once at boot. Legacy startup
-// does not download v2-only code; detached audio renders share this module instance.
-let scoreRenderer: typeof renderScorePlayback | undefined;
-export function registerScorePlaybackRenderer(renderer: typeof renderScorePlayback): void {
-    scoreRenderer = renderer;
 }
 
 export interface ChordDetails {
@@ -1371,17 +1363,6 @@ export function validateProgression(
     renderCallback?: () => any,
 ): void {
     const { arranger } = state;
-    if (arranger.scorePlan) {
-        if (!scoreRenderer) {
-            throw new Error('Semantic chart playback is unavailable in this host.');
-        }
-        const rendered = scoreRenderer(state, parseProgressionPart);
-        // @direct-mutation — same passed-state/detached-render boundary as the legacy path.
-        Object.assign(arranger, rendered);
-        dispatch?.(ACTIONS.PROG_VALIDATED);
-        renderCallback?.();
-        return;
-    }
     let allChords: Chord[] = [];
     let lastMidis: number[] = [];
 
@@ -1443,7 +1424,6 @@ function updateProgressionCache(state: any): void {
         Object.assign(arranger, {
             totalSteps: 0,
             stepMap: [],
-            measureMap: [],
             sectionMap: [],
         });
         return;
@@ -1460,14 +1440,12 @@ function updateProgressionCache(state: any): void {
     });
 
     const newSectionMap: any[] = [];
-    const newMeasureMap: any[] = [];
 
     let mapIndex = 0;
     let sectionAcc = 0;
 
     arranger.sections.forEach((section: any) => {
         const sectionStart = sectionAcc;
-        let iterationSteps = 0;
 
         const startMapIndex = mapIndex;
 
@@ -1487,10 +1465,6 @@ function updateProgressionCache(state: any): void {
                 }
             }
 
-            if (entry.chord.repeatIndex === 0) {
-                iterationSteps += entry.end - entry.start;
-            }
-
             mapIndex++;
         }
 
@@ -1508,35 +1482,11 @@ function updateProgressionCache(state: any): void {
             timeSignature: section.timeSignature || arranger.timeSignature,
         });
         sectionAcc += totalSectionSteps;
-
-        if (iterationSteps > 0) {
-            const repeats = section.repeat || 1;
-            const tsName = section.timeSignature || arranger.timeSignature;
-            const ts = TIME_SIGNATURES[tsName] || TIME_SIGNATURES['4/4'];
-            const stepsPerMeasure = Math.round(ts.beats * ts.stepsPerBeat);
-
-            let stepAccLocal = sectionStart;
-
-            for (let r = 0; r < repeats; r++) {
-                let sectionStep = 0;
-                while (sectionStep < iterationSteps) {
-                    const measureEnd = Math.min(sectionStep + stepsPerMeasure, iterationSteps);
-                    newMeasureMap.push({
-                        start: stepAccLocal + sectionStep,
-                        end: stepAccLocal + measureEnd,
-                        ts: tsName,
-                    });
-                    sectionStep += stepsPerMeasure;
-                }
-                stepAccLocal += iterationSteps;
-            }
-        }
     });
 
     Object.assign(arranger, {
         totalSteps: current,
         stepMap: newStepMap,
         sectionMap: newSectionMap,
-        measureMap: newMeasureMap,
     });
 }

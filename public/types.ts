@@ -224,8 +224,6 @@ export interface Section {
 export type SectionInstrumentKey = 'groove' | 'bass' | 'chords' | 'harmony' | 'soloist';
 
 export interface ArrangerState {
-    /** Derived semantic performance input; main-thread rebuild only, never persisted/synced. */
-    readonly scorePlan?: import('./songbook/score-playback.js').ScorePlaybackPlan | null;
     /** List of song sections. */
     readonly sections: Section[];
     /** Flattened list of parsed chord objects. */
@@ -242,13 +240,6 @@ export interface ArrangerState {
     readonly totalSteps: number;
     /** Map of steps to chord objects. */
     readonly stepMap: Array<{ start: number; end: number; chord: Chord }>;
-    /** Map of measures to time signatures. */
-    readonly measureMap: Array<{
-        start: number;
-        end: number;
-        ts: string;
-        config?: import('./config.js').TimeSignatureConfig;
-    }>;
     /** Map of sections to step ranges. */
     readonly sectionMap: Array<{ id: string; start: number; end: number; label: string }>;
     /** Custom rhythmic grouping array (e.g. [3, 2]). */
@@ -949,40 +940,6 @@ export interface EnsembleState {
     bass: BassState;
     soloist: SoloistState;
     chords: ChordState;
-}
-
-export interface StepInfo {
-    isMeasureStart: boolean;
-    isBeatStart: boolean;
-    /** Semantic backbeat (e.g., beats 2 & 4). */
-    isBackbeat: boolean;
-    /** Rhythmic group boundary (e.g., beats 1 & 3). */
-    isGroupStart: boolean;
-    /** 8th-note offbeat. */
-    isOffbeat: boolean;
-    /**
-     * True when the step falls on an eighth-note grid position.
-     * For 16th-grid meters (stepsPerBeat=4: 2/4, 3/4, 4/4, 5/4, 7/4): every other step.
-     * For 8th-grid meters (stepsPerBeat=2: 6/8, 7/8, 12/8): every step (each step IS an eighth).
-     */
-    isEighthBoundary: boolean;
-    /** "e" of a 16th-note beat. */
-    isEOfBeat: boolean;
-    /** "a" of a 16th-note beat. */
-    isAOfBeat: boolean;
-    isCompound?: boolean;
-    isPulse?: boolean;
-    isPulseStart?: boolean;
-    /** Alias for isMeasureStart. */
-    isDownbeat?: boolean;
-    isTurnaround?: boolean;
-    beatIndex: number;
-    groupIndex: number;
-    stepInGroup: number;
-    mStep: number;
-    stepInBeat?: number;
-    tsConfig?: any;
-    tsName?: string;
 }
 
 export interface ActionPayloadSetParam {

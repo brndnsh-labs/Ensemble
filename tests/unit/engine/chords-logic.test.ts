@@ -597,4 +597,21 @@ describe('Chords & Voicing Logic', () => {
             expect(arranger.progression.map((chord) => chord.quality)).toEqual(['m6', 'm6', '7']);
         });
     });
+
+    describe('Step maps (updateProgressionCache, via validateProgression)', () => {
+        it('rebuilds the progression, step map and total from the sections', () => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: 'F G7 | C', repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+            validateProgression(getState());
+
+            expect(arranger.progression.map((chord) => chord.absName)).toEqual(['F', 'G7', 'C']);
+            expect(arranger.stepMap.map(({ start, end }) => [start, end])).toEqual([
+                [0, 8],
+                [8, 16],
+                [16, 32],
+            ]);
+            expect(arranger.totalSteps).toBe(32);
+        });
+    });
 });

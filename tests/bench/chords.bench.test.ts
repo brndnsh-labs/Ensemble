@@ -38,6 +38,5 @@ describe('Chords Logic Performance', () => {
         expect(arranger.progression.length).toBeGreaterThan(0);
         expect(arranger.totalSteps).toBeGreaterThan(0);
         expect(arranger.sectionMap.length).toBe(500);
-        expect(arranger.measureMap.length).toBeGreaterThan(0);
     });
 });

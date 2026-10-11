@@ -114,7 +114,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/songbook/ireal-import.ts` | Source-preserving iReal import results, raw metadata, the playlist's own name (#1478) and per-song blocking diagnostics. `parseIRealImportInSteps` is the same parse in slices, so a whole playlist never freezes the page; `MAX_IMPORT_MEASURES` is sized from Jazz 1460. | `parseIRealImport`, `parseIRealImportInSteps`, `IRealImportResult`, `MAX_IMPORT_MEASURES` |
 | `public/songbook/ireal-decode.ts` | Bounded inert HTML/link extraction, separate protocol envelopes and modern permutation decoder. Up to the account's 2,000 songs (#1478); `songSourceLink` rebuilds one song's own link from its fields. | `decodeIRealInput`, `decodeIRealMusic`, `MAX_IREAL_SONGS`, `songSourceLink` |
 | `public/songbook/ireal-score.ts` | Conservative rhythm-cell and notation mapping into validated semantic scores; uncertain music blocks import. | `scoreFromIRealBody` |
-| `public/songbook/score-playback.ts` | Bounded semantic-score playback capability checks and exact chord/measure maps over performed visits; preserves written context and existing voicing. | `prepareScorePlayback`, `renderScorePlayback`, `scoreArrangement` |
 | `public/songbook/score-text.ts` | Complete-token chord-bar parsing/printing, meter-labelled lengths and alternate spellings; independent of voicing. | `parseChordBar`, `printChordBar`, `isScoreChord` |
 | `public/songbook/score-codec.ts` | Detached authored-score validation, duration sums and source/marker reference integrity; not a performance itinerary compiler. | `validateSemanticScore` |
 | `public/songbook/document-v2.ts` | Version-2 envelope codec alongside the unchanged version-1 reader; no implicit conversion. | `validateChartDocumentV2`, `decodeChartDocumentV2`, `encodeChartDocumentV2` |
@@ -196,7 +195,7 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | `public/export/detached-generation-state.ts` | Offline-render state clone (the band's WAV export and the listening-gate tools): preserves generation settings while stripping live handles and runtime buffers. |
 | `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping: chords grouped into measures and section blocks. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
-| `public/utils.ts` | Pure musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
+| `public/utils.ts` | Pure musical/math primitives: pitch conversion + the step-map lookup. No DOM, no Web Audio, no persistence. | `getFrequency`, `binarySearchMap` |
 | `public/sanitize.ts` | Main-thread string sanitization (HTML escaping, dangerous-char stripping, song-seed normalizing). | `escapeHTML`, `stripDangerousChars`, `normalizeSongSeed` |
 
 ## Infrastructure & Lifecycle (Internal)
@@ -204,7 +203,7 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | Path | Responsibility |
 | :--- | :--- |
 | `public/config.ts` | Global timing and musical constants. |
-| `public/meter.ts` | Validated effective-meter resolution for authored rhythmic grouping. |
+| `public/meter.ts` | Validity check for an authored rhythmic grouping against its meter. |
 | `public/constants.ts` | Global visual and UI state constants. |
 
 ## Documentation, Parsing & Testing

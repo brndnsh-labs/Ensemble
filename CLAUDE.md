@@ -121,7 +121,7 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 
 ### State (`public/state.ts`, `public/state/`)
 
-- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — each a `deepSignal`. A field nothing reads gets removed, not kept as a leftover: the old engine's `conductor` and `vizState` slices, its toast/flash state and its scheduler scratch fields went that way on 2026-10-11. That cleanup is not finished — `soloist.session`, `arranger.scorePlan`/`measureMap` and a few fields the audio path reads but nothing sets are still to go — so don't assume a field is live because it is declared.
+- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — each a `deepSignal`. A field nothing reads gets removed, not kept as a leftover: the old engine's `conductor` and `vizState` slices, its toast/flash state and its scheduler scratch fields went that way on 2026-10-11. That cleanup is not finished — `soloist.session` and a few fields the audio path reads but nothing sets are still to go — so don't assume a field is live because it is declared.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - Hosts read with `getState()` and listen with `subscribe()` (`public/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
 - `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
@@ -210,7 +210,7 @@ Each band lane keeps to its register slot — bass 23–57, keyboard comp 52–8
 
 ### TypeScript
 
-All `public/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.json` has `strict: true` and `moduleResolution: "Bundler"` — import specifiers can keep `.js`/`.jsx` suffixes; the resolver finds the `.ts`/`.tsx` source. Use global interfaces in `public/types.ts` (`EnsembleState`, `StepInfo`, etc.). Run `npm run typecheck` before concluding any task.
+All `public/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.json` has `strict: true` and `moduleResolution: "Bundler"` — import specifiers can keep `.js`/`.jsx` suffixes; the resolver finds the `.ts`/`.tsx` source. Use global interfaces in `public/types.ts` (`EnsembleState`, `ArrangerState`, etc.). Run `npm run typecheck` before concluding any task.
 
 ## Testing Standards
 

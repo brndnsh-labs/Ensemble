@@ -51,7 +51,6 @@ describe('Arranger Reducer', () => {
                 notation: 'name',
                 totalSteps: 128,
                 stepMap: [{ s: 1 }],
-                measureMap: [{ m: 1 }],
                 sectionMap: [{ id: '1' }],
             };
 

@@ -28,10 +28,11 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ### 🔴 `prototypes/v2/checks/songbook-home.spec.ts` — "one search returns your songs and the standards, grouped"
 
-- **Class:** e2e-timing (unconfirmed; one observation).
+- **Class:** e2e-timing (unconfirmed; two observations).
 - **Symptom:** `v2-suite (2, webkit-phone)` on `feat/shell-voicings` (run 38100585677, `5c4734f6`, 2026-10-11): after `search.fill('blu')`, `expect(songs.getByRole('heading', { name: 'Your songs' })).toBeVisible()` timed out at 15s (element not found). The branch touches nothing on the songbook home or search; the spec is unchanged since #1457. A rerun of the failed job passed, and the test passes locally on both projects.
 - **Not yet diagnosed:** no fail-rate measured, no contention run. Candidates: the seeded starters not yet in the library when the search ran (`seedStarters` → IndexedDB write → the home's library read), or the search results' first paint lagging the keystrokes on a starved WebKit. Run `/flake` on it before treating a second hit as a regression.
-- **Last seen:** 2026-10-11 (`feat/shell-voicings`, run 38100585677).
+- **Second observation:** `v2-suite (1, webkit-phone)` on `chore/remove-unread-state` (#1629, run 38181830420, 2026-10-11), same assertion, same 15s timeout, on a branch that removes unread engine state and touches nothing on the home page. It is the first failure since the suite moved to four WebKit legs dealt from CI timings (#1625), which changed which specs share a runner. The other six legs passed; a re-run of the leg is the evidence still owed here.
+- **Last seen:** 2026-10-11 (`chore/remove-unread-state`, run 38181830420).
 
 ### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4" (second shape)
 
