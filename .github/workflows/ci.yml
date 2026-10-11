@@ -261,10 +261,13 @@ jobs:
           - { project: laptop, browser: chromium, shard: 1, of: 3 }
           - { project: laptop, browser: chromium, shard: 2, of: 3 }
           - { project: laptop, browser: chromium, shard: 3, of: 3 }
-          - { project: webkit-phone, browser: webkit, shard: 1, of: 4 }
-          - { project: webkit-phone, browser: webkit, shard: 2, of: 4 }
+          - { project: webkit-phone, browser: webkit, shard: 1, of: 4, image: 'mcr.microsoft.com/playwright:v1.63.0-noble' }
+          - { project: webkit-phone, browser: webkit, shard: 2, of: 4, image: 'mcr.microsoft.com/playwright:v1.63.0-noble' }
           - { project: webkit-phone, browser: webkit, shard: 3, of: 4 }
           - { project: webkit-phone, browser: webkit, shard: 4, of: 4 }
+    # TRIAL (webkit system libraries): a leg with `image` runs in Playwright's own image,
+    # which has the browser and its libraries already installed.
+    container: ${{ matrix.image }}
     steps:
       - uses: actions/checkout@v7
 
@@ -297,6 +300,7 @@ jobs:
       # One cache per browser: a leg that installed only Chromium must not save a cache
       # that a WebKit leg then restores as a hit.
       - name: Cache Playwright Browsers
+        if: ${{ !matrix.image }}
         id: playwright-cache
         uses: actions/cache@v5
         with:
@@ -304,12 +308,12 @@ jobs:
           key: ${{ runner.os }}-playwright-v2-${{ matrix.browser }}-${{ env.PLAYWRIGHT_VERSION }}
 
       - name: Install Playwright browser + system deps
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: ${{ !matrix.image && steps.playwright-cache.outputs.cache-hit != 'true' }}
         run: npx playwright install --with-deps ${{ matrix.browser }}
         working-directory: prototypes/v2
 
       - name: Install Playwright system deps (browser came from cache)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        if: ${{ !matrix.image && steps.playwright-cache.outputs.cache-hit == 'true' }}
         run: npx playwright install-deps ${{ matrix.browser }}
         working-directory: prototypes/v2
 
