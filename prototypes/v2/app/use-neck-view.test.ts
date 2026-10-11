@@ -307,7 +307,7 @@ describe('neckModel', () => {
         expect(model.nextName).toBe('G7');
         expect(model.grip?.symbol).toBe('Dm7');
         expect(model.headline).toBe(
-            'Starts on Dm7 · then G7: root up a 4th, over to the 6th string, 2 frets lower',
+            'Starts on Dm7 · then G7: root moves to the 6th string, 2 frets lower',
         );
         // Dm7 x 5 3 5 x x is 2-1-3, root under the middle finger (#1611). It was 3-2-4, the
         // root under the ring finger so that the middle one could stay on the F ("Finger 2
@@ -320,12 +320,10 @@ describe('neckModel', () => {
 
     it('playing, names the next chord and the root move', () => {
         const model = neckModel(band, voiced, 0, GUITAR)!;
-        expect(model.headline).toBe(
-            'Next: G7 · root up a 4th, over to the 6th string, 2 frets lower',
-        );
+        expect(model.headline).toBe('Next: G7 · root moves to the 6th string, 2 frets lower');
         expect(model.fingers).not.toMatch(/lifts off/);
         const second = neckModel(band, voiced, 1, GUITAR)!;
-        expect(second.headline).toBe('Next: Cmaj7#5 · root up a 4th, same fret, one string over');
+        expect(second.headline).toBe('Next: Cmaj7#5 · root moves one string over, same fret');
         expect(second.fingers).toBe(
             'Finger 3 stays down; finger 2 moves to the 5th string, fret 3; ' +
                 'finger 4 goes down on the 2nd string, fret 5.',
