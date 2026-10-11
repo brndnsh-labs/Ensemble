@@ -11,8 +11,9 @@
  * written chord `i`, and `runtime.playheadSlot` already reports the step-map index as the slot.
  * A v1 chart has no repeat or ending marks, so performance order is written order.
  *
- * This is the interim seam. The structural fix, drawing a v1 chart from
- * `bandChart(scoreForBand(), timeline)` like a score, is filed as #1589.
+ * This seam stays (DECISION 2026-10-11, #1589): drawing a v1 chart from
+ * `bandChart(scoreForBand(), timeline)` could not retire the step-map reader, because a chart the
+ * conversion refuses still has to be drawn. Nothing the app ships is measure-less any more.
  */
 import { notePc, PPQ, parseChord } from '@band/index';
 import type { EnsembleState } from '@engine/types';
