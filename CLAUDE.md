@@ -33,6 +33,11 @@ releases it: the CI `deploy` job publishes no files at all any more — it relea
 - A story touching **`prototypes/v2/**`** is live at `ensemble.brndn.zip/` on merge, gated by
   the required `v2-checks` context (v2 build + its Playwright suite) alongside `checks` and
   `e2e-tests`. There is no longer a v1 app beside it for it to regress; it is the release.
+- A PR that **cannot reach the app** skips the Playwright legs, and `v2-checks` reports green
+  without them: every changed file is under `docs/`, `tests/`, `band/test/`, `.claude/`, or is a
+  `*.md` or a `band/**/*.test.ts` (the `changes` job in `ci.yml` holds the list). Anything else
+  runs the suite, and so does every push to `main`. Don't widen that list without proving the
+  path reaches neither the export nor the suite.
 - A story touching **`public/**`** is live production code on that same merge — the shared
   songbook codecs, engine hooks and state slices very much included, since the v2 export
   compiles `public/`, so `v2-checks` must stay green. v1's own UI shell is gone (#1358).
