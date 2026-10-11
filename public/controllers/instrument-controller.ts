@@ -113,8 +113,4 @@ export function togglePower(type: string): void {
     if (newState) {
         restoreGains(getState());
     }
-
-    // #1144 — no immediate save: the SET_PARAM dispatch above (enabled, plus
-    // the soloist flag dispatches) already schedules the #1127 chokepoint's
-    // debounced save.
 }
