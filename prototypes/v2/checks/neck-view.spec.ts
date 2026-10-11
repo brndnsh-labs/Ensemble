@@ -67,7 +67,7 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(view.getByTestId('neck-next')).toContainText('G7');
     const headline = view.locator('.neck-headline');
     await expect(headline).toContainText('then G7');
-    await expect(headline).toContainText('root up a 4th');
+    await expect(headline).toContainText('root moves to the 6th string');
     // The finger-by-finger detail is off until asked for, and remembered once it is.
     await expect(view.locator('.neck-fingers')).toHaveCount(0);
     const sayFingers = view.getByRole('checkbox', { name: 'Say the fingers' });

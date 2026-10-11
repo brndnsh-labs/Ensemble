@@ -1,30 +1,13 @@
 import { type Barre, barres, fingerMap } from './fingering';
-import { mod } from './theory';
 import type { InstrumentDef, Note, Voicing } from './types';
 
-const ROOT_MOVES: Record<number, [string, string]> = {
-    0: ['stays put', '='],
-    1: ['up a half step', '↑½'],
-    2: ['up a whole step', '↑1'],
-    3: ['up a minor 3rd', '↑m3'],
-    4: ['up a major 3rd', '↑M3'],
-    5: ['up a 4th', '↑4th'],
-    6: ['a tritone away', 'tri'],
-    7: ['down a 4th', '↓4th'],
-    8: ['down a major 3rd', '↓M3'],
-    9: ['down a minor 3rd', '↓m3'],
-    10: ['down a whole step', '↓1'],
-    11: ['down a half step', '↓½'],
-};
-
 export interface RootMove {
-    /** Semitones up from a's root to b's root, 0-11. */
-    semitones: number;
-    /** "up a 4th" */
-    text: string;
-    /** "↑4th" for compact tags */
-    short: string;
-    /** Where the root goes on the neck: "same fret, one string over", "slides up 2 frets on the same string"... */
+    /**
+     * What the root does on the neck, read off the two fretted notes: "moves one string over,
+     * same fret", "slides up 2 frets on the same string"... The interval is not named (it was,
+     * as "up a 4th", from the note names alone — which pointed up while the hand went down a
+     * 5th; cut 2026-10-11).
+     */
     geometry: string;
     from?: Note;
     to?: Note;
@@ -33,7 +16,6 @@ export interface RootMove {
 }
 
 export function rootMove(inst: InstrumentDef, a: Voicing, b: Voicing): RootMove {
-    const d = mod(b.root.pc - a.root.pc, 12);
     const ra = a.notes.find((n) => n.role === 'R'),
         rb = b.notes.find((n) => n.role === 'R');
     let geometry = '';
@@ -41,22 +23,22 @@ export function rootMove(inst: InstrumentDef, a: Voicing, b: Voicing): RootMove 
         const ds = Math.abs(ra.string - rb.string),
             df = rb.fret - ra.fret;
         if (ra.string === rb.string && df === 0) {
-            geometry = 'same spot';
+            geometry = 'stays put';
         } else if (ra.string === rb.string) {
             geometry = `slides ${df > 0 ? 'up' : 'down'} ${Math.abs(df)} fret${Math.abs(df) > 1 ? 's' : ''} on the same string`;
         } else if (df === 0) {
-            geometry = ds === 1 ? 'same fret, one string over' : `same fret, ${ds} strings over`;
+            geometry =
+                ds === 1
+                    ? 'moves one string over, same fret'
+                    : `moves ${ds} strings over, same fret`;
         } else {
-            geometry = `over to the ${inst.strName(rb.string)}, ${Math.abs(df)} fret${Math.abs(df) > 1 ? 's' : ''} ${df > 0 ? 'higher' : 'lower'}`;
+            geometry = `moves to the ${inst.strName(rb.string)}, ${Math.abs(df)} fret${Math.abs(df) > 1 ? 's' : ''} ${df > 0 ? 'higher' : 'lower'}`;
         }
-        if (rb.fret === 0) {
+        if (rb.fret === 0 && !(ra.string === rb.string && df === 0)) {
             geometry = `lands on the open ${inst.strName(rb.string)}`;
         }
     }
     return {
-        semitones: d,
-        text: ROOT_MOVES[d][0],
-        short: ROOT_MOVES[d][1],
         geometry,
         from: ra,
         to: rb,

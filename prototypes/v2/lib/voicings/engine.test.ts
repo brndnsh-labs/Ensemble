@@ -2003,12 +2003,11 @@ describe('barres (#1594): what guitarists and uke players actually do', () => {
 });
 
 describe('rootMove', () => {
-    it('names the interval and the path on the neck', () => {
+    it('names the path on the neck, not the interval', () => {
         const a = build(GUITAR, shape(GUITAR, '6A'), R('C'), 'm7'); // 8th fret, 6th string
         const b = build(GUITAR, shape(GUITAR, '5A'), R('F'), 'dom7'); // 8th fret, 5th string
         const m = rootMove(GUITAR, a!, b!);
-        expect(m.text).toBe('up a 4th');
-        expect(m.geometry).toBe('same fret, one string over');
+        expect(m.geometry).toBe('moves one string over, same fret');
         expect(m.straightAcross).toBe(true);
     });
 });

@@ -155,7 +155,7 @@ describe('Neck: previewing the next chord (#1592)', () => {
         expect(host.querySelector('.is-hold, .is-lift')).toBeNull();
     });
 
-    it('strong: the next grip as ghost dots where it sits, and one labelled root path', () => {
+    it('strong: the next grip as ghost dots where it sits, and one root path', () => {
         render({ next: c7, preview: 'strong' });
         const { sy } = neckLayout(GUITAR.strings);
         expect(ghosts()).toHaveLength(c7.notes.length);
@@ -170,7 +170,8 @@ describe('Neck: previewing the next chord (#1592)', () => {
             host.querySelector(`[data-ghost="${rootGhost.string}-${rootGhost.fret}"]`)!.classList,
         ).toContain('neck-fill-root');
         expect(host.querySelectorAll('.neck-rootpath')).toHaveLength(1);
-        expect(host.querySelector('.neck-rootlabel')!.textContent).toBe('up a 4th');
+        // The path is not labelled: the interval name is cut until it can be right.
+        expect(host.querySelector('.neck-rootlabel')).toBeNull();
         // Where, not how: no finger arrows, targets or hold/lift styling without the fingers.
         expect(host.querySelector('.neck-preview')).toBeNull();
         expect(host.querySelector('.neck-arrow, .neck-target')).toBeNull();

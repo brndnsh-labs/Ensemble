@@ -158,8 +158,8 @@ const holdsPhrase = (fingers: number[]): string =>
         : `Fingers ${fingers.slice(0, -1).join(', ')} and ${fingers.at(-1)} stay down`;
 
 /**
- * The root's move from `from` to `to`, for the headline: the interval, then where it lands on
- * the neck ("root up a 4th, same fret, one string over").
+ * The root's move from `from` to `to`, for the headline: what it does on the neck ("root moves
+ * one string over, same fret"), or '' for a grip with no root to follow.
  */
 export function rootLine(
     instrument: InstrumentDef,
@@ -167,7 +167,7 @@ export function rootLine(
     to: VoicedBandChord,
 ): string {
     const root = rootMove(instrument, from, to);
-    return `root ${root.text}${root.geometry ? `, ${root.geometry}` : ''}`;
+    return root.geometry ? `root ${root.geometry}` : '';
 }
 
 /**
@@ -203,8 +203,8 @@ export interface NeckModel {
     held: 'hold' | 'no-chord' | null;
     nextName: string | null;
     /**
-     * The one-line headline under the names: stopped, `Starts on Dm7 · then G7: root up a 4th,
-     * …`; playing, `Next: G7 · root up a 4th, …`; '' while playing with no next chord.
+     * The one-line headline under the names: stopped, `Starts on Dm7 · then G7: root moves
+     * to …`; playing, `Next: G7 · root moves to …`; '' while playing with no next chord.
      */
     headline: string;
     /** The finger-by-finger detail of the change to the next grip (`fingersLine`), or ''. */
@@ -242,12 +242,13 @@ export function neckModel(
     const held = written.kind === 'hold' ? 'hold' : written.kind === 'no-chord' ? 'no-chord' : null;
     const name = held === 'no-chord' ? 'N.C.' : soundingChord.absName;
     const nextName = nextChord ? nextChord.absName : null;
-    const change = grip && next && nextName ? rootLine(instrument, grip, next) : null;
+    const ahead = grip && next && nextName ? nextName : null;
+    const change = grip && next ? rootLine(instrument, grip, next) : '';
     let headline = '';
     if (active === null) {
-        headline = `Starts on ${name}${change ? ` · then ${nextName}: ${change}` : ''}`;
-    } else if (change) {
-        headline = `Next: ${nextName} · ${change}`;
+        headline = `Starts on ${name}${ahead ? ` · then ${ahead}${change && `: ${change}`}` : ''}`;
+    } else if (ahead) {
+        headline = `Next: ${ahead}${change && ` · ${change}`}`;
     }
     const fingers = grip && next ? fingersLine(instrument, grip, next) : '';
     return {

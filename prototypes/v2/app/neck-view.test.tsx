@@ -116,7 +116,9 @@ describe('NeckView: stepping through the chart stopped (#1595)', () => {
         expect(text('neck-current')).toBe('G7');
         expect(text('neck-position')).toBe('2 / 3');
         // The playing form: the change ahead, with the ghost grip of the third chord.
-        expect($('.neck-headline')!.textContent).toMatch(/^Next: Cmaj7 · root up a 4th/);
+        expect($('.neck-headline')!.textContent).toMatch(
+            /^Next: Cmaj7 · root moves one string over, same fret/,
+        );
         expect(ghosts()).toBe(studyGrips.get(2)!.notes.length);
         expect($('.neck-rootpath')).not.toBeNull();
 
