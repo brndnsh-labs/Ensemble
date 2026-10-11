@@ -161,11 +161,6 @@ export function markPackInstalled(packId: string, installed: boolean): void {
     }
 }
 
-/** Drop a pack's buffers (eviction / test reset). */
-export function clearPack(packId: string): void {
-    packCache.delete(packId);
-}
-
 /** Test helper: wipe the entire pack cache (and installed-set) between cases. */
 export function __resetPackCacheForTest(): void {
     packCache.clear();

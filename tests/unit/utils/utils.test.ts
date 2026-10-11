@@ -2,7 +2,6 @@
 import { describe, expect, it } from 'vitest';
 import { TIME_SIGNATURES } from '../../../public/config.js';
 import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
-import { formatUnicodeSymbols } from '../../../public/sanitize.js';
 import { compressSections, tryDecompressSections } from '../../../public/state/share-codec.js';
 
 /** A valid payload's sections (a rejected one reads as none). */
@@ -13,9 +12,7 @@ import {
     getMidi,
     getStepInfo,
     keyDistance,
-    midiToNote,
     normalizeKey,
-    secondsPerBeatFor,
     secondsPerStepFor,
     transposeKeyName,
 } from '../../../public/utils.js';
@@ -83,36 +80,13 @@ describe('Utility Functions', () => {
 
     // BPM is quarter-notes/min for every meter (DAW/MIDI convention). Lock in:
     //   - secondsPerStepFor(bpm) = (60/bpm)/4 — one 16th — in ALL meters.
-    //   - secondsPerBeatFor returns one `ts.beats`-native unit:
-    //       stepsPerBeat=4 (2/4, 3/4, 4/4, 5/4, 7/4) → 60/bpm (one quarter);
-    //       stepsPerBeat=2 (6/8, 7/8, 12/8)          → (60/bpm)/2 (one eighth).
-    describe('secondsPerStepFor / secondsPerBeatFor (quarter-note BPM)', () => {
+    describe('secondsPerStepFor (quarter-note BPM)', () => {
         const bpm = 120;
         const FLOAT_TOL = 1e-9;
-
-        const quarterBeatMeters = ['2/4', '3/4', '4/4', '5/4', '7/4'];
-        const eighthBeatMeters = ['7/8', '6/8', '12/8'];
 
         it('step duration is one 16th = (60/bpm)/4 regardless of meter', () => {
             // Step duration no longer depends on time signature at all.
             expect(secondsPerStepFor(bpm)).toBeCloseTo(60 / bpm / 4, 12);
-        });
-
-        quarterBeatMeters.forEach((tsName) => {
-            it(`one ts.beats unit = one quarter for ${tsName} (quarter beat)`, () => {
-                const ts = TIME_SIGNATURES[tsName];
-                expect(ts.stepsPerBeat).toBe(4);
-                expect(secondsPerBeatFor(ts, bpm)).toBeCloseTo(60 / bpm, 12);
-            });
-        });
-
-        eighthBeatMeters.forEach((tsName) => {
-            it(`one ts.beats unit = one eighth for ${tsName} (eighth beat)`, () => {
-                const ts = TIME_SIGNATURES[tsName];
-                // ts.beats counts eighths in all three (7/8, 6/8, 12/8)
-                expect(ts.stepsPerBeat).toBe(2);
-                expect(secondsPerBeatFor(ts, bpm)).toBeCloseTo(60 / bpm / 2, 12);
-            });
         });
 
         it('matches the All-Blues 6/8 felt pulse: ~0.667s per dotted-quarter at bpm=90', () => {
@@ -145,33 +119,6 @@ describe('Utility Functions', () => {
             expect(14 * secondsPerStepFor(bpm)).toBeCloseTo(3.5 * (60 / bpm), 9);
         });
     });
-    describe('formatUnicodeSymbols', () => {
-        it('should convert ASCII sharp (#) to Unicode sharp (♯) in chord strings', () => {
-            expect(formatUnicodeSymbols('C#')).toBe('C♯');
-            expect(formatUnicodeSymbols('F#m7')).toBe('F♯m7');
-            expect(formatUnicodeSymbols('#IV')).toBe('♯IV');
-        });
-
-        it('should convert ASCII flat (b) to Unicode flat (♭) in chord notes and suffixes', () => {
-            expect(formatUnicodeSymbols('Bb')).toBe('B♭');
-            expect(formatUnicodeSymbols('Ebmaj7')).toBe('E♭maj7');
-            expect(formatUnicodeSymbols('bII')).toBe('♭II');
-            expect(formatUnicodeSymbols('bvii9')).toBe('♭vii9');
-            expect(formatUnicodeSymbols('m7b5')).toBe('m7♭5');
-            expect(formatUnicodeSymbols('7b9')).toBe('7♭9');
-        });
-
-        it('should NOT convert "b" character in chord quality names like "halfdim" or "maj"', () => {
-            expect(formatUnicodeSymbols('halfdim')).toBe('halfdim');
-            expect(formatUnicodeSymbols('maj7')).toBe('maj7');
-        });
-
-        it('should correctly convert flat/sharp symbols in slash chords (e.g., Ab/Gb)', () => {
-            expect(formatUnicodeSymbols('Ab/Gb')).toBe('A♭/G♭');
-            expect(formatUnicodeSymbols('C/E')).toBe('C/E');
-        });
-    });
-
     describe('normalizeKey', () => {
         it('should normalize C# to its enharmonic equivalent Db for consistent internal key representation', () => {
             expect(normalizeKey('C#')).toBe('Db');
@@ -238,30 +185,6 @@ describe('Utility Functions', () => {
 
         it('should return approximately 261.63Hz for MIDI note 60 (Middle C)', () => {
             expect(getFrequency(60)).toBeCloseTo(261.63, 2);
-        });
-    });
-
-    describe('midiToNote', () => {
-        it('should correctly convert valid MIDI numbers to note names and octaves', () => {
-            expect(midiToNote(60)).toEqual({ name: 'C', octave: 4 });
-            expect(midiToNote(61)).toEqual({ name: 'Db', octave: 4 });
-            expect(midiToNote(69)).toEqual({ name: 'A', octave: 4 });
-            expect(midiToNote(72)).toEqual({ name: 'C', octave: 5 });
-            expect(midiToNote(21)).toEqual({ name: 'A', octave: 0 });
-            expect(midiToNote(0)).toEqual({ name: 'C', octave: -1 });
-        });
-
-        it('should handle negative MIDI numbers correctly', () => {
-            expect(midiToNote(-1)).toEqual({ name: 'B', octave: -2 });
-            expect(midiToNote(-12)).toEqual({ name: 'C', octave: -2 });
-        });
-
-        it('should return fallback for NaN or non-finite values', () => {
-            expect(midiToNote(NaN)).toEqual({ name: '---', octave: 0 });
-            expect(midiToNote(Infinity)).toEqual({ name: '---', octave: 0 });
-            expect(midiToNote(undefined as any)).toEqual({ name: '---', octave: 0 });
-            expect(midiToNote(null as any)).toEqual({ name: '---', octave: 0 });
-            expect(midiToNote('60' as any)).toEqual({ name: '---', octave: 0 });
         });
     });
 

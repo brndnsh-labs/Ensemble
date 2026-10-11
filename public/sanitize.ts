@@ -87,17 +87,3 @@ export function normalizeSongSeed(value: unknown): string {
     }
     return stripDangerousChars(value).slice(0, SONG_SEED_MAX_LENGTH);
 }
-
-const REGEX_SHARP = /#/g;
-const REGEX_FLAT1 = /([A-G])b/g;
-const REGEX_FLAT2 = /b(?=[0-9IVivm\-/])/g;
-
-/**
- * Replaces ASCII # and b with Unicode ♯ and ♭ for display.
- */
-export function formatUnicodeSymbols(str: string): string {
-    if (!str) {
-        return str;
-    }
-    return str.replace(REGEX_SHARP, '♯').replace(REGEX_FLAT1, '$1♭').replace(REGEX_FLAT2, '♭');
-}

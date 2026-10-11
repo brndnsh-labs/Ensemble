@@ -17,6 +17,7 @@
         "spellcheck": "cspell --no-must-find-files .",
         "depcheck": "biome lint --only=suspicious/noImportCycles .",
         "knip": "knip",
+        "knip:prod": "knip --production --config knip.production.json",
         "jscpd": "jscpd public --no-tips",
         "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.scripts.json",
         "typecheck:tests": "tsc -p tsconfig.tests.json",

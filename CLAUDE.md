@@ -88,6 +88,8 @@ npm run test:e2e --prefix prototypes/v2  # v2 Playwright suite against the BUILT
 
 `npm run depcheck` is the focused circular-import check (`biome lint --only=suspicious/noImportCycles`). The same configured rule runs as part of `npm run lint` and therefore `npm test`; CI does not run the focused command a second time. It catches **runtime cycles only** — `import type` edges are invisible to it, and that is a deliberate 2026-07-24 call (#1234), not an oversight. A type-only cycle erases at compile time and cannot cause the load-order bug this gate exists to prevent. (Verified by mutation test in #1191: a planted runtime cycle exits 1 with 3 diagnostics; a planted type-only cycle exits 0, uncaught.) Biome has no config surface to include type edges, and every TS-aware alternative (madge, dpdm, skott, dependency-cruiser) routes through the TypeScript compiler API and hits the TS7 wall. Don't assume type cycles are covered; don't hand-roll a resolver to catch them.
 
+`npm run knip:prod` lists exports that only tests use. The normal `knip` cannot see them, because it treats test files as entry points, so a function whose last real caller is gone still reads as used. Run it by hand now and then; it is not a gate. Its list always includes deliberate test seams (`__reset…ForTest`) and the encoders the codec tests round-trip through, so it is never empty. Read each entry before deleting it: some are live code that a test happens to be the only caller of.
+
 Targeted tests:
 
 ```bash

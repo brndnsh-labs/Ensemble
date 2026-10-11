@@ -1,11 +1,7 @@
 // @ts-nocheck
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-    CANONICAL_METERS_BY_FEEL,
-    GENRE_FEELS,
-    getCanonicalMeters,
-} from '../../../public/data/smart-genres.js';
+import { CANONICAL_METERS_BY_FEEL, GENRE_FEELS } from '../../../public/data/smart-genres.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
@@ -101,20 +97,6 @@ describe('Smart Genre System', () => {
     });
 
     describe('Canonical meters (S10 time-signature hint)', () => {
-        it('returns the idiomatic meters for genres with extra time signatures', () => {
-            expect(getCanonicalMeters('Jazz')).toEqual(['4/4', '3/4', '6/8']);
-            expect(getCanonicalMeters('Blues')).toEqual(['4/4', '12/8', '6/8']);
-            expect(getCanonicalMeters('Country')).toEqual(['4/4', '3/4']);
-            expect(getCanonicalMeters('Acoustic')).toEqual(['4/4', '3/4']);
-        });
-
-        it('defaults non-annotated genres (and unknown feels) to 4/4', () => {
-            expect(getCanonicalMeters('Funk')).toEqual(['4/4']);
-            expect(getCanonicalMeters('Reggae')).toEqual(['4/4']);
-            expect(getCanonicalMeters('Nonexistent Genre')).toEqual(['4/4']);
-            expect(getCanonicalMeters(undefined)).toEqual(['4/4']);
-        });
-
         it('covers every genre feel with a non-empty meter list including 4/4', () => {
             for (const feel of GENRE_FEELS) {
                 const meters = CANONICAL_METERS_BY_FEEL[feel];

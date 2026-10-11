@@ -87,7 +87,6 @@ import {
     getBestInversion,
     getChordDetails,
     getIntervals,
-    transformRelativeProgression,
     validateProgression,
 } from '../../../public/engine/chords-engine.js';
 import { getState } from '../../../public/state.js';
@@ -257,28 +256,6 @@ describe('Chords & Voicing Logic', () => {
             const voiced = getBestInversion(48, intervals, []);
             const resultIntervals = voiced.map((n) => n - voiced[0]);
             expect(resultIntervals).toEqual(intervals);
-        });
-    });
-
-    describe('Transposition (transformRelativeProgression)', () => {
-        it('should transpose Roman Numerals correctly', () => {
-            // iim7 | V7 | Imaj7 shift -3
-            const result = transformRelativeProgression('iim7 | V7 | Imaj7', -3, true);
-            expect(result).toBe('ivm7 | bVII7 | bIIImaj7');
-        });
-
-        it('should handle Nashville Numbers and Absolute names', () => {
-            expect(transformRelativeProgression('1 | 4 | 5', -3, true)).toBe('b3 | b6 | b7');
-            expect(transformRelativeProgression('C | F | G', 1, false)).toBe('Db | Gb | Ab');
-        });
-
-        it('should handle slash chords and preserve casing', () => {
-            expect(transformRelativeProgression('C/E | G/B', 2, false)).toBe('D/Gb | A/Db');
-            expect(transformRelativeProgression('i | IV | V7', 3, false)).toBe('vi | II | III7');
-        });
-
-        it('should keep sharp roman spellings for tritone functions', () => {
-            expect(transformRelativeProgression('I | #IVdim7 | V', 0)).toBe('I | #IVdim7 | V');
         });
     });
 

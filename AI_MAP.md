@@ -150,7 +150,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` (re-export from `synth-chords`) |
 | `public/engine/reverb.ts` | Algorithmic Schroeder/Freeverb reverb (shared reverb return). | `createAlgorithmicReverb`, `REVERB_PRESETS` |
 | `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, velocity→timbre). | `rampGain`, `killActiveVoices`, `velocityTimbre` |
-| `public/engine/humanize.ts` | Leaf module (imports only `hash-utils.ts`) owning the seeded humanization primitives every lane shares — bar-independent timing placement, bar-varying velocity/detune colour, and the knob curve, used by the synth voices. | `humanizePlacement`, `humanizeColor`, `humanizeScale`, `HUMANIZE_PROFILES` |
+| `public/engine/humanize.ts` | Leaf module (imports only `hash-utils.ts`) owning the seeded humanization primitives every lane shares — bar-independent timing placement and the knob curve, used by the synth voices. | `humanizePlacement`, `humanizeScale`, `HUMANIZE_PROFILES` |
 | `public/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
 | `public/engine/section-overrides.ts` | Per-section instrument-enabled overrides for a measure-less chart. | `isInstrumentActiveAtStep`, `isInstrumentEverActive` |
 | `public/engine/hash-utils.ts` | Canonical deterministic hash helpers. `scrambleHash` is stateless and seed-tuple-indexed — see `public/engine/CLAUDE.md` §27. | `scrambleHash`, `stringHash33`, `stringHash31` |
@@ -196,10 +196,10 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | `public/controllers/instrument-controller.ts` | Per-instrument state and preset routing. |
 | `public/controllers/practice-controller.ts` | Section practice — a section's step bounds, for start-from-here (#1016). |
 | `public/export/detached-generation-state.ts` | Offline-render state clone (the band's WAV export and the listening-gate tools): preserves generation settings while stripping live handles and runtime buffers. |
-| `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping for 4-measure row packing, section markers, and density selection. |
+| `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping: chords grouped into measures and section blocks. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/utils.ts` | Pure musical/math primitives: pitch conversion + the step/meter timing core. No DOM, no Web Audio, no persistence. | `getFrequency`, `getStepInfo` |
-| `public/sanitize.ts` | Main-thread string sanitization and display formatting (HTML escaping, dangerous-char stripping, ♯/♭ glyphs). | `escapeHTML`, `stripDangerousChars`, `formatUnicodeSymbols` |
+| `public/sanitize.ts` | Main-thread string sanitization (HTML escaping, dangerous-char stripping, song-seed normalizing). | `escapeHTML`, `stripDangerousChars`, `normalizeSongSeed` |
 | `public/visualizer/visualizer-events.ts` | Note-event contract the scheduler queues when `vizState.enabled`; kept only because the old engine's scheduler, which the app no longer runs, queues through it. | `queueVisualizerNoteEvent`, `VisualizerQueuedEvent` |
 
 ## Infrastructure & Lifecycle (Internal)
