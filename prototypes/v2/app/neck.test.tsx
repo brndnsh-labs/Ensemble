@@ -169,9 +169,8 @@ describe('Neck: previewing the next chord (#1592)', () => {
         expect(
             host.querySelector(`[data-ghost="${rootGhost.string}-${rootGhost.fret}"]`)!.classList,
         ).toContain('neck-fill-root');
-        const paths = host.querySelectorAll('.neck-rootpath');
-        expect(paths).toHaveLength(1);
-        expect(paths[0].textContent).toBe('up a 4th');
+        expect(host.querySelectorAll('.neck-rootpath')).toHaveLength(1);
+        expect(host.querySelector('.neck-rootlabel')!.textContent).toBe('up a 4th');
         // Where, not how: no finger arrows, targets or hold/lift styling without the fingers.
         expect(host.querySelector('.neck-preview')).toBeNull();
         expect(host.querySelector('.neck-arrow, .neck-target')).toBeNull();

@@ -650,6 +650,14 @@ export function Neck({
                             })}
                         </g>
                     )}
+                    {rootPair && (
+                        <RootLabel
+                            from={point(rootPair.from)}
+                            to={point(rootPair.to)}
+                            sameString={rootPair.from.string === rootPair.to.string}
+                            text={rootPair.text}
+                        />
+                    )}
                 </g>
                 {home && band && (
                     <g
@@ -675,32 +683,48 @@ export function Neck({
     );
 }
 
-function RootPath({
-    from,
-    to,
-    sameString,
-    text,
-    marker,
-}: {
+interface RootPathProps {
     from: { x: number; y: number };
     to: { x: number; y: number };
     sameString: boolean;
     text: string;
-    marker: string;
-}) {
-    // Same string: bow well clear of the dots between. Straight across one fret: no bow at all.
+}
+
+/**
+ * The root's path and where its label sits. Same string: bow well clear of the dots between, and
+ * put the label on the bow's far side — the midpoint of a two-fret move is still under the dots,
+ * so "above the curve" would be on the string. Straight across one fret: no bow, label beside.
+ * Any other move: a slight bow, label above the curve.
+ */
+function rootPathGeometry({ from, to, sameString, text }: RootPathProps) {
     const vertical = Math.abs(to.x - from.x) < 4;
     const bend = sameString ? 30 : vertical ? 0 : -14;
     const c = curve(from, to, 18, 19, bend);
-    // The pill sits at the curve's midpoint, beside a vertical path and above any other.
     const lx = 0.25 * c.sx + 0.5 * c.cx + 0.25 * c.ex;
     const ly = 0.25 * c.sy + 0.5 * c.cy + 0.25 * c.ey;
     const w = text.length * 6.6 + 16;
     const tx = vertical ? lx + w / 2 + 14 : lx;
-    const ty = vertical ? ly : ly - 16;
+    // Which side the bow went (sign of the control point's offset from the straight line).
+    const bowSide = Math.sign(c.cy - (c.sy + c.ey) / 2) || -1;
+    const ty = vertical ? ly : sameString ? ly + bowSide * 16 : ly - 16;
+    return { d: c.d, tx, ty, w };
+}
+
+/** The root's path, drawn under the dots; its label is `RootLabel`, drawn over them. */
+function RootPath({ marker, ...props }: RootPathProps & { marker: string }) {
+    const { d } = rootPathGeometry(props);
     return (
         <g className="neck-rootpath">
-            <path className="neck-rootpath-line" d={c.d} markerEnd={marker} />
+            <path className="neck-rootpath-line" d={d} markerEnd={marker} />
+        </g>
+    );
+}
+
+/** The root move's label, on top of every dot so it always reads. */
+function RootLabel(props: RootPathProps) {
+    const { tx, ty, w } = rootPathGeometry(props);
+    return (
+        <g className="neck-rootlabel">
             <rect
                 className="neck-fill-root"
                 x={tx - w / 2}
@@ -710,7 +734,7 @@ function RootPath({
                 rx={10}
             />
             <text className="neck-rootpath-label" x={tx} y={ty + 4}>
-                {text}
+                {props.text}
             </text>
         </g>
     );
