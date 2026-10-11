@@ -100,14 +100,9 @@ describe('a counted performance generated a chorus at a time (`PassOptions.until
                         : []),
                 ];
                 for (const trade of trades) {
-                    for (const comp of [
-                        'piano',
-                        'rhodes',
-                        'organ',
-                        'clav',
-                        'guitar',
-                        'nylon',
-                    ] as const) {
+                    // The comps that play a different book: rhodes and clav are the piano's in
+                    // all but their MIDI program (`COMP_INSTRUMENTS`).
+                    for (const comp of ['piano', 'organ', 'guitar', 'nylon'] as const) {
                         const settings: BandSettings = {
                             ...DEFAULT_SETTINGS,
                             style,

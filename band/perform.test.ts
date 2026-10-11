@@ -10,6 +10,7 @@ import {
 } from './core/types.js';
 import { chordAt, compileTimeline } from './form/timeline.js';
 import { performPass } from './perform.js';
+import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
 import { STYLE_IDS, STYLES } from './styles/index.js';
 import { FIXTURES, score } from './test/scores.js';
 import { fifthOf } from './theory/chord.js';
@@ -53,12 +54,22 @@ describe('performPass windows', () => {
  */
 const RESUME_COMPS = ['piano', 'organ', 'guitar', 'nylon'] as const;
 
+it('rhodes and clav are the piano in all but their MIDI program', () => {
+    // What lets this file, the invariant suite and the chorus seams leave them out. A profile
+    // that starts to differ has to bring them back into all three.
+    const { program: _, ...piano } = COMP_INSTRUMENTS.piano;
+    for (const comp of ['rhodes', 'clav'] as const) {
+        const { program: __, ...profile } = COMP_INSTRUMENTS[comp];
+        expect(profile).toEqual(piano);
+    }
+});
+
 describe.each(STYLE_IDS)('%s resume parity', (styleId) => {
     for (const [name, fixtureScore] of Object.entries(FIXTURES)) {
         it(`${name} resumes at any barline exactly as the full pass, trading off`, () => {
             const timeline = compileTimeline(fixtureScore);
             const failures: string[] = [];
-            for (const comp of RESUME_COMPS) {
+            for (const [c, comp] of RESUME_COMPS.entries()) {
                 const settings: BandSettings = {
                     ...DEFAULT_SETTINGS,
                     style: styleId,
@@ -69,7 +80,16 @@ describe.each(STYLE_IDS)('%s resume parity', (styleId) => {
                 // `passLift` caps at pass 3) — a resumed pass can land in any of them.
                 for (const pass of [0, 1, 2, 3] as const) {
                     const full = performPass(timeline, settings, { pass, looping: true });
+                    // A quarter of the barlines for each instrument and pass, a different quarter
+                    // each time: every barline is still resumed on every instrument and in every
+                    // pass, only not in all sixteen pairings (which were 25,000 passes). The
+                    // `from >> 2` turns the pairing every four bars, since sections open on a
+                    // multiple of four: without it every section's first bar would get the same
+                    // four pairings, and an organ would never resume at one in the head.
                     for (let from = 1; from < timeline.bars.length; from++) {
+                        if ((from + (from >> 2) + c + pass) % 4 !== 0) {
+                            continue;
+                        }
                         const resumed = performPass(timeline, settings, {
                             pass,
                             looping: true,

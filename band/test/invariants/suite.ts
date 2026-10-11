@@ -402,8 +402,16 @@ function defineCounted(styles: StyleId[]): void {
 function defineStyles(styles: StyleId[]): void {
     describe.each(styles)('%s invariants', (styleId) => {
         const style = STYLES[styleId];
+        // Each case below plays half the seeds, and the next case the other half (the full eight
+        // on every case was two thirds of the unit suite's time). A chart has an even number of
+        // cases, so the halves also swap from one chart to the next: otherwise a guitar with a
+        // bassist, or a keyboard's ending, would only ever meet the same four seeds. Each
+        // instrument, looping or ending, with a bassist or without, plays all eight across the
+        // charts.
+        let turn = 0;
         for (const [name, score] of Object.entries(FIXTURES)) {
             const timeline = compileTimeline(score);
+            turn++;
             for (const comp of INSTRUMENTS) {
                 // Guitars also play without a bassist: the grips come down, the bossa thumb plays.
                 const bassless =
@@ -412,10 +420,12 @@ function defineStyles(styles: StyleId[]): void {
                     bassless.map((b) => [l, b] as const),
                 )) {
                     const label = `${name} on ${comp}${noBass ? ' without bass' : ''}`;
+                    const seeds = SEEDS.filter((_, i) => (i + turn) % 2 === 0);
+                    turn++;
                     it(`${label}${looping ? ' (looping)' : ' (ending)'}`, () => {
                         const problems: string[] = [];
                         const judged = asPlayed(timeline, styleId, looping);
-                        for (const seed of SEEDS) {
+                        for (const seed of seeds) {
                             const settings: BandSettings = {
                                 ...DEFAULT_SETTINGS,
                                 style: styleId,
@@ -432,9 +442,15 @@ function defineStyles(styles: StyleId[]): void {
                                 lead: style.lead?.prefers ?? DEFAULT_SETTINGS.lead,
                             };
                             const first = performPass(timeline, settings, { pass: 0, looping });
-                            const again = performPass(timeline, settings, { pass: 0, looping });
-                            if (JSON.stringify(again.events) !== JSON.stringify(first.events)) {
-                                problems.push(`${seed}: not deterministic`);
+                            // Played again, the same notes: on a case's first seed, which
+                            // catches a draw from outside the seed wherever the pass always
+                            // makes it. One made only on a rare branch is left to resume parity
+                            // and the chorus joins, which compare separately generated passes.
+                            if (seed === seeds[0]) {
+                                const again = performPass(timeline, settings, { pass: 0, looping });
+                                if (JSON.stringify(again.events) !== JSON.stringify(first.events)) {
+                                    problems.push(`${seed}: not deterministic`);
+                                }
                             }
                             checkPass(
                                 judged,
