@@ -387,9 +387,7 @@ export interface SoloistVoice {
 }
 
 /**
- * Main-thread synth/voice tracking. Lives on the audio thread (not the worker)
- * and is mutated by the synth layer. Not persisted, not synced to the worker
- * (the worker computes its own `lastFreq` for engine reads).
+ * Synth voice tracking, mutated by the synth layer. Not persisted.
  */
 export interface SoloistAudio {
     /** Active polyphonic voices. */

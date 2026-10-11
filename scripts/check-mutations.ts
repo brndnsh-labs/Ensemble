@@ -14,9 +14,9 @@ const SLICES = 'playback|chords|bass|soloist|groove|midi|arranger';
 // typecheck in `public/`, so every REAL write in the tree uses a cast and the
 // bare-only regex fired on nothing.
 //
-// 1. bare        `playback.step = 4`  (still possible through a loosely-typed handle)
-// 2. cast        `(playback as Mutable<typeof playback>).step = 4`
-// 3. aliased     `const p = playback as Mutable<typeof playback>;  p.step = 4`
+// 1. bare        `playback.bpm = 90`  (still possible through a loosely-typed handle)
+// 2. cast        `(playback as Mutable<typeof playback>).bpm = 90`
+// 3. aliased     `const p = playback as Mutable<typeof playback>;  p.bpm = 90`
 //
 // The `(?<!graph\.)` anchor keeps AUDIO-NODE writes off the state-mutation radar:
 // `conductor.ts` aliases `playback.audioGraph` to `graph`, so `graph.bass.eq.type =`

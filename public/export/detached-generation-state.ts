@@ -43,7 +43,7 @@ function cloneRaw<T>(value: T): T {
  * Creates a detached generation state for worker or offline-render ownership.
  *
  * Musical settings and precomputed arrangement maps are preserved, while live
- * Web Audio/DOM handles and every scheduled-note buffer start empty. The final
+ * Web Audio/DOM handles start empty. The final
  * cloneRaw pass is load-bearing for Web Worker postMessage: deepSignal proxies
  * cannot cross a structured-clone boundary.
  */

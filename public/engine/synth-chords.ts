@@ -300,8 +300,7 @@ function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
             brightOsc.frequency.setValueAtTime(freq, startTime);
             // Upper partials die first: a fast attack then an immediate decay
             // (time-constant 0.18 s) makes this an attack-brightness bloom,
-            // not a sustained ring — which also sidesteps sustain-pedal
-            // coordination, since the layer is gone long before pedal-up.
+            // not a sustained ring.
             brightGain.gain.setValueAtTime(0, startTime);
             brightGain.gain.setTargetAtTime(finalVol * brightness * 0.45, startTime, 0.004);
             rampGain(brightGain.gain, 0, startTime + 0.03, 0.18);
