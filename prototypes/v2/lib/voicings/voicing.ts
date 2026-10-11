@@ -13,9 +13,15 @@
  * which grips a chord is offered (`allPositions`, a quality's `required` tones, where `buildAt`
  * puts one, what `candidates` holds back as a last resort and how far past the window it
  * looks, `inReach`), to which barre a shell may take
- * (`fingerRules`), and so does letting a newer rule reach a shell, which is why triad rules are
- * gated by `kind`. If the change is meant, regenerate the fixture in the same commit (the
- * test's header says how) and review its diff.
+ * (`fingerRules`), to which fingerings the chart plan may give a shell (`fingering.ts`'s
+ * `taughtAmong`, #1611: fingers only), and so does letting a newer rule reach a shell, which is
+ * why triad rules are gated by `kind`. If the change is meant, regenerate the fixture in the
+ * same commit (the test's header says how) and review its diff.
+ *
+ * Grip choice reads the fingering costs too: `buildAt` places an added tone by the cheapest
+ * fingering's cost, and `rootBuried` by whether any fingering in reach has the root first
+ * (`fingerOptions`, both). So a change to `handCost` or to that list can move a GRIP, not
+ * only a finger; #1611 left both alone for that reason and put its rules in the plan.
  */
 import { assignFingers, type FingerOpts, fingerOptions, fingerSequence } from './fingering';
 import { DEGREES, mod, QUALITIES } from './theory';
@@ -841,7 +847,7 @@ function unifyGrips(
  * Voice a whole chart at once: one grip per chord, chosen so the hand moves as little as possible
  * and the root takes simple paths, a strummed symbol (a triad, a ukulele shell) kept to one grip
  * where that costs little (`unifyGrips`), then fingers planned across the chart so held notes
- * stay held.
+ * stay held — for a shell, between the fingerings it is taught with (`fingerSequence`, #1611).
  * Extra fields on each chart entry (bar, beat, numeral, duration...) are carried through.
  */
 export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions): VoicedChord<C>[] {

@@ -309,9 +309,12 @@ describe('neckModel', () => {
         expect(model.headline).toBe(
             'Starts on Dm7 · then G7: root up a 4th, over to the 6th string, 2 frets lower',
         );
+        // Dm7 x 5 3 5 x x is 2-1-3, root under the middle finger (#1611). It was 3-2-4, the
+        // root under the ring finger so that the middle one could stay on the F ("Finger 2
+        // stays down"): a hold no teacher shows. Fingered root first, the 7th slides to G7's 3rd.
         expect(model.fingers).toBe(
-            'Finger 2 stays down; finger 1 goes down on the 6th string, fret 3; ' +
-                'finger 3 moves to the 3rd string, fret 4.',
+            'Finger 1 moves to the 6th string, fret 3; finger 2 moves to the 4th string, fret 3; ' +
+                'finger 3 slides down 1 fret.',
         );
     });
 
@@ -326,6 +329,31 @@ describe('neckModel', () => {
         expect(second.fingers).toBe(
             'Finger 3 stays down; finger 2 moves to the 5th string, fret 3; ' +
                 'finger 4 goes down on the 2nd string, fret 5.',
+        );
+    });
+
+    it('says the same change the same way a tone down, at the 1st fret (#1611)', () => {
+        // Cm7 F7 B♭maj7 is the chart above two frets lower. F7 1 x 1 2 x x to B♭maj7
+        // x 1 x 2 3 x keeps the ring finger on its note exactly as G7 to Cmaj7 does: a finger
+        // that is already down is not lifted so that the index can take the 1st fret.
+        const flat = view([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: ['Cm7', 'F7', 'Bbmaj7'].map((name, i) => bar(`m${i}`, [chord(name, 4)])),
+            },
+        ]);
+        const grips = new Map(
+            voiceBandChart(flat, {
+                instrument: 'guitar',
+                home: [1, 6],
+                rootStrings: 'classic',
+            }).map((v) => [v.globalIndex, v] as const),
+        );
+        expect(neckModel(flat, grips, 1, GUITAR)!.fingers).toBe(
+            'Finger 3 stays down; finger 2 moves to the 5th string, fret 1; ' +
+                'finger 4 goes down on the 2nd string, fret 3.',
         );
     });
 

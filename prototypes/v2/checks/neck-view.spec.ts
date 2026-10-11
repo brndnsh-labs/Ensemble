@@ -74,8 +74,9 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(sayFingers).not.toBeChecked();
     await sayFingers.check();
     await expect(view.locator('.neck-fingers')).toBeVisible();
-    await expect(view.locator('.neck-fingers')).toContainText('Finger 2 stays down');
-    await expect(view.locator('.neck-fingers')).toContainText('goes down');
+    // Dm7 x 5 3 5 x x (2-1-3) to G7 3 x 3 4 x x (1-2-3): the 7th slides down to G7's 3rd.
+    await expect(view.locator('.neck-fingers')).toContainText('Finger 1 moves to');
+    await expect(view.locator('.neck-fingers')).toContainText('finger 3 slides down 1 fret');
     await page.reload();
     await songLink(page, 'Neck study').first().click();
     await expect(view.getByRole('checkbox', { name: 'Say the fingers' })).toBeChecked();
