@@ -23,10 +23,10 @@ describe('Disco Piano Critique', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockState = {
-            playback: { bandIntensity: 0.5, complexity: 0.7, step: 0, intent: {} },
+            playback: { bandIntensity: 0.5, complexity: 0.7, intent: {} },
             groove: { genreFeel: 'Disco', pocket: 0, instruments: [] },
-            soloist: makeSoloistMock({ enabled: false, lastFreq: 0 }),
-            bass: { enabled: true, lastFreq: 55 },
+            soloist: makeSoloistMock({ enabled: false }),
+            bass: { enabled: true },
             harmony: { enabled: false },
             chords: { enabled: true, style: 'disco', density: 'balanced' },
             arranger: { timeSignature: '4/4', totalSteps: 512, progression: [] },

@@ -88,7 +88,5 @@ export function resetAllStateForTest(): void {
     s.mode = 'monophonic';
     s.autoMode = true;
     const aud = s.audio as Mutable<typeof s.audio>;
-    aud.lastFreq = null;
     aud.lastRenderedFreq = null;
-    aud.lastPlayedFreq = null;
 }

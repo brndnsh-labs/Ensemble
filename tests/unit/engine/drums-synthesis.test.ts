@@ -509,14 +509,14 @@ describe('Drum Synthesis', () => {
             ],
         };
         const forcedFullState = {
-            playback: { bandIntensity: 0.7, step: 0 },
+            playback: { bandIntensity: 0.7 },
             arranger,
             bass: { enabled: false },
             chords: { enabled: false },
             soloist: makeSoloistMock({ enabled: false }),
         };
         const forcedSparseState = {
-            playback: { bandIntensity: 0.7, step: 16 },
+            playback: { bandIntensity: 0.7 },
             arranger,
             bass: { enabled: true },
             chords: { enabled: true },

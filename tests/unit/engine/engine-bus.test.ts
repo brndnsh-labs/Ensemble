@@ -27,7 +27,6 @@ vi.mock('../../../public/engine/synth-chords.js', () => ({
     killAllPianoNotes: vi.fn(),
     INSTRUMENT_PRESETS: {},
     playNote: vi.fn(),
-    updateSustain: vi.fn(),
 }));
 vi.mock('../../../public/engine/synth-drums.js', () => ({
     killDrumNote: vi.fn(),

@@ -53,10 +53,7 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
             ...liveState.playback,
             audio: null,
             audioGraph: null,
-            heldNotes: new Set(),
             isPlaying: false,
-            nextNoteTime: 0,
-            unswungNextNoteTime: 0,
         },
         arranger: {
             ...liveState.arranger,
@@ -75,13 +72,9 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
         },
         chords: {
             ...liveState.chords,
-            buffer: new Map(),
         },
         bass: {
             ...liveState.bass,
-            buffer: new Map(),
-            lastFreq: null,
-            lastPlayedFreq: null,
             lastBassGain: null,
         },
         soloist: {
@@ -89,10 +82,7 @@ export function cloneStateForDetachedGeneration(liveState: EnsembleState): Ensem
             audio: {
                 ...liveState.soloist.audio,
                 activeVoices: [],
-                buffer: new Map(),
-                lastFreq: null,
                 lastRenderedFreq: null,
-                lastPlayedFreq: null,
             },
         },
     } satisfies EnsembleState;

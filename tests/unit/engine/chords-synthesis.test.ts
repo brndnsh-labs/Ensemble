@@ -57,8 +57,6 @@ vi.mock('../../../public/state.js', () => {
         },
         audioGraph: { chords: { gain: { connect: vi.fn() } } },
         bandIntensity: 0.5,
-        sustainActive: false,
-        heldNotes: new Set(),
     };
     const mockGroove = { audioBuffers: { noise: {} } };
     // voice: 'synth' — the reworked synth voice is the only chord voice since
@@ -92,7 +90,7 @@ vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) =>
     safeDisconnect: vi.fn(),
 }));
 
-import { killAllPianoNotes, playNote, updateSustain } from '../../../public/engine/synth-chords.js';
+import { playNote } from '../../../public/engine/synth-chords.js';
 import { getState } from '../../../public/state.js';
 
 const { playback } = getState();
@@ -101,8 +99,6 @@ describe('Chord Synthesis', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         playback.audio.currentTime = 10;
-        playback.sustainActive = false;
-        playback.heldNotes.clear();
     });
 
     it('should use a PeriodicWave for the piano voice', () => {
@@ -137,51 +133,6 @@ describe('Chord Synthesis', () => {
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
     });
 
-    it('should hold notes when sustain is active', () => {
-        playback.sustainActive = true;
-        playNote(getState(), 440, 10, 1.0);
-
-        expect(playback.heldNotes.size).toBe(1);
-    });
-
-    it('should pop the oldest note when heldNotes exceeds 64 limit', () => {
-        playback.sustainActive = true;
-        for (let i = 0; i < 65; i++) {
-            playNote(getState(), 440 + i, 10 + i * 0.1, 1.0);
-        }
-        expect(playback.heldNotes.size).toBe(64);
-    });
-
-    it('should release held notes when sustain is deactivated', () => {
-        playback.sustainActive = true;
-        for (let i = 0; i < 3; i++) {
-            playNote(getState(), 440 + i, 10, 1.0);
-        }
-
-        expect(playback.heldNotes.size).toBe(3);
-
-        updateSustain(getState(), false, 11);
-
-        expect(playback.sustainActive).toBe(false);
-        expect(playback.heldNotes.size).toBe(0);
-        const releasedBodies = playback.audio.createGain.mock.results.filter(({ value: gain }) =>
-            gain.gain.setTargetAtTime.mock.calls.some(
-                ([target, time, damping]) => target === 0 && time === 11 && damping === 0.12,
-            ),
-        );
-        expect(releasedBodies).toHaveLength(3);
-    });
-
-    it('should kill all piano notes immediately', () => {
-        playback.sustainActive = true;
-        playNote(getState(), 440, 10, 1.0);
-
-        killAllPianoNotes(getState());
-
-        expect(playback.sustainActive).toBe(false);
-        expect(playback.heldNotes.size).toBe(0);
-    });
-
     // RETIRED (#649): the reworked Piano voice has no WaveShaper analog. The
     // legacy `current` voice ran its body through a per-note WaveShaper; the new
     // additive-body voice (playAdditiveBody) replaces the single-oscillator +
@@ -210,14 +161,12 @@ describe('Chord Synthesis', () => {
     // like the sampled path, so the scheduler can track + cut it.
     describe('#707 B1 — synth chord voice release handle', () => {
         it('returns a handle with release() for the (no-pedal) synth Piano voice', () => {
-            playback.sustainActive = false;
             const handle = playNote(getState(), 440, 10, 1.0);
             expect(handle).not.toBeNull();
             expect(typeof handle.release).toBe('function');
         });
 
         it('release() eases the body to silence and pulls in the oscillator stop', () => {
-            playback.sustainActive = false;
             const handle = playNote(getState(), 440, 10, 1.0);
             const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
             const gains = playback.audio.createGain.mock.results.map((r) => r.value);

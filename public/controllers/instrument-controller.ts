@@ -11,17 +11,10 @@ import {
     restoreGains,
 } from '../engine/engine.js';
 import { dispatch, getState, stateMap } from '../state.js';
-import type { Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export function flushBuffers(): void {
-    const { bass, soloist, chords } = getState();
-    // 1. Clear local buffers
-    bass.buffer.clear();
-    soloist.audio.buffer.clear();
-    chords.buffer.clear();
-
-    // 2. Kill current sounds and buses
+    // Kill current sounds and buses
     killAllPianoNotes(stateMap);
     killSoloistNote(stateMap);
     killBassNote(stateMap);
@@ -36,27 +29,16 @@ export function flushBuffers(): void {
 }
 
 function flushBuffer(...types: string[]): void {
-    const { chords, bass, soloist } = getState();
     const has = (lane: string) => types.includes(lane) || types.includes('all');
     if (has('bass')) {
-        if (bass.lastPlayedFreq !== null) {
-            (bass as Mutable<typeof bass>).lastFreq = bass.lastPlayedFreq; // @direct-mutation
-        }
-        bass.buffer.clear();
         killBassNote(stateMap);
         killBassBus(stateMap);
     }
     if (has('soloist')) {
-        if (soloist.audio.lastPlayedFreq !== null) {
-            (soloist.audio as Mutable<typeof soloist.audio>).lastFreq =
-                soloist.audio.lastPlayedFreq; // @direct-mutation
-        }
-        soloist.audio.buffer.clear();
         killSoloistNote(stateMap);
         killSoloistBus(stateMap);
     }
     if (has('chord')) {
-        chords.buffer.clear();
         killAllPianoNotes(stateMap);
         killChordBus(stateMap);
     }

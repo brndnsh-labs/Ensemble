@@ -35,7 +35,7 @@ vi.mock('../../../public/engine/synth-drums.js', () => ({
 
 vi.mock('../../../public/state.js', () => {
     const mockState = {
-        playback: { step: 10, bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },
+        playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },
         groove: {
             genreFeel: 'Rock',
             enabled: true,
@@ -59,26 +59,19 @@ vi.mock('../../../public/state.js', () => {
             density: 1,
             enabled: true,
             volume: 0.5,
-            buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
         },
         bass: {
             style: 'simple',
             octave: 2,
             enabled: true,
-            lastFreq: null,
-            lastPlayedFreq: 55,
             volume: 0.5,
-            buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
         },
         soloist: makeSoloistMock({
             style: 'scalar',
             octave: 4,
             enabled: true,
-            lastFreq: null,
-            lastPlayedFreq: 440,
             volume: 0.5,
             mode: 'auto',
-            buffer: { clear: vi.fn(), set: vi.fn(), size: 0, delete: vi.fn() },
         }),
     };
 
@@ -107,19 +100,12 @@ describe('Instrument Controller', () => {
         state.bass.enabled = true;
         state.soloist.enabled = true;
         state.groove.enabled = true;
-
-        // Reset buffers
-        state.bass.buffer.size = 0;
     });
 
     describe('flushBuffers', () => {
-        it('should clear all buffers and silence every lane', () => {
-            const state = getState();
-            state.bass.buffer.size = 1;
-
+        it('should silence every lane', () => {
             InstrumentController.flushBuffers();
 
-            expect(state.bass.buffer.clear).toHaveBeenCalled();
             expect(Engine.killAllPianoNotes).toHaveBeenCalled();
             expect(Engine.killBassNote).toHaveBeenCalled();
             expect(Engine.killSoloistNote).toHaveBeenCalled();

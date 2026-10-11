@@ -74,8 +74,6 @@ function makeState(audio) {
         playback: {
             audio,
             audioGraph: { chords: bus(), bass: bus(), soloist: bus(), drums: bus() },
-            heldNotes: new Set(),
-            sustainActive: false,
         },
         chords: { voice: `pack:${PACK}` },
         bass: { voice: `pack:${PACK}`, lastBassGain: null },

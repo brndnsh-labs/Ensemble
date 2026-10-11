@@ -1,4 +1,3 @@
-import { setBpm } from '../controllers/app-controller.js';
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { SMART_GENRES } from '../data/smart-genres.js';
 import { syncBusReverbSend, syncBusVolume, syncMasterVolume } from '../engine/engine.js';
@@ -198,10 +197,6 @@ export function handleEffects(
             if (action.payload?.module === 'playback' && action.payload?.param === 'masterVolume') {
                 syncMasterVolume(stateMap);
             }
-            break;
-        }
-        case ACTIONS.SET_BPM: {
-            setBpm(action.payload, true, context.oldBpm);
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {

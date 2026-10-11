@@ -786,11 +786,7 @@ function getBandLayerCount(state: EnsembleState, step: number): number {
 /**
  * Keep cymbals supportive when the full arrangement is active.
  */
-export function getCymbalMixScale(
-    state: EnsembleState,
-    name: CymbalName,
-    step = state.playback?.step ?? 0,
-): number {
+export function getCymbalMixScale(state: EnsembleState, name: CymbalName, step = 0): number {
     const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
     // Over 4, the lane count before the harmony lane went (#1436): kept so the cymbal mix
     // for today's three pitched lanes is unchanged.

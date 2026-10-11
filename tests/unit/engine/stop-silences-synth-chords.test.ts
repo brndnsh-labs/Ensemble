@@ -1,9 +1,8 @@
 // @ts-nocheck
 /**
- * Stop reaches a synth chord that was never pedal-held (#1569). `playNote` used to register a
- * note in `heldNotes` only under the sustain pedal, so a no-pedal chord — every band chord —
- * scheduled its own release at its written end and `killAllPianoNotes` had nothing to release:
- * measured live, a whole-note piano chord rang to its written end after Stop in 3 of 6 runs.
+ * Stop reaches a synth chord (#1569). `playNote` used to register a note only under the
+ * sustain pedal, so a no-pedal chord — every band chord — scheduled its own release at its
+ * written end and `killAllPianoNotes` had nothing to release: measured live, a whole-note piano chord rang to its written end after Stop in 3 of 6 runs.
  * Each voice now joins a per-context registry as it is made (the synth sibling of #1530's), and
  * Stop releases the registry.
  */
@@ -68,8 +67,6 @@ function makeState(audio) {
         playback: {
             audio,
             audioGraph: { chords: { gain: { connect: vi.fn(), gain: param() } } },
-            heldNotes: new Set(),
-            sustainActive: false,
             bandIntensity: 0.7,
         },
         chords: { voice: 'synth', style: 'piano', reverb: 0 },
@@ -97,7 +94,6 @@ describe('Stop silences a sounding synth chord (#1569)', () => {
         // is clamped to the clock, so "struck a second ago" has to be staged this way.)
         playNote(state, 261.63, audio.currentTime, 8, { vol: 0.5 });
         expect(oscillators.length).toBeGreaterThan(0);
-        expect(state.playback.heldNotes.size).toBe(0); // no pedal: `heldNotes` never saw it
         audio.currentTime = 5;
         const fadesBefore = fadesAt(gains, audio.currentTime);
         const stopsBefore = oscillators.map((osc) => osc.stop.mock.calls.length);
@@ -153,18 +149,5 @@ describe('Stop silences a sounding synth chord (#1569)', () => {
 
         const after = gains.flatMap((g) => g.gain.setTargetAtTime.mock.calls.length);
         expect(after).toEqual(before);
-    });
-
-    it('a pedal-held chord is still released through heldNotes', () => {
-        const { audio, gains } = makeAudio(4);
-        const state = makeState(audio);
-        state.playback.sustainActive = true;
-        playNote(state, 261.63, 3, 8, { vol: 0.5 });
-        expect(state.playback.heldNotes.size).toBe(1);
-
-        killAllPianoNotes(state);
-
-        expect(state.playback.heldNotes.size).toBe(0);
-        expect(fadesAt(gains, audio.currentTime)).toBeGreaterThan(0);
     });
 });

@@ -317,8 +317,6 @@ export interface ChordState {
     readonly volume: number;
     /** Reverb send amount. */
     readonly reverb: number;
-    /** Scheduled notes buffer. */
-    readonly buffer: Map<number, any>;
 }
 
 export interface BassState {
@@ -332,12 +330,6 @@ export interface BassState {
     readonly volume: number;
     /** Reverb level. */
     readonly reverb: number;
-    /** Frequency of the last played note. */
-    readonly lastFreq: number | null;
-    /** Frequency of the note currently ringing. */
-    readonly lastPlayedFreq: number | null;
-    /** Map of scheduled notes from the worker. */
-    readonly buffer: Map<number, any>;
     /** Playing style ID (e.g., 'walking', 'funk'). */
     readonly style: string;
     /** Last gain node for dynamic continuity. */
@@ -402,14 +394,8 @@ export interface SoloistVoice {
 export interface SoloistAudio {
     /** Active polyphonic voices. */
     readonly activeVoices: SoloistVoice[];
-    /** Map of scheduled notes from the worker. */
-    readonly buffer: Map<number, any>;
-    /** Last frequency played. */
-    readonly lastFreq: number | null;
     /** Last frequency actually rendered by the synth (used for portamento). */
     readonly lastRenderedFreq: number | null;
-    /** Last frequency sent to the visualizer. */
-    readonly lastPlayedFreq: number | null;
 }
 
 export interface SoloistState {
@@ -537,12 +523,6 @@ export interface GlobalContext {
     readonly isPlaying: boolean;
     /** Beats per minute (40-240). */
     readonly bpm: number;
-    /** The scheduler time for the next note (swung). */
-    readonly nextNoteTime: number;
-    /** The scheduler time for the next note (straight/quantized). */
-    readonly unswungNextNoteTime: number;
-    /** The global step counter. */
-    readonly step: number;
     /**
      * Section-practice ("drill") — the absolute step at which the next play
      * should begin. Normally 0; set to a section's first step by "start from
@@ -556,12 +536,6 @@ export interface GlobalContext {
     readonly autoIntensity: boolean;
     /** Whether the metronome is active. */
     readonly metronome: boolean;
-    /** Whether the global sustain pedal is "pressed". */
-    readonly sustainActive: boolean;
-    /** Whether debug logging for the soloist is active. */
-    readonly debugSoloist: boolean;
-    /** Currently sustaining piano notes. */
-    readonly heldNotes: Set<any>;
     /** Master output volume. */
     readonly masterVolume: number;
     /** Whether the metronome count-in is enabled. */

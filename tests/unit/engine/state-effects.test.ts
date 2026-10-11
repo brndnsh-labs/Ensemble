@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { setBpm } from '../../../public/controllers/app-controller.js';
 import { syncBusReverbSend, syncBusVolume } from '../../../public/engine/engine.js';
 import {
     __resetPackCacheForTest,
@@ -12,9 +11,6 @@ import { ACTIONS } from '../../../public/types.js';
 // Mock all the imported functions
 vi.mock('../../../public/engine/chords-engine.js', () => ({
     validateProgression: vi.fn(),
-}));
-vi.mock('../../../public/controllers/app-controller.js', () => ({
-    setBpm: vi.fn(),
 }));
 vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
@@ -32,13 +28,6 @@ describe('State Effects Handler', () => {
             playback: { isPlaying: false, theme: 'dark' },
         };
         dispatch = vi.fn();
-    });
-
-    it('should call setBpm on SET_BPM action', () => {
-        const payload = 120;
-        const context = { dispatch, oldBpm: 100 };
-        handleEffects({ type: ACTIONS.SET_BPM, payload: payload }, stateMap, context);
-        expect(setBpm).toHaveBeenCalledWith(payload, true, 100);
     });
 
     it('reconciles URL genre effects after boot while restoring explicit groove settings (#1000)', async () => {

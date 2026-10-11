@@ -1,7 +1,7 @@
 /**
  * Builds a soloist-state mock with the nested `audio` shape populated from a legacy flat
- * input. Tests can keep writing flat properties (e.g. `{ lastFreq: 440 }`) and this helper
- * lifts each known key into its real home, so engine code reading `soloist.audio.lastFreq`
+ * input. Tests can keep writing flat properties (e.g. `{ lastRenderedFreq: 440 }`) and this helper
+ * lifts each known key into its real home, so engine code reading `soloist.audio.lastRenderedFreq`
  * sees the value.
  *
  * Unknown keys are kept at the top level (for forward compat with tests that
@@ -27,10 +27,7 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
     // shape; tests overwrite specific leaves via the flat input below.
     const audio: any = {
         activeVoices: [],
-        buffer: new Map(),
-        lastFreq: null,
         lastRenderedFreq: null,
-        lastPlayedFreq: null,
     };
 
     // Routing: flat alias -> path in the nested shape.
@@ -38,17 +35,8 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
         activeVoices: (v) => {
             audio.activeVoices = v as any;
         },
-        buffer: (v) => {
-            audio.buffer = v as any;
-        },
-        lastFreq: (v) => {
-            audio.lastFreq = v as any;
-        },
         lastRenderedFreq: (v) => {
             audio.lastRenderedFreq = v as any;
-        },
-        lastPlayedFreq: (v) => {
-            audio.lastPlayedFreq = v as any;
         },
     };
 

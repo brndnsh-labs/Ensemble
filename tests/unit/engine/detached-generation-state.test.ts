@@ -12,7 +12,6 @@ describe('detached generation state', () => {
                 ...live.playback,
                 audio: { close: vi.fn() },
                 audioGraph: { master: { disconnect: vi.fn() } },
-                heldNotes: new Set([{ stop: vi.fn() }]),
                 isPlaying: true,
             },
             arranger: {
@@ -27,7 +26,6 @@ describe('detached generation state', () => {
             },
             bass: {
                 ...live.bass,
-                buffer: new Map([[0, [{ midi: 36 }]]]),
                 lastBassGain: { disconnect: vi.fn() },
             },
         };
@@ -40,10 +38,8 @@ describe('detached generation state', () => {
             audioGraph: null,
             isPlaying: false,
         });
-        expect(detached.playback.heldNotes).toEqual(new Set());
         expect(detached.groove.lastHatGain).toBeNull();
         expect(detached.groove.lastSampledHatVoice).toBeNull();
-        expect(detached.bass.buffer).toEqual(new Map());
         expect(detached.bass.lastBassGain).toBeNull();
         expect(detached.arranger.progression).toEqual(input.arranger.progression);
         expect(detached.arranger.progression).not.toBe(input.arranger.progression);

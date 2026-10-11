@@ -23,7 +23,6 @@ export const chords = deepSignal<ChordState>({
     style: 'smart',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.chords,
-    buffer: new Map(),
 });
 
 export const bass = deepSignal<BassState>({
@@ -32,9 +31,6 @@ export const bass = deepSignal<BassState>({
     autoSound: true,
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.bass,
-    lastFreq: null,
-    lastPlayedFreq: null,
-    buffer: new Map(),
     style: 'smart',
     lastBassGain: null,
 });
@@ -59,10 +55,7 @@ export const soloist = deepSignal<SoloistState>({
     // === Main-thread synth / voice tracking ===
     audio: {
         activeVoices: [],
-        buffer: new Map(),
-        lastFreq: null,
         lastRenderedFreq: null,
-        lastPlayedFreq: null,
     },
 });
 
