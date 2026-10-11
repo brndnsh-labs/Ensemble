@@ -109,7 +109,7 @@ const grid = (
 // 273 let all three pass. (First position read as ending at the 1st fret or the 6th was
 // already caught by the 273, and still is.)
 //
-// With all 363, removing each of #1607's rules turns charts red: the open-string rule 2, the
+// With those 363, removing each of #1607's rules turns charts red: the open-string rule 2, the
 // ukulele's open-string credit 11, the barre that frees a root 22, the buried-root rule 38.
 // `engine.test.ts` brackets each from both sides.
 //
@@ -125,14 +125,51 @@ const grid = (
 // grip's free hand 9, one grip per symbol 21. Letting either rule reach a guitar shell turns
 // guitar charts red instead: one grip per symbol 55, the first-position target 20.
 //
+// The last 6 (#1610) are for the window widened by a fret (`inReach`). Only a guitar held
+// to roots on the 6th and 5th strings ever has a window with no grip a player would take, and
+// of the 363 just two charts met one (both in B♭, at frets 2–7 and 7–12); neither is a window
+// the app opens on. These are, at frets 1–6 and 2–7:
+// - `plagal` in E♭ and in E, `minorDim` in C♯ and in D: the °7 and the m7♭5 whose window holds
+//   only the buried-root grip, with the root-first one a fret out (E♭°7 x-6-7-5-7-x, D♯m7♭5
+//   x-6-7-6-7-x, E°7 x-7-8-6-8-x, Em7♭5 x-7-8-7-8-x). `plagal` in E♭ also ends on the B♭7 that
+//   was x-1-0-1-x-x until the open form of a fretted shape became a last resort
+//   (`openShapeOneOff`).
+// - `bossa` in D at frets 1–6: what the reach leaves alone. Its Em7♭5 is two frets out with
+//   its root outside (x-7-8-7-8-x, #1607's accepted case), which is not a reach, and its E♭maj7
+//   (x-6-5-7-x-x) is one the costs already chose.
+// - `fifties` in B at frets 2–7, the window B opens on: its E is the open 6th string or the 7th
+//   fret of the 5th, so Emaj7 has nothing inside, and an open root counts as in the window
+//   (0-x-1-1-x-x, between G♯m7 at the 4th fret and F♯7 at the 2nd; with fretted roots only
+//   it is x-7-6-8-x-x, up the neck and back for one chord).
+// With all 369, removing the wider window turns 6 charts red, removing the open-form rule 2,
+// and counting fretted roots only 1 (this one).
+//
 // So add charts freely, after the ones here, so the fixture's diff is additions only; measure
 // before dropping one (45 of the 436 mutations tried are caught by exactly one chart).
+const classic = (win: number, song: string, key: string): Case => ({
+    ins: 'guitar',
+    rootSet: 'classic',
+    win,
+    song,
+    key,
+    mode: SONG_SHAPES[song].mode,
+});
+const REACH_CASES: Case[] = [
+    classic(1, 'plagal', 'E♭'),
+    classic(1, 'minorDim', 'C♯'),
+    classic(2, 'plagal', 'E'),
+    classic(2, 'minorDim', 'D'),
+    classic(1, 'bossa', 'D'),
+    classic(2, 'fifties', 'B'),
+];
+
 const CASES: Case[] = [
     ...grid(SETUPS, WINDOWS, SONGS, KEYS),
     ...grid(SETUPS, WINDOWS, ['plagal', 'minorDim'], KEYS),
     ...grid([{ ins: 'uke-low-g', rootSet: 'all' }], [null], ['plagal', 'minorDim'], ['C']),
     ...grid([{ ins: 'guitar', rootSet: 'all' }], [1], ['walk'], ['F']),
     ...grid(SETUPS, [1], [...SONGS, 'plagal', 'minorDim'], KEYS),
+    ...REACH_CASES,
 ];
 
 const label = (c: Case): string =>
