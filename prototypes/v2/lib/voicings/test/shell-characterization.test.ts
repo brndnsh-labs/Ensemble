@@ -144,6 +144,21 @@ const grid = (
 // With all 369, removing the wider window turns 6 charts red, removing the open-form rule 2,
 // and counting fretted roots only 1 (this one).
 //
+// #1611 added no chart and moved no grip: it changed FINGERS on 279 chords in 157 of the 369
+// charts (264 chords in 147 guitar charts, 12 in 8 high-G ukulele charts, 3 in the two low-G
+// ones), every shape, root fret, string, fret, degree and role as it was. The chart plan now
+// gives a shell only the fingerings it is taught with (`fingering.ts`'s `taughtAmong`).
+// Undoing each part turns charts red here: the idle-index rule 17; the index-behind-the-nut
+// rule 53, and that rule made absolute (a finger already down lifted) 15; a marked fingering
+// needing no finger of its own 3; the margin at 2.8, where the cheapest stretch gets in, 4.
+// Parts no chart here sees, each bracketed in `engine.test.ts` instead: the margin at 0.7 (the
+// one choice of fingers 0.8 dearer is the root-first Gm7 x-x-5-3-6-x, never taken here); the
+// root-first rule without the margin's help (only the 6th-string °7 below the 4th fret); a
+// finger swapped on its string; and the minor 7th's position fingering, 3-1-4, which in practice a
+// neighbouring triad gives a reason for — no chart here mixes shells with triads, so the
+// pass that keeps a triad's fingers beside a shell is not seen either. Letting 3-1-4 in with
+// no reason turns 17 red, and with any fingering of the neighbour for a reason 2.
+//
 // So add charts freely, after the ones here, so the fixture's diff is additions only; measure
 // before dropping one (45 of the 436 mutations tried are caught by exactly one chart).
 const classic = (win: number, song: string, key: string): Case => ({
