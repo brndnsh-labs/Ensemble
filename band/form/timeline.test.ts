@@ -14,6 +14,32 @@ import {
 
 const BAR = PPQ * 4;
 
+/** A chart whose second bar changes the key and the meter mid-section, with a D.C. al Fine. */
+const BAR_CONTEXT: SemanticScore = (() => {
+    const built = score([
+        { label: 'A', bars: 'I' },
+        { label: 'waltz', meter: '3/4', bars: 'I | I' },
+        { label: 'B', bars: 'I' },
+    ]);
+    const [a, waltz, b] = built.sections;
+    // The 3/4 bars join A as bars of A: the meter is written on the bar, not on a section.
+    a.measures.push(...waltz.measures);
+    a.measures[1] = { ...a.measures[1], key: 'D', meter: '3/4' };
+    a.measures[2] = { ...a.measures[2], end: [{ kind: 'fine', label: 'finish' }] };
+    b.measures[0] = {
+        ...b.measures[0],
+        end: [
+            {
+                kind: 'jump',
+                from: 'start',
+                destination: { kind: 'fine', label: 'finish' },
+                repeats: 'skip',
+            },
+        ],
+    };
+    return { ...built, sections: [a, b] };
+})();
+
 describe('meter skeleton', () => {
     it.each([
         ['4/4', null, [0, 480, 960, 1440], ['down', 'back', 'strong', 'back']],
@@ -160,6 +186,30 @@ describe('timeline', () => {
         expect(secondsAt(t, last.start + BAR, bpm) - secondsAt(t, last.start, bpm)).toBeCloseTo(
             written * FERMATA_STRETCH,
         );
+    });
+
+    it("keeps a bar's key and meter change to the end of its section, and again on a D.C.", () => {
+        // A: I | I (now in D, 3/4) | I, Fine.  B: I, D.C. al Fine. The change written on A's
+        // second bar holds for its third, is gone at B (which starts over from the score), and
+        // is back when the D.C. plays A again.
+        const t = compileTimeline(BAR_CONTEXT);
+        expect(t.bars.map((b) => b.visit.label)).toEqual(['A', 'A', 'A', 'B', 'A', 'A', 'A']);
+        expect(t.bars.map((b) => b.key.tonic)).toEqual([0, 2, 2, 0, 0, 2, 2]);
+        const waltz = 3 * PPQ;
+        expect(t.bars.map((b) => b.meter.barTicks)).toEqual([
+            BAR,
+            waltz,
+            waltz,
+            BAR,
+            BAR,
+            waltz,
+            waltz,
+        ]);
+        // Each bar starts where the one before ended, whatever its length.
+        const starts = [0, BAR, BAR + waltz, BAR + 2 * waltz, 2 * BAR + 2 * waltz];
+        expect(t.bars.slice(0, 5).map((b) => b.start)).toEqual(starts);
+        // The I chord is the tonic of whichever key its bar is in.
+        expect(t.bars.map((b) => chordAt(t, b.start)?.root)).toEqual([0, 2, 2, 0, 0, 2, 2]);
     });
 
     it('gives every meter its own bar length', () => {

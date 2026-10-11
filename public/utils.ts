@@ -1,8 +1,7 @@
 import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
 
 /**
- * utils.ts — shared musical/math primitives, DOM- and Web-Audio-free so the
- * logic worker can import it freely.
+ * utils.ts — shared musical/math primitives, DOM- and Web-Audio-free.
  *
  * What belongs here: pitch/frequency conversion (`getFrequency`, `getMidi`)
  * and the step-map lookup (`binarySearchMap`, `normalizeKey`) — the things every

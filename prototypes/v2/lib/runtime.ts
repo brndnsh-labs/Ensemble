@@ -484,8 +484,8 @@ export function captureContent(): ChartContent {
 
 function rebuild(): void {
     validateProgression(getState(), dispatch);
-    // A score on the band engine installs no plan for the old engine, so it derives nothing
-    // from it (empty maps, an idle worker): that is expected, not an unplayable chart.
+    // A bar-level score has no chord text for `validateProgression` to parse, so its step maps
+    // come out empty: that is expected, not an unplayable chart.
     if (!bandView && !getState().arranger.progression.length) {
         throw new Error('The chart has no playable chords. Check your chord text.');
     }

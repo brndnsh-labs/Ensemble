@@ -468,8 +468,8 @@ the song once through with its ending, a lead track only when the lead played.
 **The chart sheet** draws a score from the score and its timeline (`prototypes/v2/lib/band-chart.ts`),
 not from the old engine's plan, so any chart the timeline compiles opens, edits and plays:
 holds show as `/`, N.C. as `N.C.`, a fermata sits over its chord, and off-grid lengths keep
-their exact widths. The old engine builds nothing from such a score, so its `arranger` maps
-derive empty and its worker idles. Every path that lets a chart onto the stand (open, edit,
+their exact widths. `validateProgression` has no chord text to parse in such a score, so the `arranger` step
+maps derive empty. Every path that lets a chart onto the stand (open, edit,
 import, the guided form) asks `checkPlayable` in `lib/engine-mode.ts`: on the band engine
 that is `validateSemanticScore` plus `compileTimeline`. A measure-less (v1) chart is still drawn from the old maps. On the
 band engine the measure editor can put a fermata on (or take it off) a bar's last event: the flag is

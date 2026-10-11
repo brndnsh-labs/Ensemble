@@ -12,9 +12,9 @@ describe('resolveScoreContext', () => {
         expect(resolveScoreContext(context, {})).toEqual(context);
     });
 
-    it('resets a bar-level change at the next section, which inherits from the score', () => {
-        const changed = resolveScoreContext(score, { key: 'G', meter: '6/8' });
-        expect(changed.key).toBe('G');
+    it('leaves the context as it was inherited when nothing is written', () => {
+        // A section starts over from the score by resolving against it, not against the last
+        // bar: `band/form/timeline.test.ts` checks that end to end.
         expect(resolveScoreContext(score, {})).toEqual(score);
     });
 

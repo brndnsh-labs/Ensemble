@@ -23,7 +23,7 @@ trade layer, the density mirror) survive only as history in §5. The law itself 
 `conductor` and `vizState` slices, `playback`'s toast/flash/session-timer fields, and the
 arranger/groove/chords/bass scheduler scratch fields (`history` and `isDirty` on `arranger`,
 `sectionSeedMap` and `buffer` on `groove`, …) — so the manifest is down from 131
-fields to 76. Not every one of those has a reader yet (`soloist.session`).
+fields to 74. Not every one of those has a reader yet (`soloist.session`).
 The law is unchanged.
 
 **Amended 2026-10-05 (#1437):** `playback.conductorVelocity`, the last paired `runtime-derived`
