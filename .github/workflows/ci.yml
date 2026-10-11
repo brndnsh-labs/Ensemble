@@ -198,16 +198,18 @@ jobs:
         # playwright.config.ts. Each leg is `V2_SHARD=<shard>/<of>`, so a project's legs
         # must count 1..<of> with none missing, or its specs on the missing leg never run.
         #
-        # WebKit gets three legs to the laptop's two (measured 2026-10-11): the same specs
-        # take it about 1.4x as long on a runner, its slower leg was the whole PR wall
-        # clock (383s against the laptop's 263s), and a third brings its legs level with
-        # the laptop's.
+        # Three laptop legs and four WebKit (measured on the runner, 2026-10-11): WebKit takes
+        # about 1.3x the laptop's seconds for fewer specs, and its slower leg was the whole
+        # PR wall clock (383s on two legs). A leg is about 75s of setup and build before its
+        # first test, so past this a further leg buys little.
         include:
-          - { project: laptop, browser: chromium, shard: 1, of: 2 }
-          - { project: laptop, browser: chromium, shard: 2, of: 2 }
-          - { project: webkit-phone, browser: webkit, shard: 1, of: 3 }
-          - { project: webkit-phone, browser: webkit, shard: 2, of: 3 }
-          - { project: webkit-phone, browser: webkit, shard: 3, of: 3 }
+          - { project: laptop, browser: chromium, shard: 1, of: 3 }
+          - { project: laptop, browser: chromium, shard: 2, of: 3 }
+          - { project: laptop, browser: chromium, shard: 3, of: 3 }
+          - { project: webkit-phone, browser: webkit, shard: 1, of: 4 }
+          - { project: webkit-phone, browser: webkit, shard: 2, of: 4 }
+          - { project: webkit-phone, browser: webkit, shard: 3, of: 4 }
+          - { project: webkit-phone, browser: webkit, shard: 4, of: 4 }
     steps:
       - uses: actions/checkout@v7
 
