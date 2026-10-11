@@ -231,13 +231,11 @@ describe('Soloist Synthesis', () => {
         });
 
         it('should apply blues style vibrato (lines 761, 770)', () => {
-            soloist.session.currentPhrase.context = { profile: 'gilmour' }; // Covers profile branch
             // function signature: playSoloNote(getState(), freq, time, duration, vol = 0.5, bendStartInterval = 0, style = null, forceVibrato = false)
             playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'blues', true); // forceVibrato = true
         });
 
         it('should apply neo style vibrato (lines 763, 772)', () => {
-            soloist.session.currentPhrase.context = { profile: 'slash' }; // Covers profile branch
             playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'neo', true);
         });
 

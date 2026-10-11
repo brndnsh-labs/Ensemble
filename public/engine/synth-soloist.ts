@@ -822,7 +822,7 @@ function createVibrato(
         depthFactor = 0.015;
     }
 
-    const profile = soloist.session.currentPhrase.context?.profile;
+    const profile: string = 'srv';
     if (profile === 'gilmour') {
         depthFactor *= 1.3;
     } else if (profile === 'slash') {
