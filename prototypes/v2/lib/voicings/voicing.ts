@@ -262,9 +262,9 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
 }
 
 /** Keep the hand still and the root's path simple: same string or the neighboring string, few frets. */
-function transCost(a: Voicing, b: Voicing): number {
+function transCost(a: Voicing, b: Voicing, home: HomeWindow | null): number {
     if (a.shape.kind !== 'shell' || b.shape.kind !== 'shell') {
-        return triadTransCost(a, b);
+        return triadTransCost(a, b, home);
     }
     const ra = a.notes.find((n) => n.role === 'R')!,
         rb = b.notes.find((n) => n.role === 'R')!;
@@ -285,7 +285,7 @@ function transCost(a: Voicing, b: Voicing): number {
 // whole story. A triad is the opposite: its inversions move the root around on purpose, and an
 // open string costs the hand nothing — the first-position C, Am, F and G a uke player learns
 // are "in position" at the nut. So a triad's position is read off its FRETTED notes only, its
-// move cost counts the fingers that actually change, and in first position (a window from
+// move cost follows each voice on its own string and keeps the string set (#1597), and in first position (a window from
 // fret 1, or no window) each open string earns a little: open strings ring, and they are the
 // whole point of the chords a player learns first.
 
@@ -308,14 +308,45 @@ function triadUnaryCost(v: Voicing, target: number, home: HomeWindow | null): nu
     );
 }
 
+/** The grip's lowest string: where its string set sits across the neck. */
+const lowString = (v: Voicing): number => Math.min(...v.notes.map((n) => n.string));
+
 /**
- * Keep the hand where it is and move as few fingers as possible: a held note is a finger that
- * stays. A shift inside one fret is free — the hand has not moved, a finger has reached.
+ * Voice-lead on a string set (#1597), the way a guitarist comps a pop loop: keep the same three
+ * strings and move through the inversions, each voice stepping or holding. Three terms:
+ *
+ * - **Stay on the set.** The sets are compared by their lowest string, which is how a player
+ *   names one ("the 4-3-2 set") and stays well-defined between a two-note power chord and a
+ *   three-note triad, where an overlap count would read a smaller grip as a move. Every uke grip
+ *   rings all four strings, so this never fires there.
+ * - **Move by step.** Each note of the new grip is costed on its own string: a common tone (same
+ *   string, same fret) is free, a slide costs by its fret distance (an open string is fret 0), a
+ *   string that was silent before is a fresh placement. A note on an open string costs nothing in
+ *   first position (the finger simply lifts and the string rings, the uke's 0003 → 2000 move);
+ *   up the neck it is fret 0, a reach all the way back to the nut.
+ * - **Keep the hand where it is.** A shift inside one fret is free — the hand has not moved, a
+ *   finger has reached.
  */
-function triadTransCost(a: Voicing, b: Voicing): number {
-    const held = new Set(a.notes.map((n) => `${n.string}:${n.fret}`));
-    const moved = b.notes.filter((n) => n.fret > 0 && !held.has(`${n.string}:${n.fret}`)).length;
-    return Math.max(0, Math.abs(handAt(b) - handAt(a)) - 1) * 0.7 + moved * 0.35;
+function triadTransCost(a: Voicing, b: Voicing, home: HomeWindow | null): number {
+    const sets = Math.abs(lowString(b) - lowString(a));
+    // One string over is a real choice (a player would rather not, 1.2 ≈ an eight-fret slide's
+    // worth of finger travel); each further string is a register jump that leaves the comping
+    // range the ear was following, so it costs more again (+1.5 a string).
+    const setCost = sets === 0 ? 0 : 1.2 + (sets - 1) * 1.5;
+    const was = new Map(a.notes.map((n) => [n.string, n.fret]));
+    const lifts = atTheNut(home);
+    let stepCost = 0;
+    for (const n of b.notes) {
+        const before = was.get(n.string);
+        if (n.fret === 0 && lifts) {
+            continue;
+        }
+        // 0.15 a fret: a one-fret slide is near free, a five-fret leap (0.75) is not.
+        // 0.3 for a fresh string: a new finger placed, about a two-fret slide's worth.
+        stepCost += before === undefined ? 0.3 : Math.abs(n.fret - before) * 0.15;
+    }
+    // 0.7 a fret beyond the first: moving the whole hand is the costliest thing a grip change does.
+    return Math.max(0, Math.abs(handAt(b) - handAt(a)) - 1) * 0.7 + setCost + stepCost;
 }
 
 function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
@@ -349,7 +380,7 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     const picked = viterbi(
         chart.map((c) => candidates(c, opts)),
         (v) => unaryCost(v, opts),
-        transCost,
+        (a, b) => transCost(a, b, opts.home ?? null),
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(out.map((v) => ({ notes: v.notes, barre: mayBarre(v.shape) })));

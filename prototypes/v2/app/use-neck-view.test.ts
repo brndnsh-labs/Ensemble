@@ -305,9 +305,9 @@ describe('neckModel', () => {
         const models = [0, 1, 2, 3].map((slot) => neckModel(pop, grips, slot, GUITAR)!);
         expect(models.map((m) => m.grip?.symbol)).toEqual(['C', 'G', 'Am', 'F']);
         expect(models.every((m) => m.approximatedFrom === null)).toBe(true);
-        // The hand stays at the 5th fret: C x x 5 5 5 x (G C E), G x 5 5 4 x x (D G B),
-        // Am x x x 5 5 5 (C E A), F x x x 5 6 5 (C F A).
-        expect(models.map((m) => m.inversion)).toEqual([2, 2, 1, 2]);
+        // One string set, voice-led (#1597): C x x x 5 5 3 (C E G), G x x x 4 3 3 (B D G),
+        // Am x x x 5 5 5 (C E A), F x x x 5 6 5 (C F A) — every voice steps or holds.
+        expect(models.map((m) => m.inversion)).toEqual([0, 1, 1, 2]);
         // A barre is one finger (#1594): laid across its strings, then held into the F.
         expect(models[1].fingers).toBe('Finger 1 bars fret 5 on the top three strings.');
         expect(models[2].fingers).toBe(

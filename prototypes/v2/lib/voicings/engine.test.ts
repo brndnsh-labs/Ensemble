@@ -221,12 +221,36 @@ describe('voiceChart on triads (#1588): the hand stays put, open chords win firs
         const v = voiceChart(chart(['C', 'Am', 'F', 'G']), { instrument: UKULELE, home: [5, 10] });
         expect(v.every((x) => inHome(x, [5, 10]) && x.notes.every((n) => n.fret >= 5))).toBe(true);
     });
-    it('guitar C G Am F in frets 2–7 stays within two frets of the 5th, all closed', () => {
+    it('guitar C G Am F in frets 2–7 voice-leads on one string set (#1597)', () => {
+        // Every voice steps or holds on the top three strings: G held on top into the G, then
+        // B→C, D→E, G→A into the Am, then C and A held while E steps to F. The 4-3-2 path
+        // (x x 5 5 5 x, x x 5 4 3 x, x x 7 5 5 x, x x 7 5 6 x) is the same voice leading a 4th
+        // lower; this one sits at frets 3–6 around the window's centre where that one climbs
+        // to the 7th, so the hand shifts less.
         const v = voiceChart(chart(['C', 'G', 'Am', 'F']), { instrument: GUITAR, home: [2, 7] });
+        expect(v.map((x) => tab(GUITAR, x))).toEqual([
+            'x x x 5 5 3',
+            'x x x 4 3 3',
+            'x x x 5 5 5',
+            'x x x 5 6 5',
+        ]);
         const frets = v.flatMap((x) => x.notes.map((n) => n.fret));
-        expect(Math.min(...frets)).toBeGreaterThanOrEqual(4);
-        expect(Math.max(...frets)).toBeLessThanOrEqual(6);
-        expect(v.map((x) => x.shape.kind)).toEqual(['triad', 'triad', 'triad', 'triad']);
+        expect(Math.max(...frets) - Math.min(...frets)).toBeLessThan(4);
+    });
+    it('guitar G D Em C G D C D in frets 2–7 keeps one string set (#1597)', () => {
+        const v = voiceChart(chart(['G', 'D', 'Em', 'C', 'G', 'D', 'C', 'D']), {
+            instrument: GUITAR,
+            home: [2, 7],
+        });
+        const sets = new Set(
+            v.map((x) =>
+                x.notes
+                    .map((n) => n.string)
+                    .sort()
+                    .join(''),
+            ),
+        );
+        expect(sets.size).toBe(1);
     });
     it('guitar unlocked C Am F G takes the open-position triads', () => {
         expect(tabs(GUITAR, ['C', 'Am', 'F', 'G'], null)).toEqual([
