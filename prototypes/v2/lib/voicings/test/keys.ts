@@ -157,8 +157,8 @@ export const SONG_SHAPES: Record<string, SongShape> = {
         mode: 'minor',
         bars: [0, v(0, 0, 'dom7', 'I7'), 3, v(6, 3, 'dim7', '♯iv°7'), 4, 0, 1, 4],
     },
-    // vi–viiø–I–ii–I–viiø–vi: the scale walked up and back. In F its viiø is Em7♭5, whose
-    // x-x-2-0-3-6 is the one shell grip wider than three frets (`unaryCost`, `MAX_SPAN`)
+    // vi–viiø–I–ii–I–viiø–vi: the scale walked up and back. In F its viiø is Em7♭5, which
+    // once took x-x-2-0-3-6 on the way down, a reach around its open G string (`openOneOff`)
     walk: { mode: 'major', bars: [5, 6, 0, 1, 0, 6, 5] },
 };
 

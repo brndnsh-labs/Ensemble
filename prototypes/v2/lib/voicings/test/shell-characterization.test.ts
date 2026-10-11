@@ -89,12 +89,29 @@ const grid = (
 //   move when it drops a twentieth or rises a tenth.
 // - Two low-G ukulele charts. It voices as the high-G one does (strings an octave apart are the
 //   same string to the voicer), so two charts pin that, on all four uke shell shapes.
-// - `walk` in F on the 1–6 window holds the one shell grip wider than three frets, Em7♭5's
-//   x-x-2-0-3-6, played once and passed over once. It alone moves with `unaryCost`'s wide-span
-//   cost (nudged 3% either way) and with `MAX_SPAN` lowered.
-// Three things no chart can catch, because no shell reaches them: `unaryCost`'s out-of-window
-// cost and `fretFor`'s reach (each says why where it is written), and `MAX_SPAN` one fret higher
-// (5 allows no grip that 4 refuses).
+// - `walk` in F on the 1–6 window held the one shell grip wider than three frets, Em7♭5's
+//   x-x-2-0-3-6, a reach around its open G string. #1607 refuses that grip (`openOneOff`), and
+//   the chart now pins what plays instead: Em7♭5 as x-x-2-3-3-3 both times, the chart a
+//   palindrome on the 4th string.
+// Things no chart can catch, because no shell reaches them: `unaryCost`'s out-of-window cost
+// and `fretFor`'s reach (each says why where it is written), and since #1607 `unaryCost`'s
+// wide-span cost and `MAX_SPAN` at any value from 2 up (no shell on offer is wider than three
+// frets, and no added tone widens a grip past two). So the three mutations `walk` alone caught
+// in #1604's count (the wide-span cost nudged either way, `MAX_SPAN` lowered) are caught by
+// nothing now; the counts above are that measurement, not a new one.
+//
+// The last 90 (#1607) are the window the app opens on: frets 1–6, where a ukulele always starts
+// and a guitar does in C, F and the flat keys (`defaultNeckHome`). The 273 before them never
+// voiced it (their windows are none, 2–7 and 7–12), and first position is the only place two
+// of #1607's rules act: the open-string credit a ukulele shell earns (`openStringCredit`) and
+// the open strings an added tone may leave (`openOneOff`). Every setup, song and key above, at
+// window 1. With them the credit nudged to 0.15, 0.25 or 0.3 turns a ukulele chart red; the
+// 273 let all three pass. (First position read as ending at the 1st fret or the 6th was
+// already caught by the 273, and still is.)
+//
+// With all 363, removing each of #1607's rules turns charts red: the open-string rule 2, the
+// ukulele's open-string credit 11, the barre that frees a root 22, the buried-root rule 38.
+// `engine.test.ts` brackets each from both sides.
 //
 // So add charts freely, after the ones here, so the fixture's diff is additions only; measure
 // before dropping one (45 of the 436 mutations tried are caught by exactly one chart).
@@ -103,6 +120,7 @@ const CASES: Case[] = [
     ...grid(SETUPS, WINDOWS, ['plagal', 'minorDim'], KEYS),
     ...grid([{ ins: 'uke-low-g', rootSet: 'all' }], [null], ['plagal', 'minorDim'], ['C']),
     ...grid([{ ins: 'guitar', rootSet: 'all' }], [1], ['walk'], ['F']),
+    ...grid(SETUPS, [1], [...SONGS, 'plagal', 'minorDim'], KEYS),
 ];
 
 const label = (c: Case): string =>

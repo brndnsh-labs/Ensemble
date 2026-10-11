@@ -8,12 +8,13 @@
  * root-string limits) and ukulele (high G, and two low-G charts), with and without a hand
  * window. A change to a shell cost here or in `fingering.ts` (`unaryCost`,
  * `transCost`, `handCost`, `fingerTransCost`) moves it; so does a change to which grips a
- * chord is offered (`allPositions`, a quality's `required` tones, where `buildAt` puts one), and
- * so does letting a newer rule reach a shell, which is why triad rules are gated by `kind`. If
- * the change is meant, regenerate the fixture in the same commit (the test's header says how)
- * and review its diff.
+ * chord is offered (`allPositions`, a quality's `required` tones, where `buildAt` puts one,
+ * what `candidates` holds back as a last resort), to which barre a shell may take
+ * (`fingerRules`), and so does letting a newer rule reach a shell, which is why triad rules are
+ * gated by `kind`. If the change is meant, regenerate the fixture in the same commit (the
+ * test's header says how) and review its diff.
  */
-import { assignFingers, fingerOptions, fingerSequence } from './fingering';
+import { assignFingers, type FingerOpts, fingerOptions, fingerSequence } from './fingering';
 import { DEGREES, mod, QUALITIES } from './theory';
 import type {
     ChartChord,
@@ -37,10 +38,58 @@ const spanOf = (frets: number[]): number => {
 const MAX_SPAN = 4;
 
 /**
+ * First position: the index at the 1st fret and a finger per fret, so the 4th fret is the last
+ * one the hand covers while the open strings are still part of where it sits. It is the same
+ * place `atTheNut` credits a triad's open strings in; there the window says where the hand is,
+ * here the grip's own fretted notes do. No shell's added tone meets an open string with the
+ * highest fretted note on frets 3 to 5, so 2 to 5 draw the same line today: at 1 the grips at
+ * the nut go (Bm7♭5 x-2-0-2-x-1), from 6 the stretch comes back.
+ */
+const FIRST_POSITION_TOP = 4;
+
+/**
+ * The most open strings a grip with an added tone may ring. One or two beside fretted notes in
+ * first position is a grip the books print (Am7♭5 x-0-1-0-1-x, Bm7♭5 x-2-0-2-x-1). Three of
+ * four notes open is not a shell any more: it is a fragment of an open-position chord, good for
+ * one root only (Em7♭5 0-1-0-0-x-x, its ♭5 a tritone over the root on the two lowest strings),
+ * and it reads as the hand gone to the nut, which pulls the chords around it down to their own
+ * open one-offs.
+ */
+const MAX_OPEN_STRINGS = 2;
+
+/**
+ * A grip the added tone would turn into an open-string one-off (#1607): the shape for this root
+ * only, not the movable one being learned. Two ways:
+ *
+ * - An open string under fretted notes that have left first position. The open string costs no
+ *   finger, so it is free on span — but the hand is up the neck and the string rings at the nut
+ *   (E♭m7♭5 11-0-11-11-x-x leans on the open A), and it is often a stretch in disguise (Em7♭5
+ *   x-x-2-0-3-6 is a reach from the 2nd fret to the 6th around the open G).
+ * - More open strings than `MAX_OPEN_STRINGS`, wherever the fretted note is.
+ *
+ * So a shell with an added tone takes an open string only where every method book does: one or
+ * two of them, in first position (B♭°7 x-1-2-0-2-x).
+ */
+const openOneOff = (frets: number[]): boolean => {
+    const open = frets.filter((f) => f === 0).length;
+    return open > MAX_OPEN_STRINGS || (open > 0 && Math.max(...frets) > FIRST_POSITION_TOP);
+};
+
+/**
  * Triad and power grips may take a barre (#1594); a shell is one finger per note, its skipped
- * string muted by the fretting hand, as jazz comping is taught.
+ * string muted by the fretting hand, as jazz comping is taught — but for the one barre
+ * `fingerRules` gives a guitar shell.
  */
 const mayBarre = (shape: ShapeDef): boolean => shape.kind !== 'shell';
+
+/**
+ * What a grip's fingering may use (`FingerOpts`). A triad or power grip takes barres freely. A
+ * shell that leaves strings muted — a guitar shell, its root on a bass string — takes only the
+ * index barre that frees its root (`rootBarre`, #1607). A ukulele shell rings every string and
+ * has no bass root to anchor, so it keeps a finger per note.
+ */
+const fingerRules = (shape: ShapeDef, notes: Note[], inst: InstrumentDef): FingerOpts =>
+    mayBarre(shape) ? { barre: true } : { rootBarre: !strumsEveryString({ notes }, inst) };
 
 /**
  * Fret on string `s` for a note `interval` semitones above a root at fret `r` on `rootString`,
@@ -131,6 +180,9 @@ export function buildAt(
         const used = new Set(notes.map((n) => n.string));
         // How hard the grip is to finger with the tone at fret `f` of string `s`: the fingering
         // planner's own cost for its best fingering (`handCost`).
+        // A finger per note, on purpose: the barre that frees a root (`fingerRules`) is how a
+        // grip gets held once it is chosen, not a reason to put the tone somewhere else — with
+        // it x 9 x 8 10 8 would beat the book's x 9 10 8 10 x from the 7th fret up.
         const effort = (s: number, f: number): number =>
             fingerOptions(
                 [...notes, { string: s, fret: f, degree: deg, role: `X${deg}`, finger: null }],
@@ -146,8 +198,13 @@ export function buildAt(
                 if (f < 0 || f > inst.maxFret) {
                     continue;
                 }
-                const span = spanOf(notes.map((n) => n.fret).concat(f));
-                if (span > MAX_SPAN) {
+                const frets = notes.map((n) => n.fret).concat(f);
+                const span = spanOf(frets);
+                // No room here if the tone is out of reach, or if it would make the grip an
+                // open-string one-off (`openOneOff`). Only a grip with an added tone is asked:
+                // a three-note shell on open strings (Em7 0-x-0-0-x-x) is taken or not on its
+                // costs, and a ukulele shell has no added tone at all.
+                if (span > MAX_SPAN || openOneOff(frets)) {
                     continue;
                 }
                 // The narrowest grip wins. Of two as narrow:
@@ -188,7 +245,7 @@ export function buildAt(
         }
     }
     notes.sort((a, b) => b.string - a.string);
-    assignFingers(notes, { barre: mayBarre(shape) });
+    assignFingers(notes, fingerRules(shape, notes, inst));
     return { shape, rootFret: r, notes, missing, root, quality, symbol: root.name + q.symbol };
 }
 
@@ -319,13 +376,32 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
     }
     // The out-of-window term (here and in `triadUnaryCost`) never picks a grip: `candidates` gives
     // a chord its in-window grips, or every grip when it has none, so a chord's grips are all
-    // inside or all outside and the term adds the same to each (#1604).
+    // inside or all outside and the term adds the same to each (#1604). Nor does the wide-span
+    // term pick a shell any more: the one shell wider than three frets was a reach around an
+    // open string (`openOneOff`, #1607), and without it none is on offer. It stays for a
+    // shape that would be.
     return (
         Math.abs(center(v) - target) * (home ? 0.15 : 0.45) +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
-        (inHome(v, home) ? 0 : 5)
+        (inHome(v, home) ? 0 : 5) -
+        (strumsEveryString(v, opts.instrument) ? openStringCredit(v, home) : 0)
     );
 }
+
+/**
+ * A shell that sounds every string of its instrument: each ukulele shell (root, 3rd, 7th and a
+ * helper 5th across the four strings), never a guitar one (three or four notes of six, the rest
+ * muted). It is a strummed chord like the uke triads, and it is taught the same way: first
+ * position, open strings ringing — C6 and Am7 are 0-0-0-0, C7 is 0-0-0-1, Cmaj7 0-0-0-2 in
+ * every ukulele method. So it earns the triads' open-string credit (`openStringCredit`, #1607).
+ *
+ * A guitar shell does not. There an open string turns the movable shape being learned into a
+ * one-off for one root (Fmaj7 1-0-2-x-x-x, A7 x-0-x-0-2-x), and with the credit a chart at the
+ * nut swaps its shells for a different such grip per chord. One is still taken when the costs
+ * already favour it (Am7 x-0-x-0-1-x); it is not sought.
+ */
+const strumsEveryString = (v: { notes: Note[] }, inst: InstrumentDef): boolean =>
+    v.notes.length === inst.strings;
 
 /** Keep the hand still and the root's path simple: same string or the neighboring string, few frets. */
 function transCost(a: Voicing, b: Voicing, home: HomeWindow | null): number {
@@ -364,13 +440,25 @@ function handAt(v: Voicing): number {
 /** First position: the nut is in reach, so open strings are part of the hand's position. */
 const atTheNut = (home: HomeWindow | null): boolean => home === null || home[0] === 1;
 
+/**
+ * What a grip's open strings earn in first position, 0.2 each: they ring, cost no finger, and
+ * are the whole point of the chords a player learns first. Against the pull to the target
+ * fret, one open string is worth under half a fret with no window (0.45 a fret) and a fret and
+ * a third inside one (0.15 a fret, where the window already keeps the hand close): enough that
+ * in frets 1–6 the uke's all-open C6 (centre 0, three and a half frets from the middle) beats
+ * the closed 2-4-3-3 (centre 3, half a fret from it), never enough to carry a grip across the
+ * neck. Up the neck an open string earns nothing.
+ */
+function openStringCredit(v: Voicing, home: HomeWindow | null): number {
+    return atTheNut(home) ? v.notes.filter((n) => n.fret === 0).length * 0.2 : 0;
+}
+
 function triadUnaryCost(v: Voicing, target: number, home: HomeWindow | null): number {
-    const open = v.notes.filter((n) => n.fret === 0).length;
     return (
         Math.abs(handAt(v) - target) * (home ? 0.15 : 0.45) +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
         (inHome(v, home) ? 0 : 5) -
-        (atTheNut(home) ? open * 0.2 : 0)
+        openStringCredit(v, home)
     );
 }
 
@@ -415,10 +503,43 @@ function triadTransCost(a: Voicing, b: Voicing, home: HomeWindow | null): number
     return Math.max(0, Math.abs(handAt(b) - handAt(a)) - 1) * 0.7 + setCost + stepCost;
 }
 
+/**
+ * A guitar shell whose root no fingering gets under the index or middle finger (#1607): the
+ * R–3–7 shapes of m7♭5 and °7, where two of the other notes (m7♭5: the ♭3 and ♭5) or all three
+ * (°7) sit below the root's fret, on strings no barre can join (Dm7♭5 x-5-3-5-x-4 is 3-1-4-2,
+ * its ♭7 level with the root; E°7 x-7-5-6-x-6 is 4-1-2-3). The root is
+ * the note the hand finds first and the finger that mutes the skipped string; under the ring or
+ * little finger the other three reach back across it. Players take the R–7–3 grip on the same
+ * root instead (x-5-6-5-6-x, x-7-8-6-8-x). The fingering planner's own options decide
+ * (`fingerOptions`, which includes the barre that frees a root), so a grip it can finger root
+ * first — every three-note shell, the 6th-string °7 — is never one of these. Shells only: a
+ * triad's root moves with its inversion and the ring finger takes it as often as not
+ * (`handCost`), and a ukulele shell has no bass root to anchor.
+ */
+const rootBuried = (v: Voicing, inst: InstrumentDef): boolean => {
+    const root = v.notes.find((n) => n.role === 'R');
+    // An open root takes no finger, so it cannot be under a weak one.
+    if (v.shape.kind !== 'shell' || !root || root.fret === 0 || strumsEveryString(v, inst)) {
+        return false;
+    }
+    return fingerOptions(v.notes, fingerRules(v.shape, v.notes, inst)).every((o) => {
+        const finger = o.p[o.fr.indexOf(root)];
+        return finger !== null && finger > 2;
+    });
+};
+
+/**
+ * The grips a chord is voiced from: those inside the hand window, or every grip when none fits
+ * — and of those, the ones a player would take. A grip with a buried root (`rootBuried`) stays
+ * only when the position offers nothing else: staying in the window comes first, because that
+ * is where the musician put the hand, and an awkward grip there is still the right chord.
+ */
 function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
     const all = allPositions(opts.instrument, c.root, c.quality, { rootStrings: opts.rootStrings });
     const inside = all.filter((v) => inHome(v, opts.home));
-    return inside.length ? inside : all;
+    const reachable = inside.length ? inside : all;
+    const clear = reachable.filter((v) => !rootBuried(v, opts.instrument));
+    return clear.length ? clear : reachable;
 }
 
 function stamp<C extends ChartChord>(v: Voicing, c: C): VoicedChord<C> {
@@ -559,6 +680,8 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
         opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
-    fingerSequence(out.map((v) => ({ notes: v.notes, barre: mayBarre(v.shape) })));
+    fingerSequence(
+        out.map((v) => ({ notes: v.notes, ...fingerRules(v.shape, v.notes, opts.instrument) })),
+    );
     return out;
 }
