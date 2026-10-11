@@ -20,14 +20,15 @@ import { scrambleHash, stringHash31 } from './hash-utils.js';
 //     given 16th in a given lane leans the SAME way every bar. That is what
 //     makes it read as a deliberate, consistent placement behind/ahead of the
 //     grid instead of per-hit noise.
-//   * COLOUR (`humanizeColor`, the sibling of `humanizeDraw`) — velocity and
-//     detune — stays keyed on the absolute step, because dynamics genuinely do
-//     vary bar-to-bar in a way placement should not.
+//   * COLOUR — velocity and detune — was keyed on the absolute step, because
+//     dynamics genuinely do vary bar-to-bar in a way placement should not. Its
+//     helper went with the old engine's scheduler, which was its
+//     only caller; the band draws its own velocity from `rng(seed, …keys)`.
 //
-// Both are gated by `humanizeScale(groove.humanize)`, which is EXACTLY 0 at
+// Placement is gated by `humanizeScale(groove.humanize)`, which is EXACTLY 0 at
 // knob 0: at `humanize: 0` every lane is bit-for-bit grid-locked, no residual
-// base offset anywhere (that is the #1068 acceptance, and the reason both
-// helpers early-return rather than multiply by zero — `-0` is not `0`).
+// base offset anywhere (that is the #1068 acceptance, and the reason the helper
+// early-returns rather than multiplying by zero — `-0` is not `0`).
 
 /**
  * Per-instrument humanization character. Each spread is the ± maximum at full
@@ -42,17 +43,6 @@ export interface HumanizeProfile {
     /** ± pitch detune, in cents. */
     readonly detuneSpread: number;
 }
-
-/** One note's humanization colour — two independent seeded draws. */
-export interface HumanizedNote {
-    /** Factor to multiply the note velocity by (centered on 1.0). */
-    readonly velocityMult: number;
-    /** Cents to add to the note's detune. */
-    readonly detuneCents: number;
-}
-
-/** The knob-off result — shared so the `scale <= 0` path allocates nothing new. */
-const NEUTRAL_COLOR: HumanizedNote = { velocityMult: 1, detuneCents: 0 };
 
 /**
  * Per-instrument feel profiles. A drummer plays tighter than a soloist, so the
@@ -105,22 +95,6 @@ export function humanizeScale(humanize: number | undefined | null): number {
 }
 
 /**
- * Compose a deterministic integer seed from a note's identity. Distinct
- * `(step, instrument, voiceIndex)` triples map to well-separated seeds, so
- * each instrument — and each voice within it — draws an independent stream.
- * `voiceIndex` is any integer discriminator (a chord-tone index, or a hashed
- * drum-piece name).
- *
- * This is the COLOUR seed: `step` is the absolute/monotonic transport step, so
- * the draw varies bar to bar. Placement uses `placementSeed` instead.
- */
-export const humanizeSeed = (step: number, instrument: string, voiceIndex: number): number =>
-    (Math.imul(step + 1, 0x9e3779b1) ^
-        stringHash31(instrument) ^
-        Math.imul(voiceIndex + 1, 0x85ebca77)) |
-    0;
-
-/**
  * The PLACEMENT seed — the direct analogue of `placementSkew` in
  * `grooves/utils.ts`. Keyed on `(barStep, lane, voiceIndex)` and nothing else,
  * so it is bar-independent by construction: pass a BAR-RELATIVE step
@@ -155,28 +129,4 @@ export function humanizePlacement(
     }
     const r = scrambleHash(placementSeed(barStep, lane, voiceIndex));
     return (r - 0.5) * 2 * spread * scale * positionWeight;
-}
-
-/**
- * Seeded per-note COLOUR humanization — velocity and detune, two *independent*
- * draws off `seed` (use `humanizeSeed`, i.e. keyed on the absolute step so the
- * dynamics breathe bar to bar).
- *
- * `scale` (default 1) is `humanizeScale(groove.humanize)`: at 0 the result is
- * the exact neutral `{ velocityMult: 1, detuneCents: 0 }`. Deterministic — the
- * same seed always yields the same offsets, so looped playback and critique
- * tests reproduce exactly.
- */
-export function humanizeColor(seed: number, profile: HumanizeProfile, scale = 1): HumanizedNote {
-    if (!(scale > 0)) {
-        return NEUTRAL_COLOR;
-    }
-    // Two independent draws off one seed: XOR with distinct constants so
-    // velocity and detune don't move in lockstep.
-    const rVel = scrambleHash(seed ^ 0x9e3779b9);
-    const rDetune = scrambleHash(seed ^ 0x85ebca6b);
-    return {
-        velocityMult: 1 + (rVel - 0.5) * 2 * profile.velSpread * scale,
-        detuneCents: (rDetune - 0.5) * 2 * profile.detuneSpread * scale,
-    };
 }

@@ -198,7 +198,7 @@ export const GENRE_FEELS: string[] = Object.values(GENRES)
  * truthy. That mattered most here: `feelToCanon` is `(feel && GENRE_NAME_BY_FEEL[feel])
  * || null`, so `?genre=__proto__` made `resolveGenre` return a *hit* instead of `null`
  * and `groove.genreFeel` was set to `'__proto__'` before the Preact tree mounted.
- * Downstream, `getCanonicalMeters` has the same defeated-`||` shape and returned
+ * Downstream, the canonical-meters lookup had the same defeated-`||` shape and returned
  * `Object.prototype` in place of an array — so `canonicalMeters.includes(...)` in
  * `KeySignatureControls` threw during the initial render, took out `ChartSurface`, and
  * left the app on the ErrorBoundary's "Refresh App" screen, which reloads the same URL
@@ -271,8 +271,3 @@ export const CANONICAL_METERS_BY_FEEL: Record<string, string[]> = Object.values(
     }
     return acc;
 }, Object.create(null));
-
-/** Idiomatic meters for a genre feel; falls back to 4/4 for unknown feels. */
-export function getCanonicalMeters(genreFeel: string | undefined): string[] {
-    return (genreFeel && CANONICAL_METERS_BY_FEEL[genreFeel]) || DEFAULT_GENRE_METERS;
-}

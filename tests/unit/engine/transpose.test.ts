@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { transformRelativeProgression } from '../../../public/engine/chords-engine.js';
 import { transposeChordText } from '../../../public/engine/transpose.js';
 
 // #777: the single shared progression-text transposer. Covers the slash-bass bug, the two-mode
@@ -53,13 +52,6 @@ describe('transposeChordText — relative-key switch (rewriteRelative: true)', (
 
     it('still moves note-name roots and slash basses by +shift', () => {
         expect(transposeChordText('C/E | G/B', 2, { rewriteRelative: true })).toBe('D/Gb | A/Db');
-    });
-
-    it('is the implementation behind transformRelativeProgression', () => {
-        const input = 'I | V | vi | IV';
-        expect(transformRelativeProgression(input, -3)).toBe(
-            transposeChordText(input, -3, { rewriteRelative: true }),
-        );
     });
 });
 

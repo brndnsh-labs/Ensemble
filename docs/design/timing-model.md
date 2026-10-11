@@ -50,7 +50,7 @@ pocket (§4). The corollary is the design rule:
   (e.g. Neo-Soul: snare +6–18 ms drag, hats −8–20 ms push, kick +8 ms weight). Relative *within*
   the kit → audible → stays in genre strategies, not in engine plumbing.
 - **Humanization:** seeded per-lane/per-note wobble, owned by `public/engine/humanize.ts`
-  (`humanizePlacement` / `humanizeColor`, scaled by `humanizeScale(groove.humanize)`). Squarely
+  (`humanizePlacement`, scaled by `humanizeScale(groove.humanize)`). Squarely
   tier 3 and re-modelled as such in #1068 — it is a *differential*: each lane draws its own value,
   the drums draw one per kit piece, and nothing band-global is added (the pre-#1068 shape, a single
   `Math.random()` per tick handed unchanged to the comp + harmony + chart visuals, was the §2

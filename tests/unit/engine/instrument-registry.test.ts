@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
     __resetPackCacheForTest,
-    clearPack,
     getPackBuffer,
     hydrateVoice,
     isPackLoaded,
@@ -81,14 +80,6 @@ describe('instrument-registry — pack buffer cache', () => {
         expect(getPackBuffer('grand', 'C4')).toBe(buf);
         expect(getPackBuffer('grand', 'missing')).toBeNull();
         expect(getPackBuffer('other', 'C4')).toBeNull();
-    });
-
-    it('clearPack evicts a pack and reverts resolution to synth', () => {
-        registerPackBuffer('grand', 'A4', fakeBuffer());
-        expect(resolveInstrumentSource('pack:grand')).toEqual({ kind: 'sample', packId: 'grand' });
-        clearPack('grand');
-        expect(isPackLoaded('grand')).toBe(false);
-        expect(resolveInstrumentSource('pack:grand')).toEqual({ kind: 'synth' });
     });
 });
 

@@ -1721,8 +1721,8 @@ function setupNewCymbalHit(
  * `partialDecay` does the choking, exactly as the discovery report prescribed.
  *
  * Per `epic-4-drums.md`, the `new` drum voice does NOT carry `playDrumSoundCurrent`'s
- * un-seeded `Math.random()` `velJitter`: the scheduler's seeded `humanizeColor`
- * (Epic 0 S6) already humanizes the incoming velocity, and dropping the second,
+ * un-seeded `Math.random()` `velJitter`: the old scheduler's seeded velocity
+ * humanizing (Epic 0 S6) already humanized the incoming velocity, and dropping the second,
  * un-seeded layer keeps the `new` voice reproducible.
  */
 function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): void {
@@ -1845,7 +1845,7 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
  * The decay curve is steep (`openness²`) on purpose: a linear map bunches the
  * quarter/half hats together near the long-decay end and they stop reading as
  * distinct articulations. Like the closed hat this carries no `velJitter` —
- * the scheduler's seeded `humanizeColor` already humanized `velocity`.
+ * the old scheduler's seeded humanizing already humanized `velocity`.
  *
  * NOTE: the decay/stop/brightness constants are by-ear starting points; expect
  * to retune them at the listening gate.
@@ -2030,7 +2030,7 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
  * the Epic 4 S4 variation pool — the first `new` ride voice can finally honor
  * S4's "fast ride patterns" clause), same bandpass/highpass chain, same gain
  * envelope and `lastRideGain` choke. Per the epic note the `new` drum voice
- * carries no un-seeded `velJitter` — the scheduler's seeded `humanizeColor`
+ * carries no un-seeded `velJitter` — the old scheduler's seeded humanizing
  * already humanized `velocity`.
  *
  * NOTE: `pingScale`'s curve constants are by-ear starting points; expect to

@@ -93,12 +93,7 @@ vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) =>
     safeDisconnect: vi.fn(),
 }));
 
-import {
-    killAllPianoNotes,
-    playChordScratch,
-    playNote,
-    updateSustain,
-} from '../../../public/engine/synth-chords.js';
+import { killAllPianoNotes, playNote, updateSustain } from '../../../public/engine/synth-chords.js';
 import { getState } from '../../../public/state.js';
 
 const { playback } = getState();
@@ -141,14 +136,6 @@ describe('Chord Synthesis', () => {
         playNote(getState(), 440, 10, 1.0);
 
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
-    });
-
-    it('should implement chord scratch synthesis', () => {
-        playChordScratch(getState(), 10, 0.5);
-
-        expect(playback.audio.createBufferSource).toHaveBeenCalled();
-        const filter = playback.audio.createBiquadFilter.mock.results[0].value;
-        expect(filter.type).toBe('bandpass');
     });
 
     it('should hold notes when sustain is active', () => {

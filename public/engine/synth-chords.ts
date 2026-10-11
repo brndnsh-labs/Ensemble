@@ -604,26 +604,3 @@ function playAdditiveBody(
     });
     return releaseHandle;
 }
-
-export function playChordScratch(state: EnsembleState, time: number, vol = 0.1): void {
-    const { playback, groove } = state;
-    if (!playback.audio || !playback.audioGraph) {
-        return;
-    }
-    const randomizedVol = vol * (0.8 + Math.random() * 0.4);
-    playPercussiveStrike(
-        playback.audio,
-        groove.audioBuffers.noise,
-        playback.audioGraph.chords.gain,
-        time,
-        {
-            volume: randomizedVol,
-            filterType: 'bandpass',
-            freq: 1200 + Math.random() * 400,
-            Q: 1.5,
-            attack: 0.005,
-            decay: 0.02,
-            duration: 0.2,
-        },
-    );
-}

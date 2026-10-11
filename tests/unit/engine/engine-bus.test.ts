@@ -26,7 +26,6 @@ vi.mock('../../../public/engine/synth-bass.js', () => ({
 vi.mock('../../../public/engine/synth-chords.js', () => ({
     killAllPianoNotes: vi.fn(),
     INSTRUMENT_PRESETS: {},
-    playChordScratch: vi.fn(),
     playNote: vi.fn(),
     updateSustain: vi.fn(),
 }));

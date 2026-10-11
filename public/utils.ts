@@ -5,8 +5,8 @@ import type { StepInfo } from './types.js';
  * utils.ts — shared musical/math primitives, DOM- and Web-Audio-free so the
  * logic worker can import it freely.
  *
- * What belongs here: pitch/frequency conversion (`getFrequency`, `getMidi`,
- * `midiToNote`) and the step/meter timing core
+ * What belongs here: pitch/frequency conversion (`getFrequency`, `getMidi`)
+ * and the step/meter timing core
  * (`getStepInfo`, `secondsPerStepFor`, `getStepsPerMeasure`, `binarySearchMap`,
  * `normalizeKey`) — the things every lane's generator needs.
  *
@@ -91,39 +91,6 @@ export function getFrequency(midi: number): number {
     return 440 * 2 ** ((midi - 69) / 12);
 }
 
-const NOTE_NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
-
-// Pre-calculate note names and octaves for standard MIDI range (0-127) to avoid object allocation
-const MIDI_NOTE_CACHE: Array<{ name: string; octave: number }> = new Array(128);
-for (let i = 0; i < 128; i++) {
-    MIDI_NOTE_CACHE[i] = {
-        name: NOTE_NAMES[i % 12],
-        octave: Math.floor(i / 12) - 1,
-    };
-}
-
-/**
- * Converts a MIDI note number to an object containing its note name and octave.
- */
-export function midiToNote(midi: number): { name: string; octave: number } {
-    if (typeof midi !== 'number' || !Number.isFinite(midi)) {
-        return { name: '---', octave: 0 };
-    }
-
-    // Fast path: lookup from cache if within 0-127 and integer
-    const cached = MIDI_NOTE_CACHE[midi];
-    if (cached !== undefined) {
-        return cached;
-    }
-
-    // Slow path: calculate for extended range or microtonal values
-    const idx = Math.floor(midi) % 12;
-    return {
-        name: NOTE_NAMES[idx < 0 ? idx + 12 : idx],
-        octave: Math.floor(midi / 12) - 1,
-    };
-}
-
 /**
  * Converts a frequency in Hertz to a MIDI note number.
  */
@@ -145,25 +112,6 @@ export function getMidi(freq: number): number | null {
  */
 export function secondsPerStepFor(bpm: number): number {
     return 60.0 / bpm / 4;
-}
-
-/**
- * Returns the duration, in seconds, of one `ts.beats`-native unit given a
- * time signature and displayed BPM.
- *
- * Definition: `ts.beats` is the denominator-derived count — quarters for
- * 4/4, eighths for 6/8 / 7/8 / 12/8 — so this helper returns
- * `stepsPerBeat * secondsPerStepFor(bpm)`.
- *
- *   - 4/4 / 3/4 / 5/4 / 7/4 (stepsPerBeat=4) → 60/bpm (one quarter)
- *   - 6/8 / 12/8 / 7/8 (stepsPerBeat=2)      → (60/bpm)/2 (one eighth)
- *
- * Use this for count-in (`ts.beats` clicks per bar), chord-duration
- * visualization (`chord.beats * secondsPerBeat`), etc.
- */
-export function secondsPerBeatFor(ts: { stepsPerBeat?: number } | undefined, bpm: number): number {
-    const stepsPerBeat = ts?.stepsPerBeat ?? 4;
-    return secondsPerStepFor(bpm) * stepsPerBeat;
 }
 
 /**
@@ -400,7 +348,7 @@ export function getStepInfo(
 // `synth-utils.ts` first (#1176) to sit beside their peers, but that formed an
 // import cycle with `sample-voice.ts`, so #1192 split them into a leaf module.
 
-// escapeHTML / stripDangerousChars / formatUnicodeSymbols live in
+// escapeHTML / stripDangerousChars live in
 // `public/sanitize.ts` — DOM-adjacent display concerns, main-thread only, moved
 // out in #1179 so nothing DOM-shaped can drift back into this worker-safe module.
 //

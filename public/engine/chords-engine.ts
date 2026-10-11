@@ -12,7 +12,6 @@ import type { Chord, ChordDensity, Dispatch, FormattedChordNames, Mutable } from
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
 import { spellPitchClass } from './note-spelling.js';
-import { transposeChordText } from './transpose.js';
 import { COMP_REGISTER_FLOOR, getNearestVoiceLeadingCost } from './voicing-policy.js';
 
 // `FormattedChordNames` stays: it's the return type of the exported
@@ -751,16 +750,6 @@ export function getBestInversion(
     finalResult = dedupeMidis(finalResult);
 
     return finalResult.sort((a, b) => a - b);
-}
-
-/**
- * Intelligent transposition for relative major/minor toggles.
- * Rewrites the progression string while maintaining original pitches.
- */
-export function transformRelativeProgression(input: string, semitoneShift: number): string {
-    // Relative major/minor switch: rewrite Roman/NNS tokens against the new key while note-name
-    // roots move by +shift. Shares the single tokenizer in transpose.ts with `transposeKey`.
-    return transposeChordText(input, semitoneShift, { rewriteRelative: true });
 }
 
 /**
