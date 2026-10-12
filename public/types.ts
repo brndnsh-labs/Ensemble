@@ -48,8 +48,9 @@ export function isSwingSub(value: unknown): value is SwingSub {
 }
 
 /**
- * Chord voicing density. Consumers in `chords-styles.ts` branch on the literal
- * (`density === 'rich'` / `=== 'thin'`), so this is a keyspace, not a scale.
+ * Chord voicing density, as a saved chart's legacy `density` field spells it (the songbook
+ * codec validates it). A keyspace, not a scale; the old voicing stack that branched on
+ * `'rich'` / `'thin'` is gone, and nothing in the band reads it.
  *
  * Union rather than `string` for the same reason as `SwingSub` (#1264): the share
  * reader ran this through a numeric `clamp`, which did `parseFloat('rich') → NaN`
@@ -138,8 +139,9 @@ export interface FormattedChordNames {
 }
 
 /**
- * Canonical parsed-chord type produced by `chords-engine.validateProgression()` and
- * consumed by every musical engine. Section-context fields (sectionId, sectionLabel,
+ * Canonical parsed-chord type produced by `chords-engine.validateProgression()`: the names, the
+ * root and the timing a measure-less chart is drawn from. It holds no voicing; the band voices
+ * the chord (`prototypes/v2/lib/legacy-band-chart.ts`'s `legacyChordFacts`). Section-context fields (sectionId, sectionLabel,
  * localIndex, keyIsMinor, repeatIndex) are tagged on by validateProgression after
  * parsing — they're absent on a freshly parsed chord and present once it's been
  * placed in the arrangement.
@@ -151,16 +153,12 @@ export interface Chord {
     absName: string;
     display: FormattedChordNames;
 
-    // --- Pitch content (audio-critical) ---
+    // --- Pitch content ---
+    /** The root's pitch in the octave from C4: which pitch class, not how it is voiced. */
     rootMidi: number;
-    bassMidi: number | null;
-    freqs: number[];
-    intervals: number[];
 
-    // --- Quality / harmony ---
+    // --- Quality ---
     quality: string;
-    is7th: boolean;
-    isMinor: boolean;
 
     // --- Temporal / structural ---
     beats: number;

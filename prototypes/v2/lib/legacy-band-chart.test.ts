@@ -7,13 +7,13 @@
  * written chords in written order, one slot per step-map entry performing chord `i`.
  */
 
-import { PPQ } from '@band/index';
+import { notePc, PPQ, parseChord, voice } from '@band/index';
 import { TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
 import type { ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { firstVoicedSlot, neckModel, nextVoicedSlot } from '../app/use-neck-view';
-import { legacyBandChart } from './legacy-band-chart';
+import { legacyAuditionMidis, legacyBandChart } from './legacy-band-chart';
 import { load, state } from './runtime';
 import { bandForGenre } from './standards';
 import { GUITAR, voiceBandChart } from './voicings';
@@ -97,5 +97,47 @@ describe('legacyBandChart', () => {
         const chart = legacyBandChart(blocks, stepMap.slice(0, 2));
         expect(chart.chords).toHaveLength(3);
         expect(chart.slots).toHaveLength(2);
+    });
+});
+
+describe('legacyAuditionMidis', () => {
+    // The tap preview on a measure-less chart is the band's own comp voicing of the chord the
+    // chart names: whatever the chord was written as, parsed in its key, voiced with no chord
+    // before it. Read the chord back through the real load (`absName` is the parser's rewrite
+    // of the written symbol), then compare with `voice` fed the symbol as written.
+    it.each([
+        ['major', 'C'],
+        ['minor seventh', 'Dm7'],
+        ['altered dominant', 'G7alt'],
+        ['sharp nine', 'G7#9'],
+        ['dominant flat nine', 'G7b9'],
+        ['slash chord', 'C/E'],
+        ['slash seventh', 'G7/B'],
+        ['suspended', 'Gsus4'],
+        ['dominant sus', 'G7sus4'],
+        ['half-diminished', 'Bm7b5'],
+    ])('a %s (%s) sounds what the band comp voices for it', (_name, symbol) => {
+        load(v1Chart(symbol));
+        const key = { tonic: notePc('C'), minor: false };
+        const expected = voice(parseChord(symbol, key)!, 'close', null);
+        const heard = legacyAuditionMidis(state().arranger.progression[0]);
+        expect(heard).toEqual(expected);
+        expect(heard?.length).toBeGreaterThan(2);
+        expect(Math.min(...heard!)).toBeGreaterThanOrEqual(52);
+        expect(Math.max(...heard!)).toBeLessThanOrEqual(84);
+    });
+
+    it('sounds nothing for a chord the band does not read', () => {
+        expect(
+            legacyAuditionMidis({ absName: '???', key: 'C', keyIsMinor: false }),
+        ).toBeUndefined();
+    });
+
+    it('voices a chord in the key it was written in', () => {
+        load(v1Chart('V7'));
+        const heard = legacyAuditionMidis(state().arranger.progression[0]);
+        expect(heard).toEqual(
+            voice(parseChord('G7', { tonic: notePc('C'), minor: false })!, 'close', null),
+        );
     });
 });

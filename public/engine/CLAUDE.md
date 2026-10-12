@@ -3,8 +3,9 @@
 The sounds the band engine plays through: the synth voices (`synth-*.ts`), the sample-pack
 voices (`sample-voice.ts`, `pack-runtime.ts`, `instrument-registry.ts`), the bus graph and reverb
 (`engine.ts` `initAudio()`, `reverb.ts`), and the chord parser the measure-less charts' display
-still uses (`chords-engine.ts`'s `validateProgression`, with `chords-styles.ts` and
-`voicing-policy.ts`). The old worker-based generators that used to live here were deleted with the
+still uses for names and timing (`chords-engine.ts`'s `validateProgression`; it holds no voicing —
+a tap on such a chord sounds the band's comp voicing, `prototypes/v2/lib/legacy-band-chart.ts`'s
+`legacyAuditionMidis`, #1650). The old worker-based generators that used to live here were deleted with the
 old engine (#1404); the band's musical rules are in `band/CLAUDE.md` and
 `docs/design/band-engine.md`. The rule numbers below are kept from the old file, so a reference to
 one elsewhere still points at the same rule.

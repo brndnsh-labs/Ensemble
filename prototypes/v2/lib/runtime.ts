@@ -86,6 +86,7 @@ import {
 } from './documents';
 import { checkPlayable } from './engine-mode';
 import { genreSwing } from './genre-swing';
+import { legacyAuditionMidis } from './legacy-band-chart';
 import {
     countInPreference,
     masterVolumePreference,
@@ -1317,7 +1318,10 @@ export function audition(index: number): void {
             const chord = bandView.chords[index]?.chord;
             return chord ? auditionMidis(chord).map(getFrequency) : undefined;
         }
-        return state.arranger.progression[index]?.freqs;
+        // A measure-less chart has no band view: the tap sounds the band's comp voicing of the
+        // chord the old maps name (`legacyAuditionMidis`), through the same voice and gain.
+        const old = state.arranger.progression[index];
+        return old ? legacyAuditionMidis(old)?.map(getFrequency) : undefined;
     }, 0);
 }
 /**

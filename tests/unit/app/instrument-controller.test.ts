@@ -4,7 +4,6 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as InstrumentController from '../../../public/controllers/instrument-controller.js';
-import * as ChordsEngine from '../../../public/engine/chords-engine.js';
 import * as Engine from '../../../public/engine/engine.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
@@ -23,10 +22,6 @@ vi.mock('../../../public/engine/engine.js', () => ({
     killSoloistBus: vi.fn(),
     killSoloistNote: vi.fn(),
     restoreGains: vi.fn(),
-}));
-
-vi.mock('../../../public/engine/chords-engine.js', () => ({
-    validateProgression: vi.fn(),
 }));
 
 vi.mock('../../../public/engine/synth-drums.js', () => ({
@@ -124,34 +119,16 @@ describe('Instrument Controller', () => {
             expect(Engine.killChordBus).toHaveBeenCalled();
         });
 
-        // #1313 — chord voicings are baked at parse time and depend on whether a bass
-        // line is sounding, so a bass toggle must re-voice, and the flush must cover every
-        // re-voiced lane.
-        it('re-voices the progression on a bass toggle, then flushes the re-voiced lanes', () => {
+        it('silences only the bass voices when the bass is toggled', () => {
             InstrumentController.togglePower('bass');
 
-            const order = (fn) => fn.mock.invocationCallOrder[0];
-            expect(ChordsEngine.validateProgression).toHaveBeenCalledTimes(1);
-            // The WHOLE state tree — togglePower's local lane map is also called
-            // `stateMap`, and passing that one has no `arranger`.
-            const [passedState] = ChordsEngine.validateProgression.mock.calls[0];
-            expect(passedState.arranger).toBe(getState().arranger);
-            expect(passedState.arranger).toBeDefined();
-            expect(order(dispatch)).toBeLessThan(order(ChordsEngine.validateProgression));
-            expect(order(ChordsEngine.validateProgression)).toBeLessThan(
-                order(Engine.killAllPianoNotes),
-            );
-            // The comp reads the re-voiced progression too...
-            expect(Engine.killAllPianoNotes).toHaveBeenCalled();
             expect(Engine.killBassNote).toHaveBeenCalled();
-            // ...but the time must not hiccup: drums and soloist ring through.
+            expect(Engine.killBassBus).toHaveBeenCalled();
+            // The comp is voiced by the band, not baked from which lanes sound (#1650), and the
+            // time must not hiccup: chords, drums and soloist ring through.
+            expect(Engine.killAllPianoNotes).not.toHaveBeenCalled();
             expect(Engine.killDrumNote).not.toHaveBeenCalled();
             expect(Engine.killSoloistNote).not.toHaveBeenCalled();
-        });
-
-        it('does not re-voice the progression for a non-bass lane', () => {
-            InstrumentController.togglePower('chords');
-            expect(ChordsEngine.validateProgression).not.toHaveBeenCalled();
         });
 
         it('toggles the soloist lane and silences only its voices', () => {

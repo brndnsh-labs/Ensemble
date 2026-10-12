@@ -1,4 +1,3 @@
-import { validateProgression } from '../engine/chords-engine.js';
 import {
     killAllPianoNotes,
     killBassBus,
@@ -50,17 +49,10 @@ export function togglePower(module: InstrumentModule): void {
 
     dispatch(ACTIONS.SET_PARAM, { module, param: 'enabled', value: newState });
 
-    // #1313 — chord voicings are baked at parse time and depend on whether a bass
-    // line is sounding (rootless shells + a higher floor with it, rooted voicings
-    // without). Muting the bass is "I'm playing that part", so the comp has to be
-    // re-voiced NOW or it keeps the rootless shapes with nothing stating the root.
-    // Mutate -> validate -> flush. Flush every lane that reads the re-voiced progression
-    // (the chords, not just the bass) — but NOT the drums or the
-    // soloist: a player muting the bass mid-groove must not hear the time hiccup.
-    if (module === 'bass') {
-        validateProgression(getState(), dispatch);
-        flushBuffer('bass', 'chords');
-    } else if (module === 'chords' || module === 'soloist') {
+    // Silence only the lane that was toggled: a player muting the bass mid-groove must not
+    // hear the time hiccup, and the parsed progression carries no voicing that depends on
+    // which lanes sound (the band voices the comp, #1650).
+    if (module === 'bass' || module === 'chords' || module === 'soloist') {
         flushBuffer(module);
     } else {
         restoreGains(getState());

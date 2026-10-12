@@ -20,6 +20,7 @@ export type { Bar, Timeline } from './form/timeline.js';
 export { barAtTick, compileTimeline, secondsAt } from './form/timeline.js';
 export type { PassMemory, PassResult } from './perform.js';
 export { performPass } from './perform.js';
+export { voice } from './players/comp/voicing.js';
 export { LEAD_INSTRUMENTS } from './players/lead/instruments.js';
 export { GM_DRUMS, toMidi } from './sinks/midi.js';
 export { STYLE_IDS, STYLES } from './styles/index.js';

@@ -126,7 +126,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
-| `public/engine/chords-engine.ts` | Chord parsing for a measure-less chart's display and chord audition (`arranger.progression`). | `validateProgression`, `getChordDetails` |
+| `public/engine/chords-engine.ts` | Chord parsing and naming for a measure-less chart's display (`arranger.progression`); no voicing. | `validateProgression`, `getChordDetails` |
 | `public/engine/note-spelling.ts` | Canonical pitch-class → letter-name spelling policy (sharp/flat by key), shared by the chart render path and the chord editor. | `spellPitchClass` |
 | `public/data/note-names.ts` | Pure pitch-class name table; re-exported by config without pulling genre data into notation-only editors. | `KEY_ORDER` |
 | `public/engine/transpose.ts` | Single shared progression-text transposer for absolute transpose + relative-key switch. | `transposeChordText` |
@@ -135,8 +135,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Patterns |
 | :--- | :--- | :--- |
-| `public/engine/chords-styles.ts` | Chord intervals and rootless-voicing choices for the parsed progression. | `getIntervals` |
-| `public/engine/voicing-policy.ts` | Rootless-voicing rules and voice-leading cost for the parsed progression. | `shouldUseRootlessVoicing`, `getNearestVoiceLeadingCost` |
 
 ## Engine Core (Internal)
 

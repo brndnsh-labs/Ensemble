@@ -49,12 +49,8 @@ describe('Harmonic Fuzz Testing', () => {
 
             // Additional sanity checks on the result
             arranger.progression.forEach((chord) => {
-                expect(chord.freqs).toBeInstanceOf(Array);
-                chord.freqs.forEach((f) => {
-                    expect(typeof f).toBe('number');
-                    expect(f).toBeGreaterThan(0);
-                });
                 expect(typeof chord.rootMidi).toBe('number');
+                expect(Number.isFinite(chord.rootMidi)).toBe(true);
             });
         }
     });

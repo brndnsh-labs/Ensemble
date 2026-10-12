@@ -1,15 +1,12 @@
 import type { Chord } from '../../public/types.js';
 
-const midiToFreq = (m: number) => 440 * 2 ** ((m - 69) / 12);
-
 /**
  * A full, contract-satisfying `Chord` for tests that only care about a few
- * fields (pitch content, quality, section context). Fills the rest with
+ * fields (root, quality, section context). Fills the rest with
  * musically-inert defaults so callers can override just what the test needs.
  */
 export function makeChord(overrides: Partial<Chord> = {}): Chord {
     const rootMidi = overrides.rootMidi ?? 60;
-    const intervals = overrides.intervals ?? [0, 4, 7];
     const quality = overrides.quality ?? 'maj';
     return {
         absName: 'C',
@@ -19,12 +16,7 @@ export function makeChord(overrides: Partial<Chord> = {}): Chord {
             roman: { root: 'I', suffix: '' },
         },
         rootMidi,
-        bassMidi: null,
-        freqs: intervals.map((iv) => midiToFreq(rootMidi + iv)),
-        intervals,
         quality,
-        is7th: false,
-        isMinor: false,
         beats: 4,
         // Deliberately '' (falsy), not '4/4': several test fixtures predate
         // this required field (see lead-sheet-model.ts's fallback comment) and
