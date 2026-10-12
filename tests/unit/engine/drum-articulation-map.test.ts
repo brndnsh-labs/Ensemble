@@ -50,6 +50,17 @@ describe('drumArticulationKey — pack contract', () => {
         }
     });
 
+    it('ships no sample the mapper cannot return (#1651)', () => {
+        // The other direction: a manifest entry no drum name maps to is downloaded and
+        // stored on every device and never played. Reachable keys come from every name the
+        // engine knows (`KNOWN_SOUND_NAMES` lacks RideBell, which the band host emits as
+        // `DrumPiece` `rideBell`) plus the space-formed toms the mapper folds by substring.
+        const names = [...KNOWN_SOUND_NAMES, 'RideBell', 'High Tom', 'Mid Tom', 'Low Tom'];
+        const reachable = new Set(names.map(drumArticulationKey).filter((key) => key !== null));
+        const unreachable = [...manifestKeys].filter((key) => !reachable.has(key));
+        expect(unreachable, 'manifest articulations nothing can trigger').toEqual([]);
+    });
+
     it('returns null for the documented synth-fallback hits (no CC0 source)', () => {
         // A name the kit has no sample for must fall through to synth.
         for (const name of ['Clave', 'Cowbell', 'China']) {

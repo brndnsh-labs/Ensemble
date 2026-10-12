@@ -4,24 +4,6 @@
     "attribution": "VCSL (Versilian Community Sample Library) by Versilian Studios — CC0 1.0; Virtuosity Drums (sfzinstruments) — CC0 1.0",
     "samples": [
         {
-            "key": "agogo-high",
-            "url": "/packs/acoustic-kit/agogo-high_00.m4a",
-            "variants": [
-                "/packs/acoustic-kit/agogo-high_01.m4a",
-                "/packs/acoustic-kit/agogo-high_02.m4a"
-            ]
-        },
-        {
-            "key": "agogo-low",
-            "url": "/packs/acoustic-kit/agogo-low_00.m4a",
-            "variants": ["/packs/acoustic-kit/agogo-low_01.m4a"]
-        },
-        {
-            "key": "cowbell",
-            "url": "/packs/acoustic-kit/cowbell_00.m4a",
-            "variants": ["/packs/acoustic-kit/cowbell_01.m4a"]
-        },
-        {
             "key": "crash",
             "url": "/packs/acoustic-kit/crash_00.m4a",
             "variants": [
@@ -38,11 +20,6 @@
                 "/packs/acoustic-kit/hihat-closed_02.m4a",
                 "/packs/acoustic-kit/hihat-closed_03.m4a"
             ]
-        },
-        {
-            "key": "hihat-loose",
-            "url": "/packs/acoustic-kit/hihat-loose_00.m4a",
-            "variants": ["/packs/acoustic-kit/hihat-loose_01.m4a"]
         },
         {
             "key": "hihat-open",
