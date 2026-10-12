@@ -110,7 +110,7 @@ const CORE_DIRECTORIES = [
     'public/song', // #1178 phase 1
     'public/export', // #1178 phase 1
     'public/controllers', // #1178 phase 2
-    'public/visualizer', // #1178 phase 4
+    'public/visualizer', // #1178 phase 4 (that directory is gone with v1; no such path now)
     'public/songbook',
 ];
 
@@ -161,7 +161,7 @@ function resolveDocLink(rawPath) {
  * for root-level docs — widening it there would start checking incidental spans
  * like `dist/assets/index.js`. The dir-scoped agent docs (#1153) additionally
  * cite paths relative to their OWN directory (`state/share-codec.ts` in
- * `public/CLAUDE.md`, `../coordination-engine.ts` in the grooves one), so for
+ * `public/CLAUDE.md`, `../docs/design/band-engine.md` in `band/CLAUDE.md`), so for
  * those a second, self-limiting test applies: an explicit `./`/`../`, or a first
  * segment that is a real subdirectory of the doc. A span that matches neither
  * isn't treated as a path — that's a skip, not a pass.
@@ -197,7 +197,7 @@ function isCheckablePath(cleanPath, docDir) {
 /**
  * Doc-relative resolution is for docs that live INSIDE the source tree and
  * describe their siblings — `public/**`, `tests/`. The pipeline skill tree
- * cites every repo path root-relative (`scripts/gh-project.mjs`,
+ * cites every repo path root-relative (`scripts/deploy-test.sh`,
  * `tests/standards/…`), and its only relative spans point outside the repo
  * entirely (the `../archived-memory/` memory tree in `/wrap-up`). Reading those
  * as repo-relative invents a broken link out of correct prose, so `.claude/**`

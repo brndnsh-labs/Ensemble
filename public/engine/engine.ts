@@ -457,7 +457,7 @@ export function initAudio(
     // #666 — load any selected `pack:<id>` voice as soon as audio is live, on
     // whatever path brought audio up (play, preview, performance). Idempotent;
     // a persisted pack voice would otherwise stay unloaded (silent synth
-    // fallback) until the Sounds panel dispatched ACTIONS.INIT_AUDIO. Offline
+    // fallback) until the Sounds panel dispatched ACTIONS.INIT_AUDIO (deleted, #1381). Offline
     // render/export contexts manage packs explicitly, so they're excluded.
     if (!usingOfflineContext && playback.audio) {
         ensurePacksForVoices(playback.audio, [
@@ -606,10 +606,9 @@ export function syncBusVolume(state: EnsembleState, module: InstrumentModule): v
 
 /**
  * Live-ramp the master bus to `playback.masterVolume`. Sibling of
- * `syncBusVolume` — #1128 moved this out of `Settings.tsx handleMasterVolume`
+ * `syncBusVolume` — #1128 moved this out of v1's `Settings.tsx handleMasterVolume`
  * (which reached through a module-level `getState()` capture) into a
- * `handleEffects` case, so any non-slider writer (preset apply, restore) also
- * gets the ramp. Ramp math is preserved verbatim (exponential to target over
+ * `handleEffects` case, so any non-slider writer also gets the ramp. Ramp math is preserved verbatim (exponential to target over
  * 40ms) so slider feel is unchanged.
  */
 export function syncMasterVolume(state: EnsembleState): void {

@@ -206,7 +206,7 @@ export interface Section {
     timeSignature?: string;
     /** Whether this section transitions seamlessly from the previous one (suppresses fills). */
     seamless?: boolean;
-    /** Section-local override for conductor target intensity (0–1). Undefined → follow global. */
+    /** Section-local override for the band's target intensity (0–1; read by `band/form/timeline.ts`). Undefined → follow global. */
     targetIntensity?: number;
     /**
      * Per-instrument enabled overrides for this section. Missing keys → follow each
@@ -607,7 +607,7 @@ export type Action = {
 }[keyof ActionPayloadMap];
 
 export const ACTIONS = {
-    // --- Global / Conductor ---
+    // --- Global ---
     SET_PARAM: 'SET_PARAM',
     SET_BAND_INTENSITY: 'SET_BAND_INTENSITY',
     SET_AUTO_INTENSITY: 'SET_AUTO_INTENSITY',

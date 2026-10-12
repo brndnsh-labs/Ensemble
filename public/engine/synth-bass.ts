@@ -133,7 +133,7 @@ function playBassNoteNew(
     // `muted` carries TWO meanings and only one of them is a number — see
     // `mute-contract.ts`, which owns the disambiguation for every consumer.
     // Normalizing here matters because a boolean can legitimately reach this
-    // param (`NoteResult.muted` in `tick-logic.ts` allows both forms), and
+    // param (the old engine's `NoteResult.muted` allowed both forms), and
     // `Number.isFinite(true) === false` would trip the guard below
     // and drop the note in total silence with no error. A non-finite *number*
     // deliberately survives normalization so that guard still fires on it. Both
@@ -166,8 +166,8 @@ function playBassNoteNew(
         // ceiling instead of pinning at unity. Below 1.0 the mapping is unchanged;
         // above it the filter/drive keep opening, because a level accent whose
         // timbre is already pinned reads as pumping, not as digging in. The
-        // reference is the EMISSION domain (1.5), not the higher post-conductor
-        // value the level axis sees — a note the band-swell pushes past 1.5 is
+        // reference is the EMISSION domain (1.5), not the higher post-swell
+        // value the level axis sees — a note a band swell pushes past 1.5 is
         // already at full brightness; only its level should keep climbing.
         const timbre = velocityTimbre(velocity, {
             curve: 1.6,

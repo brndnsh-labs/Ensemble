@@ -338,7 +338,7 @@ export function getIntervals(
             intervals = [0, 3, 8];
         } else if (quality === 'm7#5') {
             // 1 b3 #5 b7 (#1340) — the m7 with its fifth raised (its scale is the fifth-less
-            // Aeolian; see `theory-scales.ts`). No
+            // Aeolian in the old engine's `theory-scales.ts`, since deleted). No
             // natural 5: `isAltered5` matches this name's '#5' too, so neither the >= 0.8
             // "Wall of Sound" backfill can add one back, and the
             // final-safety filter strips pitch class 7 regardless. The b7 is written, so the
@@ -413,7 +413,7 @@ export function getIntervals(
     // power-triad clarity, Jazz/Funk own dedicated voicing lanes). The full 0.6
     // block below still adds the 7th and re-adds the 9 above high intensity;
     // this is purely a downward reach of the add9 color. Genre keys are the
-    // canonical `groove.genreFeel` values (groove-engine.ts strategies map).
+    // canonical `groove.genreFeel` values (the same keys as the old engine's groove strategies map).
     const COLOR_FRIENDLY_GENRES = ['Acoustic', 'Neo-Soul', 'Country'];
     if (
         intensity >= 0.35 &&

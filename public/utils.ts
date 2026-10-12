@@ -11,7 +11,7 @@ import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
  * `engine/hash-utils.ts`; share-URL and preset encoding lives in
  * `state/share-codec.ts`; HTML escaping and display glyph formatting live in
  * `sanitize.ts`; Web Audio graph helpers live in `engine/audio-graph-utils.ts`.
- * Anything DOM-touching would break the worker bundle — keep it out.
+ * Anything DOM-touching would break the node-side callers (tests, scripts, the band) — keep it out.
  */
 
 /**
@@ -25,9 +25,8 @@ import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
  * Edge cases: `NaN` passes through unchanged (as it does for the `Math.*`
  * form); `-0` is returned as `-0` rather than being normalized to `+0`.
  *
- * NOTE: the per-sample / per-frame loops in `wav-encoder.ts` and
- * `visualizer-engine.ts` deliberately keep their clamp inlined — don't route
- * those through here.
+ * NOTE: the per-sample loop in `engine/wav-encoder.ts` deliberately keeps its
+ * clamp inlined — don't route it through here.
  */
 export function clamp01(x: number): number {
     return x < 0 ? 0 : x > 1 ? 1 : x;
@@ -142,7 +141,7 @@ export function binarySearchMap<T extends { start: number; end: number }>(
 
 // escapeHTML / stripDangerousChars live in
 // `public/sanitize.ts` — DOM-adjacent display concerns, main-thread only, moved
-// out in #1179 so nothing DOM-shaped can drift back into this worker-safe module.
+// out in #1179 so nothing DOM-shaped can drift back into this DOM-free module.
 //
 // encodeBase64Unicode / decodeBase64Unicode / compressSections /
 // tryDecompressSections / generateId live in `public/state/share-codec.ts` —
@@ -154,11 +153,11 @@ export function binarySearchMap<T extends { start: number; end: number }>(
 // calculateTimingOffset (the gravity-era pocket formula: globalDrive / tightness /
 // per-instrument gravity) removed in #1063 — post-#714 its output was added to the
 // drum grid AND every melodic lane equally, a uniform whole-band shift that is
-// inaudible by construction. The live band-level lean is getBandPocket in
-// coordination-engine.ts. See docs/design/timing-model.md §2/§4.
+// inaudible by construction. (The old engine's `getBandPocket` lean is gone too;
+// the band's lean is in `band/feel/`.) See docs/design/timing-model.md §2/§4.
 
 // applyBluesBends (the blues/neo ±0.5 gospel b3/b5 vocal scoop) removed in
-// epic #10/#866 — its only caller was the retired legacy picker. The live
-// phrase-first engine uses an integer `bendStartInterval` flurry around the apex,
-// not this per-blue-note microtonal scoop. The gospel-scoop idiom is a tracked
-// #870 PORT CANDIDATE (recoverable from git history if/when it's ported).
+// epic #10/#866 — its only caller was the retired legacy picker. The old
+// phrase-first engine (since deleted) used an integer `bendStartInterval` flurry
+// around the apex, not this per-blue-note microtonal scoop. The gospel-scoop idiom
+// was a tracked #870 PORT CANDIDATE (recoverable from git history).

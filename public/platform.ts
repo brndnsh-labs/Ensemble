@@ -1,6 +1,6 @@
 /**
  * Handles environment-specific APIs (WakeLock, AudioContext unlocking, etc.)
- * to keep the core scheduler pure.
+ * to keep the audio engine pure.
  */
 
 interface PlatformState {

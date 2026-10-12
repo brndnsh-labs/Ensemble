@@ -19,7 +19,7 @@ const SLICES = 'playback|chords|bass|soloist|groove|midi|arranger';
 // 3. aliased     `const p = playback as Mutable<typeof playback>;  p.bpm = 90`
 //
 // The `(?<!graph\.)` anchor keeps AUDIO-NODE writes off the state-mutation radar:
-// `conductor.ts` aliases `playback.audioGraph` to `graph`, so `graph.bass.eq.type =`
+// `engine.ts` aliases `playback.audioGraph` to `graph`, so `graph.bass.eq.type =`
 // matched the bare slice-name alternation and read as a `bass` state mutation. A
 // `state.<slice>.field =` write is still caught — only the `graph.` alias is excluded.
 const bareRegex = new RegExp(String.raw`(?<!graph\.)\b(${SLICES})(\.[a-zA-Z0-9_]+)+ = `);

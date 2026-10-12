@@ -4,13 +4,12 @@
  *
  * Sibling in spirit to `mute-contract.ts`: a note's generated `velocity` is
  * reinterpreted independently on several paths (the synth voice, the sampled
- * voice, live MIDI-out, and the `.mid` exporter — see `public/engine/CLAUDE.md`
- * §7 for the same hazard on bend gestures), and every time a curve got
+ * voice, and the old engine's live MIDI-out and `.mid` exporter), and every time a curve got
  * copy-pasted into two of them they drifted apart while the comment claiming
  * they matched outlived the fact. #1322 audited the two curves the exporter
  * claimed to "match live" and found BOTH claims false, in different ways.
  *
- * #1325 resolved the **soloist** one, below. It deliberately did NOT resolve the
+ * #1325 resolved the **soloist** one (its curve is no longer in this file). It deliberately did NOT resolve the
  * bass one: the obvious fix (give the exporter live's `[0,1]` clamp) turned out
  * to propagate a truncation rather than share a curve, and "match live" is
  * ill-defined for bass because the synth and sampled voices disagree with each
@@ -23,7 +22,7 @@
  * used — and `bassVelocityToAmplitude` (below) is live's shared law on it.
  *
  * Deliberately dependency-free (pure math, no state import) so both the
- * main-thread audio scheduler and the worker-side exporter can call it.
+ * voices and any offline render can call it.
  */
 
 /**
@@ -31,8 +30,8 @@
  * into the voice, NOT the loudest value a style is allowed to author. (It was the old
  * engine's bass generator's emission clamp; the band host sends at most ~1.1.)
  *
- * why 1.5: it is the domain `normalizeMidiVelocity` (`midi-utils.ts`) has always
- * assumed for the `.mid` export ("we treat 1.5 as the theoretical maximum for
+ * why 1.5: it is the domain the old engine's `normalizeMidiVelocity` (`midi-utils.ts`,
+ * deleted with its exporter) always assumed for the `.mid` export ("we treat 1.5 as the theoretical maximum for
  * internal accents"), so live and export now measure velocity on the same ruler.
  * The old 1.25 clamp was the *authoring* ceiling doing double duty as the domain
  * ceiling: three stacked intensity terms (`velocityParam × accent ×
@@ -43,7 +42,7 @@
  *
  * #941 removed the stacking itself: the emitted product is now
  * `velocityParam × accent × bassEnvelope`, all three intensity-FREE, and the
- * lane's macro swell moved downstream into `bassMacroGain`. This clamp is
+ * lane's macro swell moved downstream into the old scheduler's `bassMacroGain`. This clamp is
  * consequently near-unreachable in practice (the loudest authored combination is
  * a 1.25 slap token × a 1.15 accent × a 1.05 envelope = 1.51) — which is the
  * point. It is a contract on what an engine may EMIT, not a working ceiling the
@@ -67,7 +66,7 @@ const BASS_ACCENT_EXPONENT = 0.9;
 /**
  * Defensive input bound for the bass voice — NOT a musical ceiling.
  *
- * why 2.5: the loudest value the live chain can hand the voice is
+ * why 2.5: the loudest value the old live chain could hand the voice was
  * `BASS_VELOCITY_DOMAIN_MAX (1.5) × bassMacroGain (≤1.5) × humanize
  * velocityMult (≤1.1)` = 2.48, so 2.5 sits just above every reachable product
  * and only ever engages if an upstream producer breaks its own contract. Bounded

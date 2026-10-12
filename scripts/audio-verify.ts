@@ -7,7 +7,7 @@
 // asserts the engine *decided* to play a note. This asserts the note is actually
 // **present in the render** — audible, on time, at the right pitch, at a level that
 // tracks its velocity. The gap between those two is every defect that lives below
-// the note buffer: a synth voice that never sounds, a scheduler that drops a hit,
+// the note buffer: a synth voice that never sounds, a host that drops a hit,
 // an envelope that swallows an accent, a graph that emits a click.
 //
 // SCOPE LIMIT (state it, it is not a flaw): the events and the audio come from the
@@ -16,18 +16,17 @@
 
 import { toDb } from './audio-analysis.js';
 
-/** One scheduled note, as captured from the renderer's visualizer event queue. */
+/** One scheduled note, as captured from the render's event dump (`mix:report --write-events`). */
 export interface ScheduledEvent {
     track: string;
     /** Absolute seconds into the render (post-humanization — the real play time). */
     time: number;
     midi: number;
     duration?: number;
-    /** Absent on lanes whose visualizer payload omits it (drums/chords carry it today). */
+    /** Absent on lanes whose event payload omits it. */
     velocity?: number;
     /**
-     * The exact final scalar the voice received — post-conductor, post-humanization
-     * (#1351). Preferred over `velocity` when present: it is the level the render
+     * The exact final scalar the voice received, after every velocity shaper (#1351). Preferred over `velocity` when present: it is the level the render
      * was actually asked to produce.
      */
     renderVelocity?: number;

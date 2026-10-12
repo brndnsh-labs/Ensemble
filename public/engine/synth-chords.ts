@@ -98,8 +98,8 @@ interface PlayNoteOptions {
 const SYNTH_CHORD_LEVEL = 0.85;
 
 // #707/#691 — the release contract shared by the sampled and synth chord
-// voices. The scheduler calls `release(when, fade)` on the previous voicing
-// when the harmony changes; this is the shape `playSampledNote` returns and
+// voices. The old engine's scheduler called `release(when, fade)` on the previous
+// voicing when the harmony changed; this is the shape `playSampledNote` returns and
 // is structurally satisfied by the sampled `SampledNoteHandle`.
 type ChordVoiceHandle = { release(when: number, fade: number): void };
 
@@ -176,8 +176,8 @@ export function playNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
             return handle;
         }
     }
-    // #707 — the synth path now returns a release handle too, so the scheduler
-    // can cut a ringing synth voicing on a chord change exactly as it cuts a
+    // #707 — the synth path now returns a release handle too, so a caller
+    // (the old engine's scheduler, then) can cut a ringing synth voicing on a chord change exactly as it cuts a
     // sampled one (was: returned null, so synth chords rang across the change).
     return playSynthNote(...args);
 }
@@ -294,7 +294,7 @@ function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
 
     // synth-audit Epic 2 S4 — per-partial additive body (replaces the legacy
     // delegated single-oscillator-through-one-LPF body). Guarded: the
-    // scheduler iterates a chord's notes with `forEach`, so an un-caught
+    // caller iterates a chord's notes with `forEach`, so an un-caught
     // throw here would abort every later note in the chord, not just this
     // one.
     try {
@@ -425,7 +425,7 @@ function playAdditiveBody(
         o.start(startTime);
     }
 
-    // Release / panic stop — mirrors the legacy voice's `stopNote` semantics
+    // Release / panic stop — mirrors the semantics of the old single-oscillator voice's `stopNote`
     // so `killAllPianoNotes` keeps working.
     const stopBody = (t: number, isPanic = false): void => {
         const damping = isPanic ? 0.005 : duration < 0.2 ? 0.02 : 0.12;
@@ -451,8 +451,8 @@ function playAdditiveBody(
         o.stop(naturalStop);
     }
 
-    // #707/#691 — release handle so the scheduler can cut this synth voicing on
-    // a chord change, exactly as it already cuts sampled voices. Mirrors the
+    // #707/#691 — release handle so a caller can cut this synth voicing on
+    // a chord change, exactly as it cuts sampled voices. Mirrors the
     // sampled voice's `choke`: ease the body to silence from its live value
     // (after cancelling the pending decay → no click) and pull the partials'
     // stop in — never later than the natural end. A release arriving after the

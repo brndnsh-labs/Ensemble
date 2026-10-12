@@ -627,7 +627,7 @@ export function getBestInversion(
     // Opt-in via `enableVoiceLeading`: this is jazz-style voice leading and is
     // appropriate for chord comping over functional progressions (ii–V–I). Pocket
     // genres (Neo-Soul, Funk, Reggae) and harmony-line callers that own their own
-    // register intent (harmonies.ts spectral-gap branch) want stability, not
+    // register intent (the old engine's harmonies.ts spectral-gap branch) want stability, not
     // common-tone octave snaps, so the pass stays off by default. Production
     // callers can opt in per-genre in a follow-up; the test fixture exercises the
     // behavior directly.
@@ -1380,12 +1380,12 @@ export function validateProgression(state: any, dispatch?: Dispatch): void {
     (arranger as Mutable<typeof arranger>).progression = allChords; // @direct-mutation
     updateProgressionCache(state);
     if (dispatch) {
-        dispatch(ACTIONS.PROG_VALIDATED); // Notify Preact
+        dispatch(ACTIONS.PROG_VALIDATED); // tell dispatch subscribers the progression changed
     }
 }
 
 /**
- * Caches progression metadata to avoid redundant calculations in the scheduler.
+ * Caches progression metadata (the step map) to avoid redundant calculations by its readers.
  */
 function updateProgressionCache(state: any): void {
     const { arranger } = state;

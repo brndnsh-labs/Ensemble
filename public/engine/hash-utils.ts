@@ -1,23 +1,24 @@
 /**
  * hash-utils.ts — canonical deterministic hash + seeded-RNG helpers shared
- * across the generative engines (bass, drums/groove, harmony, accompaniment,
- * soloist/drum seeders, conductor).
+ * across the voices (sample, soloist, drums) and the v1 import. (The generative
+ * engines it was written for — bass, drums/groove, harmony, accompaniment,
+ * soloist/drum seeders, conductor — are gone, #1404.)
  *
  * What belongs here: pure, dependency-free determinism primitives — string
  * folds, stateless scrambles, and seeded generators. Nothing in this module may
- * import anything else in the repo; it is deliberately a leaf so both worker
- * and main thread can use it freely.
+ * import anything else in the repo; it is deliberately a leaf so any caller
+ * (voices, scripts, tests) can use it freely.
  *
  * What does NOT belong here: musical interpretation of a seeded draw (that's
  * the engine that owns the decision), step/meter math (`../utils.js`), string
  * sanitization (`../sanitize.js`), or share/persistence encoding
  * (`../state/share-codec.js`).
  *
- * **The two RNG idioms here stay distinct on purpose** — see
- * `public/engine/CLAUDE.md` §27. `scrambleHash` is *stateless*, indexed by an
- * explicit seed tuple; `createPRNG` is a *stateful, sequential* stream whose
- * draw count is load-bearing. Do not unify them, and do not change how many
- * draws any call path consumes.
+ * **`scrambleHash` is *stateless*, indexed by an explicit seed tuple** — see
+ * `public/engine/CLAUDE.md` §27. It used to sit beside `createPRNG`, a *stateful,
+ * sequential* stream whose draw count was load-bearing; that went with the old
+ * engine (the band draws from `rng(seed, …keys)`, `band/core/random.ts`). Do not
+ * change how many draws any call path consumes.
  *
  * Before Epic 11 S9 `scrambleHash` was copy-pasted into four engines
  * (bass-engine, groove-engine, harmonies, plus accompaniment's
@@ -31,9 +32,10 @@
  *
  * why two string hashes, not one: changing which djb2 variant an engine feeds
  * into its seeded RNG shifts the distribution flowing into the critique gates
- * (the `feedback_prng_migration_dead_gates` trap). Bass + groove section
- * hashing already depend on the 33-from-5381 variant; accompaniment cell-bank
- * picking and groove instrument-name folding depend on the 31-from-0 variant.
+ * (the `feedback_prng_migration_dead_gates` trap). The old engine's bass + groove
+ * section hashing depended on the 33-from-5381 variant; accompaniment cell-bank
+ * picking and groove instrument-name folding on the 31-from-0 variant
+ * (`prototypes/v2/lib/import-v1.ts` still calls both).
  * Both are exported so every call site keeps its exact prior output.
  */
 

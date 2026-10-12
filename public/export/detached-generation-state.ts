@@ -40,12 +40,13 @@ function cloneRaw<T>(value: T): T {
 }
 
 /**
- * Creates a detached generation state for worker or offline-render ownership.
+ * Creates a detached state for offline-render ownership (the old engine also handed
+ * it to its worker).
  *
  * Musical settings and precomputed arrangement maps are preserved, while live
  * Web Audio/DOM handles start empty. The final
- * cloneRaw pass is load-bearing for Web Worker postMessage: deepSignal proxies
- * cannot cross a structured-clone boundary.
+ * cloneRaw pass strips the deepSignal proxies, leaving a plain tree (they could
+ * not cross the old worker's structured-clone `postMessage` boundary).
  */
 export function cloneStateForDetachedGeneration(liveState: EnsembleState): EnsembleState {
     const detached = {

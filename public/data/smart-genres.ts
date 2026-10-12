@@ -20,7 +20,7 @@ type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
 /**
  * The genre authority table. Keys are the canonical genre NAMES (the 13-genre
  * canon — see `tests/standards/genre-canon-guard.test.ts`); `feel` is the runtime
- * FEEL every engine table is keyed on. `satisfies` (rather than a `Record<string,…>`
+ * FEEL the feel-keyed tables are keyed on. `satisfies` (rather than a `Record<string,…>`
  * annotation) is load-bearing: it keeps the literal key union alive so `CanonGenre`
  * below is the exact 13-name union and every per-genre authority map gets
  * COMPILE-TIME exhaustiveness. Read value-level lookups through `GENRES` (the
@@ -142,20 +142,22 @@ export const GENRE_FEELS: string[] = Object.values(GENRES)
  *      `groove.lastSmartGenre`, and pinned by `genre-canon-guard.test.ts`.
  *      Changing one is a user-visible rename.
  *   2. FEEL         ('Bossa Nova', 'Ska')  — the runtime keyspace. Lives in
- *      `groove.genreFeel` and is what ~20 engine tables are keyed on
- *      (`GENRE_POCKET`, `HARMONY_GENRE_PROFILES`, `STICKY_GENRES`, …). It is a
- *      *musical* label ("this genre feels like a bossa nova"), deliberately free
- *      to differ from the picker label; several genres could legitimately share
- *      a feel in future. Pinned by `genre-feel-canon-guard.test.ts`.
- *   3. GROOVE STRATEGY KEY ('latin', 'ska-punk') — the ENGINE-MODULE keyspace:
- *      the `public/engine/grooves/<key>.ts` basename that implements the kit.
- *      Many-to-one with feels by design (Bossa's kit is `latin.ts`, the sole
- *      Latin-family engine). NOTE: `'latin'` here is a *strategy* key, NOT a
- *      genre — the retired `Latin` GENRE was deleted in #628 and must never be
- *      resurrected as a `GENRE_OVERRIDES` key or a feel.
+ *      `groove.genreFeel` and is what the feel-keyed tables are keyed on
+ *      (`CANONICAL_METERS_BY_FEEL` below, the synth voices' genre trims; the old
+ *      engine had ~20 more). It is a *musical* label ("this genre feels like a
+ *      bossa nova"), deliberately free to differ from the picker label; several
+ *      genres could legitimately share a feel in future. `GENRE_FEELS` is walked
+ *      by `tests/unit/engine/smart-genre.test.ts`.
+ *   3. (retired) GROOVE STRATEGY KEY ('latin', 'ska-punk') — the old engine's
+ *      `public/engine/grooves/<key>.ts` basename for a kit, many-to-one with feels
+ *      (Bossa's kit was `latin.ts`). Those modules went with the engine (#1404); the
+ *      band's equivalent is the StyleId (`band/styles/<id>.ts`), looked up by genre
+ *      in `STYLE_FOR_GENRE` (`prototypes/v2/lib/band-voices.ts`). NOTE: `'latin'`
+ *      was a *strategy* key, NOT a genre — the retired `Latin` GENRE was deleted in
+ *      #628 and must never be resurrected as a `GENRE_OVERRIDES` key or a feel.
  *
- * The divergence is small (2 of 13 names ≠ feel, 1 strategy key ≠ feel) but it is
- * real, so it is reconciled HERE, once, instead of ad-hoc at every call site.
+ * The divergence is small (2 of 13 names ≠ feel) but it is real, so it is
+ * reconciled HERE, once, instead of ad-hoc at every call site.
  * ──────────────────────────────────────────────────────────────────────────── */
 
 /**
@@ -169,14 +171,14 @@ export const GENRE_FEELS: string[] = Object.values(GENRES)
  * arrive from outside, and on a plain object every `Object.prototype` member reads as
  * truthy. That mattered most here: `feelToCanon` is `(feel && GENRE_NAME_BY_FEEL[feel])
  * || null`, so `?genre=__proto__` made `resolveGenre` return a *hit* instead of `null`
- * and `groove.genreFeel` was set to `'__proto__'` before the Preact tree mounted.
+ * and `groove.genreFeel` was set to `'__proto__'` before v1's Preact tree mounted.
  * Downstream, the canonical-meters lookup had the same defeated-`||` shape and returned
- * `Object.prototype` in place of an array — so `canonicalMeters.includes(...)` in
- * `KeySignatureControls` threw during the initial render, took out `ChartSurface`, and
+ * `Object.prototype` in place of an array — so `canonicalMeters.includes(...)` in v1's
+ * `KeySignatureControls` threw during the initial render, took out its `ChartSurface`, and
  * left the app on the ErrorBoundary's "Refresh App" screen, which reloads the same URL
  * and crashes again. Every other feel-keyed table was poisoned in the same session too
- * (`GENRE_POCKET` → NaN scheduler timing, `strategies[genreFeel]` → a bogus groove
- * strategy). Fixing the seeds is what makes the *next* feel-keyed table safe by default.
+ * (the old engine's `GENRE_POCKET` → NaN scheduler timing, `strategies[genreFeel]` → a
+ * bogus groove strategy). Fixing the seeds is what makes the *next* feel-keyed table safe by default.
  */
 const GENRE_NAME_BY_FEEL: Record<string, string> = Object.entries(GENRES).reduce<
     Record<string, string>
@@ -201,9 +203,9 @@ function feelToCanon(feel: string | null | undefined): string | null {
  * Normalize a genre string arriving in *either* keyspace into the canonical pair.
  *
  * The UI and `groove.lastSmartGenre` speak genre NAMES; the engine and
- * `groove.genreFeel` speak FEELS, and every feel-keyed table (`GENRE_POCKET`, the
- * groove `strategies` map, `SMART_SCALE_STYLE_MAP`, `DROP_FRIENDLY_GENRES`) misses
- * on a name. Share URLs carry the feel (`sharing.ts` emits
+ * `groove.genreFeel` speak FEELS, and every feel-keyed table (`CANONICAL_METERS_BY_FEEL`,
+ * and the old engine's `GENRE_POCKET`, groove `strategies` map and the like) misses
+ * on a name. Saved charts and share URLs carry the feel (`songbook/codec.ts` writes
  * `groove.genreFeel`), but hand-written and older links carry the name — accept both,
  * and return `null` for anything in neither keyspace so callers reject it instead of
  * writing a phantom key into `genreFeel` (#1130 / #1200).

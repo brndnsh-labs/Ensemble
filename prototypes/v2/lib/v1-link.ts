@@ -346,7 +346,7 @@ function withEnergy(document: ChartDocument, intParam: string | null): ChartDocu
 function linkPartSwitches(
     bndParam: string | null,
 ): Partial<Record<'soloist' | 'bass' | 'chords', boolean>> | null {
-    // Same 100KB bound `decompressBandSettings` applies to the identical envelope (utils.ts).
+    // Same 100KB bound v1's `decompressBandSettings` applied to the identical envelope.
     if (!bndParam || bndParam.length > 102400) {
         return null;
     }

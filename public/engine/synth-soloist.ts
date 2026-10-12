@@ -156,7 +156,7 @@ function playSampledSolo(
     // every note; a guitarist slurs a connected run: pick the first note, then
     // hammer/pull the rest without re-picking. The sampled voice re-triggers a
     // fresh pluck (with its recorded pick transient) on every note, so a run reads
-    // as horn-like. When the scheduler flags a note legato (rhythmically contiguous
+    // as horn-like. When the band host flags a note legato (rhythmically contiguous
     // with its predecessor, no bend of its own), and the voice is a guitar pack,
     // and the move is a step-to-a-5th (a real slur, not a leap you'd re-pick), we
     // glide *into* the pitch from the previous note over a short 40ms slur and

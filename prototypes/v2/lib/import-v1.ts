@@ -194,7 +194,7 @@ export interface V1ImportContext {
     band: ChartBand;
     /**
      * Key/meter for an imported progression. v1's own "load this preset" gesture
-     * (`handleSelect` in `PresetLibrary.tsx`) replaces the sections and `isMinor` and
+     * (`handleSelect` in v1's `PresetLibrary.tsx`, deleted with v1) replaces the sections and `isMinor` and
      * keeps the session's key and meter, so the import does the same.
      */
     key: string;

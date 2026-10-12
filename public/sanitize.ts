@@ -7,7 +7,7 @@
  * DOM, Web Audio, or state dependencies, but they exist to serve DOM-adjacent
  * concerns (chart labels, the manual renderer, hydrated share payloads).
  *
- * What does NOT belong here: anything the logic worker needs. Seeded RNG and
+ * What does NOT belong here: anything the band or the voices need. Seeded RNG and
  * hashing live in `engine/hash-utils.ts`; share/persistence encoding lives in
  * `state/share-codec.ts`; step/meter timing math and MIDI↔frequency conversion
  * live in `utils.ts`. Keep this module import-free so it stays a leaf.
@@ -63,12 +63,12 @@ export function stripDangerousChars(str: string): string {
  * why one authority: the seed had three readers on two different bounds. #1258
  * made the share reader's `bnd.s.sd` path match `?seed=` (both
  * `stripDangerousChars(...).slice(0, 64)`), but the persist reader was a third
- * reader and stayed unbounded, and `SongSeedControl` had no `maxLength` — so a
+ * reader and stayed unbounded, and v1's `SongSeedControl` had no `maxLength` — so a
  * >64-char seed was reachable **by typing**, survived locally, and was emitted
  * whole by the share writer, while the recipient's reader truncated it. Sender
  * and recipient then heard different soloist lines off the "same" seed, because
- * the seed string is the PRNG input for the whole session (`createPRNG`) and for
- * every per-section derivation (`deriveSectionSeed`).
+ * the seed string was the PRNG input for the whole session (the old engine's `createPRNG`) and for
+ * every per-section derivation (its `deriveSectionSeed`).
  *
  * Bounding at the write side instead of adding a fourth read-side bound is what
  * makes them agree: `SET_SONG_SEED` (and the generic `SET_PARAM` write) normalize on
@@ -77,7 +77,7 @@ export function stripDangerousChars(str: string): string {
  *
  * 64 chars is inherited from #1258, not re-derived: it is far past any seed a
  * human types or the dice roller mints (6 hex chars) while capping the hashing
- * cost that `deriveSectionSeed` pays per section, per bar.
+ * cost that the old engine's `deriveSectionSeed` paid per section, per bar.
  */
 export const SONG_SEED_MAX_LENGTH = 64;
 

@@ -51,8 +51,8 @@ export const hydrateAutoSound = (saved: unknown, voice: InstrumentVoice): boolea
  * because its FALLBACK — '8th' — is v1's reading policy, not a property of the type.)
  *
  * why (#1257): `swingSub` is a **string** ('8th' | '16th') — the swing-base `<select>`
- * in `InstrumentSettings.tsx` only ever dispatches those two, and the branching
- * consumer `calculateStepDuration` compares `=== '16th'`. The share reader used to
+ * in v1's `InstrumentSettings.tsx` only ever dispatched those two, and the branching
+ * consumer (v1's `calculateStepDuration`) compared `=== '16th'`. The share reader used to
  * validate it against **numbers** (`[4, 8, 16].includes(...)`), which matched nothing
  * the writer has ever emitted (verified across all of git history: the writer's line
  * has only ever been `ss: groove.swingSub`). So *every* share link landed the number

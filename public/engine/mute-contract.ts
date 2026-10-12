@@ -7,9 +7,9 @@
  * - **Bass** takes a NUMERIC palm-mute amount, `0` (open) … `1` (fully muted): the band
  *   host passes one for a muted band bass note (`playBandEvent`). These are **real notes
  *   a bassist plays**; they sound, quietly.
- * - **Chords** write a BOOLEAN. `true` is a CC-only carrier (a sustain-pedal event
- *   with no pitch); `false` is an audible note, including a deliberately quiet ghost
- *   articulation.
+ * - **Chords** wrote a BOOLEAN (the old engine; the band's chords do not set the field).
+ *   `true` was a CC-only carrier (a sustain-pedal event with no pitch); `false` is an
+ *   audible note, including a deliberately quiet ghost articulation.
  * - **Soloist and drums** never write the field at all, so they always read
  *   `undefined` — which normalizes to "open", the same as `0`.
  *
@@ -26,10 +26,10 @@
  * became shared.
  *
  * One constant keeps the mute *ratio* identical across the synth voice, the sampled
- * voice, live MIDI-out and the exported `.mid`. It does NOT make their absolute levels
- * equal: the export applies its own `Math.sqrt(noteVel)` compression that the live MIDI
- * path does not, so the same note lands on a different MIDI velocity in each. Only the
- * open-vs-muted relationship is shared.
+ * voice and (in the old engine) live MIDI-out and the exported `.mid`. It did NOT make
+ * their absolute levels equal: the export applied its own `Math.sqrt(noteVel)` compression
+ * that the live MIDI path did not, so the same note landed on a different MIDI velocity in
+ * each. Only the open-vs-muted relationship was shared.
  */
 export const MUTE_ATTENUATION = 0.85;
 
