@@ -131,10 +131,7 @@ export function handleEffects(
             // moving the slider alone is live (= slider × reverbSendForPack(voice)).
             // The helper no-ops before the audio graph exists.
             if (action.payload?.module) {
-                // Cast: SET_REVERB is shared across every lane, so its payload
-                // types `module` as a plain string; runtime callers only ever
-                // dispatch a real InstrumentModule name.
-                syncBusReverbSend(stateMap, action.payload.module as InstrumentModule);
+                syncBusReverbSend(stateMap, action.payload.module);
             }
             break;
         }
@@ -144,7 +141,7 @@ export function handleEffects(
             // gain node was otherwise only re-trimmed at initAudio/restoreGains (a
             // mute toggle, transport start). Re-trim now, mirroring SET_REVERB.
             if (action.payload?.module) {
-                syncBusVolume(stateMap, action.payload.module as InstrumentModule);
+                syncBusVolume(stateMap, action.payload.module);
             }
             break;
         }

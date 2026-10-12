@@ -1,0 +1,1625 @@
+=== Kick / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(0,10.5)
+panner#4.connect(gain#2)
+random x1
+gain#3.gain.cancelScheduledValues(10.5)
+gain#3.gain.setTargetAtTime(0.45,10.5,0.005)
+gain#3.gain.setTargetAtTime(1,10.505,0.12)
+create osc#5
+create gain#6
+gain#6.gain.setValueAtTime(0,10.5)
+osc#5.type=sine
+random x1
+osc#5.frequency.setValueAtTime(2803.16357,10.5)
+osc#5.frequency.exponentialRampToValueAtTime(576,10.506)
+gain#6.gain.setTargetAtTime(0.36965731,10.5,0.001)
+gain#6.gain.setTargetAtTime(0,10.504,0.0037)
+random x1
+create source#7
+source#7.buffer=buffer#1
+create filter#8
+create gain#9
+filter#8.type=bandpass
+filter#8.frequency.setValueAtTime(1010.18493,10.5)
+filter#8.Q.setValueAtTime(0.9,10.5)
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.setTargetAtTime(0.1826542,10.5,0.0015)
+gain#9.gain.setTargetAtTime(0,10.5015,0.012)
+source#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+source#7.start(10.5,0)
+source#7.stop(10.62)
+source#7.onended=fn
+random x1
+create osc#10
+create gain#11
+osc#10.type=triangle
+osc#10.frequency.setValueAtTime(169.118957,10.5)
+osc#10.frequency.exponentialRampToValueAtTime(57.2,10.52)
+gain#11.gain.setValueAtTime(0,10.5)
+gain#11.gain.setTargetAtTime(1.35685977,10.5,0.001)
+gain#11.gain.setTargetAtTime(0,10.501,0.0446)
+osc#10.connect(gain#11)
+gain#11.connect(panner#4)
+osc#10.start(10.5)
+osc#10.stop(10.74)
+osc#10.onended=fn
+random x2
+create osc#12
+create gain#13
+osc#12.type=sine
+osc#12.frequency.setValueAtTime(51.0860139,10.5)
+osc#12.frequency.exponentialRampToValueAtTime(51.0899295,10.52)
+gain#13.gain.setValueAtTime(0,10.5)
+gain#13.gain.setTargetAtTime(1.06983174,10.5,0.003)
+gain#13.gain.setTargetAtTime(0,10.503,0.109)
+osc#12.connect(gain#13)
+gain#13.connect(panner#4)
+osc#12.start(10.5)
+osc#12.stop(11.062)
+osc#12.onended=fn
+create source#14
+source#14.buffer=buffer#1
+create filter#15
+create gain#16
+filter#15.type=bandpass
+filter#15.frequency.setValueAtTime(3140,10.5)
+filter#15.Q.setValueAtTime(4,10.5)
+gain#16.gain.setValueAtTime(0,10.5)
+gain#16.gain.setTargetAtTime(0.271806846,10.5,0.0003)
+gain#16.gain.setTargetAtTime(0,10.5003,0.008)
+source#14.connect(filter#15)
+filter#15.connect(gain#16)
+gain#16.connect(panner#4)
+source#14.start(10.5,0)
+source#14.stop(10.55)
+source#14.onended=fn
+osc#5.connect(gain#6)
+gain#6.connect(panner#4)
+osc#5.start(10.5)
+osc#5.stop(10.6)
+osc#5.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#17
+panner#17.pan.setValueAtTime(-0.2,10.6)
+panner#17.connect(gain#2)
+random x2
+create osc#18
+create gain#19
+osc#18.type=sine
+osc#18.frequency.setValueAtTime(6596.46795,10.6)
+osc#18.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#19.gain.setValueAtTime(0,10.6)
+gain#19.gain.setTargetAtTime(0.345002905,10.6,0.001)
+gain#19.gain.setTargetAtTime(0,10.601,0.005)
+osc#18.connect(gain#19)
+gain#19.connect(panner#17)
+osc#18.start(10.6)
+osc#18.stop(10.7)
+osc#18.onended=fn
+random x2
+create osc#20
+create gain#21
+osc#20.type=triangle
+osc#20.frequency.setValueAtTime(331.415295,10.6)
+osc#20.frequency.exponentialRampToValueAtTime(297.539664,10.7)
+gain#21.gain.setValueAtTime(0,10.6)
+gain#21.gain.setTargetAtTime(0.69000581,10.6,0.002)
+gain#21.gain.setTargetAtTime(0,10.602,0.04)
+osc#20.connect(gain#21)
+gain#21.connect(panner#17)
+osc#20.start(10.6)
+osc#20.stop(11.1)
+osc#20.onended=fn
+create source#22
+source#22.buffer=buffer#1
+create filter#23
+create gain#24
+filter#23.type=highpass
+filter#23.frequency.setValueAtTime(3500,10.6)
+filter#23.Q.setValueAtTime(1.5,10.6)
+gain#24.gain.setValueAtTime(0,10.6)
+gain#24.gain.setTargetAtTime(0.301877542,10.6,0.002)
+gain#24.gain.setTargetAtTime(0,10.602,0.02)
+source#22.connect(filter#23)
+filter#23.connect(gain#24)
+gain#24.connect(panner#17)
+source#22.start(10.6,0)
+source#22.stop(11.1)
+source#22.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended source#7
+source#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+ended osc#10
+osc#10.disconnect()
+gain#11.disconnect()
+ended osc#12
+osc#12.disconnect()
+gain#13.disconnect()
+panner#4.disconnect()
+ended source#14
+source#14.disconnect()
+filter#15.disconnect()
+gain#16.disconnect()
+ended osc#5
+osc#5.disconnect()
+gain#6.disconnect()
+ended osc#18
+osc#18.disconnect()
+gain#19.disconnect()
+ended osc#20
+osc#20.disconnect()
+gain#21.disconnect()
+ended source#22
+source#22.disconnect()
+filter#23.disconnect()
+gain#24.disconnect()
+panner#17.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== Snare / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(-0.2,10.5)
+panner#4.connect(gain#2)
+random x2
+create osc#5
+create gain#6
+osc#5.type=triangle
+osc#5.frequency.setValueAtTime(188.295066,10.5)
+osc#5.frequency.exponentialRampToValueAtTime(170.228571,10.55)
+gain#6.gain.setValueAtTime(0,10.5)
+gain#6.gain.setTargetAtTime(0.27098828,10.5,0.001)
+gain#6.gain.setTargetAtTime(0,10.501,0.0537142857)
+osc#5.connect(gain#6)
+gain#6.connect(panner#4)
+osc#5.start(10.5)
+osc#5.stop(10.95)
+osc#5.onended=fn
+random x1
+create osc#7
+create gain#8
+osc#7.type=sine
+osc#7.frequency.setValueAtTime(337.545337,10.5)
+osc#7.frequency.exponentialRampToValueAtTime(297.44,10.54)
+gain#8.gain.setValueAtTime(0,10.5)
+gain#8.gain.setTargetAtTime(0.224699558,10.5,0.001)
+gain#8.gain.setTargetAtTime(0,10.501,0.0483428571)
+osc#7.connect(gain#8)
+gain#8.connect(panner#4)
+osc#7.start(10.5)
+osc#7.stop(10.9)
+osc#7.onended=fn
+random x1
+create osc#9
+create gain#10
+osc#9.type=triangle
+osc#9.frequency.setValueAtTime(2875.81389,10.5)
+osc#9.frequency.exponentialRampToValueAtTime(1685.71429,10.515)
+gain#10.gain.setValueAtTime(0,10.5)
+gain#10.gain.setTargetAtTime(0.159404871,10.5,0.0008)
+gain#10.gain.setTargetAtTime(0,10.5008,0.0117142857)
+osc#9.connect(gain#10)
+gain#10.connect(panner#4)
+osc#9.start(10.5)
+osc#9.stop(10.62)
+osc#9.onended=fn
+random x1
+create source#11
+source#11.buffer=buffer#1
+create filter#12
+create gain#13
+filter#12.type=bandpass
+filter#12.frequency.setValueAtTime(2007.87692,10.5)
+filter#12.Q.setValueAtTime(1.12857143,10.5)
+gain#13.gain.setValueAtTime(0,10.5)
+gain#13.gain.setTargetAtTime(1.01835189,10.5,0.0008)
+gain#13.gain.setTargetAtTime(0,10.5008,0.0664285714)
+source#11.connect(filter#12)
+filter#12.connect(gain#13)
+gain#13.connect(panner#4)
+source#11.start(10.5,0)
+source#11.stop(10.8971429)
+source#11.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#14
+panner#14.pan.setValueAtTime(-0.2,10.6)
+panner#14.connect(gain#2)
+random x2
+create osc#15
+create gain#16
+osc#15.type=sine
+osc#15.frequency.setValueAtTime(6503.05737,10.6)
+osc#15.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#16.gain.setValueAtTime(0,10.6)
+gain#16.gain.setTargetAtTime(0.341133987,10.6,0.001)
+gain#16.gain.setTargetAtTime(0,10.601,0.005)
+osc#15.connect(gain#16)
+gain#16.connect(panner#14)
+osc#15.start(10.6)
+osc#15.stop(10.7)
+osc#15.onended=fn
+random x2
+create osc#17
+create gain#18
+osc#17.type=triangle
+osc#17.frequency.setValueAtTime(334.897603,10.6)
+osc#17.frequency.exponentialRampToValueAtTime(298.273765,10.7)
+gain#18.gain.setValueAtTime(0,10.6)
+gain#18.gain.setTargetAtTime(0.682267974,10.6,0.002)
+gain#18.gain.setTargetAtTime(0,10.602,0.04)
+osc#17.connect(gain#18)
+gain#18.connect(panner#14)
+osc#17.start(10.6)
+osc#17.stop(11.1)
+osc#17.onended=fn
+create source#19
+source#19.buffer=buffer#1
+create filter#20
+create gain#21
+filter#20.type=highpass
+filter#20.frequency.setValueAtTime(3500,10.6)
+filter#20.Q.setValueAtTime(1.5,10.6)
+gain#21.gain.setValueAtTime(0,10.6)
+gain#21.gain.setTargetAtTime(0.298492239,10.6,0.002)
+gain#21.gain.setTargetAtTime(0,10.602,0.02)
+source#19.connect(filter#20)
+filter#20.connect(gain#21)
+gain#21.connect(panner#14)
+source#19.start(10.6,0)
+source#19.stop(11.1)
+source#19.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#5
+osc#5.disconnect()
+gain#6.disconnect()
+ended osc#7
+osc#7.disconnect()
+gain#8.disconnect()
+ended osc#9
+osc#9.disconnect()
+gain#10.disconnect()
+ended source#11
+source#11.disconnect()
+filter#12.disconnect()
+gain#13.disconnect()
+panner#4.disconnect()
+ended osc#15
+osc#15.disconnect()
+gain#16.disconnect()
+ended osc#17
+osc#17.disconnect()
+gain#18.disconnect()
+ended source#19
+source#19.disconnect()
+filter#20.disconnect()
+gain#21.disconnect()
+panner#14.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== Sidestick / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(-0.2,10.5)
+panner#4.connect(gain#2)
+random x2
+create osc#5
+create gain#6
+osc#5.type=sine
+osc#5.frequency.setValueAtTime(6441.73038,10.5)
+osc#5.frequency.exponentialRampToValueAtTime(100,10.52)
+gain#6.gain.setValueAtTime(0,10.5)
+gain#6.gain.setTargetAtTime(0.343333568,10.5,0.001)
+gain#6.gain.setTargetAtTime(0,10.501,0.005)
+osc#5.connect(gain#6)
+gain#6.connect(panner#4)
+osc#5.start(10.5)
+osc#5.stop(10.6)
+osc#5.onended=fn
+random x2
+create osc#7
+create gain#8
+osc#7.type=triangle
+osc#7.frequency.setValueAtTime(329.112196,10.5)
+osc#7.frequency.exponentialRampToValueAtTime(296.573231,10.6)
+gain#8.gain.setValueAtTime(0,10.5)
+gain#8.gain.setTargetAtTime(0.686667135,10.5,0.002)
+gain#8.gain.setTargetAtTime(0,10.502,0.04)
+osc#7.connect(gain#8)
+gain#8.connect(panner#4)
+osc#7.start(10.5)
+osc#7.stop(11)
+osc#7.onended=fn
+create source#9
+source#9.buffer=buffer#1
+create filter#10
+create gain#11
+filter#10.type=highpass
+filter#10.frequency.setValueAtTime(3500,10.5)
+filter#10.Q.setValueAtTime(1.5,10.5)
+gain#11.gain.setValueAtTime(0,10.5)
+gain#11.gain.setTargetAtTime(0.300416872,10.5,0.002)
+gain#11.gain.setTargetAtTime(0,10.502,0.02)
+source#9.connect(filter#10)
+filter#10.connect(gain#11)
+gain#11.connect(panner#4)
+source#9.start(10.5,0)
+source#9.stop(11)
+source#9.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#12
+panner#12.pan.setValueAtTime(-0.2,10.6)
+panner#12.connect(gain#2)
+random x2
+create osc#13
+create gain#14
+osc#13.type=sine
+osc#13.frequency.setValueAtTime(6430.13104,10.6)
+osc#13.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#14.gain.setValueAtTime(0,10.6)
+gain#14.gain.setTargetAtTime(0.342537556,10.6,0.001)
+gain#14.gain.setTargetAtTime(0,10.601,0.005)
+osc#13.connect(gain#14)
+gain#14.connect(panner#12)
+osc#13.start(10.6)
+osc#13.stop(10.7)
+osc#13.onended=fn
+random x2
+create osc#15
+create gain#16
+osc#15.type=triangle
+osc#15.frequency.setValueAtTime(330.15522,10.6)
+osc#15.frequency.exponentialRampToValueAtTime(301.407843,10.7)
+gain#16.gain.setValueAtTime(0,10.6)
+gain#16.gain.setTargetAtTime(0.685075112,10.6,0.002)
+gain#16.gain.setTargetAtTime(0,10.602,0.04)
+osc#15.connect(gain#16)
+gain#16.connect(panner#12)
+osc#15.start(10.6)
+osc#15.stop(11.1)
+osc#15.onended=fn
+create source#17
+source#17.buffer=buffer#1
+create filter#18
+create gain#19
+filter#18.type=highpass
+filter#18.frequency.setValueAtTime(3500,10.6)
+filter#18.Q.setValueAtTime(1.5,10.6)
+gain#19.gain.setValueAtTime(0,10.6)
+gain#19.gain.setTargetAtTime(0.299720362,10.6,0.002)
+gain#19.gain.setTargetAtTime(0,10.602,0.02)
+source#17.connect(filter#18)
+filter#18.connect(gain#19)
+gain#19.connect(panner#12)
+source#17.start(10.6,0)
+source#17.stop(11.1)
+source#17.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#5
+osc#5.disconnect()
+gain#6.disconnect()
+ended osc#7
+osc#7.disconnect()
+gain#8.disconnect()
+ended source#9
+source#9.disconnect()
+filter#10.disconnect()
+gain#11.disconnect()
+panner#4.disconnect()
+ended osc#13
+osc#13.disconnect()
+gain#14.disconnect()
+ended osc#15
+osc#15.disconnect()
+gain#16.disconnect()
+ended source#17
+source#17.disconnect()
+filter#18.disconnect()
+gain#19.disconnect()
+panner#12.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== HiHat / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(0.35,10.5)
+panner#4.connect(gain#2)
+random x3
+create source#5
+createBuffer(1,120,200)
+create buffer#6
+buffer#6.__length=120
+buffer#6.getChannelData(0)
+random x139
+source#5.buffer=buffer#6
+random x1
+source#5.playbackRate.value=1.00008396
+create filter#7
+filter#7.type=bandpass
+random x1
+filter#7.frequency.setValueAtTime(7758.80306,10.5)
+random x1
+filter#7.frequency.setTargetAtTime(7030.50879,10.508,0.02)
+random x1
+filter#7.Q.value=0.901378308
+create filter#8
+filter#8.type=highpass
+random x1
+filter#8.frequency.setValueAtTime(4185.17981,10.5)
+random x1
+filter#8.frequency.setTargetAtTime(3602.77301,10.508,0.025)
+create gain#9
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.setTargetAtTime(0.628888708,10.5,0.004)
+gain#9.gain.setTargetAtTime(0,10.512,0.142)
+source#5.connect(filter#7)
+filter#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+createBuffer(1,800,200)
+create buffer#10
+buffer#10.__length=800
+buffer#10.getChannelData(0)
+random x802
+create source#11
+source#11.buffer=buffer#10
+create filter#12
+create gain#13
+filter#12.type=bandpass
+filter#12.frequency.setValueAtTime(3375.6801,10.5)
+filter#12.Q.setValueAtTime(1.2,10.5)
+gain#13.gain.setValueAtTime(0,10.5)
+gain#13.gain.setTargetAtTime(0.075466645,10.5,0.001)
+gain#13.gain.setTargetAtTime(0,10.501,0.04)
+source#11.connect(filter#12)
+filter#12.connect(gain#13)
+gain#13.connect(panner#4)
+source#11.loop=true
+source#11.start(10.5,0.705037992)
+source#11.stop(10.56)
+source#11.onended=fn
+source#5.start(10.5)
+source#5.stop(10.95)
+source#5.onended=fn
+groove: hat=gain#9 ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#14
+panner#14.pan.setValueAtTime(-0.2,10.6)
+panner#14.connect(gain#2)
+random x2
+create osc#15
+create gain#16
+osc#15.type=sine
+osc#15.frequency.setValueAtTime(6432.47081,10.6)
+osc#15.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#16.gain.setValueAtTime(0,10.6)
+gain#16.gain.setTargetAtTime(0.345022341,10.6,0.001)
+gain#16.gain.setTargetAtTime(0,10.601,0.005)
+osc#15.connect(gain#16)
+gain#16.connect(panner#14)
+osc#15.start(10.6)
+osc#15.stop(10.7)
+osc#15.onended=fn
+random x2
+create osc#17
+create gain#18
+osc#17.type=triangle
+osc#17.frequency.setValueAtTime(325.83082,10.6)
+osc#17.frequency.exponentialRampToValueAtTime(294.20506,10.7)
+gain#18.gain.setValueAtTime(0,10.6)
+gain#18.gain.setTargetAtTime(0.690044682,10.6,0.002)
+gain#18.gain.setTargetAtTime(0,10.602,0.04)
+osc#17.connect(gain#18)
+gain#18.connect(panner#14)
+osc#17.start(10.6)
+osc#17.stop(11.1)
+osc#17.onended=fn
+create source#19
+source#19.buffer=buffer#1
+create filter#20
+create gain#21
+filter#20.type=highpass
+filter#20.frequency.setValueAtTime(3500,10.6)
+filter#20.Q.setValueAtTime(1.5,10.6)
+gain#21.gain.setValueAtTime(0,10.6)
+gain#21.gain.setTargetAtTime(0.301894549,10.6,0.002)
+gain#21.gain.setTargetAtTime(0,10.602,0.02)
+source#19.connect(filter#20)
+filter#20.connect(gain#21)
+gain#21.connect(panner#14)
+source#19.start(10.6,0)
+source#19.stop(11.1)
+source#19.onended=fn
+groove: hat=gain#9 ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended source#11
+source#11.disconnect()
+filter#12.disconnect()
+gain#13.disconnect()
+ended source#5
+source#5.disconnect()
+filter#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+panner#4.disconnect()
+ended osc#15
+osc#15.disconnect()
+gain#16.disconnect()
+ended osc#17
+osc#17.disconnect()
+gain#18.disconnect()
+ended source#19
+source#19.disconnect()
+filter#20.disconnect()
+gain#21.disconnect()
+panner#14.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== Open / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(0.35,10.5)
+panner#4.connect(gain#2)
+random x2
+create source#5
+createBuffer(1,600,200)
+create buffer#6
+buffer#6.__length=600
+buffer#6.getChannelData(0)
+random x622
+source#5.buffer=buffer#6
+random x1
+source#5.playbackRate.value=1.00490579
+create filter#7
+filter#7.type=bandpass
+filter#7.frequency.setValueAtTime(5890.32,10.5)
+filter#7.frequency.setTargetAtTime(5454,10.51,0.05)
+random x1
+filter#7.Q.value=0.688245659
+create filter#8
+filter#8.type=highpass
+filter#8.frequency.setValueAtTime(2828,10.5)
+create gain#9
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.setTargetAtTime(0.482867032,10.5,0.01)
+gain#9.gain.setTargetAtTime(0,10.514,0.53519)
+source#5.connect(filter#7)
+filter#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+source#5.start(10.5)
+source#5.stop(13.7)
+source#5.onended=fn
+groove: hat=gain#9 ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#10
+panner#10.pan.setValueAtTime(-0.2,10.6)
+panner#10.connect(gain#2)
+random x2
+create osc#11
+create gain#12
+osc#11.type=sine
+osc#11.frequency.setValueAtTime(6439.94817,10.6)
+osc#11.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#12.gain.setValueAtTime(0,10.6)
+gain#12.gain.setTargetAtTime(0.34095575,10.6,0.001)
+gain#12.gain.setTargetAtTime(0,10.601,0.005)
+osc#11.connect(gain#12)
+gain#12.connect(panner#10)
+osc#11.start(10.6)
+osc#11.stop(10.7)
+osc#11.onended=fn
+random x2
+create osc#13
+create gain#14
+osc#13.type=triangle
+osc#13.frequency.setValueAtTime(325.190937,10.6)
+osc#13.frequency.exponentialRampToValueAtTime(294.821216,10.7)
+gain#14.gain.setValueAtTime(0,10.6)
+gain#14.gain.setTargetAtTime(0.6819115,10.6,0.002)
+gain#14.gain.setTargetAtTime(0,10.602,0.04)
+osc#13.connect(gain#14)
+gain#14.connect(panner#10)
+osc#13.start(10.6)
+osc#13.stop(11.1)
+osc#13.onended=fn
+create source#15
+source#15.buffer=buffer#1
+create filter#16
+create gain#17
+filter#16.type=highpass
+filter#16.frequency.setValueAtTime(3500,10.6)
+filter#16.Q.setValueAtTime(1.5,10.6)
+gain#17.gain.setValueAtTime(0,10.6)
+gain#17.gain.setTargetAtTime(0.298336281,10.6,0.002)
+gain#17.gain.setTargetAtTime(0,10.602,0.02)
+source#15.connect(filter#16)
+filter#16.connect(gain#17)
+gain#17.connect(panner#10)
+source#15.start(10.6,0)
+source#15.stop(11.1)
+source#15.onended=fn
+groove: hat=gain#9 ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended source#5
+source#5.disconnect()
+filter#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+panner#4.disconnect()
+ended osc#11
+osc#11.disconnect()
+gain#12.disconnect()
+ended osc#13
+osc#13.disconnect()
+gain#14.disconnect()
+ended source#15
+source#15.disconnect()
+filter#16.disconnect()
+gain#17.disconnect()
+panner#10.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== HiHatPedal / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(0.35,10.5)
+panner#4.connect(gain#2)
+random x1
+create source#5
+createBuffer(1,120,200)
+create buffer#6
+buffer#6.__length=120
+buffer#6.getChannelData(0)
+random x139
+source#5.buffer=buffer#6
+random x2
+source#5.playbackRate.value=0.969872812
+create filter#7
+filter#7.type=bandpass
+filter#7.frequency.setValueAtTime(4149.6,10.5)
+filter#7.Q.value=0.7225
+create filter#8
+filter#8.type=highpass
+filter#8.frequency.setValueAtTime(2341.12,10.5)
+create gain#9
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.setTargetAtTime(0.361185411,10.5,0.007)
+gain#9.gain.setTargetAtTime(0,10.51,0.035)
+source#5.connect(filter#7)
+filter#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+source#5.start(10.5)
+source#5.stop(10.7)
+source#5.onended=fn
+groove: hat=gain#9 ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#10
+panner#10.pan.setValueAtTime(-0.2,10.6)
+panner#10.connect(gain#2)
+random x2
+create osc#11
+create gain#12
+osc#11.type=sine
+osc#11.frequency.setValueAtTime(6553.29055,10.6)
+osc#11.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#12.gain.setValueAtTime(0,10.6)
+gain#12.gain.setTargetAtTime(0.346105598,10.6,0.001)
+gain#12.gain.setTargetAtTime(0,10.601,0.005)
+osc#11.connect(gain#12)
+gain#12.connect(panner#10)
+osc#11.start(10.6)
+osc#11.stop(10.7)
+osc#11.onended=fn
+random x2
+create osc#13
+create gain#14
+osc#13.type=triangle
+osc#13.frequency.setValueAtTime(334.097878,10.6)
+osc#13.frequency.exponentialRampToValueAtTime(298.233025,10.7)
+gain#14.gain.setValueAtTime(0,10.6)
+gain#14.gain.setTargetAtTime(0.692211195,10.6,0.002)
+gain#14.gain.setTargetAtTime(0,10.602,0.04)
+osc#13.connect(gain#14)
+gain#14.connect(panner#10)
+osc#13.start(10.6)
+osc#13.stop(11.1)
+osc#13.onended=fn
+create source#15
+source#15.buffer=buffer#1
+create filter#16
+create gain#17
+filter#16.type=highpass
+filter#16.frequency.setValueAtTime(3500,10.6)
+filter#16.Q.setValueAtTime(1.5,10.6)
+gain#17.gain.setValueAtTime(0,10.6)
+gain#17.gain.setTargetAtTime(0.302842398,10.6,0.002)
+gain#17.gain.setTargetAtTime(0,10.602,0.02)
+source#15.connect(filter#16)
+filter#16.connect(gain#17)
+gain#17.connect(panner#10)
+source#15.start(10.6,0)
+source#15.stop(11.1)
+source#15.onended=fn
+groove: hat=gain#9 ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended source#5
+source#5.disconnect()
+filter#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+panner#4.disconnect()
+ended osc#11
+osc#11.disconnect()
+gain#12.disconnect()
+ended osc#13
+osc#13.disconnect()
+gain#14.disconnect()
+ended source#15
+source#15.disconnect()
+filter#16.disconnect()
+gain#17.disconnect()
+panner#10.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== Ride / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(0.35,10.5)
+panner#4.connect(gain#2)
+random x1
+create source#5
+createBuffer(1,880,200)
+create buffer#6
+buffer#6.__length=880
+buffer#6.getChannelData(0)
+random x902
+source#5.buffer=buffer#6
+random x1
+source#5.playbackRate.value=0.997269524
+create filter#7
+filter#7.type=bandpass
+filter#7.frequency.setValueAtTime(5212.08,10.5)
+filter#7.frequency.setTargetAtTime(4389.12,10.508,0.08)
+filter#7.Q.value=0.46
+create filter#8
+filter#8.type=highpass
+filter#8.frequency.setValueAtTime(2424.4,10.5)
+filter#8.frequency.setTargetAtTime(2093.8,10.508,0.1)
+create gain#9
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.setTargetAtTime(0.680930385,10.5,0.004)
+gain#9.gain.setTargetAtTime(0,10.6,1.55)
+source#5.connect(filter#7)
+filter#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+random x1
+create osc#10
+create gain#11
+osc#10.type=triangle
+osc#10.frequency.setValueAtTime(1565.58835,10.5)
+osc#10.frequency.exponentialRampToValueAtTime(1327.2,10.51)
+gain#11.gain.setValueAtTime(0,10.5)
+gain#11.gain.setTargetAtTime(0.0408558231,10.5,0.0008)
+gain#11.gain.setTargetAtTime(0,10.5008,0.01)
+osc#10.connect(gain#11)
+gain#11.connect(panner#4)
+osc#10.start(10.5)
+osc#10.stop(10.58)
+osc#10.onended=fn
+source#5.start(10.5)
+source#5.stop(15.3)
+source#5.onended=fn
+groove: hat=null ride=gain#9 crash=null sampledHat=none
+--- then Sidestick
+create panner#12
+panner#12.pan.setValueAtTime(-0.2,10.6)
+panner#12.connect(gain#2)
+random x2
+create osc#13
+create gain#14
+osc#13.type=sine
+osc#13.frequency.setValueAtTime(6579.90169,10.6)
+osc#13.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#14.gain.setValueAtTime(0,10.6)
+gain#14.gain.setTargetAtTime(0.340618007,10.6,0.001)
+gain#14.gain.setTargetAtTime(0,10.601,0.005)
+osc#13.connect(gain#14)
+gain#14.connect(panner#12)
+osc#13.start(10.6)
+osc#13.stop(10.7)
+osc#13.onended=fn
+random x2
+create osc#15
+create gain#16
+osc#15.type=triangle
+osc#15.frequency.setValueAtTime(326.975028,10.6)
+osc#15.frequency.exponentialRampToValueAtTime(299.816652,10.7)
+gain#16.gain.setValueAtTime(0,10.6)
+gain#16.gain.setTargetAtTime(0.681236014,10.6,0.002)
+gain#16.gain.setTargetAtTime(0,10.602,0.04)
+osc#15.connect(gain#16)
+gain#16.connect(panner#12)
+osc#15.start(10.6)
+osc#15.stop(11.1)
+osc#15.onended=fn
+create source#17
+source#17.buffer=buffer#1
+create filter#18
+create gain#19
+filter#18.type=highpass
+filter#18.frequency.setValueAtTime(3500,10.6)
+filter#18.Q.setValueAtTime(1.5,10.6)
+gain#19.gain.setValueAtTime(0,10.6)
+gain#19.gain.setTargetAtTime(0.298040756,10.6,0.002)
+gain#19.gain.setTargetAtTime(0,10.602,0.02)
+source#17.connect(filter#18)
+filter#18.connect(gain#19)
+gain#19.connect(panner#12)
+source#17.start(10.6,0)
+source#17.stop(11.1)
+source#17.onended=fn
+groove: hat=null ride=gain#9 crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#10
+osc#10.disconnect()
+gain#11.disconnect()
+ended source#5
+source#5.disconnect()
+filter#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+panner#4.disconnect()
+ended osc#13
+osc#13.disconnect()
+gain#14.disconnect()
+ended osc#15
+osc#15.disconnect()
+gain#16.disconnect()
+ended source#17
+source#17.disconnect()
+filter#18.disconnect()
+gain#19.disconnect()
+panner#12.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== RideBell / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+console.warn([synth-drums] unknown soundName "RideBell" — no audio voice will play.)
+create panner#4
+panner#4.pan.setValueAtTime(0,10.5)
+panner#4.connect(gain#2)
+panner#4.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#5
+panner#5.pan.setValueAtTime(-0.2,10.6)
+panner#5.connect(gain#2)
+random x2
+create osc#6
+create gain#7
+osc#6.type=sine
+osc#6.frequency.setValueAtTime(6441.73038,10.6)
+osc#6.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#7.gain.setValueAtTime(0,10.6)
+gain#7.gain.setTargetAtTime(0.343333568,10.6,0.001)
+gain#7.gain.setTargetAtTime(0,10.601,0.005)
+osc#6.connect(gain#7)
+gain#7.connect(panner#5)
+osc#6.start(10.6)
+osc#6.stop(10.7)
+osc#6.onended=fn
+random x2
+create osc#8
+create gain#9
+osc#8.type=triangle
+osc#8.frequency.setValueAtTime(329.112196,10.6)
+osc#8.frequency.exponentialRampToValueAtTime(296.573231,10.7)
+gain#9.gain.setValueAtTime(0,10.6)
+gain#9.gain.setTargetAtTime(0.686667135,10.6,0.002)
+gain#9.gain.setTargetAtTime(0,10.602,0.04)
+osc#8.connect(gain#9)
+gain#9.connect(panner#5)
+osc#8.start(10.6)
+osc#8.stop(11.1)
+osc#8.onended=fn
+create source#10
+source#10.buffer=buffer#1
+create filter#11
+create gain#12
+filter#11.type=highpass
+filter#11.frequency.setValueAtTime(3500,10.6)
+filter#11.Q.setValueAtTime(1.5,10.6)
+gain#12.gain.setValueAtTime(0,10.6)
+gain#12.gain.setTargetAtTime(0.300416872,10.6,0.002)
+gain#12.gain.setTargetAtTime(0,10.602,0.02)
+source#10.connect(filter#11)
+filter#11.connect(gain#12)
+gain#12.connect(panner#5)
+source#10.start(10.6,0)
+source#10.stop(11.1)
+source#10.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#6
+osc#6.disconnect()
+gain#7.disconnect()
+ended osc#8
+osc#8.disconnect()
+gain#9.disconnect()
+ended source#10
+source#10.disconnect()
+filter#11.disconnect()
+gain#12.disconnect()
+panner#5.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== Crash / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(0.35,10.5)
+panner#4.connect(gain#2)
+random x1
+create source#5
+createBuffer(1,1800,200)
+create buffer#6
+buffer#6.__length=1800
+buffer#6.getChannelData(0)
+random x1825
+source#5.buffer=buffer#6
+random x1
+source#5.playbackRate.value=0.996428407
+create filter#7
+filter#7.type=bandpass
+filter#7.frequency.setValueAtTime(4152.96,10.5)
+filter#7.frequency.setTargetAtTime(3559.68,10.51,0.12)
+filter#7.Q.value=0.45
+create filter#8
+filter#8.type=highpass
+filter#8.frequency.setValueAtTime(1652.4,10.5)
+filter#8.frequency.setTargetAtTime(1438.2,10.512,0.16)
+create gain#9
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.linearRampToValueAtTime(0.808521613,10.504)
+gain#9.gain.setTargetAtTime(0.339579077,10.515,0.06)
+gain#9.gain.setTargetAtTime(0,10.66,3.5)
+source#5.connect(filter#7)
+filter#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+source#5.start(10.5)
+source#5.stop(19.5)
+source#5.onended=fn
+groove: hat=null ride=null crash=gain#9 sampledHat=none
+--- then Sidestick
+create panner#10
+panner#10.pan.setValueAtTime(-0.2,10.6)
+panner#10.connect(gain#2)
+random x2
+create osc#11
+create gain#12
+osc#11.type=sine
+osc#11.frequency.setValueAtTime(6489.01471,10.6)
+osc#11.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#12.gain.setValueAtTime(0,10.6)
+gain#12.gain.setTargetAtTime(0.341802375,10.6,0.001)
+gain#12.gain.setTargetAtTime(0,10.601,0.005)
+osc#11.connect(gain#12)
+gain#12.connect(panner#10)
+osc#11.start(10.6)
+osc#11.stop(10.7)
+osc#11.onended=fn
+random x2
+create osc#13
+create gain#14
+osc#13.type=triangle
+osc#13.frequency.setValueAtTime(333.815149,10.6)
+osc#13.frequency.exponentialRampToValueAtTime(298.877403,10.7)
+gain#14.gain.setValueAtTime(0,10.6)
+gain#14.gain.setTargetAtTime(0.68360475,10.6,0.002)
+gain#14.gain.setTargetAtTime(0,10.602,0.04)
+osc#13.connect(gain#14)
+gain#14.connect(panner#10)
+osc#13.start(10.6)
+osc#13.stop(11.1)
+osc#13.onended=fn
+create source#15
+source#15.buffer=buffer#1
+create filter#16
+create gain#17
+filter#16.type=highpass
+filter#16.frequency.setValueAtTime(3500,10.6)
+filter#16.Q.setValueAtTime(1.5,10.6)
+gain#17.gain.setValueAtTime(0,10.6)
+gain#17.gain.setTargetAtTime(0.299077078,10.6,0.002)
+gain#17.gain.setTargetAtTime(0,10.602,0.02)
+source#15.connect(filter#16)
+filter#16.connect(gain#17)
+gain#17.connect(panner#10)
+source#15.start(10.6,0)
+source#15.stop(11.1)
+source#15.onended=fn
+groove: hat=null ride=null crash=gain#9 sampledHat=none
+--- onended handlers fire, in registration order
+ended source#5
+source#5.disconnect()
+filter#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+panner#4.disconnect()
+ended osc#11
+osc#11.disconnect()
+gain#12.disconnect()
+ended osc#13
+osc#13.disconnect()
+gain#14.disconnect()
+ended source#15
+source#15.disconnect()
+filter#16.disconnect()
+gain#17.disconnect()
+panner#10.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== High Tom / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+random x1
+create panner#4
+panner#4.pan.setValueAtTime(-0.0728421517,10.5)
+panner#4.connect(gain#2)
+random x2
+create osc#5
+create gain#6
+osc#5.type=sine
+osc#5.frequency.setValueAtTime(862.002262,10.5)
+osc#5.frequency.exponentialRampToValueAtTime(177.059149,10.515)
+gain#6.gain.setValueAtTime(0,10.5)
+gain#6.gain.setTargetAtTime(0.318998611,10.5,0.001)
+gain#6.gain.setTargetAtTime(0,10.501,0.009)
+osc#5.connect(gain#6)
+gain#6.connect(panner#4)
+osc#5.start(10.5)
+osc#5.stop(10.6)
+osc#5.onended=fn
+create source#7
+source#7.buffer=buffer#1
+create filter#8
+create gain#9
+filter#8.type=bandpass
+filter#8.frequency.setValueAtTime(1818.01805,10.5)
+filter#8.Q.setValueAtTime(1.45,10.5)
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.setTargetAtTime(0.123483333,10.5,0.002)
+gain#9.gain.setTargetAtTime(0,10.502,0.02)
+source#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+source#7.start(10.5,0)
+source#7.stop(10.7)
+source#7.onended=fn
+random x1
+create osc#10
+create gain#11
+osc#10.type=triangle
+osc#10.frequency.setValueAtTime(195.935879,10.5)
+osc#10.frequency.exponentialRampToValueAtTime(158.088526,10.55)
+gain#11.gain.setValueAtTime(0,10.5)
+gain#11.gain.setTargetAtTime(0.878103704,10.5,0.002)
+gain#11.gain.setTargetAtTime(0,10.502,0.134)
+osc#10.connect(gain#11)
+gain#11.connect(panner#4)
+osc#10.start(10.5)
+osc#10.stop(10.92)
+osc#10.onended=fn
+random x2
+create osc#12
+create gain#13
+osc#12.type=sine
+osc#12.frequency.setValueAtTime(154.581843,10.5)
+osc#12.frequency.exponentialRampToValueAtTime(100,10.52)
+gain#13.gain.setValueAtTime(0,10.5)
+gain#13.gain.setTargetAtTime(0.487073148,10.5,0.006)
+gain#13.gain.setTargetAtTime(0,10.506,0.209721197)
+osc#12.connect(gain#13)
+gain#13.connect(panner#4)
+osc#12.start(10.5)
+osc#12.stop(11.4)
+osc#12.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#14
+panner#14.pan.setValueAtTime(-0.2,10.6)
+panner#14.connect(gain#2)
+random x2
+create osc#15
+create gain#16
+osc#15.type=sine
+osc#15.frequency.setValueAtTime(6596.46795,10.6)
+osc#15.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#16.gain.setValueAtTime(0,10.6)
+gain#16.gain.setTargetAtTime(0.345002905,10.6,0.001)
+gain#16.gain.setTargetAtTime(0,10.601,0.005)
+osc#15.connect(gain#16)
+gain#16.connect(panner#14)
+osc#15.start(10.6)
+osc#15.stop(10.7)
+osc#15.onended=fn
+random x2
+create osc#17
+create gain#18
+osc#17.type=triangle
+osc#17.frequency.setValueAtTime(331.415295,10.6)
+osc#17.frequency.exponentialRampToValueAtTime(297.539664,10.7)
+gain#18.gain.setValueAtTime(0,10.6)
+gain#18.gain.setTargetAtTime(0.69000581,10.6,0.002)
+gain#18.gain.setTargetAtTime(0,10.602,0.04)
+osc#17.connect(gain#18)
+gain#18.connect(panner#14)
+osc#17.start(10.6)
+osc#17.stop(11.1)
+osc#17.onended=fn
+create source#19
+source#19.buffer=buffer#1
+create filter#20
+create gain#21
+filter#20.type=highpass
+filter#20.frequency.setValueAtTime(3500,10.6)
+filter#20.Q.setValueAtTime(1.5,10.6)
+gain#21.gain.setValueAtTime(0,10.6)
+gain#21.gain.setTargetAtTime(0.301877542,10.6,0.002)
+gain#21.gain.setTargetAtTime(0,10.602,0.02)
+source#19.connect(filter#20)
+filter#20.connect(gain#21)
+gain#21.connect(panner#14)
+source#19.start(10.6,0)
+source#19.stop(11.1)
+source#19.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#5
+osc#5.disconnect()
+gain#6.disconnect()
+ended source#7
+source#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+ended osc#10
+osc#10.disconnect()
+gain#11.disconnect()
+ended osc#12
+osc#12.disconnect()
+gain#13.disconnect()
+panner#4.disconnect()
+ended osc#15
+osc#15.disconnect()
+gain#16.disconnect()
+ended osc#17
+osc#17.disconnect()
+gain#18.disconnect()
+ended source#19
+source#19.disconnect()
+filter#20.disconnect()
+gain#21.disconnect()
+panner#14.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== Mid Tom / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+random x1
+create panner#4
+panner#4.pan.setValueAtTime(-0.0728421517,10.5)
+panner#4.connect(gain#2)
+random x2
+create osc#5
+create gain#6
+osc#5.type=sine
+osc#5.frequency.setValueAtTime(552.565553,10.5)
+osc#5.frequency.exponentialRampToValueAtTime(129.498048,10.515)
+gain#6.gain.setValueAtTime(0,10.5)
+gain#6.gain.setTargetAtTime(0.336149074,10.5,0.001)
+gain#6.gain.setTargetAtTime(0,10.501,0.009)
+osc#5.connect(gain#6)
+gain#6.connect(panner#4)
+osc#5.start(10.5)
+osc#5.stop(10.6)
+osc#5.onended=fn
+create source#7
+source#7.buffer=buffer#1
+create filter#8
+create gain#9
+filter#8.type=bandpass
+filter#8.frequency.setValueAtTime(1118.39223,10.5)
+filter#8.Q.setValueAtTime(1.35,10.5)
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.setTargetAtTime(0.137203704,10.5,0.002)
+gain#9.gain.setTargetAtTime(0,10.502,0.02)
+source#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+source#7.start(10.5,0)
+source#7.stop(10.7)
+source#7.onended=fn
+random x1
+create osc#10
+create gain#11
+osc#10.type=triangle
+osc#10.frequency.setValueAtTime(141.202932,10.5)
+osc#10.frequency.exponentialRampToValueAtTime(117.725498,10.55)
+gain#11.gain.setValueAtTime(0,10.5)
+gain#11.gain.setTargetAtTime(0.946705556,10.5,0.002)
+gain#11.gain.setTargetAtTime(0,10.502,0.184)
+osc#10.connect(gain#11)
+gain#11.connect(panner#4)
+osc#10.start(10.5)
+osc#10.stop(11.06)
+osc#10.onended=fn
+random x2
+create osc#12
+create gain#13
+osc#12.type=sine
+osc#12.frequency.setValueAtTime(115.114139,10.5)
+osc#12.frequency.exponentialRampToValueAtTime(100,10.52)
+gain#13.gain.setValueAtTime(0,10.5)
+gain#13.gain.setTargetAtTime(0.555675,10.5,0.008)
+gain#13.gain.setTargetAtTime(0,10.508,0.269076253)
+osc#12.connect(gain#13)
+gain#13.connect(panner#4)
+osc#12.start(10.5)
+osc#12.stop(11.6)
+osc#12.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#14
+panner#14.pan.setValueAtTime(-0.2,10.6)
+panner#14.connect(gain#2)
+random x2
+create osc#15
+create gain#16
+osc#15.type=sine
+osc#15.frequency.setValueAtTime(6596.46795,10.6)
+osc#15.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#16.gain.setValueAtTime(0,10.6)
+gain#16.gain.setTargetAtTime(0.345002905,10.6,0.001)
+gain#16.gain.setTargetAtTime(0,10.601,0.005)
+osc#15.connect(gain#16)
+gain#16.connect(panner#14)
+osc#15.start(10.6)
+osc#15.stop(10.7)
+osc#15.onended=fn
+random x2
+create osc#17
+create gain#18
+osc#17.type=triangle
+osc#17.frequency.setValueAtTime(331.415295,10.6)
+osc#17.frequency.exponentialRampToValueAtTime(297.539664,10.7)
+gain#18.gain.setValueAtTime(0,10.6)
+gain#18.gain.setTargetAtTime(0.69000581,10.6,0.002)
+gain#18.gain.setTargetAtTime(0,10.602,0.04)
+osc#17.connect(gain#18)
+gain#18.connect(panner#14)
+osc#17.start(10.6)
+osc#17.stop(11.1)
+osc#17.onended=fn
+create source#19
+source#19.buffer=buffer#1
+create filter#20
+create gain#21
+filter#20.type=highpass
+filter#20.frequency.setValueAtTime(3500,10.6)
+filter#20.Q.setValueAtTime(1.5,10.6)
+gain#21.gain.setValueAtTime(0,10.6)
+gain#21.gain.setTargetAtTime(0.301877542,10.6,0.002)
+gain#21.gain.setTargetAtTime(0,10.602,0.02)
+source#19.connect(filter#20)
+filter#20.connect(gain#21)
+gain#21.connect(panner#14)
+source#19.start(10.6,0)
+source#19.stop(11.1)
+source#19.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#5
+osc#5.disconnect()
+gain#6.disconnect()
+ended source#7
+source#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+ended osc#10
+osc#10.disconnect()
+gain#11.disconnect()
+ended osc#12
+osc#12.disconnect()
+gain#13.disconnect()
+panner#4.disconnect()
+ended osc#15
+osc#15.disconnect()
+gain#16.disconnect()
+ended osc#17
+osc#17.disconnect()
+gain#18.disconnect()
+ended source#19
+source#19.disconnect()
+filter#20.disconnect()
+gain#21.disconnect()
+panner#14.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== Low Tom / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+random x1
+create panner#4
+panner#4.pan.setValueAtTime(-0.0728421517,10.5)
+panner#4.connect(gain#2)
+random x2
+create osc#5
+create gain#6
+osc#5.type=sine
+osc#5.frequency.setValueAtTime(311.015468,10.5)
+osc#5.frequency.exponentialRampToValueAtTime(85.3678041,10.515)
+gain#6.gain.setValueAtTime(0,10.5)
+gain#6.gain.setTargetAtTime(0.353299537,10.5,0.001)
+gain#6.gain.setTargetAtTime(0,10.501,0.009)
+osc#5.connect(gain#6)
+gain#6.connect(panner#4)
+osc#5.start(10.5)
+osc#5.stop(10.6)
+osc#5.onended=fn
+create source#7
+source#7.buffer=buffer#1
+create filter#8
+create gain#9
+filter#8.type=bandpass
+filter#8.frequency.setValueAtTime(616.545252,10.5)
+filter#8.Q.setValueAtTime(1.2,10.5)
+gain#9.gain.setValueAtTime(0,10.5)
+gain#9.gain.setTargetAtTime(0.164644445,10.5,0.002)
+gain#9.gain.setTargetAtTime(0,10.502,0.02)
+source#7.connect(filter#8)
+filter#8.connect(gain#9)
+gain#9.connect(panner#4)
+source#7.start(10.5,0)
+source#7.stop(10.7)
+source#7.onended=fn
+random x1
+create osc#10
+create gain#11
+osc#10.type=triangle
+osc#10.frequency.setValueAtTime(91.6474271,10.5)
+osc#10.frequency.exponentialRampToValueAtTime(79.044263,10.55)
+gain#11.gain.setValueAtTime(0,10.5)
+gain#11.gain.setTargetAtTime(1.03245787,10.5,0.002)
+gain#11.gain.setTargetAtTime(0,10.502,0.244)
+osc#10.connect(gain#11)
+gain#11.connect(panner#4)
+osc#10.start(10.5)
+osc#10.stop(11.2)
+osc#10.onended=fn
+random x2
+create osc#12
+create gain#13
+osc#12.type=sine
+osc#12.frequency.setValueAtTime(77.2909217,10.5)
+osc#12.frequency.exponentialRampToValueAtTime(100,10.52)
+gain#13.gain.setValueAtTime(0,10.5)
+gain#13.gain.setTargetAtTime(0.607126389,10.5,0.012)
+gain#13.gain.setTargetAtTime(0,10.512,0.328431309)
+osc#12.connect(gain#13)
+gain#13.connect(panner#4)
+osc#12.start(10.5)
+osc#12.stop(11.9)
+osc#12.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#14
+panner#14.pan.setValueAtTime(-0.2,10.6)
+panner#14.connect(gain#2)
+random x2
+create osc#15
+create gain#16
+osc#15.type=sine
+osc#15.frequency.setValueAtTime(6596.46795,10.6)
+osc#15.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#16.gain.setValueAtTime(0,10.6)
+gain#16.gain.setTargetAtTime(0.345002905,10.6,0.001)
+gain#16.gain.setTargetAtTime(0,10.601,0.005)
+osc#15.connect(gain#16)
+gain#16.connect(panner#14)
+osc#15.start(10.6)
+osc#15.stop(10.7)
+osc#15.onended=fn
+random x2
+create osc#17
+create gain#18
+osc#17.type=triangle
+osc#17.frequency.setValueAtTime(331.415295,10.6)
+osc#17.frequency.exponentialRampToValueAtTime(297.539664,10.7)
+gain#18.gain.setValueAtTime(0,10.6)
+gain#18.gain.setTargetAtTime(0.69000581,10.6,0.002)
+gain#18.gain.setTargetAtTime(0,10.602,0.04)
+osc#17.connect(gain#18)
+gain#18.connect(panner#14)
+osc#17.start(10.6)
+osc#17.stop(11.1)
+osc#17.onended=fn
+create source#19
+source#19.buffer=buffer#1
+create filter#20
+create gain#21
+filter#20.type=highpass
+filter#20.frequency.setValueAtTime(3500,10.6)
+filter#20.Q.setValueAtTime(1.5,10.6)
+gain#21.gain.setValueAtTime(0,10.6)
+gain#21.gain.setTargetAtTime(0.301877542,10.6,0.002)
+gain#21.gain.setTargetAtTime(0,10.602,0.02)
+source#19.connect(filter#20)
+filter#20.connect(gain#21)
+gain#21.connect(panner#14)
+source#19.start(10.6,0)
+source#19.stop(11.1)
+source#19.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#5
+osc#5.disconnect()
+gain#6.disconnect()
+ended source#7
+source#7.disconnect()
+filter#8.disconnect()
+gain#9.disconnect()
+ended osc#10
+osc#10.disconnect()
+gain#11.disconnect()
+ended osc#12
+osc#12.disconnect()
+gain#13.disconnect()
+panner#4.disconnect()
+ended osc#15
+osc#15.disconnect()
+gain#16.disconnect()
+ended osc#17
+osc#17.disconnect()
+gain#18.disconnect()
+ended source#19
+source#19.disconnect()
+filter#20.disconnect()
+gain#21.disconnect()
+panner#14.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== Shaker / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+create panner#4
+panner#4.pan.setValueAtTime(0.35,10.5)
+panner#4.connect(gain#2)
+random x1
+createBuffer(1,800,200)
+create buffer#5
+buffer#5.__length=800
+buffer#5.getChannelData(0)
+random x801
+create source#6
+source#6.buffer=buffer#5
+create filter#7
+create gain#8
+filter#7.type=highpass
+filter#7.frequency.setValueAtTime(6981.81532,10.5)
+filter#7.Q.setValueAtTime(1.5,10.5)
+gain#8.gain.setValueAtTime(0,10.5)
+gain#8.gain.setTargetAtTime(0.465954592,10.5,0.01)
+gain#8.gain.setTargetAtTime(0,10.51,0.016)
+gain#8.gain.setTargetAtTime(0,10.532,0.0950439613)
+source#6.connect(filter#7)
+filter#7.connect(gain#8)
+gain#8.connect(panner#4)
+source#6.loop=true
+source#6.start(10.5,0.0778264878)
+source#6.stop(11.1)
+source#6.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#9
+panner#9.pan.setValueAtTime(-0.2,10.6)
+panner#9.connect(gain#2)
+random x2
+create osc#10
+create gain#11
+osc#10.type=sine
+osc#10.frequency.setValueAtTime(6438.48915,10.6)
+osc#10.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#11.gain.setValueAtTime(0,10.6)
+gain#11.gain.setTargetAtTime(0.341398423,10.6,0.001)
+gain#11.gain.setTargetAtTime(0,10.601,0.005)
+osc#10.connect(gain#11)
+gain#11.connect(panner#9)
+osc#10.start(10.6)
+osc#10.stop(10.7)
+osc#10.onended=fn
+random x2
+create osc#12
+create gain#13
+osc#12.type=triangle
+osc#12.frequency.setValueAtTime(332.282995,10.6)
+osc#12.frequency.exponentialRampToValueAtTime(299.750251,10.7)
+gain#13.gain.setValueAtTime(0,10.6)
+gain#13.gain.setTargetAtTime(0.682796846,10.6,0.002)
+gain#13.gain.setTargetAtTime(0,10.602,0.04)
+osc#12.connect(gain#13)
+gain#13.connect(panner#9)
+osc#12.start(10.6)
+osc#12.stop(11.1)
+osc#12.onended=fn
+create source#14
+source#14.buffer=buffer#1
+create filter#15
+create gain#16
+filter#15.type=highpass
+filter#15.frequency.setValueAtTime(3500,10.6)
+filter#15.Q.setValueAtTime(1.5,10.6)
+gain#16.gain.setValueAtTime(0,10.6)
+gain#16.gain.setTargetAtTime(0.29872362,10.6,0.002)
+gain#16.gain.setTargetAtTime(0,10.602,0.02)
+source#14.connect(filter#15)
+filter#15.connect(gain#16)
+gain#16.connect(panner#9)
+source#14.start(10.6,0)
+source#14.stop(11.1)
+source#14.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended source#6
+source#6.disconnect()
+filter#7.disconnect()
+gain#8.disconnect()
+panner#4.disconnect()
+ended osc#10
+osc#10.disconnect()
+gain#11.disconnect()
+ended osc#12
+osc#12.disconnect()
+gain#13.disconnect()
+ended source#14
+source#14.disconnect()
+filter#15.disconnect()
+gain#16.disconnect()
+panner#9.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none

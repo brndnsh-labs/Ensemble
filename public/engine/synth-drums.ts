@@ -176,7 +176,7 @@ const RIGHT_PANNED_INSTRUMENTS = new Set(['HiHat', 'Open', 'Crash', 'Shaker']);
  * Registry of every soundName the synth-drums dispatcher knows how to render.
  * If a groove writes a soundName not in this set, we warn once per name per session
  * — surfaces typos and stub voices without spamming the console or throwing.
- * Keep this in sync with the if/else chain in `playDrumSound`.
+ * Keep this in sync with the voices `playDrumSound` dispatches to.
  */
 const KNOWN_SOUND_NAMES = new Set<string>([
     'Kick',
@@ -486,9 +486,10 @@ function ensureCymbalBuffer(
 }
 
 // synth-audit Epic 4 S4 — per-hit cymbal variation.
-// `current` caches one metallic buffer per cymbal, so fast hat patterns replay a
-// byte-identical sample — a clear "looped" tell. The `new` hat voices instead
-// draw from a small runtime-generated pool: `createMetallicBuffer` already
+// One cached metallic buffer per cymbal would make fast hat patterns replay a
+// byte-identical sample — a clear "looped" tell. The closed hat, pedal chick, open hat
+// and ride instead draw from a small runtime-generated pool (the crash, struck
+// seldom, keeps the single cached buffer): `createMetallicBuffer` already
 // randomizes partial phases, per-partial detune/weight and the noise/transient
 // layers on every call, so N independent generations are N genuinely different
 // cymbals. Pool size 4 is the sweet spot from `drums.md` §6 — enough that a
@@ -528,18 +529,18 @@ function lastIndexFor(groove: GrooveState): Record<string, number> {
 }
 
 /**
- * Variation-pool buffer fetch for the `new` hi-hat voices (Epic 4 S4).
+ * Variation-pool buffer fetch for the hat and ride voices (Epic 4 S4).
  *
  * Lazily grows a pool of `CYMBAL_POOL_SIZE` independently-synthesized metallic
  * buffers under a derived `audioBuffers` key. While the pool is still filling,
  * each call generates and returns a fresh buffer — this spreads the synthesis
  * cost across the first few hits (one `createMetallicBuffer` per hit, the same
- * per-hit cost `current` already pays on its first hat hit) and means even
+ * per-hit cost the single-buffer crash pays on its first hit) and means even
  * hits 1–4 are already distinct. Once the pool is full it returns a random
  * member, never the one used immediately before, so a fast hat pattern has no
  * audible loop period.
  *
- * `current` is untouched: `playDrumSoundCurrent` keeps using the single-buffer
+ * The crash does not use it: `playKickSnareCrashTom` keeps the single-buffer
  * `getCymbalBuffer`/`ensureCymbalBuffer` path.
  */
 function getVariedCymbalBuffer(
@@ -587,11 +588,9 @@ function getVariedCymbalBuffer(
 // Every noise layer reads one shared flat 2 s white-noise buffer, started from
 // sample 0 every hit — spectrally flat AND static, two "synthy" tells at once.
 // `createColoredNoiseBuffer` pre-renders a longer (4 s) buffer with a per-voice
-// spectral tilt; the `new` voices read a random per-hit offset into it (via
+// spectral tilt; the closed hat and the shaker read a random per-hit offset into it (via
 // `playPercussiveStrike`'s `bufferOffset`), so a noise layer is both textured
 // and varied hit-to-hit. Runtime-generated — no bundle-size change.
-type ColoredNoiseTilt = 'bright';
-
 // Length of every colored-noise buffer, and the range `noiseOffset` draws from
 // — one symbol so the two can never drift apart.
 const NOISE_BUFFER_SECONDS = 4;
@@ -632,16 +631,11 @@ function createColoredNoiseBuffer(audioCtx: AudioContext): AudioBuffer {
 }
 
 /**
- * Lazily create and cache one colored-noise buffer per tilt, under a derived
- * `groove.audioBuffers` key. One 4 s buffer per tilt for the page lifetime —
- * a single tilt today, negligible RAM, no reset path needed.
+ * Lazily create and cache the one colored-noise buffer under its `groove.audioBuffers`
+ * key. One 4 s buffer for the page lifetime — negligible RAM, no reset path needed.
  */
-function getColoredNoiseBuffer(
-    audioCtx: AudioContext,
-    groove: GrooveState,
-    tilt: ColoredNoiseTilt,
-): AudioBuffer {
-    const key = `noise#${tilt}`;
+function getColoredNoiseBuffer(audioCtx: AudioContext, groove: GrooveState): AudioBuffer {
+    const key = 'noise#bright';
     if (!groove.audioBuffers[key]) {
         groove.audioBuffers[key] = createColoredNoiseBuffer(audioCtx);
     }
@@ -966,29 +960,51 @@ function mixStateFor(audio: BaseAudioContext): DrumMixState {
  * @param time - Start time in seconds.
  * @param velocity - Note velocity (0.0 - 1.0).
  */
-// The synth drum voice. `playDrumSoundNew` is the reworked synth-audit voice —
-// the only one since #649 retired the Current/New A/B. It renders the hi-hat
-// articulations (open, foot-pedal chick), the ride and the shaker natively and
-// falls through to `playDrumSoundCurrent` for every other sound.
-function dispatchDrumSynth(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
-    playDrumSoundNew(state, name, time, velocity);
-}
-
 // synth-audit Epic 6 S1 / Epic 7 #662 — instrument-source seam. When the groove
 // voice is a `pack:<id>` whose buffers have loaded, route each strike to the
 // sampled kit; a hit the pack doesn't cover (or a
 // not-yet-loaded buffer) falls through to the synth voice for that one hit, so a
 // sampled kit and the synth voice coexist seamlessly. With no pack installed the
 // `sample` branch is never taken and the synth path is bit-identical.
-export function playDrumSound(...args: Parameters<typeof playDrumSoundCurrent>): void {
-    const [state, name, time, velocity] = args;
+//
+// The synth voices each keep their own preamble (density ducking, the 2 ms scheduling guard,
+// the per-hit panner and its pan value), and the two groups differ in the order and constants
+// they use, so the dispatch only routes: the hats, ride and shaker use `setupPercussiveHit`
+// (NaN-guarded velocity, fixed pan); `playKickSnareCrashTom` carries the older preamble the
+// kick, snare, sidestick, crash and toms share, and is where a name no voice plays (RideBell on
+// the synth kit, a typo) is warned about and its panner freed. Do not hoist the preambles into
+// the dispatch: `tests/unit/engine/drum-dispatch.test.ts` pins the order of every side effect.
+export function playDrumSound(
+    state: EnsembleState,
+    name: string,
+    time: number,
+    velocity = 1.0,
+): void {
     if (resolveInstrumentSource(state.groove.voice).kind === 'sample') {
         if (tryPlaySampledDrum(state, name, time, velocity)) {
             return;
         }
         // articulation not in the pack (or buffer unavailable) → synth this hit
     }
-    dispatchDrumSynth(state, name, time, velocity);
+    switch (name) {
+        case 'HiHat':
+            playClosedHat(state, time, velocity);
+            return;
+        case 'Open':
+            playOpenHat(state, time, velocity);
+            return;
+        case 'HiHatPedal':
+            playPedalChick(state, time, velocity);
+            return;
+        case 'Ride':
+            playRide(state, time, velocity);
+            return;
+        case 'Shaker':
+            playShaker(state, time, velocity);
+            return;
+        default:
+            playKickSnareCrashTom(state, name, time, velocity);
+    }
 }
 
 /**
@@ -1079,11 +1095,11 @@ function tryPlaySampledDrum(
     if (!buffer) {
         return false;
     }
-    // setupNewPercHit allocates the per-hit panner, so resolve the buffer FIRST —
+    // setupPercussiveHit allocates the per-hit panner, so resolve the buffer FIRST —
     // a bail after this point would orphan that panner (it frees only via the
-    // strike's onEnded → releasePanner below). setupNewPercHit returns null only
+    // strike's onEnded → releasePanner below). setupPercussiveHit returns null only
     // when there's no audio context, before it allocates anything.
-    const ctx = setupNewPercHit(state, time, velocity, drumPanValue(name, time));
+    const ctx = setupPercussiveHit(state, time, velocity, drumPanValue(name, time));
     if (!ctx) {
         return false;
     }
@@ -1138,41 +1154,14 @@ export function isRingingHat(name: string): boolean {
     return name === 'Open';
 }
 
-function playDrumSoundNew(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
-    // The `new` drum voice diverges from `current` only where a synth-audit story
-    // has rebuilt a voice. Epic 4 S2/S3 rebuilt the whole hi-hat family (closed, open
-    // and a foot-pedal chick); everything else still routes
-    // through the (frozen, bit-identical) `playDrumSoundCurrent`.
-    switch (name) {
-        case 'HiHat':
-            playClosedHatNew(state, time, velocity);
-            return;
-        case 'Open':
-            playOpenHatNew(state, time, velocity);
-            return;
-        case 'HiHatPedal':
-            playPedalChickNew(state, time, velocity);
-            return;
-        case 'Ride':
-            playRideNew(state, time, velocity);
-            return;
-    }
-    if (name === 'Shaker') {
-        playShakerNew(state, time, velocity);
-        return;
-    }
-    playDrumSoundCurrent(state, name, time, velocity);
-}
-
 /**
- * Shared preamble for the shaker and the sampled strikes: density
+ * Shared preamble for the hats, ride, shaker and the sampled strikes: density
  * ducking, the 2 ms scheduling guard, NaN-guarded velocity, the per-hit panner
  * (wired to the drums bus) and its release callback. Returns `null` when there
- * is no audio context. The `new` drum voice carries no un-seeded `velJitter`
- * (epic note) — `masterVol` derives straight from the already-humanized
- * incoming velocity.
+ * is no audio context. These voices carry no un-seeded `velJitter` — `masterVol`
+ * derives straight from the already-humanized incoming velocity.
  */
-function setupNewPercHit(
+function setupPercussiveHit(
     state: EnsembleState,
     time: number,
     velocity: number,
@@ -1216,8 +1205,8 @@ function setupNewPercHit(
  * Velocity opens the highpass (a hard shake is brighter, more present) and
  * lengthens the decay slightly so a hard shake sustains its "sh" tail.
  */
-function playShakerNew(state: EnsembleState, time: number, velocity = 1.0): void {
-    const ctx = setupNewPercHit(state, time, velocity, 0.35);
+function playShaker(state: EnsembleState, time: number, velocity = 1.0): void {
+    const ctx = setupPercussiveHit(state, time, velocity, 0.35);
     if (!ctx) {
         return;
     }
@@ -1231,40 +1220,33 @@ function playShakerNew(state: EnsembleState, time: number, velocity = 1.0): void
     // S8 — two-stage decay: the fast `decay` is the bead-impact transient, then
     // `bodyDecay` carries the longer "sh" wash. `bodyDecay` (not `decay`) now
     // carries the S6 velocity→sustain intent — a harder shake washes longer.
-    playPercussiveStrike(
-        audio,
-        getColoredNoiseBuffer(audio, state.groove, 'bright'),
-        panner,
-        playTime,
-        {
-            volume: vol,
-            filterType: 'highpass',
-            freq: 6000 * t.cutoffMult,
-            attack: 0.01,
-            decay: 0.016,
-            holdTime: 0.022,
-            bodyDecay: 0.07 * (1 + t.brightness * 0.5),
-            // why: 0.6 s clears the worst-case body tail (~0.105 s bodyDecay at
-            // full velocity) by ~5 time-constants, so the stop is inaudible.
-            duration: 0.6,
-            onEnded: releasePanner,
-            bufferOffset: noiseOffset(),
-        },
-    );
+    playPercussiveStrike(audio, getColoredNoiseBuffer(audio, state.groove), panner, playTime, {
+        volume: vol,
+        filterType: 'highpass',
+        freq: 6000 * t.cutoffMult,
+        attack: 0.01,
+        decay: 0.016,
+        holdTime: 0.022,
+        bodyDecay: 0.07 * (1 + t.brightness * 0.5),
+        // why: 0.6 s clears the worst-case body tail (~0.105 s bodyDecay at
+        // full velocity) by ~5 time-constants, so the stop is inaudible.
+        duration: 0.6,
+        onEnded: releasePanner,
+        bufferOffset: noiseOffset(),
+    });
 }
 
 /**
- * Shared preamble for the Epic 4 cymbal `new` voices (closed/open hat, pedal
- * chick, ride): layers the family's `getCymbalVoiceConfig` lookup on top of
- * `setupNewPercHit`'s density-duck/panner/velocity preamble, pinned to the
+ * Shared preamble for the closed/open hat, pedal chick and ride: layers the family's `getCymbalVoiceConfig` lookup on top of
+ * `setupPercussiveHit`'s density-duck/panner/velocity preamble, pinned to the
  * cymbal family's fixed right-pan (0.35 — see RIGHT_PANNED_INSTRUMENTS).
  * Returns `null` when there's no audio context or the family has no runtime
- * profile. `setupNewPercHit` already created + connected the panner by the
+ * profile. `setupPercussiveHit` already created + connected the panner by the
  * time the `voiceConfig` guard runs, so the no-profile bail disconnects it
- * (mirrors the same guard-after-panner shape in `playDrumSoundCurrent`'s
+ * (mirrors the same guard-after-panner shape in `playKickSnareCrashTom`'s
  * Crash branch) rather than leaking a live node into the drums bus.
  */
-function setupNewCymbalHit(
+function setupCymbalHit(
     state: EnsembleState,
     time: number,
     velocity: number,
@@ -1277,7 +1259,7 @@ function setupNewCymbalHit(
     panner: ReturnType<typeof createSimplePanner>;
     voiceConfig: CymbalVoiceConfig;
 } | null {
-    const ctx = setupNewPercHit(state, time, velocity, 0.35);
+    const ctx = setupPercussiveHit(state, time, velocity, 0.35);
     if (!ctx) {
         return null;
     }
@@ -1301,9 +1283,9 @@ function setupNewCymbalHit(
 }
 
 /**
- * `New`-voice closed hihat — synth-audit Epic 4 S2 ("un-choke the closed hat").
+ * Closed hihat — synth-audit Epic 4 S2 ("un-choke the closed hat").
  *
- * The `current` closed hat is choked: three independent decay-shorteners stack on
+ * The closed hat before S2 was choked: three independent decay-shorteners stack on
  * the gain envelope — `getCymbalVoiceConfig`'s velocity/intensity focus, the
  * 0.92–1.10 `hatDecayMult`, and the `decayDelay` jitter — collapsing the gain
  * time-constant to ~0.04 s. That guillotines the hat well before the `hihatMetal`
@@ -1316,14 +1298,14 @@ function setupNewCymbalHit(
  * (~0.11–0.16 s) so the gain envelope barely shapes the tail and the buffer's
  * `partialDecay` does the choking, exactly as the discovery report prescribed.
  *
- * Per `epic-4-drums.md`, the `new` drum voice does NOT carry `playDrumSoundCurrent`'s
- * un-seeded `Math.random()` `velJitter`: the old scheduler's seeded velocity
+ * Per `epic-4-drums.md`, this voice does NOT carry the un-seeded `Math.random()`
+ * `velJitter` the kick/snare preamble once had: the old scheduler's seeded velocity
  * humanizing (Epic 0 S6) already humanized the incoming velocity, and dropping the second,
- * un-seeded layer keeps the `new` voice reproducible.
+ * un-seeded layer keeps the voice reproducible.
  */
-function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): void {
+function playClosedHat(state: EnsembleState, time: number, velocity = 1.0): void {
     const { groove } = state;
-    const ctx = setupNewCymbalHit(state, time, velocity, 'HiHat');
+    const ctx = setupCymbalHit(state, time, velocity, 'HiHat');
     if (!ctx) {
         return;
     }
@@ -1350,7 +1332,7 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
         rr();
 
     // Choke the previous hat so successive closed hats don't pile up — this
-    // matters more than in `current` because this hat now rings longer.
+    // matters more than it did before S2 because this hat now rings longer.
     if (groove.lastHatGain) {
         rampGain(groove.lastHatGain.gain, 0, playTime, 0.008);
     }
@@ -1401,7 +1383,7 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
     // Sizzle: thin 2–4 kHz presence layer under the bright buffer. S7 — a
     // `bright` colored-noise buffer read at a random per-hit offset, so the
     // sizzle is fine/airy and varies hit-to-hit instead of a flat static slice.
-    playPercussiveStrike(audio, getColoredNoiseBuffer(audio, groove, 'bright'), panner, playTime, {
+    playPercussiveStrike(audio, getColoredNoiseBuffer(audio, groove), panner, playTime, {
         volume: vol * 0.12,
         filterType: 'bandpass',
         freq: 3200 + Math.random() * 400,
@@ -1427,7 +1409,7 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
 }
 
 /**
- * `New`-voice fully-open hi-hat — synth-audit Epic 4 S3.
+ * Fully-open hi-hat — synth-audit Epic 4 S3.
  *
  * Sounds the `openHatMetal` buffer (which rings ≈1 s naturally) with the gain
  * envelope letting that ring run. The band only ever plays the fully-open hat,
@@ -1440,9 +1422,9 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
  * NOTE: the decay/stop/brightness constants are by-ear starting points; expect
  * to retune them at the listening gate.
  */
-function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0): void {
+function playOpenHat(state: EnsembleState, time: number, velocity = 1.0): void {
     const { groove } = state;
-    const ctx = setupNewCymbalHit(state, time, velocity, 'Open');
+    const ctx = setupCymbalHit(state, time, velocity, 'Open');
     if (!ctx) {
         return;
     }
@@ -1523,7 +1505,7 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0): voi
 }
 
 /**
- * `New`-voice foot-pedal "chick" — synth-audit Epic 4 S3.
+ * Foot-pedal "chick" — synth-audit Epic 4 S3.
  *
  * A closed hi-hat sounded by the foot pedal rather than the stick: the two
  * cymbals snap together. Versus a stick-closed hat it is darker (little stick
@@ -1533,9 +1515,9 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0): voi
  * attack (the cymbals *meet*, they are not struck), a darker bandpass, a fast
  * decay, and no sizzle layer.
  */
-function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): void {
+function playPedalChick(state: EnsembleState, time: number, velocity = 1.0): void {
     const { groove } = state;
-    const ctx = setupNewCymbalHit(state, time, velocity, 'HiHat');
+    const ctx = setupCymbalHit(state, time, velocity, 'HiHat');
     if (!ctx) {
         return;
     }
@@ -1600,9 +1582,9 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
 }
 
 /**
- * `New`-voice ride cymbal — synth-audit Epic 4 S5 ("ride ping on every hit").
+ * Ride cymbal — synth-audit Epic 4 S5 ("ride ping on every hit").
  *
- * The `current` ride fires its stick "ping" (the triangle-osc attack transient)
+ * The ride before S5 fired its stick "ping" (the triangle-osc attack transient)
  * only above `velocity > 0.92` — every softer ride hit is pure metallic wash
  * with no stick definition, so a quiet ride pattern reads as indistinct hiss.
  *
@@ -1613,19 +1595,18 @@ function playPedalChickNew(state: EnsembleState, time: number, velocity = 1.0): 
  * only when struck harder, so boosting the ping on soft hits is what gives a
  * quiet ride its definition rather than just making it uniformly louder.
  *
- * Otherwise this is the `current` ride: same `rideMetal` buffer (now drawn from
- * the Epic 4 S4 variation pool — the first `new` ride voice can finally honor
- * S4's "fast ride patterns" clause), same bandpass/highpass chain, same gain
- * envelope and `lastRideGain` choke. Per the epic note the `new` drum voice
- * carries no un-seeded `velJitter` — the old scheduler's seeded humanizing
- * already humanized `velocity`.
+ * Otherwise this is the earlier ride: the `rideMetal` buffer (now drawn from
+ * the Epic 4 S4 variation pool, which honors S4's "fast ride patterns" clause),
+ * the same bandpass/highpass chain, gain envelope and `lastRideGain` choke. Per the
+ * epic note this voice carries no un-seeded `velJitter` — the old scheduler's seeded
+ * humanizing already humanized `velocity`.
  *
  * NOTE: `pingScale`'s curve constants are by-ear starting points; expect to
  * retune them at the listening gate.
  */
-function playRideNew(state: EnsembleState, time: number, velocity = 1.0): void {
+function playRide(state: EnsembleState, time: number, velocity = 1.0): void {
     const { groove } = state;
-    const ctx = setupNewCymbalHit(state, time, velocity, 'Ride');
+    const ctx = setupCymbalHit(state, time, velocity, 'Ride');
     if (!ctx) {
         return;
     }
@@ -1696,7 +1677,7 @@ function playRideNew(state: EnsembleState, time: number, velocity = 1.0): void {
     };
 }
 
-function playDrumSoundCurrent(
+function playKickSnareCrashTom(
     state: EnsembleState,
     name: string,
     time: number,
@@ -1714,7 +1695,7 @@ function playDrumSoundCurrent(
     // Add a tiny 2ms buffer to ensure scheduling always happens slightly in the future
     const playTime = Math.max(time, now + 0.002);
 
-    // --- Density Normalization Logic --- (on the hit's own time: see `setupNewPercHit`)
+    // --- Density Normalization Logic --- (on the hit's own time: see `setupPercussiveHit`)
     const densityDuck = updateDensityDucking(mixStateFor(playback.audio), playTime);
 
     // #1068: the un-seeded `velJitter = 1 + (Math.random() - 0.5) * humanize * 0.4`

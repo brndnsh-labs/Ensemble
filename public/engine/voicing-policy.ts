@@ -72,21 +72,14 @@ function isBassSpaceFeel(feel: string | undefined | null): boolean {
 }
 
 /**
- * True when a bass line is actually sounding under the comp. This is the ONLY
- * input to "leave room for the bass" (#1313): muting the bass means the player
- * is practicing that part, so the remaining lanes must state the harmony
- * themselves — the register floor drops and rootless voicings switch off. It
- * used to also be forced true by a default-on "practice mode" preference, which
- * made `bassActive` dead and left a muted-bass band with no root anywhere. That
- * preference had no other reader left and was retired in #1314.
+ * Whether a rootless voicing is wanted for this chord. `bassActive` (a bass line actually
+ * sounding under the comp) is the ONLY input to "leave room for the bass" (#1313): muting the
+ * bass means the player is practicing that part, so the remaining lanes must state the harmony
+ * themselves — the register floor drops and rootless voicings switch off. It used to also be
+ * forced true by a default-on "practice mode" preference, which made `bassActive` dead and left
+ * a muted-bass band with no root anywhere. That preference had no other reader left and was
+ * retired in #1314.
  */
-function shouldReserveBassSpace(
-    state: EnsembleState,
-    bassActive = Boolean(state.bass?.enabled),
-): boolean {
-    return bassActive;
-}
-
 export function shouldUseRootlessVoicing(
     state: EnsembleState,
     quality: string,
@@ -94,7 +87,7 @@ export function shouldUseRootlessVoicing(
     feel: string | undefined | null,
     bassActive = Boolean(state.bass?.enabled),
 ): boolean {
-    if (!shouldReserveBassSpace(state, bassActive) || !isBassSpaceFeel(feel)) {
+    if (!bassActive || !isBassSpaceFeel(feel)) {
         return false;
     }
     // why (#1313): rootless is an idiom for chords the chart WRITES as 7ths or
