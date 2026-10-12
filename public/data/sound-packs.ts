@@ -309,14 +309,14 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         name: 'Acoustic Drum Kit',
         attribution:
             'VCSL (Versilian Community Sample Library) by Versilian Studios — CC0 1.0; Virtuosity Drums (sfzinstruments) — CC0 1.0',
-        approxSizeMB: 1.8,
+        approxSizeMB: 1.5,
         instruments: ['groove'],
         // First sampled *percussion* pack — keys by articulation, not pitch, and
         // plays each hit at native rate through `playSampledStrike` (#662). The kit
-        // covers kick/snare/sidestick, the hi-hat family (closed/loose/open/pedal),
-        // ride+bell/crash, toms, and aux perc (cowbell/agogo/shaker); china + snare
-        // brushes have no clean CC0 source, so those hits fall back to the synth
-        // voice. Deterministic round-robin (#657) over each articulation's takes
+        // covers kick/snare/sidestick, the hi-hat family (closed/open/pedal),
+        // ride+bell/crash, toms and shaker: every articulation `drumArticulationKey`
+        // can return and no other (`rev` 2, #1651, dropped four that nothing could
+        // trigger). Deterministic round-robin (#657) over each articulation's takes
         // keeps repeated hits from machine-gunning. Calibrated 2026-06-22 (#662)
         // via `mix-report --calibrate-pack=groove:acoustic-kit`: pack sat ~4 dB
         // under the synth drum stem (RMS-match = 1.59×). Drums are the rhythmic
@@ -324,6 +324,7 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // which was buried under the band → 8×), so seated at the match: 1.6×.
         // Confirm by ear on ensembletest across rock/funk/jazz/blues.
         gain: 1.6,
+        rev: 2,
         // Kit carries overhead/room — pull the send back so the drums stay tight
         // and don't wash the pocket with hall-on-room. #686 start.
         reverbSend: 0.7,
