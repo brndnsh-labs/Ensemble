@@ -1734,7 +1734,7 @@ function playKickSnareCrashTom(
     }
     // why: this per-hit panner must be disconnected once the hit fully decays, or it
     // leaks one StereoPannerNode per drum hit — dozens/second at tempo (synth-audit
-    // Epic 4 S1). The cymbal/guiro/brush branches already free it via their own
+    // Epic 4 S1). The crash branch already frees it via its own
     // buffer-source `onended`; the helper-only branches below hand `onEnded` to their
     // longest-lived (or tied-longest) `playResonantTone`/`playPercussiveStrike` call.
     // When tied, sibling layers stop at the same instant and are already silent, so
