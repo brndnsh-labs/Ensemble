@@ -1,10 +1,9 @@
 import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
-import type { EnsembleState, Mutable, SoloistExpression, SoloistVoice } from '../types.js';
+import type { EnsembleState, Mutable, SoloistVoice } from '../types.js';
 import { clampFreq, safeDisconnect } from './audio-graph-utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import {
-    clampFrac,
     playSampledNote,
     releaseSampledVoices,
     type SampleBend,
@@ -109,30 +108,15 @@ export function leadVibrato(noteSeed: number, packId?: string): SampleVibrato {
 }
 
 /**
- * Map the soloist note's two pitch-bend representations onto the sampled seam's
- * `SampleBend` (#744 Slice 2): the one-way `bendStartInterval` scalar becomes
- * `fromSemitones` (a bend-IN, now finally rendered on sampled packs — it was
- * synth-only before), and `expression.bend` becomes the bend-and-release. Either
- * may be present; returns `undefined` when neither is, so the note stays
- * fixed-pitch and no automation is scheduled.
+ * Map the soloist note's `bendStartInterval` scalar onto the sampled seam's `SampleBend`
+ * (#744 Slice 2): it becomes `fromSemitones`, a bend-IN rendered on sampled packs. Returns
+ * `undefined` when there is none, so the note stays fixed-pitch and no automation is scheduled.
  */
-function toSampleBend(
-    bendStartInterval: number,
-    expression: SoloistExpression | undefined,
-): SampleBend | undefined {
-    const gesture = expression?.bend;
-    const hasIn = Number.isFinite(bendStartInterval) && bendStartInterval !== 0;
-    const hasGesture = !!gesture && gesture.peakSemitones > 0;
-    if (!hasIn && !hasGesture) {
+function toSampleBend(bendStartInterval: number): SampleBend | undefined {
+    if (!(Number.isFinite(bendStartInterval) && bendStartInterval !== 0)) {
         return undefined;
     }
-    return {
-        fromSemitones: hasIn ? bendStartInterval : 0,
-        peakSemitones: hasGesture ? gesture.peakSemitones : 0,
-        onsetFrac: gesture?.onsetFrac,
-        peakFrac: gesture?.peakFrac,
-        releaseFrac: gesture?.releaseFrac,
-    };
+    return { fromSemitones: bendStartInterval };
 }
 
 function playSampledSolo(
@@ -145,7 +129,6 @@ function playSampledSolo(
     vibrato: boolean,
     noteSeed: number,
     bendStartInterval: number,
-    expression: SoloistExpression | undefined,
     isLegato: boolean,
     prevFreq: number,
 ): boolean {
@@ -180,8 +163,8 @@ function playSampledSolo(
     // soften the onset so the recorded pick transient is masked — a fretted-hand
     // articulation, not a picked one. Larger leaps and non-guitar sample voices
     // (sax/strings) keep the plain per-note attack. Never overrides an explicit
-    // scoop/cry (they're mutually exclusive with legato upstream).
-    let bend = toSampleBend(bendStartInterval, expression);
+    // scoop (it is mutually exclusive with legato upstream).
+    let bend = toSampleBend(bendStartInterval);
     let attack: number | undefined;
     if (!bend && isLegato && packId.includes('guitar') && prevFreq > 0 && freq > 0) {
         const semis = 12 * Math.log2(prevFreq / freq);
@@ -200,8 +183,7 @@ function playSampledSolo(
         // The engine flags vibrato on sustained notes (durationSteps >= a beat);
         // the synth voice already renders it, the sampled seam now does too (#744).
         vibrato: vibrato ? leadVibrato(noteSeed, packId) : undefined,
-        // Bend-in (bendStartInterval) and/or bend-and-release (expression.bend),
-        // now rendered on the sampled seam too — full pitch-gesture parity (#744);
+        // Bend-in (bendStartInterval), rendered on the sampled seam too (#744);
         // or the guitar legato slur synthesized just above (#855).
         bend,
         tone: toneTiltForPack(packId),
@@ -229,7 +211,6 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
             isLegato = false,
             vibrato = false,
             noteSeed = 0,
-            expression,
         ] = args;
         // Mirror the synth path's previous-pitch tracking so the sample voice can
         // slur a legato run into pitch (#855). Read the predecessor BEFORE the
@@ -248,7 +229,6 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
                 vibrato,
                 noteSeed,
                 bendStartInterval,
-                expression,
                 isLegato,
                 prevFreq,
             )
@@ -270,7 +250,6 @@ function playSoloNoteCurrent(
     isLegato: boolean = false,
     vibrato: boolean = false,
     noteSeed: number = 0,
-    expression: SoloistExpression | undefined = undefined,
 ): void {
     const { playback, soloist } = state;
     // Guard every value that feeds an AudioParam: freq → oscillators, vol →
@@ -328,7 +307,6 @@ function playSoloNoteCurrent(
         prevFreq,
         vibrato,
         timbre,
-        expression,
     );
 
     (soloist.audio as Mutable<typeof soloist.audio>).activeVoices.push(voiceObj); // @direct-mutation
@@ -593,7 +571,6 @@ function playTrumpet(
     prevFreq: number,
     vibratoFlag: boolean,
     timbre: TimbreJitter,
-    expression: SoloistExpression | undefined,
 ): void {
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -615,7 +592,6 @@ function playTrumpet(
         bendStartInterval,
         isLegato,
         prevFreq,
-        expression,
     );
 
     // Velocity + intensity → brightness (epic-3-soloist S2): a harder note opens
@@ -712,7 +688,6 @@ function applyPitchEnvelope(
     bendStartInterval: number,
     isLegato: boolean,
     prevFreq: number,
-    expression: SoloistExpression | undefined,
 ): void {
     const { soloist } = state;
     const startFreq = bendStartInterval !== 0 ? freq * 2 ** (bendStartInterval / 12) : freq;
@@ -734,32 +709,6 @@ function applyPitchEnvelope(
     } else {
         osc1.frequency.setValueAtTime(freq, playTime);
         osc2.frequency.setValueAtTime(freq, playTime);
-    }
-
-    // Bend-and-release (#744 Slice 2) — layered AFTER arrival: hold the written
-    // pitch to `onset`, bend UP to `peak`, optionally release back. Exponential
-    // ramps in frequency are linear in pitch (an even glide). Times stay strictly
-    // increasing so the ramps never invert; any vibrato LFO sums on top. When a
-    // bend-in also ran (rampTime ≤ 0.1s above), the onset is pushed past it so the
-    // re-anchor never truncates the in-progress glide — mirrors `scheduleSampleBend`.
-    const bend = expression?.bend;
-    if (bend && bend.peakSemitones > 0 && duration > 0) {
-        const f = (semis: number) => freq * 2 ** (semis / 12);
-        const bendInEnd = playTime + Math.min(0.1, duration * 0.5);
-        const rawOnset = playTime + clampFrac(bend.onsetFrac, 0.2) * duration;
-        const onsetT = bendStartInterval !== 0 ? Math.max(rawOnset, bendInEnd + 0.01) : rawOnset;
-        const peakT = Math.max(onsetT + 0.01, playTime + clampFrac(bend.peakFrac, 0.5) * duration);
-        for (const osc of [osc1, osc2]) {
-            osc.frequency.setValueAtTime(freq, onsetT);
-            osc.frequency.exponentialRampToValueAtTime(f(bend.peakSemitones), peakT);
-            if (Number.isFinite(bend.releaseFrac)) {
-                const relT = Math.max(
-                    peakT + 0.01,
-                    playTime + clampFrac(bend.releaseFrac, 0.85) * duration,
-                );
-                osc.frequency.exponentialRampToValueAtTime(freq, relT);
-            }
-        }
     }
 }
 
