@@ -374,10 +374,7 @@ function manageVoices(playTime: number, audio: SoloistState['audio'], mode: stri
 
 // --- PRESET IMPLEMENTATIONS ---
 
-// Wire the shared LFO vibrato into a voice's two oscillators. Byte-identical
-// across every preset voice (playTrumpet, playSaxophone, playNeoJuno,
-// playVowel, playShred), so it lives here instead of being copy-pasted five
-// times.
+// Wire the shared LFO vibrato into a voice's two oscillators.
 function attachVibrato(
     state: EnsembleState,
     ctx: AudioContext,

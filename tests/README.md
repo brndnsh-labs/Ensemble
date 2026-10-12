@@ -8,7 +8,7 @@ This directory contains the automated tests for the Ensemble application, powere
     *   *Examples:* Music theory rules in `chords.js`, synthesis logic in `synth-*.js`, or isolated component logic.
     *   *Environment:* `happy-dom` (simulates browser APIs like `window`, `document`, `Canvas`).
 *   **`integration/`**: Tests that verify the interaction between multiple modules.
-*   **`standards/`**: Genre and routing guards (the 13-genre canon, soloist style routing), plus the
+*   **`standards/`**: Genre and routing guards (the 13-genre canon), plus the
     [Critique Guidelines](./standards/CRITIQUE_GUIDELINES.md) the band's claims follow.
 *   **`browser/`**: Vitest browser mode (real Chromium, and WebKit for the sync suite) for what
     needs a real `OfflineAudioContext` or IndexedDB — `npm run test:browser`, `npm run test:sync`.
