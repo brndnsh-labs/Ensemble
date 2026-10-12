@@ -36,7 +36,7 @@ describe('Disco Piano Critique', () => {
 
     function pcsFor(quality, is7th, intensity, genre = 'Disco') {
         mockState.playback.bandIntensity = intensity;
-        const intervals = getIntervals(getState(), quality, is7th, 'standard', genre);
+        const intervals = getIntervals(getState(), quality, is7th, genre);
         return new Set(intervals.map((i) => ((i % 12) + 12) % 12));
     }
 

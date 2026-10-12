@@ -241,7 +241,7 @@ export interface ArrangerState {
     /** Map of steps to chord objects. */
     readonly stepMap: Array<{ start: number; end: number; chord: Chord }>;
     /** Map of sections to step ranges. */
-    readonly sectionMap: Array<{ id: string; start: number; end: number; label: string }>;
+    readonly sectionMap: Array<{ id: string; start: number; end: number }>;
     /** Custom rhythmic grouping array (e.g. [3, 2]). */
     readonly grouping: number[] | null;
     /** 6-char hex PRNG seed driving soloist + drum generation for this song. */

@@ -84,9 +84,9 @@ vi.mock('../../../public/config.js', () => ({
 import {
     getBestInversion,
     getChordDetails,
-    getIntervals,
     validateProgression,
 } from '../../../public/engine/chords-engine.js';
+import { getIntervals } from '../../../public/engine/chords-styles.js';
 import { getState } from '../../../public/state.js';
 import { getMidi } from '../../../public/utils.js';
 
@@ -117,42 +117,33 @@ describe('Chords & Voicing Logic', () => {
 
     describe('Interval Generation (getIntervals)', () => {
         it('should provide spread 10ths for Rock Major', () => {
-            const intervals = getIntervals(getState(), 'major', false, 'standard', 'Rock', false);
+            const intervals = getIntervals(getState(), 'major', false, 'Rock', false);
             expect(intervals).toEqual([0, 7, 16, 19]);
         });
 
         it('should use rootless functional voicings for Jazz', () => {
             groove.genreFeel = 'Jazz';
             // maj7 -> 3, 5, 7
-            expect(getIntervals(getState(), 'maj7', true, 'standard', 'Jazz', true)).toEqual([
-                4, 7, 11,
-            ]);
+            expect(getIntervals(getState(), 'maj7', true, 'Jazz', true)).toEqual([4, 7, 11]);
             // m7 -> b3, 5, b7
-            expect(getIntervals(getState(), 'minor', true, 'standard', 'Jazz', true)).toEqual([
-                3, 7, 10,
-            ]);
+            expect(getIntervals(getState(), 'minor', true, 'Jazz', true)).toEqual([3, 7, 10]);
             // 7 -> 3, 5, b7
-            expect(getIntervals(getState(), '7', true, 'standard', 'Jazz', true)).toEqual([
-                4, 7, 10,
-            ]);
+            expect(getIntervals(getState(), '7', true, 'Jazz', true)).toEqual([4, 7, 10]);
         });
 
-        it('should scale density for Jazz voicings', () => {
+        it('should thicken Jazz voicings with intensity', () => {
             groove.genreFeel = 'Jazz';
-            // standard maj7: 3, 5, 7 [4, 7, 11]
-            // rich maj7: 3, 7, 9 [4, 11, 14]
-            expect(getIntervals(getState(), 'maj7', true, 'rich', 'Jazz', true)).toEqual([
-                4, 11, 14,
-            ]);
-            // rich 7: 3, b7, 9, 13 [4, 10, 14, 21]
-            expect(getIntervals(getState(), '7', true, 'rich', 'Jazz', true)).toEqual([
-                4, 10, 14, 21,
-            ]);
+            // Above 0.6 (and below the 0.7 block-chord threshold) the shell takes its richer form.
+            playback.bandIntensity = 0.65;
+            // maj7: 3, 7, 9 [4, 11, 14]
+            expect(getIntervals(getState(), 'maj7', true, 'Jazz', true)).toEqual([4, 11, 14]);
+            // 7: 3, b7, 9, 13 [4, 10, 14, 21]
+            expect(getIntervals(getState(), '7', true, 'Jazz', true)).toEqual([4, 10, 14, 21]);
         });
 
         it('should handle altered dominants correctly', () => {
             groove.genreFeel = 'Jazz';
-            const intervals = getIntervals(getState(), '7alt', true, 'standard', 'Jazz', true);
+            const intervals = getIntervals(getState(), '7alt', true, 'Jazz', true);
             // Medium jazz altered dominant: 3, b7, b9, b13 -> [4, 10, 13, 20]
             expect(intervals).toEqual([4, 10, 13, 20]);
         });
@@ -160,20 +151,18 @@ describe('Chords & Voicing Logic', () => {
         it('should use rootless voicings for Blues dominant chords', () => {
             groove.genreFeel = 'Blues';
             // Dominant 7: 3, 5, b7 [4, 7, 10]
-            expect(getIntervals(getState(), '7', true, 'standard', 'Blues', true)).toEqual([
-                4, 7, 10,
-            ]);
+            expect(getIntervals(getState(), '7', true, 'Blues', true)).toEqual([4, 7, 10]);
         });
 
         it('should use "So What" voicing for Neo-Soul minor 7', () => {
             groove.genreFeel = 'Neo-Soul';
-            expect(getIntervals(getState(), 'minor', true, 'standard', 'Neo-Soul', true)).toEqual([
+            expect(getIntervals(getState(), 'minor', true, 'Neo-Soul', true)).toEqual([
                 5, 10, 15, 19,
             ]);
         });
 
         it('should NOT produce a perfect 5th for half-diminished in Rock/Pop', () => {
-            const intervals = getIntervals(getState(), 'halfdim', true, 'standard', 'Rock', true);
+            const intervals = getIntervals(getState(), 'halfdim', true, 'Rock', true);
             expect(intervals).toContain(6); // b5
             expect(intervals).not.toContain(7); // No natural 5
         });
@@ -196,14 +185,9 @@ describe('Chords & Voicing Logic', () => {
                         ['dim', true],
                         ['halfdim', true],
                     ]) {
-                        const pcs = getIntervals(
-                            getState(),
-                            quality,
-                            is7th,
-                            'standard',
-                            feel,
-                            bassActive,
-                        ).map((i) => ((i % 12) + 12) % 12);
+                        const pcs = getIntervals(getState(), quality, is7th, feel, bassActive).map(
+                            (i) => ((i % 12) + 12) % 12,
+                        );
                         const where = `${quality} is7th=${is7th} @${intensity} in ${feel}`;
                         expect(pcs, `${where} lost its b5`).toContain(6);
                         expect(pcs, `${where} stacked a natural 5th on its b5`).not.toContain(7);
@@ -215,14 +199,9 @@ describe('Chords & Voicing Logic', () => {
                 groove.genreFeel = 'Acoustic';
                 playback.bandIntensity = 0.65;
                 // A written dim triad is 1-b3-b5; the b7 silently made it half-diminished.
-                const pcs = getIntervals(
-                    getState(),
-                    'dim',
-                    false,
-                    'standard',
-                    'Acoustic',
-                    true,
-                ).map((i) => ((i % 12) + 12) % 12);
+                const pcs = getIntervals(getState(), 'dim', false, 'Acoustic', true).map(
+                    (i) => ((i % 12) + 12) % 12,
+                );
                 expect(pcs).toEqual(expect.arrayContaining([0, 3, 6]));
                 expect(pcs).not.toContain(10);
             });
@@ -481,7 +460,7 @@ describe('Chords & Voicing Logic', () => {
         });
 
         it('Cadd9 intervals should be [0,4,7,14]', () => {
-            const intervals = getIntervals(getState(), 'add9', false, 'standard', 'Rock', false);
+            const intervals = getIntervals(getState(), 'add9', false, 'Rock', false);
             expect(intervals).toEqual([0, 4, 7, 14]);
         });
 
@@ -494,7 +473,7 @@ describe('Chords & Voicing Logic', () => {
         // caller can still pass is7th=true.
         it('Cadd9 declares no seventh, and gains no b7 even if a caller claims one', () => {
             expect(getChordDetails('add9').is7th).toBe(false);
-            const intervals = getIntervals(getState(), 'add9', true, 'standard', 'Rock', false);
+            const intervals = getIntervals(getState(), 'add9', true, 'Rock', false);
             expect(intervals).toEqual([0, 4, 7, 14]);
             expect(intervals.map((i) => i % 12)).not.toContain(10);
         });
@@ -510,21 +489,21 @@ describe('Chords & Voicing Logic', () => {
         });
 
         it('6/9 intervals carry the 6th and 9th (1 3 5 6 9)', () => {
-            const intervals = getIntervals(getState(), '6/9', false, 'standard', 'Rock', false);
+            const intervals = getIntervals(getState(), '6/9', false, 'Rock', false);
             expect(intervals).toContain(9); // major 6th
             expect(intervals).toContain(14); // 9th
             expect(intervals).toEqual([0, 4, 7, 9, 14]);
         });
 
         it('7sus4 has a perfect 4th, no 3rd, and a ♭7', () => {
-            const intervals = getIntervals(getState(), '7sus4', true, 'standard', 'Rock', false);
+            const intervals = getIntervals(getState(), '7sus4', true, 'Rock', false);
             expect(intervals).toContain(5); // perfect 4th
             expect(intervals).not.toContain(4); // no major 3rd
             expect(intervals).toContain(10); // ♭7
         });
 
         it('add2 carries the added 2nd', () => {
-            const intervals = getIntervals(getState(), 'add2', false, 'standard', 'Rock', false);
+            const intervals = getIntervals(getState(), 'add2', false, 'Rock', false);
             expect(intervals).toContain(2); // major 2nd
         });
 
@@ -540,14 +519,13 @@ describe('Chords & Voicing Logic', () => {
             expect(arranger.progression[0].freqs.length).toBe(5);
         });
 
-        it('voices a parsed chord at standard density (#1424)', () => {
+        it('voices a parsed chord with the plain getIntervals stack (#1424)', () => {
             arranger.sections = [{ id: 's1', label: 'Main', value: 'I', repeat: 1 }];
             arranger.key = 'C';
             arranger.isMinor = false;
             groove.genreFeel = 'Rock';
             playback.bandIntensity = 0.5; // below every intensity-based extension tier
-            // Rock major standard is [0, 7, 16, 19] (getIntervals unit above). The density was a
-            // chords-slice setting until #1424; nothing changed it, so the parser uses standard.
+            // Rock major is [0, 7, 16, 19] (getIntervals unit above); the parser adds nothing.
             validateProgression(getState());
             expect(arranger.progression[0].intervals).toEqual([0, 7, 16, 19]);
         });
