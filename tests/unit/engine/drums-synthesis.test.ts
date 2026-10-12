@@ -158,12 +158,11 @@ describe('Drum Synthesis', () => {
         playDrumSound(getState(), 'Ride', 10.2, 1.0);
         playDrumSound(getState(), 'Crash', 10.3, 1.0);
 
-        // The reworked ('new') drum voice rebuilt the closed/open/ride hats onto
-        // getVariedCymbalBuffer (synth-drums.ts §"Epic 4 S4"), which caches a POOL
-        // of independently-synthesized buffers under a `<key>#pool` array key — one
-        // distinct dedicated pool per cymbal voice. Crash is not in playDrumSoundNew's
-        // switch, so it falls through to playDrumSoundCurrent → ensureCymbalBuffer,
-        // which still caches a single buffer under the bare `crashMetal` key.
+        // The closed/open/ride hats draw from getVariedCymbalBuffer (synth-drums.ts
+        // §"Epic 4 S4"), which caches a POOL of independently-synthesized buffers
+        // under a `<key>#pool` array key — one distinct dedicated pool per cymbal
+        // voice. The crash goes through playKickSnareCrashTom → ensureCymbalBuffer,
+        // which caches a single buffer under the bare `crashMetal` key.
         expect(groove.audioBuffers['hihatMetal#pool']).toBeDefined();
         expect(groove.audioBuffers['openHatMetal#pool']).toBeDefined();
         expect(groove.audioBuffers['rideMetal#pool']).toBeDefined();

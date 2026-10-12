@@ -1,0 +1,275 @@
+=== Bogus / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+console.warn([synth-drums] unknown soundName "Bogus" — no audio voice will play.)
+create panner#4
+panner#4.pan.setValueAtTime(0,10.5)
+panner#4.connect(gain#2)
+panner#4.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#5
+panner#5.pan.setValueAtTime(-0.2,10.6)
+panner#5.connect(gain#2)
+random x2
+create osc#6
+create gain#7
+osc#6.type=sine
+osc#6.frequency.setValueAtTime(6441.73038,10.6)
+osc#6.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#7.gain.setValueAtTime(0,10.6)
+gain#7.gain.setTargetAtTime(0.343333568,10.6,0.001)
+gain#7.gain.setTargetAtTime(0,10.601,0.005)
+osc#6.connect(gain#7)
+gain#7.connect(panner#5)
+osc#6.start(10.6)
+osc#6.stop(10.7)
+osc#6.onended=fn
+random x2
+create osc#8
+create gain#9
+osc#8.type=triangle
+osc#8.frequency.setValueAtTime(329.112196,10.6)
+osc#8.frequency.exponentialRampToValueAtTime(296.573231,10.7)
+gain#9.gain.setValueAtTime(0,10.6)
+gain#9.gain.setTargetAtTime(0.686667135,10.6,0.002)
+gain#9.gain.setTargetAtTime(0,10.602,0.04)
+osc#8.connect(gain#9)
+gain#9.connect(panner#5)
+osc#8.start(10.6)
+osc#8.stop(11.1)
+osc#8.onended=fn
+create source#10
+source#10.buffer=buffer#1
+create filter#11
+create gain#12
+filter#11.type=highpass
+filter#11.frequency.setValueAtTime(3500,10.6)
+filter#11.Q.setValueAtTime(1.5,10.6)
+gain#12.gain.setValueAtTime(0,10.6)
+gain#12.gain.setTargetAtTime(0.300416872,10.6,0.002)
+gain#12.gain.setTargetAtTime(0,10.602,0.02)
+source#10.connect(filter#11)
+filter#11.connect(gain#12)
+gain#12.connect(panner#5)
+source#10.start(10.6,0)
+source#10.stop(11.1)
+source#10.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#6
+osc#6.disconnect()
+gain#7.disconnect()
+ended osc#8
+osc#8.disconnect()
+gain#9.disconnect()
+ended source#10
+source#10.disconnect()
+filter#11.disconnect()
+gain#12.disconnect()
+panner#5.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== (empty) / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#4
+panner#4.pan.setValueAtTime(-0.2,10.6)
+panner#4.connect(gain#2)
+random x2
+create osc#5
+create gain#6
+osc#5.type=sine
+osc#5.frequency.setValueAtTime(6441.73038,10.6)
+osc#5.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#6.gain.setValueAtTime(0,10.6)
+gain#6.gain.setTargetAtTime(0.343333568,10.6,0.001)
+gain#6.gain.setTargetAtTime(0,10.601,0.005)
+osc#5.connect(gain#6)
+gain#6.connect(panner#4)
+osc#5.start(10.6)
+osc#5.stop(10.7)
+osc#5.onended=fn
+random x2
+create osc#7
+create gain#8
+osc#7.type=triangle
+osc#7.frequency.setValueAtTime(329.112196,10.6)
+osc#7.frequency.exponentialRampToValueAtTime(296.573231,10.7)
+gain#8.gain.setValueAtTime(0,10.6)
+gain#8.gain.setTargetAtTime(0.686667135,10.6,0.002)
+gain#8.gain.setTargetAtTime(0,10.602,0.04)
+osc#7.connect(gain#8)
+gain#8.connect(panner#4)
+osc#7.start(10.6)
+osc#7.stop(11.1)
+osc#7.onended=fn
+create source#9
+source#9.buffer=buffer#1
+create filter#10
+create gain#11
+filter#10.type=highpass
+filter#10.frequency.setValueAtTime(3500,10.6)
+filter#10.Q.setValueAtTime(1.5,10.6)
+gain#11.gain.setValueAtTime(0,10.6)
+gain#11.gain.setTargetAtTime(0.300416872,10.6,0.002)
+gain#11.gain.setTargetAtTime(0,10.602,0.02)
+source#9.connect(filter#10)
+filter#10.connect(gain#11)
+gain#11.connect(panner#4)
+source#9.start(10.6,0)
+source#9.stop(11.1)
+source#9.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#5
+osc#5.disconnect()
+gain#6.disconnect()
+ended osc#7
+osc#7.disconnect()
+gain#8.disconnect()
+ended source#9
+source#9.disconnect()
+filter#10.disconnect()
+gain#11.disconnect()
+panner#4.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== undefined / synth / normal
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Sidestick
+create panner#4
+panner#4.pan.setValueAtTime(-0.2,10.6)
+panner#4.connect(gain#2)
+random x2
+create osc#5
+create gain#6
+osc#5.type=sine
+osc#5.frequency.setValueAtTime(6441.73038,10.6)
+osc#5.frequency.exponentialRampToValueAtTime(100,10.62)
+gain#6.gain.setValueAtTime(0,10.6)
+gain#6.gain.setTargetAtTime(0.343333568,10.6,0.001)
+gain#6.gain.setTargetAtTime(0,10.601,0.005)
+osc#5.connect(gain#6)
+gain#6.connect(panner#4)
+osc#5.start(10.6)
+osc#5.stop(10.7)
+osc#5.onended=fn
+random x2
+create osc#7
+create gain#8
+osc#7.type=triangle
+osc#7.frequency.setValueAtTime(329.112196,10.6)
+osc#7.frequency.exponentialRampToValueAtTime(296.573231,10.7)
+gain#8.gain.setValueAtTime(0,10.6)
+gain#8.gain.setTargetAtTime(0.686667135,10.6,0.002)
+gain#8.gain.setTargetAtTime(0,10.602,0.04)
+osc#7.connect(gain#8)
+gain#8.connect(panner#4)
+osc#7.start(10.6)
+osc#7.stop(11.1)
+osc#7.onended=fn
+create source#9
+source#9.buffer=buffer#1
+create filter#10
+create gain#11
+filter#10.type=highpass
+filter#10.frequency.setValueAtTime(3500,10.6)
+filter#10.Q.setValueAtTime(1.5,10.6)
+gain#11.gain.setValueAtTime(0,10.6)
+gain#11.gain.setTargetAtTime(0.300416872,10.6,0.002)
+gain#11.gain.setTargetAtTime(0,10.602,0.02)
+source#9.connect(filter#10)
+filter#10.connect(gain#11)
+gain#11.connect(panner#4)
+source#9.start(10.6,0)
+source#9.stop(11.1)
+source#9.onended=fn
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+ended osc#5
+osc#5.disconnect()
+gain#6.disconnect()
+ended osc#7
+osc#7.disconnect()
+gain#8.disconnect()
+ended source#9
+source#9.disconnect()
+filter#10.disconnect()
+gain#11.disconnect()
+panner#4.disconnect()
+groove: hat=null ride=null crash=null sampledHat=none
+=== (no audio context) HiHat then Kick
+create buffer#1
+create gain#2
+create gain#3
+--- scenario start
+groove: hat=null ride=null crash=null sampledHat=none
+--- then Kick
+groove: hat=null ride=null crash=null sampledHat=none
+--- onended handlers fire, in registration order
+groove: hat=null ride=null crash=null sampledHat=none
+default-velocity / Kick: 167 lines, sha1 b09a1855906a05f107b372dc973ae8d6cbafa5d4
+default-velocity / Snare: 143 lines, sha1 4ff2c15d310561dd9e9a1aaabb14527ef853ce61
+default-velocity / Sidestick: 125 lines, sha1 51674d07d3314b0c1c21cd1b4c61c99fd2d3de4e
+default-velocity / HiHat: 137 lines, sha1 f58ff54a731a26d12508713b2e9a49a209ec2a57
+default-velocity / Open: 106 lines, sha1 273f39498cc25b61a8bfb5e198cdb4f390353aca
+default-velocity / HiHatPedal: 104 lines, sha1 20da3a6cae9e0f5f0f996d7d01a23710d4223487
+default-velocity / Ride: 123 lines, sha1 6c3c74e66fcc388fa5a48591e520b0aa14c354a3
+default-velocity / RideBell: 72 lines, sha1 a9e07465c38a38d978bc048b03920d0cc6099397
+default-velocity / Crash: 107 lines, sha1 105806197bf447727939d6b20891a0b9084fc6b4
+default-velocity / High Tom: 143 lines, sha1 ef4a46968a5f7d7d13de6fc959c90a2c6a52e54b
+default-velocity / Mid Tom: 143 lines, sha1 7018675dcd829bf9fed6ff8a73be0a8bc0dc33a2
+default-velocity / Low Tom: 143 lines, sha1 ecdbdd0f89ab4591c59130cda88e65b89fd8dcf3
+default-velocity / Shaker: 99 lines, sha1 d709b526f33e0f7918d06f1004abdefc722ee69f
+default-velocity / Bogus: 72 lines, sha1 639a902fe9637e2891c9009a590719b930457b1e
+nan-velocity / Kick: 167 lines, sha1 8da7a60a7712ac9535ea3c2380713cc20463e899
+nan-velocity / Snare: 126 lines, sha1 1e974bc480df4ab01902171fdd4937f37ae8a310
+nan-velocity / Sidestick: 125 lines, sha1 ff7a713151e6eab607f6efbcb0cffc648440da3c
+nan-velocity / HiHat: 137 lines, sha1 fd0d8f6d6d3ba84a65a3ac2175a1d67dee3913f4
+nan-velocity / Open: 106 lines, sha1 7c0cce6d55e968c82c1335ac43726e83e1356ead
+nan-velocity / HiHatPedal: 104 lines, sha1 2fb03f1bc720641ed6784d0434121f7f796f990a
+nan-velocity / Ride: 123 lines, sha1 611c1fbb3f2334c4503c182bc86bdbf51c9fb90b
+nan-velocity / RideBell: 72 lines, sha1 e53c6259ebfc550c358629995b8528ed6a541332
+nan-velocity / Crash: 107 lines, sha1 eeff4a25097c1db5fe5ae36af0255c648487ca2e
+nan-velocity / High Tom: 143 lines, sha1 2a8ad4fb3e8ae0d96ff33f68b2cd739c26c3bffe
+nan-velocity / Mid Tom: 143 lines, sha1 3e823a6b7f13553e072bfbc0392e072b00271470
+nan-velocity / Low Tom: 143 lines, sha1 b566cf2a64452e94c4e6cadc3b60ed3ff874fcaf
+nan-velocity / Shaker: 99 lines, sha1 4bcd5380a4d46644777c09c3e0579f6cebc1821a
+nan-velocity / Bogus: 72 lines, sha1 b9107156095aed329d738d6930f01305f0a3a166
+late-time / Kick: 167 lines, sha1 d759fe28be122c8b1d85d2dd3fe922688609ba52
+late-time / Snare: 143 lines, sha1 1f950b6c91304c14c86fa368199af3d7c40d1bf7
+late-time / Sidestick: 125 lines, sha1 7b0a004d003df460f7476c8152610233cb33b836
+late-time / HiHat: 137 lines, sha1 8541c19db7eeddd85071bad9d71b4d25d633ef82
+late-time / Open: 106 lines, sha1 bea08dc14d80270ae061366ed821682a1f1dbec6
+late-time / HiHatPedal: 104 lines, sha1 cc30fb86a7febe25431ade998479e70a29511de3
+late-time / Ride: 123 lines, sha1 93ba6c6857aed2e1b6a06303fd24cf7740e6e6b0
+late-time / RideBell: 72 lines, sha1 8d0d4e3c60b3aec154d88d7e31274d98b6d0b3bc
+late-time / Crash: 107 lines, sha1 8247065744e95946e70d4650e3af2bb4041cdc77
+late-time / High Tom: 143 lines, sha1 aaeafa3a4a0246f3ce94de0b1804fdf5d68f7978
+late-time / Mid Tom: 143 lines, sha1 9c81b2e8a531687bdd486b07d27b00c8421645e8
+late-time / Low Tom: 143 lines, sha1 282a469f20ba0118c320c929eb43444b808ba9d5
+late-time / Shaker: 99 lines, sha1 b936ab30dd8a2012df316b7aac19ba4a59bd0e62
+late-time / Bogus: 72 lines, sha1 5e44d896b53558fb07d52a91a93a084c7e5ad0d1
+burst / Kick: 2567 lines, sha1 14f499c3bc98bcc907454ae044105e02fb94232a
+burst / Snare: 1967 lines, sha1 f7eb82e61ac49fc2d596f0645eae9c37048b59af
+burst / Sidestick: 1517 lines, sha1 087163bf92342a86cecfa92fc802da3ebc7f82fa
+burst / HiHat: 1685 lines, sha1 55eb411a52faf0712c6e73b2cc3a86808442d0ec
+burst / Open: 1006 lines, sha1 78ec0064114f2ce5699e26df8c5d678b4fb50f2d
+burst / HiHatPedal: 956 lines, sha1 d2fff14318679480b82fdcbbb5018b6e02b4b852
+burst / Ride: 1431 lines, sha1 7144f436b89cc3d2ce9a86a24a4a3e69e3436722
+burst / RideBell: 168 lines, sha1 2f702ef481ae48f466a53cf2dacca42e7e305299
+burst / Crash: 995 lines, sha1 bf2ec20da74ca2916eeaae97048df2f9559c0510
+burst / High Tom: 1967 lines, sha1 ac471df6bce032eb65b0b6495e8e3985fe95e056
+burst / Mid Tom: 1967 lines, sha1 ba82ad672658dcd2163590a8874fcfe5ffa64ed7
+burst / Low Tom: 1967 lines, sha1 b635aed232ebe32c26a08e41dd8327f5a052423d
+burst / Shaker: 747 lines, sha1 bf122a3c600a0eb9d6fff6b120ae43484ff57d4e
+burst / Bogus: 168 lines, sha1 d876f18e227d0c370f294811dde1f9dddbc141af
