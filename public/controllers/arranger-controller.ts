@@ -8,15 +8,6 @@ import { ACTIONS } from '../types.js';
 import { normalizeKey } from '../utils.js';
 import { flushBuffers } from './instrument-controller.js';
 
-function validateAndAnalyze(): void {
-    validateProgression(stateMap);
-}
-
-function clearChordPresetHighlight(): void {
-    // DOM manipulation is no longer needed; there is no preset library to highlight
-    // Keeping this function as a no-op to maintain API compatibility
-}
-
 /**
  * The "arrangement changed — resync everything" sequence `transposeKey` ends in.
  * It saves nothing: v1's session save went with its load/save layer (#1424), and
@@ -24,7 +15,7 @@ function clearChordPresetHighlight(): void {
  * `captureContent`).
  */
 function refreshArrangerUI(): void {
-    validateAndAnalyze();
+    validateProgression(stateMap);
     flushBuffers();
     restoreGains(stateMap);
 }
@@ -37,28 +28,23 @@ export function transposeKey(delta: number): void {
 
     dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'key', value: newKey });
 
-    arranger.sections.forEach((section: Section) => {
-        // Absolute transpose: note-name roots AND slash basses move by delta; Roman/NNS tokens
-        // are key-relative and stay put (the key label above moves by the same delta). Uses the
-        // single tokenizer in transpose.ts — this is the fix that gets the slash bass to
-        // transpose (`C/E` +2 → `D/Gb`, previously `D/E`).
-        section.value = transposeChordText(section.value, delta);
-
+    // Absolute transpose: note-name roots AND slash basses move by delta; Roman/NNS tokens
+    // are key-relative and stay put (the key label above moves by the same delta). Uses the
+    // single tokenizer in transpose.ts — this is the fix that gets the slash bass to
+    // transpose (`C/E` +2 → `D/Gb`, previously `D/E`). Each section is a new object: the
+    // live ones are state, and state changes only through the dispatch below (#1634).
+    const sections = arranger.sections.map((section: Section): Section => {
+        const next: Section = { ...section, value: transposeChordText(section.value, delta) };
         if (section.key) {
             const secKeyIndex = KEY_ORDER.indexOf(normalizeKey(section.key));
             if (secKeyIndex !== -1) {
-                section.key = KEY_ORDER[(((secKeyIndex + delta) % 12) + 12) % 12];
+                next.key = KEY_ORDER[(((secKeyIndex + delta) % 12) + 12) % 12];
             }
         }
+        return next;
     });
 
-    // We mutated sections directly in the loop, so dispatch an updated array reference
-    dispatch(ACTIONS.SET_PARAM, {
-        module: 'arranger',
-        param: 'sections',
-        value: [...arranger.sections],
-    });
+    dispatch(ACTIONS.SET_PARAM, { module: 'arranger', param: 'sections', value: sections });
 
-    clearChordPresetHighlight();
     refreshArrangerUI();
 }
