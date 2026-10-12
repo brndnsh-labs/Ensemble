@@ -26,13 +26,21 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ## Registry
 
+### 🔴 `prototypes/v2/checks/root-handover.chromium.spec.ts` — "a v1 worker hands the site root over, keeping downloaded sounds and v1 local data"
+
+- **Class:** e2e-timing (unconfirmed; one observation).
+- **Symptom:** `v2-suite (2, laptop)` on `main` at `ebbe6a7f` (#1656, run 38195051461, 2026-10-11): `Error: page.reload: Protocol error (Page.reload): Not attached to an active page`, at the reload before `expect(page.locator('body[data-standin="v1"]')).toBeVisible()`. The same commit's PR run was green, and the change (the drum dispatcher) cannot reach this spec.
+- **Not yet diagnosed:** no fail-rate measured. The test swaps service workers under the page, so a candidate is the page being torn down and re-attached by the worker handover at the moment `page.reload()` is issued. It reddened a push to `main`, so that commit's deploy was skipped; the next push deployed.
+- **Last seen:** 2026-10-11 (`main`, `ebbe6a7f`).
+
 ### 🔴 `prototypes/v2/checks/songbook-home.spec.ts` — "one search returns your songs and the standards, grouped"
 
 - **Class:** e2e-timing (unconfirmed; two observations).
 - **Symptom:** `v2-suite (2, webkit-phone)` on `feat/shell-voicings` (run 38100585677, `5c4734f6`, 2026-10-11): after `search.fill('blu')`, `expect(songs.getByRole('heading', { name: 'Your songs' })).toBeVisible()` timed out at 15s (element not found). The branch touches nothing on the songbook home or search; the spec is unchanged since #1457. A rerun of the failed job passed, and the test passes locally on both projects.
 - **Not yet diagnosed:** no fail-rate measured, no contention run. Candidates: the seeded starters not yet in the library when the search ran (`seedStarters` → IndexedDB write → the home's library read), or the search results' first paint lagging the keystrokes on a starved WebKit. Run `/flake` on it before treating a second hit as a regression.
 - **Second observation:** `v2-suite (1, webkit-phone)` on `chore/remove-unread-state` (#1629, run 38181830420, 2026-10-11), same assertion, same 15s timeout, on a branch that removes unread engine state and touches nothing on the home page. It is the first failure since the suite moved to four WebKit legs dealt from CI timings (#1625), which changed which specs share a runner. The other six legs passed; a re-run of the leg is the evidence still owed here.
-- **Last seen:** 2026-10-11 (`chore/remove-unread-state`, run 38181830420).
+- **Third observation:** `v2-suite (1, webkit-phone)` on #1658 (run 38195335315, 2026-10-11), a PR that changes one comment and three unread constants. Same assertion. Three hits in one day on unrelated branches, always WebKit; tracked as #1635.
+- **Last seen:** 2026-10-11 (#1658, run 38195335315).
 
 ### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4" (second shape)
 
@@ -85,7 +93,8 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Root cause:** the stand paints the playhead every animation frame (#1470), so a 62.5ms chord goes unpainted exactly when no frame lands inside it. Under CPU contention the main thread does skip frames. Measured with an in-page `requestAnimationFrame` log on both engines: 50-80ms frames right after most barlines, and one 484ms frame. A long frame just after the downbeat into the sixteenth bar swallows step 1. Every skip seen locally came with a frame gap longer than the chords it skipped (none while frames ran), so the painter is sound and this is not a product bug. The original failed 2/12 under heavy contention (4 workers, 2 pinned cores, 3 spinners; 6 more timed out because the starved audio clock never finished two laps in 30s) and 0/20 at 2 workers.
 - **Fix (2026-10-02, #1485):** the page records, every animation frame, the band's audio clock as that frame read it (the test wraps `AudioContext` to reach it). A skipped chord passes only if the clock moved past all the skipped chords between two consecutive frames (more than `skipped × 62.5ms`, less one render quantum), so no frame could have read the playhead inside them. Order is still exact: a backwards or repeated chord fails. A first version compared wall-clock frame gaps instead and failed once on an ordinary loaded run (2 chords skipped across a 117ms frame). The audio clock advances in jumps of up to ~45ms even unloaded, so the wall gap is the wrong ruler. Frames are stamped when the clock is read, not with the rAF timestamp, which a throttled WebKit hands out long before the callback runs. Mutation-tested: a painter that updates only every 4th frame (the old sampler's shape) fails 6/8, on skips where the clock moved 35-56ms between frames. The budget is now 90s (the poll 60s): under the heaviest contention, reaching the second lap took over 30s in 8 of 12 runs, the starved clock again. After: 20/20 under contention (2 pinned cores, 3 spinners on them, 2 workers), and 28/28 at 4 workers.
 - **Recurred (2026-10-11, PR #1615, `v2-suite (1, webkit-phone)`):** one hit on a PR that touches only `lib/voicings/`; rerun pending at the time of writing. A new signature: `a chord went unpainted while frames ran: 48 -> 0 -> 3 -> 4 …`, two chords (steps 1 and 2) skipped at the lap wrap and the #1485 audio-clock rule did NOT excuse it, so by that rule a frame read the playhead inside the skipped chords and painted neither. That is the case the fix's root cause says should not happen ("none while frames ran"), so either the clock-gap allowance is one render quantum too tight at the wrap (the loop seam re-anchors the clock) or the painter really drops a step there. Not reproduced or diagnosed; reopened rather than left green.
-- **Last seen:** 2026-10-11 (PR #1615).
+- **Recurred again (2026-10-11, `main` at `dbe1c866`, #1648, `v2-suite (4, webkit-phone)`, run 38191612676):** `a chord went unpainted while frames ran: 48 -> 0 -> 1 -> … -> 8 -> 10 -> 11 …`, one chord (step 9) skipped mid-lap. The commit touches only the genre-change effect. It reddened a push to `main`, so that commit's deploy was skipped; the next push deployed.
+- **Last seen:** 2026-10-11 (`main`, `dbe1c866`).
 
 ### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "the jump-ahead fires in the last felt beat (not the downbeat), and fires again on the next lap"
 
