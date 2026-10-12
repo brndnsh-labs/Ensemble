@@ -200,6 +200,7 @@ export async function renderBandPasses(
                 time,
                 durationSeconds,
                 chordSizes.get(event.tick) ?? 1,
+                timeline,
                 legato.has(event),
             );
         }

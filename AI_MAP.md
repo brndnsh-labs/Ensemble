@@ -147,7 +147,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/engine/reverb.ts` | Algorithmic Schroeder/Freeverb reverb (shared reverb return). | `createAlgorithmicReverb`, `REVERB_PRESETS` |
 | `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, velocity→timbre). | `rampGain`, `killActiveVoices`, `velocityTimbre` |
 | `public/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
-| `public/engine/section-overrides.ts` | Per-section instrument-enabled overrides for a measure-less chart. | `isInstrumentActiveAtStep`, `isInstrumentEverActive` |
+| `public/engine/section-overrides.ts` | Per-section instrument-enabled overrides: whether a lane's bus is needed anywhere in the chart. | `isInstrumentEverActive` |
 | `public/engine/hash-utils.ts` | Canonical deterministic hash helpers. `scrambleHash` is stateless and seed-tuple-indexed — see `public/engine/CLAUDE.md` §27. | `scrambleHash`, `stringHash33`, `stringHash31` |
 | `public/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `public/engine/audio-recovery.ts` | Context resumption and error handling. | `audioWatchdog` |
@@ -193,7 +193,7 @@ account sync. Per-surface ownership is the navigation table in `prototypes/v2/CL
 | `public/export/detached-generation-state.ts` | Offline-render state clone (the band's WAV export and the listening-gate tools): preserves generation settings while stripping live handles and runtime buffers. |
 | `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping: chords grouped into measures and section blocks. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
-| `public/utils.ts` | Pure musical/math primitives: pitch conversion + the step-map lookup. No DOM, no Web Audio, no persistence. | `getFrequency`, `binarySearchMap` |
+| `public/utils.ts` | Pure musical/math primitives: pitch conversion + key normalization. No DOM, no Web Audio, no persistence. | `getFrequency` |
 | `public/sanitize.ts` | Main-thread string sanitization (HTML escaping, dangerous-char stripping, song-seed normalizing). | `escapeHTML`, `stripDangerousChars`, `normalizeSongSeed` |
 
 ## Infrastructure & Lifecycle (Internal)

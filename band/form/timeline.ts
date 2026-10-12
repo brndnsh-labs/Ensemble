@@ -446,6 +446,25 @@ export function chordAt(timeline: Timeline, tick: number): ChordFacts | null {
     return timeline.spans[spanIndexAt(timeline, tick)]?.chord ?? null;
 }
 
+/** The performed bar `tick` falls in, or null past either end of the timeline. */
+export function barAtTick(timeline: Timeline, tick: number): Bar | null {
+    const { bars } = timeline;
+    let lo = 0;
+    let hi = bars.length - 1;
+    while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        const bar = bars[mid];
+        if (tick < bar.start) {
+            hi = mid - 1;
+        } else if (tick >= bar.start + bar.meter.barTicks) {
+            lo = mid + 1;
+        } else {
+            return bar;
+        }
+    }
+    return null;
+}
+
 /** Seconds from tick 0 to `tick` at `bpm`, honouring fermata stretches. */
 export function secondsAt(timeline: Timeline, tick: number, bpm: number): number {
     const perTick = 60 / bpm / PPQ;
