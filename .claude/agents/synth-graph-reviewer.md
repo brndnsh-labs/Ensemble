@@ -10,7 +10,7 @@ You do not edit code. You read, grep, reason, and report. **You do not judge sou
 
 ## Context
 
-Ensemble plays every instrument through synth voices or installed sample packs. The audio graph is built once in `engine.ts` `initAudio()` and stored on `playback`; per-voice synthesis lives in `public/engine/synth-{bass,chords,drums,harmonies,soloist}.ts` with shared helpers in `synth-utils.ts`, sample-pack playback in `sample-voice.ts`; the band host (`prototypes/v2/lib/band-host.ts`) triggers voices on the audio clock.
+Ensemble plays every instrument through synth voices or installed sample packs. The audio graph is built once in `engine.ts` `initAudio()` and stored on `playback`; per-voice synthesis lives in `public/engine/synth-{bass,chords,drums,soloist}.ts` with shared helpers in `synth-utils.ts`, sample-pack playback in `sample-voice.ts`; the band host (`prototypes/v2/lib/band-host.ts`) triggers voices on the audio clock.
 
 **Always read `engine.ts` `initAudio()` first** when a change touches routing — it is the source of truth for the graph topology, and a per-voice change that assumes the wrong bus is a real bug.
 
@@ -46,7 +46,7 @@ Verify: for every node created in a `play*` path, confirm it appears in a `disco
 
 Decay/release arithmetic that can go negative, zero, or past-scheduled:
 
-- A release scheduled at `startTime + duration - releaseTime` where `releaseTime > duration` lands *before* the attack finishes — the note never reaches full gain (shipped in `synth-harmonies.ts`).
+- A release scheduled at `startTime + duration - releaseTime` where `releaseTime > duration` lands *before* the attack finishes — the note never reaches full gain (shipped in the old `synth-harmonies.ts`, since deleted).
 - Decay time-constants driven below the audible floor by stacked multipliers (the choked-hihat class — three independent shorteners multiplied, shipped in `synth-drums.ts`).
 - `osc.stop()` scheduled before the envelope has decayed → click.
 
@@ -66,7 +66,7 @@ Scheduling against `Date.now()` / `performance.now()` / a UI clock instead of `p
 
 ### DEAD NODE / PER-NOTE ALLOC
 
-- A node allocated, configured, pushed into a cleanup list, and **never connected into the graph** — dead weight (shipped as `tremoloGain` in `synth-harmonies.ts`).
+- A node allocated, configured, pushed into a cleanup list, and **never connected into the graph** — dead weight (shipped as `tremoloGain` in the old `synth-harmonies.ts`, since deleted).
 - A large allocation (e.g. a 44100-sample `Float32Array` WaveShaper curve, a buffer) rebuilt **on every note** instead of cached once — GC churn in the hot path. Check whether a sibling file already caches the same thing.
 
 ### NIT

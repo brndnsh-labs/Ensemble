@@ -24,7 +24,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/ensemble-v2-next-batch.md`](design/ensemble-v2-next-batch.md) — next bounded cycle batch; approval/filing state is explicit in the document.
 - [`docs/design/ensemble-v2-guided-form.md`](design/ensemble-v2-guided-form.md) — guided repeat/ending authoring, compiler-derived previews and advanced-form preservation (#1176).
 
-- [`docs/design/`](design/) — living design docs for load-bearing models: [`design/songbook.md`](design/songbook.md) (durable chart documents, migration, and rollback), [`design/soloist-phrase-first.md`](design/soloist-phrase-first.md) (the soloist engine), [`design/timing-model.md`](design/timing-model.md) (the three-tier micro-timing law + the uniform-shift proof), and [`design/write-ownership.md`](design/write-ownership.md) (the write-ownership invariant — runtime never writes a document/preferences field; composes with the timing-model law).
+- [`docs/design/`](design/) — living design docs for load-bearing models: [`design/songbook.md`](design/songbook.md) (durable chart documents, migration, and rollback), [`design/timing-model.md`](design/timing-model.md) (the three-tier micro-timing law + the uniform-shift proof), and [`design/write-ownership.md`](design/write-ownership.md) (the write-ownership invariant — runtime never writes a document/preferences field; composes with the timing-model law).
 - [`docs/guides/`](guides/) — implementation notes and reference guides.
 - [`docs/guides/PERFORMANCE_GUIDELINES.md`](guides/PERFORMANCE_GUIDELINES.md) — hot-loop performance notes.
 - [`docs/guides/musical-engine-patterns.md`](guides/musical-engine-patterns.md) — reusable recipes for generative-engine work (5 smells in critique tests, coordination patterns, loop-awareness, final-stage multiplier discipline, seeded determinism). Extracted from the completed musical audit.
@@ -41,7 +41,6 @@ This folder groups the living documentation for Ensemble.
 
 Frozen archives — historical context only. The live tracker is GitHub issues (see CLAUDE.md § Work Pipeline); do not pick up work from these.
 
-- [`docs/archive/`](archive/) — completed reports and archived audits.
+- [`docs/archive/`](archive/) — completed reports and archived audits, including [`TECH_DEBT.md`](archive/TECH_DEBT.md) (the May 2026 state-discipline audit snapshot; its remaining mutation finding was superseded by the detached-render exception in `CLAUDE.md`), [`TYPESCRIPT_MIGRATION.md`](archive/TYPESCRIPT_MIGRATION.md) (the finished TS migration) and [`soloist-phrase-first.md`](archive/soloist-phrase-first.md) (design proposal for the deleted soloist generator).
 - [`docs/synth-audit/`](synth-audit/) — **⛔ frozen archive** of the synth-realism audit (7 epics, shipped). Live synth work is GitHub issues, Track `synth`.
 - [`docs/audit/FOLLOWUPS.md`](audit/FOLLOWUPS.md) — **⛔ frozen archive** of the musical-audit follow-up backlog. Live follow-ups are `finding`/`backlog` issues on the GitHub tracker. The audit cycle itself is archived at [`docs/archive/musical-audit-2026-05/`](archive/musical-audit-2026-05/).
-- [`docs/TECH_DEBT.md`](TECH_DEBT.md) — historical May 2026 state-discipline audit snapshot; its remaining mutation finding was superseded by the detached-render exception in `CLAUDE.md`.

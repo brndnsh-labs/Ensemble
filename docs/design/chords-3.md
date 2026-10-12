@@ -2,6 +2,15 @@
 
 Implementation and listening status live in [issue #1150](https://github.com/brndnsh-labs/Ensemble/issues/1150).
 
+> **Status (2026-10).** The direction and the musical rules below still describe the players
+> (keyboard hands, a rhythm guitar found on the fretboard, strum gestures). The implementation
+> they were written against, the old worker-based engine, was deleted in #1404: its
+> `getGuitarNotes`, `piano-voicings.ts`, `piano-player.ts`, scheduler, `chordPerformance`
+> note metadata and worker-sync machinery no longer exist. Today's comp is `band/players/comp/`
+> (`fretboard.ts` for guitar shapes, `voicing.ts` for keyboard voicings, `idiom.ts` for the
+> rhythm, `instruments.ts` for the per-instrument profile); read `band/CLAUDE.md` and
+> `docs/design/band-engine.md`. Passages naming the old machinery are marked *(old engine)*.
+
 ## Direction
 
 Chords is the harmonic accompanist. Its instrumental identity should determine
@@ -55,7 +64,7 @@ consumers use, with additive `chordPerformance` metadata:
 - `dry: false` and `muted: false`: no second export shortening or silent ghost
   interpretation. Existing silent CC carriers retain their old meaning.
 
-The scheduler passes zero additional strum rank and ignores piano sustain for
+*(Old engine.)* The scheduler passed zero additional strum rank and ignored piano sustain for
 authored guitar notes. MIDI export preserves their fractional gate instead of
 rounding it to a step or imposing the legacy minimum duration. Existing shared
 swing/humanization authorities remain in place. Audio envelopes may have a
@@ -72,7 +81,7 @@ sound must not erase a planned third or altered extension.
 Selection prioritizes defining tones, bass support when needed, root coverage,
 and then hand position and movement from the preceding chart chord. The bounded
 candidate cache contains only content-derived shapes, not session memory; seek,
-deep-merged worker updates, and detached exports cannot inherit another take's
+*(old engine: deep-merged worker updates)* and detached exports cannot inherit another take's
 guitar phrase state. Selecting a player uses the existing rebuild → sync → flush
 controller sequence so the new choice reaches the buffered live performance.
 
@@ -90,13 +99,13 @@ user-owned. Existing genre defaults are unchanged. This is a restrained keyboard
 part: a four-bar statement, displaced answer, return and settling bar, with
 meter-native answer placement. Harmonic density changes voicings, not attack count.
 
-`piano-voicings.ts` derives defining tones from `chordFacts`, adds only a small
+*(Old engine: `piano-voicings.ts`; the band's keyboard voicings are `band/players/comp/voicing.ts`.)* It derives defining tones from `chordFacts`, adds only a small
 optional color vocabulary, and enumerates three-to-five-key voicings with at most
 an octave in either hand. A bass-free part includes the root and explicit slash
 bass; bass-active extended chords can omit the root. Ranked hand movement,
 common pitches and a more strongly weighted top line guide successive choices.
 
-`piano-player.ts` prepares each phrase with four preceding chart chords, then
+*(Old engine: `piano-player.ts`.)* It prepared each phrase with four preceding chart chords, then
 follows the actual prior planned voicing within that phrase. Its bounded caches
 are keyed by harmonic content, density, register and bass participation, so a
 deep-merged edit cannot leave an identity-keyed stale plan. The phrase position
@@ -240,8 +249,8 @@ Rock piano and Acoustic piano/strings were prior user choices and remain default
 ## Verification and audition
 
 The [piano scene](../../scripts/scenes/chords-3-piano.json) and
-[guitar scene](../../scripts/scenes/chords-3-guitar.json) render both installed
-sample paths through the normal scheduler. They deliberately share a scene ID:
+[guitar scene](../../scripts/scenes/chords-3-guitar.json) rendered both installed
+sample paths through the old engine's normal scheduler (the scene files are still on disk but were written for the old engine; the listening-gate tools now render the band, see `docs/guides/listening-gate-tools.md`). They deliberately share a scene ID:
 the renderer includes that ID in its musical seed. Separate output directories
 keep the same-seed comparison from overwriting its own files.
 

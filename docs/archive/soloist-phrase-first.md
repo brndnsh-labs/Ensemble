@@ -1,5 +1,7 @@
 # Soloist Re-Architecture — Phrase-First, Vocalist↔Improviser
 
+> **Archived (2026-10).** A design proposal for the old worker-based soloist generator, which was deleted with the old engine (#1404). The band engine's lead is in `band/` (see `band/CLAUDE.md`). Every file and symbol named below is historical.
+
 **Status:** Design proposal v2 — Slices 0/1 partially implemented (Build 2b/2c/3 shipped; see per-section "Implementation note" callouts). Remaining sections are still proposal. Source-of-truth body for the planned *Soloist* epic.
 **Date:** 2026-06-27
 **Goal:** A lead player that sounds like a tasteful session musician — composed but improvisational, idiomatic per genre, and *evolving over the course of a song* the way a great vocalist or a Beck/Satriani-style melodic player does.

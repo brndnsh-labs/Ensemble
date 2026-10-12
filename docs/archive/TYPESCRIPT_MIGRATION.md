@@ -1,6 +1,6 @@
 # TypeScript Migration Record (completed May 2026)
 
-The incremental migration completed in May 2026. This document is historical; use `CLAUDE.md` and `AI_MAP.md` for the current source layout and conventions.
+The incremental migration completed in May 2026. This document is historical, and the file paths it lists (the old `public/` app and its engine) are mostly gone. Use `CLAUDE.md` and `AI_MAP.md` for the current source layout and conventions.
 
 ## Status Legend
 

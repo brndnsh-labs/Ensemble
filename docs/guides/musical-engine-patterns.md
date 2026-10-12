@@ -1,6 +1,6 @@
 # Musical Engine Patterns
 
-Reusable recipes for working on the generative musical engines (soloist, bass, drums, chords, harmony, conductor, arranger). Captured from the May 2026 musical-audit cycle — these are the patterns that proved durable across the cycle's 80 shipped stories.
+Reusable recipes for working on the generative musical engines (the band's lanes in `band/`: drums, bass, comp and lead, and the arrangement above them). Captured from the May 2026 musical-audit cycle — these are the patterns that proved durable across the cycle's 80 shipped stories.
 
 If you're picking up new engine work and not sure how to shape the change, start here. The "5 smells" section is also the working checklist for reviewing critique tests.
 
@@ -15,7 +15,7 @@ If you're picking up new engine work and not sure how to shape the change, start
 
 ## Methodology — the 5 smells in critique tests
 
-Critique tests in `tests/standards/` are the Definition of Done for musicality. They're also where musical bugs hide. The recurring pattern:
+The band's critique tests (`band/test/critique.test.ts`, claims in `band/test/claims/`) are the Definition of Done for musicality. They're also where musical bugs hide. The recurring pattern:
 
 > A test's *name* asserts a musical claim, but its *implementation* either (a) computes the expected pattern by replaying the engine's own predicates (tautology), (b) uses a threshold below the random-baseline (passes with any output), or (c) measures a different quantity than the name implies.
 
@@ -23,7 +23,7 @@ Two additional smells discovered during the May 2026 audit:
 
 > (d) **Report/assertion mismatch** — `console.log` shows "Target: >30%" but `expect(...)` asserts `>15%`. The logged target is aspirational; the assertion is what actually guards. Check that every "Target: X" in the report is the value being asserted.
 >
-> (e) **Harness silences engine path** — the test passes an incomplete `stepInfo` object (e.g. just `{ isBeatStart: ... }`) when the engine checks other properties (`isBackbeat`, `isOffbeat`, `isMeasureStart`, `isPulseStart`). The engine's relevant lane never fires, so the test measures only the fallback lane while looking healthy. Fix: build stepInfo via `getStepInfo` from `public/utils.ts`, or construct an object containing every property the engine reads.
+> (e) **Harness silences engine path** — the test passes an incomplete `stepInfo` object (e.g. just `{ isBeatStart: ... }`) when the engine checks other properties (`isBackbeat`, `isOffbeat`, `isMeasureStart`, `isPulseStart`). The engine's relevant lane never fires, so the test measures only the fallback lane while looking healthy. Fix: build the input the way production does, or construct an object containing every property the engine reads. (The old `stepInfo` object is gone with the old engine; the smell is general.)
 
 Look for any of the five per test file, then verify the engine against the *named* musical claim before deciding whether the test, the engine, or both need to change.
 
@@ -47,81 +47,45 @@ This applies to new and modified range assertions going forward — it is not a 
 
 ## Patterns proven
 
-### Engine-knows-where-it-is (form-aware pitch / rhythm selection)
+> **Old engine, deleted (#1404).** Most of these patterns were first proven on the worker-based generator (soloist, bass, drum and groove engines, the conductor, the coordination context, `playback.currentLoopCount`). All of it is gone. Each pattern below is kept only where it is still true of `band/`, and cites `band/` code. Where the old carrier is mentioned it is history.
 
-When you want an engine to shape its output based on musical structure (phrase position, section position, loop count, role), the proven recipe:
+### Engine-knows-where-it-is (form-aware selection)
 
-1. **Planner / scheduler derives the structural fact** in the layer that already knows it. Phrase-end markers belong in the layer that builds the phrase (in the live engine, `soloist-phrase-first.ts`, which owns the lead's rhythm); SRDC phase belongs in the plan-build site that already calls `getSectionContext` (`public/engine/arranger-utils.ts`). Don't try to re-derive structure at the picker layer.
+When an engine should shape its output by musical structure (phrase position, section position, chorus, role), derive the structural fact in the layer that already knows it and hand it down; don't re-derive it at the picker.
 
-2. **Attach the fact to the work unit.** The structural fact rides on the phrase's work unit — e.g. SRDC phase rides on the phrase context (`phrase.context.srdcState`). The work unit is the unit of musical thought; the structural fact should travel with it.
+- In `band/`, the arrangement layer (`band/arrange/`, `band/form/`) owns the structure. `arrange/cycle.ts` decides which chorus of the solo arc a bar is in (`SectionVisit.chorus`), and `players/lead/form.ts`'s arc turns that into what a solo phrase slot is asked to do (how busy, how high, whether it is the peak).
+- The picker (`players/lead/idiom.ts`, `players/lead/line.ts`) reads what it was handed and does not look the structure up again.
+- **Tune to a musical sweet spot, not a statistical one.** A bias strong enough to make a tight statistical gap often sounds robotic (a response phrase that always lands on the root). A weaker, reliably directional bias keeps the musical variability. Confirmed in the May 2026 phrase-end and SRDC work.
+- **Multi-trial reliability check before locking in thresholds.** A band take is deterministic, so one run settles a seed, but a claim that sweeps seeds or styles still deserves a few runs before its range is fixed.
 
-3. **Picker reads at use-site** and applies the bias — e.g. the pitch realizer reads `phrase.context.srdcState` at the point it chooses a note.
+### Coordination between lanes
 
-> **Historical note:** the original illustration of this pattern was the legacy soloist engine's `rhythmNode.isPhraseEnd` flag (produced by the old `soloist-rhythm-engine.ts` planner, read by `selectPitchAndDevices`). Both were removed in the phrase-first migration (epic #10/#866; the orphaned rhythm planner deleted #926); the *pattern* remains the guidance, only its concrete carrier changed.
+The old coordination context (a producer-ordered carryover struct, with an order test) is gone. The band does it by construction: `performPass` (`band/perform.ts`) is a pure function over the score's timeline, and a lane that needs another lane's output takes it as an argument rather than reading the other lane's internals. Keep that rule: a consumer never reaches into a producer's private state.
 
-4. **Apply as a final-stage `weight *= mult`**, not as a multiplier on one factor's additive bonus. Generative engines have many simultaneous biases pushing the same direction; scaling just one of them gets washed out. See [[feedback-weight-tuning-multiplier-placement]] for the full reasoning.
+### Loop-awareness
 
-5. **Add a top-level state override slot for tests.** Production writes the canonical nested location every call; without an override slot, test mocks setting the same nested field get clobbered immediately. Read order: `topLevel || nested || default`. See [[feedback-state-mock-vs-production-override]].
+The old recipe read `playback.currentLoopCount` per tick; that field and the conductor that maintained it are deleted. In `band/` the pass is part of the input: `arrange/cycle.ts` hands each lane the pass and the bar's chorus, so the head, the solos and the trades follow the chart's counted choruses, and `band/arrange/choruses.test.ts` checks that a looped chart and a counted one give the same arc. A "does it vary across passes" test drives `performPass` over a counted chart and compares passes; it asserts direction-agnostic divergence, not "pass 2 has more X than pass 0". Put a cap/scale formula in a small exported helper so its boundary table is unit-testable apart from the integration.
 
-6. **Tune to a musical sweet spot, not a statistical one.** A ×8/×0.15 multiplier produces a tight statistical gap but sounds robotic (Response always lands on root, Departure always avoids it). A ×4/×0.3 multiplier produces a smaller but reliably-directional gap AND preserves musical variability. Confirmed on both phrase-end (2026-05-16) and SRDC (2026-05-16) work.
+### Dual-gate activation
 
-7. **Multi-trial reliability check before locking in thresholds.** A 20-30 run loop (`for i in $(seq 1 30); do npx vitest run ... | grep -E "FAIL|metric"; done`) catches sample-size flake that single-run testing misses. The phrase-end test went through three threshold iterations using this loop before settling on the combined-condition assertion that passed 30/30.
+When a new behavior fires on a step the active style doesn't normally play (a chromatic anticipation on a half-beat in a quarter-note style), the step has to be activated AND the pitch overridden. A pitch-only gate on a step the style skipped fires zero times. The pattern holds for any engine where an activation predicate gates a separate value selector: verify both gates fire before assuming the behavior is wired up.
 
-### Test-mock isolation (for bias-comparison tests)
+### Weighted choice and bias placement
 
-When measuring whether a new engine bias differentiates outcomes, audit the mock state for *other* biases that push the same direction and neutralize them in the test. See [[feedback-test-isolation-competing-biases]] for the recipe.
+The final-stage `weight *= mult` rule was proven on the old additive weight pickers (`getBassNote`, the soloist picker), where many bonuses pushed the same direction and scaling one of them got washed out (additive multiplier: 0pt phase gap; final-stage multiplier: 30pt+). `band/` has no such picker today: its choices are `rng.weighted([...])` tables (`pickApproach` in `band/players/bass/line.ts`, the shape tables in `band/players/lead/idiom.ts`) and the voicing `cost` function (`band/players/comp/voicing.ts`). The lesson still applies if a weight is ever built from several additive terms: apply a new bias as a last-stage multiplier. In a `weighted` table, change the table's own weights; in `cost`, the weight on the term is the knob.
 
-### Coordination patterns
+### Register slots
 
-Source of truth: `public/engine/coordination-engine.ts`. When a consumer engine needs state owned by another engine, the proven recipe:
+Each lane keeps to a register slot, and the slot is data the picker is checked against, not a comment: the bass lane's `BASS_SLOT_HI` in `band/players/bass/line.ts`, the keyboard comp's `KEYS` slot in `band/players/comp/voicing.ts` (where `cost` charges any note outside `lo`..`hi` and pulls the top voice toward `top`). The invariant suite in `band/test/invariants/` holds every style to its lane ranges; `docs/design/band-engine.md` lists the slots.
 
-1. **Producer writes to the coordination context.** Never have a consumer read another engine's `state.x.session.*` directly — that's a contract violation that breaks test mocks (see [[feedback-tests-passing-wrong-path]]) and couples engines to each other's internals.
+### Determinism via `rng(seed, ...keys)`
 
-2. **Sticky-across-ticks state goes in `CoordinationCarryover`.** Per-tick context is recreated; if the consumer needs the producer's value from N ticks ago (because the producer doesn't run every tick), use the Carryover struct threaded through `generateNotesForStep`. Always age-cap sticky values so single-shot events don't permanently steer downstream behavior. See [[reference-coordination-carryover]] for the three production hosts that must initialize it.
+For any variation that should be reproducible (motif rotation, voicing choice, ornaments), draw from `rng(...key)` in `band/core/random.ts`, never `Math.random()` or a hand-rolled hash. Inside a style or player, use `ctx.rng(purpose, scope)`.
 
-3. **Annotate producer order in code.** Every field on the coordination context gets a `// writer: <producer-name>` and `// readable-after: <producer-name>` comment in `createCoordinationContext()`. Guard with `tests/unit/engine/producer-order.test.ts` — mock the producer's output to a sentinel value (e.g. MIDI 72) and spy on a later consumer to assert it sees that value. If anyone reorders the producers, the positive test fails.
-
-### Loop-awareness via per-tick `playback.currentLoopCount`
-
-When you want an engine to vary its behavior across loop passes ("Chorus Evolution"), the proven recipe:
-
-1. **Read `playback.currentLoopCount` at per-tick time**, not at seed time. The slot lives in `playback` state (`public/types.ts`), maintained by the conductor's iteration-boundary update (`public/engine/conductor.ts`), and flowed into every per-tick engine via the `playback` arg. No new context field or state slice is needed — the data plumbing is universal.
-
-2. **Don't fake it from a seeder.** Seeders (`drum-seeder.ts`, etc.) run once at arrangement-seed time and produce static maps. They have no access to `playback.currentLoopCount`. Any "loop-aware" check inside a seeder is structurally broken — and in the drum-seeder case, the fallback `index < arranger.sectionMap.length` check was additionally defeated by `unrollArrangement` merging consecutive same-label iterations (`public/engine/arranger-utils.ts`). The seeder's `index` maxes out at ~5 regardless of loop count.
-
-3. **Reference consumers:** `loopMotifCeiling()` in `public/engine/groove-engine.ts` — the motif complexity cap, exported and applied within the same module; `loopLift`/`activityAt` in `public/engine/soloist-phrase-first.ts` — per-loop note-density shaping, keyed off `playback.currentLoopCount`.
-
-> **Historical note:** earlier versions of this guide cited `soloist-pitch-engine.ts:235, 861-877, 999-1056` (the legacy weighted picker `selectPitchAndDevices`) as the loop-awareness reference consumer. That picker was removed in the phrase-first migration (epic #10/#866); `soloist-pitch-engine.ts` is now a 124-line helper module (`chordTargetTones`/`classifyChordQuality`) with no loop-count read — the *pattern* remains the guidance, only its concrete carrier changed.
-
-4. **Helper-extract the cap/scale formula** so the boundary table is unit-testable separately from the engine integration. Pattern: `export function loopMotifCeiling(loopCount)` + a 6-line boundary-table test + one integration smoke that confirms the helper is wired into `applyGrooveOverrides`. Avoids the brittle "direction-of-divergence" assertion problem when PRNG state interacts with the cap.
-
-5. **Test framing:** drive the engine with two `playback` objects (`currentLoopCount: 0` vs `2`) against the same fixture, and assert direction-agnostic divergence (`diffSteps.length >= threshold`). Don't assert "Loop 2 produces *more* X than Loop 0" — depending on PRNG state inside the engine, tier-boundary cases can flip the direction even when the cap is correctly wired.
-
-### Dual-gate activation pattern
-
-When adding a new bass behavior that fires on a step the active style doesn't normally play (e.g. a chromatic anticipation note on the half-beat in a quarter-note country style), gate the behavior in BOTH `isBassActive` (force-activate the step) AND `getBassNote` (override the pitch). Single-gate version is dead code — `getBassNote` is never called on a step the style skipped, so a pitch-only gate fires zero times.
-
-The pattern generalizes to any engine where an activation predicate gates a separate pitch/value selector — verify both gates fire before assuming the behavior is wired up. Confirmed in Epic 1 / S3 (`upcomingSectionFirstChord` chromatic approach).
-
-### Final-stage multiplier discipline (canonical placement)
-
-For any weight-based picker (e.g. `getBassNote` (`public/engine/bass-engine.ts`), drum/soloist selectors with multiple bias contributions), if you want a new bias to actually shift the chosen distribution, apply it as a **final-stage `weight *= mult`** after all the additive bonuses, not as a multiplier on one factor's `+= bonus` line.
-
-> **Historical note:** earlier versions of this guide cited the legacy `selectPitchAndDevices` picker in `soloist-pitch-engine.ts` as the canonical example. It was removed in the phrase-first migration (epic #10/#866) — `getBassNote` is CLAUDE.md's current canonical example of this pattern.
-
-Generative engines accumulate many simultaneous biases (chord-tone bonus, profile boost, common-tone reward, etc.). Scaling just one of them gets washed out. Confirmed during the May 2026 SRDC bias work — additive multiplier gave 0pt phase gap; final-stage multiplier gave 30pt+ gap.
-
-The "weight tuning multiplier placement" smell to look for: a `weight += baseBonus * profileMultiplier` line where the new bias is the multiplier and `baseBonus` is one of N additive contributions to the same weight. Move the multiplier to the final stage instead.
-
-### Determinism via seeded mulberry32
-
-For any variation that should be reproducible across reads (motif rotation, voicing displacement, ornament toggles), use `scrambleHash` (mulberry32) over the structural key tuple, not bare `Math.random()`.
-
-- **Bare LCG produces sawtooth patterns on small integer seeds** — never use `(seed * X + Y) % Z` directly; pre-scramble with mulberry32.
-- **Seed key shape:** `(sectionId, barIndex, instName, occurrence)` — every structural input that should produce different output gets a slot. Adding `instName` (e.g.) means Snare and HiHat permute at different 16ths instead of locking together.
-- **Companion: direction-from-headroom rule** — when a clamped value (octave shift, dynamic) could go either direction, derive direction from headroom (`midi > 60 ? -12 : +12`) rather than from a coin flip. Avoids "direction-of-divergence" test flakiness.
-
-See [[feedback-seeded-prng-mulberry32]] for the canonical helper and [[feedback-determinism-test-pattern]] for the matched test recipe (different `Math.random` stubs per run, parameterized fixtures over each gated branch).
+- The stream is keyed on where the decision is in the music (seed, lane, bar, purpose), never on how many draws came before. Regenerating bar 40 gives the same answer whether or not bars 0 to 39 ran, and a new decision in one idiom cannot reshuffle another's.
+- The stream is mulberry32 behind an FNV-based `hashKey`, so adjacent integer seeds are well distributed. Never write `(seed * X + Y) % Z` directly; it sawtooths on small seeds.
+- Every structural input that should produce a different result gets a slot in the key (section, bar, lane, purpose). Leaving the lane out makes two lanes lock together.
+- When a clamped value could go either way (an octave shift), derive the direction from headroom (`midi > 60 ? -12 : +12`), not a coin flip. It avoids "direction-of-divergence" test flakiness.
 
 ## When the audit doc says one thing and the code says another
 
