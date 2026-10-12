@@ -39,7 +39,7 @@ describe('direct-mutation annotation scope', () => {
         expect(result.stderr).not.toContain('fixture.ts:1');
     });
 
-    it.each(['// @direct-mutation', '/* @worker-mutation */'])(
+    it.each(['// @direct-mutation', '/* @direct-mutation */'])(
         'accepts a standalone comment-above annotation: %s',
         (annotation) => {
             const result = runMutationCheck(`${annotation}\nplayback.step = 1;\n`);
@@ -50,13 +50,22 @@ describe('direct-mutation annotation scope', () => {
         },
     );
 
+    it('no longer accepts the retired worker marker', () => {
+        const result = runMutationCheck('playback.step = 1; // @worker-mutation\n');
+
+        expect(result.error).toBeUndefined();
+        expect(result.signal).toBeNull();
+        expect(result.status).toBe(1);
+        expect(result.stderr).toContain('fixture.ts:1');
+    });
+
     it('accepts same-line and multiline-statement annotations', () => {
         const result = runMutationCheck(
             [
                 'playback.step = 1; // @direct-mutation',
-                '(playback as Mutable<typeof playback>).currentLoopCount = Math.floor(',
-                '    4 / 2,',
-                '); // @worker-mutation',
+                '(playback as Mutable<typeof playback>).bpm = Math.floor(',
+                '    240 / 2,',
+                '); // @direct-mutation',
                 '',
             ].join('\n'),
         );
