@@ -1,6 +1,7 @@
 import { deepSignal } from 'deepsignal/core';
 import type { Action, GlobalContext, GrooveState, Mutable } from '../types.js';
 import { ACTIONS, isSwingSub } from '../types.js';
+import { writeDeclaredParam } from './set-param.js';
 
 export type { GrooveState };
 
@@ -24,29 +25,22 @@ export const groove = deepSignal<GrooveState>({
 });
 
 /**
- * Every module alias that addresses the groove/drum lane on a `SET_PARAM` /
- * `SET_VOLUME` / `SET_REVERB` payload.
+ * The module name that addresses the groove/drum lane on a `SET_PARAM` / `SET_VOLUME` /
+ * `SET_REVERB` payload.
  *
  * This slice is the single authority for those three actions (#1182): the
- * `instrumentStateMap` arms in `instruments.ts` used to write groove state too,
- * and since `state.ts` runs both reducers unconditionally (it ignores their
- * boolean return), every groove volume/reverb/param change was written twice —
- * with this one landing second and winning. The aliases had also drifted apart:
- * `instrumentStateMap` carried `groove` + `gb` while this reducer took `groove`
- * + `drum` + `drums`, so `gb` was handled ONLY over there and `drum`/`drums`
- * ONLY here. Both sides now consult this set, which is why `gb` is in it —
- * dropping it from the instrument side without adding it here would have turned
- * a `gb`-keyed dispatch into a silent no-op.
- *
- * (`gb` has no dispatcher left in the repo; it's kept for stale persisted
- * payloads. `groove` STAYS in `instrumentStateMap` regardless — the
- * `SET_INSTRUMENT_VOICE` A/B voice switch resolves through that map.)
+ * `instrumentStateMap` arms in `instruments.ts` used to write groove state too, and since
+ * `state.ts` runs both reducers unconditionally (it ignores their boolean return), every groove
+ * volume/reverb/param change was written twice. The old `drum`, `drums` and `gb` aliases had
+ * no dispatcher left and are gone (#1633): `module` is the canonical slice name only.
+ * (`groove` also stays in `instrumentStateMap` — the `SET_INSTRUMENT_VOICE` A/B voice switch
+ * resolves through that map.)
  */
-const GROOVE_MODULE_KEYS = new Set(['groove', 'drum', 'drums', 'gb']);
+const GROOVE_MODULE = 'groove';
 
 /** True when a dispatch payload's `module` addresses the groove/drum lane. */
 export function isGrooveModule(module: unknown): boolean {
-    return typeof module === 'string' && GROOVE_MODULE_KEYS.has(module);
+    return module === GROOVE_MODULE;
 }
 
 export function grooveReducer(action: Action, playback: GlobalContext): boolean {
@@ -54,8 +48,12 @@ export function grooveReducer(action: Action, playback: GlobalContext): boolean 
     switch (action.type) {
         case ACTIONS.SET_PARAM:
             if (isGrooveModule(action.payload.module)) {
-                (groove as Record<string, unknown>)[action.payload.param] = action.payload.value;
-                return true;
+                return writeDeclaredParam(
+                    groove,
+                    'groove',
+                    action.payload.param,
+                    action.payload.value,
+                );
             }
             break;
         case ACTIONS.SET_SWING:

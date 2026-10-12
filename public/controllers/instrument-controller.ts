@@ -11,7 +11,7 @@ import {
     restoreGains,
 } from '../engine/engine.js';
 import { dispatch, getState, stateMap } from '../state.js';
-import { ACTIONS } from '../types.js';
+import { ACTIONS, type InstrumentModule } from '../types.js';
 
 export function flushBuffers(): void {
     // Kill current sounds and buses
@@ -66,7 +66,8 @@ export function togglePower(type: string): void {
     }
 
     const newState = !state.enabled;
-    const moduleName = normalizedType === 'chord' ? 'chords' : normalizedType;
+    // The lookup above returned a slice, so `normalizedType` is one of the four lane keys.
+    const moduleName = (normalizedType === 'chord' ? 'chords' : normalizedType) as InstrumentModule;
 
     dispatch(ACTIONS.SET_PARAM, { module: moduleName, param: 'enabled', value: newState });
 

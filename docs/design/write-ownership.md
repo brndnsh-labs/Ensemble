@@ -231,3 +231,9 @@ field's write sites are limited to UI dispatch + hydration). Until such a gate e
 violation is a code-review discipline: ask "is the field being written here `document` or
 `preferences` in the manifest, and if so, is this write site a UI dispatch or hydration?" for any
 new write onto an existing state field from an engine/conductor/worker path.
+
+One compile-time gate does back this up for the generic write: `SET_PARAM`'s payload is typed per
+slice (`ActionPayloadSetParam` in `public/types.ts`), so a dispatch naming a field a slice does
+not declare fails typecheck, and each reducer drops (and warns about) one that gets past the
+compiler (`writeDeclaredParam`, `public/state/set-param.ts`). That keeps a deleted field from
+being re-created by a stale dispatch; it does not say who may write a field that exists.

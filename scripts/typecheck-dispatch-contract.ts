@@ -42,6 +42,21 @@ function assertDispatchContract(): void {
 
     // @ts-expect-error — broad records cannot bypass a known-field contract.
     dispatch(ACTIONS.SET_INSTRUMENT_VOICE, looseInstrumentVoice);
+
+    // SET_PARAM writes only a field its named slice declares (#1633).
+    dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'bpm', value: 120 });
+
+    // @ts-expect-error — a field no slice declares cannot be created through SET_PARAM.
+    dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'noSuchField', value: 1 });
+
+    // @ts-expect-error — a real field of another slice is not a field of this one.
+    dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'swing', value: 1 });
+
+    // @ts-expect-error — the old lane aliases are gone; the module is the slice name.
+    dispatch(ACTIONS.SET_PARAM, { module: 'sb', param: 'enabled', value: true });
+
+    // @ts-expect-error — SET_VOLUME takes a lane's canonical name, not an alias.
+    dispatch(ACTIONS.SET_VOLUME, { module: 'gb', value: 1 });
 }
 
 void assertDispatchContract;

@@ -2,6 +2,7 @@ import { deepSignal } from 'deepsignal/core';
 import { normalizeSongSeed } from '../sanitize.js';
 import type { Action, ArrangerState, Mutable, Section } from '../types.js';
 import { ACTIONS } from '../types.js';
+import { writeDeclaredParam } from './set-param.js';
 
 export type { ArrangerState, Section };
 
@@ -28,11 +29,19 @@ export function arrangerReducer(action: Action): boolean {
                 const { param, value } = action.payload;
                 // #1266 — `seed` is bounded on the way IN, on every write path, so the
                 // slice can only ever hold a value all three readers agree on. This
-                // generic back door has no `seed` caller today; it is normalized anyway
+                // generic write has no `seed` caller today; it is normalized anyway
                 // because "the reducer is the bound" is only true if it has no hole.
                 const meterChanged = param === 'timeSignature' && a.timeSignature !== value;
-                (arranger as Record<string, unknown>)[param] =
-                    param === 'seed' ? normalizeSongSeed(value) : value;
+                if (
+                    !writeDeclaredParam(
+                        arranger,
+                        'arranger',
+                        param,
+                        param === 'seed' ? normalizeSongSeed(value) : value,
+                    )
+                ) {
+                    return false;
+                }
                 if (meterChanged) {
                     a.grouping = null;
                 }

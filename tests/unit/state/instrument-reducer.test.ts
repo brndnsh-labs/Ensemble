@@ -1,6 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { groove } from '../../../public/state/groove.js';
 import { bass, chords, instrumentReducer, soloist } from '../../../public/state/instruments.js';
-import { ACTIONS, type Mutable } from '../../../public/types.js';
+import {
+    ACTIONS,
+    type BassState,
+    type ChordState,
+    type Mutable,
+    type SoloistState,
+} from '../../../public/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 const mutableChords = chords as Mutable<typeof chords>;
@@ -23,7 +30,7 @@ describe('Instrument Reducer', () => {
         instrumentReducer({
             type: ACTIONS.SET_PARAM,
             payload: { module: 'invalid', param: 'style', value: 'funk' },
-        });
+        } as any);
     });
 
     it('should set volume and reverb for modules', () => {
@@ -76,26 +83,48 @@ describe('Instrument Reducer', () => {
         expect(bass.style).toBe('slap');
     });
 
-    it('drops deprecated soloist payload keys instead of resurrecting them (#866 compat shim)', () => {
-        // An old persisted session / share-URL carries the inert legacy fields
-        // removed in #866. They must be silently dropped on load — NOT written
-        // back onto state via the generic SET_PARAM write.
+    it.each([
+        ['chords', chords],
+        ['bass', bass],
+        ['soloist', soloist],
+    ] as const)('does not create a field %s does not declare (#1633)', (module, slice) => {
+        // The removed `pinnedProfile`/`motifTracking`/`complexity` class of stale dispatch:
+        // the write is dropped (and warned about), never resurrected as a top-level field.
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        for (const param of ['pinnedProfile', 'motifTracking', 'noSuchField']) {
+            expect(
+                instrumentReducer({
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module, param, value: 'evans' },
+                } as any),
+            ).toBe(false);
+            expect(Object.hasOwn(slice, param)).toBe(false);
+        }
+        expect(warn).toHaveBeenCalledTimes(3);
+        expect(warn.mock.calls[0][0]).toContain(`'${module}' has no field 'pinnedProfile'`);
+        warn.mockRestore();
+    });
+
+    it.each(['cb', 'bb', 'sb', 'gb'])("no longer answers to the alias '%s'", (module) => {
+        const volume = soloist.volume;
+        for (const type of [ACTIONS.SET_PARAM, ACTIONS.SET_VOLUME, ACTIONS.SET_REVERB]) {
+            instrumentReducer({
+                type,
+                payload: { module, param: 'volume', value: 0.123 },
+            } as any);
+        }
+        expect(soloist.volume).toBe(volume);
+        expect(bass.volume).not.toBe(0.123);
+        expect(chords.volume).not.toBe(0.123);
+        expect(groove.volume).not.toBe(0.123);
+    });
+
+    it('a live soloist key still applies', () => {
         instrumentReducer({
             type: ACTIONS.SET_PARAM,
-            payload: { module: 'soloist', param: 'pinnedProfile', value: 'evans' },
-        });
-        instrumentReducer({
-            type: ACTIONS.SET_PARAM,
-            payload: { module: 'soloist', param: 'motifTracking', value: true },
-        });
-        instrumentReducer({
-            type: ACTIONS.SET_PARAM,
-            // a live key alongside the deprecated ones still applies
             payload: { module: 'soloist', param: 'volume', value: 0.42 },
         });
         expect(soloist.volume).toBe(0.42);
-        expect((soloist as Record<string, unknown>).pinnedProfile).toBeUndefined();
-        expect((soloist as Record<string, unknown>).motifTracking).toBeUndefined();
     });
 
     it('should return false for unknown actions', () => {
@@ -111,9 +140,9 @@ describe('Instrument Reducer', () => {
             const params = {
                 enabled: false,
                 volume: 0.1,
-                instrument: 'Wurlitzer',
-            };
-            for (const [p, v] of Object.entries(params)) {
+                voice: 'pack:wurlitzer',
+            } as const;
+            for (const [p, v] of Object.entries(params) as Array<[keyof ChordState, unknown]>) {
                 instrumentReducer({
                     type: ACTIONS.SET_PARAM,
                     payload: { module: 'chords', param: p, value: v },
@@ -126,9 +155,9 @@ describe('Instrument Reducer', () => {
             const params = {
                 enabled: false,
                 volume: 0.1,
-                instrument: 'Synth',
-            };
-            for (const [p, v] of Object.entries(params)) {
+                voice: 'pack:synthbass',
+            } as const;
+            for (const [p, v] of Object.entries(params) as Array<[keyof BassState, unknown]>) {
                 instrumentReducer({
                     type: ACTIONS.SET_PARAM,
                     payload: { module: 'bass', param: p, value: v },
@@ -141,9 +170,9 @@ describe('Instrument Reducer', () => {
             const params = {
                 enabled: true,
                 volume: 0.1,
-                instrument: 'Sax',
-            };
-            for (const [p, v] of Object.entries(params)) {
+                voice: 'pack:sax',
+            } as const;
+            for (const [p, v] of Object.entries(params) as Array<[keyof SoloistState, unknown]>) {
                 instrumentReducer({
                     type: ACTIONS.SET_PARAM,
                     payload: { module: 'soloist', param: p, value: v },
@@ -158,7 +187,7 @@ describe('Instrument Reducer', () => {
                     instrumentReducer({
                         type: ACTIONS.SET_PARAM,
                         payload: { module, param: 'volume', value: 0.8 },
-                    }),
+                    } as any),
                 ).toBe(false);
             }
         });

@@ -53,9 +53,12 @@ import {
 } from '@engine/state/state-effects';
 import {
     ACTIONS,
+    type ActionPayloadSetParam,
     type EnsembleState,
     type InstrumentModule,
     type InstrumentVoice,
+    type ParamModule,
+    type ParamSlices,
     type SwingSub,
 } from '@engine/types';
 import { getFrequency, transposeKeyName } from '@engine/utils';
@@ -418,8 +421,16 @@ function syncBand(): void {
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
-const param = (module: string, name: string, value: unknown) =>
-    dispatch(ACTIONS.SET_PARAM, { module, param: name, value });
+/**
+ * One `SET_PARAM` write. The compiler checks `name` against the named slice's fields; the one
+ * cast builds the payload, because TypeScript cannot correlate a generic `M` with the
+ * per-slice union `ActionPayloadSetParam` is.
+ */
+const param = <M extends ParamModule>(
+    module: M,
+    name: keyof ParamSlices[M] & string,
+    value: unknown,
+) => dispatch(ACTIONS.SET_PARAM, { module, param: name, value } as ActionPayloadSetParam);
 
 function mix(lane: ChartLaneMix): ChartLaneMix {
     return {

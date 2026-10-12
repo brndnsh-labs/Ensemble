@@ -1,6 +1,7 @@
 import { deepSignal } from 'deepsignal/core';
 import type { Action, GlobalContext, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
+import { writeDeclaredParam } from './set-param.js';
 
 export type { GlobalContext };
 
@@ -28,8 +29,12 @@ export function playbackReducer(action: Action): boolean {
             return true;
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'playback') {
-                (playback as Record<string, unknown>)[action.payload.param] = action.payload.value;
-                return true;
+                return writeDeclaredParam(
+                    playback,
+                    'playback',
+                    action.payload.param,
+                    action.payload.value,
+                );
             }
             break;
         case ACTIONS.SET_BAND_INTENSITY:

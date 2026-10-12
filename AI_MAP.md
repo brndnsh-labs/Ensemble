@@ -95,6 +95,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/state/arranger.ts` | Chords, sections, time signature, and key. | `arranger` |
 | `public/state/groove.ts` | Genre, swing, humanize and the drum lane's mix. | `groove` |
 | `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `chords` |
+| `public/state/set-param.ts` | The one write `SET_PARAM` makes: only to a field the slice declares. | `writeDeclaredParam` |
 | `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `tryDecompressSections`, `encodeBase64Unicode`, `generateId` |
 | `public/state/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
 | `public/state/state-hydration.ts` | v1's reading rules, kept for v2's v1 import (#1274); v1's own load/save layer went in #1424. | `validateSections`, `sanitizeDisplayString`, `clamp` |

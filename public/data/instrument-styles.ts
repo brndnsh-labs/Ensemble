@@ -138,8 +138,8 @@ const KNOWN_HARMONY_STYLES: ReadonlySet<string> = new Set(HARMONY_STYLES.map((s)
  * and harmony lanes no longer hold a style at all) —
  * never an arbitrary per-lane value (the old dedicated `ACTIONS.SET_STYLE`,
  * which was `module: 'chords'`-only in practice, was deleted in #1381; nothing
- * dispatched it — the live generic `SET_PARAM` write path could theoretically
- * target any lane, but nothing does for these three). The old engine's genre
+ * dispatched it — the live generic `SET_PARAM` write could still
+ * set a bass `style` — it checks the field name, not the value — but nothing does). The old engine's genre
  * tables routed bass and soloist at *read* time without ever writing the
  * resolved key back to the slice.
  * (`scripts/ensemble-analysis-utils.ts` does drive all four lanes, but only with
