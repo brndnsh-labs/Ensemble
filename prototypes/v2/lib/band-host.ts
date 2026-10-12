@@ -18,6 +18,7 @@ import {
     type BandEvent,
     type BandSettings,
     compileTimeline,
+    type DrumPiece,
     type PassMemory,
     type PassWindow,
     PPQ,
@@ -39,7 +40,7 @@ const TIMER_MS = 25;
 const PREPARE_S = 2;
 
 // Today's drum voices, by the band's piece names.
-const DRUM_NAMES: Record<string, string> = {
+export const DRUM_NAMES: Record<DrumPiece, string> = {
     kick: 'Kick',
     snare: 'Snare',
     ghost: 'Snare',

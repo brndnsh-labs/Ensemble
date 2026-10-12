@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { DRUM_NAMES } from '../../../prototypes/v2/lib/band-host.js';
 
 /**
  * Guard for `playDrumSound`'s dispatch: for every name the band can send (and a name it
@@ -379,5 +380,22 @@ describe('drum dispatcher', () => {
             );
         }
         await expect(out).toMatchFileSnapshot('./__snapshots__/drum-dispatch-pack.txt');
+    });
+
+    it('gives every band drum piece a synth voice, ride bell excepted (#1644)', async () => {
+        // `DRUM_NAMES` is `Record<DrumPiece, string>`, so the compiler makes its keys exactly the
+        // `DrumPiece` union: a piece added to the type without a row there fails typecheck.
+        const voiceless: string[] = [];
+        for (const [piece, name] of Object.entries(DRUM_NAMES)) {
+            // A name the synth kit cannot render makes `playDrumSound` warn once and play nothing.
+            const log = await record({ name, variant: 'normal', after: [] });
+            if (log.some((line) => line.includes('unknown soundName'))) {
+                voiceless.push(piece);
+            }
+        }
+        // `rideBell` is the one known gap, on purpose (#1644): sample packs play it
+        // ('ride-bell'), the synth kit has no RideBell voice, and nothing in `band/` emits it
+        // yet. Written as an equality so it also fails when RideBell gains a voice: then drop it.
+        expect(voiceless).toEqual(['rideBell']);
     });
 });
