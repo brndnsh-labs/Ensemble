@@ -115,7 +115,7 @@ describe('Reworked Synth Bass Voice', () => {
     });
 
     it('creates and connects the reworked voice node graph', () => {
-        // Signature: (state, freq, time, duration, velocity, muteAmount, bend).
+        // Signature: (state, freq, time, duration, velocity, muteAmount).
         playBassNote(getState(), 41.2, 10, 1.0, 1.0);
 
         // Oscillators: sub sine, sawtooth grit, sub-octave sine.

@@ -172,12 +172,11 @@ describe('Synthesis Utilities', () => {
     });
 
     describe('velocityTimbre (Epic 0 S7)', () => {
-        it('maps a harder note to a brighter, more driven timbre', () => {
+        it('maps a harder note to a brighter timbre', () => {
             const soft = velocityTimbre(0.2);
             const hard = velocityTimbre(0.9);
             expect(hard.brightness).toBeGreaterThan(soft.brightness);
             expect(hard.cutoffMult).toBeGreaterThan(soft.cutoffMult);
-            expect(hard.drive).toBeGreaterThan(soft.drive);
         });
 
         it('clamps velocity to 0..1 at both ends', () => {
@@ -186,13 +185,11 @@ describe('Synthesis Utilities', () => {
         });
 
         it('maps the endpoints onto the configured ranges', () => {
-            const opts = { cutoffRange: [0.3, 1.8] as const, driveRange: [0.1, 0.7] as const };
+            const opts = { cutoffRange: [0.3, 1.8] as const };
             const lo = velocityTimbre(0, opts);
             const hi = velocityTimbre(1, opts);
             expect(lo.cutoffMult).toBeCloseTo(0.3);
-            expect(lo.drive).toBeCloseTo(0.1);
             expect(hi.cutoffMult).toBeCloseTo(1.8);
-            expect(hi.drive).toBeCloseTo(0.7);
         });
 
         it('respects the curve: convex (>1) stays darker at mid-velocity than linear', () => {

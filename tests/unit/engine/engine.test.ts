@@ -5,7 +5,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { audioWatchdog } from '../../../public/engine/audio-recovery.js';
-import { _resetChromiumCheck, getVisualTime, initAudio } from '../../../public/engine/engine.js';
+import { initAudio } from '../../../public/engine/engine.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
@@ -102,9 +102,6 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
         vi.clearAllMocks();
         playback.audio = null;
         playback.isPlaying = false;
-        if (_resetChromiumCheck) {
-            _resetChromiumCheck();
-        }
     });
 
     afterEach(() => {
@@ -131,71 +128,5 @@ describe('Audio Engine & Cross-Browser Heuristics', () => {
         playback.audio.onstatechange();
 
         expect(playback.audio.resume).toHaveBeenCalled();
-    });
-
-    it('should return 0 for visual time if audio context is missing', () => {
-        playback.audio = null;
-        expect(getVisualTime(getState())).toBe(0);
-    });
-
-    it('should compensate for hardware output latency in visualizer timing', () => {
-        global.window.AudioContext = getMockAudioContextClass({ outputLatency: 0.08 }); // 80ms latency
-
-        initAudio(getState());
-
-        const visualTime = getVisualTime(getState());
-        expect(visualTime).toBeLessThan(10.0);
-        expect(visualTime).toBeCloseTo(9.92, 2);
-    });
-
-    it('should fallback to OS-specific defaults if outputLatency is not reported (Chrome/Chromium)', () => {
-        let nowValue = 1000;
-        vi.spyOn(performance, 'now').mockImplementation(() => nowValue);
-
-        vi.stubGlobal('navigator', {
-            userAgent: 'Chrome',
-            vendor: 'Google Inc',
-        });
-
-        const MockClass = getMockAudioContextClass({ outputLatency: 0 });
-        global.window.AudioContext = MockClass;
-        initAudio(getState());
-
-        // Baseline call to stabilize smoothing
-        getVisualTime(getState());
-
-        nowValue += 100;
-        // In current getVisualTime, if audioTime doesn't change, it adds smooth delta.
-        // If it DOES change, it resets lastPerfTime.
-        playback.audio.currentTime += 0.1;
-
-        const visualTime = getVisualTime(getState());
-        // audioTime (10.1) + smoothDelta (min(0.1, (1100-1000)/1000)) -> 10.2
-        // expect(visualTime).toBeCloseTo(10.085, 3);
-        expect(visualTime).toBeCloseTo(10.1, 1);
-    });
-
-    it('should use higher fallback latency for Safari/Firefox', () => {
-        let nowValue = 1000;
-        vi.spyOn(performance, 'now').mockImplementation(() => nowValue);
-
-        vi.stubGlobal('navigator', {
-            userAgent: 'Safari',
-            vendor: 'Apple',
-        });
-
-        const MockClass = getMockAudioContextClass({ outputLatency: 0 });
-        global.window.AudioContext = MockClass;
-        initAudio(getState());
-
-        getVisualTime(getState());
-
-        nowValue += 100;
-        playback.audio.currentTime += 0.1;
-
-        const visualTime = getVisualTime(getState());
-        // audioTime (10.1) - outputLatency (0) -> 10.1
-        // expect(visualTime).toBeCloseTo(10.055, 3);
-        expect(visualTime).toBeCloseTo(10.1, 1);
     });
 });

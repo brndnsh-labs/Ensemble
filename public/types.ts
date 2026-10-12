@@ -419,22 +419,14 @@ export interface ReverbPreset {
 
 /**
  * The shared algorithmic (Schroeder/Freeverb) reverb. Exposes `input` and
- * `output` `AudioNode`s — a drop-in replacement for the old convolver — plus
- * real-time setters that morph the space. Built in `public/engine/reverb.ts`.
+ * `output` `AudioNode`s — a drop-in replacement for the old convolver. Built in
+ * `public/engine/reverb.ts`.
  */
 export interface AlgorithmicReverb {
     /** Node bus sends connect here (downstream of the pre-filter). */
     readonly input: AudioNode;
     /** Wet output — connects to the master gain. */
     readonly output: AudioNode;
-    /** Set the -60 dB decay time in seconds, ramped from `when`. */
-    setDecay(rt60: number, when: number): void;
-    /** Scale the comb delay lengths (room size), ramped from `when`. */
-    setSize(scale: number, when: number): void;
-    /** Set the comb damping lowpass cutoff in Hz, ramped from `when`. */
-    setDamping(cutoffHz: number, when: number): void;
-    /** Apply size + decay + damping from a preset in one call. */
-    applyPreset(preset: ReverbPreset, when: number): void;
 }
 
 /**

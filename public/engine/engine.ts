@@ -25,11 +25,6 @@ import { killSoloistNote } from './synth-soloist.js';
 
 export { killAllPianoNotes, killBassNote, killDrumNote, killSoloistNote, playNote };
 
-let isChromium: boolean | null = null;
-export function _resetChromiumCheck() {
-    isChromium = null;
-}
-
 export function initAudio(
     state: EnsembleState,
     options: { audioContext?: AudioContext; enableWatchdog?: boolean } = {},
@@ -629,34 +624,4 @@ export function syncMasterVolume(state: EnsembleState): void {
     masterGain.gain.cancelScheduledValues(t);
     masterGain.gain.setValueAtTime(masterGain.gain.value, t);
     masterGain.gain.exponentialRampToValueAtTime(target, t + 0.04);
-}
-
-let lastAudioTime = 0;
-let lastPerfTime = 0;
-
-export function getVisualTime(state: EnsembleState): number {
-    const { playback } = state;
-    if (!playback.audio) {
-        return 0;
-    }
-
-    const audioTime = playback.audio.currentTime;
-    const perfTime = performance.now();
-
-    if (audioTime !== lastAudioTime) {
-        lastAudioTime = audioTime;
-        lastPerfTime = perfTime;
-    }
-
-    const dt = (perfTime - lastPerfTime) / 1000;
-    const smoothAudioTime = audioTime + Math.min(dt, 0.1);
-
-    const outputLatency = playback.audio.outputLatency || 0;
-    if (isChromium === null) {
-        isChromium = !!(
-            navigator.userAgent.includes('Chrome') && navigator.vendor.includes('Google Inc')
-        );
-    }
-
-    return isChromium ? smoothAudioTime : audioTime - outputLatency;
 }

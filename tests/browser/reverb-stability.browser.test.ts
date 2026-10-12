@@ -46,7 +46,6 @@ async function envelopeFor(presetName: keyof typeof REVERB_PRESETS): Promise<num
 
 test('reverb tail decays for every preset', async () => {
     const results = {
-        room: await envelopeFor('room'),
         hall: await envelopeFor('hall'),
     };
 

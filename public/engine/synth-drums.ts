@@ -1148,7 +1148,7 @@ function playDrumSoundNew(state: EnsembleState, name: string, time: number, velo
             playClosedHatNew(state, time, velocity);
             return;
         case 'Open':
-            playOpenHatNew(state, time, velocity, 1.0);
+            playOpenHatNew(state, time, velocity);
             return;
         case 'HiHatPedal':
             playPedalChickNew(state, time, velocity);
@@ -1194,7 +1194,7 @@ function setupNewPercHit(
     // why: counted on the hit's own time, not the context's clock (#1531). An offline render
     // schedules every hit before its clock moves, so on the clock the count never decayed and
     // the kit sank 2.5 dB over the first four bars of every export.
-    const densityDuck = updateDensityDucking(mixStateFor(playback.audio), playTime, 18, 0.015);
+    const densityDuck = updateDensityDucking(mixStateFor(playback.audio), playTime);
     const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
     const masterVol = hitVelocity * 1.3 * densityDuck;
     const panner = createSimplePanner(playback.audio, panValue, playTime);
@@ -1427,59 +1427,50 @@ function playClosedHatNew(state: EnsembleState, time: number, velocity = 1.0): v
 }
 
 /**
- * `New`-voice open / in-between hi-hat — synth-audit Epic 4 S3.
+ * `New`-voice fully-open hi-hat — synth-audit Epic 4 S3.
  *
- * Renders the closed↔open continuum *above* the closed endpoint: `openness`
- * (0–1) covers the quarter-open (~0.32) and half-open (~0.6) hats and the
- * fully-open hat (1.0) on one voice. Every non-closed position sounds the
- * `openHatMetal` buffer (which rings ≈1 s naturally); `openness` drives how
- * hard the gain envelope chokes that ring — a quarter-open hat is the
- * `openHatMetal` buffer cut short, a fully-open hat lets it ring. `openness`
- * also opens the
- * band/highpass (more-open = brighter, airier) and lengthens the stop time.
- *
- * The decay curve is steep (`openness²`) on purpose: a linear map bunches the
- * quarter/half hats together near the long-decay end and they stop reading as
- * distinct articulations. Like the closed hat this carries no `velJitter` —
- * the old scheduler's seeded humanizing already humanized `velocity`.
+ * Sounds the `openHatMetal` buffer (which rings ≈1 s naturally) with the gain
+ * envelope letting that ring run. The band only ever plays the fully-open hat,
+ * so the constants below are the old openness continuum evaluated at its top
+ * (`openness` = 1): a quarter- or half-open hat is the same buffer choked
+ * shorter, with a steeper (`openness²`) decay and a darker band/highpass.
+ * Like the closed hat this carries no `velJitter` — the old scheduler's
+ * seeded humanizing already humanized `velocity`.
  *
  * NOTE: the decay/stop/brightness constants are by-ear starting points; expect
  * to retune them at the listening gate.
  */
-function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0, openness = 1.0): void {
+function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0): void {
     const { groove } = state;
     const ctx = setupNewCymbalHit(state, time, velocity, 'Open');
     if (!ctx) {
         return;
     }
     const { audio, playTime, hitVelocity, masterVol, panner, voiceConfig } = ctx;
-    const open = clamp01(Number.isFinite(openness) ? openness : 1.0);
 
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
     const vel = clamp01(Math.max(0.3, hitVelocity));
 
     // --- The continuum ------------------------------------------------------
-    // `open` is the sole openness control. `decayTc` (the gain `setTargetAtTime`
-    // time-constant) chokes the long-ringing `openHatMetal` buffer short for a
-    // quarter-open hat and lets it ring for a full-open one; the `open²` curve
-    // keeps quarter/half distinct. A harder hit reads a touch tighter, as a
-    // real hat does. `brightness` opens the filters as the hat opens.
-    const decayTc = (0.045 + open * open * 0.5) * (1 - Math.max(0, vel - 0.7) * 0.18);
+    // Each constant is the openness continuum at `open` = 1 (fully open). `decayTc`
+    // (the gain `setTargetAtTime` time-constant) lets the long-ringing `openHatMetal`
+    // buffer ring. A harder hit reads a touch tighter, as a real hat does.
+    // `brightness` is the filters' openness term.
+    const decayTc = (0.045 + 0.5) * (1 - Math.max(0, vel - 0.7) * 0.18);
     const decayDelay = 0.014; // fixed short hold — no jitter
-    // why: source must outlive the audible ring. For low `open` the gain
-    // envelope has cleared >10 time-constants by then; the full-open stop
-    // (3.2 s) lands past the openHatMetal buffer's own 3.0 s duration, where
-    // the source already outputs pure zero — no click at either extreme.
-    const stopTime = 0.4 + open * 2.8;
-    const brightness = 0.82 + open * 0.18;
+    // why: source must outlive the audible ring. The stop (3.2 s) lands past the
+    // openHatMetal buffer's own 3.0 s duration, where the source already outputs
+    // pure zero — no click.
+    const stopTime = 0.4 + 2.8;
+    const brightness = 0.82 + 0.18;
 
     const hatArticulation = 0.985 + Math.random() * 0.04;
     const vol =
         masterVol *
         voiceConfig.volumeScale *
         getCymbalMixScale(state, 'Open') *
-        // a fully-open hat is the loudest of the family; quarter-open sits back
-        (0.86 + open * 0.16) *
+        // a fully-open hat is the loudest of the family
+        (0.86 + 0.16) *
         rr();
 
     // Choke the previous hat — an open hat ringing into a following closed or
@@ -1506,7 +1497,7 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0, open
 
     const hpFilter = audio.createBiquadFilter();
     hpFilter.type = 'highpass';
-    hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * (0.9 + open * 0.1), playTime);
+    hpFilter.frequency.setValueAtTime(voiceConfig.highpassFreq * (0.9 + 0.1), playTime);
 
     const gain = audio.createGain();
     gain.gain.setValueAtTime(0, playTime);
@@ -1724,7 +1715,7 @@ function playDrumSoundCurrent(
     const playTime = Math.max(time, now + 0.002);
 
     // --- Density Normalization Logic --- (on the hit's own time: see `setupNewPercHit`)
-    const densityDuck = updateDensityDucking(mixStateFor(playback.audio), playTime, 18, 0.015);
+    const densityDuck = updateDensityDucking(mixStateFor(playback.audio), playTime);
 
     // #1068: the un-seeded `velJitter = 1 + (Math.random() - 0.5) * humanize * 0.4`
     // that used to sit here is gone. It was the largest humanize term in the
@@ -1779,7 +1770,7 @@ function playDrumSoundCurrent(
 
         // --- Sidechain Trigger ---
         if (playback.audioGraph?.bass.sidechain) {
-            duckGain(playback.audioGraph.bass.sidechain.gain, 0.45, playTime, 0.005, 0.12);
+            duckGain(playback.audioGraph.bass.sidechain.gain, 0.45, playTime);
         }
 
         // 1. Beater Snap: Higher velocity = Sharper snap
