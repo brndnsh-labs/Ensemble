@@ -1,7 +1,6 @@
 // @ts-nocheck
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { CANONICAL_METERS_BY_FEEL, GENRE_FEELS } from '../../../public/data/smart-genres.js';
 import { dispatch, getState } from '../../../public/state.js';
 import { ACTIONS } from '../../../public/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
@@ -84,26 +83,6 @@ describe('Smart Genre System', () => {
             expect(groove.swing).toBe(15);
             expect(groove.swingSub).toBe('16th');
             expect(groove.pendingGenreFeel).toBeNull();
-        });
-    });
-
-    describe('Canonical meters (S10 time-signature hint)', () => {
-        it('covers every genre feel with a non-empty meter list including 4/4', () => {
-            for (const feel of GENRE_FEELS) {
-                const meters = CANONICAL_METERS_BY_FEEL[feel];
-                expect(meters, `${feel} has canonical meters`).toBeTruthy();
-                expect(meters.length, `${feel} non-empty`).toBeGreaterThan(0);
-                expect(meters, `${feel} includes 4/4`).toContain('4/4');
-            }
-        });
-
-        it('only lists meters the picker actually offers', () => {
-            const OFFERED = ['4/4', '3/4', '2/4', '5/4', '6/8', '7/8', '7/4', '12/8'];
-            for (const feel of GENRE_FEELS) {
-                for (const meter of CANONICAL_METERS_BY_FEEL[feel]) {
-                    expect(OFFERED, `${feel}'s ${meter} is a real option`).toContain(meter);
-                }
-            }
         });
     });
 

@@ -77,7 +77,7 @@ vi.mock('../../../public/config.js', () => ({
         11: '7',
     },
     TIME_SIGNATURES: {
-        '4/4': { beats: 4, stepsPerBeat: 4, subdivision: '16th' },
+        '4/4': { beats: 4, stepsPerBeat: 4 },
     },
 }));
 
