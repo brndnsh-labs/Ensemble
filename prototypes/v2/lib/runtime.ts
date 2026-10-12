@@ -48,7 +48,6 @@ import { DEFAULT_BAND_INTENSITY as DEFAULT_ENERGY } from '@engine/state/playback
 import {
     deriveSoloistModeOnBoot,
     handleEffects,
-    reconcileUrlGenreOnBoot,
     resolveAutoVoices,
 } from '@engine/state/state-effects';
 import {
@@ -535,10 +534,7 @@ export function initialize(): Promise<void> {
                 if (loading) {
                     return;
                 }
-                // The async genre effect is awaited explicitly by setGenre below.
-                if (action.type !== ACTIONS.SET_GENRE_FEEL) {
-                    handleEffects(action, state, context);
-                }
+                handleEffects(action, state, context);
                 syncBand();
             });
             // #1276 — `playback.masterVolume` is `preferences`-owned (never part of a
@@ -1105,7 +1101,7 @@ export async function setGenre(
         // (`syncBand`), playing it from its next barline. So this dispatch plus the
         // auto-voice effects are the entire engine change: no teardown, no rebuild, no
         // restart. A `rebuild()` here would kill the notes the band has just scheduled.
-        await reconcileUrlGenreOnBoot(getState(), name, null, dispatch);
+        resolveAutoVoices(getState(), name, dispatch);
         if (!staged) {
             rebuild();
             return;

@@ -5,7 +5,7 @@ import {
     __resetPackCacheForTest,
     markPackInstalled,
 } from '../../../public/engine/instrument-registry.js';
-import { handleEffects, reconcileUrlGenreOnBoot } from '../../../public/state/state-effects.js';
+import { handleEffects, resolveAutoVoices } from '../../../public/state/state-effects.js';
 import { ACTIONS } from '../../../public/types.js';
 
 // Mock all the imported functions
@@ -30,7 +30,7 @@ describe('State Effects Handler', () => {
         dispatch = vi.fn();
     });
 
-    it('reconciles URL genre effects after boot while restoring explicit groove settings (#1000)', async () => {
+    it('moves only the Auto lanes when the genre changes (#1000)', () => {
         __resetPackCacheForTest();
         markPackInstalled('upright-bass', true);
         stateMap = {
@@ -46,12 +46,7 @@ describe('State Effects Handler', () => {
             groove: { autoSound: false, voice: 'synth' },
         };
 
-        await reconcileUrlGenreOnBoot(
-            stateMap,
-            'Jazz',
-            { swing: 73, swingSub: '8th', humanize: 9 },
-            dispatch,
-        );
+        resolveAutoVoices(stateMap, 'Jazz', dispatch);
 
         expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
             module: 'bass',
@@ -62,24 +57,9 @@ describe('State Effects Handler', () => {
             ACTIONS.SET_INSTRUMENT_VOICE,
             expect.objectContaining({ module: 'chords' }),
         );
-        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
-            module: 'groove',
-            param: 'swing',
-            value: 73,
-        });
-        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
-            module: 'groove',
-            param: 'swingSub',
-            value: '8th',
-        });
-        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
-            module: 'groove',
-            param: 'humanize',
-            value: 9,
-        });
     });
 
-    describe('genre auto-follow on SET_GENRE_FEEL (#675)', () => {
+    describe('genre auto-follow (#675)', () => {
         beforeEach(() => {
             __resetPackCacheForTest();
             // Bass in Auto mode, currently on synth; other lanes absent (skipped).
@@ -88,11 +68,7 @@ describe('State Effects Handler', () => {
 
         it('switches an Auto lane to the genre-mapped pack when installed', () => {
             markPackInstalled('upright-bass', true);
-            handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Jazz' } },
-                stateMap,
-                { dispatch },
-            );
+            resolveAutoVoices(stateMap, 'Jazz', dispatch);
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
                 module: 'bass',
                 voice: 'pack:upright-bass',
@@ -103,22 +79,14 @@ describe('State Effects Handler', () => {
         it('leaves a pinned lane (autoSound:false) untouched', () => {
             stateMap.bass = { autoSound: false, voice: 'synth' };
             markPackInstalled('upright-bass', true);
-            handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Jazz' } },
-                stateMap,
-                { dispatch },
-            );
+            resolveAutoVoices(stateMap, 'Jazz', dispatch);
             expect(dispatch).not.toHaveBeenCalled();
         });
 
         it('does not write when the mapped sound already matches (no churn)', () => {
             markPackInstalled('upright-bass', true);
             stateMap.bass = { autoSound: true, voice: 'pack:upright-bass' };
-            handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Jazz' } },
-                stateMap,
-                { dispatch },
-            );
+            resolveAutoVoices(stateMap, 'Jazz', dispatch);
             expect(dispatch).not.toHaveBeenCalled();
         });
 
@@ -126,11 +94,7 @@ describe('State Effects Handler', () => {
             // Auto lane currently pinned-by-prior-state to the upright pack, but it
             // is no longer installed → auto-follow recovers it to synth.
             stateMap.bass = { autoSound: true, voice: 'pack:upright-bass' };
-            handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Jazz' } },
-                stateMap,
-                { dispatch },
-            );
+            resolveAutoVoices(stateMap, 'Jazz', dispatch);
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
                 module: 'bass',
                 voice: 'synth',
@@ -141,11 +105,7 @@ describe('State Effects Handler', () => {
         it('uses synth for a genre with no bass mapping', () => {
             markPackInstalled('upright-bass', true);
             stateMap.bass = { autoSound: true, voice: 'pack:upright-bass' };
-            handleEffects(
-                { type: ACTIONS.SET_GENRE_FEEL, payload: { genreName: 'Funk' } },
-                stateMap,
-                { dispatch },
-            );
+            resolveAutoVoices(stateMap, 'Funk', dispatch);
             expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
                 module: 'bass',
                 voice: 'synth',

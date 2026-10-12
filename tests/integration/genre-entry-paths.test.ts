@@ -5,7 +5,7 @@ import {
     __resetPackCacheForTest,
     markPackInstalled,
 } from '../../public/engine/instrument-registry.js';
-import { reconcileUrlGenreOnBoot, resolveAutoVoices } from '../../public/state/state-effects.js';
+import { resolveAutoVoices } from '../../public/state/state-effects.js';
 import { dispatch, getState } from '../../public/state.js';
 import { ACTIONS, type InstrumentModule } from '../../public/types.js';
 import { enterGenre } from '../utils/genre-entry.js';
@@ -142,7 +142,7 @@ describe.each(PLAYER_SOURCE_ROUTES)('%s explicit %s source', (genre, style, pack
         expect(state.chords.autoSound).toBe(false);
         // A later genre gesture resets its player but must respect the sound pin.
         dispatch(ACTIONS.SET_GENRE_FEEL, { genreName: 'Funk', ...SMART_GENRES.Funk });
-        await reconcileUrlGenreOnBoot(getState(), 'Funk', null, dispatch);
+        resolveAutoVoices(getState(), 'Funk', dispatch);
         expect(state.chords.style).toBe('funk');
         expect(state.chords.voice).toBe('pack:rhodes');
         expect(state.chords.autoSound).toBe(false);
