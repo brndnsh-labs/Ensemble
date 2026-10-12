@@ -556,38 +556,13 @@ describe('Drum Synthesis', () => {
         expect(mockPrevGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 11, 0.18);
     });
 
-    it('should implement Clave synthesis', () => {
-        playDrumSound(getState(), 'Clave', 10, 1.0);
-
-        expect(playback.audio.createOscillator).toHaveBeenCalled();
-        expect(playback.audio.createBufferSource).toHaveBeenCalled();
-    });
-
-    it('should implement Conga and Bongo synthesis', () => {
-        playDrumSound(getState(), 'Conga', 10, 1.0);
-        playDrumSound(getState(), 'Bongo', 10, 1.0);
-
-        // These create tone (osc) and noise
-        expect(playback.audio.createOscillator).toHaveBeenCalled();
-        expect(playback.audio.createBufferSource).toHaveBeenCalled();
-        expect(playback.audio.createBiquadFilter).toHaveBeenCalled();
-    });
-
-    it('should implement Agogo and Perc synthesis', () => {
-        playDrumSound(getState(), 'High Agogo', 10, 1.0);
-        playDrumSound(getState(), 'Low Agogo', 10, 1.0);
-        playDrumSound(getState(), 'Perc', 10, 1.0);
-
-        // Uses 3 oscillators via playResonantTone
-        expect(playback.audio.createOscillator).toHaveBeenCalled();
-    });
-
-    it('should implement Shaker/Guiro synthesis', () => {
+    it('should synthesize Shaker using high-pass filtered noise', () => {
         playDrumSound(getState(), 'Shaker', 10, 1.0);
-        playDrumSound(getState(), 'Guiro', 10, 1.0);
 
-        expect(playback.audio.createBufferSource).toHaveBeenCalled();
+        expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
         expect(playback.audio.createBiquadFilter).toHaveBeenCalled();
+        const filter = playback.audio.createBiquadFilter.mock.results[0].value;
+        expect(filter.type).toBe('highpass');
     });
 });
 
@@ -620,13 +595,7 @@ describe('warming the cymbal buffers', () => {
 
     const snapshot = () =>
         Object.fromEntries(
-            [
-                'crashMetal',
-                'chinaMetal',
-                'rideMetal#pool',
-                'hihatMetal#pool',
-                'openHatMetal#pool',
-            ].map((key) => {
+            ['crashMetal', 'rideMetal#pool', 'hihatMetal#pool', 'openHatMetal#pool'].map((key) => {
                 const value = groove.audioBuffers[key];
                 const buffers = Array.isArray(value) ? value : [value];
                 return [key, buffers.map((b) => Array.from(b.getChannelData(0)))];
@@ -650,7 +619,6 @@ describe('warming the cymbal buffers', () => {
     it('renders every buffer the synth kit would, and says when it is done', () => {
         expect(warmFully(PAST)).toBeGreaterThan(36);
         expect(groove.audioBuffers.crashMetal.length).toBe(9 * 4096);
-        expect(groove.audioBuffers.chinaMetal).toBeDefined();
         for (const pool of ['rideMetal#pool', 'hihatMetal#pool', 'openHatMetal#pool']) {
             expect(groove.audioBuffers[pool]).toHaveLength(4);
         }
@@ -707,12 +675,11 @@ describe('warming the cymbal buffers', () => {
         expect(groove.audioBuffers.crashMetal).toBe(crash);
     });
 
-    it('warms only the crash and china a sampled kit may fall back to', () => {
+    it('warms only the crash a sampled kit may fall back to', () => {
         registerPackBuffer('warm-test-kit', 'kick', {});
         groove.voice = 'pack:warm-test-kit';
         expect(warmDrumBuffers(getState(), NEVER)).toBe(true);
         expect(groove.audioBuffers.crashMetal).toBeDefined();
-        expect(groove.audioBuffers.chinaMetal).toBeDefined();
-        expect(playback.audio.createBuffer).toHaveBeenCalledTimes(2);
+        expect(playback.audio.createBuffer).toHaveBeenCalledTimes(1);
     });
 });
