@@ -78,6 +78,32 @@ describe('Arranger Controller', () => {
             expect(state.arranger.sections[1].key).toBe('E');
         });
 
+        it('writes new sections through dispatch and leaves the old ones alone (#1634)', () => {
+            const before = state.arranger.sections;
+            const [first, second] = before;
+
+            transposeKey(7);
+
+            // The array and objects that were state before the call are untouched...
+            expect(before).toHaveLength(2);
+            expect(first).toEqual({ id: 's1', label: 'Verse', value: 'C G', repeat: 2, key: 'C' });
+            expect(second).toEqual({
+                id: 's2',
+                label: 'Chorus',
+                value: 'Am F',
+                repeat: 1,
+                key: 'A',
+            });
+            // ...and what state holds now is a different array of different objects.
+            expect(state.arranger.sections).not.toBe(before);
+            expect(state.arranger.sections[0]).not.toBe(first);
+            expect(state.arranger.sections[0]).toMatchObject({
+                id: 's1',
+                label: 'Verse',
+                repeat: 2,
+            });
+        });
+
         it('should leave roman numeral notation intact', () => {
             state.arranger.sections[0].value = 'I V vi IV';
             transposeKey(2);
