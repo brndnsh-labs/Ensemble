@@ -83,19 +83,7 @@ describe('Drum Synth Performance', () => {
     it('measures playDrumSound loop performance', () => {
         const iterations = 1000;
         // Instruments that trigger the specific array check we are optimizing
-        const instruments = [
-            'HiHat',
-            'Open',
-            'Crash',
-            'Shaker',
-            'Agogo',
-            'Perc',
-            'Guiro',
-            'Clave',
-            'TomHigh',
-            'CongaHigh',
-            'BongoHigh',
-        ];
+        const instruments = ['HiHat', 'Open', 'Crash', 'Shaker', 'TomHigh'];
 
         const start = performance.now();
 

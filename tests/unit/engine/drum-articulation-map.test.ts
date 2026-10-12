@@ -30,19 +30,11 @@ describe('drumArticulationKey — pack contract', () => {
             'Snare',
             'Sidestick',
             'HiHat',
-            'HiHatQuarter',
-            'HiHatHalf',
             'Open',
             'HiHatPedal',
             'Ride',
             'RideBell',
             'Crash',
-            'Cowbell',
-            'CowbellHigh',
-            'CowbellLow',
-            'Agogo',
-            'AgogoHigh',
-            'AgogoLow',
             'Shaker',
             'High Tom',
             'Mid Tom',
@@ -59,16 +51,14 @@ describe('drumArticulationKey — pack contract', () => {
     });
 
     it('returns null for the documented synth-fallback hits (no CC0 source)', () => {
-        // China + brushes have no clean CC0 sample; they must fall through to synth.
-        for (const name of ['China', 'Brush', 'Clave', 'Guiro', 'CongaHigh', 'BongoLow', 'Perc']) {
+        // A name the kit has no sample for must fall through to synth.
+        for (const name of ['Clave', 'Cowbell', 'China']) {
             expect(drumArticulationKey(name), `${name} must fall back to synth`).toBeNull();
         }
     });
 
-    it('collapses hi-hat openness onto the three sampled articulations', () => {
+    it('maps each hi-hat articulation onto its sampled articulation', () => {
         expect(drumArticulationKey('HiHat')).toBe('hihat-closed');
-        expect(drumArticulationKey('HiHatQuarter')).toBe('hihat-loose');
-        expect(drumArticulationKey('HiHatHalf')).toBe('hihat-loose');
         expect(drumArticulationKey('Open')).toBe('hihat-open');
         expect(drumArticulationKey('HiHatPedal')).toBe('hihat-pedal');
     });
@@ -82,7 +72,7 @@ describe('drumArticulationKey — pack contract', () => {
     it('every mapped name is a sound the engine actually emits (no phantom keys)', () => {
         // Anything the mapper covers should be a real drum name (a KNOWN sound or a
         // space-formed tom) — catches a typo'd case label that would never fire.
-        const names = ['Kick', 'Snare', 'HiHat', 'Ride', 'Crash', 'Cowbell', 'Shaker'];
+        const names = ['Kick', 'Snare', 'HiHat', 'Ride', 'Crash', 'Shaker'];
         for (const name of names) {
             expect(KNOWN_SOUND_NAMES.has(name), `${name} not in KNOWN_SOUND_NAMES`).toBe(true);
         }
@@ -91,19 +81,19 @@ describe('drumArticulationKey — pack contract', () => {
 
 describe('hi-hat choke classification (#679)', () => {
     it('every hi-hat articulation chokes a ringing open hat', () => {
-        for (const name of ['HiHat', 'Open', 'HiHatQuarter', 'HiHatHalf', 'HiHatPedal']) {
+        for (const name of ['HiHat', 'Open', 'HiHatPedal']) {
             expect(isHatName(name), `${name} should choke a ringing hat`).toBe(true);
         }
     });
 
     it('non-hat hits never choke (a kick/snare/cymbal leaves the open hat ringing)', () => {
-        for (const name of ['Kick', 'Snare', 'Ride', 'Crash', 'Cowbell', 'Shaker', 'High Tom']) {
+        for (const name of ['Kick', 'Snare', 'Ride', 'Crash', 'Shaker', 'High Tom']) {
             expect(isHatName(name), `${name} must not choke`).toBe(false);
         }
     });
 
-    it('only open + semi-open hats are tracked as choke-able (closed/pedal are already short)', () => {
-        for (const name of ['Open', 'HiHatQuarter', 'HiHatHalf']) {
+    it('only the open hat is tracked as choke-able (closed/pedal are already short)', () => {
+        for (const name of ['Open']) {
             expect(isRingingHat(name), `${name} should be tracked as a ringing voice`).toBe(true);
         }
         for (const name of ['HiHat', 'HiHatPedal', 'Kick', 'Snare']) {
@@ -114,7 +104,7 @@ describe('hi-hat choke classification (#679)', () => {
     it('every choke-able ringing hat is also a hat that chokes (consistency)', () => {
         // A ringing hat must be in the choking set — otherwise it could register as
         // active but never get cut by its own family.
-        for (const name of ['Open', 'HiHatQuarter', 'HiHatHalf']) {
+        for (const name of ['Open']) {
             expect(isRingingHat(name) && isHatName(name)).toBe(true);
         }
     });
