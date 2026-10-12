@@ -374,7 +374,7 @@ the named service's tag into `/opt/docker/<stack>/.env`, recreates only that ser
 for its healthcheck. An unhealthy result restores the previous tag and recreates again, so a bad
 image fails the CI step without taking the service down. The account is in no `docker` group and
 has no password; its home, key file and scripts are root-owned. Provisioning is
-`docker/ensemble/release/provision.sh` (idempotent, run as root with the CI public key).
+`homelab-maintenance/docker/ensemble/release/provision.sh` (idempotent, run as root with the CI public key).
 
 The `deploy` job releases prod then test, and only for the images `api-image` and `web-image`
 built from the same commit (`deploy` `needs` both). A `workflow_dispatch`

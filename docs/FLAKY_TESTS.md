@@ -223,6 +223,13 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ## Tail-margin sweep (#1262) — full `tests/standards/` enumeration
 
+> **Historical (pre-#1404).** This sweep audited the old engine's critique suite. The engines
+> and files it names (`scheduler-core.ts`, `groove-engine.ts`, `comping-cells.ts`,
+> `conductor.ts`, `bass-engine.ts`, `midi-worker-logic.ts`, and the `*-critique.test.ts` files
+> under `tests/standards/`) are deleted, and the band's critique
+> (`band/test/critique.test.ts`) is deterministic, so no unseeded `Math.random` path is left
+> for it to be flaky on. Kept as the measurement record only.
+
 The disco/rock/hip-hop/bass-chord-change entries above ended on a shared
 observation: the suite plausibly holds **dozens** of unseeded critique gates
 with ~1-in-500 tail margins, making "some pair reds out together" nearer

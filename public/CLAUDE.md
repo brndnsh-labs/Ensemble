@@ -17,9 +17,9 @@ that don't fit either. (The old engine's logic worker and its sync contract are 
 top-level field as `document`/`preferences`/`runtime-derived` for persistence — and, per
 `docs/design/write-ownership.md`, that classification doubles as a write rule: a `document`/
 `preferences` field is written only by UI dispatch or hydration, never by a runtime system
-(conductor, trade block, worker). See that doc's read-time composition precedent
+(the old engine's conductor, trade block and worker did exactly this; they are gone, #1404, and the next runtime system sets the precedent). See that doc's read-time composition precedent
 (`isInstrumentActiveAtStep`) and its retired violations (§5) before adding a new dispatch site
-that touches an existing document field from an engine/conductor path.
+that touches an existing document field from a runtime path.
 
 ## Effects & reactivity (`state/state-effects.ts`)
 
@@ -87,8 +87,8 @@ that touches an existing document field from an engine/conductor path.
 
 14. **Changing what a config value *means*** (units, scaling, denomination — e.g. the BPM-unit
     change for compound meters) **must migrate authored data in the same commit, not just code.**
-    Grep `data/`, `prototypes/v2/lib/starters.ts` and any `presets.ts`/`fixtures.ts`/`defaults.ts`
-    for the changed field; a
+    Grep `data/`, `prototypes/v2/lib/starters.ts` and the band styles' defaults
+    (`band/styles/<id>.ts`'s `feel`, plus any fixtures) for the changed field; a
     built-in preset's numeric value was tuned under the *old* interpretation and critique tests
     won't catch a stale one (they drive their own BPM) — a missed preset plays at the wrong
     speed and is only found by ear. Schedule an explicit listen-test on any user-visible preset whose defaults depend on

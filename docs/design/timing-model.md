@@ -1,6 +1,9 @@
 # The timing model — three tiers, drums are the clock
 
 **Status:** design ratified July 2026; the gravity-era deletion it prescribes shipped as #1063.
+The law is live. The code that carries it moved: since the old engine was deleted (#1404) all
+micro-timing is in the band engine's `band/feel/feel.ts` (`applyFeel`), and §3 names today's
+owners. Anything below attributed to the old engine is dated history.
 **Provenance:** distilled from the #714 → #1005 → #1025 pocket trace. Ensemble is "a fancy
 metronome at its core": metronomic by default, expressive timing opt-in and *earned*.
 
@@ -11,9 +14,9 @@ audible only as a **differential** against the tier above it:
 
 | Tier | What it is | Owner |
 | --- | --- | --- |
-| **1. The Grid** | Metronomic truth. Swing is grid *geometry* (subdivision ratios, `swingSub`); tempo moves (ritardando, tempo breathing #1010) are clock-rate changes. | scheduler / `calculateStepDuration`, `resolution.ts` |
-| **2. Band lean** | The ONE band-level differential: melodic lanes vs. the drums, a per-genre constant (Neo-Soul +25 ms, Funk −5 ms, …). Smart, zero user knobs. | `getBandPocket` in `coordination-engine.ts` |
-| **3. Character** | Per-lane and per-note differentials: the bass's Neo-Soul drag residual, harmony stagger, the comper's deterministic wobble, per-voice drum offsets inside genre strategies (`grooves/neo-soul.ts` snare drag / hat push — the actual Dilla feel), seeded humanization. | each lane's engine / groove strategy |
+| **1. The Grid** | Metronomic truth. Swing is grid *geometry* (`swingRatio`, `warp`); tempo moves are clock-rate changes (the band has only chart-written fermatas, see `docs/design/band-engine.md`). | `applyFeel` in `band/feel/feel.ts` (swing); the host (tempo) |
+| **2. Band lean** | The ONE band-level differential: melodic lanes vs. the drums, a per-genre constant (Neo-Soul bass +32 ms and comp +25 ms, Funk bass −5 ms, …). Smart, zero user knobs. | each style's `feel.lean` (`band/styles/<id>.ts`, type in `band/styles/types.ts`), applied in `applyFeel` |
+| **3. Character** | Per-lane and per-note differentials: seeded placement keyed on `(bar position, lane, voice)`, per-hit velocity variation, and the comp's strum roll. | `applyFeel` in `band/feel/feel.ts` |
 
 A new timing idea must name its tier before it lands. If it can't, it's probably a uniform shift
 (see §2) and will be inaudible.
@@ -36,43 +39,48 @@ pocket (§4). The corollary is the design rule:
 
 ## 3. Live inventory (what exists and where)
 
-- **Band lean:** `getBandPocket(genreFeel, sectionLabel?)` — the per-genre palette table in
-  `coordination-engine.ts`, scaled per section by energy (#1064): `getSectionEnergy(sectionLabel)`
-  drives a bounded final-stage multiplier (scale ∈ [0.6, 1.4], 1.0 at verse/default energy, hard
-  30 ms feel-ceiling) so the genre's character amplifies as the arrangement builds — push genres
-  dig in harder at a chorus/drop, laid-back genres lean deeper, everyone plays breakdowns/intros
-  closer to the grid. Summed by bass (`getBassNote`), comp (`getAccompanimentNotes`),
-  harmony (`getHarmonyNotes`), and soloist (`getSoloistNotePhraseFirst`, since #1025). Drums do
-  **not** add it — that asymmetry is what makes it audible.
-- **Lane character:** bass Neo-Soul drag residual in `bass-engine.ts`; harmony's schedule
-  accumulator (stagger); the comper's deterministic onset wobble; soloist expressive devices.
-- **Drum-kit character:** per-voice `instTimeOffset` inside each `grooves/*.ts` strategy
-  (e.g. Neo-Soul: snare +6–18 ms drag, hats −8–20 ms push, kick +8 ms weight). Relative *within*
-  the kit → audible → stays in genre strategies, not in engine plumbing.
-- **Humanization:** seeded per-lane/per-note wobble, owned by `public/engine/humanize.ts`
-  (`humanizePlacement`, scaled by `humanizeScale(groove.humanize)`). Squarely
-  tier 3 and re-modelled as such in #1068 — it is a *differential*: each lane draws its own value,
-  the drums draw one per kit piece, and nothing band-global is added (the pre-#1068 shape, a single
-  `Math.random()` per tick handed unchanged to the comp + harmony + chart visuals, was the §2
-  uniform-shift mistake in miniature, and inaudible for the same reason). Two invariants worth
-  keeping: **timing PLACEMENT is bar-independent** — keyed on `(barStep, lane, voice)` so a lane's
-  lean at a given 16th repeats every bar and reads as settled placement rather than per-hit noise
-  (the same seam `grooves/utils.ts` draws between `placementSkew` and `humanizeDraw`); and
-  **placement is position-weighted** (`PLACEMENT_WEIGHTS`: downbeat 0.35 → offbeat 1.0), so the
-  band's lock points stay near the grid while the subdivisions carry the character. At
-  `groove.humanize === 0` every term is exactly zero and playback is bit-for-bit grid-locked, which
-  is the metronome-core identity stated purely (cf. §4's note on the gravity-era deletion).
-  Each lane has exactly one placement authority: the scheduler for bass/chords/soloist, per drum
-  piece inside `scheduleDrums`, and `finalizeHarmonyNotes` for harmony (which bakes its offset into
-  the note, so it is also the only lane whose humanization reaches the `.mid` export by that route
-  — every other lane's export placement is drawn in `midi-worker-logic.ts` with the same key).
-- **Swing:** tier-1 grid geometry; guarded by the swing-ratio audit.
-- **Tempo domain:** end-of-song ritardando (`resolution.ts`); tempo breathing is #1010's job.
+Every term below is applied in one pass, `applyFeel` (`band/feel/feel.ts`), after the players
+have written on the straight sixteenth grid (`band/CLAUDE.md`: "Timing moves only in
+`feel/feel.ts`"). Players never carry a timing term of their own.
 
-Guards: `tests/standards/band-pocket-palette-critique.test.ts` (lane onset = band lean + lane
-character, exactly), the swing-ratio audit, per-genre critique tests.
+- **Swing (tier 1):** grid geometry. `swingRatio(swing)` maps 0–100 to where the offbeat lands
+  in its pair, and `warp` bends the within-beat tick position; tempo is unchanged. A style's
+  `feel.swing` and `feel.swingGrid` (8th or 16th) are the defaults, a setting overrides.
+- **Band lean (tier 2):** `feel.lean` per style: bass, comp and lead against the drums, in ms,
+  positive = behind the beat. Drums are the clock and get a lean of 0, which is the asymmetry
+  that makes it audible. `compLean` lets the instrument family differ (a jazz pianist lays back,
+  a swing rhythm guitarist sits with the walking bass); an unset lead lean sits with the bass.
+- **Character (tier 3):** a seeded placement per event, `rng(seed, 'place', lane, voice,
+  position).bipolar() * MAX_CHARACTER_MS * humanize`, plus a per-hit velocity jitter. Each lane
+  draws its own value (nothing band-global is added), and at `humanize` 0 every term is exactly
+  zero, so playback is bit-for-bit grid-locked: the metronome-core identity stated purely. Two
+  invariants worth keeping:
+  **timing PLACEMENT is bar-independent**, keyed on the position within the bar and not the bar
+  index, so a lane's lean at a given sixteenth repeats every bar and reads as settled placement
+  rather than per-hit noise; the velocity jitter is keyed by the bar's place in its chorus (with
+  no chorus in the key), so a counted chart's choruses repeat the same touch at the same place,
+  as a loop's laps do.
+- **Strum:** a stroked chord rolls across its strings at the instrument's `strumMs` (low to high
+  on a down-stroke, high to low on an up-stroke). It is articulation, but it is time, so it
+  lives in `applyFeel`, and the chord takes its tier-3 placement as one gesture so the roll is
+  never scrambled.
+- **Tempo domain:** the band never changes tempo on its own. Energy moves density and dynamics,
+  and the only tempo event is a fermata written in the chart (`docs/design/band-engine.md`).
+
+Guards: `band/feel/feel.test.ts` (swing ratio and offbeats, the lean against drums, settled placement, the strum roll)
+and the per-style critique claims in `band/test/claims/`.
+
+> **Old engine, deleted (#1404).** Before the band engine, tier 2 was `getBandPocket` in
+> `coordination-engine.ts`, scaled per section by energy (#1064) and summed by each lane; tier 3
+> was `public/engine/humanize.ts` (`humanizePlacement`, `PLACEMENT_WEIGHTS`) plus per-voice drum
+> offsets inside each `grooves/*.ts` strategy (the Neo-Soul snare drag and hat push); and the
+> grid was the scheduler's `calculateStepDuration`. None of that exists. In particular the
+> energy-scaled lean and the per-drum-piece offsets were not carried over: the band's lean is a
+> per-style constant and drums never lean.
 
 ## 4. The retired gravity era (deleted — do not re-add)
+
+*Historical: every file named in this section is gone.*
 
 An earlier "instruments following each other" model predates `coordination-engine.ts` and was
 superseded by it. By the time of the July 2026 trace it was provably a no-op end to end:
@@ -99,16 +107,17 @@ see §5. Do not resurrect a band-global term; it cannot work (§2).
 
 ## 5. Future hooks (one authority per domain)
 
-- **"Band digs in / lays back as energy builds"** → **shipped as #1064**: `getBandPocket` scales
-  by `getSectionEnergy(sectionLabel)` inside `coordination-engine.ts` (see §3). Differential,
-  audible, one function, guarded by the band-pocket critique's energy-modulation section.
-- **"Band breathes with intensity" in time** → tier 1, tempo domain: #1010 tempo breathing.
-  Don't build the same response twice in two domains.
-- **New genre feel** → tier 2 palette entry + tier 3 character in that genre's strategy/lane.
+- **"Band digs in / lays back as energy builds"** was shipped in the old engine as #1064 (an
+  energy-scaled `getBandPocket`) and did not survive the band engine's rewrite: the band's lean
+  is a per-style constant. If it comes back, it is a differential in `applyFeel`: audible, one
+  function, guarded by the style critique claims.
+- **"Band breathes with intensity" in time** → tier 1, tempo domain. Don't build the same
+  response twice in two domains.
+- **New genre feel** → a tier-2 `feel.lean` entry in that genre's `band/styles/<id>.ts`, plus
+  its tier-3 character through `humanize`. Never a per-style timing term inside a player.
 
 ## Migration status
 
 - [x] `dillaFeel` removed (#1025).
-- [x] Gravity-era machinery deleted (#1063) — shipped as designed; `band-pocket-palette-critique`
-  now asserts lane onset = `getBandPocket` + lane character exactly, and the conductor test pins
-  that the retired `bass.pocketOffset` mirror write stays gone.
+- [x] Gravity-era machinery deleted (#1063) — shipped as designed.
+- [x] Old engine deleted (#1404); the law now lives in `band/feel/feel.ts`.

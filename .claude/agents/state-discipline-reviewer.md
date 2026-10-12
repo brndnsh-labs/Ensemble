@@ -10,10 +10,10 @@ You do not edit code. You read, grep, reason, and report.
 
 ## The contract (non-negotiable)
 
-1. **All state writes flow through `dispatch(ACTIONS.TYPE, payload)`.** State slices live in `public/state/{playback,arranger,groove,instruments,midi,visualizer,conductor}.ts`, each a `deepSignal` with a reducer keyed on `ACTIONS.*`. The reducer is the only legitimate writer.
+1. **All state writes flow through `dispatch(ACTIONS.TYPE, payload)`.** State slices live in `public/state/{playback,arranger,groove,instruments}.ts`, each a `deepSignal` with a reducer keyed on `ACTIONS.*`. The reducer is the only legitimate writer.
 
 2. **`@direct-mutation` is a narrow exception, not an escape hatch.** The marker trails the statement (`// @direct-mutation`). It is sanctioned in exactly the three categories of `CLAUDE.md` § `@direct-mutation` policy — that section is the authority, and every marker site in `public/` today fits one of them:
-   - **Real-time hot paths.** The `synth-*.ts` voices' audio-param writes, `app-controller.ts`'s BPM reschedule (`playback.nextNoteTime`, `unswungNextNoteTime`) and `instrument-controller.ts`'s `flushBuffer()` voice-continuity writes, where dispatch overhead would cause an audible glitch.
+   - **Real-time hot paths.** The `synth-*.ts` voices' audio-param writes, where dispatch overhead would cause an audible glitch. (The old `app-controller.ts` BPM reschedule and `flushBuffer()` voice-continuity writes were the same class; both are gone.)
    - **Init-only.** `engine.ts` `initAudio()` and `engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
    - **Detached render clone.** `prototypes/v2/lib/band-export.ts`'s render clone and `chords-engine.ts`'s `validateProgression` on its passed-in `state` — dispatching there would write the live slices mid-export.
 

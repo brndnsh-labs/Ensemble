@@ -14,22 +14,23 @@ the engine currently playing it.
 
 ---
 
-## 1. The current boundary is not a document
+## 1. The boundary was not a document (as of #1029)
 
-`saveCurrentState()` currently serializes a hand-maintained selection of global slices into the
-single `ensemble_currentState` local-storage entry. Hydration maintains a second hand-written
-field list. That arrangement has three structural problems:
+*Written in the present tense in August 2026; since #1424 this is history.*
+Before #1424, `saveCurrentState()` serialized a hand-maintained selection of global slices into the
+single `ensemble_currentState` local-storage entry. Hydration maintained a second hand-written
+field list. That arrangement had three structural problems:
 
 1. **Writer/reader drift loses authored state silently.** Before #1029, section-local
    `targetIntensity` and `instruments` were written inside `sections` but discarded by
    `validateSections`; `arranger.grouping` and `complexity` were never written. A field's
-   presence in hydration is not by itself proof that it belongs in a document: the current
-   `bandIntensity` is realized auto-conductor state and deliberately remains runtime-only.
+   presence in hydration is not by itself proof that it belongs in a document: the
+   `bandIntensity` of the day was realized auto-conductor state and deliberately remains runtime-only.
    *(Amended 2026-09-26, #1404: no conductor writes it any more. The band shapes its own
    energy, so the level is now the player's choice, saved per chart as `performance.energy`.)*
 2. **One payload mixes different lifetimes.** Musical content, device choices, visual
    preferences, session-start defaults, and runtime state do not all belong to a song.
-3. **The storage shape is doing three jobs.** It is simultaneously a crash-recovery snapshot,
+3. **The storage shape was doing three jobs.** It was simultaneously a crash-recovery snapshot,
    an implicit document, and the source for a future library. Changing it in place would make
    rollback and old-client coexistence needlessly destructive.
 
@@ -179,8 +180,9 @@ first write.
 
 ### `RuntimeState`
 
-Transport, conductor progress, generated maps, worker cursors, audio handles, transient UI, and
-undo history remain runtime-only. Opening a document derives fresh runtime state from
+Transport and playhead position, audio handles, transient UI, and undo history remain
+runtime-only. (The old engine's conductor progress, generated maps and worker cursors were
+runtime-only too; they went with that engine in #1404.) Opening a document derives fresh runtime state from
 `ChartDocument + WorkspacePreferences`; runtime state is never the persistence authority.
 
 ---

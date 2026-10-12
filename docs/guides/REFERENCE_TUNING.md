@@ -2,6 +2,13 @@
 
 This document tracks specific reference recordings used to calibrate the Ensemble engine's velocity maps and micro-timing.
 
+> **Reading note.** The reference recordings and target feels below are current. The dated
+> change log at the end is a record of the old worker-based engine (deleted in #1404): the
+> files it names (`accompaniment.ts`, the groove strategies, `playback.bandIntensity`) are gone,
+> and the `npm run test:e2e` it cites then ran the v1 app's suite. Today the same check is
+> `npm run test:e2e --prefix prototypes/v2`, and the band's per-style numbers live in
+> `band/styles/<id>.ts` and `band/test/claims/<id>.ts`.
+
 ## Jazz-Funk
 **Reference Track:** *Cantaloupe Island* - Herbie Hancock (1964)
 - **Target Feel:** Straight 8ths but laid back. Solid, repetitive bass anchor.
