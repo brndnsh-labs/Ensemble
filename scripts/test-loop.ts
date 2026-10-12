@@ -4,8 +4,8 @@
  * critique tests (the project's "30-run reliability loop" convention).
  *
  * Usage:   npm run test:loop -- <vitest-file-or-name-filter> [count]
- * Example: npm run test:loop -- tests/standards/disco-piano-critique.test.ts
- *          npm run test:loop -- disco-piano 50
+ * Example: npm run test:loop -- tests/standards/genre-canon-guard.test.ts
+ *          npm run test:loop -- genre-canon 50
  *
  * Each iteration is a fresh `vitest run` process, so Math.random-driven
  * variation and module-level caches reset between runs — matching how a

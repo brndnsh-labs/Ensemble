@@ -131,11 +131,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/data/note-names.ts` | Pure pitch-class name table; re-exported by config without pulling genre data into notation-only editors. | `KEY_ORDER` |
 | `public/engine/transpose.ts` | Single shared progression-text transposer for absolute transpose + relative-key switch. | `transposeChordText` |
 
-## Voice Data
-
-| Path | Responsibility | Key Patterns |
-| :--- | :--- | :--- |
-
 ## Engine Core (Internal)
 
 | Path | Responsibility | Key Exports |

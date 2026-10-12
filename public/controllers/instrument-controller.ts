@@ -27,17 +27,15 @@ export function flushBuffers(): void {
     restoreGains(stateMap);
 }
 
-/** Silence the named lanes (the drums are never among them: muting a part must not hiccup the time). */
-function flushBuffer(...lanes: Exclude<InstrumentModule, 'groove'>[]): void {
-    if (lanes.includes('bass')) {
+/** Silence one lane (never the drums: muting a part must not hiccup the time). */
+function flushBuffer(lane: Exclude<InstrumentModule, 'groove'>): void {
+    if (lane === 'bass') {
         killBassNote(stateMap);
         killBassBus(stateMap);
-    }
-    if (lanes.includes('soloist')) {
+    } else if (lane === 'soloist') {
         killSoloistNote(stateMap);
         killSoloistBus(stateMap);
-    }
-    if (lanes.includes('chords')) {
+    } else {
         killAllPianoNotes(stateMap);
         killChordBus(stateMap);
     }

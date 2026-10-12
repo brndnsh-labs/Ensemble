@@ -130,7 +130,7 @@ describe('legacyChordFacts', () => {
         expect(legacyChordFacts({ absName: '???', key: 'C', keyIsMinor: false })).toBeNull();
     });
 
-    it('reads a chord in the key it was written in', () => {
+    it('reads a roman numeral as the chord it names', () => {
         load(v1Chart('V7'));
         expect(legacyChordFacts(state().arranger.progression[0])).toEqual(parseChord('G7', key));
     });
