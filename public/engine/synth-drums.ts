@@ -1140,8 +1140,8 @@ export function isRingingHat(name: string): boolean {
 
 function playDrumSoundNew(state: EnsembleState, name: string, time: number, velocity = 1.0): void {
     // The `new` drum voice diverges from `current` only where a synth-audit story
-    // has rebuilt a voice. Epic 4 S2/S3 rebuilt the whole hi-hat family into a
-    // closed↔open continuum plus a foot-pedal chick; everything else still routes
+    // has rebuilt a voice. Epic 4 S2/S3 rebuilt the whole hi-hat family (closed, open
+    // and a foot-pedal chick); everything else still routes
     // through the (frozen, bit-identical) `playDrumSoundCurrent`.
     switch (name) {
         case 'HiHat':
@@ -1451,7 +1451,7 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0): voi
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
     const vel = clamp01(Math.max(0.3, hitVelocity));
 
-    // --- The continuum ------------------------------------------------------
+    // --- The fully open hat ---------------------------------------------------
     // Each constant is the openness continuum at `open` = 1 (fully open). `decayTc`
     // (the gain `setTargetAtTime` time-constant) lets the long-ringing `openHatMetal`
     // buffer ring. A harder hit reads a touch tighter, as a real hat does.
@@ -1480,7 +1480,7 @@ function playOpenHatNew(state: EnsembleState, time: number, velocity = 1.0): voi
     }
 
     const source = audio.createBufferSource();
-    // Epic 4 S4 — variation pool: fast open/half/quarter runs vary stick-to-stick.
+    // Epic 4 S4 — variation pool: fast runs vary stick-to-stick.
     source.buffer = getVariedCymbalBuffer(audio, groove, 'Open');
     source.playbackRate.value =
         voiceConfig.playbackRate * hatArticulation * rr(voiceConfig.playbackVariance);
