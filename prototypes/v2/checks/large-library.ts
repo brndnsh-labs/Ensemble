@@ -191,7 +191,7 @@ function tileTo32Bars(template: ChartDocumentV2, bars = 32): ChartDocumentV2 {
 }
 
 /** One real, validated chart via the app's own iReal import path — not a hand-built fixture. */
-async function importTemplate(page: Page): Promise<ChartDocumentV2> {
+export async function importTemplate(page: Page): Promise<ChartDocumentV2> {
     const fixture = JSON.parse(
         await readFile(
             resolve(dirname(__filename), '../../../docs/design/fixtures/ensemble-v2-charts.json'),

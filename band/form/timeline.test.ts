@@ -1,3 +1,4 @@
+import { resolveScoreMeasureEvents } from '../../public/songbook/score-measure-events.js';
 import type { ScoreEvent, SemanticScore } from '../../public/songbook/score-types.js';
 import { PPQ } from '../core/types.js';
 import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
@@ -12,6 +13,12 @@ import {
     spanIndexAt,
     type Timeline,
 } from './timeline.js';
+
+// The real resolver, wrapped only so the ceiling test can see that it never ran.
+vi.mock('../../public/songbook/score-measure-events.js', async (original) => {
+    const real = await original<typeof import('../../public/songbook/score-measure-events.js')>();
+    return { ...real, resolveScoreMeasureEvents: vi.fn(real.resolveScoreMeasureEvents) };
+});
 
 const BAR = PPQ * 4;
 
@@ -384,16 +391,19 @@ describe('performed span ceiling (#1632)', () => {
         // One more single-event bar is 65,537.
         const past = [...at, denseSection('B', 1, 1)];
         expect(() => compileTimeline(chart(past))).toThrow(
-            'This chart performs more than the playback limit of 65,536 chords. Reduce choruses, repeats, or chords per bar.',
+            'This chart plays more than the playback limit of 65,536 chord events. Reduce repeats or chords per bar.',
         );
     });
 
-    it('refuses the 256 bars x 64 events x 64 choruses probe quickly, before any span exists', () => {
+    it('refuses the 256 bars x 64 events x 64 choruses probe before any event is copied', () => {
         const probe = chart([denseSection('A', 256, 64)], 64);
-        const started = performance.now();
-        expect(() => compileTimeline(probe)).toThrow(/playback limit of 65,536 chords/);
-        const ms = performance.now() - started;
-        console.warn(`#1632 probe refused in ${ms.toFixed(1)} ms`);
-        expect(ms).toBeLessThan(250);
+        vi.mocked(resolveScoreMeasureEvents).mockClear();
+        // A counted chart is told choruses are one of the things to reduce.
+        expect(() => compileTimeline(probe)).toThrow(
+            'This chart plays more than the playback limit of 65,536 chord events. Reduce repeats, choruses or chords per bar.',
+        );
+        // The count comes from the written events and the performed bar order alone: the
+        // step that would copy a million events never runs.
+        expect(resolveScoreMeasureEvents).not.toHaveBeenCalled();
     });
 });

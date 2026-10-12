@@ -3,9 +3,9 @@
  * repeats) and rational durations become performed bars in integer ticks. Everything
  * downstream reads the timeline and never the score.
  *
- * Unlike the old step grid, nothing here rejects music: holds extend the chord before them,
- * N.C. is a span with no chord, fermatas stretch time, and any meter/grouping the codec
- * accepts gets a pulse skeleton.
+ * Unlike the old step grid, nothing here rejects music for what it says: holds extend the chord
+ * before them, N.C. is a span with no chord, fermatas stretch time, and any meter/grouping the
+ * codec accepts gets a pulse skeleton. The one refusal is for size (`MAX_PERFORMED_SPANS`).
  */
 
 import { resolveScoreContext } from '../../public/songbook/score-context.js';
@@ -156,7 +156,7 @@ function checkPerformedSpans(
         performed += counts[sectionIndex][measureIndex];
         if (performed > MAX_PERFORMED_SPANS) {
             throw new Error(
-                `This chart performs more than the playback limit of ${MAX_PERFORMED_SPANS.toLocaleString('en-US')} chords. Reduce choruses, repeats, or chords per bar.`,
+                `This chart plays more than the playback limit of ${MAX_PERFORMED_SPANS.toLocaleString('en-US')} chord events. Reduce repeats${score.choruses !== undefined ? ', choruses' : ''} or chords per bar.`,
             );
         }
     }

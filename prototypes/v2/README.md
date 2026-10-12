@@ -231,7 +231,8 @@ and endings. Al-Nth-ending destinations and jump commands inside repeated passag
 blocked. One-/two-bar references resolve earlier written IDs only when effective context matches;
 two-bar pairs must have consecutive earlier sources and stay within their sections.
 The compiler rejects ambiguous/unpaired forms and bounds nesting to 16 and performed measures
-to 16,384; exact event/step limits also apply before live adoption.
+to 16,384; the band then refuses a performance of more than 65,536 chord events
+(`MAX_PERFORMED_SPANS`, `band/form/timeline.ts`).
 
 Validated score input compiles to exact maps used by the chart, worker and detached rendering.
 Unsupported navigation, N.C., holds, alternates, fermatas, off-grid lengths and unimplemented chord
