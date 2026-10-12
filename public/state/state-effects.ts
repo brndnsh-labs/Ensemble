@@ -8,7 +8,6 @@ import type {
     Action,
     Dispatch,
     EnsembleState,
-    GrooveState,
     InstrumentModule,
     InstrumentVoice,
 } from '../types.js';
@@ -28,10 +27,11 @@ const AUTO_FOLLOW_MODULES: InstrumentModule[] = ['chords', 'bass', 'soloist', 'g
  * the registry's installed-set — auto-follow never auto-downloads). No-op writes
  * are skipped so non-mapped lanes don't churn dispatch.
  *
- * Two callers, one rule so they can't drift: the genre-change effect
- * (`SET_GENRE_FEEL`) and the pack-install path (`PacksSettings`), so installing a
- * pack upgrades the *current* genre's Auto lanes immediately rather than waiting
- * for the next genre change ("install → instantly better").
+ * Two callers in `prototypes/v2/lib/runtime.ts`, one rule so they can't drift: a genre
+ * change (`setGenre`, right after its `SET_GENRE_FEEL` dispatch) and a pack install, so
+ * installing a pack upgrades the *current* genre's Auto lanes immediately rather than
+ * waiting for the next genre change ("install → instantly better"). It is deliberately
+ * not a `handleEffects` case: `setGenre` decides when it runs.
  */
 export function resolveAutoVoices(
     stateMap: EnsembleState,
@@ -82,56 +82,16 @@ function syncSoloistMode(
 }
 
 /**
- * #856 — derive the soloist phrasing mode once at startup. Genre/voice are
- * hydrated directly (no `SET_GENRE_FEEL` fires on boot), so without this a
- * loaded session keeps its persisted/default `mode` until the next genre change
- * — leaving guitar genres stuck monophonic on load. Call after the worker + the
- * state subscriber are live so the dispatched mode crosses to the worker.
+ * #856 — derive the soloist phrasing mode when a chart is opened. Its genre and voice
+ * are installed directly (no `SET_GENRE_FEEL` fires), so without this the chart keeps
+ * the previous `mode` until the next genre change — leaving guitar genres stuck
+ * monophonic on open.
  */
 export function deriveSoloistModeOnBoot(
     stateMap: EnsembleState,
     dispatch: HandleEffectsContext['dispatch'],
 ): void {
     syncSoloistMode(stateMap, stateMap.groove.lastSmartGenre, dispatch);
-}
-
-type GenreGrooveOverrides = Pick<GrooveState, 'swing' | 'swingSub' | 'humanize'>;
-
-/**
- * Run the side-effect half of SET_GENRE_FEEL: the Auto voices and the soloist's mode. (It
- * also loaded the old engine's drum preset until the band took the drums, 2026-09-26.)
- */
-function applyGenreEffects(
-    stateMap: EnsembleState,
-    payload: { genreName?: string },
-    dispatch: HandleEffectsContext['dispatch'],
-): void {
-    resolveAutoVoices(stateMap, payload.genreName, dispatch);
-}
-
-/**
- * Complete a genre change's effects after the reducer half has run: the Auto voices, then any
- * explicit groove controls to restore over them. `setGenre` (`prototypes/v2/lib/runtime.ts`)
- * awaits it; it stays async for that caller.
- */
-export async function reconcileUrlGenreOnBoot(
-    stateMap: EnsembleState,
-    genreName: string,
-    grooveOverrides: GenreGrooveOverrides | null,
-    dispatch: HandleEffectsContext['dispatch'],
-): Promise<void> {
-    const config = SMART_GENRES[genreName];
-    if (!config) {
-        return;
-    }
-
-    applyGenreEffects(stateMap, { genreName }, dispatch);
-
-    if (grooveOverrides) {
-        for (const param of Object.keys(grooveOverrides) as Array<keyof GenreGrooveOverrides>) {
-            dispatch(ACTIONS.SET_PARAM, { module: 'groove', param, value: grooveOverrides[param] });
-        }
-    }
 }
 
 export function handleEffects(
@@ -196,12 +156,6 @@ export function handleEffects(
             if (action.payload?.module === 'playback' && action.payload?.param === 'masterVolume') {
                 syncMasterVolume(stateMap);
             }
-            break;
-        }
-        case ACTIONS.SET_GENRE_FEEL: {
-            // #675 — Auto voices + soloist mode. `setGenre` runs the same helper through
-            // reconcileUrlGenreOnBoot instead (the v2 runtime skips this case).
-            applyGenreEffects(stateMap, action.payload, dispatch);
             break;
         }
     }
