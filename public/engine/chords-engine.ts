@@ -7,15 +7,12 @@ import {
     ROMAN_VALS,
     TIME_SIGNATURES,
 } from '../config.js';
-import type { Chord, ChordDensity, Dispatch, FormattedChordNames, Mutable } from '../types.js';
+import type { Chord, Dispatch, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { getFrequency, normalizeKey } from '../utils.js';
+import { getIntervals } from './chords-styles.js';
 import { spellPitchClass } from './note-spelling.js';
 import { COMP_REGISTER_FLOOR, getNearestVoiceLeadingCost } from './voicing-policy.js';
-
-// `FormattedChordNames` stays: it's the return type of the exported
-// `getFormattedChordNames`, so consumers need to be able to name it from here.
-export type { FormattedChordNames };
 
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
@@ -27,12 +24,6 @@ const NOTE_REGEX = /^([A-G][#b]?)/i;
  * `octave` default, which nothing changed once v1's settings went (#1424).
  */
 const COMP_ANCHOR_MIDI = 65;
-
-/**
- * The voicing density a parsed chord is built at. It was the chords slice's `density`
- * default: the old engine's conductor and v1's settings were its only other writers (#1424).
- */
-const COMP_DENSITY: ChordDensity = 'standard';
 
 /**
  * Can this text be a chord ROOT — a roman numeral, a Nashville number, or a note name?
@@ -449,7 +440,6 @@ interface InversionOptions {
     anchor?: number | null;
     min?: number;
     max?: number;
-    style?: string;
     /**
      * Opt-in jazz-style voice-leading second pass (common-tone holds + guide-tone
      * resolution). Off by default — pocket genres want voicing stability. Production
@@ -550,14 +540,12 @@ export function getBestInversion(
         anchor = null,
         min = 52,
         max = 84,
-        style = 'stabs',
         enableVoiceLeading = false,
         quality,
     } = options;
     const homeAnchor = anchor || COMP_ANCHOR_MIDI;
 
-    // Organ needs more aggressive correction back to the anchor to avoid mud
-    const registerPullWeight = style === 'organ' ? 0.8 : 0.6;
+    const registerPullWeight = 0.6;
     const RANGE_MIN = min;
     const RANGE_MAX = max;
 
@@ -570,7 +558,7 @@ export function getBestInversion(
         }
         const prevAvg = sum / previousMidis.length;
         const drift = prevAvg - homeAnchor;
-        const driftLimit = style === 'organ' || isPivot ? 3 : 5;
+        const driftLimit = isPivot ? 3 : 5;
         targetCenter =
             Math.abs(drift) > driftLimit ? prevAvg - drift * registerPullWeight : prevAvg;
     }
@@ -797,10 +785,6 @@ function resolveChordRoot(
 
     return { rootMidi, rootPart, romanMatch, nnsMatch, noteMatch, rootRomanBase };
 }
-
-import { getIntervals } from './chords-styles.js';
-
-export { getIntervals };
 
 /**
  * Formats chord names with appropriate suffixes based on quality and extensions.
@@ -1074,7 +1058,6 @@ function parseProgressionPart(
     initialMidis: number[],
     keyIsMinor: boolean = false,
     bassActive = Boolean(state.bass?.enabled),
-    startsSection = true,
 ): { chords: Chord[]; finalMidis: number[] } {
     const { groove } = state;
     const parsed: Chord[] = [];
@@ -1215,17 +1198,10 @@ function parseProgressionPart(
                     }
                 }
 
-                const intervals = getIntervals(
-                    state,
-                    quality,
-                    is7th,
-                    COMP_DENSITY,
-                    groove.genreFeel,
-                    bassActive,
-                );
+                const intervals = getIntervals(state, quality, is7th, groove.genreFeel, bassActive);
                 // Reduce mud: keep the comping pocket above the bass register.
                 const pianoMin = COMP_REGISTER_FLOOR;
-                const isPivot = startsSection && parsed.length === 0;
+                const isPivot = parsed.length === 0;
                 // why: chords.md P1 #6 / Epic 11 S6(a) — functional comping genres
                 // (Jazz, Bossa, Blues) are built on guide-tone lines and common-tone
                 // holds across ii–V–I motion, so the voice-leading second pass is
@@ -1357,11 +1333,7 @@ function parseProgressionPart(
 /**
  * Parses the progression input string and updates the chord state.
  */
-export function validateProgression(
-    state: any,
-    dispatch?: Dispatch,
-    renderCallback?: () => any,
-): void {
+export function validateProgression(state: any, dispatch?: Dispatch): void {
     const { arranger } = state;
     let allChords: Chord[] = [];
     let lastMidis: number[] = [];
@@ -1409,9 +1381,6 @@ export function validateProgression(
     updateProgressionCache(state);
     if (dispatch) {
         dispatch(ACTIONS.PROG_VALIDATED); // Notify Preact
-    }
-    if (renderCallback) {
-        renderCallback();
     }
 }
 
@@ -1477,9 +1446,6 @@ function updateProgressionCache(state: any): void {
             id: section.id,
             start: sectionStart,
             end: sectionStart + totalSectionSteps,
-            label: section.label,
-            syllables: section.syllables,
-            timeSignature: section.timeSignature || arranger.timeSignature,
         });
         sectionAcc += totalSectionSteps;
     });

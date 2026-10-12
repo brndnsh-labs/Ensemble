@@ -26,7 +26,7 @@ describe('Chords Logic Performance', () => {
         arranger.timeSignature = '4/4';
 
         const start = performance.now();
-        validateProgression(getState(), null, () => {});
+        validateProgression(getState());
         const end = performance.now();
 
         const duration = end - start;

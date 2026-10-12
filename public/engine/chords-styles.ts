@@ -135,7 +135,7 @@ function getRootlessVoicing(
             // mistake, not the canonical "neo-soul crunch." The replacement keeps
             // the b3 (which is what makes the chord sound minor) and lifts the 9
             // up a whole step from the b3, so no in-octave half-step neighbors.
-            if (isRich || intensity > 0.6) {
+            if (isRich) {
                 return [3, 5, 10, 14];
             }
             return [5, 10, 15, 19];
@@ -168,7 +168,7 @@ function getRootlessVoicing(
             // why: the old form listed three extensions at high intensity and then
             // `.slice(0, 2)` them, so the third (b13) was unreachable and the line read as
             // "b9 + #9 + b13" when it played "b9 + #9". Behaviour-identical at every
-            // intensity and density — the slice's only effect was dropping that dead entry.
+            // intensity — the slice's only effect was dropping that dead entry.
             const altExtensions = intensity > 0.6 ? [13, 15] : [13, 20];
             return isRich ? [4, 10, 13, 15, 18, 20] : [4, 10, ...altExtensions];
         }
@@ -195,7 +195,7 @@ function getRootlessVoicing(
         }
 
         // #1326 — a dominant 11th's shell must be evaluated BEFORE the `isRich` shortcut
-        // below. Underneath it, a written C11 at rich density (or intensity > 0.6, which
+        // below. Underneath it, a written C11 at intensity > 0.6 (which
         // sets isRich for this call) came back as the 13 shell: it stated the major 3rd the
         // chord conventionally omits and lost the 4th/11th it exists to feature — E against
         // F, the textbook avoid-note rub. 4-b7-9 is the shell; rich adds the 13 on top.
@@ -246,12 +246,10 @@ export function getIntervals(
     state: EnsembleState,
     quality: string,
     is7th: boolean,
-    density: string,
     genre = 'Rock',
     bassActive = Boolean(state.bass?.enabled),
 ): number[] {
     const { playback } = state;
-    const isRich = density === 'rich';
     const intensity = playback.bandIntensity;
 
     // why (#1315): a diminished chord's 5th IS altered — 'dim' and 'halfdim' are the
@@ -281,7 +279,7 @@ export function getIntervals(
     // 1. JAZZ & SOUL: ROOTLESS VOICINGS
     const shouldBeRootless = shouldUseRootlessVoicing(state, quality, is7th, genre, bassActive);
     if (shouldBeRootless) {
-        const rootless = getRootlessVoicing(state, quality, is7th, isRich || intensity > 0.6);
+        const rootless = getRootlessVoicing(state, quality, is7th, intensity > 0.6);
         if (rootless) {
             return rootless;
         }
@@ -334,7 +332,7 @@ export function getIntervals(
         } else if (quality === 'm#5') {
             // 1 b3 #5 (#1336). No natural 5 — the sharpened fifth IS the spelling, and
             // `isAltered5` (which matches '#5') keeps the >= 0.8 "Wall of Sound" backfill and
-            // the rich-density tier from adding one back. No `is7th` arm: no row in
+            // the later tiers from adding one back. No `is7th` arm: no row in
             // `SUFFIX_QUALITIES` encodes this quality with a seventh, so it never arrives with
             // one (unlike `aug`, whose `aug7`/`+7`/`7#5` rows do).
             intervals = [0, 3, 8];
@@ -342,7 +340,7 @@ export function getIntervals(
             // 1 b3 #5 b7 (#1340) — the m7 with its fifth raised (its scale is the fifth-less
             // Aeolian; see `theory-scales.ts`). No
             // natural 5: `isAltered5` matches this name's '#5' too, so neither the >= 0.8
-            // "Wall of Sound" backfill nor the rich-density tier can add one back, and the
+            // "Wall of Sound" backfill can add one back, and the
             // final-safety filter strips pitch class 7 regardless. The b7 is written, so the
             // `is7th` backfill at the end of this function finds it already present.
             intervals = [0, 3, 8, 10];
@@ -512,73 +510,7 @@ export function getIntervals(
         }
     }
 
-    // 4. DENSITY-BASED MODIFICATIONS
-    if (density === 'thin' && intervals.length >= 4) {
-        if (intervals.includes(7)) {
-            intervals = intervals.filter((i) => i !== 7);
-        }
-    } else if (isRich && intervals.length <= 5 && quality !== '5') {
-        const safeExtensions: Record<string, number[]> = {
-            major: [14], // 9
-            maj7: [14, 18], // 9, #11
-            minor: [14, 17], // 9, 11
-            m7: [14, 17], // 9, 11
-            7: [14, 21], // 9, 13
-            halfdim: [17], // 11
-            // why (#1336): without its own row `m#5` fell to the `isAltered5 ? [14, 18]`
-            // default below, and 18 is the #11 — a FLAT fifth stacked onto a chord written
-            // with a sharp one, two different fifths in one voicing. The minor family's own
-            // colours (9, 11) are the honest rich extension here, so this mirrors `minor`.
-            'm#5': [14, 17], // 9, 11
-            // why (#1340): identical reasoning to the `m#5` row above — the generic
-            // `isAltered5 ? [14, 18]` default's 18 is the #11, a FLAT fifth beside this chord's
-            // written SHARP one, two different fifths in one voicing. The minor family's own
-            // 9/11 are the honest colours. NOTE both these rows are intent, not behaviour,
-            // TODAY: each quality writes four tones, so the loop below pushes the 9 and hits its
-            // 5-voice cap before reading the second entry — the rows are what keeps the #11 out
-            // if either the cap or the written tone count ever changes.
-            'm7#5': [14, 17], // 9, 11
-            // why (#1340): a ♭6 chord's top two voices (5 and ♭6) are already a semitone pair,
-            // so the 9 alone is the colour that fits — the 11 would crowd that pair from below.
-            // Same as the non-altered default by value; explicit so a later `isAltered5`-style
-            // reclassification of this quality can't silently hand it the #11.
-            mb6: [14], // 9
-            // why (#1341): this row read [14, 22] under the same "9, #11" comment — but 22 is
-            // pitch class 10, a b7. A plain C+ at rich density became C+7: dominant function
-            // the chart never wrote, which states the 7th two bars early in the line cliché
-            // an aug triad usually lives in (C | C+ | C6 | C7). The #11 keeps the whole-tone
-            // colour without changing the chord's function; aug7 arrives with its own b7.
-            aug: [14, 18], // 9, #11
-            augmaj7: [14, 18], // 9, #11
-            '7alt': [13, 15, 20], // b9, #9, b13
-            9: [21], // 13
-            13: [18], // #11
-        };
-
-        // `quality` derives from chart text, so guard the lookup (#1341): a bare
-        // `safeExtensions['constructor']` is a truthy function that sails past `||`.
-        const ownExtensions = Object.hasOwn(safeExtensions, quality)
-            ? safeExtensions[quality]
-            : undefined;
-        const potential = isAltered9
-            ? [18] // #11 only: a natural 9 would rub the written b9/#9 (see isAltered9)
-            : ownExtensions || (isAltered5 ? [14, 18] : [14]);
-        for (const ext of potential) {
-            if (!intervals.includes(ext) && !intervals.includes(ext % 12)) {
-                // Final safety: don't add natural 5th if quality is altered/augmented
-                if (ext % 12 === 7 && (isAltered5 || isAug)) {
-                    continue;
-                }
-
-                intervals.push(ext);
-                if (intervals.length >= 5) {
-                    break;
-                }
-            }
-        }
-    }
-
-    // 5. ENSURE 7th if requested but not present
+    // 4. ENSURE 7th if requested but not present
     if (
         is7th &&
         ![
