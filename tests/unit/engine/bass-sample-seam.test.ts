@@ -63,7 +63,7 @@ describe('bass sample seam (#697)', () => {
         mocks.getPackZones.mockReturnValue([zone45]);
         mocks.pickZone.mockReturnValue(zone45);
 
-        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 0, 0);
+        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 0);
 
         expect(mocks.playSampledNote).toHaveBeenCalledTimes(1);
         const [, zone, dest, targetMidi, , opts] = mocks.playSampledNote.mock.calls[0];
@@ -80,7 +80,7 @@ describe('bass sample seam (#697)', () => {
         mocks.getPackZones.mockReturnValue([zone45]);
         mocks.pickZone.mockReturnValue(zone45);
 
-        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 1, 0);
+        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 1);
 
         // 0.8 * (1 - 1*0.85) = 0.12, * gain 2 = 0.24
         expect(mocks.playSampledNote.mock.calls[0][5].velocity).toBeCloseTo(0.24, 5);
@@ -95,7 +95,7 @@ describe('bass sample seam (#697)', () => {
         mocks.getPackZones.mockReturnValue([zone45]);
         mocks.pickZone.mockReturnValue(zone45);
 
-        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, true as never, 0);
+        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, true as never);
 
         // Same 0.24 the numeric `1` produces — not 1.6, which is what
         // `Number.isFinite(true) === false → mute = 0` used to yield.
@@ -107,7 +107,7 @@ describe('bass sample seam (#697)', () => {
         mocks.getPackZones.mockReturnValue([zone45]);
         mocks.pickZone.mockReturnValue(zone45);
 
-        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 2, 0);
+        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 2);
 
         // Previously `1 - 2*0.85 = -0.7` → a NEGATIVE velocity into playSampledNote.
         const { velocity } = mocks.playSampledNote.mock.calls[0][5];
@@ -119,7 +119,7 @@ describe('bass sample seam (#697)', () => {
         mocks.resolveInstrumentSource.mockReturnValue({ kind: 'sample', packId: 'upright-bass' });
         mocks.getPackZones.mockReturnValue(null); // not loaded yet
 
-        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 0, 0);
+        playBassNote(makeState('pack:upright-bass'), A2, 0, 0.5, 0.8, 0);
 
         expect(mocks.playSampledNote).not.toHaveBeenCalled();
     });
@@ -127,7 +127,7 @@ describe('bass sample seam (#697)', () => {
     it('does not touch the sample path for a synth voice', () => {
         mocks.resolveInstrumentSource.mockReturnValue({ kind: 'synth' });
 
-        playBassNote(makeState('synth'), A2, 0, 0.5, 0.8, 0, 0);
+        playBassNote(makeState('synth'), A2, 0, 0.5, 0.8, 0);
 
         expect(mocks.getPackZones).not.toHaveBeenCalled();
         expect(mocks.playSampledNote).not.toHaveBeenCalled();

@@ -125,7 +125,6 @@ function playBassNoteNew(
     duration: number,
     velocity = 1.0,
     muteAmount = 0,
-    bendStartInterval = 0,
 ): void {
     const { playback, bass, groove } = state;
     if (!playback.audio || !playback.audioGraph) {
@@ -141,16 +140,13 @@ function playBassNoteNew(
     // routes were confirmed reachable by mutation test — neither is reachable
     // from today's producers, which all emit 0 or 1.
     const mute = normalizeMuteAmount(muteAmount);
-    // Every other input is caller-supplied — guard them all. A non-finite
-    // `bendStartInterval` would otherwise poison `startFreq` and the pitch
-    // ramp anchor, silently dropping the voice.
+    // Every other input is caller-supplied — guard them all.
     if (
         !Number.isFinite(freq) ||
         !Number.isFinite(time) ||
         !Number.isFinite(duration) ||
         !Number.isFinite(velocity) ||
-        !Number.isFinite(mute) ||
-        !Number.isFinite(bendStartInterval)
+        !Number.isFinite(mute)
     ) {
         return;
     }
@@ -161,9 +157,6 @@ function playBassNoteNew(
         const audio = playback.audio;
         const now = audio.currentTime;
         const startTime = Math.max(time, now);
-        // Clamp the bend to a sane musical range so the pitch ramp can't start
-        // from a near-zero frequency (invalid exponential-ramp anchor).
-        const bend = Math.max(-24, Math.min(24, bendStartInterval));
 
         // The whole point of the New voice: velocity → timbre, not just level.
         // Convex curve (1.6) keeps soft notes round and dark; hard notes bloom.
@@ -194,23 +187,15 @@ function playBassNoteNew(
             return;
         }
 
-        const startFreq = bend !== 0 ? freq * 2 ** (bend / 12) : freq;
-        const bendRamp = Math.min(0.1, duration * 0.5);
-
         // --- Layer 1: clean sine sub (the weight) ---
         const sub = audio.createOscillator();
         sub.type = 'sine';
-        sub.frequency.setValueAtTime(startFreq, startTime);
+        sub.frequency.setValueAtTime(freq, startTime);
 
         // --- Layer 2: sawtooth harmonics through the velocity-brightened LP ---
         const saw = audio.createOscillator();
         saw.type = 'sawtooth';
-        saw.frequency.setValueAtTime(startFreq, startTime);
-
-        if (bend !== 0) {
-            sub.frequency.exponentialRampToValueAtTime(freq, startTime + bendRamp);
-            saw.frequency.exponentialRampToValueAtTime(freq, startTime + bendRamp);
-        }
+        saw.frequency.setValueAtTime(freq, startTime);
 
         // Base (fully-open) cutoff tracks pitch; `cutoffMult` scales it down on
         // soft notes, a palm-mute (`muteAmount`) rolls it down further.
@@ -271,13 +256,7 @@ function playBassNoteNew(
         // the kick's body or just be in-band bass-doubling).
         const subOct = audio.createOscillator();
         subOct.type = 'sine';
-        subOct.frequency.setValueAtTime(Math.max(10, startFreq / 2), startTime);
-        if (bend !== 0) {
-            subOct.frequency.exponentialRampToValueAtTime(
-                Math.max(10, freq / 2),
-                startTime + bendRamp,
-            );
-        }
+        subOct.frequency.setValueAtTime(Math.max(10, freq / 2), startTime);
         const subLp = audio.createBiquadFilter();
         subLp.type = 'lowpass';
         subLp.frequency.setValueAtTime(140, startTime);

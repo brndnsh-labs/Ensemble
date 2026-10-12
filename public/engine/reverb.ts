@@ -63,17 +63,12 @@ const DAMPING_Q_DB = -6;
 /** Input scale into the comb bank — keeps the summed wet return at a sane level. */
 const INPUT_SCALE = 0.025;
 
-/** Smoothing time-constant for real-time parameter ramps. */
-const RAMP_TC = 0.08;
-
 /**
  * Built-in presets. `size` scales the comb delay lengths (room dimension),
  * `rt60` is the -60 dB decay time in seconds, `damping` is the comb lowpass
  * cutoff in Hz (a darker tail uses a lower cutoff).
  */
 export const REVERB_PRESETS = {
-    /** Tight, fast — punchy genres (funk, rock, hip-hop). */
-    room: { size: 0.7, rt60: 0.8, damping: 4500 },
     /** Lush — ballads and jazz. */
     hall: { size: 1.2, rt60: 2.2, damping: 3000 },
 } as const satisfies Record<string, ReverbPreset>;
@@ -92,30 +87,8 @@ function combFeedbackFor(delaySec: number, rt60: number): number {
 }
 
 /**
- * Clamps `value` into `[lo, hi]`, substituting `fallback` if it is not finite.
- * `Math.max`/`Math.min` pass `NaN` through, and a `NaN` `AudioParam` write
- * throws — the setters must finite-guard, not merely clamp.
- */
-function safeClamp(value: number, lo: number, hi: number, fallback: number): number {
-    if (!Number.isFinite(value)) {
-        return fallback;
-    }
-    return Math.min(hi, Math.max(lo, value));
-}
-
-/** One self-looping comb filter: `delay → damping lowpass → feedback → delay`. */
-interface Comb {
-    readonly delay: DelayNode;
-    readonly damp: BiquadFilterNode;
-    readonly feedback: GainNode;
-    /** Base delay length in seconds (before the `size` multiplier). */
-    readonly baseDelay: number;
-}
-
-/**
  * Builds the algorithmic reverb on `ctx`. The returned object's `input`/`output`
- * nodes are wired into the master graph by the caller; the setters morph the
- * space in real time.
+ * nodes are wired into the master graph by the caller.
  */
 export function createAlgorithmicReverb(
     ctx: BaseAudioContext,
@@ -130,8 +103,8 @@ export function createAlgorithmicReverb(
     // feedback perfectly periodic.
     const snap = (sec: number) => Math.round(sec * ctx.sampleRate) / ctx.sampleRate;
 
-    let size = preset.size;
-    let rt60 = preset.rt60;
+    const size = preset.size;
+    const rt60 = preset.rt60;
 
     // --- Parallel comb banks (L and R, independently tuned) -------------
     // Every comb is fed from `input` and taps into the channel's combSum.
@@ -139,8 +112,7 @@ export function createAlgorithmicReverb(
     // other channel — which is what keeps the graph stable under Web Audio
     // (cross-coupled delay cycles self-oscillate even with provably sub-unity
     // gain on Chromium; see the top docstring).
-    const buildCombBank = (tunings: readonly number[], combSum: GainNode): Comb[] => {
-        const bank: Comb[] = [];
+    const buildCombBank = (tunings: readonly number[], combSum: GainNode): void => {
         for (const tuning of tunings) {
             const baseDelay = tuning / DESIGN_RATE;
 
@@ -160,17 +132,13 @@ export function createAlgorithmicReverb(
             delay.connect(damp);
             damp.connect(feedback);
             feedback.connect(delay); // self-loop
-
-            bank.push({ delay, damp, feedback, baseDelay });
         }
-        return bank;
     };
 
     const combSumL = ctx.createGain();
     const combSumR = ctx.createGain();
-    const combsL = buildCombBank(COMB_TUNING_44K_L, combSumL);
-    const combsR = buildCombBank(COMB_TUNING_44K_R, combSumR);
-    const combs: Comb[] = [...combsL, ...combsR];
+    buildCombBank(COMB_TUNING_44K_L, combSumL);
+    buildCombBank(COMB_TUNING_44K_R, combSumR);
 
     // --- Series allpass diffusers (per channel) -------------------------
     // Freeverb's allpass: `out = delayed - in`, `delayIn = in + fb·delayed`.
@@ -215,46 +183,5 @@ export function createAlgorithmicReverb(
     chainR.connect(stereoMerger, 0, 1);
     stereoMerger.connect(output);
 
-    const rampParam = (param: AudioParam, value: number, when: number) => {
-        // Guard both arguments — a NaN value or time write to an AudioParam
-        // throws. Every current caller pre-sanitizes, but this is the choke
-        // point so it must be safe for any future caller too.
-        if (!Number.isFinite(value)) {
-            return;
-        }
-        const at = Number.isFinite(when) ? Math.max(0, when) : ctx.currentTime;
-        param.setTargetAtTime(value, at, RAMP_TC);
-    };
-
-    const setDecay = (newRt60: number, when: number) => {
-        rt60 = safeClamp(newRt60, 0.05, 60, preset.rt60);
-        for (const c of combs) {
-            rampParam(c.feedback.gain, combFeedbackFor(c.baseDelay * size, rt60), when);
-        }
-    };
-
-    const setSize = (scale: number, when: number) => {
-        size = safeClamp(scale, 0.1, 2.0, preset.size);
-        for (const c of combs) {
-            // Comb delay length is set directly (snapped to an integer sample
-            // count); ramping it would pitch-bend the recirculating tail.
-            c.delay.delayTime.value = snap(c.baseDelay * size);
-            rampParam(c.feedback.gain, combFeedbackFor(c.baseDelay * size, rt60), when);
-        }
-    };
-
-    const setDamping = (cutoffHz: number, when: number) => {
-        const hz = safeClamp(cutoffHz, 200, 18000, preset.damping);
-        for (const c of combs) {
-            rampParam(c.damp.frequency, hz, when);
-        }
-    };
-
-    const applyPreset = (p: ReverbPreset, when: number) => {
-        setSize(p.size, when);
-        setDecay(p.rt60, when);
-        setDamping(p.damping, when);
-    };
-
-    return { input, output, setDecay, setSize, setDamping, applyPreset };
+    return { input, output };
 }

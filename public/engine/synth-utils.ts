@@ -107,8 +107,8 @@ interface MixState {
 export function updateDensityDucking(
     mixState: MixState,
     now: number,
-    threshold = 4,
-    factor = 0.02,
+    threshold = 18,
+    factor = 0.015,
 ): number {
     if (now - mixState.lastTick > 0.5) {
         mixState.recentHits *= 0.5;
@@ -140,8 +140,8 @@ export function duckGain(
     param: AudioParam,
     target: number,
     time: number,
-    attack = 0.01,
-    release = 0.1,
+    attack = 0.005,
+    release = 0.12,
 ): void {
     try {
         param.cancelScheduledValues(time);
@@ -300,7 +300,6 @@ interface ResonantToneOptions extends TwoStageDecayOptions {
     attack?: number;
     decay?: number;
     duration?: number;
-    detune?: number;
     /**
      * Optional cleanup callback fired once the tone has fully finished — after the
      * helper disconnects its own `[osc, gain]` chain. See `PercussiveStrikeOptions.onEnded`.
@@ -322,7 +321,6 @@ export function playResonantTone(
         attack = 0.001,
         decay = 0.05,
         duration = 0.5,
-        detune = 0,
         onEnded,
         holdTime,
         bodyDecay,
@@ -341,9 +339,6 @@ export function playResonantTone(
         osc.frequency.setValueAtTime(freqStart, time);
         if (freqStart !== freqEnd) {
             osc.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), time + rampDuration);
-        }
-        if (detune !== 0) {
-            osc.detune.setValueAtTime(detune, time);
         }
 
         gain.gain.setValueAtTime(0, time);
@@ -373,7 +368,7 @@ export function playResonantTone(
 // brightness. A real instrument hit harder gets *brighter* — more open, more
 // harmonics — not just louder. `velocityTimbre` is the shared mapping every
 // voice uses to turn a note's velocity into timbre controls: a filter-cutoff
-// multiplier and a saturation-drive amount, shaped by a tunable curve.
+// multiplier and a brightness scalar, shaped by a tunable curve.
 //
 // S7 lands the helper + one worked example (the `new` bass voice). Epics 2–5
 // apply it per voice.
@@ -393,11 +388,6 @@ export interface VelocityTimbreOptions {
      */
     readonly cutoffRange?: readonly [number, number];
     /**
-     * `[atSoft, atHard]` saturation drive, 0..1 — how hard to push a voice's
-     * waveshaper / pre-gain. Default `[0, 1]`.
-     */
-    readonly driveRange?: readonly [number, number];
-    /**
      * Top of the CALLER's velocity domain. Default `1` — velocities above unity
      * clamp and the timbre pins. Every OTHER current caller (drums, chords,
      * soloist) omits this option, so they keep that default; whether pinning is
@@ -409,7 +399,7 @@ export interface VelocityTimbreOptions {
      *
      * A voice whose engine emits above unity passes its real ceiling here (#1331:
      * the bass, `[0, 1.5]`). Velocities in `(1, maxVelocity]` then keep opening
-     * the filter and pushing the drive along a compressed extension instead of
+     * the filter and the brightness along a compressed extension instead of
      * pinning — because the timbre axis pinning *before* the level axis is what
      * makes an accent read as pumping rather than as digging in. Values ≤ 1 are
      * ignored (the default clamp applies), so this is opt-in and byte-identical
@@ -436,18 +426,16 @@ export interface VelocityTimbre {
     readonly brightness: number;
     /** Multiply a lowpass/voice cutoff by this — harder hit, brighter. */
     readonly cutoffMult: number;
-    /** Saturation drive, 0..1 — harder hit, more harmonics. */
-    readonly drive: number;
 }
 
 /**
  * Map a note's velocity to timbre controls. `velocity` is clamped to
  * `0..options.maxVelocity` (default 1), shaped through `options.curve`, then
- * mapped linearly into the cutoff and drive ranges. Pure and deterministic — no
+ * mapped linearly into the cutoff range. Pure and deterministic — no
  * allocation beyond the small returned object, safe to call per note.
  *
  * `brightness` is `0..1` on the default domain; on an extended domain it runs to
- * `1 + TIMBRE_OVERSHOOT_AT_CEILING`, so a `cutoffRange`/`driveRange` top can be
+ * `1 + TIMBRE_OVERSHOOT_AT_CEILING`, so a `cutoffRange` top can be
  * exceeded by that much on the hardest notes — intentional headroom, not a bug.
  */
 export function velocityTimbre(
@@ -459,7 +447,6 @@ export function velocityTimbre(
     const rawCurve = options.curve ?? 1.5;
     const curve = Number.isFinite(rawCurve) && rawCurve > 0 ? rawCurve : 1.5;
     const [cutLo, cutHi] = options.cutoffRange ?? [0.5, 1.5];
-    const [driveLo, driveHi] = options.driveRange ?? [0, 1];
     const rawMax = options.maxVelocity ?? 1;
     const maxV = Number.isFinite(rawMax) && rawMax > 1 ? rawMax : 1;
     const v = Number.isFinite(velocity) ? Math.min(maxV, Math.max(0, velocity)) : 0;
@@ -476,6 +463,5 @@ export function velocityTimbre(
     return {
         brightness,
         cutoffMult: cutLo + brightness * (cutHi - cutLo),
-        drive: driveLo + brightness * (driveHi - driveLo),
     };
 }
