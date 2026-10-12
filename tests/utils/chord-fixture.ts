@@ -12,9 +12,7 @@ export function makeChord(overrides: Partial<Chord> = {}): Chord {
     const intervals = overrides.intervals ?? [0, 4, 7];
     const quality = overrides.quality ?? 'maj';
     return {
-        romanName: 'I',
         absName: 'C',
-        nnsName: '1',
         display: {
             name: { root: 'C', suffix: '' },
             nns: { root: '1', suffix: '' },
@@ -34,8 +32,6 @@ export function makeChord(overrides: Partial<Chord> = {}): Chord {
         // meter — a truthy default here would silently override that fallback.
         timeSignature: '',
         key: 'C',
-        charStart: 0,
-        charEnd: 0,
         ...overrides,
     };
 }

@@ -1066,11 +1066,9 @@ function parseProgressionPart(
 
     const barParts = input.split(/(\|)/);
     let lastMidis = initialMidis || [];
-    let charOffset = 0;
 
     barParts.forEach((barOrPipe) => {
         if (barOrPipe === '|') {
-            charOffset += 1;
             return;
         }
 
@@ -1081,7 +1079,6 @@ function parseProgressionPart(
         const ts = TIME_SIGNATURES[timeSignature] || TIME_SIGNATURES['4/4'];
         const beatsPerChord = actualChordParts.length > 0 ? ts.beats / actualChordParts.length : 0;
 
-        let barInternalOffset = 0;
         chordTokens.forEach((token) => {
             if (token.trim().length > 0) {
                 const part = token.trim();
@@ -1269,13 +1266,9 @@ function parseProgressionPart(
                 );
 
                 let finalAbsName = formatted.name.root + formatted.name.suffix;
-                let finalNNSName = formatted.nns.root + formatted.nns.suffix;
-                let finalRomName = formatted.roman.root + formatted.roman.suffix;
 
                 if (bassPart && bassNameAbs) {
                     finalAbsName += `/${bassNameAbs}`;
-                    finalNNSName += `/${bassNameNNS}`;
-                    finalRomName += `/${bassNameRom}`;
                     formatted.name.bass = bassNameAbs;
                     // bassNameNNS/Rom are set alongside bassNameAbs above, so they're
                     // non-null whenever this guard passes; coalesce null→undefined to
@@ -1304,9 +1297,7 @@ function parseProgressionPart(
                     quality === 'mb6';
 
                 parsed.push({
-                    romanName: finalRomName,
                     absName: finalAbsName,
-                    nnsName: finalNNSName,
                     display: formatted,
                     isMinor: isMinor,
                     beats: beatsPerChord,
@@ -1316,15 +1307,11 @@ function parseProgressionPart(
                     intervals: intervals,
                     quality: quality,
                     is7th: is7th,
-                    charStart: charOffset + barInternalOffset,
-                    charEnd: charOffset + barInternalOffset + token.length,
                     timeSignature: timeSignature,
                     key: key,
                 });
             }
-            barInternalOffset += token.length;
         });
-        charOffset += barText.length;
     });
 
     return { chords: parsed, finalMidis: lastMidis };

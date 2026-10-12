@@ -97,12 +97,6 @@ interface PlayNoteOptions {
 // paired with the sampled-grand 3.5× lift in `playSampledChord`.
 const SYNTH_CHORD_LEVEL = 0.85;
 
-// #707/#691 — the release contract shared by the sampled and synth chord
-// voices. The old engine's scheduler called `release(when, fade)` on the previous
-// voicing when the harmony changed; this is the shape `playSampledNote` returns and
-// is structurally satisfied by the sampled `SampledNoteHandle`.
-type ChordVoiceHandle = { release(when: number, fade: number): void };
-
 type PlayNoteArgs = [
     state: EnsembleState,
     freq: number,
@@ -152,9 +146,7 @@ function playSampledChord(
     // vol ≈ 0.25). Same trap as #1332 (soloist) and #660 (bass); defer to
     // playSampledNote's MAX_SAMPLE_PEAK envelope ceiling instead.
     const velocity = (vol / Math.sqrt(numVoices)) * gainForPack(packId);
-    // Return the voice handle so a caller can release this voicing when the
-    // harmony changes (#691) — sustained packs hold flat and would otherwise ring
-    // into the next chord.
+    // Returned so `playNote` can tell whether the pack played or the synth must.
     return playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
         velocity,
         duration,
@@ -167,30 +159,26 @@ function playSampledChord(
 // synth-audit Epic 6 S1/S6 — instrument-source seam. A `pack:<id>` voice plays
 // from the sample pack once its zones are loaded; until then (or if a note is
 // out of range) it falls back to the synth voice — bit-identical with no packs.
-export function playNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
+export function playNote(...args: PlayNoteArgs): void {
     const source = resolveInstrumentSource(args[0].chords.voice);
     if (source.kind === 'sample') {
         const [state, freq, time, duration, opts] = args;
-        const handle = playSampledChord(state, source.packId, freq, time, duration, opts);
-        if (handle) {
-            return handle;
+        if (playSampledChord(state, source.packId, freq, time, duration, opts)) {
+            return;
         }
     }
-    // #707 — the synth path now returns a release handle too, so a caller
-    // (the old engine's scheduler, then) can cut a ringing synth voicing on a chord change exactly as it cuts a
-    // sampled one (was: returned null, so synth chords rang across the change).
-    return playSynthNote(...args);
+    playSynthNote(...args);
 }
 
 /** The synth chord voice: the synth-audit additive piano (the only one since #649 and #1424). */
-function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
+function playSynthNote(...args: PlayNoteArgs): void {
     const [state, freq, time, duration, opts = {}] = args;
     const { vol = 0.1, muted = false, numVoices = 1 } = opts;
     const { playback, groove } = state;
 
     // Nothing to schedule on an unusable context or a non-finite pitch.
     if (!playback.audio || !Number.isFinite(freq)) {
-        return null;
+        return;
     }
 
     const startTime = Math.max(time, playback.audio.currentTime);
@@ -298,10 +286,9 @@ function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
     // throw here would abort every later note in the chord, not just this
     // one.
     try {
-        return playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
+        playAdditiveBody(state, freq, startTime, duration, finalVol, muted);
     } catch (err) {
         console.error('playNote (new) additive-body error:', err);
-        return null;
     }
 }
 
@@ -320,10 +307,10 @@ function playAdditiveBody(
     duration: number,
     finalVol: number,
     muted: boolean,
-): ChordVoiceHandle | null {
+): void {
     const { playback } = state;
     if (!playback.audio || !playback.audioGraph) {
-        return null;
+        return;
     }
     const audio = playback.audio;
     const preset = PIANO_BODY;
@@ -406,7 +393,7 @@ function playAdditiveBody(
         // Defensive — unreachable for any real chord pitch, but never leave
         // the mix chain dangling without a source to drive `onended`.
         safeDisconnect([bodyGain, hpf, panner]);
-        return null;
+        return;
     }
 
     // Start every partial *before* any stop is scheduled — calling `stop()`
@@ -439,8 +426,7 @@ function playAdditiveBody(
         }
     };
 
-    // Natural end — hoisted so the release handle below can clamp its
-    // early stop into the voice's live window (never push the stop later).
+    // Natural end of the voice's live window.
     const effectiveDuration = muted ? 0.015 : duration;
     const naturalStop = startTime + effectiveDuration + 0.6;
 
@@ -451,33 +437,6 @@ function playAdditiveBody(
         o.stop(naturalStop);
     }
 
-    // #707/#691 — release handle so a caller can cut this synth voicing on
-    // a chord change, exactly as it cuts sampled voices. Mirrors the
-    // sampled voice's `choke`: ease the body to silence from its live value
-    // (after cancelling the pending decay → no click) and pull the partials'
-    // stop in — never later than the natural end. A release arriving after the
-    // natural stop has fired throws InvalidState, swallowed by the try/catch.
-    const releaseHandle: ChordVoiceHandle = {
-        release(when: number, fade: number): void {
-            try {
-                const tc = Math.max(0.005, Number.isFinite(fade) ? fade : 0.05);
-                const at = Number.isFinite(when)
-                    ? Math.max(startTime, Math.min(when, naturalStop))
-                    : audio.currentTime;
-                bodyGain.gain.cancelScheduledValues(at);
-                bodyGain.gain.setTargetAtTime(0, at, tc);
-                for (const o of oscs) {
-                    try {
-                        o.stop(Math.min(naturalStop, at + tc * 8));
-                    } catch {
-                        /* already stopped */
-                    }
-                }
-            } catch {
-                /* closed context / already stopped */
-            }
-        },
-    };
     // Stop's handle (#1569). A voice scheduled ahead of the clock but not yet sounding must
     // never sound: cancelling its attack from its own start would leave the gain at the
     // default 1 for a few milliseconds — a click — so its oscillators are stopped at their
@@ -498,5 +457,4 @@ function playAdditiveBody(
         }
         stopBody(when, true);
     });
-    return releaseHandle;
 }

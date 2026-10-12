@@ -92,6 +92,9 @@ import { getMidi } from '../../../public/utils.js';
 
 const { arranger, playback, bass, groove } = getState();
 
+// The chart shows this: the Roman numeral a chord is written as, bass included.
+const romanOf = (chord) => chord.display.roman.root + chord.display.roman.suffix;
+
 describe('Chords & Voicing Logic', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -282,8 +285,8 @@ describe('Chords & Voicing Logic', () => {
 
             validateProgression(getState());
 
-            expect(arranger.progression[0].romanName).toBe('#ivø');
-            expect(arranger.progression[1].romanName).toBe('VII7alt');
+            expect(romanOf(arranger.progression[0])).toBe('#ivø');
+            expect(romanOf(arranger.progression[1])).toBe('VII7alt');
         });
 
         it('should still treat plain vii7 as the natural half-diminished leading-tone chord', () => {
@@ -294,7 +297,7 @@ describe('Chords & Voicing Logic', () => {
             validateProgression(getState());
 
             expect(arranger.progression[0].quality).toBe('halfdim');
-            expect(arranger.progression[0].romanName).toBe('viiø');
+            expect(romanOf(arranger.progression[0])).toBe('viiø');
         });
 
         it('should preserve uppercase VII7 as an explicit dominant rather than forcing half-diminished', () => {
@@ -306,7 +309,7 @@ describe('Chords & Voicing Logic', () => {
 
             expect(arranger.progression[0].absName).toBe('A7');
             expect(arranger.progression[0].quality).toBe('7');
-            expect(arranger.progression[0].romanName).toBe('VII7');
+            expect(romanOf(arranger.progression[0])).toBe('VII7');
         });
 
         it('should spell sharp-side local-key chords with sharp absolute names', () => {
