@@ -1,4 +1,6 @@
+import { encodeChartLink } from '../../../public/songbook/chart-link';
 import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
+import { importTemplate } from './large-library';
 
 // Deterministic across both projects (Desktop Chrome and the WebKit-based
 // `webkit-phone` project, which grants no clipboard permission by default,
@@ -91,6 +93,53 @@ test('editing an opened share link before Keep a copy writes nothing to recovery
 
     await fresh.getByRole('button', { name: 'Song actions' }).click();
     await expect(fresh.getByText(/Preserved drafts \(/)).toHaveCount(0);
+});
+
+test('a share link too long to play is refused with the reason, not silently (#1632)', async ({
+    page,
+    context,
+}) => {
+    // A real measured chart (the app's own iReal import), re-shared with one section of 17
+    // bars x 64 chords played 64 times: 69,632 chord events, past the band's ceiling and well
+    // inside the codec's own limits.
+    const document = await importTemplate(page);
+    const [section] = document.chart.score.sections;
+    const dense = {
+        ...document,
+        chart: {
+            ...document.chart,
+            score: {
+                ...document.chart.score,
+                sections: [
+                    {
+                        ...section,
+                        repeat: 64,
+                        measures: Array.from({ length: 17 }, (_, bar) => ({
+                            id: `dense-${bar}`,
+                            content: {
+                                kind: 'events' as const,
+                                events: Array.from({ length: 64 }, () => ({
+                                    kind: 'chord' as const,
+                                    symbol: 'C',
+                                    duration: [1, 16] as [number, number],
+                                })),
+                            },
+                        })),
+                    },
+                ],
+            },
+        },
+    };
+
+    // A separate page, so the link is opened by a page load as a pasted link would be.
+    const fresh = await context.newPage();
+    const errors: string[] = [];
+    fresh.on('pageerror', (error) => errors.push(error.message));
+    await fresh.goto(appUrl(await encodeChartLink(dense)));
+    await expect(fresh.locator('.error-banner[role="alert"]')).toContainText(
+        'playback limit of 65,536 chord events',
+    );
+    expect(errors).toEqual([]);
 });
 
 test('a malformed share link fails closed with a visible error, not a crash', async ({ page }) => {

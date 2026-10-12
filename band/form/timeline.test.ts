@@ -1,3 +1,4 @@
+import { resolveScoreMeasureEvents } from '../../public/songbook/score-measure-events.js';
 import type { ScoreEvent, SemanticScore } from '../../public/songbook/score-types.js';
 import { PPQ } from '../core/types.js';
 import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
@@ -7,10 +8,17 @@ import {
     compileTimeline,
     FERMATA_STRETCH,
     firstSpanAfter,
+    MAX_PERFORMED_SPANS,
     secondsAt,
     spanIndexAt,
     type Timeline,
 } from './timeline.js';
+
+// The real resolver, wrapped only so the ceiling test can see that it never ran.
+vi.mock('../../public/songbook/score-measure-events.js', async (original) => {
+    const real = await original<typeof import('../../public/songbook/score-measure-events.js')>();
+    return { ...real, resolveScoreMeasureEvents: vi.fn(real.resolveScoreMeasureEvents) };
+});
 
 const BAR = PPQ * 4;
 
@@ -347,5 +355,55 @@ describe('tick lookups', () => {
             }
         }
         expect(failures.slice(0, 10)).toEqual([]);
+    });
+});
+
+describe('performed span ceiling (#1632)', () => {
+    /** A section of `bars` 4/4 bars, each of `perBar` equal chord events (durations are in beats). */
+    function denseSection(label: string, bars: number, perBar: number, repeat = 1) {
+        const built = score([{ label, bars: Array(bars).fill('C').join(' | '), repeat }]);
+        const [section] = built.sections;
+        section.id = `section-${label}`;
+        section.measures = section.measures.map((measure, i) => ({
+            ...measure,
+            id: `${label}-${i}`,
+            content: {
+                kind: 'events' as const,
+                events: Array.from({ length: perBar }, () => ({
+                    kind: 'chord' as const,
+                    symbol: 'C',
+                    duration: (perBar === 1 ? [4, 1] : [1, perBar / 4]) as [number, number],
+                })),
+            },
+        }));
+        return section;
+    }
+    const chart = (sections: SemanticScore['sections'], choruses?: number): SemanticScore => ({
+        ...score([{ label: 'x', bars: 'C' }]),
+        sections,
+        ...(choruses ? { choruses } : {}),
+    });
+
+    it('accepts exactly the ceiling and refuses one past it', () => {
+        // 16 bars x 64 events, played 64 times: exactly 65,536 performed events.
+        const at = [denseSection('A', 16, 64, 64)];
+        expect(compileTimeline(chart(at)).spans).toHaveLength(MAX_PERFORMED_SPANS);
+        // One more single-event bar is 65,537.
+        const past = [...at, denseSection('B', 1, 1)];
+        expect(() => compileTimeline(chart(past))).toThrow(
+            'This chart plays more than the playback limit of 65,536 chord events. Reduce repeats or chords per bar.',
+        );
+    });
+
+    it('refuses the 256 bars x 64 events x 64 choruses probe before any event is copied', () => {
+        const probe = chart([denseSection('A', 256, 64)], 64);
+        vi.mocked(resolveScoreMeasureEvents).mockClear();
+        // A counted chart is told choruses are one of the things to reduce.
+        expect(() => compileTimeline(probe)).toThrow(
+            'This chart plays more than the playback limit of 65,536 chord events. Reduce repeats, choruses or chords per bar.',
+        );
+        // The count comes from the written events and the performed bar order alone: the
+        // step that would copy a million events never runs.
+        expect(resolveScoreMeasureEvents).not.toHaveBeenCalled();
     });
 });

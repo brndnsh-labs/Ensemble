@@ -23,7 +23,8 @@ are separate from the implementation described here.
   and the chart draws (`lib/band-chart.ts`). The old engine's score playback
   (`prepareScorePlayback`, `arranger.scorePlan`) is gone: it refused holds, N.C., alternates,
   fermatas and off-grid lengths, all of which the band plays. A performed form is bounded to
-  16,384 measures by `compileScoreForm`; the wider authored codec remains separate, and
+  16,384 measures by `compileScoreForm` and to 65,536 chord events by `compileTimeline`
+  (`MAX_PERFORMED_SPANS`, #1632); the wider authored codec remains separate, and
   ambiguous navigation fails visibly before adoption.
 - Older preview clients reject v2 records and may fail to enumerate a mixed-version library.
   Keeping a v1 source protects its data, **not** cross-version simultaneous editing. Export

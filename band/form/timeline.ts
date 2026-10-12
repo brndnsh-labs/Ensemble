@@ -3,9 +3,9 @@
  * repeats) and rational durations become performed bars in integer ticks. Everything
  * downstream reads the timeline and never the score.
  *
- * Unlike the old step grid, nothing here rejects music: holds extend the chord before them,
- * N.C. is a span with no chord, fermatas stretch time, and any meter/grouping the codec
- * accepts gets a pulse skeleton.
+ * Unlike the old step grid, nothing here rejects music for what it says: holds extend the chord
+ * before them, N.C. is a span with no chord, fermatas stretch time, and any meter/grouping the
+ * codec accepts gets a pulse skeleton. The one refusal is for size (`MAX_PERFORMED_SPANS`).
  */
 
 import { resolveScoreContext } from '../../public/songbook/score-context.js';
@@ -16,6 +16,15 @@ import { type Lane, PPQ } from '../core/types.js';
 import { type ChordFacts, parseChord } from '../theory/chord.js';
 import { type KeyContext, notePc } from '../theory/pitch.js';
 import { buildMeter, type Meter } from './meter.js';
+
+/**
+ * The most chord events a performance may play, inclusive: exactly this many is accepted, one
+ * more is refused. `compileScoreForm` caps performed bars and `resolveScoreMeasureEvents` caps
+ * written events, but neither caps their product (bars x events per bar x choruses), so the
+ * count is checked here, from the performed bar order, before any span exists (#1632). Hold
+ * events that extend the chord before them still count: the bound is an upper bound on spans.
+ */
+export const MAX_PERFORMED_SPANS = 65_536;
 
 /** A fermata holds its chord for this multiple of the written length. */
 export const FERMATA_STRETCH = 2;
@@ -121,8 +130,41 @@ function repeatedFrom(before: number[], after: number[]): boolean {
     );
 }
 
+/**
+ * Refuse a chart that performs more than `MAX_PERFORMED_SPANS` chord events, counting from the
+ * written events and the performed bar order alone: no event is copied and no span built. A
+ * measure repeat counts as its source's events, the length `resolveScoreMeasureEvents` gives it.
+ */
+function checkPerformedSpans(
+    score: SemanticScore,
+    visits: readonly { sectionIndex: number; measureIndex: number }[],
+): void {
+    const written = new Map<string, number>();
+    const counts = score.sections.map((section) =>
+        section.measures.map((measure) => {
+            const { content } = measure;
+            const count =
+                content.kind === 'events'
+                    ? content.events.length
+                    : (written.get(content.measureId) ?? 0);
+            written.set(measure.id, count);
+            return count;
+        }),
+    );
+    let performed = 0;
+    for (const { sectionIndex, measureIndex } of visits) {
+        performed += counts[sectionIndex][measureIndex];
+        if (performed > MAX_PERFORMED_SPANS) {
+            throw new Error(
+                `This chart plays more than the playback limit of ${MAX_PERFORMED_SPANS.toLocaleString('en-US')} chord events. Reduce repeats${score.choruses !== undefined ? ', choruses' : ''} or chords per bar.`,
+            );
+        }
+    }
+}
+
 export function compileTimeline(score: SemanticScore): Timeline {
     const visitsWritten = compileScoreForm(score);
+    checkPerformedSpans(score, visitsWritten);
     const events = resolveScoreMeasureEvents(score);
 
     // Effective context for every written measure.

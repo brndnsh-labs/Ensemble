@@ -1274,7 +1274,14 @@ export default function Ensemble() {
         // `chart_opened` event instead of `share_opened`.
         const openSharedDraft = (link: ChartDocument, note: string, legacy: boolean) => {
             track('share_opened', { legacy });
-            landDraftOnStand(link, note);
+            // A link that decodes can still be one the band refuses (`checkPlayable`: too long
+            // to play, #1632). This runs outside `run()`, so say why here instead of leaving
+            // an unhandled rejection and a silent page.
+            try {
+                landDraftOnStand(link, note);
+            } catch (e) {
+                setError(e instanceof Error ? e.message : String(e));
+            }
         };
         // Consumed on load either way: a corrupt/foreign payload must not resurrect on
         // reload, and a successfully opened draft must not resurrect after "Keep a copy"
