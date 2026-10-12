@@ -163,7 +163,7 @@ function playSampledSolo(
     // soften the onset so the recorded pick transient is masked — a fretted-hand
     // articulation, not a picked one. Larger leaps and non-guitar sample voices
     // (sax/strings) keep the plain per-note attack. Never overrides an explicit
-    // scoop/cry (they're mutually exclusive with legato upstream).
+    // scoop (it is mutually exclusive with legato upstream).
     let bend = toSampleBend(bendStartInterval);
     let attack: number | undefined;
     if (!bend && isLegato && packId.includes('guitar') && prevFreq > 0 && freq > 0) {

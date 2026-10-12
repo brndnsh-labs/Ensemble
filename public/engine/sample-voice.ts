@@ -182,7 +182,7 @@ export interface SampledNoteOptions {
     readonly duration?: number;
     /** Opt-in continuous pitch vibrato (#744). Omitted → fixed pitch, as before. */
     readonly vibrato?: SampleVibrato;
-    /** Opt-in pitch bend — bend-in and/or bend-and-release (#744 Slice 2). */
+    /** Opt-in pitch bend-in (#744 Slice 2). */
     readonly bend?: SampleBend;
     /**
      * Opt-in per-pack tone-correction tilt in dB (#755) — positive brightens,
