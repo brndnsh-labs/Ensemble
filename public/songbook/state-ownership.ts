@@ -84,7 +84,6 @@ export const STATE_OWNERSHIP_MANIFEST = {
         autoSound: 'document',
         mode: 'document',
         autoMode: 'document',
-        style: 'document',
         volume: 'document',
         reverb: 'document',
         tradeWith: 'document',

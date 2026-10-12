@@ -43,7 +43,6 @@ export const soloist = deepSignal<SoloistState>({
     mode: 'monophonic',
     // #856 — Auto: phrasing mode follows the lead voice (guitar pack → guitar).
     autoMode: true,
-    style: 'smart',
     volume: 1.0,
     reverb: INSTRUMENT_REVERB_DEFAULTS.soloist,
     // Trading with the player on the band engine (`BandSettings.trade`): off, or the partner.
@@ -158,9 +157,6 @@ export function instrumentReducer(action: Action): boolean {
             }
             if (action.payload.bass) {
                 b.style = action.payload.bass;
-            }
-            if (action.payload.soloist) {
-                s.style = action.payload.soloist;
             }
             return true;
     }

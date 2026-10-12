@@ -7,8 +7,7 @@
         "tests",
         "scripts",
         "**/chord-presets.ts",
-        "**/smart-genres.ts",
-        "**/soloist-config.ts"
+        "**/smart-genres.ts"
     ],
     "absolute": true,
     "gitignore": true

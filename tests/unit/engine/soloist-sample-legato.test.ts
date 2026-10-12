@@ -49,7 +49,7 @@ function makeState(voice) {
     };
 }
 
-// playSoloNote(state, freq, time, duration, vol, bendStartInterval, style,
+// playSoloNote(state, freq, time, duration, vol, bendStartInterval,
 //              isLegato, vibrato, noteSeed, expression)
 const A4 = 440;
 const Bb4 = 466.1638; // a semitone above A4 — a stepwise hammer-on target
@@ -75,7 +75,7 @@ describe('sampled guitar legato slur (#855)', () => {
         const state = makeState('pack:electric-guitar-clean');
         state.soloist.audio.lastRenderedFreq = A4; // previous note
 
-        playSoloNote(state, Bb4, 0, 0.5, 0.8, 0, 'scalar', true);
+        playSoloNote(state, Bb4, 0, 0.5, 0.8, 0, true);
 
         const { bend, attack } = lastOpts();
         // Start a semitone BELOW the target (came from A4) and glide up = hammer-on.
@@ -92,7 +92,7 @@ describe('sampled guitar legato slur (#855)', () => {
         const state = makeState('pack:electric-guitar-clean');
         state.soloist.audio.lastRenderedFreq = A4;
 
-        playSoloNote(state, Bb4, 0, 0.5, 0.8, 0, 'scalar', false);
+        playSoloNote(state, Bb4, 0, 0.5, 0.8, 0, false);
 
         const { bend, attack } = lastOpts();
         expect(bend).toBeUndefined();
@@ -107,7 +107,7 @@ describe('sampled guitar legato slur (#855)', () => {
         const state = makeState('pack:electric-guitar-clean');
         state.soloist.audio.lastRenderedFreq = A4;
 
-        playSoloNote(state, A5, 0, 0.5, 0.8, 0, 'scalar', true); // octave leap
+        playSoloNote(state, A5, 0, 0.5, 0.8, 0, true); // octave leap
 
         const { bend, attack } = lastOpts();
         expect(bend).toBeUndefined();
@@ -119,7 +119,7 @@ describe('sampled guitar legato slur (#855)', () => {
         const state = makeState('pack:sax-alto');
         state.soloist.audio.lastRenderedFreq = A4;
 
-        playSoloNote(state, Bb4, 0, 0.5, 0.8, 0, 'scalar', true);
+        playSoloNote(state, Bb4, 0, 0.5, 0.8, 0, true);
 
         const { bend, attack } = lastOpts();
         expect(bend).toBeUndefined();
@@ -135,7 +135,7 @@ describe('sampled guitar legato slur (#855)', () => {
         state.soloist.audio.lastRenderedFreq = A4;
 
         // bendStartInterval = -2 (a whole-step scoop up) — legato must not override it.
-        playSoloNote(state, Bb4, 0, 0.5, 0.8, -2, 'scalar', true);
+        playSoloNote(state, Bb4, 0, 0.5, 0.8, -2, true);
 
         const { bend, attack } = lastOpts();
         expect(bend.fromSemitones).toBe(-2); // the scoop, not the computed legato interval
@@ -151,10 +151,10 @@ describe('sampled guitar legato slur (#855)', () => {
         const state = makeState('pack:electric-guitar-clean');
 
         // First note (no predecessor → no slur), then a contiguous legato step.
-        playSoloNote(state, A4, 0, 0.5, 0.8, 0, 'scalar', false);
+        playSoloNote(state, A4, 0, 0.5, 0.8, 0, false);
         expect(state.soloist.audio.lastRenderedFreq).toBe(A4);
 
-        playSoloNote(state, Bb4, 0.5, 0.5, 0.8, 0, 'scalar', true);
+        playSoloNote(state, Bb4, 0.5, 0.5, 0.8, 0, true);
         expect(lastOpts().bend.fromSemitones).toBeCloseTo(-1, 1);
         expect(state.soloist.audio.lastRenderedFreq).toBe(Bb4);
     });

@@ -5,7 +5,6 @@ const GENRE_DEFAULTS = {
 type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
     feel?: string;
     bass?: string;
-    soloist?: string;
     // #567 — per-genre default soloist phrasing mode, applied on genre selection.
     // Neo-Soul defaults to 'guitar' (2-voice) so its signature quartal/double-stop
     // color is live; in the default 'monophonic' mode those devices are polyphony-
@@ -31,10 +30,6 @@ const GENRE_OVERRIDES = {
     Rock: {
         feel: 'Rock',
         bass: 'rock',
-        // #592: the Rock genre plays its tailored 'rock' profile (bluesy
-        // bends/double-stops/pentatonic) — the idiomatic default. (#628 retired
-        // the old 'shred' fast-lead profile; Rock owns the Rock/Metal lead voice.)
-        soloist: 'rock',
         // #856 — guitar-idiom lead: 2-voice so the double-stops are live on the
         // synth lead too (not gated on installing the electric-guitar pack).
         soloistMode: 'guitar',
@@ -43,42 +38,32 @@ const GENRE_OVERRIDES = {
         feel: 'Jazz',
         chord: 'jazz',
         bass: 'quarter',
-        soloist: 'bird',
         meters: ['4/4', '3/4', '6/8'], // swing · jazz waltz · All Blues
     },
     Funk: {
         feel: 'Funk',
         chord: 'funk',
         bass: 'funk',
-        soloist: 'funk',
         // #856 — guitar-idiom lead: tasteful 2-voice chord-stab double-stops.
         soloistMode: 'guitar',
     },
     Disco: {
         feel: 'Disco',
         bass: 'disco',
-        soloist: 'disco',
     },
     'Hip Hop': {
         feel: 'Hip Hop',
         bass: 'hiphop',
-        // #555: was 'neo' — the smart key out-prioritized GENRE_STYLE_MAPPING's
-        // 'hiphop', so Hip Hop played Neo-Soul and the hand-tuned hiphop profile
-        // was dead. Flip to the dedicated hook-lane profile (resolution guarded in
-        // soloist-routing-guard.test.ts).
-        soloist: 'hiphop',
     },
     Blues: {
         feel: 'Blues',
         chord: 'jazz',
         bass: 'blues',
-        soloist: 'blues',
         meters: ['4/4', '12/8', '6/8'], // straight/shuffle · slow blues · All Blues
     },
     'Neo-Soul': {
         feel: 'Neo-Soul',
         bass: 'neo',
-        soloist: 'neo',
         // #567 — neo's quartal/guitarDouble color is polyphony-gated; default to
         // guitar (2-voice) so the signature double-stops are live in normal playback.
         soloistMode: 'guitar',
@@ -86,21 +71,12 @@ const GENRE_OVERRIDES = {
     Reggae: {
         feel: 'Reggae',
         bass: 'dub',
-        // #570: activate the tailored 'reggae' soloist profile (skank/offbeat:
-        // syncopationLikelihood 0.9, targetExtensions [2,6,9]) — it was fully
-        // orphaned behind the generic 'minimal', which lands square on the
-        // downbeats reggae deliberately leaves to bass + skank.
-        soloist: 'reggae',
     },
     Acoustic: {
         feel: 'Acoustic',
         // The chords lane plays a fingerpick arpeggio (the 'arp' style).
         chord: 'arp',
         bass: 'acoustic',
-        // #592: the Acoustic genre plays its hand-tuned 'acoustic' profile
-        // (space-over-flash: restBase 0.15, slide/run devices) rather than the
-        // generic 'minimal' it used to fall through to.
-        soloist: 'acoustic',
         // #856 — guitar-idiom lead: fingerstyle double-stops on the synth lead too.
         soloistMode: 'guitar',
         meters: ['4/4', '3/4'], // ballads & waltz-time singer-songwriter
@@ -109,13 +85,11 @@ const GENRE_OVERRIDES = {
         feel: 'Bossa Nova',
         chord: 'jazz',
         bass: 'bossa',
-        soloist: 'bossa',
     },
     Country: {
         feel: 'Country',
         chord: 'strum-country',
         bass: 'country',
-        soloist: 'country',
         // #856 — guitar-idiom lead: chicken-pickin' double-stops by default.
         soloistMode: 'guitar',
         meters: ['4/4', '3/4'], // two-step · country waltz
@@ -124,13 +98,11 @@ const GENRE_OVERRIDES = {
         feel: 'Metal',
         chord: 'power-metal',
         bass: 'metal',
-        soloist: 'metal',
     },
     'Ska-Punk': {
         feel: 'Ska',
         chord: 'ska-upstroke',
         bass: 'walking-ska',
-        soloist: 'ska-horns',
     },
 } satisfies Record<string, GenreOverride>;
 
