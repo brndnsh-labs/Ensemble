@@ -2,7 +2,6 @@ import { gainForPack, packSustains, toneTiltForPack } from '../data/sound-packs.
 import type { EnsembleState } from '../types.js';
 import { getMidi } from '../utils.js';
 import { safeDisconnect } from './audio-graph-utils.js';
-import { HUMANIZE_PROFILES, humanizePlacement, humanizeScale } from './humanize.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { getPackZones } from './pack-runtime.js';
 import {
@@ -88,7 +87,6 @@ export function killAllPianoNotes(state: EnsembleState): void {
 
 interface PlayNoteOptions {
     vol?: number;
-    index?: number;
     muted?: boolean;
     numVoices?: number;
 }
@@ -184,45 +182,10 @@ export function playNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
     return playSynthNote(...args);
 }
 
-// synth-audit Epic 2 S1 — strum-stagger. The `current` voice always received
-// the dead `index: 0` from the scheduler, so every chord note started
-// perfectly simultaneously. The `new` voice gets a real ascending pitch rank
-// and turns it into a low→high roll: a base ~4 ms-per-voice spread plus a
-// small deterministic timing jitter so the roll isn't mechanically linear.
-// The lowest note (index 0) is anchored exactly on the beat.
-const CHORD_STRUM_STEP = 0.004; // seconds of roll per chord-voice index
-// Fraction of the chords lane's timing spread the strum jitter may use. Kept
-// small so the roll stays a roll — the jitter shapes it, never reorders it.
-const CHORD_STRUM_JITTER = 0.15;
-
-/**
- * #1068 — the per-voice wobble on a chord roll, seeded and knob-gated.
- *
- * Was `Math.random()` in the legacy chord body and an un-gated fixed-scale
- * `humanizeNote` in this voice (a constant 0.15 that ignored `groove.humanize`
- * entirely, so a chart with the knob at 0 still got ±2.4 ms of strum jitter).
- * Now: deterministic in `(index, freq)` — the same voice of the same voicing
- * rolls the same way every time — and exactly 0 when the knob is off.
- *
- * The DETERMINISTIC part of the roll (`index * CHORD_STRUM_STEP`) is not
- * humanization and deliberately survives `humanize: 0`: it is the strum
- * articulation itself, and it only ever applies to a strummed voice
- * (`isStrummedChordVoice` — a keyboard is handed `index: 0` for every note).
- */
-function chordStrumJitter(index: number, freq: number, humanize: number | undefined): number {
-    return humanizePlacement(
-        index,
-        'chords-strum',
-        Math.round(freq),
-        HUMANIZE_PROFILES.chords.timeSpread * CHORD_STRUM_JITTER,
-        humanizeScale(humanize),
-    );
-}
-
 /** The synth chord voice: the synth-audit additive piano (the only one since #649 and #1424). */
 function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
     const [state, freq, time, duration, opts = {}] = args;
-    const { vol = 0.1, index = 0, muted = false, numVoices = 1 } = opts;
+    const { vol = 0.1, muted = false, numVoices = 1 } = opts;
     const { playback, groove } = state;
 
     // Nothing to schedule on an unusable context or a non-finite pitch.
@@ -230,14 +193,7 @@ function playSynthNote(...args: PlayNoteArgs): ChordVoiceHandle | null {
         return null;
     }
 
-    // Strum offset (Epic 2 S1) — 0 for the lowest note (index 0), ascending
-    // thereafter. The transient below fires at the strum-shifted start so it
-    // lands exactly on each note's onset, including the index-0 anchor.
-    let strum = 0;
-    if (index > 0) {
-        strum = index * CHORD_STRUM_STEP + chordStrumJitter(index, freq, groove?.humanize);
-    }
-    const startTime = Math.max(time + strum, playback.audio.currentTime);
+    const startTime = Math.max(time, playback.audio.currentTime);
 
     // A per-partial additive body (S4) with the attack transient (S2) and bright
     // layer (S3) on top.
