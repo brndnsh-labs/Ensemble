@@ -664,7 +664,8 @@ export function getCymbalMixScale(state: EnsembleState, name: CymbalName, layers
     const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
     // Over 4, the lane count before the harmony lane went (#1436): kept so the cymbal mix
     // for today's three pitched lanes is unchanged.
-    const crowding = layers / 4;
+    // A count that is not a number must not reach a gain: fall back to the switched-on lanes.
+    const crowding = (Number.isFinite(layers) ? layers : enabledLayerCount(state)) / 4;
     const genreFeel = state.groove?.genreFeel;
     const instrumentBase =
         name === 'HiHat' ? 0.96 : name === 'Ride' ? 0.92 : name === 'Open' ? 0.82 : 0.95;

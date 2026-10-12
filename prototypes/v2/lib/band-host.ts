@@ -165,24 +165,23 @@ export function bandEventLevel(event: BandEvent): { level: number; levelScale?: 
 }
 
 /**
- * How many of the pitched lanes (bass, comp, lead) sound in the section playing at `tick`: the
+ * How many of the pitched lanes (bass, comp, lead) the section playing at `tick` has: the
  * lanes switched on, less any the section's own `instruments` mutes (`SectionVisit.lanes`).
- * It is the band's own rule for who plays (`planBars` in `band/arrange/plan.ts`: lane power
- * AND the visit not muting it), read from the same timeline the band performed, so the cymbal
+ * It is the band's rule for a section's lanes (`planBars` in `band/arrange/plan.ts`: lane power
+ * AND the visit not muting it; a bar's own layouts, a trade or a drum break, are not counted),
+ * read from the same timeline the band performed, so the cymbal
  * trim (`getCymbalMixScale`) follows the section that is playing and never re-derives it from
  * the arranger's step maps. A tick outside every bar (none is expected) falls back to the
  * switched-on lanes, the rule for a hit with no section (`enabledLayerCount`).
  */
 export function soundingLayers(state: EnsembleState, timeline: Timeline, tick: number): number {
-    const visit = barAtTick(timeline, tick)?.visit;
-    const enabled = { bass: state.bass, comp: state.chords, lead: state.soloist };
-    let layers = 0;
-    for (const lane of ['bass', 'comp', 'lead'] as const) {
-        if (enabled[lane]?.enabled && visit?.lanes[lane] !== false) {
-            layers++;
-        }
-    }
-    return layers;
+    // Runs for every drum hit, so no objects are built here.
+    const lanes = barAtTick(timeline, tick)?.visit.lanes;
+    return (
+        (state.bass?.enabled && lanes?.bass !== false ? 1 : 0) +
+        (state.chords?.enabled && lanes?.comp !== false ? 1 : 0) +
+        (state.soloist?.enabled && lanes?.lead !== false ? 1 : 0)
+    );
 }
 
 /**

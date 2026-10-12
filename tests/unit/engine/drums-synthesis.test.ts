@@ -507,6 +507,19 @@ describe('Drum Synthesis', () => {
         expect(byLayers[3]).toBeLessThan(byLayers[2]);
     });
 
+    it('falls back to the switched-on lanes for a count that is not a number', () => {
+        const state = {
+            playback: { bandIntensity: 0.7 },
+            bass: { enabled: true },
+            chords: { enabled: true },
+            soloist: makeSoloistMock({ enabled: false }),
+        };
+
+        expect(getCymbalMixScale(state, 'Crash', Number.NaN)).toBe(
+            getCymbalMixScale(state, 'Crash', 2),
+        );
+    });
+
     it('counts the switched-on pitched lanes when no section says otherwise', () => {
         const state = (bass: boolean, chords: boolean, soloist: boolean) => ({
             bass: { enabled: bass },
