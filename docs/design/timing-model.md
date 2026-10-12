@@ -76,8 +76,7 @@ and the per-style critique claims in `band/test/claims/`.
 > offsets inside each `grooves/*.ts` strategy (the Neo-Soul snare drag and hat push); and the
 > grid was the scheduler's `calculateStepDuration`. None of that exists. In particular the
 > energy-scaled lean and the per-drum-piece offsets were not carried over: the band's lean is a
-> per-style constant and drums never lean. (`public/engine/humanize.ts` survives as a small
-> leaf used by the synth voices, not as the band's timing.)
+> per-style constant and drums never lean.
 
 ## 4. The retired gravity era (deleted — do not re-add)
 
