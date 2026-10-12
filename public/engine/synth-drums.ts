@@ -928,7 +928,7 @@ export function killDrumNote(state: EnsembleState): void {
         (groove as Mutable<typeof groove>).lastHatGain = null; // @direct-mutation
     }
     if (groove.lastSampledHatVoice) {
-        // Choke the ringing sampled open/loose hat too (#679), then drop the slot —
+        // Choke the ringing sampled open hat too (#679), then drop the slot —
         // parallel to lastHatGain above so a stop/reset doesn't leave it ringing.
         groove.lastSampledHatVoice.choke(playback.audio.currentTime);
         (groove as Mutable<typeof groove>).lastSampledHatVoice = null; // @direct-mutation
@@ -1088,7 +1088,7 @@ function tryPlaySampledDrum(
         return false;
     }
     // Hi-hat choke (#679): the kit is one physical hi-hat, so any new hat hit
-    // silences a still-ringing open/loose hat — cut it at this hit's onset before
+    // silences a still-ringing open hat — cut it at this hit's onset before
     // the new strike sounds. This is what lets an open hat carry a natural decay
     // (the sample rings out) yet stay tight in hat-dense genres like disco, where
     // the downbeat closed hat chokes the offbeat open (the classic "tss-chk"). The
@@ -1114,7 +1114,7 @@ function tryPlaySampledDrum(
             ctx.releasePanner();
         },
     });
-    // Only the ringing hats (open / semi-open) are worth choking later; closed and
+    // Only the ringing hat (open) is worth choking later; closed and
     // pedal hits are already short, so they choke others but aren't tracked themselves.
     if (voice && isRingingHat(name)) {
         groove.lastSampledHatVoice = voice; // @direct-mutation
@@ -1122,14 +1122,14 @@ function tryPlaySampledDrum(
     return true;
 }
 
-/** Any hi-hat articulation — all of these choke a ringing open/loose hat. */
+/** Any hi-hat articulation — all of these choke a ringing open hat. */
 export function isHatName(name: string): boolean {
     return name === 'HiHat' || name === 'Open' || name === 'HiHatPedal';
 }
 
 /**
- * The hats that ring long enough to be worth tracking + choking (open +
- * semi-open). Deliberately a **strict subset** of {@link isHatName}: closed and
+ * The hat that rings long enough to be worth tracking + choking (open).
+ * Deliberately a **strict subset** of {@link isHatName}: closed and
  * pedal hats *choke* a ringing voice (so they're in `isHatName`) but are too
  * short to need choking themselves (so they're excluded here). Keep this asymmetry
  * — widening it to match `isHatName` would re-introduce the closed-hat pile-up.
@@ -1165,7 +1165,7 @@ function playDrumSoundNew(state: EnsembleState, name: string, time: number, velo
 }
 
 /**
- * Shared preamble for the Epic 4 S6 hand-percussion `new` voices: density
+ * Shared preamble for the shaker and the sampled strikes: density
  * ducking, the 2 ms scheduling guard, NaN-guarded velocity, the per-hit panner
  * (wired to the drums bus) and its release callback. Returns `null` when there
  * is no audio context. The `new` drum voice carries no un-seeded `velJitter`
@@ -1212,7 +1212,7 @@ function setupNewPercHit(
 }
 
 /**
- * `New`-voice shaker — Epic 4 S6. `current` is a fixed 6 kHz highpass strike.
+ * The shaker — Epic 4 S6.
  * Velocity opens the highpass (a hard shake is brighter, more present) and
  * lengthens the decay slightly so a hard shake sustains its "sh" tail.
  */
