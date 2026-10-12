@@ -198,7 +198,7 @@ const KNOWN_SOUND_NAMES = new Set<string>([
 const warnedUnknownSounds = new Set<string>();
 
 // why: enumerate the exact suffix vocabulary that each per-family dispatcher
-// branch in `playDrum` actually recognizes. Substring matching was too lax — a
+// branch in `playDrumSound` actually recognizes. Substring matching was too lax — a
 // typo would be exempt from the warning. Listing the legal suffixes here makes
 // typos warn loudly while preserving the exemption for canonical names. Each
 // entry is a tuple of `{ root, suffixes, spacedForm }`:
@@ -496,8 +496,8 @@ function ensureCymbalBuffer(
 // synthesized at runtime, so the bundle is unchanged.
 //
 // Resident-RAM ceiling: `CYMBAL_POOL_SIZE × (distinct cymbal keys reaching
-// `getVariedCymbalBuffer`)`. Today that key set is fixed at 2 (`hihatMetal`,
-// `openHatMetal`), so 8 metallic buffers — negligible. NOTE for future stories:
+// `getVariedCymbalBuffer`)`. Today that key set is fixed at 3 (`hihatMetal`,
+// `openHatMetal`, `rideMetal`), so 12 metallic buffers — negligible. NOTE for future stories:
 // `groove.audioBuffers` is created once (`state/groove.ts`) and has no reset or
 // prune path, so a `#pool` entry lives for the page lifetime. If a future story
 // derives `profile.key` dynamically (per groove / velocity / articulation), the
@@ -634,7 +634,7 @@ function createColoredNoiseBuffer(audioCtx: AudioContext): AudioBuffer {
 /**
  * Lazily create and cache one colored-noise buffer per tilt, under a derived
  * `groove.audioBuffers` key. One 4 s buffer per tilt for the page lifetime —
- * three tilts, negligible RAM, no reset path needed.
+ * a single tilt today, negligible RAM, no reset path needed.
  */
 function getColoredNoiseBuffer(
     audioCtx: AudioContext,
@@ -815,8 +815,8 @@ export function getSnareVoiceConfig(velocity: number): SnareVoiceConfig {
     };
 }
 
-// Key → pitch-class (0–11). Mirrors KEY_PC in soloist-phrase-first.ts — a stable
-// 12-name music constant, kept local to avoid a soloist→drum-synth import edge.
+// Key → pitch-class (0–11). A stable 12-name music constant, kept local (it mirrored
+// KEY_PC in the old engine's soloist-phrase-first.ts, to avoid a soloist→drum-synth import edge).
 const TOM_KEY_PC: Record<string, number> = {
     C: 0,
     'C#': 1,
@@ -1993,7 +1993,7 @@ function playDrumSoundCurrent(
     } else if (name.includes('Tom')) {
         // #730: tune the synth tom kit to the selected key so fills reinforce the
         // bass register harmonically instead of beating against it. Reads the live
-        // key at play time (main-thread synth voice) — no worker sync needed.
+        // key at play time (main-thread synth voice), so nothing has to sync it.
         const voiceConfig = getTomVoiceConfig(
             name,
             velocity,

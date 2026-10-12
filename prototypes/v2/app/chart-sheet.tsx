@@ -44,7 +44,7 @@ function chorusChoice(choruses: number | undefined): string {
  * The visible chord symbol in the chart's current notation (#1276). `chord.display`
  * (`FormattedChordNames`) is precomputed for all three notations by
  * `chords-engine.validateProgression()` regardless of which one is selected — the
- * same shared field `ChordVisualizer.tsx` reads in v1 — so switching notation is a
+ * same shared field v1's `ChordVisualizer.tsx` read — so switching notation is a
  * pure read-time choice, never a re-analysis of the chord.
  */
 function chordSymbol(chord: ChartChord, notation: ChartNotation): string {

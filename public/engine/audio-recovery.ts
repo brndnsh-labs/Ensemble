@@ -1,7 +1,7 @@
 import type { GlobalContext } from '../state/playback.js';
 
 /**
- * AudioRecovery.ts
+ * audio-recovery.ts
  *
  * robust "Watchdog" service that monitors the Web Audio Context for:
  * 1. Unexpected suspensions (OS interruptions, headset unplugging)

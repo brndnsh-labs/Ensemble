@@ -1260,8 +1260,8 @@ export default function Ensemble() {
         //      (a `#:~:text=` scroll anchor, a chat client's `#`) that is nobody's share link;
         //   3. otherwise any other non-empty hash, which stays on the v2 path so a corrupt
         //      `#chart=…` still says so.
-        // The `chart` key is `chart-link.ts`'s `CHART_LINK_KEY`; read here rather than
-        // imported because `public/` is live v1 production code this story does not touch.
+        // The `chart` key is `public/songbook/chart-link.ts`'s `CHART_LINK_KEY`, which is not
+        // exported; read here rather than exported because `public/` is live production code.
         const chartFragment = new URLSearchParams(hash.replace(/^#/, '')).has('chart');
         const entry = chartFragment ? 'v2' : hasV1SharePayload(search) ? 'v1' : hash ? 'v2' : null;
         if (!entry) {

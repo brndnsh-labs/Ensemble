@@ -10,7 +10,7 @@ import type { SampleZone } from './sample-voice.js';
  * Bridges the loader and the pitched-voice player: fetch a pack's manifest,
  * load+decode its samples (S3), then build the `SampleZone[]` (root MIDI +
  * decoded buffer) that `pickZone`/`playSampledNote` (S5) consume — cached per
- * pack so the chord/harmony/soloist seams can pull zones cheaply per note.
+ * pack so the chord/soloist seams can pull zones cheaply per note.
  *
  * `ensurePackLoaded` is idempotent and safe to call from a state effect every
  * time a `pack:<id>` voice is selected (or on play-start); the loader itself
@@ -95,9 +95,9 @@ export function ensurePackLoaded(audio: BaseAudioContext, packId: string): Promi
  * no-op for synth voices). Called from `initAudio` so a persisted/selected pack
  * voice loads whenever audio comes up — regardless of which path initialized it.
  * This is the fix for #666: the only prior trigger was the `ACTIONS.INIT_AUDIO`
- * effect, which fires solely from the Sounds panel, so the normal play path's
- * direct `initAudio()` call left a persisted pack voice unloaded (silent synth
- * fallback) until the user visited Settings.
+ * effect (deleted since, #1381), which fired solely from v1's Sounds panel, so the
+ * normal play path's direct `initAudio()` call left a persisted pack voice unloaded
+ * (silent synth fallback) until the user visited Settings.
  */
 export function ensurePacksForVoices(
     audio: BaseAudioContext,

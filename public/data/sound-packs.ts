@@ -302,10 +302,12 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // Rhythm-guitar CHORDS voice (#698). Same 13 crunch zones as the driven
         // LEAD pack (electric-guitar-driven) — a distinct catalog id so the chord
         // seat calibrates independently of the lead seat (`gain`/`reverbSend` are
-        // per-pack-id). The chords engine reduces its voicings to POWER CHORDS
-        // (root+5+oct) when this voice is active — distorted triads mud up (the
+        // per-pack-id). The old chords engine reduced its voicings to POWER CHORDS
+        // (root+5+oct) when this voice was active (`applyPowerChordVoicing`, behind a
+        // `tick-logic.ts` gate, both deleted); the band's Metal comp plays them now
+        // (`band/styles/metal.ts`). Distorted triads mud up (the
         // thirds clash under drive), which is the whole reason a guitar plays
-        // power chords (`applyPowerChordVoicing`, tick-logic gate).
+        // power chords.
         // GAIN calibrated 2026-07-01 via `mix-report --calibrate-pack=chords:electric-guitar-rhythm`
         // (RMS-match to the synth chords baseline). Suggested 4.157× (mean Δ 0.33
         // dB across rock/blues/jazz/funk); seated at 4.2×. The pack reads +481 Hz

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // re-triggered a fresh pluck on every note, so runs read as horn-like. These lock
 // the producer decision — WHEN a legato guitar note glides into pitch from its
 // predecessor and softens its attack — without pulling in the real audio graph
-// (the sample scheduler is mocked; the "does it sound right" call is by-ear).
+// (the sample voice is mocked; the "does it sound right" call is by-ear).
 
 const mocks = vi.hoisted(() => ({
     resolveInstrumentSource: vi.fn(),

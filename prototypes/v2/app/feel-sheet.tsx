@@ -9,7 +9,7 @@ import { useRangeCommit } from './use-range-commit';
 
 /**
  * Compound meters already notate the shuffle feel in the written rhythm, so Swing
- * would double it — mirrors `InstrumentRail.tsx`'s `SWING_DISABLED_METERS`.
+ * would double it — mirrors v1's `InstrumentRail.tsx` `SWING_DISABLED_METERS` (deleted).
  */
 const SWING_DISABLED_METERS = new Set(['6/8', '12/8']);
 

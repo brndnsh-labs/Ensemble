@@ -1,7 +1,9 @@
 // Canonical note-spelling policy — the single source of truth for how a pitch
 // class is rendered as a letter name given a key context. Both the chord-render
-// path (`chords-engine.ts`) and the chord *editor* (`ChordPicker.tsx`) spell
-// through here, so a chart and the picker that edits it never disagree.
+// path (`chords-engine.ts`) and the v2 chart and voicing code
+// (`prototypes/v2/lib/band-chart.ts`, `lib/voicings/adapter.ts`) spell through here,
+// so a chart and the voicings drawn from it never disagree. (v1's chord editor,
+// `ChordPicker.tsx`, spelled through here too.)
 //
 // Policy: pitch is always correct regardless of spelling (Gb == F#). This only
 // chooses the *notation*. Sharp keys spell with sharps so charts read the way a

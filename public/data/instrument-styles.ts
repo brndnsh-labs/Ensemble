@@ -95,8 +95,8 @@ const KNOWN_CHORD_STYLES: ReadonlySet<string> = new Set([
  * why (#1257): `CHORD_STYLES` is the **picker** list — UI metadata. It is NOT the
  * set of values `chords.style` can hold, because the genre table routes styles the
  * picker doesn't offer: Acoustic sets `chord: 'arp'` (see `GENRE_OVERRIDES` in
- * smart-genres.ts), which `comping-emit.ts` reads via `chords.style === 'arp'` to
- * emit the fingerpick arpeggio. Validating untrusted input against the picker list
+ * smart-genres.ts), which the old engine's `comping-emit.ts` read via `chords.style === 'arp'`
+ * to emit the fingerpick arpeggio. Validating untrusted input against the picker list
  * alone therefore *rejects a live style* — sharing an Acoustic session silently
  * dropped its arpeggio and landed the recipient's current comp style instead. The
  * share reader is not re-applying the genre either (it writes `genreFeel` without
@@ -142,8 +142,7 @@ const KNOWN_HARMONY_STYLES: ReadonlySet<string> = new Set(HARMONY_STYLES.map((s)
  * set a bass `style` — it checks the field name, not the value — but nothing does). The old engine's genre
  * tables routed bass and soloist at *read* time without ever writing the
  * resolved key back to the slice.
- * (`scripts/ensemble-analysis-utils.ts` does drive all four lanes, but only with
- * values already in these lists — checked, not assumed.) So the picker list
+ * So the picker list
  * genuinely is the whole keyspace here — see `isKnownChordStyle` above for why
  * that is emphatically NOT true of chords.
  */

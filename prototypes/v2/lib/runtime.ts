@@ -710,7 +710,7 @@ export async function setVoice(
         await prepareSound(voice.slice(5), progress);
     }
     // Keep the old selection throughout download/failure. Dispatch through the
-    // established effects and worker delta (including crunch chord voicing).
+    // established effects (including crunch chord voicing).
     dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module, voice, auto });
     if (auto && module === 'soloist') {
         // Auto dispatch normally runs inside genre resolution; this explicit
@@ -720,7 +720,7 @@ export async function setVoice(
     rebuild();
 }
 
-/** Live bus gain — mirrors `InstrumentSettings.tsx`'s `updateInstrumentAudio`. */
+/** Live bus gain — mirrors v1's `InstrumentSettings.tsx` `updateInstrumentAudio` (deleted). */
 export function setVolume(module: InstrumentModule, value: number): void {
     dispatch(ACTIONS.SET_VOLUME, { module, value });
 }
@@ -852,7 +852,7 @@ export function setCountIn(enabled: boolean): void {
  * Patch both so either schema's next `captureDocument()` reflects the change. No
  * `rebuild()`/`editScore()`: notation is a pure display selector over the chord's
  * already-precomputed `display: FormattedChordNames` (all three notations are always
- * present), so it never touches arrangement layout, generation, or the worker.
+ * present), so it never touches arrangement layout or the band.
  */
 export function setNotation(notation: ChartNotation): void {
     dispatch(ACTIONS.SET_NOTATION, notation);

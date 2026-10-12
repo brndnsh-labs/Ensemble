@@ -23,8 +23,8 @@ function sectionAtStep(arranger: ArrangerState | null | undefined, step: number)
         return null;
     }
     // sectionMap is one chart pass while transport steps are monotonic. Normalize
-    // here so every section-aware consumer (worker generation, live scheduling,
-    // conductor, and practice playback) gets the same override on later loops.
+    // here so every section-aware consumer (the drum voices' band-layer count and the bus
+    // mute logic in `engine.ts`) gets the same override on later loops.
     const totalSteps = arranger.totalSteps || 0;
     const chartStep = totalSteps > 0 ? ((step % totalSteps) + totalSteps) % totalSteps : step;
     const entry = binarySearchMap(map, chartStep);
@@ -56,8 +56,8 @@ export function isInstrumentActiveAtStep(
 /**
  * True when a lane can sound anywhere in this chart.
  *
- * Audio buses and worker heads are chart-wide resources: a globally-muted lane
- * still needs a live bus/head when a later section explicitly forces it on.
+ * Audio buses are chart-wide resources (the old engine's worker heads were too): a
+ * globally-muted lane still needs a live bus when a later section explicitly forces it on.
  * Per-step emission remains governed by `isInstrumentActiveAtStep` above.
  */
 export function isInstrumentEverActive(

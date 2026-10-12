@@ -4,8 +4,8 @@
  * What belongs here: the wire format for getting a chart *out of* and *back
  * into* the app — Unicode-safe Base64, the minified section payload used by
  * share URLs and saved presets, and the section-id generator that
- * deserialization has to mint. These are main-thread concerns only; the logic
- * worker never encodes or decodes a share payload.
+ * deserialization has to mint. These are main-thread concerns only; the band
+ * and the voices never encode or decode a share payload.
  *
  * What does NOT belong here: musical/timing math (`../utils.js`), seeded RNG
  * and hashing (`../engine/hash-utils.js`), or raw string sanitization

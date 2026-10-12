@@ -151,7 +151,7 @@ export function handleEffects(
         case ACTIONS.SET_PARAM: {
             // #1128 — master volume writes via SET_PARAM (playback.masterVolume),
             // not a dedicated action; ramp the master bus here instead of in
-            // Settings.tsx so any non-slider writer (preset apply, restore) also
+            // v1's Settings.tsx so any non-slider writer (preset apply, restore) also
             // gets the live ramp — mirrors SET_VOLUME above for the per-bus case.
             if (action.payload?.module === 'playback' && action.payload?.param === 'masterVolume') {
                 syncMasterVolume(stateMap);

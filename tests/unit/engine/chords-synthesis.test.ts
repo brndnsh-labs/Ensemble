@@ -144,10 +144,10 @@ describe('Chord Synthesis', () => {
         expect(sinePartials.length).toBeGreaterThan(1);
     });
 
-    // #707 B1 — the synth chord voice used to return null, so the scheduler's
+    // #707 B1 — the synth chord voice used to return null, so the old scheduler's
     // chord-change release (#691) only ever cut sampled voices and a synth
     // voicing rang across the change. It now returns a release handle, exactly
-    // like the sampled path, so the scheduler can track + cut it.
+    // like the sampled path, so a caller can track + cut it.
     describe('#707 B1 — synth chord voice release handle', () => {
         it('returns a handle with release() for the (no-pedal) synth Piano voice', () => {
             const handle = playNote(getState(), 440, 10, 1.0);

@@ -18,7 +18,7 @@ const BASS_SPACE_FEELS = new Set([
     // why: #1216 — the riddim is bass-led: the bass line is reggae's melodic
     //      subject, not its floor, and both comping lanes sit deliberately above
     //      it (the backbeat skank on the chords channel, the organ bubble on the
-    //      harmony channel). Doubling roots down there is the mud this set
+    //      old engine's harmony channel). Doubling roots down there is the mud this set
     //      exists to prevent. Same class as the entries above; it was an
     //      omission rather than a decision — the set had never been pinned.
     //      Audible consequence: WRITTEN minor-7th skanks voice rootless; plain
@@ -28,9 +28,10 @@ const BASS_SPACE_FEELS = new Set([
     //      Two knock-ons, both already accepted for the six feels above: the old
     //      engine's grounded-voicing rule re-admitted the
     //      root on identity-losing qualities (halfdim/dim/alt) for Reggae, and
-    //      the soloist's voicing-derived `chordMask` treats the root as a
-    //      non-chord-tone on 7th-family chords — see engine/CLAUDE.md #6; bend
-    //      and slide targets already derive from `quality`, not the mask.
+    //      the old soloist's voicing-derived `chordMask` treated the root as a
+    //      non-chord-tone on 7th-family chords (engine/CLAUDE.md #6 is gone with
+    //      that engine); bend and slide targets already derived from `quality`,
+    //      not the mask.
     'Reggae',
 ]);
 
@@ -125,9 +126,9 @@ export function shouldUseRootlessVoicing(
 }
 
 /**
- * Lowest MIDI the comp voices to. Deliberately NOT bass-aware (#1313): tick-logic's
- * `enforceRegisterSlotting` clamps every chords note to 52-84 one note at
- * a time, so a lower parse floor (the old bass-off 43) only ever produced voicings
+ * Lowest MIDI the comp voices to. Deliberately NOT bass-aware (#1313): the old engine's
+ * tick-logic `enforceRegisterSlotting` clamped every chords note to 52-84 one note at
+ * a time (the band's keyboard comp slot is the same 52-84), so a lower parse floor (the old bass-off 43) only ever produced voicings
  * whose bottom notes were then folded up INDIVIDUALLY — re-inverting the chord
  * (Dm9 from D3 became F-A-C-D-E, an F6/9) and clustering it. "The comp states the
  * root when the bass is muted" is delivered by pitch-class presence, not register.

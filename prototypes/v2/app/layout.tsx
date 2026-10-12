@@ -18,8 +18,8 @@ export const metadata: Metadata = {
     ...(AT_SITE_ROOT
         ? {
               manifest: '/manifest.json',
-              // Both of v1's links, not just the Apple one: `public/index.html` also carries
-              // `<link rel="icon" type="image/svg+xml" href="icon.svg">`, and a tab that lost
+              // Both of v1's links, not just the Apple one: v1's `public/index.html` (deleted)
+              // also carried `<link rel="icon" type="image/svg+xml" href="icon.svg">`, and a tab that lost
               // its favicon at the cutover would be a visible regression nobody asked for.
               icons: { icon: '/icon.svg', apple: '/icon-maskable-512.png' },
           }
