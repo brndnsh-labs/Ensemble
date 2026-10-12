@@ -75,118 +75,6 @@ function makeCtx() {
 
 const zone = (rootMidi: number): SampleZone => ({ rootMidi, buffer: fakeBuffer() });
 
-describe('sampled held-voice dynamics (#1147)', () => {
-    it('keeps release automation finite for a zero-tail sample', () => {
-        const { ctx, gain } = makeCtx();
-        const voice = playSampledNote(
-            ctx,
-            { rootMidi: 60, buffer: fakeBuffer(20) },
-            {} as AudioNode,
-            60,
-            10,
-            { duration: 2, release: 0 },
-        );
-        voice?.release(11, 0.05);
-        expect(gain.gain.calls.every((c: { value: number }) => Number.isFinite(c.value))).toBe(
-            true,
-        );
-    });
-
-    it('evaluates an early stop before an already-queued future gain extension', () => {
-        const { ctx, gain } = makeCtx();
-        const voice = playSampledNote(
-            ctx,
-            { rootMidi: 60, buffer: fakeBuffer(20) },
-            {} as AudioNode,
-            60,
-            10,
-            { duration: 2, attack: 0.2, velocity: 1 },
-        );
-        expect(voice?.extend(10.15, 2, 1.08)).toBe(true);
-        voice?.release(10.05, 0.05);
-        expect(
-            gain.gain.calls
-                .filter((c: { op: string; time: number }) => c.op === 'ramp' && c.time === 10.05)
-                .at(-1)?.value,
-        ).toBeCloseTo(0.25, 8);
-    });
-
-    it('uses the new hold release and lets a panic bring a queued release forward', () => {
-        const { ctx, source, gain } = makeCtx();
-        const voice = playSampledNote(
-            ctx,
-            { rootMidi: 60, buffer: fakeBuffer(20) },
-            {} as AudioNode,
-            60,
-            10,
-            { duration: 2, velocity: 1, release: 0.3 },
-        );
-        expect(voice?.extend(12, 0.43, 1, 0.172)).toBe(true);
-        expect(source.stop.mock.calls.at(-1)?.[0]).toBeCloseTo(12.612, 8);
-        voice?.release(12.5, 0.05);
-        voice?.release(12.1, 0.05);
-        expect(gain.gain.setTargetAtTime).toHaveBeenLastCalledWith(0, 12.1, 0.0125);
-        expect(source.stop.mock.calls.at(-1)?.[0]).toBeCloseTo(12.2, 8);
-    });
-    it('extends one source from baseline through a swell and back, without accumulating gain', () => {
-        const { ctx, source, gain } = makeCtx();
-        const handle = playSampledNote(
-            ctx,
-            { rootMidi: 60, buffer: fakeBuffer(30) },
-            {} as AudioNode,
-            60,
-            10,
-            { duration: 2, velocity: 0.5 },
-        );
-        expect(handle?.extend(12, 2, 0.54)).toBe(true);
-        expect(handle?.extend(14, 2, 0.5)).toBe(true);
-        expect(ctx.createBufferSource).toHaveBeenCalledTimes(1);
-        expect(source.start).toHaveBeenCalledTimes(1);
-        expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.54, 12.03);
-        expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 14.03);
-        expect(source.stop).toHaveBeenLastCalledWith(16.09);
-        handle?.release(15, 0.05);
-        expect(handle?.extend(15, 2, 0.5)).toBe(false);
-    });
-
-    it('refuses extension before onset, after stop, or beyond pitch-adjusted sample length', () => {
-        const { ctx, gain } = makeCtx();
-        const handle = playSampledNote(
-            ctx,
-            { rootMidi: 60, buffer: fakeBuffer(10) },
-            {} as AudioNode,
-            72,
-            10,
-            { duration: 2 },
-        );
-        const calls = gain.gain.calls.length;
-        expect(handle?.extend(9, 2, 0.5)).toBe(false);
-        expect(handle?.extend(12.5, 1, 0.5)).toBe(false);
-        expect(handle?.extend(12, 3, 0.5)).toBe(false); // octave up: buffer ends at 15, before requested release
-        expect(handle?.extend(12, 1, Number.NaN)).toBe(false);
-        expect(gain.gain.calls).toHaveLength(calls);
-    });
-
-    it('cleans up after an extended source and never revives an ended voice', () => {
-        const { ctx, source, gain } = makeCtx();
-        const onEnded = vi.fn();
-        const handle = playSampledNote(
-            ctx,
-            { rootMidi: 60, buffer: fakeBuffer(20) },
-            {} as AudioNode,
-            60,
-            10,
-            { duration: 2, onEnded },
-        );
-        expect(handle?.extend(12, 2, 0.5)).toBe(true);
-        source.onended();
-        expect(source.disconnect).toHaveBeenCalledTimes(1);
-        expect(gain.disconnect).toHaveBeenCalledTimes(1);
-        expect(onEnded).toHaveBeenCalledTimes(1);
-        expect(handle?.extend(13, 2, 0.5)).toBe(false);
-    });
-});
-
 describe('sample-voice — pitchRatio', () => {
     it('is unity at the root (in tune where recorded)', () => {
         expect(pitchRatio(60, 60)).toBe(1);
@@ -251,7 +139,6 @@ describe('sample-voice — playSampledNote', () => {
         const { ctx, gain, source } = makeCtx();
         playSampledNote(ctx, zone(60), {} as AudioNode, 60, 2.0, {
             attack: 0.01,
-            release: 0.1,
             velocity: 0.8,
             duration: 0.5,
         });
@@ -259,8 +146,8 @@ describe('sample-voice — playSampledNote', () => {
         expect(c[0]).toEqual({ op: 'set', value: 0, time: 2.0 }); // start silent
         expect(c[1]).toEqual({ op: 'ramp', value: 0.8, time: 2.01 }); // attack to peak
         expect(c[2]).toEqual({ op: 'set', value: 0.8, time: 2.5 }); // hold-plateau anchor
-        expect(c[3]).toEqual({ op: 'ramp', value: 0, time: 2.0 + 0.5 + 0.1 }); // release to 0
-        expect(source.stop).toHaveBeenCalledWith(2.0 + 0.5 + 0.1 + 0.01);
+        expect(c[3]).toEqual({ op: 'ramp', value: 0, time: 2.0 + 0.5 + 0.08 }); // release to 0
+        expect(source.stop).toHaveBeenCalledWith(2.0 + 0.5 + 0.08 + 0.01);
     });
 
     it('keeps a monotonic envelope when duration < attack (no ramp inversion)', () => {
@@ -268,28 +155,25 @@ describe('sample-voice — playSampledNote', () => {
         // duration 0 < attack 0.01 → releaseStart floors to the attack endpoint.
         playSampledNote(ctx, zone(60), {} as AudioNode, 0, 0, {
             attack: 0.01,
-            release: 0.1,
             duration: 0,
         });
         const times = gain.gain.calls.map((x: any) => x.time);
-        // releaseStart = max(0+0.01, 0+0) = 0.01, so: 0, 0.01, 0.01, 0.11
-        expect(times).toEqual([0, 0.01, 0.01, 0.11]);
+        // releaseStart = max(0+0.01, 0+0) = 0.01, so: 0, 0.01, 0.01, 0.09
+        expect(times).toEqual([0, 0.01, 0.01, 0.09]);
         for (let i = 1; i < times.length; i++) {
             expect(times[i]).toBeGreaterThanOrEqual(times[i - 1]); // never goes backwards
         }
-        expect(source.stop).toHaveBeenCalledWith(0.01 + 0.1 + 0.01);
+        expect(source.stop).toHaveBeenCalledWith(0.01 + 0.08 + 0.01);
     });
 
-    it('disconnects its node chain on end, then fires onEnded (no per-note leak)', () => {
+    it('disconnects its node chain on end (no per-note leak)', () => {
         const { ctx, source, gain } = makeCtx();
-        const onEnded = vi.fn();
-        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, { onEnded });
+        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0);
         // The note schedules a self-cleanup handler rather than leaking nodes.
         expect(typeof source.onended).toBe('function');
         source.onended(); // simulate playback finishing
         expect(source.disconnect).toHaveBeenCalled();
         expect(gain.disconnect).toHaveBeenCalled();
-        expect(onEnded).toHaveBeenCalledTimes(1);
     });
 
     it('allows over-unity velocity up to the sanity ceiling, defaults non-finite to full', () => {
@@ -325,20 +209,16 @@ describe('sample-voice — playSampledNote', () => {
         expect(source.start).toHaveBeenCalledWith(5);
     });
 
-    it('bails and fires onEnded on a missing buffer/destination (graceful fallback)', () => {
+    it('bails with no voice on a missing buffer/destination (graceful fallback)', () => {
         const { ctx } = makeCtx();
-        const onEnded = vi.fn();
-        playSampledNote(
+        const handle = playSampledNote(
             ctx,
             { rootMidi: 60, buffer: null as unknown as AudioBuffer },
             {} as AudioNode,
             60,
             0,
-            {
-                onEnded,
-            },
         );
-        expect(onEnded).toHaveBeenCalledTimes(1);
+        expect(handle).toBeNull();
         expect(ctx.createBufferSource).not.toHaveBeenCalled();
     });
 
@@ -547,58 +427,11 @@ describe('sample-voice — playSampledNote bend (#744 Slice 2)', () => {
         expect(arrive.value).toBeCloseTo(1, 10); // ramps to the base rate (in tune)
     });
 
-    it('renders a bend-and-release: base → up to peak → back to base', () => {
-        const { ctx, source } = makeCtx();
-        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 10, {
-            duration: 2, // hold window 2s from t=10
-            bend: { peakSemitones: 2, onsetFrac: 0.1, peakFrac: 0.4, releaseFrac: 0.8 },
-        });
-        const c = source.playbackRate.calls;
-        // base anchor at start, base re-anchored at onset, exp ramp UP to +2st, exp ramp back to base.
-        expect(c[0]).toMatchObject({ op: 'set', value: 1, time: 10 });
-        const onsetAnchor = c.find((x: any) => x.op === 'set' && x.time > 10);
-        expect(onsetAnchor.time).toBeCloseTo(10 + 0.1 * 2, 6); // onsetFrac·hold
-        const ramps = c.filter((x: any) => x.op === 'exp');
-        expect(ramps).toHaveLength(2);
-        expect(ramps[0].value).toBeCloseTo(2 ** (2 / 12), 6); // up to whole step
-        expect(ramps[0].time).toBeCloseTo(10 + 0.4 * 2, 6); // peakFrac·hold
-        expect(ramps[1].value).toBeCloseTo(1, 10); // back to base
-        expect(ramps[1].time).toBeCloseTo(10 + 0.8 * 2, 6); // releaseFrac·hold
-        // Strictly increasing schedule (no inverted ramps).
-        const times = c.map((x: any) => x.time);
-        for (let i = 1; i < times.length; i++) {
-            expect(times[i]).toBeGreaterThanOrEqual(times[i - 1]);
-        }
-    });
-
-    it('holds the peak (no return) when releaseFrac is omitted', () => {
+    it('anchors at the base rate with no ramp for a zero bend-in', () => {
         const { ctx, source } = makeCtx();
         playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, {
             duration: 2,
-            bend: { peakSemitones: 1, onsetFrac: 0.1, peakFrac: 0.5 },
-        });
-        const ramps = source.playbackRate.calls.filter((x: any) => x.op === 'exp');
-        expect(ramps).toHaveLength(1); // only the up-bend, never returns
-        expect(ramps[0].value).toBeCloseTo(2 ** (1 / 12), 6);
-    });
-
-    it('scales the bend by the zone shift (transposed notes bend in tune)', () => {
-        const { ctx, source } = makeCtx();
-        // A fifth up: base ratio 2^(7/12); a +2 peak is base·2^(2/12).
-        playSampledNote(ctx, zone(60), {} as AudioNode, 67, 0, {
-            duration: 2,
-            bend: { peakSemitones: 2, onsetFrac: 0.1, peakFrac: 0.5, releaseFrac: 0.8 },
-        });
-        const ramps = source.playbackRate.calls.filter((x: any) => x.op === 'exp');
-        expect(ramps[0].value).toBeCloseTo(2 ** (7 / 12) * 2 ** (2 / 12), 6);
-        expect(ramps[1].value).toBeCloseTo(2 ** (7 / 12), 6); // back to the (shifted) base
-    });
-
-    it('no-ops the bend-and-release for a non-positive peak', () => {
-        const { ctx, source } = makeCtx();
-        playSampledNote(ctx, zone(60), {} as AudioNode, 60, 0, {
-            duration: 2,
-            bend: { peakSemitones: 0, fromSemitones: 0 },
+            bend: { fromSemitones: 0 },
         });
         // Only the base anchor — no ramps at all.
         expect(source.playbackRate.calls.filter((x: any) => x.op === 'exp')).toHaveLength(0);
@@ -632,14 +465,6 @@ describe('sample-voice — playSampledStrike (sampled drums #662)', () => {
         expect(c[2]).toEqual({ op: 'set', value: 0.7, time: 5 }); // hold across full 2 s buffer
         expect(c[3]).toEqual({ op: 'ramp', value: 0, time: 5.01 }); // release after the tail
         expect(source.stop).toHaveBeenCalledWith(5.01 + 0.01);
-    });
-
-    it('honors an explicit shorter duration (choke a hit)', () => {
-        const { ctx, gain } = makeCtx();
-        playSampledStrike(ctx, fakeBuffer(2), {} as AudioNode, 0, { duration: 0.1 });
-        // releaseStart = max(0.002, 0.1) = 0.1, not the 2 s buffer length.
-        const hold = gain.gain.calls.find((x: any) => x.op === 'set' && x.value > 0);
-        expect(hold.time).toBe(0.1);
     });
 
     it('allows over-unity velocity (calibrated gain) up to the sanity ceiling', () => {
@@ -924,11 +749,9 @@ describe('sample-voice — a sustaining note outlasts its recording (#1532)', ()
 
     it('a release stops every pass, and the voice ends when the last one has', () => {
         const { ctx, sources } = makeLoopCtx();
-        const onEnded = vi.fn();
         const voice = playSampledNote(ctx, organ, {} as AudioNode, 60, 1, {
             duration: 12,
             sustain: true,
-            onEnded,
         });
         voice?.release(6, 0.01);
         for (const source of sources) {
@@ -937,8 +760,8 @@ describe('sample-voice — a sustaining note outlasts its recording (#1532)', ()
         sources.slice(0, -1).forEach((source) => {
             source.onended();
         });
-        expect(onEnded).not.toHaveBeenCalled();
+        expect(sources[0].disconnect).not.toHaveBeenCalled();
         sources.at(-1).onended();
-        expect(onEnded).toHaveBeenCalledTimes(1);
+        expect(sources[0].disconnect).toHaveBeenCalled();
     });
 });

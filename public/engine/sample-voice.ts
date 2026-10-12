@@ -151,12 +151,6 @@ export interface SampledNoteHandle {
      * once. No-op-safe if the voice has already ended.
      */
     release(when: number, fade: number): void;
-    /**
-     * Continue a fixed-pitch sample without another attack. False means the
-     * source cannot cover the new hold (ended, released, or buffer exhausted).
-     * Callers may then crossfade a fresh source at this existing note event.
-     */
-    extend(when: number, duration: number, velocity: number, release?: number): boolean;
 }
 
 /** Time constant for the choke ramp — ~3·tc ≈ 12 ms to inaudible, click-free. */
@@ -182,8 +176,6 @@ export interface SampleVibrato {
 export interface SampledNoteOptions {
     /** Linear attack ramp (s). */
     readonly attack?: number;
-    /** Linear release ramp (s) after the held duration. */
-    readonly release?: number;
     /** 0..1 → envelope peak gain. */
     readonly velocity?: number;
     /** Seconds the note is held at peak before the release ramp. */
@@ -203,6 +195,13 @@ export interface SampledNoteOptions {
      * as a struck or plucked one should. A note the recording covers is untouched either way.
      */
     readonly sustain?: boolean;
+    /** The lane a stop silences this voice with (`releaseSampledVoices`). Omitted: none. */
+    readonly lane?: SampleLane;
+}
+
+export interface SampledStrikeOptions {
+    /** 0..1 → envelope peak gain. */
+    readonly velocity?: number;
     /** The lane a stop silences this voice with (`releaseSampledVoices`). Omitted: none. */
     readonly lane?: SampleLane;
     readonly onEnded?: () => void;
@@ -345,7 +344,7 @@ export function pickRoundRobin<T>(takes: readonly T[], seed: number): T | null {
  * bus's EQ, reverb send, ducking, and limiting — the identical downstream path
  * the synth drum voice uses.
  *
- * `duration` defaults to the buffer's full length so the natural decay tail
+ * The hit holds the buffer's full length so the natural decay tail
  * rings out; callers fold the pack's calibrated `gainForPack` into `velocity`.
  * Returns a {@link SampleVoiceHandle} so a later hit can choke this one (hi-hat
  * choke, #679), or `null` when it bails (firing `onEnded`) on a missing
@@ -375,19 +374,17 @@ function scheduleEnvelope(
     return releaseStart;
 }
 
+/** A struck sample's linear attack ramp (s). */
+const STRIKE_ATTACK = 0.002;
+/** A struck sample's linear release ramp (s) after its hold. */
+const STRIKE_RELEASE = 0.01;
+
 export function playSampledStrike(
     audio: AudioContext,
     buffer: AudioBuffer | null,
     destination: AudioNode,
     time: number,
-    {
-        attack = 0.002,
-        release = 0.01,
-        velocity = 1,
-        duration,
-        lane,
-        onEnded,
-    }: Omit<SampledNoteOptions, 'duration'> & { duration?: number } = {},
+    { velocity = 1, lane, onEnded }: SampledStrikeOptions = {},
 ): SampleVoiceHandle | null {
     if (!audio || !buffer || !destination) {
         onEnded?.();
@@ -396,14 +393,10 @@ export function playSampledStrike(
 
     try {
         const startTime = Number.isFinite(time) ? time : audio.currentTime;
-        // Hold the whole recording by default — a real cymbal/snare carries its
-        // own decay, so cutting it short (the way the synth strike's envelope
-        // does) would amputate the tail. A caller can pass a shorter `duration`
-        // to choke a hit (e.g. a closed hat).
-        const hold =
-            Number.isFinite(duration) && (duration as number) > 0
-                ? (duration as number)
-                : buffer.duration;
+        // Hold the whole recording — a real cymbal/snare carries its own decay, so
+        // cutting it short (the way the synth strike's envelope does) would amputate
+        // the tail. A later hit chokes it instead (hi-hat choke, #679).
+        const hold = buffer.duration;
         // Same over-unity ceiling as playSampledNote: a loudness-calibrated kit
         // folds gainForPack into velocity and may sit above 1.0; the bus limiter
         // catches stacked peaks, MAX_SAMPLE_PEAK bounds a config typo.
@@ -415,7 +408,14 @@ export function playSampledStrike(
         source.buffer = buffer;
 
         const gain = audio.createGain();
-        const releaseStart = scheduleEnvelope(gain, startTime, peak, attack, hold, release);
+        const releaseStart = scheduleEnvelope(
+            gain,
+            startTime,
+            peak,
+            STRIKE_ATTACK,
+            hold,
+            STRIKE_RELEASE,
+        );
 
         source.connect(gain);
         gain.connect(destination);
@@ -427,7 +427,7 @@ export function playSampledStrike(
             onEnded?.();
         };
 
-        const naturalEnd = releaseStart + release + 0.01;
+        const naturalEnd = releaseStart + STRIKE_RELEASE + 0.01;
         source.start(startTime);
         source.stop(naturalEnd);
 
@@ -523,41 +523,20 @@ function attachSampleVibrato(
 }
 
 /**
- * A pitch-bend gesture for a sampled note (#744 Slice 2). Covers both shapes the
- * soloist needs, rendered as automation on `BufferSource.playbackRate`:
- *  - **bend-in** (`fromSemitones`): start the note off-pitch and ramp *to* it —
- *    the existing `bendStartInterval` scalar, finally rendered on the sampled
- *    seam (it was synth-only before this slice).
- *  - **bend-and-release** (`peakSemitones` + fractions): hold the written pitch, bend
- *    *up* to a peak, and (with `releaseFrac`) come back — the blues "cry".
- * The two compose; a vibrato LFO (if any) sums on top of whatever the bend is
- * doing, so a held bend can still shimmer.
+ * A pitch bend for a sampled note (#744 Slice 2): a **bend-in** (`fromSemitones`) — start the
+ * note off-pitch and ramp *to* it, the `bendStartInterval` scalar (a scoop), rendered as
+ * automation on `BufferSource.playbackRate`. A vibrato LFO (if any) sums on top of it.
  */
 export interface SampleBend {
     /** Start offset from the target, in semitones (bend-IN). 0/omit = start in tune. */
     fromSemitones?: number;
-    /** Peak offset *above* the target for a bend-and-release. 0/omit = no up-bend. */
-    peakSemitones?: number;
-    /** When the up-bend leaves the note (0..1 of hold). */
-    onsetFrac?: number;
-    /** When it reaches the peak (0..1 of hold). */
-    peakFrac?: number;
-    /** When it returns to the target (0..1 of hold). Omit = hold the peak. */
-    releaseFrac?: number;
     /**
      * Bend-IN glide duration in seconds. Omit → the default short scoop glide
      * (`min(0.1, hold·0.5)`). A guitar legato slur (hammer-on/pull-off) passes a
      * short value (~0.04s) so the pitch snaps into place like a fretted slur, not
-     * a slow scoop. Only affects the `fromSemitones` glide, never the cry's
-     * up-bend timing (which stays fraction-of-hold based). #855.
+     * a slow scoop. #855.
      */
     inSeconds?: number;
-}
-
-/** Clamp to [0,1], mapping a non-finite input to the given fallback. */
-export function clampFrac(v: number | undefined, fallback: number): number {
-    const n = Number.isFinite(v) ? (v as number) : fallback;
-    return Math.max(0, Math.min(1, n));
 }
 
 /**
@@ -595,29 +574,6 @@ function scheduleSampleBend(
     } else {
         rate.setValueAtTime(baseRate, startTime);
     }
-
-    // Bend-and-release: hold the written pitch to `onset`, bend up to `peak`, and
-    // (if a release is given) ramp back. Times are kept strictly increasing so
-    // the ramps never invert. No-op for a zero/negative peak or a zero-length note.
-    // When a bend-IN is also present, the onset anchor is pushed past the glide's
-    // end so the re-anchor never truncates the in-progress bend-in — the two
-    // genuinely compose (the producer keeps them exclusive today, but the
-    // primitive stays honest for the wider callers Slice 3 adds).
-    const peak = Number.isFinite(bend.peakSemitones) ? (bend.peakSemitones as number) : 0;
-    if (peak > 0 && dur > 0) {
-        const rawOnset = startTime + clampFrac(bend.onsetFrac, 0.2) * dur;
-        const onsetT = from !== 0 ? Math.max(rawOnset, bendInEnd + 0.01) : rawOnset;
-        const peakT = Math.max(onsetT + 0.01, startTime + clampFrac(bend.peakFrac, 0.5) * dur);
-        rate.setValueAtTime(baseRate, onsetT);
-        rate.exponentialRampToValueAtTime(ratioAt(peak), peakT);
-        if (Number.isFinite(bend.releaseFrac)) {
-            const relT = Math.max(
-                peakT + 0.01,
-                startTime + clampFrac(bend.releaseFrac, 0.85) * dur,
-            );
-            rate.exponentialRampToValueAtTime(baseRate, relT);
-        }
-    }
 }
 
 /**
@@ -626,7 +582,7 @@ function scheduleSampleBend(
  * gain envelope, and connects to `destination` (the instrument's `[name]Gain`
  * node) so it inherits that bus's EQ, reverb send, and limiting.
  *
- * Bails (firing `onEnded`) on a missing context, buffer, or destination — the
+ * Bails (returning `null`) on a missing context, buffer, or destination — the
  * graceful-fallback contract the registry relies on.
  */
 export function playSampledNote(
@@ -637,7 +593,6 @@ export function playSampledNote(
     time: number,
     {
         attack = 0.005,
-        release = 0.08,
         velocity = 1,
         duration = 0.5,
         vibrato,
@@ -645,13 +600,12 @@ export function playSampledNote(
         tone,
         sustain,
         lane,
-        onEnded,
     }: SampledNoteOptions = {},
 ): SampledNoteHandle | null {
     if (!audio || !zone?.buffer || !destination) {
-        onEnded?.();
         return null;
     }
+    const release = 0.08;
 
     try {
         // Sanitize the scheduling inputs so a stray non-finite value (e.g. an
@@ -724,13 +678,10 @@ export function playSampledNote(
 
         // Stop just past the release tail so the source frees itself; never cut
         // the envelope short.
-        let naturalEnd = releaseStart + release + 0.01;
+        const naturalEnd = releaseStart + release + 0.01;
         let ended = false;
         let releasedAt = Number.POSITIVE_INFINITY;
-        // Only fixed-pitch voices can use the buffer-duration calculation.
-        // Bends/vibrato retain their existing one-shot lifecycle.
-        const bufferEnd = startTime + zone.buffer.duration / baseRate;
-        let envelope = {
+        const envelope = {
             start: startTime,
             from: 0,
             attackEnd: startTime + attack,
@@ -738,16 +689,8 @@ export function playSampledNote(
             releaseStart,
             end: releaseStart + release,
         };
-        // A panic can precede an extension already queued by lookahead. Keep
-        // the prior segments until this finite recording ends so that release
-        // evaluates the envelope at the requested time, not the last queued one.
-        const envelopes = [envelope];
         const holdEnvelope = (at: number) => {
-            let index = envelopes.length - 1;
-            while (index > 0 && envelopes[index].start > at) {
-                index--;
-            }
-            const segment = envelopes[index];
+            const segment = envelope;
             // Reconstruct the scheduled value, not AudioParam.value (which is
             // the audio clock's value, wrong for lookahead and offline renders).
             const ramping = at < segment.attackEnd || at > segment.releaseStart;
@@ -788,9 +731,9 @@ export function playSampledNote(
               )
             : [];
 
-        // Disconnect the node chain once the note finishes, then fire onEnded —
-        // the same self-cleanup contract as `playPercussiveStrike`, so sampled
-        // notes don't leak a source+gain per played note.
+        // Disconnect the node chain once the note finishes — the same self-cleanup
+        // contract as `playPercussiveStrike`, so sampled notes don't leak a
+        // source+gain per played note.
         // The later passes of a looped note, each starting as the one before fades out.
         const stops = [looped ? firstEnd + 0.01 : Number.POSITIVE_INFINITY];
         if (looped) {
@@ -839,7 +782,6 @@ export function playSampledNote(
                 ...(toneTilt?.nodes ?? []),
                 ...vibratoNodes,
             ]);
-            onEnded?.();
         };
         for (const each of sources) {
             each.onended = finish;
@@ -849,49 +791,6 @@ export function playSampledNote(
         stopAll(naturalEnd);
 
         const handle: SampledNoteHandle = {
-            extend(when: number, duration: number, velocity: number, nextTail = release): boolean {
-                if (
-                    ended ||
-                    looped ||
-                    Number.isFinite(releasedAt) ||
-                    bend ||
-                    vibrato ||
-                    !Number.isFinite(when) ||
-                    !Number.isFinite(duration) ||
-                    duration <= 0 ||
-                    !Number.isFinite(velocity) ||
-                    !Number.isFinite(nextTail) ||
-                    nextTail < 0 ||
-                    when < envelope.start ||
-                    when >= Math.min(naturalEnd, bufferEnd) ||
-                    when + duration + nextTail > bufferEnd
-                ) {
-                    return false;
-                }
-                const at = Math.max(when, audio.currentTime);
-                if (at >= Math.min(naturalEnd, bufferEnd) || at + duration + nextTail > bufferEnd) {
-                    return false;
-                }
-                const from = holdEnvelope(at);
-                const nextPeak = Math.max(0, Math.min(MAX_SAMPLE_PEAK, velocity));
-                const attackEnd = at + Math.min(0.03, duration / 2);
-                const nextRelease = at + duration;
-                gain.gain.linearRampToValueAtTime(nextPeak, attackEnd);
-                gain.gain.setValueAtTime(nextPeak, nextRelease);
-                gain.gain.linearRampToValueAtTime(0, nextRelease + nextTail);
-                envelope = {
-                    start: at,
-                    from,
-                    attackEnd,
-                    peak: nextPeak,
-                    releaseStart: nextRelease,
-                    end: nextRelease + nextTail,
-                };
-                envelopes.push(envelope);
-                naturalEnd = nextRelease + nextTail + 0.01;
-                source.stop(naturalEnd);
-                return true;
-            },
             release(when: number, fade: number): void {
                 if (ended) {
                     return;
@@ -921,7 +820,6 @@ export function playSampledNote(
         return handle;
     } catch {
         /* ignore audio errors (e.g. a closed context) */
-        onEnded?.();
         return null;
     }
 }

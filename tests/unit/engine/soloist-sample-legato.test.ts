@@ -50,7 +50,7 @@ function makeState(voice) {
 }
 
 // playSoloNote(state, freq, time, duration, vol, bendStartInterval,
-//              isLegato, vibrato, noteSeed, expression)
+//              isLegato, vibrato, noteSeed)
 const A4 = 440;
 const Bb4 = 466.1638; // a semitone above A4 — a stepwise hammer-on target
 const A5 = 880; // an octave above — a leap you'd re-pick, not slur
