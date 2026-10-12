@@ -10,7 +10,6 @@ import {
     type SampleBend,
     type SampleVibrato,
 } from './sample-voice.js';
-import { STYLE_CONFIG, type StyleConfig } from './soloist-config.js';
 import {
     getSoloistVoiceLimit,
     isSoloistGuitarMode,
@@ -24,6 +23,10 @@ import {
 } from './synth-utils.js';
 
 type SoloistState = EnsembleState['soloist'];
+
+// The synth lead's vibrato depth scale. The per-style table this once read it from is gone
+// (the lead has one voice); 0.8 is what its default ('scalar') entry resolved to.
+const VIBRATO_INTENSITY = 0.8;
 
 interface VibratoNodes {
     vibrato: OscillatorNode;
@@ -223,7 +226,6 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
             duration,
             vol,
             bendStartInterval = 0,
-            ,
             isLegato = false,
             vibrato = false,
             noteSeed = 0,
@@ -265,7 +267,6 @@ function playSoloNoteCurrent(
     duration: number,
     vol: number,
     bendStartInterval: number = 0,
-    style: string = 'scalar',
     isLegato: boolean = false,
     vibrato: boolean = false,
     noteSeed: number = 0,
@@ -321,7 +322,6 @@ function playSoloNoteCurrent(
         duration,
         vol,
         bendStartInterval,
-        style,
         gain,
         voiceObj,
         isLegato,
@@ -374,17 +374,13 @@ function manageVoices(playTime: number, audio: SoloistState['audio'], mode: stri
 
 // --- PRESET IMPLEMENTATIONS ---
 
-// Wire the shared LFO vibrato into a voice's two oscillators. Byte-identical
-// across every preset voice (playTrumpet, playSaxophone, playNeoJuno,
-// playVowel, playShred), so it lives here instead of being copy-pasted five
-// times.
+// Wire the shared LFO vibrato into a voice's two oscillators.
 function attachVibrato(
     state: EnsembleState,
     ctx: AudioContext,
     freq: number,
     playTime: number,
     duration: number,
-    style: string,
     vibratoFlag: boolean,
     voiceObj: SoloistVoice,
     osc1: OscillatorNode,
@@ -399,7 +395,6 @@ function attachVibrato(
         freq,
         playTime,
         duration,
-        style,
         outputGain,
         vol,
         filterFreq,
@@ -592,7 +587,6 @@ function playTrumpet(
     duration: number,
     vol: number,
     bendStartInterval: number,
-    style: string,
     outputGain: GainNode,
     voiceObj: SoloistVoice,
     isLegato: boolean,
@@ -619,7 +613,6 @@ function playTrumpet(
         playTime,
         duration,
         bendStartInterval,
-        style,
         isLegato,
         prevFreq,
         expression,
@@ -676,7 +669,6 @@ function playTrumpet(
         freq,
         playTime,
         duration,
-        style,
         vibratoFlag,
         voiceObj,
         osc1,
@@ -718,7 +710,6 @@ function applyPitchEnvelope(
     playTime: number,
     duration: number,
     bendStartInterval: number,
-    _style: string,
     isLegato: boolean,
     prevFreq: number,
     expression: SoloistExpression | undefined,
@@ -778,15 +769,12 @@ function createVibrato(
     freq: number,
     time: number,
     duration: number,
-    style: string,
     outputGain: GainNode,
     vol: number,
     filterFreq: AudioParam | null,
     forceVibrato: boolean = false,
 ): VibratoNodes {
     const { soloist, playback } = state;
-    const config: StyleConfig =
-        (STYLE_CONFIG as Record<string, StyleConfig>)[style] || STYLE_CONFIG.scalar;
     const intensity = Number.isFinite(playback.bandIntensity) ? playback.bandIntensity : 0.5;
     const vibrato = ctx.createOscillator();
 
@@ -802,22 +790,8 @@ function createVibrato(
     vibSpeed *= jitter;
     vibSpeed *= 1.0 + intensity * 0.1;
 
-    if (style === 'blues') {
-        vibSpeed -= 0.5;
-    } else if (style === 'neo') {
-        vibSpeed -= 0.8;
-    }
-
     let depthFactor = 0.008;
-    if (style === 'blues') {
-        depthFactor = 0.012;
-    } else if (style === 'neo') {
-        depthFactor = 0.015;
-    }
-
-    if (config.vibratoIntensity !== undefined) {
-        depthFactor *= config.vibratoIntensity;
-    }
+    depthFactor *= VIBRATO_INTENSITY;
 
     if (forceVibrato) {
         depthFactor *= 1.5;

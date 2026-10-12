@@ -916,7 +916,6 @@ function applyGenre(name: string): void {
     param('groove', 'genreFeel', genre.feel);
     param('chords', 'style', genre.chord);
     param('bass', 'style', genre.bass ?? 'smart');
-    param('soloist', 'style', genre.soloist ?? 'smart');
 }
 
 function apply(content: DocumentContent): void {

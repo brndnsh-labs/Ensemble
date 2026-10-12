@@ -54,8 +54,8 @@ export const BASS_STYLES: StyleEntry[] = [
 // #628: the one soloist voice per canonical genre (the 13). The manual soloist
 // picker is gone, and so is the v1 manual's generated style table (#1358), so this list
 // now serves the songbook codec's legacy `soloist.style` validation (`isKnownSoloistStyle`).
-// Ids match the voices the 13 genres actually resolve to via smart-genres.ts
-// `.soloist`; the retired `shred`/`minimal` phantom profiles are gone.
+// Ids are the values the 13 genres once routed to the lead; nothing sets or reads a lead
+// style any more, so the list only says what an old chart may carry.
 export const SOLOIST_STYLES: StyleEntry[] = [
     { id: 'smart', name: 'Smart (Auto)', category: 'Experimental' },
     { id: 'rock', name: 'Rock', category: 'Rock/Metal' },
@@ -133,8 +133,9 @@ const KNOWN_HARMONY_STYLES: ReadonlySet<string> = new Set(HARMONY_STYLES.map((s)
  * load/save layer, #1424; the songbook codec's legacy-field validation reads them now.)
  *
  * Unlike chords, none of these three unions in a genre-routed value. Within
- * `public/`, a `style` write for bass/soloist/harmony reaches the slice only
- * through `SET_GENRE_FEEL` (bulk, genre-driven) or a loaded chart's own data —
+ * `public/`, a `style` write for bass reaches the slice only through
+ * `SET_GENRE_FEEL` (bulk, genre-driven) or a loaded chart's own data (the soloist
+ * and harmony lanes no longer hold a style at all) —
  * never an arbitrary per-lane value (the old dedicated `ACTIONS.SET_STYLE`,
  * which was `module: 'chords'`-only in practice, was deleted in #1381; nothing
  * dispatched it — the live generic `SET_PARAM` write path could theoretically

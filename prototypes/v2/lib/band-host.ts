@@ -208,7 +208,6 @@ export function playBandEvent(
             durationSeconds,
             level,
             -(event.bendIn ?? 0),
-            'scalar',
             legato,
             event.vibrato === true,
             event.tick,

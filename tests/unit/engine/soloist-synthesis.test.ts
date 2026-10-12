@@ -149,10 +149,10 @@ describe('Soloist Synthesis', () => {
         );
     });
 
-    it('should configure vibrato for the "blues" style', () => {
+    it('should configure vibrato for guitar mode', () => {
         playback.bpm = 120;
         soloist.mode = 'guitar';
-        playSoloNote(getState(), 440, 10, 1.0, 0.4, 0, 'blues');
+        playSoloNote(getState(), 440, 10, 1.0, 0.4);
 
         // Trumpet oscillator order for the reworked voice (#649): osc1, osc2,
         // cutoff-LFO (always created for duration > 0.5), vibrato, depthMod —
@@ -160,29 +160,29 @@ describe('Soloist Synthesis', () => {
         const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
-        // Base 120 BPM speed is 6.0. Blues nudge is -0.5. Guitar nudge is +0.4. Total 5.9
-        // Account for jitter (+/- 3%) and intensity scaling (approx +5% at default 0.5 intensity)
-        expect(vibSpeed).toBeCloseTo(5.9, 0); // Use 0 precision to allow for wide "musical" variance
+        // Base 120 BPM speed is 6.0, +5% for the default 0.5 intensity = 6.3. Guitar nudge is
+        // +0.4. Total 6.7, give or take the +/- 3% jitter.
+        expect(vibSpeed).toBeCloseTo(6.7, 0); // Use 0 precision to allow for wide "musical" variance
     });
 
     it('should reduce vibrato speed for monophonic mode', () => {
         playback.bpm = 120;
         soloist.mode = 'monophonic';
-        playSoloNote(getState(), 440, 10, 1.0, 0.4, 0, 'blues');
+        playSoloNote(getState(), 440, 10, 1.0, 0.4);
 
         // Reworked voice (#649): cutoff-LFO at index 2 (duration > 0.5), so
         // the vibrato oscillator is index 3.
         const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
 
-        // 6.0 (base) - 0.5 (blues) - 0.5 (monophonic) = 5.0
-        expect(vibSpeed).toBeCloseTo(5.0, 0);
+        // 6.3 (base, with the intensity lift) - 0.5 (monophonic) = 5.8
+        expect(vibSpeed).toBeCloseTo(5.8, 0);
     });
 
     it('treats deprecated piano mode like monophonic routing', () => {
         soloist.mode = 'piano';
         const freq = 440;
-        playSoloNote(getState(), freq, 10, 1.0, 0.4, 0, 'blues');
+        playSoloNote(getState(), freq, 10, 1.0, 0.4);
 
         const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
         expect(oscs.length).toBeGreaterThanOrEqual(4); // vibrato remains active via monophonic fallback
@@ -191,7 +191,7 @@ describe('Soloist Synthesis', () => {
         // the vibrato oscillator is index 3.
         const vibratoOsc = playback.audio.createOscillator.mock.results[3].value;
         const vibSpeed = vibratoOsc.frequency.setValueAtTime.mock.calls[0][0];
-        expect(vibSpeed).toBeCloseTo(5.0, 0);
+        expect(vibSpeed).toBeCloseTo(5.8, 0);
     });
 
     it('should use dual sawtooth oscillators for trumpet tone', () => {
@@ -226,27 +226,8 @@ describe('Soloist Synthesis', () => {
     describe('Vibrato Engine Extensivenss', () => {
         it('should create vibrato for long notes', () => {
             // Note > 0.4s triggers vibrato
-            playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'scalar');
+            playSoloNote(getState(), 440, 10, 1.0, 0.5);
             expect(playback.audio.createOscillator).toHaveBeenCalled();
-        });
-
-        it('should apply blues style vibrato (lines 761, 770)', () => {
-            // function signature: playSoloNote(getState(), freq, time, duration, vol = 0.5, bendStartInterval = 0, style = null, forceVibrato = false)
-            playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'blues', true); // forceVibrato = true
-        });
-
-        it('should apply neo style vibrato (lines 763, 772)', () => {
-            playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'neo', true);
-        });
-
-        it('should apply guitar mode vibrato adjustments (line 787)', () => {
-            soloist.mode = 'guitar';
-            playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'shred', true);
-        });
-
-        it('should apply specific config vibratoIntensity (line 777)', () => {
-            // Test with a style that is handled but might trigger default configs
-            playSoloNote(getState(), 440, 10, 1.0, 0.5, 0, 'jazz', true);
         });
     });
 });

@@ -186,7 +186,6 @@ function buildBandParam(args: CliArgs): string | null {
     if (switched.has('soloist')) {
         band.s = {
             e: flag('soloist', soloist.enabled),
-            s: soloist.style,
             p: 'trumpet',
             o: 72,
             v: soloist.volume,

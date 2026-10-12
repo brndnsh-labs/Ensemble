@@ -204,12 +204,11 @@ describe('opening an old chart and capturing it again', () => {
     it('derives the lane styles from the genre, not from the chart or the one open before', () => {
         load(oldChart());
         // The old chart's own styles (funk/hiphop/bird/horns) are legacy; Bossa routes its own.
-        const { chords, bass, soloist, groove } = state();
+        const { chords, bass, groove } = state();
         expect(groove.lastSmartGenre).toBe('Bossa');
         expect(groove.genreFeel).toBe('Bossa Nova');
         expect(chords.style).toBe('jazz');
         expect(bass.style).toBe('bossa');
-        expect(soloist.style).toBe('bossa');
     });
 });
 

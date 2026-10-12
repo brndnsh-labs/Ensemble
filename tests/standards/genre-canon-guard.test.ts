@@ -10,10 +10,9 @@ import { GENRE_NAMES } from '../../public/data/smart-genres.js';
 // (or an existing one vanish) without a deliberate update here — the
 // canonicalization discipline from CLAUDE.md "Naming / Canonicalization".
 //
-// NOTE: "phantom" routing keys like Minimal / Shred / Latin appear in some
-// engine routing maps (config.ts SMART_BASS_STYLE_MAP, soloist-config
-// GENRE_STYLE_MAPPING) but are NOT canonical genres — they are not selectable
-// and are slated for retirement. They must never appear in GENRE_NAMES.
+// NOTE: "phantom" routing keys like Minimal / Shred / Latin once sat in the old engine's
+// routing maps. Those maps are gone; the keys were never canonical genres and must never
+// appear in GENRE_NAMES.
 describe('Supported-genre canon (#544)', () => {
     const CANON = [
         'Rock',

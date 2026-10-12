@@ -84,7 +84,6 @@ export function resetAllStateForTest(): void {
     s.autoSound = true;
     s.volume = 1.0;
     s.reverb = INSTRUMENT_REVERB_DEFAULTS.soloist;
-    s.style = 'smart';
     s.mode = 'monophonic';
     s.autoMode = true;
     const aud = s.audio as Mutable<typeof s.audio>;

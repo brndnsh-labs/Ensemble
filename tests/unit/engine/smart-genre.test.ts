@@ -32,14 +32,13 @@ vi.mock('../../../public/controllers/instrument-controller.js', () => ({
 }));
 
 describe('Smart Genre System', () => {
-    let playback, chords, bass, soloist, groove;
+    let playback, chords, bass, groove;
 
     beforeEach(() => {
         const state = getState();
         playback = state.playback;
         chords = state.chords;
         bass = state.bass;
-        soloist = state.soloist;
         groove = state.groove;
 
         resetAllStateForTest();
@@ -49,7 +48,6 @@ describe('Smart Genre System', () => {
         // Reset some defaults
         chords.style = 'smart';
         bass.style = 'smart';
-        soloist.style = 'smart';
         groove.genreFeel = 'Rock';
     });
 
@@ -118,7 +116,6 @@ describe('Smart Genre System', () => {
                 sub: '16th',
                 chord: 'funk',
                 bass: 'funk',
-                soloist: 'blues',
             };
 
             dispatch(ACTIONS.SET_GENRE_FEEL, payload);
@@ -133,9 +130,6 @@ describe('Smart Genre System', () => {
 
             // Check Bass
             expect(bass.style).toBe('funk');
-
-            // Check Soloist
-            expect(soloist.style).toBe('blues');
         });
 
         it('should set appropriate instrument styles for each smart genre configuration', () => {
@@ -145,7 +139,6 @@ describe('Smart Genre System', () => {
                 sub: '8th',
                 chord: 'jazz',
                 bass: 'quarter',
-                soloist: 'bird',
             };
 
             dispatch(ACTIONS.SET_GENRE_FEEL, JAZZ_CONFIG);
@@ -161,15 +154,9 @@ describe('Smart Genre System', () => {
                 param: 'style',
                 value: JAZZ_CONFIG.bass,
             });
-            dispatch(ACTIONS.SET_PARAM, {
-                module: 'soloist',
-                param: 'style',
-                value: JAZZ_CONFIG.soloist,
-            });
 
             expect(chords.style).toBe('jazz');
             expect(bass.style).toBe('quarter');
-            expect(soloist.style).toBe('bird');
         });
     });
 });

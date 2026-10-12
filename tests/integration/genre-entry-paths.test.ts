@@ -13,60 +13,28 @@ import { enterGenre } from '../utils/genre-entry.js';
 // Approved defaults, independent of the tables under test. In particular, the
 // Acoustic preset is still arp; optional players are tested separately.
 const ROUTES = [
-    [
-        'Rock',
-        'Rock',
-        'rock',
-        'smart',
-        'rock',
-        'grand',
-        'electric-guitar-driven',
-        '',
-        'acoustic-kit',
-    ],
-    [
-        'Jazz',
-        'Jazz',
-        'quarter',
-        'jazz',
-        'bird',
-        'grand',
-        'sax-alto',
-        'upright-bass',
-        'acoustic-kit',
-    ],
-    [
-        'Funk',
-        'Funk',
-        'funk',
-        'funk',
-        'funk',
-        'clavinet',
-        'electric-guitar-clean',
-        '',
-        'acoustic-kit',
-    ],
-    ['Disco', 'Disco', 'disco', 'smart', 'disco', 'rhodes', '', '', 'acoustic-kit'],
-    ['Hip Hop', 'Hip Hop', 'hiphop', 'smart', 'hiphop', 'rhodes', '', '', ''],
+    ['Rock', 'Rock', 'rock', 'smart', 'grand', 'electric-guitar-driven', '', 'acoustic-kit'],
+    ['Jazz', 'Jazz', 'quarter', 'jazz', 'grand', 'sax-alto', 'upright-bass', 'acoustic-kit'],
+    ['Funk', 'Funk', 'funk', 'funk', 'clavinet', 'electric-guitar-clean', '', 'acoustic-kit'],
+    ['Disco', 'Disco', 'disco', 'smart', 'rhodes', '', '', 'acoustic-kit'],
+    ['Hip Hop', 'Hip Hop', 'hiphop', 'smart', 'rhodes', '', '', ''],
     [
         'Blues',
         'Blues',
         'blues',
         'jazz',
-        'blues',
         'hammond-organ',
         'sax-alto',
         'upright-bass',
         'acoustic-kit',
     ],
-    ['Neo-Soul', 'Neo-Soul', 'neo', 'smart', 'neo', 'rhodes', '', '', 'acoustic-kit'],
-    ['Reggae', 'Reggae', 'dub', 'smart', 'reggae', 'hammond-organ', '', '', 'acoustic-kit'],
+    ['Neo-Soul', 'Neo-Soul', 'neo', 'smart', 'rhodes', '', '', 'acoustic-kit'],
+    ['Reggae', 'Reggae', 'dub', 'smart', 'hammond-organ', '', '', 'acoustic-kit'],
     [
         'Acoustic',
         'Acoustic',
         'acoustic',
         'arp',
-        'acoustic',
         'grand',
         'nylon-guitar',
         'upright-bass',
@@ -77,7 +45,6 @@ const ROUTES = [
         'Bossa Nova',
         'bossa',
         'jazz',
-        'bossa',
         'grand',
         'nylon-guitar',
         'upright-bass',
@@ -88,24 +55,13 @@ const ROUTES = [
         'Country',
         'country',
         'strum-country',
-        'country',
         'grand',
         'electric-guitar-clean',
         'upright-bass',
         'acoustic-kit',
     ],
-    ['Metal', 'Metal', 'metal', 'power-metal', 'metal', 'electric-guitar-rhythm', '', '', ''],
-    [
-        'Ska-Punk',
-        'Ska',
-        'walking-ska',
-        'ska-upstroke',
-        'ska-horns',
-        'hammond-organ',
-        '',
-        '',
-        'acoustic-kit',
-    ],
+    ['Metal', 'Metal', 'metal', 'power-metal', 'electric-guitar-rhythm', '', '', ''],
+    ['Ska-Punk', 'Ska', 'walking-ska', 'ska-upstroke', 'hammond-organ', '', '', 'acoustic-kit'],
 ];
 const MODULES: InstrumentModule[] = ['chords', 'soloist', 'bass', 'groove'];
 
@@ -115,7 +71,7 @@ it('pins routes for exactly the thirteen selectable genres', () => {
     expect(ROUTES.map(([genre]) => genre).sort()).toEqual([...GENRE_NAMES].sort());
 });
 
-describe.each(ROUTES)('%s preset entry', (genre, feel, bass, chords, soloist, ...packs) => {
+describe.each(ROUTES)('%s preset entry', (genre, feel, bass, chords, ...packs) => {
     it('applies the real default players and installed Auto sounds, then falls back when absent', async () => {
         for (const pack of SOUND_PACKS) {
             markPackInstalled(pack.id, true);
@@ -123,11 +79,7 @@ describe.each(ROUTES)('%s preset entry', (genre, feel, bass, chords, soloist, ..
         const state = await enterGenre(genre);
         expect(state.groove.lastSmartGenre).toBe(genre);
         expect(state.groove.genreFeel).toBe(feel);
-        expect([state.bass.style, state.chords.style, state.soloist.style]).toEqual([
-            bass,
-            chords,
-            soloist,
-        ]);
+        expect([state.bass.style, state.chords.style]).toEqual([bass, chords]);
         for (const [index, module] of MODULES.entries()) {
             expect(state[module].autoSound, module).toBe(true);
             expect(state[module].voice, module).toBe(

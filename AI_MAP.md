@@ -136,7 +136,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | :--- | :--- | :--- |
 | `public/engine/chords-styles.ts` | Chord intervals and rootless-voicing choices for the parsed progression. | `getIntervals` |
 | `public/engine/voicing-policy.ts` | Rootless-voicing rules and voice-leading cost for the parsed progression. | `shouldUseRootlessVoicing`, `getNearestVoiceLeadingCost` |
-| `public/engine/soloist-config.ts` | The soloist voice's per-style timbre settings. | `STYLE_CONFIG` |
 
 ## Engine Core (Internal)
 

@@ -120,7 +120,7 @@ describe('Stop silences every sampled lane (#1530)', () => {
         ['bass', (state) => playBassNote(state, 110, 3, 8, 0.8, 0), killBassNote],
         [
             'soloist',
-            (state) => playSoloNote(state, 440, 3, 8, 0.8, 0, 'scalar', false, false, 1),
+            (state) => playSoloNote(state, 440, 3, 8, 0.8, 0, false, false, 1),
             killSoloistNote,
         ],
         ['drums', (state) => playDrumSound(state, 'Crash', 3, 1), killDrumNote],

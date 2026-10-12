@@ -410,8 +410,6 @@ export interface SoloistState {
     /** #856 — Auto phrasing mode: when true, `mode` is derived from the lead
      *  voice + genre (guitar pack → guitar). An explicit pick pins it (false). */
     readonly autoMode: boolean;
-    /** Optional playing style (e.g. 'jazz', 'blues', 'smart'). */
-    readonly style?: string;
     /** Mix volume (0.0 - 1.0). */
     readonly volume: number;
     /** Reverb level. */
@@ -594,7 +592,6 @@ export interface ActionPayloadSetGenreFeel {
     sub?: string;
     chord?: string;
     bass?: string;
-    soloist?: string;
 }
 
 export interface ActionPayloadMap {

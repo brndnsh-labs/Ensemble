@@ -70,11 +70,10 @@ describe('Instrument Reducer', () => {
     });
 
     it('should handle SET_GENRE_FEEL for all instruments', () => {
-        const payload = { chord: 'pad', bass: 'slap', soloist: 'shred' };
+        const payload = { chord: 'pad', bass: 'slap' };
         instrumentReducer({ type: ACTIONS.SET_GENRE_FEEL, payload });
         expect(chords.style).toBe('pad');
         expect(bass.style).toBe('slap');
-        expect(soloist.style).toBe('shred');
     });
 
     it('drops deprecated soloist payload keys instead of resurrecting them (#866 compat shim)', () => {
