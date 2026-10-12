@@ -7,6 +7,7 @@ import {
     compileTimeline,
     FERMATA_STRETCH,
     firstSpanAfter,
+    MAX_PERFORMED_SPANS,
     secondsAt,
     spanIndexAt,
     type Timeline,
@@ -347,5 +348,52 @@ describe('tick lookups', () => {
             }
         }
         expect(failures.slice(0, 10)).toEqual([]);
+    });
+});
+
+describe('performed span ceiling (#1632)', () => {
+    /** A section of `bars` 4/4 bars, each of `perBar` equal chord events (durations are in beats). */
+    function denseSection(label: string, bars: number, perBar: number, repeat = 1) {
+        const built = score([{ label, bars: Array(bars).fill('C').join(' | '), repeat }]);
+        const [section] = built.sections;
+        section.id = `section-${label}`;
+        section.measures = section.measures.map((measure, i) => ({
+            ...measure,
+            id: `${label}-${i}`,
+            content: {
+                kind: 'events' as const,
+                events: Array.from({ length: perBar }, () => ({
+                    kind: 'chord' as const,
+                    symbol: 'C',
+                    duration: (perBar === 1 ? [4, 1] : [1, perBar / 4]) as [number, number],
+                })),
+            },
+        }));
+        return section;
+    }
+    const chart = (sections: SemanticScore['sections'], choruses?: number): SemanticScore => ({
+        ...score([{ label: 'x', bars: 'C' }]),
+        sections,
+        ...(choruses ? { choruses } : {}),
+    });
+
+    it('accepts exactly the ceiling and refuses one past it', () => {
+        // 16 bars x 64 events, played 64 times: exactly 65,536 performed events.
+        const at = [denseSection('A', 16, 64, 64)];
+        expect(compileTimeline(chart(at)).spans).toHaveLength(MAX_PERFORMED_SPANS);
+        // One more single-event bar is 65,537.
+        const past = [...at, denseSection('B', 1, 1)];
+        expect(() => compileTimeline(chart(past))).toThrow(
+            'This chart performs more than the playback limit of 65,536 chords. Reduce choruses, repeats, or chords per bar.',
+        );
+    });
+
+    it('refuses the 256 bars x 64 events x 64 choruses probe quickly, before any span exists', () => {
+        const probe = chart([denseSection('A', 256, 64)], 64);
+        const started = performance.now();
+        expect(() => compileTimeline(probe)).toThrow(/playback limit of 65,536 chords/);
+        const ms = performance.now() - started;
+        console.warn(`#1632 probe refused in ${ms.toFixed(1)} ms`);
+        expect(ms).toBeLessThan(250);
     });
 });
