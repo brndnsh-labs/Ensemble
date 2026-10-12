@@ -20,8 +20,6 @@ export interface SoundPack {
     readonly id: string;
     /** Human-facing name shown in the Sounds section and the source picker. */
     readonly name: string;
-    /** Short description / character note. */
-    readonly description: string;
     /** License / credit line for the sampled source. */
     readonly attribution: string;
     /** Approximate download size, MB — shown before install. */
@@ -85,7 +83,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'grand',
         name: 'Acoustic Grand Piano',
-        description: 'A sampled Yamaha C5 grand — warm, real piano body for the chords.',
         attribution: 'Salamander Grand Piano (Yamaha C5) by Alexander Holm — CC-BY 3.0',
         approxSizeMB: 1.3,
         instruments: ['chords'],
@@ -98,8 +95,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'hammond-organ',
         name: 'Drawbar Organ',
-        description:
-            'A sampled drawbar organ — warm tonewheel keys for reggae bubble, blues, gospel.',
         attribution: 'FreePats Drawbar Organ Emulation (setBfree) — CC0 1.0 (public domain)',
         approxSizeMB: 0.8,
         instruments: ['chords'],
@@ -120,7 +115,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'clavinet',
         name: 'Clavinet',
-        description: 'A sampled clavinet — bright, percussive funk keys for the chords.',
         attribution: 'GeneralUser GS by S. Christian Collins — permissive (host-your-own-copy)',
         approxSizeMB: 0.1,
         instruments: ['chords'],
@@ -142,8 +136,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'rhodes',
         name: 'Electric Piano (Rhodes)',
-        description:
-            'A sampled 1977 Rhodes Mark I — warm tine electric piano with a bell-y bark for neo-soul, hip-hop, jazz.',
         attribution: 'jRhodes3c (1977 Rhodes Mark I) by Jeff Learman — CC BY-NC-SA 4.0',
         approxSizeMB: 0.8,
         instruments: ['chords'],
@@ -169,7 +161,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'sax-alto',
         name: 'Alto Saxophone',
-        description: 'A sampled alto sax — a real horn lead for the soloist.',
         attribution: 'Karoryfer Weresax (alto sax) — CC0 1.0 (public domain)',
         approxSizeMB: 0.7,
         instruments: ['soloist'],
@@ -188,8 +179,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'nylon-guitar',
         name: 'Nylon Guitar',
-        description:
-            'A sampled Spanish classical guitar — warm nylon lead and acoustic rhythm strums.',
         attribution:
             'FreePats Spanish Classical Guitar (nylon-string) by roberto@zenvoid.org — CC0 1.0 (public domain)',
         approxSizeMB: 0.6,
@@ -227,8 +216,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'electric-guitar-clean',
         name: 'Electric Guitar (Clean)',
-        description:
-            'A sampled clean Fender electric — a real single-coil lead for jazz, funk, soul, country, clean blues.',
         attribution:
             'FreePats Clean Electric Guitar (Fender, bridge pickup) — CC0 1.0 (public domain)',
         approxSizeMB: 0.7,
@@ -259,8 +246,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'electric-guitar-driven',
         name: 'Electric Guitar (Driven)',
-        description:
-            'An overdriven electric — a crunchy amp tone for rock leads (and a gritty blues option).',
         attribution:
             'FreePats Clean Electric Guitar (Fender) — CC0 1.0; overdrive + cabinet voicing applied (CC0)',
         approxSizeMB: 0.7,
@@ -293,8 +278,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'electric-guitar-rhythm',
         name: 'Rhythm Electric (Crunch)',
-        description:
-            'A crunchy rhythm electric — power chords / driven strums for Rock & Metal chords.',
         attribution:
             'FreePats Clean Electric Guitar (Fender) — CC0 1.0; overdrive + cabinet voicing applied (CC0)',
         approxSizeMB: 0.7,
@@ -324,8 +307,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'acoustic-kit',
         name: 'Acoustic Drum Kit',
-        description:
-            'A full sampled acoustic kit — real kick/snare/hats/cymbals + aux perc for the groove.',
         attribution:
             'VCSL (Versilian Community Sample Library) by Versilian Studios — CC0 1.0; Virtuosity Drums (sfzinstruments) — CC0 1.0',
         approxSizeMB: 1.8,
@@ -350,8 +331,6 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'upright-bass',
         name: 'Upright Bass',
-        description:
-            'A sampled pizzicato double bass — a real acoustic upright for jazz/bossa/blues walking lines.',
         attribution:
             'VSCO-2 Community Edition (Solo Contrabass, pizzicato) by Versilian Studios — CC0 1.0 (public domain)',
         approxSizeMB: 0.2,

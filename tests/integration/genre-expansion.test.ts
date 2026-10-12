@@ -4,18 +4,18 @@ import { BASS_STYLES, CHORD_STYLES, SOLOIST_STYLES } from '../../public/data/ins
 describe('Genre Expansion Integration', () => {
     describe('Definitions', () => {
         it('should have new Chord Styles', () => {
-            expect(CHORD_STYLES.find((s) => s.id === 'strum-country')).toBeDefined();
-            expect(CHORD_STYLES.find((s) => s.id === 'power-metal')).toBeDefined();
+            expect(CHORD_STYLES).toContain('strum-country');
+            expect(CHORD_STYLES).toContain('power-metal');
         });
 
         it('should have new Bass Styles', () => {
-            expect(BASS_STYLES.find((s) => s.id === 'country')).toBeDefined();
-            expect(BASS_STYLES.find((s) => s.id === 'metal')).toBeDefined();
+            expect(BASS_STYLES).toContain('country');
+            expect(BASS_STYLES).toContain('metal');
         });
 
         it('should have new Soloist Styles', () => {
-            expect(SOLOIST_STYLES.find((s) => s.id === 'country')).toBeDefined();
-            expect(SOLOIST_STYLES.find((s) => s.id === 'metal')).toBeDefined();
+            expect(SOLOIST_STYLES).toContain('country');
+            expect(SOLOIST_STYLES).toContain('metal');
         });
     });
 });

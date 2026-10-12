@@ -7,7 +7,7 @@ if (args.length === 0) {
 
 const files = args.flatMap((arg) => (arg.includes('*') ? globSync(arg) : [arg]));
 
-const SLICES = 'playback|chords|bass|soloist|groove|midi|arranger';
+const SLICES = 'playback|chords|bass|soloist|groove|arranger';
 
 // Three write idioms reach a slice. The guard has to see all three, because the
 // slices are `readonly` in `types.ts` — a bare `slice.field = x` doesn't even

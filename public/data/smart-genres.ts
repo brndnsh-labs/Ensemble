@@ -11,10 +11,6 @@ type GenreOverride = Partial<typeof GENRE_DEFAULTS> & {
     // gated and dead. Omitted = leave the user's current mode untouched. The user
     // can still switch modes after selecting the genre.
     soloistMode?: 'monophonic' | 'guitar';
-    // Time signatures idiomatic for this genre — used to softly highlight
-    // canonical meters in the time-signature picker (S10). Omitted = ['4/4'].
-    // Non-blocking hint only: any genre × meter pairing still plays.
-    meters?: string[];
 };
 
 /**
@@ -38,7 +34,6 @@ const GENRE_OVERRIDES = {
         feel: 'Jazz',
         chord: 'jazz',
         bass: 'quarter',
-        meters: ['4/4', '3/4', '6/8'], // swing · jazz waltz · All Blues
     },
     Funk: {
         feel: 'Funk',
@@ -59,7 +54,6 @@ const GENRE_OVERRIDES = {
         feel: 'Blues',
         chord: 'jazz',
         bass: 'blues',
-        meters: ['4/4', '12/8', '6/8'], // straight/shuffle · slow blues · All Blues
     },
     'Neo-Soul': {
         feel: 'Neo-Soul',
@@ -79,7 +73,6 @@ const GENRE_OVERRIDES = {
         bass: 'acoustic',
         // #856 — guitar-idiom lead: fingerstyle double-stops on the synth lead too.
         soloistMode: 'guitar',
-        meters: ['4/4', '3/4'], // ballads & waltz-time singer-songwriter
     },
     Bossa: {
         feel: 'Bossa Nova',
@@ -92,7 +85,6 @@ const GENRE_OVERRIDES = {
         bass: 'country',
         // #856 — guitar-idiom lead: chicken-pickin' double-stops by default.
         soloistMode: 'guitar',
-        meters: ['4/4', '3/4'], // two-step · country waltz
     },
     Metal: {
         feel: 'Metal',
@@ -109,7 +101,7 @@ const GENRE_OVERRIDES = {
 /**
  * Widened, value-level view of the authority table. `GENRE_OVERRIDES` itself keeps
  * its literal type (so `CanonGenre` is the 13-name union); every *read* goes through
- * this alias, because reading an optional field (`meters`, `bass`, …) off the literal
+ * this alias, because reading an optional field (`bass`, `soloistMode`, …) off the literal
  * union would not typecheck for the genres that omit it.
  */
 const GENRES: Record<string, GenreOverride> = GENRE_OVERRIDES;
@@ -143,11 +135,11 @@ export const GENRE_FEELS: string[] = Object.values(GENRES)
  *      Changing one is a user-visible rename.
  *   2. FEEL         ('Bossa Nova', 'Ska')  — the runtime keyspace. Lives in
  *      `groove.genreFeel` and is what the feel-keyed tables are keyed on
- *      (`CANONICAL_METERS_BY_FEEL` below, the synth voices' genre trims; the old
+ *      (the synth voices' genre trims; the old
  *      engine had ~20 more). It is a *musical* label ("this genre feels like a
  *      bossa nova"), deliberately free to differ from the picker label; several
- *      genres could legitimately share a feel in future. `GENRE_FEELS` is walked
- *      by `tests/unit/engine/smart-genre.test.ts`.
+ *      genres could legitimately share a feel in future. `GENRE_FEELS` is the set
+ *      the songbook codec accepts for `groove.genreFeel`.
  *   3. (retired) GROOVE STRATEGY KEY ('latin', 'ska-punk') — the old engine's
  *      `public/engine/grooves/<key>.ts` basename for a kit, many-to-one with feels
  *      (Bossa's kit was `latin.ts`). Those modules went with the engine (#1404); the
@@ -172,11 +164,9 @@ export const GENRE_FEELS: string[] = Object.values(GENRES)
  * truthy. That mattered most here: `feelToCanon` is `(feel && GENRE_NAME_BY_FEEL[feel])
  * || null`, so `?genre=__proto__` made `resolveGenre` return a *hit* instead of `null`
  * and `groove.genreFeel` was set to `'__proto__'` before v1's Preact tree mounted.
- * Downstream, the canonical-meters lookup had the same defeated-`||` shape and returned
- * `Object.prototype` in place of an array — so `canonicalMeters.includes(...)` in v1's
- * `KeySignatureControls` threw during the initial render, took out its `ChartSurface`, and
- * left the app on the ErrorBoundary's "Refresh App" screen, which reloads the same URL
- * and crashes again. Every other feel-keyed table was poisoned in the same session too
+ * Downstream, v1's canonical-meters lookup had the same defeated-`||` shape and returned
+ * `Object.prototype` in place of an array, which crashed its initial render on every
+ * reload. Every other feel-keyed table was poisoned in the same session too
  * (the old engine's `GENRE_POCKET` → NaN scheduler timing, `strategies[genreFeel]` → a
  * bogus groove strategy). Fixing the seeds is what makes the *next* feel-keyed table safe by default.
  */
@@ -203,8 +193,8 @@ function feelToCanon(feel: string | null | undefined): string | null {
  * Normalize a genre string arriving in *either* keyspace into the canonical pair.
  *
  * The UI and `groove.lastSmartGenre` speak genre NAMES; the engine and
- * `groove.genreFeel` speak FEELS, and every feel-keyed table (`CANONICAL_METERS_BY_FEEL`,
- * and the old engine's `GENRE_POCKET`, groove `strategies` map and the like) misses
+ * `groove.genreFeel` speak FEELS, and every feel-keyed table (the old
+ * engine's `GENRE_POCKET`, groove `strategies` map and the like) misses
  * on a name. Saved charts and share URLs carry the feel (`songbook/codec.ts` writes
  * `groove.genreFeel`), but hand-written and older links carry the name — accept both,
  * and return `null` for anything in neither keyspace so callers reject it instead of
@@ -228,20 +218,3 @@ export function resolveGenre(
     }
     return null;
 }
-
-const DEFAULT_GENRE_METERS = ['4/4'];
-
-/**
- * Canonical (idiomatic) time signatures per genre feel, keyed by `groove.genreFeel`.
- * Drives the soft time-signature hint in the topbar (S10) — non-blocking; any
- * genre × meter pairing still plays. Genres without an explicit `meters` field
- * default to 4/4.
- */
-export const CANONICAL_METERS_BY_FEEL: Record<string, string[]> = Object.values(GENRES).reduce<
-    Record<string, string[]>
->((acc, override) => {
-    if (override.feel) {
-        acc[override.feel] = override.meters ?? DEFAULT_GENRE_METERS;
-    }
-    return acc;
-}, Object.create(null));
