@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-function getFiles(dir, allFiles = []) {
+function getFiles(dir: string, allFiles: string[] = []): string[] {
     const files = readdirSync(dir);
     for (const file of files) {
         const name = path.join(dir, file);
@@ -44,7 +43,7 @@ describe('Security Ledger Verification: DOM Injection', () => {
     it('should NOT contain direct innerHTML or dangerouslySetInnerHTML use for musical content', () => {
         const forbiddenPatterns = [/\.innerHTML\b/, /dangerouslySetInnerHTML/];
 
-        const violations = [];
+        const violations: string[] = [];
 
         sourceFiles.forEach((file) => {
             const content = readFileSync(file, 'utf8');

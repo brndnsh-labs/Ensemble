@@ -1,13 +1,6 @@
-// @ts-nocheck
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { getIntervals } from '../../public/engine/chords-styles.js';
-import { getState } from '../../public/state.js';
-
-const { makeSoloistMock } = await vi.hoisted(async () => await import('../utils/mock-soloist.js'));
-
-vi.mock('../../public/state.js', () => ({
-    getState: vi.fn(),
-}));
+import type { EnsembleState } from '../../public/types.js';
 
 // #552 (genre-audit Wave 1, Disco/Piano): Disco was excluded from the moderate
 // add9 color lane and only reached a 7th/9th at the >=0.6 extension block, so its
@@ -18,25 +11,14 @@ vi.mock('../../public/state.js', () => ({
 // getIntervals() is the voicing source the live piano consumes (parseProgressionPart
 // -> chord.intervals -> getAccompanimentNotes). Tested directly here.
 describe('Disco Piano Critique', () => {
-    let mockState;
-
-    beforeEach(() => {
-        vi.clearAllMocks();
-        mockState = {
-            playback: { bandIntensity: 0.5, complexity: 0.7, intent: {} },
-            groove: { genreFeel: 'Disco', pocket: 0, instruments: [] },
-            soloist: makeSoloistMock({ enabled: false }),
+    // getIntervals (and the voicing policy it calls) reads exactly these three fields.
+    function pcsFor(quality: string, is7th: boolean, intensity: number, genre = 'Disco') {
+        const state = {
+            playback: { bandIntensity: intensity },
+            groove: { genreFeel: 'Disco' },
             bass: { enabled: true },
-            harmony: { enabled: false },
-            chords: { enabled: true, style: 'disco', density: 'balanced' },
-            arranger: { timeSignature: '4/4', totalSteps: 512, progression: [] },
-        };
-        getState.mockReturnValue(mockState);
-    });
-
-    function pcsFor(quality, is7th, intensity, genre = 'Disco') {
-        mockState.playback.bandIntensity = intensity;
-        const intervals = getIntervals(getState(), quality, is7th, genre);
+        } as unknown as EnsembleState;
+        const intervals = getIntervals(state, quality, is7th, genre);
         return new Set(intervals.map((i) => ((i % 12) + 12) % 12));
     }
 
@@ -44,19 +26,12 @@ describe('Disco Piano Critique', () => {
 
     // (a) THE FIX: a plain MAJOR triad at mid intensity is a 6/9, not a bare triad.
     it('voices a major triad as 6/9 at mid intensity', () => {
-        const report = [];
         for (const intensity of [0.4, 0.5, 0.59]) {
             const pcs = pcsFor('major', false, intensity);
-            report.push(
-                `  major i=${intensity}  pcs={${[...pcs].sort((a, b) => a - b).join(',')}}`,
-            );
             expect(pcs.has(9)).toBe(true); // 6th  (the 6/9 color)
             expect(pcs.has(2)).toBe(true); // 9th
             expect(pcs.has(4)).toBe(true); // major 3rd intact (real triad, not vacuous)
         }
-        console.log('\n--- DISCO PIANO: major 6/9 at mid intensity ---');
-        console.log(report.join('\n'));
-        console.log('-----------------------------------------------\n');
     });
 
     // (b) THE FIX: a plain MINOR triad at mid intensity is an m9, not a bare triad.

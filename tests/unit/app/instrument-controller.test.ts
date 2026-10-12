@@ -67,8 +67,6 @@ vi.mock('../../../public/state.js', () => {
             volume: 0.5,
         },
         soloist: makeSoloistMock({
-            style: 'scalar',
-            octave: 4,
             enabled: true,
             volume: 0.5,
             mode: 'auto',
@@ -156,14 +154,16 @@ describe('Instrument Controller', () => {
             expect(ChordsEngine.validateProgression).not.toHaveBeenCalled();
         });
 
-        it('should handle the chords alias name', () => {
-            InstrumentController.togglePower('chords');
-            expect(dispatch).toHaveBeenCalledWith(
-                ACTIONS.SET_PARAM,
-                expect.objectContaining({
-                    module: 'chords',
-                }),
-            );
+        it('toggles the soloist lane and silences only its voices', () => {
+            InstrumentController.togglePower('soloist');
+            expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_PARAM, {
+                module: 'soloist',
+                param: 'enabled',
+                value: false,
+            });
+            expect(getState().soloist.enabled).toBe(false);
+            expect(Engine.killSoloistNote).toHaveBeenCalled();
+            expect(Engine.killAllPianoNotes).not.toHaveBeenCalled();
         });
     });
 });

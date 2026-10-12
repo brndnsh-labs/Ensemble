@@ -113,6 +113,29 @@ describe('Chords & Voicing Logic', () => {
             expect(getChordDetails('13(#11b9)').quality).toBe('7b9');
             expect(getChordDetails('m7/G').quality).toBe('minor');
         });
+
+        it.each([
+            ['Cmaj11', 'maj11'],
+            ['Cmaj7#11', 'maj7#11'],
+            ['Cadd9', 'add9'],
+            ['Cm6', 'm6'],
+        ])('extracts the extended quality of %s as %s', (input, quality) => {
+            expect(getChordDetails(input).quality).toBe(quality);
+        });
+
+        it.each([
+            ['C9', '9'],
+            ['C11', '11'],
+            ['C13', '13'],
+            ['C7b9', '7b9'],
+            ['C7#9', '7#9'],
+            ['C7b5', '7b5'],
+            ['C7#5', 'aug'],
+        ])('reads the dominant extension %s as %s, a seventh chord', (input, quality) => {
+            const details = getChordDetails(input);
+            expect(details.quality).toBe(quality);
+            expect(details.is7th).toBe(true);
+        });
     });
 
     describe('Interval Generation (getIntervals)', () => {

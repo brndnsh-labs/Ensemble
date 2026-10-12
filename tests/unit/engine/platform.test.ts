@@ -47,15 +47,24 @@ describe('Platform Utilities', () => {
 
     it('should handle missing Audio constructor', () => {
         const originalAudio = global.Audio;
+        const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+        const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
         delete global.Audio;
 
-        // No real Audio element exists, so the dummy { play, pause, currentTime }
-        // fallback must be used — none of these should throw.
-        expect(() => initPlatform()).not.toThrow();
-        expect(() => unlockAudio()).not.toThrow(); // hits the dummy object's play()
-        expect(() => lockAudio()).not.toThrow(); // hits the dummy object's pause()
-
-        global.Audio = originalAudio;
+        try {
+            // No real Audio element exists, so the dummy { play, pause, currentTime }
+            // fallback must be used. The proof is that it is the dummy that ran: the
+            // global is gone, and no real media element was ever played or paused.
+            expect(() => initPlatform()).not.toThrow();
+            expect(() => unlockAudio()).not.toThrow(); // hits the dummy object's play()
+            expect(() => lockAudio()).not.toThrow(); // hits the dummy object's pause()
+            expect(playSpy).not.toHaveBeenCalled();
+            expect(pauseSpy).not.toHaveBeenCalled();
+        } finally {
+            global.Audio = originalAudio;
+            playSpy.mockRestore();
+            pauseSpy.mockRestore();
+        }
     });
 
     it('should unlock and lock audio', () => {

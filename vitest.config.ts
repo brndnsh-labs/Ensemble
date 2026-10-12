@@ -28,7 +28,6 @@ export default defineConfig({
         exclude: [
             ...configDefaults.exclude,
             'tests/browser/**',
-            'tests/bench/**',
             // The isolated Next preview owns a separate Playwright runner.
             'prototypes/v2/checks/**',
             // The standalone account API has its own package, tsconfig, Vitest config and CI

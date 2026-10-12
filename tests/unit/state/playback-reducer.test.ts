@@ -39,7 +39,7 @@ describe('Playback Reducer', () => {
         });
     });
 
-    it('should handle generic SET_PARAM action and break for other modules (line 174)', () => {
+    it('should handle generic SET_PARAM action and break for other modules', () => {
         playbackReducer({
             type: ACTIONS.SET_PARAM,
             payload: { module: 'playback', param: 'masterVolume', value: 0.6 },

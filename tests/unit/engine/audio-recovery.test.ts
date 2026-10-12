@@ -5,7 +5,6 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { audioWatchdog } from '../../../public/engine/audio-recovery.js';
-import * as Engine from '../../../public/engine/engine.js';
 import {
     activateWakeLock,
     initPlatform,
@@ -13,13 +12,6 @@ import {
     unlockAudio,
 } from '../../../public/platform.js';
 import { getState } from '../../../public/state.js';
-
-// Mock engine dependencies for Watchdog tests
-vi.mock('../../../public/engine/engine.js', () => ({
-    initAudio: vi.fn(),
-    killAllNotes: vi.fn().mockResolvedValue(),
-    restoreGains: vi.fn(),
-}));
 
 describe('Audio Recovery & Platform Integrity', () => {
     let mockAudioContext, mockAnalyser, mockMasterGain, playback;
@@ -73,6 +65,8 @@ describe('Audio Recovery & Platform Integrity', () => {
         audioWatchdog.crashCount = 0;
         audioWatchdog.isRecovering = false;
         audioWatchdog.analyser = null;
+        audioWatchdog.onRecover = null;
+        vi.restoreAllMocks();
     });
 
     // --- Platform Tests ---
@@ -176,28 +170,37 @@ describe('Audio Recovery & Platform Integrity', () => {
         });
 
         it('should execute the DSP reset pipeline', async () => {
-            // Setup onRecover callback
-            audioWatchdog.onRecover = async (pb) => {
-                const map = getState();
-                await Engine.killAllNotes(map);
-                await pb.audio.close();
-                Engine.initAudio(map);
-                Engine.restoreGains(map);
-            };
+            // audio-recovery imports nothing from the engine: the host wires the rebuild in
+            // through onRecover, so the watchdog's own job is mute -> callback -> clear flag.
+            const order: string[] = [];
+            mockMasterGain.disconnect.mockImplementation(() => order.push('disconnect'));
+            audioWatchdog.onRecover = vi.fn(async () => {
+                order.push('onRecover');
+                // The re-entrancy guard is held for the whole rebuild.
+                expect(audioWatchdog.isRecovering).toBe(true);
+            });
 
-            // Initiate reset
             const resetPromise = audioWatchdog.triggerDSPReset(playback);
 
             expect(audioWatchdog.isRecovering).toBe(true);
             expect(mockMasterGain.disconnect).toHaveBeenCalled();
-            expect(Engine.killAllNotes).toHaveBeenCalled();
+            expect(mockMasterGain.gain.value).toBe(0);
 
-            // Flush promises
             await resetPromise;
 
-            expect(mockAudioContext.close).toHaveBeenCalled();
-            expect(Engine.initAudio).toHaveBeenCalled();
-            expect(Engine.restoreGains).toHaveBeenCalled();
+            expect(audioWatchdog.onRecover).toHaveBeenCalledWith(playback);
+            expect(order).toEqual(['disconnect', 'onRecover']);
+            expect(audioWatchdog.isRecovering).toBe(false);
+            expect(audioWatchdog.crashCount).toBe(1);
+        });
+
+        it('should still clear the recovering flag when the recovery callback throws', async () => {
+            audioWatchdog.onRecover = vi.fn().mockRejectedValue(new Error('boom'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            await audioWatchdog.triggerDSPReset(playback);
+
+            expect(audioWatchdog.isRecovering).toBe(false);
         });
     });
 });
