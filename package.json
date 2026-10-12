@@ -29,7 +29,6 @@
         "test:api": "npm test --prefix prototypes/v2-api",
         "test:verbose": "npm run check-mutations && npm run lint && npx vitest run",
         "test:coverage": "npx vitest run --coverage",
-        "test:bench": "npx vitest run --config vitest.bench.config.ts tests/bench",
         "test:loop": "node scripts/test-loop.ts",
         "mix:report": "tsx scripts/mix-report.ts",
         "render:node": "tsx scripts/render-node.ts",

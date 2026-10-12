@@ -7,7 +7,6 @@
                 "band/**/*.test.ts",
                 "scripts/**/*.ts",
                 "tests/**/*.{test,spec}.ts",
-                "tests/bench/**/*.ts",
                 "tests/scripts/**/*.ts",
                 "tests/utils/seeded-random.ts"
             ],

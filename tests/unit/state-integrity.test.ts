@@ -1,4 +1,3 @@
-// @ts-nocheck
 import fs from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -13,7 +12,7 @@ const PUBLIC_DIR = path.resolve(__dirname, '../../public');
 const TYPES_FILE = path.resolve(PUBLIC_DIR, 'types.ts');
 
 // Helper to get all files in a directory recursively
-function getFiles(dir, files = []) {
+function getFiles(dir: string, files: string[] = []): string[] {
     const dirFiles = fs.readdirSync(dir);
     for (const file of dirFiles) {
         const name = path.join(dir, file);
@@ -36,22 +35,33 @@ const V2_DIRS = ['app', 'lib'].map((dir) => path.resolve(__dirname, '../../proto
 const allFiles = [PUBLIC_DIR, ...V2_DIRS]
     .flatMap((dir) => getFiles(dir))
     .filter((f) => !/\.(test|spec)\.tsx?$/.test(f));
-const fileContents = allFiles.map((f) => ({ path: f, content: fs.readFileSync(f, 'utf8') }));
+interface SourceFile {
+    path: string;
+    content: string;
+}
+const fileContents: SourceFile[] = allFiles.map((f) => ({
+    path: f,
+    content: fs.readFileSync(f, 'utf8'),
+}));
 
 // "Is this a state slice?" is a CONTENT question, not a directory one: `public/state/`
 // also holds non-slice plumbing (`state-effects`, `state-hydration`, `history`,
 // `share-codec`) that dispatches like any other consumer. Keying on the
 // `deepSignal<` declaration keeps the dispatch/handler split honest as files move in and
 // out of that directory. Same discriminator as `scripts/check-mutations.ts`.
-const isSlice = (f) => /deepSignal</.test(f.content);
+const isSlice = (f: SourceFile) => /deepSignal</.test(f.content);
 // The effect listener handles actions with `case` arms outside any slice.
 const HANDLER_FILES = ['state-effects.ts'];
 
-const isHandlerFile = (f) => isSlice(f) || HANDLER_FILES.some((h) => f.path.endsWith(h));
+const isHandlerFile = (f: SourceFile) =>
+    isSlice(f) || HANDLER_FILES.some((h) => f.path.endsWith(h));
 
 // Extract ACTIONS keys from public/types.js
 const typesContent = fs.readFileSync(TYPES_FILE, 'utf8');
 const actionKeysMatch = typesContent.match(/ACTIONS = {([\s\S]*?)} as const/);
+if (!actionKeysMatch) {
+    throw new Error('ACTIONS table not found in public/types.ts');
+}
 const actionKeys = actionKeysMatch[1]
     .split('\n')
     .map((line) => line.trim().split(':')[0])
@@ -59,8 +69,8 @@ const actionKeys = actionKeysMatch[1]
 
 describe('State Integrity Audit', () => {
     it('should verify all ACTIONS are correctly implemented', () => {
-        const unusedInDispatch = [];
-        const unusedInHandler = [];
+        const unusedInDispatch: string[] = [];
+        const unusedInHandler: string[] = [];
 
         actionKeys.forEach((key) => {
             // Check for an actual `dispatch(ACTIONS.KEY` call site — not just the bare

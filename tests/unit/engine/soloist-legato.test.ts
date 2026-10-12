@@ -1,7 +1,7 @@
-// @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { playSoloNote } from '../../../public/engine/synth-soloist.js';
 import { getState } from '../../../public/state.js';
+import type { Mutable, SoloistState } from '../../../public/types.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
@@ -75,7 +75,6 @@ vi.mock('../../../public/state.js', () => {
         },
         soloist: makeSoloistMock({
             activeVoices: [],
-            preset: 'neo',
             mode: 'monophonic',
             voice: 'synth',
             lastRenderedFreq: null, // New property
@@ -88,7 +87,24 @@ vi.mock('../../../public/state.js', () => {
 });
 
 describe('Soloist Legato Articulation', () => {
-    const { soloist } = getState();
+    // The mocked slice is plain, so the tests may write the read-only fields directly.
+    const soloist = getState().soloist as Omit<Mutable<SoloistState>, 'audio'> & {
+        audio: Mutable<SoloistState['audio']>;
+    };
+
+    /** The oscillator-shaped mock node in a voice: the one with a scheduled frequency. */
+    function oscOf(voice: { nodes: unknown[] }) {
+        const osc = voice.nodes.find(
+            (n) => (n as { frequency?: { setValueAtTime?: unknown } }).frequency?.setValueAtTime,
+        ) as unknown as {
+            frequency: {
+                setValueAtTime: ReturnType<typeof vi.fn>;
+                exponentialRampToValueAtTime: ReturnType<typeof vi.fn>;
+            };
+        };
+        expect(osc).toBeDefined();
+        return osc;
+    }
 
     beforeEach(() => {
         soloist.audio.activeVoices = [];
@@ -113,7 +129,7 @@ describe('Soloist Legato Articulation', () => {
         playSoloNote(getState(), 554, 100.5, 0.5, 0.5, 0, true);
 
         const voice = soloist.audio.activeVoices[0];
-        const osc = voice.nodes.find((n) => n.frequency?.setValueAtTime);
+        const osc = oscOf(voice);
 
         // Should start at prevFreq (440)
         expect(osc.frequency.setValueAtTime).toHaveBeenCalledWith(440, 100.5);
@@ -130,7 +146,7 @@ describe('Soloist Legato Articulation', () => {
         // In guitar mode, playTime 100.5 doesn't kill the first voice (100 + 0.5 + 1.0 > 100.5)
         // So the activeVoices will have 2 voices. The legato glide happens on the SECOND voice.
         const voice = soloist.audio.activeVoices[1];
-        const osc = voice.nodes.find((n) => n.frequency?.setValueAtTime);
+        const osc = oscOf(voice);
 
         // Guitar mode keeps a quicker hammer-on glide of 40ms (epic-3-soloist S1).
         expect(osc.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(554, 100.5 + 0.04);

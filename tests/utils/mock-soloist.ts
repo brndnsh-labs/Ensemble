@@ -4,24 +4,12 @@
  * lifts each known key into its real home, so engine code reading `soloist.audio.lastRenderedFreq`
  * sees the value.
  *
- * Unknown keys are kept at the top level (for forward compat with tests that
- * stash bespoke fields on the soloist mock — these don't cross the engine
- * boundary).
+ * Every other key is kept at the top level as given (the slice's config fields are flat, and
+ * tests may stash bespoke fields on the mock — these don't cross the engine boundary). The
+ * helper does not validate keys against `SoloistState`.
  */
 export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
     const out: any = {};
-
-    // Config (flat at the top)
-    const CONFIG = new Set([
-        'enabled',
-        'mode',
-        'style',
-        'volume',
-        'reverb',
-        'complexity',
-        'doubleStopProb',
-        'seed',
-    ]);
 
     // Default nested skeleton — engine code only reads, so we provide the
     // shape; tests overwrite specific leaves via the flat input below.
@@ -41,15 +29,12 @@ export function makeSoloistMock<T extends Record<string, unknown>>(flat: T): T {
     };
 
     for (const [k, v] of Object.entries(flat)) {
-        if (CONFIG.has(k)) {
-            out[k] = v;
-        } else if (ROUTES[k]) {
+        if (ROUTES[k]) {
             ROUTES[k](v);
         } else if (k === 'audio' && v && typeof v === 'object') {
             deepMerge(audio, v as Record<string, unknown>);
         } else {
-            // Unknown key — preserve at top level for back-compat with tests
-            // that stash bespoke fields here.
+            // Config field (or a bespoke test field): keep it flat at the top.
             out[k] = v;
         }
     }

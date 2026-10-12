@@ -3,80 +3,11 @@
 /**
  * @vitest-environment happy-dom
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-// Mock dependencies
 import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
-import { initAudio } from '../../../public/engine/engine.js';
-import { getState } from '../../../public/state.js';
-
-const { playback, chords, bass } = getState();
 
 describe('DSP & Signal Safety', () => {
-    beforeEach(() => {
-        vi.clearAllMocks();
-
-        const MockAudioContext = vi.fn().mockImplementation(function () {
-            this.state = 'running';
-            this.currentTime = 0;
-            this.sampleRate = 44100;
-            this.createGain = vi.fn().mockImplementation(() => ({
-                connect: vi.fn(),
-                gain: {
-                    value: 1,
-                    setTargetAtTime: vi.fn(),
-                    setValueAtTime: vi.fn(),
-                    exponentialRampToValueAtTime: vi.fn(),
-                    cancelScheduledValues: vi.fn(),
-                },
-            }));
-            this.createStereoPanner = vi.fn().mockImplementation(() => ({
-                connect: vi.fn(),
-                pan: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn() },
-            }));
-            this.createWaveShaper = vi.fn().mockImplementation(() => ({
-                connect: vi.fn(),
-                curve: null,
-                oversample: 'none',
-            }));
-            this.createDynamicsCompressor = vi.fn().mockImplementation(() => ({
-                connect: vi.fn(),
-                threshold: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn() },
-                ratio: { value: 0, setTargetAtTime: vi.fn(), setValueAtTime: vi.fn() },
-                knee: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                attack: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                release: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-            }));
-            this.createBiquadFilter = vi.fn().mockImplementation(() => ({
-                connect: vi.fn(),
-                frequency: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                Q: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                gain: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                type: 'lowpass',
-            }));
-            this.createConvolver = vi.fn().mockImplementation(() => ({ connect: vi.fn() }));
-            this.createDelay = vi.fn().mockImplementation(() => ({
-                connect: vi.fn(),
-                delayTime: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-            }));
-            this.createOscillator = vi.fn().mockImplementation(() => ({
-                connect: vi.fn(),
-                frequency: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-                start: vi.fn(),
-                stop: vi.fn(),
-            }));
-            this.createBuffer = vi.fn(() => ({
-                getChannelData: vi.fn(() => new Float32Array(1024)),
-            }));
-            this.createChannelMerger = vi.fn().mockImplementation(() => ({ connect: vi.fn() }));
-            this.createChannelSplitter = vi.fn().mockImplementation(() => ({ connect: vi.fn() }));
-            this.destination = {};
-        });
-
-        global.window.AudioContext = MockAudioContext;
-        playback.audio = null;
-    });
-
     it('should generate a valid soft-clip curve for the saturator', () => {
         const curve = createSoftClipCurve();
         expect(curve).toBeInstanceOf(Float32Array);
@@ -93,18 +24,6 @@ describe('DSP & Signal Safety', () => {
         for (let i = 1; i < curve.length; i += 100) {
             expect(curve[i]).toBeGreaterThanOrEqual(curve[i - 1]);
         }
-    });
-
-    it('should ensure all instrument reverb sends are within safe bounds', () => {
-        // High reverb settings in state
-        chords.reverb = 1.2; // Over 1.0!
-        bass.reverb = 0.8;
-
-        initAudio(getState());
-
-        // The engine should clamp or handle these.
-        // Let's verify what the gain nodes were actually set to.
-        // (Depends on engine.js implementation)
     });
 
     describe('DSP Clamping', () => {

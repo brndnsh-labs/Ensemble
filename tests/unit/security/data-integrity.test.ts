@@ -1,4 +1,3 @@
-// @ts-nocheck
 import { describe, expect, it } from 'vitest';
 import { escapeHTML } from '../../../public/sanitize.js';
 import { tryDecompressSections } from '../../../public/state/share-codec.js';
@@ -25,9 +24,9 @@ describe('Security: Data Integrity & Sanitization', () => {
 
         it('should handle empty strings and non-string inputs safely', () => {
             expect(escapeHTML('')).toBe('');
-            expect(escapeHTML(null)).toBe('');
-            expect(escapeHTML(undefined)).toBe('');
-            expect(escapeHTML(123)).toBe('123');
+            expect(escapeHTML(null as unknown as string)).toBe('');
+            expect(escapeHTML(undefined as unknown as string)).toBe('');
+            expect(escapeHTML(123 as unknown as string)).toBe('123');
         });
 
         it('should prevent script and event handler injection', () => {
@@ -56,7 +55,7 @@ describe('Security: Data Integrity & Sanitization', () => {
             const encoded = btoa(binString);
 
             const result = tryDecompressSections(encoded);
-            expect(result.length).toBeLessThanOrEqual(500);
+            expect(result?.length).toBeLessThanOrEqual(500);
         });
 
         it('should sanitize section labels and values during decompression', () => {
@@ -66,10 +65,11 @@ describe('Security: Data Integrity & Sanitization', () => {
 
             const result = tryDecompressSections(encoded);
 
-            expect(result[0].label).not.toContain('<script>');
-            expect(result[0].label).toContain('&lt;script&gt;');
+            expect(result).not.toBeNull();
+            expect(result?.[0].label).not.toContain('<script>');
+            expect(result?.[0].label).toContain('&lt;script&gt;');
 
-            expect(result[0].value).not.toContain('<img');
+            expect(result?.[0].value).not.toContain('<img');
         });
 
         it('should preserve valid text characters like apostrophes and ampersands', () => {
@@ -78,8 +78,8 @@ describe('Security: Data Integrity & Sanitization', () => {
             const encoded = btoa(json);
 
             const result = tryDecompressSections(encoded);
-            expect(result[0].value).toBe("Don't Stop");
-            expect(result[0].label).toBe('R&amp;B');
+            expect(result?.[0].value).toBe("Don't Stop");
+            expect(result?.[0].label).toBe('R&amp;B');
         });
     });
 });

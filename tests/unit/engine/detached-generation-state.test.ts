@@ -1,11 +1,12 @@
-// @ts-nocheck
 import { describe, expect, it, vi } from 'vitest';
 import { cloneStateForDetachedGeneration } from '../../../public/export/detached-generation-state.js';
 import { getState } from '../../../public/state.js';
+import type { EnsembleState } from '../../../public/types.js';
 
 describe('detached generation state', () => {
     it('preserves generation inputs while stripping live handles and runtime buffers', () => {
         const live = getState();
+        // Live handles stand in for Web Audio nodes, which the slice types do not model.
         const input = {
             ...live,
             playback: {
@@ -28,7 +29,7 @@ describe('detached generation state', () => {
                 ...live.bass,
                 lastBassGain: { disconnect: vi.fn() },
             },
-        };
+        } as unknown as EnsembleState;
 
         const detached = cloneStateForDetachedGeneration(input);
 

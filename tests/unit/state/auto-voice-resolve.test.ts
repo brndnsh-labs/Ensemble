@@ -111,6 +111,57 @@ describe('resolveAutoVoices (#683 install → instantly better)', () => {
             auto: true,
         });
     });
+
+    it('moves only the Auto lanes when the genre changes (#1000)', () => {
+        // A pinned chords lane on a pack and a pinned lead/drums stay put; only the Auto bass flips.
+        markPackInstalled('upright-bass', true);
+        const dispatch = vi.fn();
+        const state = makeState({
+            chords: { autoSound: false, voice: 'pack:clavinet' },
+            bass: { autoSound: true, voice: 'synth' },
+        });
+
+        resolveAutoVoices(state, 'Jazz', dispatch);
+
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
+            module: 'bass',
+            voice: 'pack:upright-bass',
+            auto: true,
+        });
+        expect(dispatch).not.toHaveBeenCalledWith(
+            ACTIONS.SET_INSTRUMENT_VOICE,
+            expect.objectContaining({ module: 'chords' }),
+        );
+    });
+
+    it('recovers an Auto lane to synth when its pack is no longer installed', () => {
+        // Auto bass still on the upright pack, but the pack is gone: auto-follow drops it to
+        // synth rather than leaving a voice that cannot play (no auto-download).
+        const dispatch = vi.fn();
+        const state = makeState({ bass: { autoSound: true, voice: 'pack:upright-bass' } });
+
+        resolveAutoVoices(state, 'Jazz', dispatch);
+
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
+            module: 'bass',
+            voice: 'synth',
+            auto: true,
+        });
+    });
+
+    it('moves an Auto lane back to synth for a genre with no mapping for it', () => {
+        markPackInstalled('upright-bass', true);
+        const dispatch = vi.fn();
+        const state = makeState({ bass: { autoSound: true, voice: 'pack:upright-bass' } });
+
+        resolveAutoVoices(state, 'Funk', dispatch);
+
+        expect(dispatch).toHaveBeenCalledWith(ACTIONS.SET_INSTRUMENT_VOICE, {
+            module: 'bass',
+            voice: 'synth',
+            auto: true,
+        });
+    });
 });
 
 // #856 — phrasing mode follows the lead voice. The pure mapping:
