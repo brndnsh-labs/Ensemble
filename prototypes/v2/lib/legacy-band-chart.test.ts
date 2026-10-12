@@ -7,13 +7,14 @@
  * written chords in written order, one slot per step-map entry performing chord `i`.
  */
 
-import { notePc, PPQ, parseChord, voice } from '@band/index';
+import { notePc, PPQ, parseChord } from '@band/index';
 import { TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
 import type { ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { firstVoicedSlot, neckModel, nextVoicedSlot } from '../app/use-neck-view';
-import { legacyAuditionMidis, legacyBandChart } from './legacy-band-chart';
+import { auditionMidis } from './band-chart';
+import { legacyBandChart, legacyChordFacts } from './legacy-band-chart';
 import { load, state } from './runtime';
 import { bandForGenre } from './standards';
 import { GUITAR, voiceBandChart } from './voicings';
@@ -100,11 +101,12 @@ describe('legacyBandChart', () => {
     });
 });
 
-describe('legacyAuditionMidis', () => {
-    // The tap preview on a measure-less chart is the band's own comp voicing of the chord the
-    // chart names: whatever the chord was written as, parsed in its key, voiced with no chord
-    // before it. Read the chord back through the real load (`absName` is the parser's rewrite
-    // of the written symbol), then compare with `voice` fed the symbol as written.
+describe('legacyChordFacts', () => {
+    // A tap on a measure-less chart sounds `auditionMidis` of these facts, the same preview a
+    // measured chart gets. Read the chord back through the real load (`absName` is the parser's
+    // rewrite of the written symbol), then compare with the band's parse of the symbol as written.
+    const key = { tonic: notePc('C'), minor: false };
+
     it.each([
         ['major', 'C'],
         ['minor seventh', 'Dm7'],
@@ -116,28 +118,20 @@ describe('legacyAuditionMidis', () => {
         ['suspended', 'Gsus4'],
         ['dominant sus', 'G7sus4'],
         ['half-diminished', 'Bm7b5'],
-    ])('a %s (%s) sounds what the band comp voices for it', (_name, symbol) => {
+    ])('a %s (%s) taps as it would on a measured chart', (_name, symbol) => {
         load(v1Chart(symbol));
-        const key = { tonic: notePc('C'), minor: false };
-        const expected = voice(parseChord(symbol, key)!, 'close', null);
-        const heard = legacyAuditionMidis(state().arranger.progression[0]);
-        expect(heard).toEqual(expected);
+        const facts = legacyChordFacts(state().arranger.progression[0]);
+        const heard = facts && auditionMidis(facts);
+        expect(heard).toEqual(auditionMidis(parseChord(symbol, key)!));
         expect(heard?.length).toBeGreaterThan(2);
-        expect(Math.min(...heard!)).toBeGreaterThanOrEqual(52);
-        expect(Math.max(...heard!)).toBeLessThanOrEqual(84);
     });
 
-    it('sounds nothing for a chord the band does not read', () => {
-        expect(
-            legacyAuditionMidis({ absName: '???', key: 'C', keyIsMinor: false }),
-        ).toBeUndefined();
+    it('is null for a chord the band does not read', () => {
+        expect(legacyChordFacts({ absName: '???', key: 'C', keyIsMinor: false })).toBeNull();
     });
 
-    it('voices a chord in the key it was written in', () => {
+    it('reads a chord in the key it was written in', () => {
         load(v1Chart('V7'));
-        const heard = legacyAuditionMidis(state().arranger.progression[0]);
-        expect(heard).toEqual(
-            voice(parseChord('G7', { tonic: notePc('C'), minor: false })!, 'close', null),
-        );
+        expect(legacyChordFacts(state().arranger.progression[0])).toEqual(parseChord('G7', key));
     });
 });

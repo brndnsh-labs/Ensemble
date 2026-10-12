@@ -15,7 +15,7 @@
  * `bandChart(scoreForBand(), timeline)` could not retire the step-map reader, because a chart the
  * conversion refuses still has to be drawn. Nothing the app ships is measure-less any more.
  */
-import { type ChordFacts, notePc, PPQ, parseChord, voice } from '@band/index';
+import { type ChordFacts, notePc, PPQ, parseChord } from '@band/index';
 import type { Chord, EnsembleState } from '@engine/types';
 import type { BandChart, BandChartChord, BandSlot } from './band-chart';
 import { type ChartBlock, measureOfGlobalIndex } from './lead-sheet';
@@ -26,7 +26,8 @@ const STEP_TICKS = PPQ / 4;
 /**
  * A measure-less chart's chord as the band reads it: its written name, parsed in the chord's own
  * key. Null when the band's parser refuses it. (`parseChord` reads ♭/♯ glyphs itself.) The one
- * conversion, so what the neck follows and what a tap auditions agree by construction.
+ * conversion, so what the neck follows and what a tap auditions (`auditionMidis`, as on any
+ * other chart) agree by construction.
  */
 export function legacyChordFacts(
     chord: Pick<Chord, 'absName' | 'key' | 'keyIsMinor'>,
@@ -35,18 +36,6 @@ export function legacyChordFacts(
         tonic: notePc(chord.key),
         minor: chord.keyIsMinor === true,
     });
-}
-
-/**
- * The notes a tap on a measure-less chart's chord sounds: the band's own comp voicing for that
- * chord (`voice`, in the keys' register slot, with no chord before it). The kind is `close`, the
- * plain keyboard voicing, since a tap has no genre's comp book to follow.
- */
-export function legacyAuditionMidis(
-    chord: Pick<Chord, 'absName' | 'key' | 'keyIsMinor'>,
-): number[] | undefined {
-    const facts = legacyChordFacts(chord);
-    return facts ? voice(facts, 'close', null) : undefined;
 }
 
 export function legacyBandChart(
