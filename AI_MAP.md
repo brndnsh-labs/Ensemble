@@ -145,7 +145,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` (re-export from `synth-chords`) |
 | `public/engine/reverb.ts` | Algorithmic Schroeder/Freeverb reverb (shared reverb return). | `createAlgorithmicReverb`, `REVERB_PRESETS` |
 | `public/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, velocity→timbre). | `rampGain`, `killActiveVoices`, `velocityTimbre` |
-| `public/engine/humanize.ts` | Leaf module (imports only `hash-utils.ts`) owning the seeded humanization primitives every lane shares — bar-independent timing placement and the knob curve, used by the synth voices. | `humanizePlacement`, `humanizeScale`, `HUMANIZE_PROFILES` |
 | `public/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
 | `public/engine/section-overrides.ts` | Per-section instrument-enabled overrides for a measure-less chart. | `isInstrumentActiveAtStep`, `isInstrumentEverActive` |
 | `public/engine/hash-utils.ts` | Canonical deterministic hash helpers. `scrambleHash` is stateless and seed-tuple-indexed — see `public/engine/CLAUDE.md` §27. | `scrambleHash`, `stringHash33`, `stringHash31` |

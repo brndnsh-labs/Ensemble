@@ -1,6 +1,5 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HUMANIZE_PROFILES, humanizePlacement } from '../../../public/engine/humanize.js';
 import {
     createSimplePanner,
     killActiveVoices,
@@ -169,27 +168,6 @@ describe('Synthesis Utilities', () => {
 
             const result = createSimplePanner(mockCtx, 0.5, 10.0);
             expect(result).toBe(mockGain);
-        });
-    });
-
-    describe('humanizePlacement (#1068)', () => {
-        const drums = HUMANIZE_PROFILES.drums;
-
-        it('draws independently per voice at the same bar position', () => {
-            const skewA = humanizePlacement(4, 'drums', 0, drums.timeSpread, 1);
-            const skewB = humanizePlacement(4, 'drums', 1, drums.timeSpread, 1);
-            expect(skewA).not.toBe(skewB);
-        });
-
-        it('is a no-op at scale 0 (humanize knob off)', () => {
-            expect(humanizePlacement(3, 'drums', 0, drums.timeSpread, 0)).toBe(0);
-        });
-
-        it('stays within the profile spread (± at full strength)', () => {
-            for (let step = 0; step < 200; step++) {
-                const skew = humanizePlacement(step % 16, 'drums', step % 5, drums.timeSpread, 1);
-                expect(Math.abs(skew)).toBeLessThanOrEqual(drums.timeSpread);
-            }
         });
     });
 

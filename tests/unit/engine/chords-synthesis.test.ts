@@ -116,17 +116,6 @@ describe('Chord Synthesis', () => {
         expect(oscsWithWave.length).toBe(1);
     });
 
-    it('should apply a randomized strum offset based on index', () => {
-        playNote(getState(), 440, 10, 1.0, { index: 2 });
-
-        const osc = playback.audio.createOscillator.mock.results[0].value;
-        const startTime = osc.frequency.setValueAtTime.mock.calls[0][1];
-
-        // Base time is 10. Index 2 should add approx 0.01 - 0.03s
-        expect(startTime).toBeGreaterThan(10.005);
-        expect(startTime).toBeLessThan(10.05);
-    });
-
     it('should create a hammer strike noise layer for Piano', () => {
         playNote(getState(), 440, 10, 1.0);
 
