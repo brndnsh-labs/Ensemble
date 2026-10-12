@@ -93,7 +93,7 @@ export function instrumentReducer(action: Action): boolean {
             if (isGrooveModule(action.payload.module)) {
                 return false;
             }
-            if (instrumentStateMap[action.payload.module]) {
+            if (Object.hasOwn(instrumentStateMap, action.payload.module)) {
                 instrumentStateMap[action.payload.module].volume = action.payload.value;
             }
             return true;
@@ -102,7 +102,7 @@ export function instrumentReducer(action: Action): boolean {
             if (isGrooveModule(action.payload.module)) {
                 return false;
             }
-            if (instrumentStateMap[action.payload.module]) {
+            if (Object.hasOwn(instrumentStateMap, action.payload.module)) {
                 instrumentStateMap[action.payload.module].reverb = action.payload.value;
             }
             return true;
@@ -112,8 +112,8 @@ export function instrumentReducer(action: Action): boolean {
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             // synth-audit Epic 0 S1 — A/B voice switch. instrumentStateMap
             // covers groove too, so this one case handles all five modules.
-            const target = instrumentStateMap[action.payload.module];
-            if (target) {
+            if (Object.hasOwn(instrumentStateMap, action.payload.module)) {
+                const target = instrumentStateMap[action.payload.module];
                 target.voice = action.payload.voice;
                 // #675 — a manual pick pins (auto:false); selecting Auto sets
                 // auto:true + the genre's voice. Omitting `auto` (a bare voice

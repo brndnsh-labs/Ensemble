@@ -28,67 +28,40 @@ export function flushBuffers(): void {
     restoreGains(stateMap);
 }
 
-function flushBuffer(...types: string[]): void {
-    const has = (lane: string) => types.includes(lane) || types.includes('all');
-    if (has('bass')) {
+/** Silence the named lanes (the drums are never among them: muting a part must not hiccup the time). */
+function flushBuffer(...lanes: Exclude<InstrumentModule, 'groove'>[]): void {
+    if (lanes.includes('bass')) {
         killBassNote(stateMap);
         killBassBus(stateMap);
     }
-    if (has('soloist')) {
+    if (lanes.includes('soloist')) {
         killSoloistNote(stateMap);
         killSoloistBus(stateMap);
     }
-    if (has('chord')) {
+    if (lanes.includes('chords')) {
         killAllPianoNotes(stateMap);
         killChordBus(stateMap);
-    }
-    if (has('groove')) {
-        killDrumNote(stateMap);
-        killDrumBus(stateMap);
     }
     restoreGains(stateMap);
 }
 
-export function togglePower(type: string): void {
-    const { groove, chords, bass, soloist } = getState();
-    const normalizedType = type === 'chords' ? 'chord' : type;
+export function togglePower(module: InstrumentModule): void {
+    const newState = !getState()[module].enabled;
 
-    const stateMap = {
-        chord: chords,
-        bass: bass,
-        soloist: soloist,
-        groove: groove,
-    };
-
-    const state = (stateMap as any)[normalizedType];
-    if (!state) {
-        return;
-    }
-
-    const newState = !state.enabled;
-    // The lookup above returned a slice, so `normalizedType` is one of the four lane keys.
-    const moduleName = (normalizedType === 'chord' ? 'chords' : normalizedType) as InstrumentModule;
-
-    dispatch(ACTIONS.SET_PARAM, { module: moduleName, param: 'enabled', value: newState });
+    dispatch(ACTIONS.SET_PARAM, { module, param: 'enabled', value: newState });
 
     // #1313 — chord voicings are baked at parse time and depend on whether a bass
     // line is sounding (rootless shells + a higher floor with it, rooted voicings
     // without). Muting the bass is "I'm playing that part", so the comp has to be
     // re-voiced NOW or it keeps the rootless shapes with nothing stating the root.
     // Mutate -> validate -> flush. Flush every lane that reads the re-voiced progression
-    // (the chords, not just the bass buffer) — but NOT the drums or the
+    // (the chords, not just the bass) — but NOT the drums or the
     // soloist: a player muting the bass mid-groove must not hear the time hiccup.
-    const bassToggled = normalizedType === 'bass';
-    if (bassToggled) {
-        // getState(), NOT `stateMap`: this function's local `stateMap` is the lane
-        // lookup above and shadows the imported state tree.
+    if (module === 'bass') {
         validateProgression(getState(), dispatch);
-    }
-
-    if (bassToggled) {
-        flushBuffer('bass', 'chord');
-    } else if (['chord', 'soloist'].includes(normalizedType)) {
-        flushBuffer(normalizedType);
+        flushBuffer('bass', 'chords');
+    } else if (module === 'chords' || module === 'soloist') {
+        flushBuffer(module);
     } else {
         restoreGains(getState());
     }
