@@ -71,7 +71,7 @@ export function stripDangerousChars(str: string): string {
  * every per-section derivation (`deriveSectionSeed`).
  *
  * Bounding at the write side instead of adding a fourth read-side bound is what
- * makes them agree: `SET_SONG_SEED` (and the `SET_PARAM` back door) normalize on
+ * makes them agree: `SET_SONG_SEED` (and the generic `SET_PARAM` write) normalize on
  * the way in, so the slice can only ever hold an already-bounded value and the
  * share writer emits what the readers accept.
  *

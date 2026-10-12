@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { playback, playbackReducer } from '../../../public/state/playback.js';
-import { ACTIONS } from '../../../public/types.js';
+import { ACTIONS, type GlobalContext } from '../../../public/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 describe('Playback Reducer', () => {
@@ -46,49 +46,56 @@ describe('Playback Reducer', () => {
         });
         expect(playback.masterVolume).toBe(0.6);
 
-        // Other module (hits line 174)
+        // Another slice's write is not this reducer's.
         const result = playbackReducer({
             type: ACTIONS.SET_PARAM,
-            payload: { module: 'not_playback', param: 'masterVolume', value: 0.9 },
+            payload: { module: 'groove', param: 'swing', value: 30 },
         });
         expect(result).toBe(false);
+        expect(playback.masterVolume).toBe(0.6);
+    });
+
+    it('does not create a field the slice does not declare (#1633)', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const result = playbackReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'playback', param: 'noSuchField', value: 1 },
+        } as any);
+        expect(result).toBe(false);
+        expect(Object.hasOwn(playback, 'noSuchField')).toBe(false);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0][0]).toContain("'playback' has no field 'noSuchField'");
+        warn.mockRestore();
+    });
+
+    it('can write a field that starts null (own at init)', () => {
+        const audio = { ctx: true } as unknown as AudioContext;
+        playbackReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'playback', param: 'audio', value: audio },
+        });
+        expect(playback.audio).toBeTruthy();
     });
 
     describe('setPlaybackParam via reducer', () => {
         it('should update ALL supported parameters', () => {
-            const allParams = {
-                audio: { ctx: true },
-                masterGain: { gain: true },
-                saturator: { sat: true },
-                reverbNode: { rev: true },
-                chordsGain: { g: 1 },
-                chordsReverb: { r: 1 },
-                chordsEQ: { e: 1 },
-                drumsReverb: { dr: 1 },
-                drumsGain: { dg: 1 },
-                bassReverb: { br: 1 },
-                bassGain: { bg: 1 },
-                bassEQ: { be: 1 },
-                soloistReverb: { sr: 1 },
-                soloistGain: { sg: 1 },
-                harmoniesReverb: { hr: 1 },
+            // Every field `GlobalContext` declares (the type is the checklist).
+            const allParams: { [K in keyof GlobalContext]: unknown } = {
+                audio: null,
+                audioGraph: null,
                 isPlaying: true,
+                startStep: 16,
                 bpm: 120,
-                theme: 'light',
                 bandIntensity: 0.8,
                 autoIntensity: false,
                 metronome: true,
-                viz: { v: 1 },
-                lyricalBias: 0.2,
-                masterLimiter: { l: 1 },
                 masterVolume: 0.7,
                 countIn: false,
-                soloistEQ: { eq: 1 },
-                harmoniesGain: { g: 1 },
-                harmoniesEQ: { eq: 1 },
             };
 
-            for (const [param, value] of Object.entries(allParams)) {
+            for (const [param, value] of Object.entries(allParams) as Array<
+                [keyof GlobalContext, unknown]
+            >) {
                 playbackReducer({
                     type: ACTIONS.SET_PARAM,
                     payload: { module: 'playback', param, value },

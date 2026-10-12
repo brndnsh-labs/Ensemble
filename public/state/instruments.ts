@@ -1,11 +1,19 @@
 import { deepSignal } from 'deepsignal/core';
 import { resolveSoloistMode } from '../engine/soloist-mode-policy.js';
-import type { Action, BassState, ChordState, Mutable, SoloistState } from '../types.js';
+import type {
+    Action,
+    BassState,
+    ChordState,
+    InstrumentModule,
+    Mutable,
+    SoloistState,
+} from '../types.js';
 import { ACTIONS } from '../types.js';
 
 export type { BassState, ChordState, SoloistState };
 
 import { groove, isGrooveModule } from './groove.js';
+import { writeDeclaredParam } from './set-param.js';
 
 export const MIXER_SETTINGS_VERSION = 2;
 
@@ -58,35 +66,11 @@ export const soloist = deepSignal<SoloistState>({
     },
 });
 
-/**
- * Soloist payload keys that were removed after the field behind them went away:
- * `motifTracking` / `pinnedProfile` in #866 (the legacy engine's retirement, epic
- * #10), and `complexity` in #1070 (dead since #1167 rewired the slider to
- * `phrasingIntensity` — zero writers, zero readers, absent from
- * `buildSoloistSyncPayload`), and the old engine's settings `preset`, `octave`,
- * `phrasingIntensity`, `tradeMode` and `tradeSilenced` in #1424. A stray payload
- * carrying one is dropped rather than letting the generic `SET_PARAM` write
- * resurrect it as a stray top-level field. Keep entries here.
- */
-const DEPRECATED_SOLOIST_KEYS = new Set([
-    'motifTracking',
-    'pinnedProfile',
-    'complexity',
-    'preset',
-    'octave',
-    'phrasingIntensity',
-    'tradeMode',
-    'tradeSilenced',
-]);
-
-const instrumentStateMap: Record<string, any> = {
-    cb: chords,
+/** The four lanes by canonical slice name — the only module names the lane actions accept. */
+const instrumentStateMap: Record<InstrumentModule, any> = {
     chords,
-    bb: bass,
     bass,
-    sb: soloist,
     soloist,
-    gb: groove,
     groove,
 };
 
@@ -96,21 +80,11 @@ export function instrumentReducer(action: Action): boolean {
     const s = soloist as Mutable<typeof soloist>;
     switch (action.type) {
         case ACTIONS.SET_PARAM: {
-            const modKey = action.payload.module;
-            // A retired soloist setting is dropped, not written as a stray top-level field.
-            if (
-                (modKey === 'soloist' || modKey === 'sb') &&
-                DEPRECATED_SOLOIST_KEYS.has(action.payload.param)
-            ) {
-                return true;
-            }
-            // grooveReducer owns the groove lane for this action (#1182).
-            if (isGrooveModule(modKey)) {
-                return false;
-            }
-            if (instrumentStateMap[modKey]) {
-                instrumentStateMap[modKey][action.payload.param] = action.payload.value;
-                return true;
+            const { module: modKey, param, value } = action.payload;
+            // grooveReducer owns the groove lane for this action (#1182); the playback and
+            // arranger reducers own theirs.
+            if (modKey === 'chords' || modKey === 'bass' || modKey === 'soloist') {
+                return writeDeclaredParam(instrumentStateMap[modKey], modKey, param, value);
             }
             break;
         }
@@ -119,7 +93,7 @@ export function instrumentReducer(action: Action): boolean {
             if (isGrooveModule(action.payload.module)) {
                 return false;
             }
-            if (instrumentStateMap[action.payload.module]) {
+            if (Object.hasOwn(instrumentStateMap, action.payload.module)) {
                 instrumentStateMap[action.payload.module].volume = action.payload.value;
             }
             return true;
@@ -128,7 +102,7 @@ export function instrumentReducer(action: Action): boolean {
             if (isGrooveModule(action.payload.module)) {
                 return false;
             }
-            if (instrumentStateMap[action.payload.module]) {
+            if (Object.hasOwn(instrumentStateMap, action.payload.module)) {
                 instrumentStateMap[action.payload.module].reverb = action.payload.value;
             }
             return true;
@@ -138,8 +112,8 @@ export function instrumentReducer(action: Action): boolean {
         case ACTIONS.SET_INSTRUMENT_VOICE: {
             // synth-audit Epic 0 S1 — A/B voice switch. instrumentStateMap
             // covers groove too, so this one case handles all five modules.
-            const target = instrumentStateMap[action.payload.module];
-            if (target) {
+            if (Object.hasOwn(instrumentStateMap, action.payload.module)) {
+                const target = instrumentStateMap[action.payload.module];
                 target.voice = action.payload.voice;
                 // #675 — a manual pick pins (auto:false); selecting Auto sets
                 // auto:true + the genre's voice. Omitting `auto` (a bare voice

@@ -21,6 +21,17 @@ top-level field as `document`/`preferences`/`runtime-derived` for persistence �
 (`isInstrumentActiveAtStep`) and its retired violations (§5) before adding a new dispatch site
 that touches an existing document field from a runtime path.
 
+## The generic `SET_PARAM` write
+
+0. **`SET_PARAM` writes only a field its slice declares.** `ActionPayloadSetParam` is a union on
+   `module` (`playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — the canonical slice
+   names, no aliases) whose `param` is `keyof` that slice's interface, and every reducer that
+   handles it goes through `writeDeclaredParam` (`state/set-param.ts`): `Object.hasOwn` on the
+   slice, else the write is dropped with a `console.warn`. So **a state field must be an own key
+   of its slice's initial `deepSignal` object** — a field with no value starts `null`, never
+   absent, or `SET_PARAM` can never set it. Removing a field means removing its dispatches too;
+   the compiler now finds them. `value` is still `unknown`.
+
 ## Effects & reactivity (`state/state-effects.ts`)
 
 7. **Any side effect on the global dispatch subscriber (`handleEffects`) fires on every single

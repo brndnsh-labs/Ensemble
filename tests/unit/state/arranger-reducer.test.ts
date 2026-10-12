@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { arranger, arrangerReducer } from '../../../public/state/arranger.js';
-import { ACTIONS, type Mutable } from '../../../public/types.js';
+import { ACTIONS, type ArrangerState, type Mutable } from '../../../public/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 const mutableArranger = arranger as Mutable<typeof arranger>;
@@ -39,9 +39,22 @@ describe('Arranger Reducer', () => {
         expect(arranger.grouping).toEqual([2, 3]);
     });
 
+    it('does not create a field the slice does not declare (#1633)', () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const result = arrangerReducer({
+            type: ACTIONS.SET_PARAM,
+            payload: { module: 'arranger', param: 'noSuchField', value: 1 },
+        } as any);
+        expect(result).toBe(false);
+        expect(Object.hasOwn(arranger, 'noSuchField')).toBe(false);
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn.mock.calls[0][0]).toContain("'arranger' has no field 'noSuchField'");
+        warn.mockRestore();
+    });
+
     describe('setArrangerParam', () => {
         it('should update all supported parameters', () => {
-            const params = {
+            const params: { [K in keyof ArrangerState]?: unknown } = {
                 sections: [],
                 progression: [{ c: 1 }],
                 key: 'F#',
@@ -54,7 +67,9 @@ describe('Arranger Reducer', () => {
                 sectionMap: [{ id: '1' }],
             };
 
-            for (const [param, value] of Object.entries(params)) {
+            for (const [param, value] of Object.entries(params) as Array<
+                [keyof ArrangerState, unknown]
+            >) {
                 arrangerReducer({
                     type: ACTIONS.SET_PARAM,
                     payload: { module: 'arranger', param, value },

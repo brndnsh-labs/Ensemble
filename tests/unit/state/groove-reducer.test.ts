@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { groove, grooveReducer as grooveReducerImpl } from '../../../public/state/groove.js';
 import { ACTIONS } from '../../../public/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
@@ -26,7 +26,7 @@ describe('Groove Reducer', () => {
     it('should set volume and reverb via module actions', () => {
         grooveReducer({ type: ACTIONS.SET_VOLUME, payload: { module: 'groove', value: 0.7 } });
         expect(groove.volume).toBe(0.7);
-        grooveReducer({ type: ACTIONS.SET_REVERB, payload: { module: 'drum', value: 0.3 } });
+        grooveReducer({ type: ACTIONS.SET_REVERB, payload: { module: 'groove', value: 0.3 } });
         expect(groove.reverb).toBe(0.3);
 
         const result = grooveReducer({
@@ -93,39 +93,66 @@ describe('Groove Reducer', () => {
     // to back and ignores their boolean returns, so before this both wrote groove
     // state on every one of these actions.
     describe('#1182 sole authority over the groove lane', () => {
-        // The two reducers used to accept DIFFERENT aliases — instrumentStateMap had
-        // `groove` + `gb`, this one had `groove` + `drum` + `drums`. Handing the lane
-        // over without covering `gb` here would have made a gb-keyed dispatch a silent
-        // no-op, so every alias is pinned.
-        for (const module of ['groove', 'drum', 'drums', 'gb']) {
-            it(`owns SET_PARAM / SET_VOLUME / SET_REVERB for module '${module}'`, () => {
+        // The old `drum`, `drums` and `gb` aliases are gone (#1633): the module is the slice name.
+        it("owns SET_PARAM / SET_VOLUME / SET_REVERB for module 'groove'", () => {
+            const module = 'groove';
+            expect(
+                grooveReducer(
+                    {
+                        type: ACTIONS.SET_PARAM,
+                        payload: { module, param: 'humanize', value: 3 },
+                    },
+                    {},
+                ),
+            ).toBe(true);
+            expect(groove.humanize).toBe(3);
+
+            expect(
+                grooveReducer({ type: ACTIONS.SET_VOLUME, payload: { module, value: 0.42 } }),
+            ).toBe(true);
+            expect(groove.volume).toBe(0.42);
+
+            expect(
+                grooveReducer({ type: ACTIONS.SET_REVERB, payload: { module, value: 0.11 } }),
+            ).toBe(true);
+            expect(groove.reverb).toBe(0.11);
+        });
+
+        it.each(['drum', 'drums', 'gb'])("no longer answers to the alias '%s'", (module) => {
+            const before = { ...groove };
+            for (const type of [ACTIONS.SET_PARAM, ACTIONS.SET_VOLUME, ACTIONS.SET_REVERB]) {
                 expect(
                     grooveReducer(
-                        {
-                            type: ACTIONS.SET_PARAM,
-                            payload: { module, param: 'humanize', value: 3 },
-                        },
+                        { type, payload: { module, param: 'humanize', value: 99 } } as any,
                         {},
                     ),
-                ).toBe(true);
-                expect(groove.humanize).toBe(3);
+                ).toBe(false);
+            }
+            expect(groove.humanize).toBe(before.humanize);
+            expect(groove.volume).toBe(before.volume);
+            expect(groove.reverb).toBe(before.reverb);
+        });
 
-                expect(
-                    grooveReducer({ type: ACTIONS.SET_VOLUME, payload: { module, value: 0.42 } }),
-                ).toBe(true);
-                expect(groove.volume).toBe(0.42);
-
-                expect(
-                    grooveReducer({ type: ACTIONS.SET_REVERB, payload: { module, value: 0.11 } }),
-                ).toBe(true);
-                expect(groove.reverb).toBe(0.11);
-            });
-        }
+        it('does not create a field the slice does not declare (#1633)', () => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            const result = grooveReducer(
+                {
+                    type: ACTIONS.SET_PARAM,
+                    payload: { module: 'groove', param: 'noSuchField', value: 1 },
+                } as any,
+                {},
+            );
+            expect(result).toBe(false);
+            expect(Object.hasOwn(groove, 'noSuchField')).toBe(false);
+            expect(warn).toHaveBeenCalledTimes(1);
+            expect(warn.mock.calls[0][0]).toContain("'groove' has no field 'noSuchField'");
+            warn.mockRestore();
+        });
 
         it('instrumentReducer declines the groove lane instead of double-writing it', async () => {
             const { instrumentReducer } = await import('../../../public/state/instruments.js');
 
-            for (const module of ['groove', 'gb']) {
+            for (const module of ['groove'] as const) {
                 expect(
                     instrumentReducer({
                         type: ACTIONS.SET_VOLUME,

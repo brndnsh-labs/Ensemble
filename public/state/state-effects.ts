@@ -128,8 +128,8 @@ export async function reconcileUrlGenreOnBoot(
     applyGenreEffects(stateMap, { genreName }, dispatch);
 
     if (grooveOverrides) {
-        for (const [param, value] of Object.entries(grooveOverrides)) {
-            dispatch(ACTIONS.SET_PARAM, { module: 'groove', param, value });
+        for (const param of Object.keys(grooveOverrides) as Array<keyof GenreGrooveOverrides>) {
+            dispatch(ACTIONS.SET_PARAM, { module: 'groove', param, value: grooveOverrides[param] });
         }
     }
 }

@@ -519,19 +519,36 @@ export interface EnsembleState {
     chords: ChordState;
 }
 
-export interface ActionPayloadSetParam {
-    module: string;
-    param: string;
-    value: unknown;
+/** The state slice each `SET_PARAM` module names, by its canonical slice name. */
+export interface ParamSlices {
+    playback: GlobalContext;
+    arranger: ArrangerState;
+    groove: GrooveState;
+    chords: ChordState;
+    bass: BassState;
+    soloist: SoloistState;
 }
 
+/** The slices `SET_PARAM` can write. */
+export type ParamModule = keyof ParamSlices;
+
+/**
+ * A generic write of one slice field. `param` must be a field the named slice declares, so a
+ * dispatch naming a removed or misspelled field fails typecheck, and each reducer drops (and
+ * warns about) one that slips past the compiler instead of creating it. `value` is not typed
+ * per field.
+ */
+export type ActionPayloadSetParam = {
+    [M in ParamModule]: { module: M; param: keyof ParamSlices[M] & string; value: unknown };
+}[ParamModule];
+
 export interface ActionPayloadSetVolume {
-    module: string;
+    module: InstrumentModule;
     value: number;
 }
 
 export interface ActionPayloadSetReverb {
-    module: string;
+    module: InstrumentModule;
     value: number;
 }
 
