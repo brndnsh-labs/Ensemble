@@ -1,8 +1,8 @@
 import type { EnsembleState } from '../types.js';
 
 /**
- * Recursively removes deepSignal proxies and other non-cloneable wrappers while
- * preserving the Maps and Sets used by the generation engine.
+ * Recursively removes deepSignal proxies and function members, leaving a plain tree of
+ * objects, arrays and primitives. No state slice holds a Map or a Set, so neither is cloned.
  */
 function cloneRaw<T>(value: T): T {
     if (value === null || value === undefined) {
@@ -16,14 +16,6 @@ function cloneRaw<T>(value: T): T {
     }
     if (Array.isArray(value)) {
         return value.map((item) => cloneRaw(item)) as T;
-    }
-    if (value instanceof Set) {
-        return new Set(Array.from(value, (item) => cloneRaw(item))) as T;
-    }
-    if (value instanceof Map) {
-        return new Map(
-            Array.from(value.entries(), ([key, item]) => [cloneRaw(key), cloneRaw(item)]),
-        ) as T;
     }
 
     const clone: Record<string, unknown> = {};

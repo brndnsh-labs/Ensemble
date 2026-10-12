@@ -148,9 +148,7 @@ export interface Chord {
     /** Written measure identity, present for semantic-score playback. */
     measureId?: string;
     // --- Display ---
-    romanName: string;
     absName: string;
-    nnsName: string;
     display: FormattedChordNames;
 
     // --- Pitch content (audio-critical) ---
@@ -170,10 +168,6 @@ export interface Chord {
 
     // --- Tonal context ---
     key: string;
-
-    // --- Parser metadata (used by the chart editor) ---
-    charStart: number;
-    charEnd: number;
 
     // --- Section context (added by validateProgression) ---
     sectionId?: string;
@@ -568,7 +562,7 @@ export interface ActionPayloadMap {
     SET_PARAM: ActionPayloadSetParam;
     SET_BAND_INTENSITY: number;
     SET_AUTO_INTENSITY: boolean;
-    SET_BPM: number | string;
+    SET_BPM: number;
     SET_VOLUME: ActionPayloadSetVolume;
     SET_REVERB: ActionPayloadSetReverb;
     SET_SOLOIST_MODE: string;

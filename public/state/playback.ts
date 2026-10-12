@@ -25,7 +25,7 @@ export function playbackReducer(action: Action): boolean {
     const p = playback as Mutable<typeof playback>;
     switch (action.type) {
         case ACTIONS.SET_BPM:
-            p.bpm = Math.max(40, Math.min(240, parseInt(String(action.payload), 10)));
+            p.bpm = Math.max(40, Math.min(240, Math.trunc(action.payload)));
             return true;
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'playback') {

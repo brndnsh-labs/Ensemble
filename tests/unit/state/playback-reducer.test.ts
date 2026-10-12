@@ -16,6 +16,24 @@ describe('Playback Reducer', () => {
         expect(playback.bpm).toBe(40);
     });
 
+    it('truncates a fractional tempo toward zero before clamping', () => {
+        playbackReducer({ type: ACTIONS.SET_BPM, payload: 120.9 });
+        expect(playback.bpm).toBe(120);
+        playbackReducer({ type: ACTIONS.SET_BPM, payload: 39.9 });
+        expect(playback.bpm).toBe(40);
+    });
+
+    it('clamps an infinite tempo and leaves a NaN one as NaN (no guard, as before)', () => {
+        playbackReducer({ type: ACTIONS.SET_BPM, payload: Number.POSITIVE_INFINITY });
+        expect(playback.bpm).toBe(240);
+        playbackReducer({ type: ACTIONS.SET_BPM, payload: Number.NEGATIVE_INFINITY });
+        expect(playback.bpm).toBe(40);
+        // The only dispatcher rounds and clamps first, so NaN never arrives; the reducer's
+        // arithmetic passes it through, exactly as `parseInt` did.
+        playbackReducer({ type: ACTIONS.SET_BPM, payload: Number.NaN });
+        expect(playback.bpm).toBeNaN();
+    });
+
     it('should set various playback flags and params', () => {
         playbackReducer({ type: ACTIONS.SET_BAND_INTENSITY, payload: 0.9 });
         expect(playback.bandIntensity).toBe(0.9);
