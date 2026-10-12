@@ -139,10 +139,10 @@ export function releaseSampledVoices(
 }
 
 /**
- * Handle returned by {@link playSampledNote} so a caller can release the voice
- * early — used by the chords seam (#691) to clear the previous voicing when the
- * harmony changes, so a sustained pack (e.g. the Drawbar Organ, which holds flat
- * at full level for its whole duration) doesn't ring into the next chord.
+ * Handle returned by {@link playSampledNote}. Its `release` ends the voice early:
+ * the lane registry (`trackVoice`) calls it on Stop, so a sustained pack (e.g. the
+ * Drawbar Organ, which holds flat at full level for its whole duration) doesn't
+ * ring on.
  */
 export interface SampledNoteHandle {
     /**

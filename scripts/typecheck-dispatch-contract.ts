@@ -13,7 +13,7 @@ function assertDispatchContract(): void {
     // @ts-expect-error — unknown action strings are not part of the keyspace.
     dispatch('NOT_AN_ACTION');
 
-    // @ts-expect-error — SET_BPM requires its numeric/string payload.
+    // @ts-expect-error — SET_BPM requires its numeric payload.
     dispatch(ACTIONS.SET_BPM);
 
     // @ts-expect-error — payload shape must match the selected action.
