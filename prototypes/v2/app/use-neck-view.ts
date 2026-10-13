@@ -6,7 +6,11 @@ import {
     fingerMoves,
     type InstrumentDef,
     inversionOf,
+    type Note,
     rootMove,
+    type SharedNote,
+    sharedNotes,
+    spokenDegree,
     type VoicedBandChord,
     voiceBandChart,
 } from '../lib/voicings';
@@ -152,10 +156,52 @@ export function changePosition(changes: readonly number[], slot: number): number
     return after <= 0 ? changes.length : after;
 }
 
+const list = (items: Array<string | number>): string =>
+    items.length === 1 ? `${items[0]}` : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+
 const holdsPhrase = (fingers: number[]): string =>
-    fingers.length === 1
-        ? `Finger ${fingers[0]} stays down`
-        : `Fingers ${fingers.slice(0, -1).join(', ')} and ${fingers.at(-1)} stay down`;
+    fingers.length === 1 ? `Finger ${fingers[0]} stays down` : `Fingers ${list(fingers)} stay down`;
+
+/**
+ * A common tone the narration can name (#1618): one with a name and two jobs a student would
+ * recognise on the dots. A diminished 7th (`spokenDegree`) or a double-flat or double-sharp
+ * spelling is left out, and that note is narrated as before.
+ */
+const nameable = (s: SharedNote): boolean =>
+    spokenDegree(s.from.degree) !== null &&
+    spokenDegree(s.to.degree) !== null &&
+    !/♭♭|♯♯/.test(s.name);
+
+/** One entry per note name: an octave doubling is the same note with the same two jobs. */
+const byName = (notes: SharedNote[]): SharedNote[] =>
+    notes.filter((s, i) => notes.findIndex((t) => t.name === s.name) === i);
+
+const changesJob = (s: SharedNote): boolean =>
+    spokenDegree(s.from.degree) !== spokenDegree(s.to.degree);
+
+/**
+ * How many common tones get their change of job spelled out. One is the lesson ("the 3rd becomes
+ * the 7th") and two still fit a clause ("C becomes the 3rd and E the 5th"); three is a list, and
+ * the notes are then named without it.
+ */
+const JOBS_TOLD = 2;
+
+/**
+ * What the notes become, or '' when there is nothing to say: one of them is the same degree in
+ * both chords (Cmaj7 to C7 keeps the root a root), or there are more than `JOBS_TOLD`.
+ */
+function jobs(notes: SharedNote[], told: boolean): string {
+    if (!told || !notes.length || !notes.every(changesJob)) {
+        return '';
+    }
+    const [first, ...rest] = notes;
+    if (!rest.length) {
+        return `the ${spokenDegree(first.from.degree)} becomes the ${spokenDegree(first.to.degree)}`;
+    }
+    return `${first.name} becomes the ${spokenDegree(first.to.degree)} and ${rest
+        .map((s) => `${s.name} the ${spokenDegree(s.to.degree)}`)
+        .join(' and ')}`;
+}
 
 /**
  * The root's move from `from` to `to`, for the headline: what it does on the neck ("root moves
@@ -171,9 +217,15 @@ export function rootLine(
 }
 
 /**
- * The finger-by-finger detail of the change, as one sentence: which fingers stay down, then where
- * each moving finger goes, or '' when nothing moves. Lifts are left out — the strong preview
- * already dims the dots that come off, and naming them is noise.
+ * The finger-by-finger detail of the change, as one sentence: which fingers stay down, then any
+ * note that stays under another finger, then where each moving finger goes; '' when nothing
+ * moves. Lifts are left out — the strong preview already dims the dots that come off, and naming
+ * them is noise.
+ *
+ * A note both grips fret in the same place is said as a teacher says it (#1618): the note stays
+ * and its job changes. Under the same finger that is "Finger 3 stays down on B: the 3rd becomes
+ * the 7th"; under another, "F stays: the 3rd becomes the 7th; re-finger it with 2", which stands
+ * in for that finger's own move. A change with no such note reads as it always did.
  */
 export function fingersLine(
     instrument: InstrumentDef,
@@ -182,10 +234,53 @@ export function fingersLine(
 ): string {
     const { moves } = fingerMoves(instrument, from, to);
     const holds = moves.filter((m) => m.kind === 'hold').map((m) => m.finger);
-    const parts = [
-        ...(holds.length ? [holdsPhrase(holds)] : []),
-        ...moves.filter((m) => m.kind === 'move').map((m) => `finger ${m.finger} ${m.text}`),
-    ];
+    const common = sharedNotes(from, to).filter(nameable);
+    // A staying note is narrated under the finger that holds it or the one that takes it over.
+    // An open string that rings in both chords has neither, so it is not said: nothing is asked
+    // of the hand, and a strummed ukulele chord shares one with nearly every neighbour — naming
+    // them would bury the fingers the line is for. A barre that changes its strings keeps its
+    // finger on the note but is not a hold: it is narrated as the barre it becomes.
+    const held = common
+        .filter((s) => s.from.finger === s.to.finger && holds.includes(s.to.finger ?? 0))
+        .sort((x, y) => x.to.finger! - y.to.finger!);
+    const swapped = common
+        .filter((s) => s.from.finger && s.to.finger && s.from.finger !== s.to.finger)
+        .sort((x, y) => x.to.finger! - y.to.finger!);
+    const told = byName([...held, ...swapped]).length <= JOBS_TOLD;
+    const barring = new Set(moves.filter((m) => m.kind === 'move' && m.barre).map((m) => m.finger));
+    const parts: string[] = [];
+    if (holds.length) {
+        const notes = byName(held);
+        // Only when every finger that stays is on a note the line can name.
+        const all = holds.every((f) => held.some((s) => s.to.finger === f));
+        const become = all ? jobs(notes, told) : '';
+        const on = become && notes.length === 1 ? ` on ${notes[0].name}` : '';
+        parts.push(`${holdsPhrase(holds)}${on}${become && `: ${become}`}`);
+    }
+    if (swapped.length) {
+        const notes = byName(swapped);
+        const become = jobs(notes, told);
+        parts.push(
+            `${list(notes.map((s) => s.name))} ${notes.length === 1 ? 'stays' : 'stay'}${become && `: ${become}`}`,
+        );
+        // A barre laid over the note says its own fret and strings below: that is the finger.
+        const fingers = [...new Set(swapped.map((s) => s.to.finger!))].filter(
+            (f) => !barring.has(f),
+        );
+        if (fingers.length) {
+            parts.push(`re-finger ${swapped.length === 1 ? 'it' : 'them'} with ${list(fingers)}`);
+        }
+    }
+    // "Re-finger it with 2" is finger 2's move, so it is not said twice.
+    const said = (finger: number, at: Note | undefined) =>
+        swapped.some(
+            (s) => s.to.finger === finger && s.string === at?.string && s.fret === at?.fret,
+        );
+    for (const m of moves) {
+        if (m.kind === 'move' && (m.barre || !said(m.finger, m.to))) {
+            parts.push(`finger ${m.finger} ${m.text}`);
+        }
+    }
     if (!parts.length) {
         return '';
     }

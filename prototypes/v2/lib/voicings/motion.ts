@@ -1,5 +1,6 @@
 import { type Barre, barres, fingerMap } from './fingering';
-import type { InstrumentDef, Note, Voicing } from './types';
+import { spellDegree } from './theory';
+import type { Degree, InstrumentDef, Note, Voicing } from './types';
 
 export interface RootMove {
     /**
@@ -156,3 +157,67 @@ export function fingerMoves(
     }
     return { moves, openStrings: b.notes.filter((n) => n.fret === 0).map((n) => n.string) };
 }
+
+/** A note two grips share: the same string at the same fret, so the same pitch left sounding. */
+export interface SharedNote {
+    string: number;
+    /** 0 for an open string that rings in both grips: no finger holds it. */
+    fret: number;
+    /** The note in the first grip and in the second: its degree and finger in each. */
+    from: Note;
+    to: Note;
+    /**
+     * The note's name as the first grip spells it (`spellDegree`, the neck's own dot labels, so
+     * the key's spelling): "F". Where the second grip spells it another way, both: "D♯/E♭".
+     */
+    name: string;
+}
+
+/**
+ * The common tones of a change (#1618): every note on the same string and fret in both grips,
+ * lowest string first, with what it is in each chord. Read off the notes alone — whether a finger
+ * stays on one is `fingerMoves`' business, and the two disagree on purpose: Dm7 `x 5 3 5 x x` to
+ * G7 `3 x 3 4 x x` shares the F on the 4th string under two different fingers.
+ */
+export function sharedNotes(a: Voicing, b: Voicing): SharedNote[] {
+    const shared: SharedNote[] = [];
+    for (const from of a.notes) {
+        const to = b.notes.find((n) => n.string === from.string && n.fret === from.fret);
+        if (to) {
+            const was = spellDegree(a.root, from.degree),
+                is = spellDegree(b.root, to.degree);
+            shared.push({
+                string: from.string,
+                fret: from.fret,
+                from,
+                to,
+                name: was === is ? was : `${was}/${is}`,
+            });
+        }
+    }
+    return shared.sort((x, y) => y.string - x.string);
+}
+
+/**
+ * A degree as a teacher says it across a change: "the 3rd becomes the 7th". The 3rd and the 7th
+ * are named without their quality — the chord symbol already says minor or dominant, and the
+ * lesson is which chord tone the note is. An altered 5th keeps its alteration, which is what the
+ * chord is named for. Null for the diminished 7th: it is spelled with a double flat and sounds
+ * as a 6th, so neither "7th" nor "6th" is a name a student would match to the dot — the
+ * narration leaves that note out instead.
+ */
+const SPOKEN: Record<Degree, string | null> = {
+    R: 'root',
+    '2': '2nd',
+    '3': '3rd',
+    b3: '3rd',
+    '4': '4th',
+    '5': '5th',
+    b5: 'flat 5th',
+    '#5': 'sharp 5th',
+    '6': '6th',
+    '7': '7th',
+    b7: '7th',
+    bb7: null,
+};
+export const spokenDegree = (degree: Degree): string | null => SPOKEN[degree];

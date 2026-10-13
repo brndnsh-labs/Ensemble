@@ -74,17 +74,35 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(sayFingers).not.toBeChecked();
     await sayFingers.check();
     await expect(view.locator('.neck-fingers')).toBeVisible();
-    // Dm7 x 5 3 5 x x (2-1-3) to G7 3 x 3 4 x x (1-2-3): the 7th slides down to G7's 3rd.
-    await expect(view.locator('.neck-fingers')).toContainText('Finger 1 moves to');
-    await expect(view.locator('.neck-fingers')).toContainText('finger 3 slides down 1 fret');
+    // Dm7 x 5 3 5 x x (2-1-3) to G7 3 x 3 4 x x (1-2-3): no finger stays on the F both chords
+    // fret, so the line names the note and its two jobs (#1618), then the fingers that move —
+    // the 7th slides down to G7's 3rd.
+    const fingers = view.locator('.neck-fingers');
+    await expect(fingers).toContainText('F stays: the 3rd becomes the 7th; re-finger it with 2');
+    await expect(fingers).not.toContainText('finger 2 moves');
+    await expect(fingers).toContainText('finger 1 moves to');
+    await expect(fingers).toContainText('finger 3 slides down 1 fret');
     await page.reload();
     await songLink(page, 'Neck study').first().click();
     await expect(view.getByRole('checkbox', { name: 'Say the fingers' })).toBeChecked();
     await expect(view.locator('.neck-fingers')).toBeVisible();
 
-    // The phone keeps the page inside the screen in Neck mode.
+    // The phone keeps the page inside the screen in Neck mode — the finger line included, which
+    // wraps inside the strip instead of widening it.
     expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+    expect(
+        await fingers.evaluate((el) => {
+            const strip = el.parentElement!.getBoundingClientRect();
+            const box = el.getBoundingClientRect();
+            return (
+                el.scrollWidth <= el.clientWidth &&
+                box.left >= strip.left &&
+                box.right <= strip.right &&
+                box.right <= window.innerWidth
+            );
+        }),
     ).toBe(true);
 
     // The hand position is the neck's own slider; in C it starts in first position (#1598).
@@ -115,6 +133,13 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(headline).toContainText('Next: Cmaj7');
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
+
+    // Stopped, one step on: G7 to Cmaj7 keeps the ring finger on its note, and the line still
+    // says so — now with the note and what it becomes (#1618).
+    await view.getByRole('button', { name: 'Next chord' }).click();
+    await expect(view.getByTestId('neck-current')).toHaveText('G7');
+    await expect(view.getByTestId('neck-next')).toContainText('Cmaj7');
+    await expect(fingers).toContainText('Finger 3 stays down on B: the 3rd becomes the 7th');
 
     // Neck mode is remembered on this device.
     await page.reload();
