@@ -9,7 +9,7 @@
  * window. A change to a shell cost here or in `fingering.ts` (`unaryCost`,
  * `transCost`, `handCost`, `fingerTransCost`) moves it — and for a ukulele shell, which is
  * costed and held to one grip as the ukulele triads are (`byHand`, #1609), a change to
- * `triadUnaryCost`, `triadTransCost`, `handFree` or `unifyGrips` does too; so does a change to
+ * `triadUnaryCost`, `triadTransCost`, `handFree`, `unifyGrips` or `bookGrip` does too; so does a change to
  * which grips a chord is offered (`allPositions`, a quality's `required` tones, where `buildAt`
  * puts one, what `candidates` holds back as a last resort and how far past the window it
  * looks, `inReach`), to which barre a shell may take
@@ -142,6 +142,7 @@ export function allowedShapes(
     return inst.shapes.filter(
         (sh) =>
             sh.kind === kind &&
+            (!sh.qualities || sh.qualities.includes(quality)) &&
             (kind !== 'shell' || !rootStrings || rootStrings.includes(sh.rootString)),
     );
 }
@@ -177,6 +178,10 @@ export function buildAt(
         finger: null,
     }));
     if (!notes.every((n) => n.fret >= 0 && n.fret <= inst.maxFret)) {
+        return null;
+    }
+    // A first-position form exists only on its open string (`ShapeDef.openOnly`, #1613).
+    if (shape.openOnly && !notes.some((n) => n.fret === 0)) {
         return null;
     }
 
@@ -764,6 +769,27 @@ const chordKey = (c: ChartChord): string => `${c.root.pc}:${c.quality}`;
 /** One of a chord's candidate grips: the shape and where its root sits. */
 const gripKey = (v: Voicing): string => `${v.shape.id}@${v.rootFret}`;
 
+/**
+ * The grip a ukulele teacher shows first (#1613): a strummed chord in first position with a
+ * string ringing open — A7 0-1-0-0, G7 0-2-1-2, E7 1-2-0-2. `unifyGrips` prefers it when a
+ * symbol is voiced two ways and holding either costs less than a position shift
+ * (`SAME_GRIP_TOLERANCE`). On cost alone the closed grip can win by standing one finger from a
+ * neighbour that has no open form: a jazz blues in A played every A7 as 2-4-3-4 because its
+ * F♯7 has to be 3-4-2-4. A player keeps the grip they know and moves for the one chord that
+ * needs it (DECISION 2026-10-12).
+ *
+ * It chooses between holds the tolerance already calls close; it does not look for an open
+ * grip the plan never used, and a symbol with no open form (C♯7, B♭7) is held as it was. First
+ * position only (`atTheNut`): in a window further up an open string is the hand gone back to
+ * the nut. And only a grip that strums every string (`strumsEveryString`), as with the other
+ * first-position rules of #1609: a guitar triad or power grip on open strings is one inversion
+ * among three, not the book's one grip. How high its fretted notes sit is not asked: the aim
+ * at first position (`unaryCost`) already keeps a chart at the nut off such a grip, and no
+ * chart tried voiced a symbol two ways with one.
+ */
+const bookGrip = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
+    atTheNut(home) && strumsEveryString(v, inst) && v.notes.some((n) => n.fret === 0);
+
 interface Plan {
     path: Voicing[];
     cost: number;
@@ -785,6 +811,9 @@ interface Plan {
  * charts in frets 1–6 and 49 in frets 5–10 voiced a 7th chord two ways (Gm7 Cm7 D7 Gm7 opened
  * on 3-5-3-5 and closed on 0-2-1-1). A guitar shell is left out: its jazz comping moves a chord
  * between its two root strings on purpose.
+ *
+ * Which grip, when more than one hold is inside the tolerance: the cheapest, unless one of them
+ * is the chord's book grip in first position (`bookGrip`, #1613), which is then taken.
  */
 function unifyGrips(
     chart: ChartChord[],
@@ -792,6 +821,7 @@ function unifyGrips(
     plan: (states: Voicing[][]) => Plan,
     tolerance: number,
     inst: InstrumentDef,
+    home: HomeWindow | null,
 ): Voicing[] {
     const keys = chart.map((c, i) =>
         states[i].every((v) => byHand(v, inst)) ? chordKey(c) : null,
@@ -806,15 +836,16 @@ function unifyGrips(
         });
     let best = plan(states);
     for (;;) {
-        // The grips each undecided symbol is voiced with, and how often, in chart order.
-        const used = new Map<string, Map<string, number>>();
+        // The grips each undecided symbol is voiced with, how often, and one voicing of each,
+        // in chart order.
+        const used = new Map<string, Map<string, { count: number; grip: Voicing }>>();
         best.path.forEach((v, i) => {
             const key = keys[i];
             if (key === null || decided.has(key)) {
                 return;
             }
-            const grips = used.get(key) ?? new Map<string, number>();
-            grips.set(gripKey(v), (grips.get(gripKey(v)) ?? 0) + 1);
+            const grips = used.get(key) ?? new Map<string, { count: number; grip: Voicing }>();
+            grips.set(gripKey(v), { count: (grips.get(gripKey(v))?.count ?? 0) + 1, grip: v });
             used.set(key, grips);
         });
         const split = [...used].find(([, grips]) => grips.size > 1);
@@ -823,20 +854,30 @@ function unifyGrips(
         }
         const [key, grips] = split;
         decided.add(key);
-        const occurrences = [...grips.values()].reduce((a, b) => a + b, 0);
-        let pick: (Plan & { grip: string; changed: number }) | null = null;
+        const occurrences = [...grips.values()].reduce((a, b) => a + b.count, 0);
+        const base = best.cost;
         // Most used first, then first played (the sort is stable over the Map's insertion
         // order): on equal cost the chart keeps the shape it already plays most.
-        for (const [grip, count] of [...grips].sort((a, b) => b[1] - a[1])) {
-            held.set(key, grip);
-            const tried = plan(holding());
-            if (!pick || tried.cost < pick.cost - COST_NOISE) {
-                pick = { ...tried, grip, changed: occurrences - count };
-            }
-        }
-        if (pick && pick.cost - best.cost < tolerance * pick.changed - COST_NOISE) {
-            held.set(key, pick.grip);
-            best = pick;
+        const holds = [...grips]
+            .sort((a, b) => b[1].count - a[1].count)
+            .map(([id, { count, grip }]) => {
+                held.set(key, id);
+                return { ...plan(holding()), id, grip, changed: occurrences - count };
+            });
+        type Hold = (typeof holds)[number];
+        const cheapest = (among: Hold[]) =>
+            among.reduce<Hold | null>(
+                (pick, h) => (!pick || h.cost < pick.cost - COST_NOISE ? h : pick),
+                null,
+            );
+        const inside = holds.filter((h) => h.cost - base < tolerance * h.changed - COST_NOISE);
+        // The cheapest hold of all decides whether the symbol is held; held, it takes the book
+        // grip when holding that is inside the tolerance too (`bookGrip`).
+        const pick = cheapest(holds);
+        if (pick && inside.includes(pick)) {
+            const kept = cheapest(inside.filter((h) => bookGrip(h.grip, home, inst))) ?? pick;
+            held.set(key, kept.id);
+            best = kept;
         } else {
             held.delete(key);
         }
@@ -871,6 +912,7 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
         plan,
         opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
         opts.instrument,
+        home,
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(
