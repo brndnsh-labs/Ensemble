@@ -475,8 +475,8 @@ that is `validateSemanticScore` plus `compileTimeline`. A measure-less (v1) char
 Its chord names come from the old parser (`validateProgression`) while the band plays the
 written token, so the two are held to each other: **the chart shows what the band plays**
 (DECISION 2026-10-12, #1662). A lowercase numeral is read literally as minor, on any degree:
-`vii` is a B minor triad in C, `i7b9` a Cm7b9, and `i11` a C11, because a dominant 11th is
-written without a third to lower. `parseChord` reads every name the old parser writes, so a tap
+`vii` is a B minor triad in C, `i7b9` a Cm7b9, and `i11` a Cm11 (#1674: a dominant 11th is
+written without a third, so the numeral's case gives it a minor one; `I11` stays C11). `parseChord` reads every name the old parser writes, so a tap
 and the neck sound the chord that is shown. `prototypes/v2/lib/legacy-band-chart.test.ts` holds
 every chord such a chart can play (`LEGACY_CHORD_QUALITIES`) to it. On the
 band engine the measure editor can put a fermata on (or take it off) a bar's last event: the flag is

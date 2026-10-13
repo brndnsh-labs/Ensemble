@@ -76,6 +76,25 @@ describe('chord facts', () => {
         expect(names('viio7')).toBe('B D F Ab');
     });
 
+    it('reads a lowercase numeral with 11 as a minor 11th, and keeps the other 11ths (#1674)', () => {
+        // ii11 in C: D F A C E G, a minor third under the 11.
+        expect(facts('ii11', C).intervals).toEqual([0, 3, 7, 10, 14, 17]);
+        expect(names('ii11')).toBe('D F A C E G');
+        expect(facts('i11', C).intervals).toEqual([0, 3, 7, 10, 14, 17]);
+        expect(facts('vi11', C).intervals).toEqual(facts('Am11', C).intervals);
+        // An accidental or a slash bass does not change the reading.
+        expect(facts('bvii11', C).intervals).toEqual([0, 3, 7, 10, 14, 17]);
+        expect(facts('ii11/V', C).intervals).toEqual([0, 3, 7, 10, 14, 17]);
+        // The dominant 11th (no third) stays for uppercase numerals and letter names.
+        for (const symbol of ['V11', 'I11', 'G11', 'C11']) {
+            expect(facts(symbol, C).intervals).toEqual([0, 7, 10, 14, 17]);
+        }
+        expect(facts('Cm11', C).intervals).toEqual([0, 3, 7, 10, 14, 17]);
+        // Lowercase 9 and 13 already keep the minor third.
+        expect(facts('ii9', C).intervals).toEqual([0, 3, 7, 10, 14]);
+        expect(facts('ii13', C).intervals).toEqual([0, 3, 7, 10, 14, 21]);
+    });
+
     it('keeps the slash bass separate from the chord', () => {
         const chord = facts('C/E');
         expect(chord.root).toBe(0);
