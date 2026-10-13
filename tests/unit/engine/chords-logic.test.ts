@@ -159,15 +159,51 @@ describe('Chord parsing and naming', () => {
             expect(romanOf(arranger.progression[1])).toBe('VII7alt');
         });
 
-        it('should still treat plain vii7 as the natural half-diminished leading-tone chord', () => {
-            arranger.sections = [{ id: 's1', label: 'Main', value: 'vii7 | Imaj7', repeat: 1 }];
+        // #1662 — a lowercase numeral is read literally as minor, on every degree, because that
+        // is what the band plays for the token. `vii` and `vii7` were once shown as the key's
+        // half-diminished seventh while the band played a B minor chord under it.
+        it('reads plain vii and vii7 as minor chords; the half-diminished is written out', () => {
+            arranger.sections = [
+                { id: 's1', label: 'Main', value: 'vii | vii7 | viim7b5 | Imaj7', repeat: 1 },
+            ];
             arranger.key = 'C';
             arranger.isMinor = false;
 
             validateProgression(getState());
 
-            expect(arranger.progression[0].quality).toBe('halfdim');
-            expect(romanOf(arranger.progression[0])).toBe('viiø');
+            expect(arranger.progression.map((chord) => chord.absName)).toEqual([
+                'Bm',
+                'Bm7',
+                'Bm7b5',
+                'Cmaj7',
+            ]);
+            expect(arranger.progression.map(romanOf)).toEqual(['vii', 'vii7', 'viiø', 'Imaj7']);
+        });
+
+        // #1662 — the rest of the same rule: the suffix's major third is lowered and nothing
+        // else moves. `i11` has no third to lower (a dominant 11th is written without one).
+        it.each([
+            ['i7b5', 'Cm7b5', 'iø'],
+            ['i7#5', 'Cm7#5', 'i7#5'],
+            ['i7b9', 'Cm7b9', 'i7b9'],
+            ['i7#11', 'Cm7#11', 'i7#11'],
+            ['i7b13', 'Cm7b13', 'i7b13'],
+            ['i7#9', 'Cm7', 'i7'],
+            ['i11', 'C11', 'I11'],
+            ['i+', 'Cm#5', 'i#5'],
+            ['imaj7', 'CmMaj7', 'iMaj7'],
+            ['iadd9', 'Cmadd9', 'iadd9'],
+            ['I7b9', 'C7b9', 'I7b9'],
+            ['I11', 'C11', 'I11'],
+        ])('names %s as %s (%s in roman numerals)', (written, name, roman) => {
+            arranger.sections = [{ id: 's1', label: 'Main', value: written, repeat: 1 }];
+            arranger.key = 'C';
+            arranger.isMinor = false;
+
+            validateProgression(getState());
+
+            expect(arranger.progression[0].absName).toBe(name);
+            expect(romanOf(arranger.progression[0])).toBe(roman);
         });
 
         it('should preserve uppercase VII7 as an explicit dominant rather than forcing half-diminished', () => {
@@ -178,7 +214,6 @@ describe('Chord parsing and naming', () => {
             validateProgression(getState());
 
             expect(arranger.progression[0].absName).toBe('A7');
-            expect(arranger.progression[0].quality).toBe('7');
             expect(romanOf(arranger.progression[0])).toBe('VII7');
         });
 
@@ -262,37 +297,38 @@ describe('Chord parsing and naming', () => {
         });
     });
 
+    // Read off the Nashville number: in C it names the degree the root resolved to.
     describe('Bug #776 — enharmonic root pitch resolution', () => {
-        it('B# resolves to pitch class 0 (C)', () => {
+        it('B# resolves to the 1 (C)', () => {
             arranger.sections = [{ id: 's1', label: 'Main', value: 'B#maj7', repeat: 1 }];
             arranger.key = 'C';
             arranger.isMinor = false;
             validateProgression(getState());
-            expect(arranger.progression[0].rootMidi % 12).toBe(0);
+            expect(arranger.progression[0].display.nns.root).toBe('1');
         });
 
-        it('E# resolves to pitch class 5 (F)', () => {
+        it('E# resolves to the 4 (F)', () => {
             arranger.sections = [{ id: 's1', label: 'Main', value: 'E#maj7', repeat: 1 }];
             arranger.key = 'C';
             arranger.isMinor = false;
             validateProgression(getState());
-            expect(arranger.progression[0].rootMidi % 12).toBe(5);
+            expect(arranger.progression[0].display.nns.root).toBe('4');
         });
 
-        it('Fb resolves to pitch class 4 (E)', () => {
+        it('Fb resolves to the 3 (E)', () => {
             arranger.sections = [{ id: 's1', label: 'Main', value: 'Fbmaj7', repeat: 1 }];
             arranger.key = 'C';
             arranger.isMinor = false;
             validateProgression(getState());
-            expect(arranger.progression[0].rootMidi % 12).toBe(4);
+            expect(arranger.progression[0].display.nns.root).toBe('3');
         });
 
-        it('Cb resolves to pitch class 11 (B)', () => {
+        it('Cb resolves to the 7 (B)', () => {
             arranger.sections = [{ id: 's1', label: 'Main', value: 'Cbmaj7', repeat: 1 }];
             arranger.key = 'C';
             arranger.isMinor = false;
             validateProgression(getState());
-            expect(arranger.progression[0].rootMidi % 12).toBe(11);
+            expect(arranger.progression[0].display.nns.root).toBe('7');
         });
     });
 
@@ -348,12 +384,10 @@ describe('Chord parsing and naming', () => {
             validateProgression(getState());
 
             const [minorSix, majorSix] = arranger.progression;
-            expect(minorSix.quality).toBe('m6');
             expect(minorSix.absName).toBe('Fm6');
             // #1313 — an m6 has no 7th; a true is7th re-adds the b7 it must never carry.
             expect(getChordDetails('m6').is7th).toBe(false);
 
-            expect(majorSix.quality).toBe('6');
             expect(majorSix.absName).toBe('F6'); // IV6 is still major
         });
 
@@ -368,7 +402,6 @@ describe('Chord parsing and naming', () => {
                 'Dm6',
                 'E7',
             ]);
-            expect(arranger.progression.map((chord) => chord.quality)).toEqual(['m6', 'm6', '7']);
         });
     });
 

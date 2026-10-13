@@ -225,6 +225,16 @@ describe('chordNames', () => {
         expect(names('Cmaj7').roman).toBe('Imaj7');
     });
 
+    it('reads the m of madd9 as the minor third, and writes a minor-major seventh as mMaj7', () => {
+        expect(names('imadd9')).toEqual({ name: 'Cmadd9', roman: 'imadd9', nns: '1-add9' });
+        expect(names('Cmadd9')).toEqual({ name: 'Cmadd9', roman: 'iadd9', nns: '1-add9' });
+        expect(names('iimadd9/5').name).toBe('Dmadd9/G');
+        expect(names('imaj7')).toEqual({ name: 'CmMaj7', roman: 'imaj7', nns: '1-maj7' });
+        expect(names('CmMaj7')).toEqual({ name: 'CmMaj7', roman: 'iMaj7', nns: '1-Maj7' });
+        // Still a major seventh, not a minor third.
+        expect(names('Cma7')).toEqual({ name: 'Cma7', roman: 'Ima7', nns: '1ma7' });
+    });
+
     it('spells roots in the key', () => {
         expect(names('IV', 'F').name).toBe('Bb');
         expect(names('III', 'E').name).toBe('G#');

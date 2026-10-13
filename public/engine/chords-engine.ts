@@ -16,10 +16,7 @@ const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
 const NOTE_REGEX = /^([A-G][#b]?)/i;
 
-/**
- * The octave a parsed chord's `rootMidi` is placed in: C4 (MIDI 60) up to B4. It is a root's
- * identity (which pitch class, which key degree), not a voicing; the band voices the chord.
- */
+/** Roots are worked out as MIDI numbers from C4; only their pitch class is ever used. */
 const ROOT_OCTAVE_MIDI = 60;
 
 /**
@@ -516,6 +513,13 @@ export function getFormattedChordNames(
         absSuffix = 'm7#5';
         nnsSuffix = '-7#5';
         romSuffix = '7#5';
+    } else if (quality === 'm7b9' || quality === 'm7#11' || quality === 'm7b13') {
+        // why (#1662): a lowercase numeral with a dominant's alteration (`i7b9`) is a minor
+        // seventh with that colour, which is what the band plays. The quality is its own
+        // letter-name suffix; the numeral and the `-` carry the minor third in the other two.
+        absSuffix = quality;
+        nnsSuffix = `-${quality.slice(1)}`;
+        romSuffix = quality.slice(1);
     } else if (quality === 'mb6') {
         // why (#1340): `-b6` is iReal's spelling of the same chord and was already accepted by
         // the score vocabulary; `is7th` is false here, so no append guard is needed.
@@ -668,6 +672,10 @@ export function getFormattedChordNames(
             // why (#1340): `m7#5` spells its own seventh too — without this a written Cm7#5
             // displayed as "Cm7#57", the exact nonsense #1323 is named for.
             'm7#5',
+            // why (#1662): and so do the minor sevenths with a written colour above them.
+            'm7b9',
+            'm7#11',
+            'm7b13',
         ].includes(quality)
     ) {
         absSuffix += '7';
@@ -693,7 +701,11 @@ export function getFormattedChordNames(
         quality === 'm#5' ||
         // #1340 — same rule for the 7th-chord sibling and for the added ♭6: the b3 names both.
         quality === 'm7#5' ||
-        quality === 'mb6'
+        quality === 'mb6' ||
+        // #1662 — and for a minor seventh with a b9, #11 or b13 above it.
+        quality === 'm7b9' ||
+        quality === 'm7#11' ||
+        quality === 'm7b13'
     ) {
         romanName = rootRomanBase.toLowerCase();
     } else {
@@ -705,6 +717,75 @@ export function getFormattedChordNames(
         nns: { root: rootNNS, suffix: nnsSuffix },
         roman: { root: romanName, suffix: romSuffix },
     };
+}
+
+/**
+ * The quality a LOWERCASE roman numeral names: the chord its suffix spells, with the major
+ * third lowered and nothing else moved. That is how the band reads the token it plays
+ * (`parseChord` in `band/theory/chord.ts`), and the chart shows what the band plays
+ * (DECISION 2026-10-12, #1662), so a tap and the neck sound the chord that is heard. The
+ * numeral is read literally, in any key and on any degree: `vii` is a minor triad, not the
+ * key's half-diminished seventh, which is written `viim7b5`.
+ *
+ * `prototypes/v2/lib/legacy-band-chart.test.ts` holds every suffix a measure-less chart can
+ * play to the band's own reading. A quality with no row here has no major third to lower
+ * (`sus4`, `5`, `dim`), is minor already, or is one of the spellings such a chart cannot play
+ * (`7alt`, `maj7#11`, `maj7b5`, `maj7#5`), which keep the name they had.
+ */
+function minorReading(quality: string, is7th: boolean): string {
+    switch (quality) {
+        case 'major':
+        case '7':
+            // `is7th` tells the pair apart: 'minor' with a seventh IS m7.
+            return 'minor';
+        case '7#9':
+            // The sharp ninth is the minor third's own pitch, so with the third lowered there
+            // is no colour left to name: the band plays a minor seventh.
+            return 'minor';
+        case '9':
+            return 'm9';
+        case '13':
+            return 'm13';
+        case '6':
+            // why (#1317): `i6`/`iv6` are everyday minor-key chords (Minor Swing is
+            // `i6 | iv6 | V7`); the MAJOR 6th quality put an A natural over an F minor triad.
+            // `m6` keeps `is7th === false` (#1313): a 6th chord has no 7th.
+            return 'm6';
+        case '6/9':
+            // why (#1322): there is no minor 6/9 quality here. `m6` is the honest subset: it
+            // keeps the b3 and the 6th and drops only the 9th, as the `m6/9` spelling does.
+            return 'm6';
+        case 'add9':
+        case 'add2':
+            // why (#1322): a minor triad plus the added tone; `add9`'s major 3rd contradicts
+            // the numeral.
+            return 'madd9';
+        case 'maj7':
+        case 'maj9':
+        case 'maj11':
+        case 'maj13':
+            // why (#1321): `imaj7` / `iM7` is the minor-major 7th, the melodic-minor tonic.
+            // The extensions collapse to the same quality (a subset: the 9/11/13 colour is
+            // dropped, the defining b3 + maj7 is not).
+            return 'mMaj7';
+        case 'aug':
+            // `i7#5` is a minor seventh with a raised fifth, `i+` the triad.
+            return is7th ? 'm7#5' : 'm#5';
+        case '7b5':
+            // A minor third, a flat fifth and a minor seventh: the half-diminished chord.
+            return 'halfdim';
+        case '7b9':
+            return 'm7b9';
+        case '7#11':
+            return 'm7#11';
+        case '7b13':
+            return 'm7b13';
+        // No row for '11': a dominant 11th is written without its third (the 11 would sit a
+        // minor 9th above it), so there is nothing for the numeral's case to lower and the
+        // band plays `i11` as it plays `I11`. It was shown as a minor 11th until #1662.
+        default:
+            return quality;
+    }
 }
 
 /**
@@ -788,66 +869,10 @@ function parseProgressionPart(
                 }
 
                 const suffixPart = chordPart.slice(rootPart.length);
-                let { quality, is7th } = getChordDetails(suffixPart);
-
-                if (romanMatch) {
-                    const accidental = romanMatch[1] || '';
-                    const numeral = romanMatch[2];
-                    const isLowercase = numeral === numeral.toLowerCase();
-
-                    if (isLowercase) {
-                        if (quality === 'major' || quality === '7') {
-                            quality = 'minor';
-                        } else if (quality === '9') {
-                            quality = 'm9';
-                        } else if (quality === '11') {
-                            quality = 'm11';
-                        } else if (quality === '13') {
-                            quality = 'm13';
-                        } else if (quality === '6') {
-                            // why (#1317): a lowercase numeral means minor, and `i6`/`iv6` are
-                            // everyday minor-key chords (Minor Swing is `i6 | iv6 | V7`). Without
-                            // this branch `iv6` parsed as the MAJOR 6th quality — F6 in C, with an
-                            // A natural over the F minor triad. `m6` keeps `is7th === false`
-                            // (#1313): a 6th chord has no 7th.
-                            quality = 'm6';
-                        } else if (quality === '6/9') {
-                            // why (#1322): there is no minor 6/9 quality, so `iv6/9` read major
-                            // (an A natural over an F minor triad). `m6` is the honest subset —
-                            // it keeps the b3 and the 6th and drops only the 9th colour, which is
-                            // also what the `m6/9` spelling already resolves to.
-                            quality = 'm6';
-                        } else if (quality === 'add9' || quality === 'add2') {
-                            // why (#1322): same class — a lowercase numeral's added-tone chord is
-                            // a MINOR triad plus that colour tone; `add9`'s major 3rd contradicts
-                            // the numeral.
-                            quality = 'madd9';
-                        } else if (
-                            quality === 'maj7' ||
-                            quality === 'maj9' ||
-                            quality === 'maj11' ||
-                            quality === 'maj13'
-                        ) {
-                            // why (#1321): `imaj7` / `iM7` is the minor-major 7th — the melodic-minor
-                            // tonic, not a major chord on a minor degree. Without this the numeral's
-                            // lowercase (minor) reading was silently overridden by the suffix's major
-                            // 3rd. The extensions collapse to the same quality (a subset: the 9/11/13
-                            // colour is dropped, the defining b3 + maj7 is not).
-                            quality = 'mMaj7';
-                        }
-                    }
-
-                    // Only auto-diminished if it's a natural vii (no b or # prefix)
-                    if (
-                        isLowercase &&
-                        numeral.toLowerCase() === 'vii' &&
-                        !accidental &&
-                        (suffixPart === '' || suffixPart === '7')
-                    ) {
-                        quality = 'halfdim';
-                        is7th = true;
-                    }
-                }
+                const { quality: written, is7th } = getChordDetails(suffixPart);
+                const lowercase =
+                    romanMatch !== null && romanMatch[2] === romanMatch[2].toLowerCase();
+                const quality = lowercase ? minorReading(written, is7th) : written;
 
                 const interval = (rootMidi - keyRootMidi + 24) % 12;
                 const rootNNS = (INTERVAL_TO_NNS as Record<number, string>)[interval];
@@ -894,8 +919,6 @@ function parseProgressionPart(
                     absName: finalAbsName,
                     display: formatted,
                     beats: beatsPerChord,
-                    rootMidi: rootMidi,
-                    quality: quality,
                     timeSignature: timeSignature,
                     key: key,
                 });

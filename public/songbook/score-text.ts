@@ -2,7 +2,7 @@ import { addScoreDurations, scoreDuration, scoreMeter } from './score-duration.j
 import type { ScoreDuration, ScoreEvent } from './score-types.js';
 import type { CodecDecodeResult } from './types.js';
 
-// cspell:ignore minb susadd
+// cspell:ignore minb susadd madd iadd
 
 // Spelling vocabulary, not voicings. The official iReal grammar and Ensemble's existing
 // spellings belong here independently of octave, genre, instrument or generated intervals.
@@ -129,6 +129,17 @@ const QUALITIES = new Set([
     '-7+5',
     'mb6',
     'minb6',
+    // #1662: the names the measure-less charts' parser shows for chords the band already
+    // played but could not read back: the minor-major 7th and minor add9 of a lowercase
+    // numeral (`imaj7`, `iadd9`), its minor 7th with a dominant's alteration (`i7b9`), and
+    // the suspended 9th and 13th with their 4th spelled out.
+    'mMaj7',
+    'madd9',
+    'm7b9',
+    'm7#11',
+    'm7b13',
+    '9sus4',
+    '13sus4',
     'min',
     'm',
     'dim7',

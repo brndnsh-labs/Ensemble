@@ -233,8 +233,11 @@ export function auditionMidis(chord: ChordFacts): number[] {
 // roman numeral, Nashville number, or letter name, each with its own accidental.
 const ROOT =
     /^(?:([#b]?)(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)|([#b]?)([1-7])|([A-Ga-g])([#b]?))/;
-/** A written minor third: `m`, `min` or `-`, but not the `ma`/`maj` of a major seventh. */
-const MINOR_MARK = /^(?:min|m(?!a)|-)/;
+/**
+ * A written minor third: `m`, `min` or `-`, but not the `ma`/`maj` of a major seventh. The `m` of
+ * `madd9` is one: `add` is the only thing after `ma` that is not a major seventh.
+ */
+const MINOR_MARK = /^(?:min|m(?!a(?!dd))|-)/;
 /** Diminished spellings carry their own third. */
 const DIMINISHED_MARK = /^(?:o|°|dim|h|ø)/;
 
@@ -289,7 +292,8 @@ export function chordNames(
 
     const name: ChordNamePart = {
         root: letter(root, facts.root),
-        suffix: implied ? `m${quality}` : quality,
+        // A minor chord with a major seventh is written `mMaj7`, never `mmaj7`.
+        suffix: implied ? `m${quality.replace(/^maj/, 'Maj')}` : quality,
     };
     const nns: ChordNamePart = {
         root: root[4] ? root[3] + root[4] : INTERVAL_TO_NNS[degree(facts.root)],
