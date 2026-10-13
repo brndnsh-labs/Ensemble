@@ -103,14 +103,19 @@ const mayBarre = (shape: ShapeDef): boolean => shape.kind !== 'shell';
  * the fretting hand can mute the strings the shape skips. A ukulele shell skips none. It rings
  * every string (`strumsEveryString`), a strummed chord like the triad taught beside it, and it
  * bars as that triad does (#1681): D7 2-2-2-3 is the index across three strings and the middle
- * finger, B♭7 1-2-1-1 the index across all four. Every ukulele chord is also marked
- * `everyString`, which holds its fingering to how the ukulele is taught (`fingering.ts`'s
- * `barreOptions` and `taughtStrummed`). Grip choice reads none of this for a ukulele
- * (`rootBuried` and `buildAt`'s added tone are a guitar shell's), so it moves fingers only.
+ * finger, B♭7 1-2-1-1 the index across all four. Every ukulele grip is also marked
+ * `ukulele`, which holds its fingering to how the ukulele is taught (`fingering.ts`'s
+ * `barreOptions` and `taughtStrummed`). That is read off the instrument, not off how many
+ * strings the grip sounds (#1677): the three-string power chord, G5 0-2-3-x, is a ukulele
+ * chord too, and a guitar grip on every string would not be one. Grip choice reads no
+ * strummed grip's fingering (`rootBuried` and `buildAt`'s added tone are a guitar shell's),
+ * so the strummed rules move fingers only.
  */
 const fingerRules = (shape: ShapeDef, notes: Note[], inst: InstrumentDef): FingerOpts => {
-    const everyString = strumsEveryString({ notes }, inst);
-    return mayBarre(shape) || everyString ? { barre: true, everyString } : { rootBarre: true };
+    const ukulele = inst.id === 'uke';
+    return mayBarre(shape) || strumsEveryString({ notes }, inst)
+        ? { barre: true, ukulele }
+        : { rootBarre: true };
 };
 
 /**
