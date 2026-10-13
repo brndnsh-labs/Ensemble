@@ -28,10 +28,11 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ### 🔴 `prototypes/v2/checks/root-handover.chromium.spec.ts` — "a v1 worker hands the site root over, keeping downloaded sounds and v1 local data"
 
-- **Class:** e2e-timing (unconfirmed; one observation).
+- **Class:** e2e-timing (unconfirmed; two observations).
 - **Symptom:** `v2-suite (2, laptop)` on `main` at `ebbe6a7f` (#1656, run 38195051461, 2026-10-11): `Error: page.reload: Protocol error (Page.reload): Not attached to an active page`, at the reload before `expect(page.locator('body[data-standin="v1"]')).toBeVisible()`. The same commit's PR run was green, and the change (the drum dispatcher) cannot reach this spec.
 - **Not yet diagnosed:** no fail-rate measured. The test swaps service workers under the page, so a candidate is the page being torn down and re-attached by the worker handover at the moment `page.reload()` is issued. It reddened a push to `main`, so that commit's deploy was skipped; the next push deployed.
-- **Last seen:** 2026-10-11 (`main`, `ebbe6a7f`).
+- **Second sighting:** same leg, same error, on `main` at `6c782fc1` (#1685, run 38469579107, 2026-10-13). The change (a chord-formula row) cannot reach this spec, and its PR run was green. Both sightings are pushes to `main`, never a PR run. Deploy was skipped until the failed leg was re-run.
+- **Last seen:** 2026-10-13 (`main`, `6c782fc1`).
 
 ### 🟢 `prototypes/v2/checks/songbook-home.spec.ts` — "one search returns your songs and the standards, grouped"
 
