@@ -294,6 +294,31 @@ describe('fermatas', () => {
         // fermata would make this 4.
         expect(readsPerFermata(128) / readsPerFermata(32)).toBeLessThan(1.5);
     });
+
+    it('ignore a fermata that lasts no time (#1670)', () => {
+        // A chord given a sliver of the bar rounds to a span of no ticks. Sixty-four of them
+        // on one tick (a bar's limit) once doubled the comp events each time.
+        const lanes = { drums: true, bass: true, comp: true, lead: true };
+        const perform = (zeroLength: number) => {
+            const timeline = compileTimeline(score([{ label: 'A', bars: 'C | F | G7 | C' }]));
+            const at = timeline.spans[2];
+            timeline.spans.splice(
+                2,
+                0,
+                ...Array.from({ length: zeroLength }, () => ({
+                    ...at,
+                    end: at.start,
+                    fermata: true,
+                })),
+            );
+            return performPass(
+                timeline,
+                { ...DEFAULT_SETTINGS, lanes, seed: 'z' },
+                { pass: 0, looping: true },
+            ).events;
+        };
+        expect(perform(64)).toEqual(perform(0));
+    });
 });
 
 describe('comp instruments', () => {

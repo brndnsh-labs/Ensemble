@@ -431,7 +431,10 @@ function holdFermatas(
 ): BandEvent[] {
     const held: { span: ChordSpan; barIndex: number; plan: (typeof plans)[number] }[] = [];
     for (const span of timeline.spans) {
-        if (span.fermata) {
+        // A fermata whose span rounds to no ticks holds nothing for no time: skip it. Holding
+        // one copied the comp chord and removed nothing, so a few on one tick doubled the
+        // events each time (#1670).
+        if (span.fermata && span.end > span.start) {
             const barIndex = barAtTick(timeline, span.start)?.index ?? -1;
             const plan = plans[barIndex];
             // No plan: the fermata is outside this pass's window.
