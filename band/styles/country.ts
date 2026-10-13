@@ -42,11 +42,11 @@ import type { BarContext, PitchedIdiom, Style } from './types.js';
 
 // ================================================================ drums
 // Mid energy is the two-step: kick on 1 and 3 (the boom), snare on 2 and 4 (the chick),
-// eighth hats. Some sections play the light train beat instead — the snare keeps eighths
+// even eighth hats (a soft offbeat made the two-step limp, #1421). Some sections play the light train beat instead — the snare keeps eighths
 // going under the backbeat. High energy is the driving train beat. Low is a ballad:
 // cross-stick on 2 and 4, a soft kick, quarter-note hat clicks.
 const TWO_STEP: Lines = {
-    hat: 'x.o.x.o.x.o.x.o.',
+    hat: 'x.x.x.x.x.x.x.x.',
     kick: 'x.......x.......',
     snare: '....X.......X...',
 };
@@ -337,12 +337,13 @@ const countryBass: PitchedIdiom = {
             }
             notes.forEach(({ step, midi, velocity, legato }, k) => {
                 const gap = (notes[k + 1]?.step ?? to) - step;
-                // The ballad's half notes and a walking line connect; a boom rings a beat
-                // (shorter when the train drives) and leaves room for the chick.
+                // The ballad's half notes and a walking line connect. A two-step boom is
+                // short, about half a beat, so the chick answers into air and not over a
+                // ringing bass (by ear, #1421); the train's boom rings a little longer.
                 const length =
                     tier === 'low' || legato
                         ? gap * 0.92
-                        : Math.min(gap, 4) * (tier === 'high' ? 0.75 : 0.9);
+                        : Math.min(gap, 4) * (tier === 'high' ? 0.75 : 0.55);
                 events.push(bassNote(bar, step, midi, length, dyn(velocity, plan.energy)));
                 last = midi;
             });
@@ -419,8 +420,9 @@ const honkyTonk = compIdiom({
         const hits: Hit[] = [];
         for (let s = from; s < to; s++) {
             if (line[s] === 'X') {
-                // The chick is detached — an eighth and a bit, so the next boom lands in air.
-                hits.push({ step: s, length: 2.5, velocity: 90 });
+                // The chick is a dry stab, just over a sixteenth: a ringing one blurred the
+                // boom-chick (by ear, #1421).
+                hits.push({ step: s, length: 1.2, velocity: 90 });
             } else if (line[s] === 'x') {
                 hits.push({ step: s, length: 1.5, velocity: 70 });
             }
@@ -751,13 +753,12 @@ const countryLead = leadIdiom({
 export const country: Style = {
     id: 'country',
     name: 'Country',
-    // Straight eighths with a hair of lilt (30 → an offbeat at ~55% of the beat): the old
-    // engine's by-ear correction, after a 16th-grid swing lurched against the two-step. A
-    // train beat's sixteenths lean with it, slightly long-short, which is how it's played.
+    // Straight eighths. Any lilt read as a shuffle that isn't one: 55 was stilted, 30
+    // still off, and straight was the one that sounded right by ear (#1421).
     // The boom sits right on the kick; the piano's chick a hair behind the snare, the
     // guitar's right with it (the old engine called country "rock solid" — little humanize).
     feel: {
-        swing: 30,
+        swing: 0,
         swingGrid: 8,
         // The picker sits right on the kick with the bass: chicken-pickin' is crisp, on top.
         lean: { bass: 0, comp: 3, lead: 0 },
