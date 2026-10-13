@@ -40,7 +40,13 @@ const BAND_NAMES = [
 ];
 const OTHER_NAMES: Array<string | undefined> = ['Bogus', '', undefined];
 
-type Variant = 'normal' | 'default-velocity' | 'nan-velocity' | 'late-time' | 'burst';
+type Variant =
+    | 'normal'
+    | 'default-velocity'
+    | 'nan-velocity'
+    | 'infinite-velocity'
+    | 'late-time'
+    | 'burst';
 
 // Names whose AudioParams are objects of their own; everything else on a node is a method.
 const PARAMS = new Set(['gain', 'frequency', 'Q', 'pan', 'playbackRate', 'detune']);
@@ -280,6 +286,8 @@ async function record(scenario: Scenario): Promise<string[]> {
                 return [name as string, time];
             case 'nan-velocity':
                 return [name as string, time, Number.NaN];
+            case 'infinite-velocity':
+                return [name as string, time, Number.POSITIVE_INFINITY];
             case 'late-time':
                 // A time already past: the 2 ms guard against the context clock decides.
                 return [name as string, 9, 0.8];
@@ -351,6 +359,27 @@ describe('drum dispatcher', () => {
             }
         }
         await expect(out).toMatchFileSnapshot('./__snapshots__/drum-dispatch-variants.txt');
+    });
+
+    it('lets no non-finite velocity reach an AudioParam on the kick, snare, crash or toms (#1657)', async () => {
+        // The recorder prints a non-finite number as NaN / Infinity / -Infinity, so any such
+        // line is a poisoned param (or a poisoned scalar handed to one).
+        for (const name of [
+            'Kick',
+            'Snare',
+            'Sidestick',
+            'Crash',
+            'High Tom',
+            'Mid Tom',
+            'Low Tom',
+        ]) {
+            for (const variant of ['nan-velocity', 'infinite-velocity'] as const) {
+                const log = await record({ name, variant });
+                expect(log.length, `${name} ${variant} played`).toBeGreaterThan(5);
+                const bad = log.filter((line) => /\b(NaN|-?Infinity)\b/.test(line));
+                expect(bad, `${name} ${variant}`).toEqual([]);
+            }
+        }
     });
 
     it('hands the lane count to every cymbal voice, and to no other', async () => {
