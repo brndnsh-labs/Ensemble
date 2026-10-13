@@ -385,7 +385,10 @@ export function parseChord(symbol: string, key: KeyContext): ChordFacts | null {
         bass = over.pc;
         tail = tail.slice(0, slash);
     }
-    const formula = FORMULAS.get(tail);
+    // A lowercase numeral with `11` is an ordinary minor 11th (1 b3 5 b7 9 11): the dominant
+    // 11th drops its 3rd only because the 11 would clash with a major one, and the numeral's
+    // case has just ruled the major third out. Lowercase 9 and 13 keep their third below.
+    const formula = FORMULAS.get(root.lowercase && tail === '11' ? 'm11' : tail);
     if (!formula) {
         return null;
     }

@@ -233,8 +233,8 @@ describe('a measure-less chart shows the chord the band plays', () => {
             'Cm7b9',
             'Cm7#5',
             'Cm7b5',
-            // A dominant 11th has no third for the numeral's case to lower.
-            'C11',
+            // The dominant 11th has no third, so the numeral's case gives it a minor one (#1674).
+            'Cm11',
         ]);
     });
 
@@ -244,6 +244,10 @@ describe('a measure-less chart shows the chord the band plays', () => {
     it.each([
         ['imaj7', 'CmMaj7', [0, 3, 7, 11]],
         ['iadd9', 'Cmadd9', [0, 2, 3, 7]],
+        // ii in C is D: D F A C E G, a minor third under the 11th (#1674).
+        ['ii11', 'Dm11', [0, 2, 4, 5, 7, 9]],
+        // The dominant 11th keeps its missing third: G C D F A, no B.
+        ['V11', 'G11', [0, 2, 5, 7, 9]],
         ['G9sus4', 'G9sus4', [0, 2, 5, 7, 9]],
         ['G9sus', 'G9sus4', [0, 2, 5, 7, 9]],
         ['G13sus', 'G13sus4', [0, 2, 4, 5, 7, 9]],

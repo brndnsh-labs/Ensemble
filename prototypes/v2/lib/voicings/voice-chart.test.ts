@@ -85,6 +85,35 @@ describe('voiceBandChart', () => {
         expect(voiced.every((v) => inHome(v, [2, 7]))).toBe(true);
     });
 
+    it('voices a lowercase-numeral 11th with a minor third and no major one (#1674)', () => {
+        const roman: SemanticScore = {
+            ...twoFiveOne,
+            notation: 'roman',
+            sections: [
+                {
+                    id: 'a',
+                    label: 'A',
+                    repeat: 1,
+                    measures: ['ii11', 'i11'].map((symbol, i) => ({
+                        id: `m${i}`,
+                        content: { kind: 'events', events: [chord(symbol)] },
+                    })),
+                },
+            ],
+        };
+        const chart = bandChart(roman, compileTimeline(roman));
+        expect(chart.chords.map((c) => c.display?.name.suffix)).toEqual(['m11', 'm11']);
+        for (const instrument of ['guitar', 'uke'] as const) {
+            const voiced = voiceBandChart(chart, { instrument, home: [1, 7], rootStrings: 'all' });
+            expect(voiced.map((v) => v.symbol)).toEqual(['Dm7', 'Cm7']);
+            for (const v of voiced) {
+                const degrees = v.notes.map((n) => n.degree);
+                expect(degrees, `${instrument} ${v.symbol}`).toContain('b3');
+                expect(degrees, `${instrument} ${v.symbol}`).not.toContain('3');
+            }
+        }
+    });
+
     it('classic root strings keep guitar roots on the 6th and 5th; a uke ignores them', () => {
         const chart = bandChart(twoFiveOne, compileTimeline(twoFiveOne));
         const classic = voiceBandChart(chart, {

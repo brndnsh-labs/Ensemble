@@ -181,7 +181,8 @@ describe('Chord parsing and naming', () => {
         });
 
         // #1662 — the rest of the same rule: the suffix's major third is lowered and nothing
-        // else moves. `i11` has no third to lower (a dominant 11th is written without one).
+        // else moves. A dominant 11th is written without a third, so `i11` takes a minor one
+        // outright and reads as the minor 11th (#1674).
         it.each([
             ['i7b5', 'Cm7b5', 'iø'],
             ['i7#5', 'Cm7#5', 'i7#5'],
@@ -189,7 +190,9 @@ describe('Chord parsing and naming', () => {
             ['i7#11', 'Cm7#11', 'i7#11'],
             ['i7b13', 'Cm7b13', 'i7b13'],
             ['i7#9', 'Cm7', 'i7'],
-            ['i11', 'C11', 'I11'],
+            ['i11', 'Cm11', 'i11'],
+            ['ii11', 'Dm11', 'ii11'],
+            ['bvii11', 'Bbm11', 'bvii11'],
             ['i+', 'Cm#5', 'i#5'],
             ['imaj7', 'CmMaj7', 'iMaj7'],
             ['iadd9', 'Cmadd9', 'iadd9'],

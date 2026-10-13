@@ -780,9 +780,11 @@ function minorReading(quality: string, is7th: boolean): string {
             return 'm7#11';
         case '7b13':
             return 'm7b13';
-        // No row for '11': a dominant 11th is written without its third (the 11 would sit a
-        // minor 9th above it), so there is nothing for the numeral's case to lower and the
-        // band plays `i11` as it plays `I11`. It was shown as a minor 11th until #1662.
+        case '11':
+            // A dominant 11th is written without its third (the 11 would sit a minor 9th
+            // above a major one), but a lowercase numeral has ruled the major third out: the
+            // band plays `i11` as the ordinary minor 11th (1 b3 5 b7 9 11) (#1674).
+            return 'm11';
         default:
             return quality;
     }
