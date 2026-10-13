@@ -515,6 +515,8 @@ interface StretchIndex {
     added: Float64Array;
 }
 
+// Keyed by the array itself: a compiled timeline's stretches are never edited afterwards
+// (`compileTimeline` is the only writer), so an index built once stays true.
 const STRETCH_INDEX = new WeakMap<Timeline['stretches'], StretchIndex>();
 
 function stretchIndex(stretches: Timeline['stretches']): StretchIndex {
