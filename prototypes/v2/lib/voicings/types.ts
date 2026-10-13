@@ -61,7 +61,7 @@ export interface ShapeDef {
     voices: Array<[number, ShapeRole]>;
     /**
      * The only qualities taught on this shape, where that is fewer than every quality of its
-     * `kind` (`allowedShapes`). Unset on a shape that serves them all.
+     * `kind` (`allowedShapes`, `build`). Unset on a shape that serves them all.
      */
     qualities?: Quality[];
     /**
