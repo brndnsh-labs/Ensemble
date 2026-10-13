@@ -3,12 +3,14 @@ import type { Note } from './types';
 /**
  * Fingering: try every assignment of fingers 1-4 where higher frets get higher fingers and equal frets go
  * from the lower-pitched string to the higher one, scored by how compact the hand is. Triad and
- * power grips may also lay one finger across a run of same-fret strings (a barre, #1594), and a
+ * power grips, and every ukulele chord (#1681), may also lay one finger across a run of
+ * same-fret strings (a barre, #1594), and a
  * guitar shell the one index barre that frees its root (#1607); a barre
  * is derived from the fingers, never stored — several fretted notes sharing a finger (`barres`).
  * A chart is planned as a sequence so shared notes keep their finger (`fingerSequence`), and
  * that plan chooses only among the fingerings a grip is taught with (`taughtOptions`: a shell's
- * `taughtAmong`, #1611; a triad's or power chord's `taughtStrummed`, #1617). What the cheapest
+ * `taughtAmong`, #1611; a triad's, a power chord's or any ukulele chord's `taughtStrummed`,
+ * #1617, #1681). What the cheapest
  * option costs is also what grip choice reads (`voicing.ts`'s `buildAt` and `rootBuried`), so
  * `handCost` and the options list stay as they are and the teaching rules live in the plan.
  */
@@ -26,9 +28,16 @@ export interface FingerOption {
      */
     needs?: 'left' | 'before' | 'after';
     /**
+     * Set with `needs` on a ukulele grip's fingerings (`taughtStrummed`, #1681): how many of
+     * this fingering's fingers the chord beside it must hold on the same notes (`heldFingers`).
+     * Two, or the one finger of a one-finger fingering.
+     */
+    hold?: number;
+    /**
      * Set by `taughtOptions`: per note of `fr`, whether this fingering puts a different finger
      * on it than the grip's default fingering does (all false on the default itself). The
-     * default is the cheapest, but for the ukulele chords of `UKE_BOOK`.
+     * default is the cheapest, but for the ukulele chords of `UKE_BOOK` and a grip whose
+     * cheapest is a cramped barre.
      */
     own?: boolean[];
 }
@@ -61,7 +70,10 @@ function perms(k: number): number[][] {
 
 /** What a fingering may use. */
 export interface FingerOpts {
-    /** A triad or power grip: any finger but the middle may lie across a run of same-fret notes (#1594). */
+    /**
+     * A triad or power grip, or a ukulele 7th chord: any finger but the middle may lie across
+     * a run of same-fret notes (#1594).
+     */
     barre?: boolean;
     /**
      * A shell whose root sits on a bass string under muted strings (a guitar shell): it is a
@@ -69,6 +81,14 @@ export interface FingerOpts {
      * little finger (`rootBarreOptions`, #1607).
      */
     rootBarre?: boolean;
+    /**
+     * The grip sounds every string of its instrument, which here is a ukulele chord, triad or
+     * 7th (`voicing.ts`'s `strumsEveryString`). It is fingered as the ukulele is taught
+     * (#1681): no barre that would lie on an open string (`barreOptions`), and one fingering
+     * for a chord unless two fingers can stay down (`taughtStrummed`). Neither is asked of a
+     * guitar grip: its fingerings were not part of that review and stay as they were.
+     */
+    everyString?: boolean;
 }
 
 /**
@@ -141,8 +161,16 @@ const holeCost = (fret: number): number => 4.6 - 0.3 * fret;
  * The middle finger never bars. One barre per grip. Every other finger keeps the split rule, with
  * the barre counted once at its fret. The candidates are costed alongside the split ones, so the
  * planner, not a rule, decides between them.
+ *
+ * `openRings` (a ukulele grip, `FingerOpts.everyString`, #1681) adds the other half of that
+ * legality: no open string of the grip on the barre's palm side, the strings numbered below
+ * the run. A finger laid flat reaches its strings from that side, tip on the furthest, so
+ * everything nearer is under it: across the G, C and E strings it damps the open A of D
+ * 2-2-2-0, which is why D is taught a fingertip each (1-2-3), Asus4 2-2-0-0 as 1-2 and C♯m
+ * 1-1-0-4 as 1-2-4. An open string beyond the fingertip is clear of it (Gm7 0-2-1-1 and
+ * Gmaj7 0-2-2-2 are barres).
  */
-function barreOptions(notes: Note[], fr: Note[]): FingerOption[] {
+function barreOptions(notes: Note[], fr: Note[], openRings: boolean): FingerOption[] {
     const out: FingerOption[] = [];
     const byString = new Map(notes.map((n) => [n.string, n]));
     for (const f of new Set(fr.map((n) => n.fret))) {
@@ -162,7 +190,7 @@ function barreOptions(notes: Note[], fr: Note[]): FingerOption[] {
                     }
                     hole ||= n.fret > f;
                 }
-                if (!legal) {
+                if (!legal || (openRings && notes.some((n) => n.string < lo && n.fret === 0))) {
                     continue;
                 }
                 const inBarre = fr.map((n) => n.fret === f && n.string >= lo && n.string <= hi);
@@ -234,14 +262,15 @@ function rootBarreOptions(notes: Note[], fr: Note[], split: FingerOption[]): Fin
     if (split.some((o) => rootFinger(o) <= 2)) {
         return [];
     }
-    return barreOptions(notes, fr).filter((o) => rootFinger(o) <= 2);
+    return barreOptions(notes, fr, false).filter((o) => rootFinger(o) <= 2);
 }
 
 /**
- * Every reasonable fingering for a grip, cheapest first. `barre: true` marks a triad or power grip:
- * it is offered barres, and drops the shell's root-finger rule (`handCost`). Without it — a
- * shell — every note has its own finger, the skipped string muted by the fretting hand; a guitar
- * shell (`rootBarre`) is also offered the index barre that frees its root.
+ * Every reasonable fingering for a grip, cheapest first. `barre: true` marks a strummed grip — a
+ * triad, a power chord, any ukulele chord: it is offered barres, and drops the guitar shell's
+ * root-finger rule (`handCost`). Without it — a guitar shell — every note has its own finger,
+ * the skipped string muted by the fretting hand, and with `rootBarre` it is also offered the
+ * index barre that frees its root.
  */
 export function fingerOptions(notes: Note[], opts: FingerOpts = {}): FingerOption[] {
     const fr = notes.filter((n) => n.fret > 0);
@@ -253,7 +282,7 @@ export function fingerOptions(notes: Note[], opts: FingerOpts = {}): FingerOptio
     }
     const out = splitOptions(fr, !opts.barre);
     if (opts.barre) {
-        out.push(...barreOptions(notes, fr));
+        out.push(...barreOptions(notes, fr, opts.everyString === true));
     } else if (opts.rootBarre) {
         out.push(...rootBarreOptions(notes, fr, out));
     }
@@ -524,12 +553,28 @@ const spelled = (notes: Note[], o: FingerOption): string =>
  * default, priced as the cheapest so the plan reaches for it cold. What the rules would have
  * offered is still there for fingers already down: the index on the 3rd fret of Cm 0-3-3-3
  * stays for C 0-0-0-3, though C alone is the ring finger.
+ *
+ * A ukulele chord (`everyString`, #1681) asks more before it leaves its default. On a guitar
+ * one held note is reason enough to take a second taught fingering. In first position on a
+ * ukulele each chord has the one fingering its chart prints, and a single finger kept from
+ * the chord before drags the others off it: E7 1-2-0-2 after Dm played 2-3-0-4, G7 0-2-1-2
+ * after Fm 0-3-2-4, each with the whole hand a fret behind its place. So there a fingering
+ * other than the default — a second one, or fingers left down (`needs: 'left'`) — is taken
+ * only beside a chord that holds TWO of its fingers (`FingerOption.hold`, `heldFingers`): G7
+ * after Dm7♭5 1-2-1-3 keeps the middle and ring finger and is 0-3-2-4, Em 0-4-3-2 beside G
+ * keeps two and is 4-3-2. A fingering of one finger needs only that one (Cmaj7 0-0-0-2 under
+ * the ring finger G7 leaves there). The table's own alternatives are book fingerings too and
+ * stay unmarked.
  */
-function taughtStrummed(notes: Note[], all: FingerOption[]): FingerOption[] {
-    const best = all[0];
-    if (best.p.includes(null)) {
+function taughtStrummed(notes: Note[], all: FingerOption[], everyString: boolean): FingerOption[] {
+    if (all[0].p.includes(null)) {
         return all;
     }
+    // The cheapest fingering that is not a cramped barre is what the others are measured
+    // from. On three strings that is the cheapest of all; on a ukulele's four the cramped
+    // barre can undercut every other (A♭m7♭5 1-2-2-2 as 1-2-3-3), and measured from it the
+    // fingertip-each fingering players use (1-2-3-4) would be a stretch too far.
+    const best = all.find((o) => !crampedBarre(o)) ?? all[0];
     const usual = all.filter(
         (o) => o.cost <= best.cost + TAUGHT_MARGIN && !idleIndexStretches(o) && !crampedBarre(o),
     );
@@ -560,27 +605,39 @@ function taughtStrummed(notes: Note[], all: FingerOption[]): FingerOption[] {
         ...(needs ? { needs } : {}),
     });
     const taken = new Set(free.map((o) => o.p.join()));
+    const left = usual.filter((o) => !taken.has(o.p.join())).map((o) => mark(o, 'left'));
+    if (!everyString) {
+        return [...free.map((o) => mark(o)), ...left];
+    }
+    // The default and whatever else the table prints stay free. A second fingering is offered
+    // once for the chord before and once for the chord after, as a shell's is (`taughtAmong`).
+    const second = free.slice(printed?.length || 1).map((o) => mark(o));
     return [
-        ...free.map((o) => mark(o)),
-        ...usual.filter((o) => !taken.has(o.p.join())).map((o) => mark(o, 'left')),
+        ...free.slice(0, printed?.length || 1).map((o) => mark(o)),
+        ...[
+            ...second.map((o) => ({ ...o, needs: 'before' as const })),
+            ...second.map((o) => ({ ...o, needs: 'after' as const })),
+            ...left,
+        ].map((o) => ({ ...o, hold: Math.min(2, new Set(o.p).size) })),
     ];
 }
 
 /**
  * The fingerings the chart plan may give a grip: the ones it is taught with, so across a chart
- * a held note only ever chooses between two fingerings a teacher would show. A shell's are
- * `taughtAmong` (#1611); a triad's or a power chord's (`barre`) are `taughtStrummed` (#1617).
+ * a held note only ever chooses between two fingerings a teacher would show. A guitar shell's
+ * are `taughtAmong` (#1611); a triad's, a power chord's or a ukulele chord's (`barre`) are
+ * `taughtStrummed` (#1617, #1681).
  * The first is the grip's default, unmarked: what it takes alone (`assignFingers`).
  */
 export function taughtOptions(notes: Note[], opts: FingerOpts = {}): FingerOption[] {
     const all = fingerOptions(notes, opts);
-    return opts.barre ? taughtStrummed(notes, all) : taughtAmong(all);
+    return opts.barre ? taughtStrummed(notes, all, opts.everyString === true) : taughtAmong(all);
 }
 
 /**
- * Finger one grip by itself: its default taught fingering. For every shell and nearly every
- * strummed grip that is the cheapest (`fingerOptions`); the exceptions are the ukulele chords
- * of `UKE_BOOK`.
+ * Finger one grip by itself: its default taught fingering. For every guitar shell and nearly
+ * every strummed grip that is the cheapest (`fingerOptions`); the exceptions are the ukulele
+ * chords of `UKE_BOOK` and a grip whose cheapest is a cramped barre (`taughtStrummed`).
  */
 export const assignFingers = (notes: Note[], opts: FingerOpts = {}): void =>
     applyFingers(notes, taughtOptions(notes, opts)[0]);
@@ -715,6 +772,26 @@ function sharesTheHand(marked: FingerOption, other: FingerOption, inPlace: boole
 }
 
 /**
+ * How many of `marked`'s fingers `other` has down already: on a note the two chords share
+ * (same string, same fret), under the same finger. A barre that stays is one finger.
+ */
+function heldFingers(marked: FingerOption, other: FingerOption): number {
+    const held = new Set<number>();
+    marked.fr.forEach((x, i) => {
+        const j = other.fr.findIndex((y) => y.string === x.string && y.fret === x.fret);
+        const finger = marked.p[i];
+        if (j >= 0 && finger !== null && other.p[j] === finger) {
+            held.add(finger);
+        }
+    });
+    return held.size;
+}
+
+/** Whether `other` holds as many of a marked fingering's fingers as it asks (`FingerOption.hold`). */
+const holdsEnough = (marked: FingerOption, other: FingerOption): boolean =>
+    heldFingers(marked, other) >= (marked.hold ?? 0);
+
+/**
  * A chord in its default fingering, the one it takes alone: no finger differs from it
  * (`FingerOption.own`).
  */
@@ -728,15 +805,23 @@ const ordinary = (o: FingerOption): boolean => !o.own?.includes(true);
  *   (`sharesTheHand`), in any taught fingering: a finger that is down is not lifted;
  * - `b` marked `'before'` only from a chord that shares its fingers, in its ordinary
  *   fingering, and `a` marked `'after'` only to one.
+ *
+ * And a marked ukulele fingering only beside a chord that holds enough of its fingers
+ * (`FingerOption.hold`, #1681).
  */
 function arrives(a: FingerOption | null, b: FingerOption): boolean {
-    if (b.needs === 'left' && !(a && sharesTheHand(b, a, true))) {
+    if (b.needs === 'left' && !(a && sharesTheHand(b, a, true) && holdsEnough(b, a))) {
         return false;
     }
-    if (b.needs === 'before' && !(a && ordinary(a) && sharesTheHand(b, a, false))) {
+    if (
+        b.needs === 'before' &&
+        !(a && ordinary(a) && sharesTheHand(b, a, false) && holdsEnough(b, a))
+    ) {
         return false;
     }
-    return !(a?.needs === 'after' && !(ordinary(b) && sharesTheHand(a, b, false)));
+    return !(
+        a?.needs === 'after' && !(ordinary(b) && sharesTheHand(a, b, false) && holdsEnough(a, b))
+    );
 }
 
 /**
@@ -786,8 +871,8 @@ function planFingers(options: FingerOption[][]): FingerOption[] {
 
 /**
  * Plan fingers across a sequence of voicings (mutates each voicing's notes). Each carries what
- * its fingering may use (`FingerOpts`): `barre` for triad and power grips, `rootBarre` for a
- * guitar shell.
+ * its fingering may use (`FingerOpts`): `barre` for triad and power grips and for every
+ * ukulele chord (`everyString`), `rootBarre` for a guitar shell.
  *
  * Every grip is planned from the fingerings it is taught with (`taughtOptions`: #1611 for
  * shells, #1617 for triad and power grips), in one pass, so a held note never costs a stretch,
@@ -799,7 +884,11 @@ export function fingerSequence(chords: Array<{ notes: Note[] } & FingerOpts>): v
         return;
     }
     const options = chords.map((b) =>
-        taughtOptions(b.notes, { barre: b.barre, rootBarre: b.rootBarre }),
+        taughtOptions(b.notes, {
+            barre: b.barre,
+            rootBarre: b.rootBarre,
+            everyString: b.everyString,
+        }),
     );
     planFingers(options).forEach((o, i) => {
         applyFingers(chords[i].notes, o);

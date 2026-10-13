@@ -89,18 +89,28 @@ const openOneOff = (frets: number[]): boolean => {
 /**
  * Triad and power grips may take a barre (#1594); a shell is one finger per note, its skipped
  * string muted by the fretting hand, as jazz comping is taught — but for the one barre
- * `fingerRules` gives a guitar shell.
+ * `fingerRules` gives a guitar shell, and for a ukulele's shells, which it treats as the
+ * strummed chords they are. Read by `buildAt` too, where it prices an added tone: no ukulele
+ * shell has one, so only the guitar's rule is ever asked there.
  */
 const mayBarre = (shape: ShapeDef): boolean => shape.kind !== 'shell';
 
 /**
  * What a grip's fingering may use (`FingerOpts`). A triad or power grip takes barres freely. A
  * shell that leaves strings muted — a guitar shell, its root on a bass string — takes only the
- * index barre that frees its root (`rootBarre`, #1607). A ukulele shell rings every string and
- * has no bass root to anchor, so it keeps a finger per note.
+ * index barre that frees its root (`rootBarre`, #1607): the finger-per-note rule is there so
+ * the fretting hand can mute the strings the shape skips. A ukulele shell skips none. It rings
+ * every string (`strumsEveryString`), a strummed chord like the triad taught beside it, and it
+ * bars as that triad does (#1681): D7 2-2-2-3 is the index across three strings and the middle
+ * finger, B♭7 1-2-1-1 the index across all four. Every ukulele chord is also marked
+ * `everyString`, which holds its fingering to how the ukulele is taught (`fingering.ts`'s
+ * `barreOptions` and `taughtStrummed`). Grip choice reads none of this for a ukulele
+ * (`rootBuried` and `buildAt`'s added tone are a guitar shell's), so it moves fingers only.
  */
-const fingerRules = (shape: ShapeDef, notes: Note[], inst: InstrumentDef): FingerOpts =>
-    mayBarre(shape) ? { barre: true } : { rootBarre: !strumsEveryString({ notes }, inst) };
+const fingerRules = (shape: ShapeDef, notes: Note[], inst: InstrumentDef): FingerOpts => {
+    const everyString = strumsEveryString({ notes }, inst);
+    return mayBarre(shape) || everyString ? { barre: true, everyString } : { rootBarre: true };
+};
 
 /**
  * Fret on string `s` for a note `interval` semitones above a root at fret `r` on `rootString`,
