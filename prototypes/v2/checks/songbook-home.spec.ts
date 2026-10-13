@@ -221,6 +221,35 @@ test('one search returns your songs and the standards, grouped', async ({ page }
     await expect(page.getByRole('heading', { name: 'Minor Blues', exact: true })).toBeVisible();
 });
 
+test('a commit that lands before the search box’s input event is handled does not eat the typing (#1635)', async ({
+    page,
+}) => {
+    // The race behind the intermittent "one search returns…" timeout on WebKit: the browser has
+    // already put "blu" in the box, but a React render commits (here the settle of the first
+    // session read, in CI) before React's own `input` handler has seen it. A controlled box is
+    // rewritten to the state it held, "", by that commit — and React, finding the tracked value
+    // unchanged, never fires `onChange`, so the typing is gone and no results appear. Reproduced
+    // deterministically: set the value the way the browser does (past React's value tracker),
+    // force a synchronous commit with a real click, and only then deliver the `input` event.
+    await seedStarters(page);
+    await expect(page.getByTestId('continue-card')).toBeVisible();
+    const search = page.getByRole('searchbox', { name: 'Search your songs and the standards' });
+    await search.evaluate(async (box: HTMLInputElement) => {
+        box.focus();
+        Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set?.call(box, 'blu');
+        // Opening the Import dialog is a discrete click; React renders and commits the shell in
+        // the microtask checkpoint after it, so yield one before delivering the event.
+        (document.querySelector('.header-tools .btn') as HTMLButtonElement).click();
+        await Promise.resolve();
+        await Promise.resolve();
+        box.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await expect(search).toHaveValue('blu');
+    await expect(
+        page.getByTestId('search-songs').getByRole('heading', { name: 'Your songs' }),
+    ).toBeVisible();
+});
+
 test('the first visit keeps an h1 while searching', async ({ page }) => {
     await page.goto(appUrl());
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(

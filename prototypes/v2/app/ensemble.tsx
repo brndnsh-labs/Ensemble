@@ -4921,7 +4921,13 @@ export default function Ensemble() {
                         <input
                             type="search"
                             placeholder="Search titles and composers, yours and the standards…"
-                            value={search}
+                            // Uncontrolled on purpose (#1635): `search` is only ever written from
+                            // this box, so nothing needs to push a value back into it. A controlled
+                            // box is rewritten to the state it held by ANY commit that lands
+                            // between the browser inserting text and React handling the `input`
+                            // event — typing lost, no `onChange`, no results. `defaultValue` still
+                            // restores the query when the box remounts on the way back home.
+                            defaultValue={search}
                             onFocus={wantLiveLibrary}
                             onChange={(event) => {
                                 wantLiveLibrary();
