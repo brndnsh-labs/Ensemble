@@ -1154,6 +1154,13 @@ export function isRingingHat(name: string): boolean {
     return name === 'Open';
 }
 
+// why (#1657): a non-finite velocity must not reach a gain `AudioParam` (NaN poisons the
+// param). Every drum voice falls back to full velocity, 1.0; the only caller today always
+// passes a finite level, so this is a guard, not a behaviour.
+function finiteVelocity(velocity: number): number {
+    return Number.isFinite(velocity) ? velocity : 1.0;
+}
+
 /**
  * Shared preamble for the hats, ride, shaker and the sampled strikes: density
  * ducking, the 2 ms scheduling guard, NaN-guarded velocity, the per-hit panner
@@ -1184,7 +1191,7 @@ function setupPercussiveHit(
     // schedules every hit before its clock moves, so on the clock the count never decayed and
     // the kit sank 2.5 dB over the first four bars of every export.
     const densityDuck = updateDensityDucking(mixStateFor(playback.audio), playTime);
-    const hitVelocity = Number.isFinite(velocity) ? velocity : 1.0;
+    const hitVelocity = finiteVelocity(velocity);
     const masterVol = hitVelocity * 1.3 * densityDuck;
     const panner = createSimplePanner(playback.audio, panValue, playTime);
     if (playback.audioGraph) {
@@ -1691,13 +1698,14 @@ function playKickSnareCrashTom(
     state: EnsembleState,
     name: string,
     time: number,
-    velocity: number,
+    rawVelocity: number,
     layers: number,
 ): void {
     const { playback, groove } = state;
     if (!name || !playback.audio) {
         return;
     }
+    const velocity = finiteVelocity(rawVelocity);
     // why: surface engine typos / stub soundNames as a one-shot warning instead of silent
     // audio dropouts.
     maybeWarnUnknownSound(name);

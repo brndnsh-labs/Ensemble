@@ -231,20 +231,20 @@ default-velocity / Mid Tom: 143 lines, sha1 7018675dcd829bf9fed6ff8a73be0a8bc0dc
 default-velocity / Low Tom: 143 lines, sha1 ecdbdd0f89ab4591c59130cda88e65b89fd8dcf3
 default-velocity / Shaker: 99 lines, sha1 d709b526f33e0f7918d06f1004abdefc722ee69f
 default-velocity / Bogus: 72 lines, sha1 639a902fe9637e2891c9009a590719b930457b1e
-nan-velocity / Kick: 167 lines, sha1 8da7a60a7712ac9535ea3c2380713cc20463e899
-nan-velocity / Snare: 126 lines, sha1 1e974bc480df4ab01902171fdd4937f37ae8a310
-nan-velocity / Sidestick: 125 lines, sha1 ff7a713151e6eab607f6efbcb0cffc648440da3c
-nan-velocity / HiHat: 137 lines, sha1 fd0d8f6d6d3ba84a65a3ac2175a1d67dee3913f4
-nan-velocity / Open: 106 lines, sha1 7c0cce6d55e968c82c1335ac43726e83e1356ead
-nan-velocity / HiHatPedal: 104 lines, sha1 2fb03f1bc720641ed6784d0434121f7f796f990a
-nan-velocity / Ride: 123 lines, sha1 611c1fbb3f2334c4503c182bc86bdbf51c9fb90b
-nan-velocity / RideBell: 72 lines, sha1 e53c6259ebfc550c358629995b8528ed6a541332
-nan-velocity / Crash: 107 lines, sha1 eeff4a25097c1db5fe5ae36af0255c648487ca2e
-nan-velocity / High Tom: 143 lines, sha1 2a8ad4fb3e8ae0d96ff33f68b2cd739c26c3bffe
-nan-velocity / Mid Tom: 143 lines, sha1 3e823a6b7f13553e072bfbc0392e072b00271470
-nan-velocity / Low Tom: 143 lines, sha1 b566cf2a64452e94c4e6cadc3b60ed3ff874fcaf
-nan-velocity / Shaker: 99 lines, sha1 4bcd5380a4d46644777c09c3e0579f6cebc1821a
-nan-velocity / Bogus: 72 lines, sha1 b9107156095aed329d738d6930f01305f0a3a166
+nan-velocity / Kick: 167 lines, sha1 b09a1855906a05f107b372dc973ae8d6cbafa5d4
+nan-velocity / Snare: 143 lines, sha1 4ff2c15d310561dd9e9a1aaabb14527ef853ce61
+nan-velocity / Sidestick: 125 lines, sha1 51674d07d3314b0c1c21cd1b4c61c99fd2d3de4e
+nan-velocity / HiHat: 137 lines, sha1 f58ff54a731a26d12508713b2e9a49a209ec2a57
+nan-velocity / Open: 106 lines, sha1 273f39498cc25b61a8bfb5e198cdb4f390353aca
+nan-velocity / HiHatPedal: 104 lines, sha1 20da3a6cae9e0f5f0f996d7d01a23710d4223487
+nan-velocity / Ride: 123 lines, sha1 6c3c74e66fcc388fa5a48591e520b0aa14c354a3
+nan-velocity / RideBell: 72 lines, sha1 a9e07465c38a38d978bc048b03920d0cc6099397
+nan-velocity / Crash: 107 lines, sha1 105806197bf447727939d6b20891a0b9084fc6b4
+nan-velocity / High Tom: 143 lines, sha1 ef4a46968a5f7d7d13de6fc959c90a2c6a52e54b
+nan-velocity / Mid Tom: 143 lines, sha1 7018675dcd829bf9fed6ff8a73be0a8bc0dc33a2
+nan-velocity / Low Tom: 143 lines, sha1 ecdbdd0f89ab4591c59130cda88e65b89fd8dcf3
+nan-velocity / Shaker: 99 lines, sha1 d709b526f33e0f7918d06f1004abdefc722ee69f
+nan-velocity / Bogus: 72 lines, sha1 639a902fe9637e2891c9009a590719b930457b1e
 late-time / Kick: 167 lines, sha1 d759fe28be122c8b1d85d2dd3fe922688609ba52
 late-time / Snare: 143 lines, sha1 1f950b6c91304c14c86fa368199af3d7c40d1bf7
 late-time / Sidestick: 125 lines, sha1 7b0a004d003df460f7476c8152610233cb33b836
