@@ -321,14 +321,18 @@ export class BandHost {
         return (this.options.state().playback.audio as AudioContext | null) ?? null;
     }
 
-    /** Compile a chart. Only a change of content (not of object identity) restarts the band. */
-    setScore(score: SemanticScore): void {
+    /**
+     * Compile a chart. Only a change of content (not of object identity) restarts the band.
+     * `compiled` is this score's timeline when the caller already holds it (the runtime compiles
+     * a chart as it opens it), so a chart is not compiled again to be played (#1665).
+     */
+    setScore(score: SemanticScore, compiled?: Timeline): void {
         const key = JSON.stringify(score);
         if (key === this.scoreKey) {
             return;
         }
         this.scoreKey = key;
-        this.timeline = compileTimeline(score);
+        this.timeline = compiled ?? compileTimeline(score);
         this.counted = score.choruses !== undefined;
         if (this.playing && this.settings) {
             // The form changed under the band: restart the song cleanly.

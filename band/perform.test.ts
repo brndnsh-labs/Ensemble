@@ -254,6 +254,46 @@ describe('fermatas', () => {
         }
         expect(failures).toEqual([]);
     });
+
+    it('cost the same each however long the chart is (#1665)', () => {
+        // Every chord of the chart is a fermata, and each fermata span counts how often its
+        // bounds are read. Holding one may look at the events it replaces; checking it against
+        // every event of the pass is what froze the tab on a long chart, and reads its bounds
+        // once per event — four times as often in a chart four times as long.
+        const readsPerFermata = (bars: number) => {
+            const chart = score([{ label: 'A', bars: Array(bars).fill('C F G7 Am').join(' | ') }]);
+            for (const { content } of chart.sections[0].measures) {
+                if (content.kind === 'events') {
+                    content.events = content.events.map((e) => ({ ...e, fermata: true }));
+                }
+            }
+            const timeline = compileTimeline(chart);
+            let reads = 0;
+            timeline.spans = timeline.spans.map(
+                (span) =>
+                    new Proxy(span, {
+                        get(target, key, receiver) {
+                            if (key === 'start' || key === 'end') {
+                                reads++;
+                            }
+                            return Reflect.get(target, key, receiver);
+                        },
+                    }),
+            );
+            const lanes = { drums: true, bass: true, comp: true, lead: true };
+            const { events } = performPass(
+                timeline,
+                { ...DEFAULT_SETTINGS, lanes, seed: 'f' },
+                { pass: 0, looping: true },
+            );
+            expect(timeline.spans).toHaveLength(bars * 4);
+            expect(events.length).toBeGreaterThan(bars * 4);
+            return reads / timeline.spans.length;
+        };
+        // The binary searches over the spans add a read or two per doubling; a scan per
+        // fermata would make this 4.
+        expect(readsPerFermata(128) / readsPerFermata(32)).toBeLessThan(1.5);
+    });
 });
 
 describe('comp instruments', () => {

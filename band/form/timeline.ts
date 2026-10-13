@@ -507,15 +507,71 @@ export function barAtTick(timeline: Timeline, tick: number): Bar | null {
     return null;
 }
 
-/** Seconds from tick 0 to `tick` at `bpm`, honouring fermata stretches. */
+interface StretchIndex {
+    /** The latest start, and the latest end, among each stretch and those before it. */
+    starts: Float64Array;
+    ends: Float64Array;
+    /** The ticks of written time all the stretches before each one add, played whole. */
+    added: Float64Array;
+}
+
+const STRETCH_INDEX = new WeakMap<Timeline['stretches'], StretchIndex>();
+
+function stretchIndex(stretches: Timeline['stretches']): StretchIndex {
+    let index = STRETCH_INDEX.get(stretches);
+    if (!index) {
+        index = {
+            starts: new Float64Array(stretches.length),
+            ends: new Float64Array(stretches.length),
+            added: new Float64Array(stretches.length + 1),
+        };
+        stretches.forEach((s, i) => {
+            index!.starts[i] = Math.max(s.start, i ? index!.starts[i - 1] : s.start);
+            index!.ends[i] = Math.max(s.end, i ? index!.ends[i - 1] : s.end);
+            index!.added[i + 1] = index!.added[i] + (s.end - s.start) * (s.factor - 1);
+        });
+        STRETCH_INDEX.set(stretches, index);
+    }
+    return index;
+}
+
+/** The first index whose value is past `limit` (or at it, when `inclusive`); the length if none. */
+function firstPast(ascending: Float64Array, limit: number, inclusive: boolean): number {
+    let lo = 0;
+    let hi = ascending.length;
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (ascending[mid] > limit || (inclusive && ascending[mid] === limit)) {
+            hi = mid;
+        } else {
+            lo = mid + 1;
+        }
+    }
+    return lo;
+}
+
+/**
+ * Seconds from tick 0 to `tick` at `bpm`, honouring fermata stretches. Every scheduled event
+ * asks, and a chart may write tens of thousands of fermatas, so the stretches that are over by
+ * `tick` are read off a running total (`stretchIndex`) found by binary search (#1665). Only a
+ * stretch `tick` falls inside is measured on its own: at most one, but for the few a barline's
+ * rounding lets overlap (`spanIndexAt`).
+ */
 export function secondsAt(timeline: Timeline, tick: number, bpm: number): number {
     const perTick = 60 / bpm / PPQ;
-    let seconds = tick * perTick;
-    for (const s of timeline.stretches) {
-        if (s.start >= tick) {
-            break;
-        }
-        seconds += (Math.min(tick, s.end) - s.start) * perTick * (s.factor - 1);
+    const { stretches } = timeline;
+    if (!stretches.length) {
+        return tick * perTick;
     }
-    return seconds;
+    const { starts, ends, added } = stretchIndex(stretches);
+    // Stretches count up to the first that starts at or after `tick`; those before the first
+    // still going at `tick` count whole.
+    const started = firstPast(starts, tick, true);
+    const over = Math.min(started, firstPast(ends, tick, false));
+    let ticks = tick + added[over];
+    for (let i = over; i < started; i++) {
+        const s = stretches[i];
+        ticks += (Math.min(tick, s.end) - s.start) * (s.factor - 1);
+    }
+    return ticks * perTick;
 }
