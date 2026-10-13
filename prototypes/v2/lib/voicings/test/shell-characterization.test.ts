@@ -166,6 +166,7 @@ const grid = (
 // the 369 before it met the rule (in C, F♯ and B♭ no symbol is split between an open grip and
 // a cheaper closed one), so #1613 moved none of them, and with the rule off this chart alone
 // turns red. #1613's triad forms (`UKE_OPEN_FORMS`) are no shell's, and no chart here sees them.
+// (Since #1675 that rule is not `unifyGrips`' any more: see below.)
 //
 // #1617 added no chart and moved no grip: it changed FINGERS on 265 chords in 150 of the 370
 // charts (263 on guitar, 2 on the ukulele), every shape, root fret, string, fret, degree and
@@ -181,6 +182,16 @@ const grid = (
 // the cap leaves is a barre chosen over a fingertip each by the count of fingers, and no
 // shell chart has one. `engine.test.ts` holds that, and #1617's triad rules, which no chart
 // here sees either.
+//
+// #1675 added no chart and moved 17 chords in 9 of the 121 high-G ukulele charts, no guitar
+// chart and neither low-G one: a ukulele chord that has a book grip in first position is voiced
+// from those alone (`candidates`, `bookGrip`), where before the open grip was only preferred
+// when the plan had split the symbol. All in B♭, unlocked and at frets 1–6 (Gm7 and B♭6
+// 3-5-3-5 to 0-2-1-1, B♭7 3-5-4-5 to 1-2-1-1, B♭°7 and E°7 3-4-3-4 to 0-1-0-1, and a
+// B♭maj7 that follows its Gm7 down, 3-5-5-5 to 2-2-1-1), and the C♯m7 of the `canon` in A
+// (4-4-4-4 to 1-1-0-2). With the rule off those 9 turn red. Its other rule, the five-fret
+// reach as a last resort (`fiveFretReach`), is no shell's: no ukulele shell is that wide, and
+// `engine.test.ts` holds it on triads.
 //
 // So add charts freely, after the ones here, so the fixture's diff is additions only; measure
 // before dropping one (45 of the 436 mutations tried are caught by exactly one chart).

@@ -134,23 +134,34 @@ export const GUITAR: InstrumentDef = {
 
 /**
  * First-position chords that are not a moving shape (#1613): each is the book grip for ONE
- * chord, made by an open string, and the six shapes of `UKE_TRIADS` cannot reach it — they
+ * root, made by an open string, and the six shapes of `UKE_TRIADS` cannot reach it — they
  * voiced Fm as 1543 (a five-fret reach), E as 1442 or 4442 and Cm as 5333. Every ukulele method
- * prints these three instead.
+ * prints these instead.
  *
- * Each is held to the one quality it is taught for (`ShapeDef.qualities`) and to the place its
+ * Each is held to the qualities it is taught for (`ShapeDef.qualities`) and to the place its
  * open string rings (`ShapeDef.openOnly`), because moved or re-coloured the same layout is a
  * grip nobody shows: the Fm form as a major chord is F 2013, a finger more than the book's
  * 2010, and a fret up it is F♯m 2124 for the book's 2120; the E form as a minor is Em 0402
  * for the book's 0432. Left free, the costs took all three.
+ *
+ * Two of them serve a sus chord as well (#1675), one finger from the chord beside it: the E
+ * form with its 3rd moved up a fret is Esus4 2402, and the Cm form with its 3rd moved down one
+ * is Csus2 0233 (the grip every book prints for Gsus4, which is the same three notes). Asus2
+ * 2402 is a form of its own: the same four frets as Esus4 and the same three notes, with A
+ * named as the root. Without it Asus2 was 2452 or 4452, a barre at the 2nd or 4th fret beside
+ * the open A 2100.
  */
 const UKE_OPEN_FORMS: ShapeDef[] = [
     // Fm 1013: A♭ C F C — the 3rd, the open C string's 5th, the root, the 5th again on top.
-    openForm('UTFm', 'Fm form', 2, ['T', 'F', 'R', 'F2'], 'min'),
+    openForm('UTFm', 'Fm form', 2, ['T', 'F', 'R', 'F2'], ['min']),
     // E 1402: G♯ E E B — the 3rd, the root, the open E string's root, the 5th.
-    openForm('UTEo', 'E form', 3, ['T', 'R', 'R2', 'F'], 'maj'),
+    // Esus4 2402: A E E B — the 4th in the 3rd's seat.
+    openForm('UTEo', 'E form', 3, ['T', 'R', 'R2', 'F'], ['maj', 'sus4']),
     // Cm 0333: G E♭ G C — the open G string's 5th, the 3rd, the 5th again, the root on top.
-    openForm('UTCm', 'Cm form', 1, ['F', 'T', 'F2', 'R'], 'min'),
+    // Csus2 0233: G D G C — the 2nd in the 3rd's seat.
+    openForm('UTCm', 'Cm form', 1, ['F', 'T', 'F2', 'R'], ['min', 'sus2']),
+    // Asus2 2402: A E E B — the root, the 5th, the open E string's 5th, the 2nd on top.
+    openForm('UTAs', 'Asus2 form', 4, ['R', 'F', 'F2', 'T'], ['sus2']),
 ];
 
 /**
@@ -183,6 +194,11 @@ const UKE_TRIADS: ShapeDef[] = [
 /**
  * Ukulele power chords: root and 5th, the root doubled. C5 0033 strums all four strings; G5 023x
  * leaves the A string out (its 5th up there would be a five-fret stretch).
+ *
+ * Two more are first-position forms like `UKE_OPEN_FORMS` (#1675), each for the one root whose
+ * open strings make it: A5 2400 and E5 4402. The two shapes above gave A5 as 245x, a string
+ * short, and E5 as 4477, which no window from the nut holds (in frets 1–6 it went to the 9th
+ * fret).
  */
 const UKE_POWER: ShapeDef[] = [
     { ...uke('UPC', 'C shape', 3, ['F', 'R', 'F2', 'R2']), kind: 'power' },
@@ -197,6 +213,10 @@ const UKE_POWER: ShapeDef[] = [
             [2, 'R2'],
         ],
     },
+    // A5 2400: A E E A — the root, the 5th, and the open E and A strings.
+    { ...openForm('UPA', 'A5 form', 4, ['R', 'F', 'F2', 'R2'], ['five']), kind: 'power' },
+    // E5 4402: B E E B — the 5th, the root, the open E string's root, the 5th on top.
+    { ...openForm('UPE', 'E5 form', 3, ['F', 'R', 'R2', 'F2'], ['five']), kind: 'power' },
 ];
 
 /** A four-string uke triad shape: `roles` run from the G string (4) to the A string (1). */
@@ -210,15 +230,15 @@ function uke(id: string, name: string, rootString: number, roles: ShapeRole[]): 
     };
 }
 
-/** A first-position form for one quality: the same layout, offered only on its open string. */
+/** A first-position form: one layout, for the qualities named, offered only on its open string. */
 function openForm(
     id: string,
     name: string,
     rootString: number,
     roles: ShapeRole[],
-    quality: Quality,
+    qualities: Quality[],
 ): ShapeDef {
-    return { ...uke(id, name, rootString, roles), qualities: [quality], openOnly: true };
+    return { ...uke(id, name, rootString, roles), qualities, openOnly: true };
 }
 
 /**

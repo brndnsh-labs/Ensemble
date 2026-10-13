@@ -159,17 +159,56 @@ describe('triad grips (#1588)', () => {
             expect(tab(UKULELE, f)).toBe('0 0 1 3');
             expect(gripMidis(UKULELE, f)).toEqual([67, 60, 65, 72]);
         });
-        it('each open form is one chord: not moved up the neck, not lent to another quality', () => {
+        it('each open form is one root: not moved up the neck, not lent to another quality', () => {
             // Free to move or change colour they are grips nobody shows, and the costs took
             // them: F 2 0 1 3 for the book's 2 0 1 0, F♯m 2 1 2 4 for 2 1 2 0, Em 0 4 0 2 for
-            // 0 4 3 2, C♯m 1 4 4 4 for 1 1 0 4.
+            // 0 4 3 2, C♯m 1 4 4 4 for 1 1 0 4. The E and Cm forms also serve the sus chord
+            // one finger away (#1675).
             expect(offeredTo('UTFm')).toEqual(['Fm 1 0 1 3']);
-            expect(offeredTo('UTEo')).toEqual(['E 1 4 0 2']);
-            expect(offeredTo('UTCm')).toEqual(['Cm 0 3 3 3']);
+            expect(offeredTo('UTEo')).toEqual(['E 1 4 0 2', 'Esus4 2 4 0 2']);
+            expect(offeredTo('UTCm')).toEqual(['Cm 0 3 3 3', 'Csus2 0 2 3 3']);
+            expect(offeredTo('UTAs')).toEqual(['Asus2 2 4 0 2']);
+            expect(offeredTo('UPA')).toEqual(['A5 2 4 0 0']);
+            expect(offeredTo('UPE')).toEqual(['E5 4 4 0 2']);
             // The sus2 shape does move, for sus2 only: every root has it.
             const sus2 = offeredTo('UTFs');
             expect(sus2.every((s) => s.includes('sus2'))).toBe(true);
             expect(new Set(sus2.map((s) => s.split(' ')[0])).size).toBe(12);
+        });
+        // As above: the pitches come from the tuning, so each grip is shown to sound its own
+        // chord — and Esus4 and Asus2, the same three notes, the same four strings.
+        it('Esus4 and Asus2 are both 2 4 0 2, A E E B (#1675)', () => {
+            const esus4 = grip('UTEo', 'E', 'sus4');
+            const asus2 = grip('UTAs', 'A', 'sus2');
+            for (const v of [esus4, asus2]) {
+                expect(tab(UKULELE, v)).toBe('2 4 0 2');
+                expect(gripMidis(UKULELE, v)).toEqual([69, 64, 64, 71]);
+                expect(barres(v.notes)).toEqual([]);
+            }
+            expect(esus4.notes.map((n) => n.degree)).toEqual(['4', 'R', 'R', '5']);
+            expect(asus2.notes.map((n) => n.degree)).toEqual(['R', '5', '5', '2']);
+        });
+        it('Csus2 0 2 3 3 is G D G C; A5 2 4 0 0 is A E E A; E5 4 4 0 2 is B E E B (#1675)', () => {
+            const csus2 = grip('UTCm', 'C', 'sus2');
+            expect(tab(UKULELE, csus2)).toBe('0 2 3 3');
+            expect(gripMidis(UKULELE, csus2)).toEqual([67, 62, 67, 72]);
+            const a5 = grip('UPA', 'A', 'five');
+            expect(tab(UKULELE, a5)).toBe('2 4 0 0');
+            expect(gripMidis(UKULELE, a5)).toEqual([69, 64, 64, 69]);
+            const e5 = grip('UPE', 'E', 'five');
+            expect(tab(UKULELE, e5)).toBe('4 4 0 2');
+            expect(gripMidis(UKULELE, e5)).toEqual([71, 64, 64, 71]);
+        });
+        it('build gives a shape only the qualities it is taught for (#1675)', () => {
+            // It went straight to `buildAt`, so the Fm form built an F major, 2 0 1 3.
+            expect(build(UKULELE, shape(UKULELE, 'UTFm'), R('F'), 'maj')).toBeNull();
+            expect(build(UKULELE, shape(UKULELE, 'UTEo'), R('E'), 'min')).toBeNull();
+            expect(build(UKULELE, shape(UKULELE, 'UTFs'), R('F'), 'min')).toBeNull();
+            expect(build(UKULELE, shape(UKULELE, 'UTFm'), R('F'), 'min')).not.toBeNull();
+            // A shape with no list serves every quality of its kind, as before.
+            expect(tab(UKULELE, build(UKULELE, shape(UKULELE, 'UTD'), R('D'), 'sus4')!)).toBe(
+                '2 2 3 0',
+            );
         });
     });
     it('a power chord is root, 5th and octave: E5 on the 6th string is 0 2 2', () => {
@@ -892,8 +931,8 @@ describe('a ukulele chart stays in first position (#1609)', () => {
 
         it('a jazz blues in A plays every A7 as 0 1 0 0, and moves for F♯7 3 4 2 4', () => {
             // It was 2 4 3 4 throughout: F♯7 has to be 3 4 2 4, one finger from that A7, so
-            // holding the closed grip was the cheaper of the two holds. Both are inside the
-            // tolerance, and the open one is what a teacher shows (`bookGrip`).
+            // holding the closed grip was the cheaper of the two holds. The open one is what a
+            // teacher shows (`bookGrip`); since #1675 it is the only A7 on offer at the nut.
             const names = 'A7 D7 A7 A7 D7 D7 A7 F♯7 Bm7 E7 A7 F♯7 Bm7 E7';
             for (const home of NUT) {
                 expect(gripsOf(UKULELE, names, 'A7', home)).toEqual(new Set([BOOK.A7]));
@@ -906,13 +945,14 @@ describe('a ukulele chart stays in first position (#1609)', () => {
             const triads = 'B♭ F Gm Dm E♭ B♭ E♭ F';
             expect(gripsOf(UKULELE, triads, 'E♭', [1, 6])).toEqual(new Set(['0 3 3 1']));
         });
-        it('it is not sought: a symbol the plan voices one way is left as it is', () => {
-            // C♯7's book grip 1 1 1 2 has no open string, and the plan never splits it.
+        it('a chord with no open grip is left to the costs: C♯7 stays 4 5 4 4', () => {
+            // C♯7's book grip 1 1 1 2 has no open string, so nothing puts it first.
             expect(tabs(UKULELE, 'F♯maj7 C♯7 D♯m7 Bmaj7', [1, 6])[1]).toBe('4 5 4 4');
-            // C♯m7 in that canon in A: one grip, closed, beside an Amaj7 that changed.
+            // C♯m7 in that canon in A has one, 1 1 0 2, and plays it (#1675). It was
+            // 4 4 4 4: the plan voiced it one way, so the rule for a split symbol never saw it.
             expect(
                 gripsOf(UKULELE, 'Amaj7 E7 F♯m7 C♯m7 Dmaj7 Amaj7 Dmaj7 E7', 'C♯m7', [1, 6]),
-            ).toEqual(new Set(['4 4 4 4']));
+            ).toEqual(new Set(['1 1 0 2']));
         });
         it('past the tolerance the two grips stay: B♭maj7 in a canon in B♭', () => {
             // One B♭maj7 would cost 2.275, over a position shift; neither grip is open.
@@ -1055,6 +1095,260 @@ describe('a ukulele chart stays in first position (#1609)', () => {
             expect(wide).toEqual([]);
         });
     });
+    describe('a chord with a book grip plays it, whatever stands beside it (#1675)', () => {
+        it('F is 2 0 1 0 between two Cm 0 3 3 3, never the Em shape 2 5 5 3', () => {
+            // The i–IV–i vamp. It was 2 5 5 3: a fret from the Cm on three strings, so the
+            // shorter trip. `Cm F` and `Cm F G Cm` already gave 2 0 1 0.
+            const F = '2 0 1 0';
+            const CM = '0 3 3 3';
+            for (const home of NUT) {
+                for (const inst of [UKULELE, UKULELE_LOW_G]) {
+                    expect(tabs(inst, 'Cm F Cm', home)).toEqual([CM, F, CM]);
+                    expect(tabs(inst, 'Cm F Cm G', home)).toEqual([CM, F, CM, '0 2 3 2']);
+                    expect(tabs(inst, 'Cm F Cm Cm', home)).toEqual([CM, F, CM, CM]);
+                    expect(tabs(inst, 'Cm Cm F Cm', home)).toEqual([CM, CM, F, CM]);
+                    // A♭ 1 3 4 3 is its first-position grip (5 3 4 3 is for a hand at the 3rd fret).
+                    expect(tabs(inst, 'Cm F A♭ G', home)).toEqual([CM, F, '1 3 4 3', '0 2 3 2']);
+                }
+            }
+        });
+        it('a dim triad beside it does not pull C or F off the nut', () => {
+            // C was 5 4 3 3 beside Fdim and Cdim, F 2 5 5 3 beside Fdim.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'F Fdim C', home)).toEqual(['2 0 1 0', '4 5 4 2', '0 0 0 3']);
+                expect(tabs(UKULELE, 'C Fdim', home)).toEqual(['0 0 0 3', '4 5 4 2']);
+                expect(tabs(UKULELE, 'C Cdim Dm7 G7', home)).toEqual([
+                    '0 0 0 3',
+                    '5 3 2 3',
+                    '2 2 1 3',
+                    G7,
+                ]);
+            }
+        });
+        it('A7 opens at 0 1 0 0 before D7 2 2 2 3', () => {
+            // It was 2 4 3 4, one finger from the D7; with a second A7 after an E7 it was open.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'A7 D7', home)).toEqual(book('A7 D7'));
+                expect(tabs(UKULELE, 'A7 D7 E7', home)).toEqual(book('A7 D7 E7'));
+            }
+        });
+        it('E is 1 4 0 2 beside Eaug, Asus2 and G♯m', () => {
+            // It was 1 4 4 2 in all three, the Em shape as a major: the plan voiced E one way,
+            // so the rule for a split symbol had nothing to settle.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'E Eaug E6 E7 A', home)).toEqual([
+                    '1 4 0 2',
+                    '1 4 4 3',
+                    '1 1 0 2',
+                    BOOK.E7,
+                    '2 1 0 0',
+                ]);
+                // Asus2 2 4 0 2 is one finger from that E; A is the open 2 1 0 0 (it was the
+                // G shape 2 4 5 4, one finger from Asus2 2 4 5 2).
+                expect(tabs(UKULELE, 'E Asus2 A B', home)).toEqual([
+                    '1 4 0 2',
+                    '2 4 0 2',
+                    '2 1 0 0',
+                    '4 3 2 2',
+                ]);
+                expect(tabs(UKULELE, 'E G♯m A B', home)).toEqual([
+                    '1 4 0 2',
+                    '1 3 4 2',
+                    '2 1 0 0',
+                    '4 3 2 2',
+                ]);
+            }
+        });
+        it('Esus4 is 2 4 0 2 beside E 1 4 0 2; up the neck both are closed', () => {
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'E Esus4 E', home)).toEqual(['1 4 0 2', '2 4 0 2', '1 4 0 2']);
+            }
+            // In frets 2–7 the E is a closed grip, and the sus4 is that grip with one finger up.
+            expect(tabs(UKULELE, 'E Esus4 E', [2, 7])).toEqual(['4 4 4 7', '4 4 5 7', '4 4 4 7']);
+        });
+        it('alone: Esus4 and Asus2 2 4 0 2, Csus2 0 2 3 3, A5 2 4 0 0, E5 4 4 0 2', () => {
+            // They were 4 4 5 2 (both), 5 2 3 3, 2 4 5 x and 4 4 7 7 — and E5 in frets 1–6,
+            // which hold no 4 4 7 7, went to the 9th fret.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'Esus4', home)).toEqual(['2 4 0 2']);
+                expect(tabs(UKULELE, 'Asus2', home)).toEqual(['2 4 0 2']);
+                expect(tabs(UKULELE, 'Csus2', home)).toEqual(['0 2 3 3']);
+                expect(tabs(UKULELE, 'A5', home)).toEqual(['2 4 0 0']);
+                expect(tabs(UKULELE, 'E5', home)).toEqual(['4 4 0 2']);
+            }
+            expect(tabs(UKULELE, 'C Csus2 C', [1, 6])).toEqual(['0 0 0 3', '0 2 3 3', '0 0 0 3']);
+        });
+        it('every chord that has a book grip plays one, in twelve keys', () => {
+            // Plain chords beside the neighbours that used to move them: a dim, aug or sus
+            // chord, a closed 7th, the minor tonic's barre. A book grip, read off the frets
+            // alone: a string open, nothing past the 4th fret.
+            const isBook = (v: Voicing) =>
+                v.notes.length === UKULELE.strings &&
+                v.notes.some((n) => n.fret === 0) &&
+                v.notes.every((n) => n.fret <= 4);
+            const PROGRESSIONS: [number, Quality][][] = [
+                [
+                    [0, 'min'],
+                    [5, 'maj'],
+                    [0, 'min'],
+                ],
+                [
+                    [5, 'maj'],
+                    [5, 'dim'],
+                    [0, 'maj'],
+                ],
+                [
+                    [0, 'maj'],
+                    [0, 'dim'],
+                    [2, 'm7'],
+                    [7, 'dom7'],
+                ],
+                [
+                    [0, 'dom7'],
+                    [5, 'dom7'],
+                    [7, 'dom7'],
+                ],
+                [
+                    [0, 'maj'],
+                    [0, 'aug'],
+                    [0, 'six'],
+                    [0, 'dom7'],
+                    [5, 'maj'],
+                ],
+                [
+                    [0, 'maj'],
+                    [5, 'sus2'],
+                    [5, 'maj'],
+                    [7, 'maj'],
+                ],
+                [
+                    [0, 'maj'],
+                    [8, 'min'],
+                    [5, 'maj'],
+                    [7, 'maj'],
+                ],
+            ];
+            const closed: string[] = [];
+            let seen = 0;
+            for (const home of NUT) {
+                for (let tonic = 0; tonic < 12; tonic++) {
+                    for (const bars of PROGRESSIONS) {
+                        const voiced = voiceChart(
+                            bars.map(([interval, quality]) => ({
+                                root: ROOTS[(tonic + interval) % 12],
+                                quality,
+                            })),
+                            { instrument: UKULELE, home },
+                        );
+                        for (const v of voiced) {
+                            if (allPositions(UKULELE, v.root, v.quality).some(isBook)) {
+                                seen++;
+                                if (!isBook(v)) {
+                                    closed.push(`${v.symbol} ${tab(UKULELE, v)}`);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            expect(closed).toEqual([]);
+            // Not vacuous: about half the chords of these charts have such a grip.
+            expect(seen).toBeGreaterThan(300);
+        });
+        it('a chord with no open grip is still the costs’ to place: D♭ beside D♭sus2', () => {
+            // D♭ 1 1 1 4 is in every book and has no open string, so the rule does not
+            // speak: beside D♭sus2 6 3 4 4 it is the same shape, 6 5 4 4, one finger away.
+            expect(tabs(UKULELE, 'D♭ D♭sus2 D♭', [1, 6])).toEqual([
+                '6 5 4 4',
+                '6 3 4 4',
+                '6 5 4 4',
+            ]);
+        });
+        it('only in first position: in frets 2–7 A beside Asus2 stays the closed pair', () => {
+            // An open string there is the hand gone back to the nut (`atTheNut`).
+            expect(tabs(UKULELE, 'A Asus2 A', [2, 7])).toEqual(['2 4 5 4', '2 4 5 2', '2 4 5 4']);
+            expect(tabs(UKULELE, 'Cm F Cm', [2, 7])).toEqual(['5 3 3 3', '5 5 5 3', '5 3 3 3']);
+        });
+    });
+    describe('a five-fret reach is the last resort (#1675)', () => {
+        const span = (frets: string) => {
+            const fretted = frets
+                .split(' ')
+                .map(Number)
+                .filter((f) => f > 0);
+            return fretted.length ? Math.max(...fretted) - Math.min(...fretted) : 0;
+        };
+        it('the Em shape as a minor needs its open G string: Gm 7 7 6 5, B♭m 10 10 9 8', () => {
+            // They were 3 7 6 5 and 6 10 9 8, the same grips with the G string four frets
+            // below the rest. Alone the chords already took the D shape; a neighbour brought
+            // the reach in.
+            expect(tabs(UKULELE, 'Gm C D', [2, 7])).toEqual(['7 7 6 5', '5 4 3 3', '2 2 2 5']);
+            expect(tabs(UKULELE, 'Gm B♭ F Gm', [2, 7])[0]).toBe('7 7 6 5');
+            expect(tabs(UKULELE, 'B♭m G♭ D♭ A♭', [5, 10])[0]).toBe('10 10 9 8');
+            expect(tabs(UKULELE_LOW_G, 'B♭m G♭ D♭ A♭', [5, 10])[0]).toBe('10 10 9 8');
+            // Em itself is that shape on its open string, three frets wide under the fingers.
+            expect(tabs(UKULELE, 'G Em C D', [1, 6])[1]).toBe('0 4 3 2');
+            // The major form is no reach and stays: F♯ 3 6 6 4.
+            expect(tabs(UKULELE, 'F♯ B C♯', [2, 7])[0]).toBe('3 6 6 4');
+        });
+        it('Fdim is 4 5 4 2, not 1 5 4 2', () => {
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'F Fdim Gm7 C7', home)[1]).toBe('4 5 4 2');
+                expect(tabs(UKULELE, 'E Fdim F♯m B', home)[1]).toBe('4 5 4 2');
+            }
+        });
+        it('Ddim is 7 5 4 5, a fret past frets 1–6, where the window holds only 1 2 1 5', () => {
+            // The dim triad stays a triad: 1 2 1 2, the dim7 teachers play there, adds a note
+            // the symbol does not name.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'Ddim', home)).toEqual(['7 5 4 5']);
+                expect(tabs(UKULELE, 'C Ddim G', home)).toEqual(['0 0 0 3', '7 5 4 5', '0 2 3 2']);
+            }
+            // The same widening further up: E♭m in frets 2–7 held only 3 3 2 6.
+            expect(tabs(UKULELE, 'E♭m', [2, 7])).toEqual(['8 6 6 6']);
+            expect(tabs(UKULELE, 'B♭m E♭m F B♭m', [2, 7])[1]).toBe('3 3 2 1');
+        });
+        it('a grip inside the window comes first: nothing leaves it that need not', () => {
+            // Dm 2 2 1 5 had company in frets 1–6, so the window does not widen for it.
+            expect(tabs(UKULELE, 'Dm Ddim', [1, 6])[0]).toBe('2 2 1 0');
+            // C♯m 1 1 0 4 is the C shape on an open string: three frets under the fingers.
+            expect(tabs(UKULELE, 'F♯m B E C♯m', [1, 6])[3]).toBe('1 1 0 4');
+        });
+        it('no triad alone is five frets wide, in any window from the nut to frets 9–14', () => {
+            // Unlocked and in each six-fret window. Before, 28 were (the sweep over frets
+            // 1–15); what is left is Bdim in frets 10–15, where the neck ends.
+            const windows: ([number, number] | null)[] = [null];
+            for (let w = 1; w <= 9; w++) {
+                windows.push([w, w + 5]);
+            }
+            const wide: string[] = [];
+            for (const home of windows) {
+                for (const root of ROOTS) {
+                    for (const q of ['maj', 'min', 'dim', 'aug', 'sus4', 'sus2'] as Quality[]) {
+                        const [v] = voiceChart([{ root, quality: q }], {
+                            instrument: UKULELE,
+                            home,
+                        });
+                        if (span(tab(UKULELE, v)) > 3) {
+                            wide.push(`${v.symbol} ${tab(UKULELE, v)} in ${home}`);
+                        }
+                        // And never more than a fret out of the window.
+                        if (home) {
+                            for (const n of v.notes) {
+                                expect(
+                                    n.fret === 0 ||
+                                        (n.fret >= home[0] - 1 && n.fret <= home[1] + 1),
+                                    `${v.symbol} ${tab(UKULELE, v)} in ${home}`,
+                                ).toBe(true);
+                            }
+                        }
+                    }
+                }
+            }
+            expect(wide).toEqual([]);
+            expect(tabs(UKULELE, 'Bdim', [10, 15])).toEqual(['10 11 10 14']);
+        });
+    });
     it('the guitar is not touched: its triads and shells keep their own reckoning', () => {
         const guitar = (names: string, home: [number, number] | null) => tabs(GUITAR, names, home);
         // Three open strings of six are not "every string" (`handFree`): were Am x x 0 0 0 x
@@ -1148,16 +1442,24 @@ describe('a ukulele chart stays in first position (#1609)', () => {
     });
 
     describe('one grip per symbol', () => {
-        it('holds a ukulele shell: Gm7 Cm7 D7 Gm7 plays one Gm7, 0 2 1 1', () => {
-            expect(tabs(UKULELE, 'Gm7 Cm7 D7 Gm7', [1, 6])).toEqual([
-                '0 2 1 1',
-                '3 3 3 3',
-                D7,
-                '0 2 1 1',
+        it('holds a ukulele shell: B♭7 E♭7 B♭7 F7 plays one B♭7, 1 2 1 1', () => {
+            expect(tabs(UKULELE, 'B♭7 E♭7 B♭7 F7', [1, 6])).toEqual([
+                '1 2 1 1',
+                '3 3 3 4',
+                '1 2 1 1',
+                '2 3 1 3',
             ]);
-            // The plan alone starts on 3 5 3 5, level with the Cm7, and ends on the open grip.
+            // The plan alone starts on 3 5 4 5, level with the E♭7, and comes down for the F7.
+            expect(tabs(UKULELE, 'B♭7 E♭7 B♭7 F7', [1, 6], 0)).toEqual([
+                '3 5 4 5',
+                '3 3 3 4',
+                '1 2 1 1',
+                '2 3 1 3',
+            ]);
+            // Gm7 Cm7 D7 Gm7 was this test's chart, opening on 3 5 3 5 with the rule off. Gm7
+            // has an open grip, so it is 0 2 1 1 both times before the rule is asked (#1675).
             expect(tabs(UKULELE, 'Gm7 Cm7 D7 Gm7', [1, 6], 0)).toEqual([
-                '3 5 3 5',
+                '0 2 1 1',
                 '3 3 3 3',
                 D7,
                 '0 2 1 1',

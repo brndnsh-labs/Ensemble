@@ -9,10 +9,10 @@
  * window. A change to a shell cost here or in `fingering.ts` (`unaryCost`,
  * `transCost`, `handCost`, `fingerTransCost`) moves it — and for a ukulele shell, which is
  * costed and held to one grip as the ukulele triads are (`byHand`, #1609), a change to
- * `triadUnaryCost`, `triadTransCost`, `handFree`, `unifyGrips` or `bookGrip` does too; so does a change to
+ * `triadUnaryCost`, `triadTransCost`, `handFree` or `unifyGrips` does too; so does a change to
  * which grips a chord is offered (`allPositions`, a quality's `required` tones, where `buildAt`
- * puts one, what `candidates` holds back as a last resort and how far past the window it
- * looks, `inReach`), to which barre a shell may take
+ * puts one, what `candidates` puts first — a ukulele chord's `bookGrip` — or holds back as a
+ * last resort, and how far past the window it looks, `inReach`), to which barre a shell may take
  * (`fingerRules`), to which fingerings the chart plan may give a shell and what a change of
  * fingering costs it (`fingering.ts`'s `taughtAmong`, #1611, and `fingerTransCost`, #1617:
  * fingers only), and so does letting a newer rule reach a shell, which is
@@ -154,10 +154,14 @@ export function allowedShapes(
     return inst.shapes.filter(
         (sh) =>
             sh.kind === kind &&
-            (!sh.qualities || sh.qualities.includes(quality)) &&
+            taughtFor(sh, quality) &&
             (kind !== 'shell' || !rootStrings || rootStrings.includes(sh.rootString)),
     );
 }
+
+/** A shape held to some qualities (`ShapeDef.qualities`) serves only those; any other serves all. */
+const taughtFor = (shape: ShapeDef, quality: Quality): boolean =>
+    !shape.qualities || shape.qualities.includes(quality);
 
 /** Build one grip with its root at fret `r`. Returns null if any note falls off the neck. */
 export function buildAt(
@@ -309,13 +313,20 @@ export function gripMidis(inst: InstrumentDef, v: Voicing): number[] {
         .map((n) => inst.open[n.string] + n.fret);
 }
 
-/** Lowest-fret playable version of a grip. */
+/**
+ * Lowest-fret playable version of a grip, or null when the shape has none for this chord: a
+ * note off the neck, or a quality the shape is not taught for (`ShapeDef.qualities`, as
+ * `allowedShapes` reads it — the Fm form is no major chord).
+ */
 export function build(
     inst: InstrumentDef,
     shape: ShapeDef,
     root: Spelled,
     quality: Quality,
 ): Voicing | null {
+    if (!taughtFor(shape, quality)) {
+        return null;
+    }
     for (const r of rootFrets(inst, shape, root)) {
         const b = buildAt(inst, shape, root, quality, r);
         if (b) {
@@ -418,9 +429,9 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
         return triadUnaryCost(v, target, pull, home, opts.instrument);
     }
     // The out-of-window term (here and in `triadUnaryCost`) never picks a grip: `candidates` gives
-    // a chord its in-window grips, else its grips a fret's reach past the window (`inReach`),
-    // else every grip, and each of those sets is all inside or all outside, so the term adds
-    // the same to each (#1604, #1610). Nor does the wide-span
+    // a chord its in-window grips, else its grips a fret's reach past the window (`inReach`,
+    // `aFretPast`), else every grip, and each of those sets is all inside or all outside, so
+    // the term adds the same to each (#1604, #1610, #1675). Nor does the wide-span
     // term pick a shell any more: the one shell wider than three frets was a reach around an
     // open string (`openOneOff`, #1607), and without it none is on offer. It stays for a
     // shape that would be.
@@ -696,43 +707,110 @@ export const inReach = (v: Voicing, home: HomeWindow | null): boolean => {
 };
 
 /**
+ * The grip a ukulele teacher shows first (#1613, #1675): a strummed chord in first position
+ * with a string ringing open and nothing fretted past the 4th fret (`FIRST_POSITION_TOP`) —
+ * C 0-0-0-3, F 2-0-1-0, A7 0-1-0-0, E 1-4-0-2, Cm 0-3-3-3. Every such grip the shapes hold is
+ * one the method books print (each was read, over the twelve roots and every quality, for
+ * #1675); the two open-string grips that are not, Dsus2 2-2-0-5 and Fsus2 0-5-3-3, reach past
+ * the 4th fret around the open string and are left out by that.
+ *
+ * Where a chord has one, it is voiced from those alone (`candidates`). The costs cannot be
+ * left to choose: they count finger travel, and one neighbour is enough to make a closed grip
+ * the shorter trip. F between two Cm 0-3-3-3 was 2-5-5-3, the Em shape as a major chord, for
+ * sharing a fret with it; C beside Fdim 4-5-4-2 was 5-4-3-3; A7 before D7 2-2-2-3 was 2-4-3-4;
+ * E beside Eaug 1-4-4-3 was 1-4-4-2. No price on the open grip sorts them: tried as a flat
+ * credit, A7 opens beside D7 at 0.4 and F beside Fdim not until 0.8. A player does not weigh
+ * it either. They play the grip they know and move for the chord that needs it (DECISION
+ * 2026-10-12, which first said so for a symbol voiced two ways).
+ *
+ * First position only (`atTheNut`): in a window further up an open string is the hand gone
+ * back to the nut. And only a grip that strums every string (`strumsEveryString`), as with the
+ * other first-position rules of #1609: a guitar triad or power grip on open strings is one
+ * inversion among three, not the book's one grip, and a guitar shell's open string is a
+ * one-off (`openShapeOneOff`).
+ */
+const bookGrip = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
+    atTheNut(home) &&
+    strumsEveryString(v, inst) &&
+    v.notes.some((n) => n.fret === 0) &&
+    v.notes.every((n) => n.fret <= FIRST_POSITION_TOP);
+
+/**
+ * A strummed ukulele grip five frets wide (#1675): the index and the little finger four frets
+ * apart with the other two between them, on a neck where every chord has a grip of four frets
+ * or fewer. They are the minor, diminished and sus2 forms of two shapes whose major form is
+ * fine. The Em shape drops its G-string note a fret or two (Gm 3-7-6-5, Fdim 1-5-4-2), where
+ * the D shape plays the same chord with that one string up at the others (7-7-6-5, 4-5-4-2);
+ * it is a grip only where the G string is open (Em 0-4-3-2). The C shape reaches up for its top
+ * note (Ddim 1-2-1-5, E♭m 3-3-2-6); it is a grip only where strings ring open (C♯m 1-1-0-4).
+ * `spanOf` reads fretted notes alone, so both of those stay.
+ *
+ * A last resort (`candidates`), like a guitar shell's buried root: taken when nothing else is
+ * in the window or a fret past it.
+ */
+const fiveFretReach = (v: Voicing, inst: InstrumentDef): boolean =>
+    strumsEveryString(v, inst) && spanOf(v.notes.map((n) => n.fret)) > 3;
+
+/**
+ * A strummed ukulele grip no more than a fret (`REACH`) past the window (#1675): what the
+ * window widens to when all it holds is a `fiveFretReach`. Ddim in frets 1–6 is 7-5-4-5, one
+ * fret past the top, for 1-2-1-5; E♭m in frets 2–7 is 3-3-2-1 or 8-6-6-6 for 3-3-2-6. A
+ * guitar shell's reach asks for the root inside (`inReach`), because a shell is built up from
+ * its root and the window is where the roots fall. A ukulele chord has no such anchor: its
+ * root moves from string to string with the shape, so only the distance is asked.
+ */
+const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
+    home !== null &&
+    strumsEveryString(v, inst) &&
+    v.notes.every((n) => n.fret === 0 || (n.fret >= home[0] - REACH && n.fret <= home[1] + REACH));
+
+/**
  * The grips a chord is voiced from: the first of these that holds any.
  *
- * 1. Grips inside the hand window that a player would take: every one but those with a buried
- *    root (`rootBuried`) and the open-string one-offs of a fretted shape (`openShapeOneOff`).
- *    Where the window has one, nothing below is looked at.
- * 2. Such grips with the window widened by a fret, root in it (`inReach`, #1610). They are
- *    this position's grips for the chord, so they come before the awkward one inside and
+ * 1. A ukulele chord's book grips in first position (`bookGrip`, #1675): where it has one, it
+ *    is the chord, whatever stands beside it.
+ * 2. Grips inside the hand window that a player would take: every one but those with a buried
+ *    root (`rootBuried`), the open-string one-offs of a fretted shape (`openShapeOneOff`) and
+ *    a ukulele's five-fret reaches (`fiveFretReach`). Where the window has one, nothing below
+ *    is looked at.
+ * 3. Such grips with the window widened by a fret: a shell's with its root in the window
+ *    (`inReach`, #1610), a strummed ukulele chord's wherever its root is (`aFretPast`). They
+ *    are this position's grips for the chord, so they come before the awkward one inside and
  *    before a grip somewhere else on the neck (in frets 1–6, roots on the 6th and 5th strings,
  *    E♭m7♭5 is x-6-7-6-7-x, not x-6-4-6-x-5; E♭maj7, which has no grip inside at all, is
  *    x-6-5-7-x-x and not the 11th fret).
- * 3. Any grip inside the window, those two kinds included: an awkward grip in the place the
+ * 4. Any grip inside the window, those three kinds included: an awkward grip in the place the
  *    musician put the hand is still the right chord, and it beats leaving.
- * 4. Nothing near: every grip on the neck, those two kinds last, and the costs pick (they keep
- *    it close: Em7♭5 in frets 1–6 is x-7-8-7-8-x, its root one fret out and its top two).
+ * 5. Nothing near: every grip on the neck, those three kinds last, and the costs pick (they
+ *    keep it close: Em7♭5 in frets 1–6 is x-7-8-7-8-x, its root one fret out and its top two).
  *
  * So no chord goes unvoiced, and a chord whose window already holds a grip a player would take
  * is voiced exactly as if the wider window were not there. Of the shells, only a guitar's with roots
- * kept to the 6th and 5th strings ever get past the first step: with the 4th string's shapes
- * every chord has such a grip in every six-fret window, as every ukulele shell does. A triad
- * or power chord has neither a buried root nor a reach (`inReach`), so for it this is what it
- * always was: the grips inside the window, or every grip when none fits.
+ * kept to the 6th and 5th strings ever get past step 2: with the 4th string's shapes
+ * every chord has such a grip in every six-fret window, as every ukulele shell does. A guitar
+ * triad or power chord has neither a buried root nor a reach, so for it this is what it
+ * always was: the grips inside the window, or every grip when none fits. A ukulele triad gets
+ * to step 3 only where the window holds nothing but a five-fret reach, and its two power
+ * shapes where the window holds neither.
  *
- * Each step's grips are all inside the window or all outside it (step 2 is only looked at for
- * what step 1 did not find inside, and step 4 when nothing is inside at all), which is why
+ * Each step's grips are all inside the window or all outside it (step 3 is only looked at for
+ * what step 2 did not find inside, and step 5 when nothing is inside at all), which is why
  * `unaryCost`'s out-of-window term never picks between them.
  */
 function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
     const home = opts.home ?? null;
-    const all = allPositions(opts.instrument, c.root, c.quality, { rootStrings: opts.rootStrings });
+    const inst = opts.instrument;
+    const all = allPositions(inst, c.root, c.quality, { rootStrings: opts.rootStrings });
     const clear = (grips: Voicing[]) =>
         grips.filter(
-            (v) => !rootBuried(v, opts.instrument) && !openShapeOneOff(v, all, opts.instrument),
+            (v) =>
+                !rootBuried(v, inst) && !openShapeOneOff(v, all, inst) && !fiveFretReach(v, inst),
         );
     const inside = all.filter((v) => inHome(v, home));
     const tiers = [
+        () => inside.filter((v) => bookGrip(v, home, inst)),
         () => clear(inside),
-        () => clear(all.filter((v) => inReach(v, home))),
+        () => clear(all.filter((v) => inReach(v, home) || aFretPast(v, home, inst))),
         () => inside,
         () => clear(all),
     ];
@@ -781,27 +859,6 @@ const chordKey = (c: ChartChord): string => `${c.root.pc}:${c.quality}`;
 /** One of a chord's candidate grips: the shape and where its root sits. */
 const gripKey = (v: Voicing): string => `${v.shape.id}@${v.rootFret}`;
 
-/**
- * The grip a ukulele teacher shows first (#1613): a strummed chord in first position with a
- * string ringing open — A7 0-1-0-0, G7 0-2-1-2, E7 1-2-0-2. `unifyGrips` prefers it when a
- * symbol is voiced two ways and holding either costs less than a position shift
- * (`SAME_GRIP_TOLERANCE`). On cost alone the closed grip can win by standing one finger from a
- * neighbour that has no open form: a jazz blues in A played every A7 as 2-4-3-4 because its
- * F♯7 has to be 3-4-2-4. A player keeps the grip they know and moves for the one chord that
- * needs it (DECISION 2026-10-12).
- *
- * It chooses between holds the tolerance already calls close; it does not look for an open
- * grip the plan never used, and a symbol with no open form (C♯7, B♭7) is held as it was. First
- * position only (`atTheNut`): in a window further up an open string is the hand gone back to
- * the nut. And only a grip that strums every string (`strumsEveryString`), as with the other
- * first-position rules of #1609: a guitar triad or power grip on open strings is one inversion
- * among three, not the book's one grip. How high its fretted notes sit is not asked: the aim
- * at first position (`unaryCost`) already keeps a chart at the nut off such a grip, and no
- * chart tried voiced a symbol two ways with one.
- */
-const bookGrip = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
-    atTheNut(home) && strumsEveryString(v, inst) && v.notes.some((n) => n.fret === 0);
-
 interface Plan {
     path: Voicing[];
     cost: number;
@@ -824,8 +881,10 @@ interface Plan {
  * on 3-5-3-5 and closed on 0-2-1-1). A guitar shell is left out: its jazz comping moves a chord
  * between its two root strings on purpose.
  *
- * Which grip, when more than one hold is inside the tolerance: the cheapest, unless one of them
- * is the chord's book grip in first position (`bookGrip`, #1613), which is then taken.
+ * Which grip is the cheapest hold's business alone. From #1613 to #1675 a ukulele symbol in
+ * first position took the hold with an open string over a cheaper closed one; a chord that has
+ * such a grip is now offered nothing else (`bookGrip`, in `candidates`), so every hold of it is
+ * one and there is nothing left to prefer.
  */
 function unifyGrips(
     chart: ChartChord[],
@@ -833,7 +892,6 @@ function unifyGrips(
     plan: (states: Voicing[][]) => Plan,
     tolerance: number,
     inst: InstrumentDef,
-    home: HomeWindow | null,
 ): Voicing[] {
     const keys = chart.map((c, i) =>
         states[i].every((v) => byHand(v, inst)) ? chordKey(c) : null,
@@ -848,16 +906,15 @@ function unifyGrips(
         });
     let best = plan(states);
     for (;;) {
-        // The grips each undecided symbol is voiced with, how often, and one voicing of each,
-        // in chart order.
-        const used = new Map<string, Map<string, { count: number; grip: Voicing }>>();
+        // The grips each undecided symbol is voiced with, and how often, in chart order.
+        const used = new Map<string, Map<string, number>>();
         best.path.forEach((v, i) => {
             const key = keys[i];
             if (key === null || decided.has(key)) {
                 return;
             }
-            const grips = used.get(key) ?? new Map<string, { count: number; grip: Voicing }>();
-            grips.set(gripKey(v), { count: (grips.get(gripKey(v))?.count ?? 0) + 1, grip: v });
+            const grips = used.get(key) ?? new Map<string, number>();
+            grips.set(gripKey(v), (grips.get(gripKey(v)) ?? 0) + 1);
             used.set(key, grips);
         });
         const split = [...used].find(([, grips]) => grips.size > 1);
@@ -866,30 +923,20 @@ function unifyGrips(
         }
         const [key, grips] = split;
         decided.add(key);
-        const occurrences = [...grips.values()].reduce((a, b) => a + b.count, 0);
-        const base = best.cost;
+        const occurrences = [...grips.values()].reduce((a, b) => a + b, 0);
+        let pick: (Plan & { grip: string; changed: number }) | null = null;
         // Most used first, then first played (the sort is stable over the Map's insertion
         // order): on equal cost the chart keeps the shape it already plays most.
-        const holds = [...grips]
-            .sort((a, b) => b[1].count - a[1].count)
-            .map(([id, { count, grip }]) => {
-                held.set(key, id);
-                return { ...plan(holding()), id, grip, changed: occurrences - count };
-            });
-        type Hold = (typeof holds)[number];
-        const cheapest = (among: Hold[]) =>
-            among.reduce<Hold | null>(
-                (pick, h) => (!pick || h.cost < pick.cost - COST_NOISE ? h : pick),
-                null,
-            );
-        const inside = holds.filter((h) => h.cost - base < tolerance * h.changed - COST_NOISE);
-        // The cheapest hold of all decides whether the symbol is held; held, it takes the book
-        // grip when holding that is inside the tolerance too (`bookGrip`).
-        const pick = cheapest(holds);
-        if (pick && inside.includes(pick)) {
-            const kept = cheapest(inside.filter((h) => bookGrip(h.grip, home, inst))) ?? pick;
-            held.set(key, kept.id);
-            best = kept;
+        for (const [grip, count] of [...grips].sort((a, b) => b[1] - a[1])) {
+            held.set(key, grip);
+            const tried = plan(holding());
+            if (!pick || tried.cost < pick.cost - COST_NOISE) {
+                pick = { ...tried, grip, changed: occurrences - count };
+            }
+        }
+        if (pick && pick.cost - best.cost < tolerance * pick.changed - COST_NOISE) {
+            held.set(key, pick.grip);
+            best = pick;
         } else {
             held.delete(key);
         }
@@ -924,7 +971,6 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
         plan,
         opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
         opts.instrument,
-        home,
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(
