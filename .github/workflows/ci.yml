@@ -557,9 +557,10 @@ jobs:
       - name: Install v2 dependencies
         run: npm ci --prefix prototypes/v2
 
-      # Built here rather than downloaded: `v2-suite` uploads the `/v2` export, which is a
-      # different artifact. The image COPYs this prebuilt output through a named build context,
-      # so the Docker context stays hosting/web — same prebuilt-bundle shape as `api-image`.
+      # Built here rather than downloaded: `v2-suite` builds the same `/` export on every leg
+      # but uploads no export (only failure traces and shard timings). The image COPYs this
+      # prebuilt output through a named build context, so the Docker context stays hosting/web
+      # — same prebuilt-bundle shape as `api-image`.
       - name: Build the v2 static export at basePath /
         run: npm run build --prefix prototypes/v2
 
