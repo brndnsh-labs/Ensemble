@@ -7,13 +7,14 @@
  * written chords in written order, one slot per step-map entry performing chord `i`.
  */
 
-import { PPQ } from '@band/index';
+import { notePc, PPQ, parseChord } from '@band/index';
 import { TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
 import type { ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { firstVoicedSlot, neckModel, nextVoicedSlot } from '../app/use-neck-view';
-import { legacyBandChart } from './legacy-band-chart';
+import { auditionMidis } from './band-chart';
+import { legacyBandChart, legacyChordFacts } from './legacy-band-chart';
 import { load, state } from './runtime';
 import { bandForGenre } from './standards';
 import { GUITAR, voiceBandChart } from './voicings';
@@ -97,5 +98,40 @@ describe('legacyBandChart', () => {
         const chart = legacyBandChart(blocks, stepMap.slice(0, 2));
         expect(chart.chords).toHaveLength(3);
         expect(chart.slots).toHaveLength(2);
+    });
+});
+
+describe('legacyChordFacts', () => {
+    // A tap on a measure-less chart sounds `auditionMidis` of these facts, the same preview a
+    // measured chart gets. Read the chord back through the real load (`absName` is the parser's
+    // rewrite of the written symbol), then compare with the band's parse of the symbol as written.
+    const key = { tonic: notePc('C'), minor: false };
+
+    it.each([
+        ['major', 'C'],
+        ['minor seventh', 'Dm7'],
+        ['altered dominant', 'G7alt'],
+        ['sharp nine', 'G7#9'],
+        ['dominant flat nine', 'G7b9'],
+        ['slash chord', 'C/E'],
+        ['slash seventh', 'G7/B'],
+        ['suspended', 'Gsus4'],
+        ['dominant sus', 'G7sus4'],
+        ['half-diminished', 'Bm7b5'],
+    ])('a %s (%s) taps as it would on a measured chart', (_name, symbol) => {
+        load(v1Chart(symbol));
+        const facts = legacyChordFacts(state().arranger.progression[0]);
+        const heard = facts && auditionMidis(facts);
+        expect(heard).toEqual(auditionMidis(parseChord(symbol, key)!));
+        expect(heard?.length).toBeGreaterThan(2);
+    });
+
+    it('is null for a chord the band does not read', () => {
+        expect(legacyChordFacts({ absName: '???', key: 'C', keyIsMinor: false })).toBeNull();
+    });
+
+    it('reads a roman numeral as the chord it names', () => {
+        load(v1Chart('V7'));
+        expect(legacyChordFacts(state().arranger.progression[0])).toEqual(parseChord('G7', key));
     });
 });

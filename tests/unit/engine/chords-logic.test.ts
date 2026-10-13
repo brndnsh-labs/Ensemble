@@ -81,26 +81,17 @@ vi.mock('../../../public/config.js', () => ({
     },
 }));
 
-import {
-    getBestInversion,
-    getChordDetails,
-    validateProgression,
-} from '../../../public/engine/chords-engine.js';
-import { getIntervals } from '../../../public/engine/chords-styles.js';
+import { getChordDetails, validateProgression } from '../../../public/engine/chords-engine.js';
 import { getState } from '../../../public/state.js';
-import { getMidi } from '../../../public/utils.js';
 
-const { arranger, playback, bass, groove } = getState();
+const { arranger } = getState();
 
 // The chart shows this: the Roman numeral a chord is written as, bass included.
 const romanOf = (chord) => chord.display.roman.root + chord.display.roman.suffix;
 
-describe('Chords & Voicing Logic', () => {
+describe('Chord parsing and naming', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        groove.genreFeel = 'Rock';
-        bass.enabled = true;
-        playback.bandIntensity = 0.5;
     });
 
     describe('Chord Parsing (getChordDetails)', () => {
@@ -138,127 +129,6 @@ describe('Chords & Voicing Logic', () => {
             const details = getChordDetails(input);
             expect(details.quality).toBe(quality);
             expect(details.is7th).toBe(true);
-        });
-    });
-
-    describe('Interval Generation (getIntervals)', () => {
-        it('should provide spread 10ths for Rock Major', () => {
-            const intervals = getIntervals(getState(), 'major', false, 'Rock', false);
-            expect(intervals).toEqual([0, 7, 16, 19]);
-        });
-
-        it('should use rootless functional voicings for Jazz', () => {
-            groove.genreFeel = 'Jazz';
-            // maj7 -> 3, 5, 7
-            expect(getIntervals(getState(), 'maj7', true, 'Jazz', true)).toEqual([4, 7, 11]);
-            // m7 -> b3, 5, b7
-            expect(getIntervals(getState(), 'minor', true, 'Jazz', true)).toEqual([3, 7, 10]);
-            // 7 -> 3, 5, b7
-            expect(getIntervals(getState(), '7', true, 'Jazz', true)).toEqual([4, 7, 10]);
-        });
-
-        it('should thicken Jazz voicings with intensity', () => {
-            groove.genreFeel = 'Jazz';
-            // Above 0.6 (and below the 0.7 block-chord threshold) the shell takes its richer form.
-            playback.bandIntensity = 0.65;
-            // maj7: 3, 7, 9 [4, 11, 14]
-            expect(getIntervals(getState(), 'maj7', true, 'Jazz', true)).toEqual([4, 11, 14]);
-            // 7: 3, b7, 9, 13 [4, 10, 14, 21]
-            expect(getIntervals(getState(), '7', true, 'Jazz', true)).toEqual([4, 10, 14, 21]);
-        });
-
-        it('should handle altered dominants correctly', () => {
-            groove.genreFeel = 'Jazz';
-            const intervals = getIntervals(getState(), '7alt', true, 'Jazz', true);
-            // Medium jazz altered dominant: 3, b7, b9, b13 -> [4, 10, 13, 20]
-            expect(intervals).toEqual([4, 10, 13, 20]);
-        });
-
-        it('should use rootless voicings for Blues dominant chords', () => {
-            groove.genreFeel = 'Blues';
-            // Dominant 7: 3, 5, b7 [4, 7, 10]
-            expect(getIntervals(getState(), '7', true, 'Blues', true)).toEqual([4, 7, 10]);
-        });
-
-        it('should use "So What" voicing for Neo-Soul minor 7', () => {
-            groove.genreFeel = 'Neo-Soul';
-            expect(getIntervals(getState(), 'minor', true, 'Neo-Soul', true)).toEqual([
-                5, 10, 15, 19,
-            ]);
-        });
-
-        it('should NOT produce a perfect 5th for half-diminished in Rock/Pop', () => {
-            const intervals = getIntervals(getState(), 'halfdim', true, 'Rock', true);
-            expect(intervals).toContain(6); // b5
-            expect(intervals).not.toContain(7); // No natural 5
-        });
-
-        // #1315 — the test above only ran at the default intensity. 'dim' and 'halfdim'
-        // are the canonical diminished qualities (getChordDetails never emits
-        // 'dim7'/'m7b5'), and the `isAltered5` predicate that guards the intensity-based
-        // extension blocks only matched name SHAPES ('alt'/'b5'/'#5'/'aug') — so a loud
-        // band stacked a perfect 5th right next to the chord's own b5.
-        describe('#1315 — a diminished 5th is an altered 5th at every intensity', () => {
-            it.each([
-                ['Jazz', true], // a bass-space feel, bass sounding
-                ['Acoustic', false], // a rooted, non-bass-space feel
-            ])('%s never backfills a natural 5th over the b5 when loud', (feel, bassActive) => {
-                groove.genreFeel = feel;
-                for (const intensity of [0.8, 1.0]) {
-                    playback.bandIntensity = intensity;
-                    for (const [quality, is7th] of [
-                        ['dim', false],
-                        ['dim', true],
-                        ['halfdim', true],
-                    ]) {
-                        const pcs = getIntervals(getState(), quality, is7th, feel, bassActive).map(
-                            (i) => ((i % 12) + 12) % 12,
-                        );
-                        const where = `${quality} is7th=${is7th} @${intensity} in ${feel}`;
-                        expect(pcs, `${where} lost its b5`).toContain(6);
-                        expect(pcs, `${where} stacked a natural 5th on its b5`).not.toContain(7);
-                    }
-                }
-            });
-
-            it('no longer slams a b7 onto a plain diminished triad at the 0.6 colour tier', () => {
-                groove.genreFeel = 'Acoustic';
-                playback.bandIntensity = 0.65;
-                // A written dim triad is 1-b3-b5; the b7 silently made it half-diminished.
-                const pcs = getIntervals(getState(), 'dim', false, 'Acoustic', true).map(
-                    (i) => ((i % 12) + 12) % 12,
-                );
-                expect(pcs).toEqual(expect.arrayContaining([0, 3, 6]));
-                expect(pcs).not.toContain(10);
-            });
-        });
-    });
-
-    describe('Inversion & Voice Leading (getBestInversion)', () => {
-        it('should center the first chord and minimize movement thereafter', () => {
-            // C Major triad, centred on the comp's anchor (MIDI 65)
-            const voicedC = getBestInversion(60, [0, 4, 7], []);
-            expect(voicedC).toEqual([60, 64, 67]);
-
-            // Transition to F Major [5, 9, 0]
-            const voicedF = getBestInversion(65, [0, 4, 7], voicedC);
-            // Verify voice leading: the F triad stays close to the C before it.
-            const avgC = voicedC.reduce((a, b) => a + b, 0) / 3; // 63.66
-            const avgF = voicedF.reduce((a, b) => a + b, 0) / 3;
-            expect(Math.abs(avgF - avgC)).toBeLessThan(7);
-        });
-
-        it('should respect range limits and prevent overlapping with bass', () => {
-            const voicedLow = getBestInversion(36, [0, 4, 7], []);
-            const avg = voicedLow.reduce((a, b) => a + b, 0) / 3;
-            expect(avg).toBeGreaterThanOrEqual(43);
-        });
-
-        it('should maintain spread voicings as a unit', () => {
-            const intervals = [0, 7, 16, 19];
-            const voiced = getBestInversion(48, intervals, []);
-            const resultIntervals = voiced.map((n) => n - voiced[0]);
-            expect(resultIntervals).toEqual(intervals);
         });
     });
 
@@ -326,66 +196,17 @@ describe('Chords & Voicing Logic', () => {
             expect(arranger.progression[2].absName).toBe('Emaj7');
         });
 
-        it('should place slash bass notes below the upper chord voicing', () => {
+        it('names a slash chord with its bass note in the key it is written in', () => {
             arranger.sections = [
-                { id: 's1', label: 'Verse', value: 'IVmaj9/5 | III7#9', repeat: 1 },
+                { id: 's1', label: 'Verse', value: 'IVmaj9/5 | III7#9 | G7/B', repeat: 1 },
             ];
             arranger.key = 'C';
             arranger.isMinor = false;
-            groove.genreFeel = 'Neo-Soul';
 
             validateProgression(getState());
 
-            const slashChord = arranger.progression[0];
-            const voicedMidis = slashChord.freqs.map((freq) => getMidi(freq));
-
-            expect(slashChord.bassMidi % 12).toBe(7);
-            expect(Math.min(...voicedMidis)).toBe(slashChord.bassMidi);
-            expect(slashChord.bassMidi).toBeLessThan(Math.max(...voicedMidis));
-        });
-
-        it('should preserve rootless jazz guide tones when a slash bass claims one chord tone', () => {
-            arranger.sections = [{ id: 's1', label: 'Main', value: 'G7/B | Cmaj7', repeat: 1 }];
-            arranger.key = 'C';
-            arranger.isMinor = false;
-            groove.genreFeel = 'Jazz';
-            validateProgression(getState());
-
-            const slashChord = arranger.progression[0];
-            const voicedMidis = slashChord.freqs.map((freq) => getMidi(freq));
-            const voicedPitchClasses = voicedMidis.map((midi) => midi % 12);
-
-            expect(slashChord.bassMidi % 12).toBe(11); // B bass
-            expect(Math.min(...voicedMidis)).toBe(slashChord.bassMidi);
-            expect(voicedPitchClasses.filter((pc) => pc === 11)).toHaveLength(1);
-            expect(voicedPitchClasses).toContain(2); // D retained above the bass
-            expect(voicedPitchClasses).toContain(5); // F retained above the bass
-        });
-
-        it('voices each section for its effective bass override', () => {
-            bass.enabled = false;
-            groove.genreFeel = 'Jazz';
-            arranger.key = 'C';
-            arranger.isMinor = false;
-            arranger.sections = [
-                {
-                    id: 'with-bass',
-                    label: 'With Bass',
-                    value: 'Cmaj7',
-                    instruments: { bass: true },
-                },
-                {
-                    id: 'without-bass',
-                    label: 'Without Bass',
-                    value: 'Cmaj7',
-                    instruments: { bass: false },
-                },
-            ];
-
-            validateProgression(getState());
-
-            expect(arranger.progression[0].intervals).not.toContain(0);
-            expect(arranger.progression[1].intervals).toContain(0);
+            expect(arranger.progression[0].absName).toBe('Fmaj9/G');
+            expect(arranger.progression[2].absName).toBe('G7/B');
         });
     });
 
@@ -485,23 +306,12 @@ describe('Chords & Voicing Logic', () => {
             expect(arranger.progression[0].absName).not.toContain('7');
         });
 
-        it('Cadd9 intervals should be [0,4,7,14]', () => {
-            const intervals = getIntervals(getState(), 'add9', false, 'Rock', false);
-            expect(intervals).toEqual([0, 4, 7, 14]);
-        });
-
-        // #1316 → #1322. The case above passes is7th=false, which production only started
-        // doing in #1322: `getChordDetails('add9')` used to report is7th=TRUE (its "9"
-        // tripped the raw-symbol heuristic), which sent the "ENSURE 7th" backfill in to add
-        // a b7 the chart explicitly didn't write — Cadd9 sounded as a C9. #1322 derives
-        // `is7th` from the matched QUALITY, so an added tone can no longer claim a seventh;
-        // the getIntervals exclusion stays as the belt to that braces, since any direct
-        // caller can still pass is7th=true.
-        it('Cadd9 declares no seventh, and gains no b7 even if a caller claims one', () => {
+        // #1316 → #1322. `getChordDetails('add9')` used to report is7th=TRUE (its "9" tripped
+        // the raw-symbol heuristic), which sent a b7 in that the chart explicitly didn't
+        // write. #1322 derives `is7th` from the matched QUALITY, so an added tone can no longer
+        // claim a seventh.
+        it('Cadd9 declares no seventh', () => {
             expect(getChordDetails('add9').is7th).toBe(false);
-            const intervals = getIntervals(getState(), 'add9', true, 'Rock', false);
-            expect(intervals).toEqual([0, 4, 7, 14]);
-            expect(intervals.map((i) => i % 12)).not.toContain(10);
         });
     });
 
@@ -514,25 +324,6 @@ describe('Chords & Voicing Logic', () => {
             expect(getChordDetails('add2').quality).toBe('add2');
         });
 
-        it('6/9 intervals carry the 6th and 9th (1 3 5 6 9)', () => {
-            const intervals = getIntervals(getState(), '6/9', false, 'Rock', false);
-            expect(intervals).toContain(9); // major 6th
-            expect(intervals).toContain(14); // 9th
-            expect(intervals).toEqual([0, 4, 7, 9, 14]);
-        });
-
-        it('7sus4 has a perfect 4th, no 3rd, and a ♭7', () => {
-            const intervals = getIntervals(getState(), '7sus4', true, 'Rock', false);
-            expect(intervals).toContain(5); // perfect 4th
-            expect(intervals).not.toContain(4); // no major 3rd
-            expect(intervals).toContain(10); // ♭7
-        });
-
-        it('add2 carries the added 2nd', () => {
-            const intervals = getIntervals(getState(), 'add2', false, 'Rock', false);
-            expect(intervals).toContain(2); // major 2nd
-        });
-
         it('C6/9 parses end-to-end as one chord, not "C6 over a 9 bass"', () => {
             arranger.sections = [{ id: 's1', label: 'Main', value: 'C6/9', repeat: 1 }];
             arranger.key = 'C';
@@ -541,19 +332,6 @@ describe('Chords & Voicing Logic', () => {
             // The whole token is one chord — the slash is notation, not a bass split.
             expect(arranger.progression).toHaveLength(1);
             expect(arranger.progression[0].absName).toBe('C6/9');
-            // 1 3 5 6 9 — five distinct voiced pitches, no dropped/orphaned bass.
-            expect(arranger.progression[0].freqs.length).toBe(5);
-        });
-
-        it('voices a parsed chord with the plain getIntervals stack (#1424)', () => {
-            arranger.sections = [{ id: 's1', label: 'Main', value: 'I', repeat: 1 }];
-            arranger.key = 'C';
-            arranger.isMinor = false;
-            groove.genreFeel = 'Rock';
-            playback.bandIntensity = 0.5; // below every intensity-based extension tier
-            // Rock major is [0, 7, 16, 19] (getIntervals unit above); the parser adds nothing.
-            validateProgression(getState());
-            expect(arranger.progression[0].intervals).toEqual([0, 7, 16, 19]);
         });
     });
 
@@ -563,8 +341,6 @@ describe('Chords & Voicing Logic', () => {
     // are `i6 | iv6 | V7`) parsed as the MAJOR 6th quality, sounding an A natural over
     // an F minor triad.
     describe('#1317 — a lowercase numeral makes a 6th chord minor', () => {
-        const pcOf = (freq) => ((getMidi(freq) % 12) + 12) % 12;
-
         it('parses iv6 as Fm6 in C and leaves IV6 major', () => {
             arranger.sections = [{ id: 's1', label: 'Main', value: 'iv6 | IV6', repeat: 1 }];
             arranger.key = 'C';
@@ -574,17 +350,11 @@ describe('Chords & Voicing Logic', () => {
             const [minorSix, majorSix] = arranger.progression;
             expect(minorSix.quality).toBe('m6');
             expect(minorSix.absName).toBe('Fm6');
-            // #1313 — an m6 has no 7th; a true is7th here re-adds the b7 it must never carry.
-            expect(minorSix.is7th).toBe(false);
-            expect(minorSix.intervals).toEqual([0, 3, 7, 9]);
-            const voicedPcs = minorSix.freqs.map(pcOf);
-            expect(voicedPcs, 'Ab, the minor 3rd').toContain(8);
-            expect(voicedPcs, 'D, the 6th').toContain(2);
-            expect(voicedPcs, 'A natural would make it F6').not.toContain(9);
+            // #1313 — an m6 has no 7th; a true is7th re-adds the b7 it must never carry.
+            expect(getChordDetails('m6').is7th).toBe(false);
 
             expect(majorSix.quality).toBe('6');
-            expect(majorSix.absName).toBe('F6');
-            expect(majorSix.freqs.map(pcOf)).toContain(9); // A natural: IV6 is still major
+            expect(majorSix.absName).toBe('F6'); // IV6 is still major
         });
 
         it('parses the Minor Swing changes in A minor as Am6 | Dm6 | E7', () => {

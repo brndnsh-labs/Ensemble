@@ -15,13 +15,28 @@
  * `bandChart(scoreForBand(), timeline)` could not retire the step-map reader, because a chart the
  * conversion refuses still has to be drawn. Nothing the app ships is measure-less any more.
  */
-import { notePc, PPQ, parseChord } from '@band/index';
-import type { EnsembleState } from '@engine/types';
+import { type ChordFacts, notePc, PPQ, parseChord } from '@band/index';
+import type { Chord, EnsembleState } from '@engine/types';
 import type { BandChart, BandChartChord, BandSlot } from './band-chart';
 import { type ChartBlock, measureOfGlobalIndex } from './lead-sheet';
 
 /** One sixteenth in band ticks: the step map's unit. */
 const STEP_TICKS = PPQ / 4;
+
+/**
+ * A measure-less chart's chord as the band reads it: its written name, parsed in the chord's own
+ * key. Null when the band's parser refuses it. (`parseChord` reads ♭/♯ glyphs itself.) The one
+ * conversion, so what the neck follows and what a tap auditions (`auditionMidis`, as on any
+ * other chart) agree by construction.
+ */
+export function legacyChordFacts(
+    chord: Pick<Chord, 'absName' | 'key' | 'keyIsMinor'>,
+): ChordFacts | null {
+    return parseChord(chord.absName, {
+        tonic: notePc(chord.key),
+        minor: chord.keyIsMinor === true,
+    });
+}
 
 export function legacyBandChart(
     blocks: ChartBlock[],
@@ -38,12 +53,8 @@ export function legacyBandChart(
                 ...chord,
                 kind: 'chord',
                 fermata: false,
-                // Null when the band's parser refuses it: the neck leaves it unvoiced. (`parseChord`
-                // reads ♭/♯ glyphs itself.)
-                chord: parseChord(chord.absName, {
-                    tonic: notePc(chord.key),
-                    minor: chord.keyIsMinor === true,
-                }),
+                // Null when the band's parser refuses it: the neck leaves it unvoiced.
+                chord: legacyChordFacts(chord),
             },
         }));
     // Both maps come from the same progression, so they agree in length; should they ever not,

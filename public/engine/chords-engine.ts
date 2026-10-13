@@ -9,21 +9,18 @@ import {
 } from '../config.js';
 import type { Chord, Dispatch, FormattedChordNames, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
-import { getFrequency, normalizeKey } from '../utils.js';
-import { getIntervals } from './chords-styles.js';
+import { normalizeKey } from '../utils.js';
 import { spellPitchClass } from './note-spelling.js';
-import { COMP_REGISTER_FLOOR, getNearestVoiceLeadingCost } from './voicing-policy.js';
 
 const ROMAN_REGEX = /^([#b])?(III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)/;
 const NNS_REGEX = /^([#b])?([1-7])/;
 const NOTE_REGEX = /^([A-G][#b]?)/i;
 
 /**
- * Where a parsed chord's keyboard voicing is anchored (MIDI 65, the F above middle C): the
- * key's root octave and the inversion search's home register. It was the chords slice's
- * `octave` default, which nothing changed once v1's settings went (#1424).
+ * The octave a parsed chord's `rootMidi` is placed in: C4 (MIDI 60) up to B4. It is a root's
+ * identity (which pitch class, which key degree), not a voicing; the band voices the chord.
  */
-const COMP_ANCHOR_MIDI = 65;
+const ROOT_OCTAVE_MIDI = 60;
 
 /**
  * Can this text be a chord ROOT — a roman numeral, a Nashville number, or a note name?
@@ -73,40 +70,6 @@ function getAbsoluteDisplayNoteName(
     keyIsMinor: boolean = false,
 ): string {
     return spellPitchClass(pitchClass, keyContext, accidentalHint, explicitNote, keyIsMinor);
-}
-
-function ensurePitchClassAboveFloor(
-    midis: number[],
-    pitchClass: number,
-    minMidi: number,
-    maxMidi: number = 84,
-): number[] {
-    if (midis.some((midi) => midi % 12 === pitchClass)) {
-        return midis;
-    }
-
-    const targetCenter =
-        midis.length > 0 ? midis.reduce((sum, midi) => sum + midi, 0) / midis.length : minMidi + 12;
-    let bestMidi: number | null = null;
-    let bestScore = Number.POSITIVE_INFINITY;
-
-    for (let octave = -1; octave <= 8; octave++) {
-        const candidate = pitchClass + octave * 12;
-        if (candidate < minMidi || candidate > maxMidi) {
-            continue;
-        }
-        const score = Math.abs(candidate - targetCenter);
-        if (score < bestScore) {
-            bestScore = score;
-            bestMidi = candidate;
-        }
-    }
-
-    if (!Number.isFinite(bestMidi)) {
-        return midis;
-    }
-
-    return [...midis, bestMidi as number].sort((a, b) => a - b);
 }
 
 /**
@@ -430,309 +393,6 @@ export function getChordDetails(symbol: string): ChordDetails {
 }
 
 /**
- * Calculates the best inversion for a chord to maintain smooth voice leading
- * while preventing register creep using an anchored "Home Register".
- *
- * Resolves chord root midi to an absolute note, searching octaves.
- */
-interface InversionOptions {
-    isPivot?: boolean;
-    anchor?: number | null;
-    min?: number;
-    max?: number;
-    /**
-     * Opt-in jazz-style voice-leading second pass (common-tone holds + guide-tone
-     * resolution). Off by default — pocket genres want voicing stability. Production
-     * comping callers gate this on `style ∈ {Jazz, Bossa Nova, Blues}`.
-     */
-    enableVoiceLeading?: boolean;
-    /**
-     * Chord quality (e.g. 'maj7', '7b9'). Lets the m2-cluster guard (#708) exempt
-     * tension qualities whose voicing legitimately carries a half-step. When
-     * omitted, the guard treats the voicing as non-tension and de-clusters it.
-     */
-    quality?: string;
-}
-
-/** True if any two voices in the set sit a minor 2nd (1 semitone) apart. */
-function hasMinorSecondCluster(midis: number[]): boolean {
-    const sorted = [...midis].sort((a, b) => a - b);
-    for (let i = 1; i < sorted.length; i++) {
-        if (sorted[i] - sorted[i - 1] === 1) {
-            return true;
-        }
-    }
-    return false;
-}
-
-// B6 (#708) — qualities whose voicing legitimately carries an internal minor 2nd
-// as color (altered-dominant tensions: the b9 rubs the root, the #9 the major 3rd;
-// dim/halfdim carry none but are listed defensively), so the de-cluster guard
-// below leaves them alone. Everything else (maj7's root↔maj7, plain triads/7ths)
-// must NOT voice an m2 adjacent — that's an octave-fold artifact, not the chord.
-// Canonical quality strings only (`getChordDetails` emits 'dim'/'halfdim', never
-// 'dim7'/'m7b5'). maj7#11/augmaj7 are deliberately NOT exempt: their root↔maj7
-// fold must break, and spreading it also separates the #11/5 (a benign side
-// effect — the Lydian #11 color survives, just an octave from the 5).
-const M2_TOLERANT_QUALITIES = new Set(['7alt', '7b9', '7#9', '7b13', '7#11', 'dim', 'halfdim']);
-
-/**
- * B6 (#708) — break any internal minor-2nd cluster created by independent
- * per-interval octave placement (e.g. Cmaj7 folding the maj7 down next to the
- * root → B+C). Move the LOWER note of the lowest m2 pair up an octave (keeps the
- * top voice / melody); fall back to dropping the UPPER note down if up would
- * leave the register. Bounded iterations — a 3–4 note voicing resolves in ≤3.
- */
-function spreadMinorSeconds(midis: number[], min: number, max: number): number[] {
-    const v = [...midis].sort((a, b) => a - b);
-    for (let iter = 0; iter < 4; iter++) {
-        let idx = -1;
-        for (let i = 1; i < v.length; i++) {
-            if (v[i] - v[i - 1] === 1) {
-                idx = i;
-                break;
-            }
-        }
-        if (idx === -1) {
-            break;
-        }
-        const lower = v[idx - 1];
-        const upper = v[idx];
-        if (lower + 12 <= max) {
-            v[idx - 1] = lower + 12;
-        } else if (upper - 12 >= min) {
-            v[idx] = upper - 12;
-        } else {
-            break; // can't separate within the register slot
-        }
-        v.sort((a, b) => a - b);
-    }
-    return v;
-}
-
-/**
- * B7 (#708) — drop exact duplicate MIDIs before emit. The intensity≥0.8
- * `intervals.push(12)` can fold pc0 onto the root's MIDI, which would otherwise
- * schedule two oscillator banks on the same pitch (+6 dB, audible beating).
- */
-function dedupeMidis(midis: number[]): number[] {
-    const seen = new Set<number>();
-    const out: number[] = [];
-    for (const m of midis) {
-        const n = Math.round(m);
-        if (seen.has(n)) {
-            continue;
-        }
-        seen.add(n);
-        out.push(n);
-    }
-    return out;
-}
-
-export function getBestInversion(
-    rootMidi: number,
-    intervals: number[],
-    previousMidis: number[],
-    options: InversionOptions = {},
-): number[] {
-    const {
-        isPivot = false,
-        anchor = null,
-        min = 52,
-        max = 84,
-        enableVoiceLeading = false,
-        quality,
-    } = options;
-    const homeAnchor = anchor || COMP_ANCHOR_MIDI;
-
-    const registerPullWeight = 0.6;
-    const RANGE_MIN = min;
-    const RANGE_MAX = max;
-
-    let targetCenter = homeAnchor;
-    if (previousMidis && previousMidis.length > 0) {
-        // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
-        let sum = 0;
-        for (let i = 0; i < previousMidis.length; i++) {
-            sum += previousMidis[i];
-        }
-        const prevAvg = sum / previousMidis.length;
-        const drift = prevAvg - homeAnchor;
-        const driftLimit = isPivot ? 3 : 5;
-        targetCenter =
-            Math.abs(drift) > driftLimit ? prevAvg - drift * registerPullWeight : prevAvg;
-    }
-
-    // VOICING PRESERVATION: If the intervals are spread (> 12 semitones),
-    // shift the entire block as a unit to preserve the harmonic structure.
-    const isSpread = Math.max(...intervals) > 12;
-
-    let result: number[];
-    if (isSpread) {
-        let bestShift = 0;
-        let minDistance = Infinity;
-        for (let shift = -24; shift <= 24; shift += 12) {
-            // Optimization: Replace Array.prototype.reduce with a standard for loop to avoid closure overhead in hot audio path
-            let sum = 0;
-            for (let i = 0; i < intervals.length; i++) {
-                sum += intervals[i] + rootMidi + shift;
-            }
-            const currentAvg = sum / intervals.length;
-            const dist = Math.abs(currentAvg - targetCenter);
-            if (dist < minDistance) {
-                minDistance = dist;
-                bestShift = shift;
-            }
-        }
-        result = intervals.map((i: any) => rootMidi + i + bestShift).sort((a, b) => a - b);
-    } else {
-        result = [];
-        intervals.forEach((inter, i) => {
-            const note = rootMidi + inter;
-            const pc = note % 12;
-            const octaves = [-24, -12, 0, 12, 24];
-            const candidates = octaves.map((o) => Math.floor(targetCenter / 12) * 12 + o + pc);
-            candidates.sort((a, b) => Math.abs(a - targetCenter) - Math.abs(b - targetCenter));
-
-            let best = candidates[0];
-            if (i > 0 && best < RANGE_MIN) {
-                while (best - result[i - 1] < 7) {
-                    best += 12;
-                }
-            }
-            result.push(best);
-        });
-    }
-
-    // B6 (#708) — de-cluster the BASELINE here, before the voice-leading pass, so
-    // VL re-smooths the cleaned voicing rather than having a later guard undo its
-    // top-voice work. The per-interval octave placement above can fold a chord's
-    // m2 pitch-class pair adjacent (e.g. Cmaj7 root↔maj7 → B+C); spread it unless
-    // the quality legitimately carries the half-step. VL's own introduces-cluster
-    // gate then keeps the refinement clean.
-    if (!quality || !M2_TOLERANT_QUALITIES.has(quality)) {
-        result = spreadMinorSeconds(result, RANGE_MIN, RANGE_MAX);
-    }
-
-    // Voice-leading second pass: refine the per-interval register-centroid baseline
-    // by snapping each new voice toward its nearest pitch-class neighbor in
-    // `previousMidis`. why: chords.md P1 #6 — the first pass places each interval
-    // at "nearest octave to targetCenter" independently, so common tones and
-    // guide-tone partners (b7→3, 3→7) don't carry across chord changes. This pass
-    // snaps each voice to the octave of its nearest-PC prev voice; common tones
-    // (PC dist 0) collapse to the prior MIDI exactly, half-step resolutions fall
-    // out naturally. Cost-gated against the baseline so we only commit when total
-    // voice-leading motion strictly decreases.
-    //
-    // Opt-in via `enableVoiceLeading`: this is jazz-style voice leading and is
-    // appropriate for chord comping over functional progressions (ii–V–I). Pocket
-    // genres (Neo-Soul, Funk, Reggae) and harmony-line callers that own their own
-    // register intent (the old engine's harmonies.ts spectral-gap branch) want stability, not
-    // common-tone octave snaps, so the pass stays off by default. Production
-    // callers can opt in per-genre in a follow-up; the test fixture exercises the
-    // behavior directly.
-    let voiceLedResult = result;
-    if (enableVoiceLeading && previousMidis && previousMidis.length > 0) {
-        const refined = result.map((current) => {
-            const pc = ((current % 12) + 12) % 12;
-
-            // Find the previous midi nearest in pitch-class space. Pitch-class
-            // distance (mod 12, folded to [0,6]) means common tones get distance 0,
-            // 7→3 and 3→7 get distance 1, etc. — natural priority order.
-            let bestPrev = previousMidis[0];
-            let bestPcDist = Number.POSITIVE_INFINITY;
-            for (let p = 0; p < previousMidis.length; p++) {
-                const prevPc = ((previousMidis[p] % 12) + 12) % 12;
-                const raw = Math.abs(pc - prevPc);
-                const pcDist = Math.min(raw, 12 - raw);
-                if (pcDist < bestPcDist) {
-                    bestPcDist = pcDist;
-                    bestPrev = previousMidis[p];
-                }
-            }
-
-            // Snap `current` to whichever octave of its pitch class sits closest to
-            // bestPrev. For common tones this collapses to bestPrev itself; for
-            // step-wise neighbors it picks the same octave as the prior partner.
-            // Try candidates in distance order so that if the closest octave
-            // falls outside the register slot we fall back to the next-closest.
-            const prevOctaveBase = Math.floor(bestPrev / 12) * 12;
-            const candidates = [
-                prevOctaveBase - 12 + pc,
-                prevOctaveBase + pc,
-                prevOctaveBase + 12 + pc,
-            ];
-            candidates.sort((a, b) => Math.abs(a - bestPrev) - Math.abs(b - bestPrev));
-
-            for (let c = 0; c < candidates.length; c++) {
-                if (candidates[c] >= RANGE_MIN && candidates[c] <= RANGE_MAX) {
-                    return candidates[c];
-                }
-            }
-            return current;
-        });
-
-        const baselineCost = getNearestVoiceLeadingCost(result, previousMidis);
-        const refinedCost = getNearestVoiceLeadingCost(refined, previousMidis);
-        // Pocket-preservation gate: getNearestVoiceLeadingCost doesn't enforce a
-        // one-to-one match between new and prev voices, so it can reward "all new
-        // voices crowd around a single prev voice" — which
-        // is how a greedy nearest-PC snap can ratchet a comping pattern down
-        // toward the bass floor across a long progression. Require the refined
-        // centroid to stay within a perfect fourth (5 semitones) of homeAnchor
-        // so common-tone holds and step-wise resolutions can still commit but
-        // a register slide can't. ANCHOR-relative (not baseline-relative) because
-        // the goal is to keep voicings IN the comping pocket the caller asked for,
-        // not just close to whatever the first pass happened to produce.
-        const MAX_REFINED_CENTROID_DRIFT = 5;
-        let refinedSum = 0;
-        for (let i = 0; i < refined.length; i++) {
-            refinedSum += refined[i];
-        }
-        const refinedCentroid = refinedSum / refined.length;
-        const refinedAnchorDrift = Math.abs(refinedCentroid - homeAnchor);
-        // why: #702 — the nearest-PC snap can pull an upper extension down a full
-        // octave onto a common-tone position a half-step from a chord tone that
-        // stayed put (the F7 13th D snapping to D4, a minor 2nd from the b7 Eb),
-        // manufacturing an internal m2 cluster in the comp at a chord change — the
-        // "wrong note from the organ on the IV7" report. The clean baseline spread
-        // keeps the 13 an octave up, so reject any refinement that INTRODUCES a
-        // minor 2nd the baseline didn't have and keep the baseline.
-        //
-        // Presence-based (not count-based): assumes the baseline spread is itself
-        // cluster-free, which holds for every VL-genre quality (the register-
-        // centroid spread always separates a chord's m2 pitch-class pairs by an
-        // octave). If the baseline ever carried a cluster, a refinement adding a
-        // *second, different* one could slip through — not reachable in practice.
-        const introducesCluster = hasMinorSecondCluster(refined) && !hasMinorSecondCluster(result);
-        if (
-            refinedCost < baselineCost &&
-            refinedAnchorDrift <= MAX_REFINED_CENTROID_DRIFT &&
-            !introducesCluster
-        ) {
-            voiceLedResult = refined;
-        }
-    }
-
-    let finalResult = voiceLedResult;
-    const minNote = Math.min(...finalResult);
-    if (minNote < RANGE_MIN) {
-        finalResult = finalResult.map((n) => n + 12);
-    }
-    const maxNote = Math.max(...finalResult);
-    if (maxNote > RANGE_MAX) {
-        finalResult = finalResult.map((n) => n - 12);
-    }
-
-    // B7 (#708) — drop exact duplicate MIDIs after all register placement. The
-    // VL snap or the intensity≥0.8 octave-double can collapse two voices onto one
-    // pitch; emitting both schedules two oscillator banks on it (+6 dB beating).
-    finalResult = dedupeMidis(finalResult);
-
-    return finalResult.sort((a, b) => a - b);
-}
-
-/**
  * Resolves the root midi and base representations from a chord string.
  */
 function resolveChordRoot(
@@ -1051,21 +711,16 @@ export function getFormattedChordNames(
  * Parses a single progression string part (e.g., from one section).
  */
 function parseProgressionPart(
-    state: any,
     input: string,
     key: string,
     timeSignature: string,
-    initialMidis: number[],
     keyIsMinor: boolean = false,
-    bassActive = Boolean(state.bass?.enabled),
-): { chords: Chord[]; finalMidis: number[] } {
-    const { groove } = state;
+): Chord[] {
     const parsed: Chord[] = [];
-    const baseOctave = Math.floor(COMP_ANCHOR_MIDI / 12) * 12;
+    const baseOctave = ROOT_OCTAVE_MIDI;
     const keyRootMidi = baseOctave + KEY_ORDER.indexOf(normalizeKey(key));
 
     const barParts = input.split(/(\|)/);
-    let lastMidis = initialMidis || [];
 
     barParts.forEach((barOrPipe) => {
         if (barOrPipe === '|') {
@@ -1105,13 +760,12 @@ function parseProgressionPart(
                 );
 
                 // Handle slash bass if present
-                let bassMidi: number | null = null;
                 let bassNameAbs: string | null = null,
                     bassNameNNS: string | null = null,
                     bassNameRom: string | null = null;
                 if (bassPart) {
                     const resolvedBass = resolveChordRoot(bassPart, keyRootMidi, baseOctave);
-                    bassMidi = resolvedBass.rootMidi;
+                    const bassMidi = resolvedBass.rootMidi;
 
                     const bassInterval = (bassMidi - keyRootMidi + 24) % 12;
                     const bassAccidentalHint =
@@ -1195,47 +849,6 @@ function parseProgressionPart(
                     }
                 }
 
-                const intervals = getIntervals(state, quality, is7th, groove.genreFeel, bassActive);
-                // Reduce mud: keep the comping pocket above the bass register.
-                const pianoMin = COMP_REGISTER_FLOOR;
-                const isPivot = parsed.length === 0;
-                // why: chords.md P1 #6 / Epic 11 S6(a) — functional comping genres
-                // (Jazz, Bossa, Blues) are built on guide-tone lines and common-tone
-                // holds across ii–V–I motion, so the voice-leading second pass is
-                // idiomatic there. Pocket genres (Funk/Neo-Soul/Reggae/Rock) want
-                // voicing stability and keep the pass off. genreFeel is the canonical
-                // genre key ('Bossa Nova', not 'Bossa').
-                const vlGenre = groove.genreFeel;
-                const enableVoiceLeading =
-                    vlGenre === 'Jazz' || vlGenre === 'Bossa Nova' || vlGenre === 'Blues';
-                let currentMidis = getBestInversion(rootMidi, intervals, lastMidis, {
-                    isPivot,
-                    anchor: COMP_ANCHOR_MIDI,
-                    min: pianoMin,
-                    max: 84,
-                    enableVoiceLeading,
-                    quality,
-                });
-                if (bassMidi !== null) {
-                    currentMidis = ensurePitchClassAboveFloor(
-                        currentMidis,
-                        rootMidi % 12,
-                        pianoMin,
-                        84,
-                    );
-                    while (bassMidi >= currentMidis[0]) {
-                        bassMidi -= 12;
-                    }
-                    const bassPC = bassMidi % 12;
-                    const filtered = currentMidis.filter((m: any) => m % 12 !== bassPC);
-                    if (filtered.length > 0) {
-                        currentMidis = filtered;
-                    }
-                    currentMidis.unshift(bassMidi);
-                    currentMidis.sort((a, b) => a - b);
-                }
-                lastMidis = currentMidis;
-
                 const interval = (rootMidi - keyRootMidi + 24) % 12;
                 const rootNNS = (INTERVAL_TO_NNS as Record<number, string>)[interval];
                 const displayRomanBase = romanMatch
@@ -1277,36 +890,12 @@ function parseProgressionPart(
                     formatted.roman.bass = bassNameRom ?? undefined;
                 }
 
-                const isMinor =
-                    quality === 'minor' ||
-                    quality === 'dim' ||
-                    quality === 'halfdim' ||
-                    quality === 'm9' ||
-                    quality === 'm11' ||
-                    quality === 'm13' ||
-                    quality === 'm6' ||
-                    // #1321/#1322 — both are minor-triad chords; the flag drives minor-key
-                    // display and the UI's major/minor colouring.
-                    quality === 'mMaj7' ||
-                    quality === 'madd9' ||
-                    // #1336/#1340 — same again: a raised 5th or an added b6 sits on a
-                    // MINOR triad. These rendered a lowercase numeral while this flag
-                    // still coloured them major.
-                    quality === 'm#5' ||
-                    quality === 'm7#5' ||
-                    quality === 'mb6';
-
                 parsed.push({
                     absName: finalAbsName,
                     display: formatted,
-                    isMinor: isMinor,
                     beats: beatsPerChord,
-                    freqs: currentMidis.map(getFrequency),
                     rootMidi: rootMidi,
-                    bassMidi: bassMidi,
-                    intervals: intervals,
                     quality: quality,
-                    is7th: is7th,
                     timeSignature: timeSignature,
                     key: key,
                 });
@@ -1314,7 +903,7 @@ function parseProgressionPart(
         });
     });
 
-    return { chords: parsed, finalMidis: lastMidis };
+    return parsed;
 }
 
 /**
@@ -1323,7 +912,6 @@ function parseProgressionPart(
 export function validateProgression(state: any, dispatch?: Dispatch): void {
     const { arranger } = state;
     let allChords: Chord[] = [];
-    let lastMidis: number[] = [];
 
     arranger.sections.forEach((section: any) => {
         try {
@@ -1332,20 +920,13 @@ export function validateProgression(state: any, dispatch?: Dispatch): void {
             const sectionTS = section.timeSignature || arranger.timeSignature;
             const sectionIsMinor =
                 typeof section.isMinor === 'boolean' ? section.isMinor : arranger.isMinor;
-            const sectionBassActive =
-                typeof section.instruments?.bass === 'boolean'
-                    ? section.instruments.bass
-                    : Boolean(state.bass?.enabled);
 
             for (let r = 0; r < repeats; r++) {
-                const { chords, finalMidis } = parseProgressionPart(
-                    state,
+                const chords = parseProgressionPart(
                     section.value,
                     sectionKey,
                     sectionTS,
-                    lastMidis,
                     sectionIsMinor,
-                    sectionBassActive,
                 );
                 const taggedChords = chords.map((c, idx) => ({
                     ...c,
@@ -1356,7 +937,6 @@ export function validateProgression(state: any, dispatch?: Dispatch): void {
                     repeatIndex: r,
                 }));
                 allChords = allChords.concat(taggedChords);
-                lastMidis = finalMidis;
             }
         } catch (e) {
             console.error(`[Arranger] Error parsing section "${section.label}":`, e);
