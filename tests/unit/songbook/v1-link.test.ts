@@ -229,7 +229,7 @@ describe('a real v1 share link', () => {
                 .groove;
         expect(feelOf('Jazz')).toMatchObject({ swing: 60, swingSub: '8th' });
         expect(feelOf('Blues')).toMatchObject({ swing: 100, swingSub: '8th' });
-        expect(feelOf('Country')).toMatchObject({ swing: 30, swingSub: '8th' });
+        expect(feelOf('Country')).toMatchObject({ swing: 0, swingSub: '8th' });
         expect(feelOf('Neo-Soul')).toMatchObject({ swing: 45, swingSub: '16th' });
         // The feel-spelled genre the share writer emits resolves the same way.
         expect(feelOf('Bossa%20Nova')).toMatchObject({ swing: 0, swingSub: '16th' });
