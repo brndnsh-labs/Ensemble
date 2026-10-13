@@ -473,9 +473,11 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
 
     it('a 3rd that stays a 3rd a semitone away is no change of job either', () => {
         // Am x 3 2 2 x x to A♭ x 3 1 1 x x: C is the minor 3rd of one and the major 3rd of the
-        // other. "The 3rd becomes the 3rd" is nothing a teacher says.
+        // other. "The 3rd becomes the 3rd" is nothing a teacher says. No finger stays on it:
+        // A♭ is the barre 3-1-1 (#1617), not 2-1-1 with the middle finger two frets from the
+        // index, so the note is named and the ring finger takes it.
         expect(lines(['Am', 'Ab'], guitar(null))[0]).toBe(
-            'Finger 2 stays down; finger 1 slides down 1 fret.',
+            'C stays; re-finger it with 3; finger 1 slides down 1 fret.',
         );
     });
 

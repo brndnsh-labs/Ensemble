@@ -156,8 +156,9 @@ const grid = (
 // root-first rule without the margin's help (only the 6th-string °7 below the 4th fret); a
 // finger swapped on its string; and the minor 7th's position fingering, 3-1-4, which in practice a
 // neighbouring triad gives a reason for — no chart here mixes shells with triads, so the
-// pass that keeps a triad's fingers beside a shell is not seen either. Letting 3-1-4 in with
-// no reason turns 17 red, and with any fingering of the neighbour for a reason 2.
+// pass that kept a triad's fingers beside a shell (gone in #1617) was not seen either.
+// Letting 3-1-4 in with no reason turns 17 red, and with any fingering of the neighbour for a
+// reason 2.
 //
 // The last 1 (#1613) is for the book grip a split symbol is held to (`unifyGrips`, `bookGrip`):
 // a ukulele `canon` in A at frets 1–6, whose Amaj7 the plan voices as 1-1-0-0 and as 2-4-4-4.
@@ -165,6 +166,21 @@ const grid = (
 // the 369 before it met the rule (in C, F♯ and B♭ no symbol is split between an open grip and
 // a cheaper closed one), so #1613 moved none of them, and with the rule off this chart alone
 // turns red. #1613's triad forms (`UKE_OPEN_FORMS`) are no shell's, and no chart here sees them.
+//
+// #1617 added no chart and moved no grip: it changed FINGERS on 265 chords in 150 of the 370
+// charts (263 on guitar, 2 on the ukulele), every shape, root fret, string, fret, degree and
+// role as it was. A change of fingering now costs only the notes that change finger
+// (`fingering.ts`'s `fingerTransCost`): the charge for a finger's travel is gone, and with it
+// every second fingering no held note explains. Before, 45 grips here took two fingerings in
+// one chart, off their default 58 times and 48 of those keeping no note; now 12 do, 14 times,
+// each keeping one. All but
+// four of the 55 distinct changes are a second fingering going back to the grip's default
+// (B♭7 x-1-x-1-3-x 1-2-4 to 1-2-3, Gm7 3-x-3-3-x-x 2-3-4 to 1-2-3); the four take a second
+// one to keep a note (C7 x-3-x-3-5-x 1-2-4 after C6, the little finger staying). Putting the
+// travel back turns 150 charts red. Capped at a lift and a place it turns none red here: what
+// the cap leaves is a barre chosen over a fingertip each by the count of fingers, and no
+// shell chart has one. `engine.test.ts` holds that, and #1617's triad rules, which no chart
+// here sees either.
 //
 // So add charts freely, after the ones here, so the fixture's diff is additions only; measure
 // before dropping one (45 of the 436 mutations tried are caught by exactly one chart).
