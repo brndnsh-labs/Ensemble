@@ -17,6 +17,7 @@
 import {
     type BandEvent,
     type BandSettings,
+    barAtTick,
     compileTimeline,
     type DrumPiece,
     type PassMemory,
@@ -164,6 +165,26 @@ export function bandEventLevel(event: BandEvent): { level: number; levelScale?: 
 }
 
 /**
+ * How many of the pitched lanes (bass, comp, lead) the section playing at `tick` has: the
+ * lanes switched on, less any the section's own `instruments` mutes (`SectionVisit.lanes`).
+ * It is the band's rule for a section's lanes (`planBars` in `band/arrange/plan.ts`: lane power
+ * AND the visit not muting it; a bar's own layouts, a trade or a drum break, are not counted),
+ * read from the same timeline the band performed, so the cymbal
+ * trim (`getCymbalMixScale`) follows the section that is playing and never re-derives it from
+ * the arranger's step maps. A tick outside every bar (none is expected) falls back to the
+ * switched-on lanes, the rule for a hit with no section (`enabledLayerCount`).
+ */
+export function soundingLayers(state: EnsembleState, timeline: Timeline, tick: number): number {
+    // Runs for every drum hit, so no objects are built here.
+    const lanes = barAtTick(timeline, tick)?.visit.lanes;
+    return (
+        (state.bass?.enabled && lanes?.bass !== false ? 1 : 0) +
+        (state.chords?.enabled && lanes?.comp !== false ? 1 : 0) +
+        (state.soloist?.enabled && lanes?.lead !== false ? 1 : 0)
+    );
+}
+
+/**
  * Turns one `BandEvent` into sound through today's voices and sample packs — the single
  * place both the live host (`BandHost.sound` below) and the offline render
  * (`renderBandPasses` in `prototypes/v2/lib/band-export.ts`, behind the WAV/stem export and
@@ -180,11 +201,18 @@ export function playBandEvent(
     time: number,
     durationSeconds: number,
     chordSize: number,
+    timeline: Timeline,
     legato = false,
 ): void {
     const { level } = bandEventLevel(event);
     if (event.lane === 'drums') {
-        playDrumSound(state, DRUM_NAMES[event.piece], time, level);
+        playDrumSound(
+            state,
+            DRUM_NAMES[event.piece],
+            time,
+            level,
+            soundingLayers(state, timeline, event.tick),
+        );
         return;
     }
     if (event.lane === 'bass') {
@@ -553,24 +581,7 @@ export class BandHost {
 
     /** The performed bar `tick` falls in, or null past either end of the timeline. */
     private barContaining(tick: number): Timeline['bars'][number] | null {
-        const bars = this.timeline?.bars;
-        if (!bars?.length) {
-            return null;
-        }
-        let lo = 0;
-        let hi = bars.length - 1;
-        while (lo <= hi) {
-            const mid = (lo + hi) >> 1;
-            const bar = bars[mid];
-            if (tick < bar.start) {
-                hi = mid - 1;
-            } else if (tick >= bar.start + bar.meter.barTicks) {
-                lo = mid + 1;
-            } else {
-                return bar;
-            }
-        }
-        return null;
+        return this.timeline ? barAtTick(this.timeline, tick) : null;
     }
 
     /**
@@ -831,6 +842,7 @@ export class BandHost {
             time,
             durationSeconds,
             segment.chordSizes.get(event.tick) ?? 1,
+            this.timeline!,
             segment.legato.has(event),
         );
     }

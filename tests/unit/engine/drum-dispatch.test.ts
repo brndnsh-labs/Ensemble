@@ -221,6 +221,8 @@ type Scenario = {
     voice?: string;
     packKeys?: string[];
     noAudio?: boolean;
+    /** The lane count handed to the hit (the cymbal trim's input); omitted, the voice's default. */
+    layers?: number;
     /** Extra hits played on the same context after the first, in order. */
     after?: Array<string | undefined>;
 };
@@ -282,7 +284,9 @@ async function record(scenario: Scenario): Promise<string[]> {
                 // A time already past: the 2 ms guard against the context clock decides.
                 return [name as string, 9, 0.8];
             default:
-                return [name as string, time, 0.8];
+                return scenario.layers === undefined
+                    ? [name as string, time, 0.8]
+                    : [name as string, time, 0.8, scenario.layers];
         }
     };
 
@@ -347,6 +351,24 @@ describe('drum dispatcher', () => {
             }
         }
         await expect(out).toMatchFileSnapshot('./__snapshots__/drum-dispatch-variants.txt');
+    });
+
+    it('hands the lane count to every cymbal voice, and to no other', async () => {
+        // The cymbal trim (#1637) reads the count the hit is given. The state here switches two
+        // pitched lanes on, so leaving it out is the same as handing over 2; handing over a
+        // different count must change the cymbals' gain, and the kick's not at all.
+        for (const name of ['HiHat', 'Open', 'HiHatPedal', 'Ride', 'Crash']) {
+            const left = await record({ name, variant: 'normal' });
+            const two = await record({ name, variant: 'normal', layers: 2 });
+            const none = await record({ name, variant: 'normal', layers: 0 });
+            const three = await record({ name, variant: 'normal', layers: 3 });
+            expect(two, name).toEqual(left);
+            expect(none, name).not.toEqual(left);
+            expect(three, name).not.toEqual(left);
+            expect(three, name).not.toEqual(none);
+        }
+        const kick = await record({ name: 'Kick', variant: 'normal' });
+        expect(await record({ name: 'Kick', variant: 'normal', layers: 0 })).toEqual(kick);
     });
 
     it('performs the recorded side effects on a sample kit, with synth fall-through', async () => {

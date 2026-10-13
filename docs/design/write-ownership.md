@@ -97,8 +97,9 @@ no race to lose.
   targeting (`conductor.ts`). The conductor reads a section's authored override to decide how
   hard to close the gap toward it; it never writes the override back. Its only UI writer, v1's
   section-intensity slider, is gone; a value arrives with a loaded chart, i.e. user intent.
-- **`isInstrumentActiveAtStep`** (`engine/section-overrides.ts`) — the single authority the
-  generation paths called to decide whether a lane sounds on a given step. It layers a
+- **`isInstrumentActiveAtStep`** (`engine/section-overrides.ts`, deleted in #1637: the band's
+  `planBars` decides who plays, and the host hands the cymbal trim the section's lane count) —
+  the single authority the generation paths called to decide whether a lane sounds on a given step. It layers a
   per-section override (and, from #1062 until #1424, the soloist trade block's `tradeSilenced`)
   over the slice's own `enabled` — composed inside this one function, at read time. No caller
   ever needs to know the field is layered; no writer ever touches `enabled` to express the

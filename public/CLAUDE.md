@@ -18,7 +18,7 @@ top-level field as `document`/`preferences`/`runtime-derived` for persistence �
 `docs/design/write-ownership.md`, that classification doubles as a write rule: a `document`/
 `preferences` field is written only by UI dispatch or hydration, never by a runtime system
 (the old engine's conductor, trade block and worker did exactly this; they are gone, #1404, and the next runtime system sets the precedent). See that doc's read-time composition precedent
-(`isInstrumentActiveAtStep`) and its retired violations (§5) before adding a new dispatch site
+(`isInstrumentActiveAtStep`, deleted in #1637; the example stands) and its retired violations (§5) before adding a new dispatch site
 that touches an existing document field from a runtime path.
 
 ## The generic `SET_PARAM` write

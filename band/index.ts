@@ -17,7 +17,7 @@ export type {
 } from './core/types.js';
 export { DEFAULT_SETTINGS, LANES, PPQ } from './core/types.js';
 export type { Bar, Timeline } from './form/timeline.js';
-export { compileTimeline, secondsAt } from './form/timeline.js';
+export { barAtTick, compileTimeline, secondsAt } from './form/timeline.js';
 export type { PassMemory, PassResult } from './perform.js';
 export { performPass } from './perform.js';
 export { LEAD_INSTRUMENTS } from './players/lead/instruments.js';

@@ -93,6 +93,7 @@ vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) =>
 
 import { registerPackBuffer } from '../../../public/engine/instrument-registry.js';
 import {
+    enabledLayerCount,
     getCymbalMixScale,
     getCymbalVoiceConfig,
     getKickVoiceConfig,
@@ -441,8 +442,8 @@ describe('Drum Synthesis', () => {
             soloist: makeSoloistMock({ enabled: false }),
         };
 
-        expect(getCymbalMixScale(jazzState, 'Ride')).toBeGreaterThan(
-            getCymbalMixScale(rockState, 'Ride'),
+        expect(getCymbalMixScale(jazzState, 'Ride', enabledLayerCount(jazzState))).toBeGreaterThan(
+            getCymbalMixScale(rockState, 'Ride', enabledLayerCount(rockState)),
         );
         expect(getCymbalVoiceConfig('Ride', 0.85, 0.35).decayTime).toBeGreaterThan(1.4);
     });
@@ -460,8 +461,10 @@ describe('Drum Synthesis', () => {
 
         expect(ride).not.toBeNull();
         expect(crash).not.toBeNull();
-        expect(crash.volumeScale * getCymbalMixScale(jazzState, 'Crash')).toBeGreaterThan(
-            ride.volumeScale * getCymbalMixScale(jazzState, 'Ride'),
+        expect(
+            crash.volumeScale * getCymbalMixScale(jazzState, 'Crash', enabledLayerCount(jazzState)),
+        ).toBeGreaterThan(
+            ride.volumeScale * getCymbalMixScale(jazzState, 'Ride', enabledLayerCount(jazzState)),
         );
         expect(crash.bandpassFreq).toBeLessThan(ride.bandpassFreq);
     });
@@ -480,52 +483,54 @@ describe('Drum Synthesis', () => {
             soloist: makeSoloistMock({ enabled: true }),
         };
 
-        expect(getCymbalMixScale(fullBandState, 'Crash')).toBeLessThan(
-            getCymbalMixScale(sparseState, 'Crash'),
-        );
-        expect(getCymbalMixScale(fullBandState, 'Open')).toBeLessThan(
-            getCymbalMixScale(sparseState, 'HiHat'),
-        );
+        expect(
+            getCymbalMixScale(fullBandState, 'Crash', enabledLayerCount(fullBandState)),
+        ).toBeLessThan(getCymbalMixScale(sparseState, 'Crash', enabledLayerCount(sparseState)));
+        expect(
+            getCymbalMixScale(fullBandState, 'Open', enabledLayerCount(fullBandState)),
+        ).toBeLessThan(getCymbalMixScale(sparseState, 'HiHat', enabledLayerCount(sparseState)));
     });
 
-    it('mixes cymbals from per-section participation, not global lane flags', () => {
-        const sections = [
-            {
-                id: 'full',
-                instruments: { bass: true, chords: true, soloist: true },
-            },
-            {
-                id: 'sparse',
-                instruments: { bass: false, chords: false, soloist: false },
-            },
-        ];
-        const arranger = {
-            totalSteps: 32,
-            sections,
-            sectionMap: [
-                { id: 'full', start: 0, end: 16 },
-                { id: 'sparse', start: 16, end: 32 },
-            ],
-        };
-        const forcedFullState = {
+    it('trims by the lane count it is handed, one lane at a time', () => {
+        const state = {
             playback: { bandIntensity: 0.7 },
-            arranger,
+            // Every lane off: the trim reads only the count handed in.
             bass: { enabled: false },
             chords: { enabled: false },
             soloist: makeSoloistMock({ enabled: false }),
         };
-        const forcedSparseState = {
+
+        const byLayers = [0, 1, 2, 3].map((n) => getCymbalMixScale(state, 'Crash', n));
+
+        expect(byLayers[1]).toBeLessThan(byLayers[0]);
+        expect(byLayers[2]).toBeLessThan(byLayers[1]);
+        expect(byLayers[3]).toBeLessThan(byLayers[2]);
+    });
+
+    it('falls back to the switched-on lanes for a count that is not a number', () => {
+        const state = {
             playback: { bandIntensity: 0.7 },
-            arranger,
             bass: { enabled: true },
             chords: { enabled: true },
-            soloist: makeSoloistMock({ enabled: true }),
+            soloist: makeSoloistMock({ enabled: false }),
         };
 
-        const crowded = getCymbalMixScale(forcedFullState, 'Crash', 0);
-        const sparse = getCymbalMixScale(forcedSparseState, 'Crash', 16);
+        expect(getCymbalMixScale(state, 'Crash', Number.NaN)).toBe(
+            getCymbalMixScale(state, 'Crash', 2),
+        );
+    });
 
-        expect(crowded).toBeLessThan(sparse);
+    it('counts the switched-on pitched lanes when no section says otherwise', () => {
+        const state = (bass: boolean, chords: boolean, soloist: boolean) => ({
+            bass: { enabled: bass },
+            chords: { enabled: chords },
+            soloist: makeSoloistMock({ enabled: soloist }),
+        });
+
+        expect(enabledLayerCount(state(false, false, false))).toBe(0);
+        expect(enabledLayerCount(state(true, false, false))).toBe(1);
+        expect(enabledLayerCount(state(true, true, false))).toBe(2);
+        expect(enabledLayerCount(state(true, true, true))).toBe(3);
     });
 
     it('should keep ride and crash present even in crowded high-intensity sections', () => {
@@ -536,8 +541,12 @@ describe('Drum Synthesis', () => {
             soloist: makeSoloistMock({ enabled: true }),
         };
 
-        expect(getCymbalMixScale(fullBandState, 'Ride')).toBeGreaterThan(0.74);
-        expect(getCymbalMixScale(fullBandState, 'Crash')).toBeGreaterThan(0.63);
+        expect(
+            getCymbalMixScale(fullBandState, 'Ride', enabledLayerCount(fullBandState)),
+        ).toBeGreaterThan(0.74);
+        expect(
+            getCymbalMixScale(fullBandState, 'Crash', enabledLayerCount(fullBandState)),
+        ).toBeGreaterThan(0.63);
     });
 
     it('should choke previous crash wash when a new crash starts', () => {

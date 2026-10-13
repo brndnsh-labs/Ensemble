@@ -15,7 +15,6 @@ import {
     releaseSampledVoices,
     type SampleVoiceHandle,
 } from './sample-voice.js';
-import { isInstrumentActiveAtStep } from './section-overrides.js';
 import {
     createSimplePanner,
     duckGain,
@@ -647,28 +646,26 @@ function noiseOffset(): number {
     return Math.random() * NOISE_BUFFER_SECONDS;
 }
 
-function getBandLayerCount(state: EnsembleState, step: number): number {
-    let layers = 0;
-    if (isInstrumentActiveAtStep(state, 'bass', step)) {
-        layers++;
-    }
-    if (isInstrumentActiveAtStep(state, 'chords', step)) {
-        layers++;
-    }
-    if (isInstrumentActiveAtStep(state, 'soloist', step)) {
-        layers++;
-    }
-    return layers;
+/**
+ * The pitched lanes (bass, chords, soloist) the cymbal trim counts when no performance says
+ * otherwise: the ones switched on. This is the one rule for a hit with no section behind it (a
+ * preview, a test); a band hit is handed the count of the lanes its own section sounds
+ * (`soundingLayers` in `prototypes/v2/lib/band-host.ts`).
+ */
+export function enabledLayerCount(state: EnsembleState): number {
+    return [state.bass, state.chords, state.soloist].filter((lane) => lane?.enabled).length;
 }
 
 /**
- * Keep cymbals supportive when the full arrangement is active.
+ * Keep cymbals supportive when the full arrangement is active. `layers` is how many pitched
+ * lanes are sounding at the hit (0-3).
  */
-export function getCymbalMixScale(state: EnsembleState, name: CymbalName, step = 0): number {
+export function getCymbalMixScale(state: EnsembleState, name: CymbalName, layers: number): number {
     const bandIntensity = clamp01(state.playback?.bandIntensity ?? 0.5);
     // Over 4, the lane count before the harmony lane went (#1436): kept so the cymbal mix
     // for today's three pitched lanes is unchanged.
-    const crowding = getBandLayerCount(state, step) / 4;
+    // A count that is not a number must not reach a gain: fall back to the switched-on lanes.
+    const crowding = (Number.isFinite(layers) ? layers : enabledLayerCount(state)) / 4;
     const genreFeel = state.groove?.genreFeel;
     const instrumentBase =
         name === 'HiHat' ? 0.96 : name === 'Ride' ? 0.92 : name === 'Open' ? 0.82 : 0.95;
@@ -974,11 +971,14 @@ function mixStateFor(audio: BaseAudioContext): DrumMixState {
 // kick, snare, sidestick, crash and toms share, and is where a name no voice plays (RideBell on
 // the synth kit, a typo) is warned about and its panner freed. Do not hoist the preambles into
 // the dispatch: `tests/unit/engine/drum-dispatch.test.ts` pins the order of every side effect.
+// `layers` is how many pitched lanes sound at this hit, for the cymbal trim (`getCymbalMixScale`); a
+// caller with no section behind the hit leaves it to `enabledLayerCount`.
 export function playDrumSound(
     state: EnsembleState,
     name: string,
     time: number,
     velocity = 1.0,
+    layers = enabledLayerCount(state),
 ): void {
     if (resolveInstrumentSource(state.groove.voice).kind === 'sample') {
         if (tryPlaySampledDrum(state, name, time, velocity)) {
@@ -988,22 +988,22 @@ export function playDrumSound(
     }
     switch (name) {
         case 'HiHat':
-            playClosedHat(state, time, velocity);
+            playClosedHat(state, time, velocity, layers);
             return;
         case 'Open':
-            playOpenHat(state, time, velocity);
+            playOpenHat(state, time, velocity, layers);
             return;
         case 'HiHatPedal':
-            playPedalChick(state, time, velocity);
+            playPedalChick(state, time, velocity, layers);
             return;
         case 'Ride':
-            playRide(state, time, velocity);
+            playRide(state, time, velocity, layers);
             return;
         case 'Shaker':
             playShaker(state, time, velocity);
             return;
         default:
-            playKickSnareCrashTom(state, name, time, velocity);
+            playKickSnareCrashTom(state, name, time, velocity, layers);
     }
 }
 
@@ -1303,7 +1303,7 @@ function setupCymbalHit(
  * humanizing (Epic 0 S6) already humanized the incoming velocity, and dropping the second,
  * un-seeded layer keeps the voice reproducible.
  */
-function playClosedHat(state: EnsembleState, time: number, velocity = 1.0): void {
+function playClosedHat(state: EnsembleState, time: number, velocity: number, layers: number): void {
     const { groove } = state;
     const ctx = setupCymbalHit(state, time, velocity, 'HiHat');
     if (!ctx) {
@@ -1327,7 +1327,7 @@ function playClosedHat(state: EnsembleState, time: number, velocity = 1.0): void
     const vol =
         masterVol *
         voiceConfig.volumeScale *
-        getCymbalMixScale(state, 'HiHat') *
+        getCymbalMixScale(state, 'HiHat', layers) *
         (0.95 + Math.random() * 0.03) *
         rr();
 
@@ -1422,7 +1422,7 @@ function playClosedHat(state: EnsembleState, time: number, velocity = 1.0): void
  * NOTE: the decay/stop/brightness constants are by-ear starting points; expect
  * to retune them at the listening gate.
  */
-function playOpenHat(state: EnsembleState, time: number, velocity = 1.0): void {
+function playOpenHat(state: EnsembleState, time: number, velocity: number, layers: number): void {
     const { groove } = state;
     const ctx = setupCymbalHit(state, time, velocity, 'Open');
     if (!ctx) {
@@ -1450,7 +1450,7 @@ function playOpenHat(state: EnsembleState, time: number, velocity = 1.0): void {
     const vol =
         masterVol *
         voiceConfig.volumeScale *
-        getCymbalMixScale(state, 'Open') *
+        getCymbalMixScale(state, 'Open', layers) *
         // a fully-open hat is the loudest of the family
         (0.86 + 0.16) *
         rr();
@@ -1515,7 +1515,12 @@ function playOpenHat(state: EnsembleState, time: number, velocity = 1.0): void {
  * attack (the cymbals *meet*, they are not struck), a darker bandpass, a fast
  * decay, and no sizzle layer.
  */
-function playPedalChick(state: EnsembleState, time: number, velocity = 1.0): void {
+function playPedalChick(
+    state: EnsembleState,
+    time: number,
+    velocity: number,
+    layers: number,
+): void {
     const { groove } = state;
     const ctx = setupCymbalHit(state, time, velocity, 'HiHat');
     if (!ctx) {
@@ -1527,7 +1532,11 @@ function playPedalChick(state: EnsembleState, time: number, velocity = 1.0): voi
 
     // A pedal chick is quieter and darker than a struck closed hat.
     const vol =
-        masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, 'HiHat') * 0.55 * rr();
+        masterVol *
+        voiceConfig.volumeScale *
+        getCymbalMixScale(state, 'HiHat', layers) *
+        0.55 *
+        rr();
 
     if (groove.lastHatGain) {
         rampGain(groove.lastHatGain.gain, 0, playTime, 0.006);
@@ -1604,7 +1613,7 @@ function playPedalChick(state: EnsembleState, time: number, velocity = 1.0): voi
  * NOTE: `pingScale`'s curve constants are by-ear starting points; expect to
  * retune them at the listening gate.
  */
-function playRide(state: EnsembleState, time: number, velocity = 1.0): void {
+function playRide(state: EnsembleState, time: number, velocity: number, layers: number): void {
     const { groove } = state;
     const ctx = setupCymbalHit(state, time, velocity, 'Ride');
     if (!ctx) {
@@ -1613,7 +1622,8 @@ function playRide(state: EnsembleState, time: number, velocity = 1.0): void {
     const { audio, playTime, hitVelocity, masterVol, panner, voiceConfig } = ctx;
 
     const rr = (amt = 0.03) => 1 + (Math.random() - 0.5) * amt;
-    const vol = masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, 'Ride') * rr();
+    const vol =
+        masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, 'Ride', layers) * rr();
 
     // Choke any prior ride tail so successive rides don't pile up.
     if (groove.lastRideGain) {
@@ -1681,7 +1691,8 @@ function playKickSnareCrashTom(
     state: EnsembleState,
     name: string,
     time: number,
-    velocity = 1.0,
+    velocity: number,
+    layers: number,
 ): void {
     const { playback, groove } = state;
     if (!name || !playback.audio) {
@@ -1917,7 +1928,10 @@ function playKickSnareCrashTom(
             return;
         }
         const vol =
-            masterVol * voiceConfig.volumeScale * getCymbalMixScale(state, cymbalName) * rr();
+            masterVol *
+            voiceConfig.volumeScale *
+            getCymbalMixScale(state, cymbalName, layers) *
+            rr();
 
         if (groove.lastHatGain) {
             rampGain(groove.lastHatGain.gain, 0, playTime, 0.04);

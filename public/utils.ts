@@ -4,7 +4,7 @@ import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
  * utils.ts — shared musical/math primitives, DOM- and Web-Audio-free.
  *
  * What belongs here: pitch/frequency conversion (`getFrequency`, `getMidi`)
- * and the step-map lookup (`binarySearchMap`, `normalizeKey`) — the things every
+ * and key-name normalization (`normalizeKey`) — the things every
  * lane's generator needs.
  *
  * What does NOT belong here (#1179 split): seeded RNG/hashing lives in
@@ -95,42 +95,6 @@ export function getMidi(freq: number): number | null {
         return null;
     }
     return Math.round(12 * Math.log2(freq / 440) + 69);
-}
-
-/**
- * Optimized binary search for arrays containing objects with `start` and `end` properties.
- * Useful for fast O(log N) lookups in `arranger.stepMap` and `sectionMap`.
- */
-function binarySearchMapIndex(
-    mapArray: Array<{ start: number; end: number }>,
-    step: number,
-): number {
-    if (!mapArray || mapArray.length === 0) {
-        return -1;
-    }
-    let low = 0;
-    let high = mapArray.length - 1;
-
-    while (low <= high) {
-        const mid = (low + high) >>> 1;
-        const m = mapArray[mid];
-        if (step >= m.start && step < m.end) {
-            return mid;
-        } else if (step < m.start) {
-            high = mid - 1;
-        } else {
-            low = mid + 1;
-        }
-    }
-    return -1;
-}
-
-export function binarySearchMap<T extends { start: number; end: number }>(
-    mapArray: T[],
-    step: number,
-): T | null {
-    const index = binarySearchMapIndex(mapArray, step);
-    return index !== -1 ? mapArray[index] : null;
 }
 
 // safeDisconnect / createSoftClipCurve / clampFreq live in
