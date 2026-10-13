@@ -7,6 +7,7 @@ import {
     type FingerOpts,
     fingerOptions,
     fingerSequence,
+    fingerTransCost,
     taughtOptions,
 } from './fingering';
 import {
@@ -127,11 +128,11 @@ describe('triad grips (#1588)', () => {
 
         // The pitches are worked out from the tuning (G4 67, C4 60, E4 64, A4 69), not read
         // off the digits: each grip must sound its own chord and nothing else.
-        it('Fm 1 0 1 3 is A♭ C F C, index, middle and ring', () => {
+        it('Fm 1 0 1 3 is A♭ C F C, index, middle and little finger', () => {
             const fm = grip('UTFm', 'F', 'min');
             expect(tab(UKULELE, fm)).toBe('1 0 1 3');
             expect(gripMidis(UKULELE, fm)).toEqual([68, 60, 65, 72]);
-            expect(fingers(fm)).toBe('1 0 2 3');
+            expect(fingers(fm)).toBe('1 0 2 4');
             expect(barres(fm.notes)).toEqual([]);
         });
         it('E 1 4 0 2 is G♯ E E B, index, little finger and middle', () => {
@@ -1651,7 +1652,8 @@ describe('fingers a teacher would show (#1611)', () => {
                 ['F', 'maj7'],
                 ['F', 'm7'],
             );
-            expect(v.slice(1, 3)).toEqual(['x 3 x 3 5 x [1-2-3]', 'x x 3 x 5 5 [1-3-4]']);
+            // C6 x 3 x 2 5 x holds the E under the little finger, and C7 keeps it there.
+            expect(v.slice(1, 3)).toEqual(['x 3 x 3 5 x [1-2-4]', 'x x 3 x 5 5 [1-2-3]']);
         });
     });
 
@@ -1845,50 +1847,7 @@ describe('fingers a teacher would show (#1611)', () => {
                 }
             }
         });
-        it('triad and power grips are planned from every fingering, none marked', () => {
-            for (const [tabs, root] of [
-                ['x x x 5 5 3', 1],
-                ['x 5 3 3 x x', 5],
-                ['x x x 0 0 1', 2],
-                ['x 2 4 4 x x', 5],
-            ] as [string, number][]) {
-                const all = fingerOptions(notesOf(tabs, root), { barre: true });
-                const offered = taughtOptions(notesOf(tabs, root), { barre: true });
-                expect(offered.map((o) => o.p)).toEqual(all.map((o) => o.p));
-                expect(offered.every((o) => o.needs === undefined)).toBe(true);
-            }
-        });
-        it('a triad beside a re-fingered shell keeps its fingering: B♭ x 5 3 3 x x stays 3-1-1', () => {
-            // E♭maj7 B♭ Cm7 A♭. Planned in one pass with the shells' new options, the B♭
-            // gives up its barre for 4-2-3 to hold a note of the Cm7 after it.
-            const v = played(
-                GUITAR,
-                [1, 6],
-                CLASSIC,
-                ['E♭', 'maj7'],
-                ['B♭', 'maj'],
-                ['C', 'm7'],
-                ['A♭', 'maj'],
-            );
-            expect([v[1], v[3]]).toEqual(['x 5 3 3 x x [3-1-1]', 'x 3 1 1 x x [3-1-1]']);
-            // The Cm7 between them takes its position fingering to stay on the A♭.
-            expect(v[2]).toBe('x 3 1 3 x x [3-1-4]');
-            // Cmaj7 Am Fmaj7 G: in one pass the G's one fretted note changes finger.
-            const fifties = played(
-                GUITAR,
-                [1, 6],
-                undefined,
-                ['C', 'maj7'],
-                ['A', 'min'],
-                ['F', 'maj7'],
-                ['G', 'maj'],
-            );
-            expect([fifties[1], fifties[3]]).toEqual([
-                'x 3 2 2 x x [2-1-1]',
-                'x 2 0 0 x x [1-0-0]',
-            ]);
-        });
-        it('a chart of triads is planned exactly as before: C G Am F in frets 2–7', () => {
+        it('a chart of closed triads keeps its barres: C G Am F in frets 2–7', () => {
             const v = played(
                 GUITAR,
                 [2, 7],
@@ -1904,6 +1863,371 @@ describe('fingers a teacher would show (#1611)', () => {
                 'x x x 5 5 5 [1-1-1]',
                 'x x x 5 6 5 [1-2-1]',
             ]);
+        });
+    });
+
+    describe('a strummed grip is fingered as it is taught (#1617)', () => {
+        const STRUM: FingerOpts = { barre: true };
+        const strummed = (tabs: string) => taught(tabs, 0, STRUM);
+
+        it('guitar triads, shape by shape: the barre forms and the three inversions', () => {
+            // Root position, first and second inversion on the top three strings.
+            expect(strummed('x x x 5 5 3')).toEqual(['3-3-1', '3-4-1']); // C, the A shape
+            expect(strummed('x x x 9 8 8')).toEqual(['2-1-1']); // C/E, the F shape
+            expect(strummed('x x x 2 3 2')).toEqual(['1-3-2', '2-4-3']); // D, a finger each
+            expect(strummed('x x x 7 8 7')).toEqual(['1-2-1', '1-3-2', '2-4-3']);
+            expect(strummed('x x x 12 13 12')).toEqual(['1-2-1']); // C/G, the index barre
+            // The minors on the same strings.
+            expect(strummed('x x x 4 3 2')).toEqual(['3-2-1', '4-3-2']); // Bm
+            expect(strummed('x x x 7 7 7')).toEqual(['1-1-1']); // Bm/D
+            expect(strummed('x x x 2 3 1')).toEqual(['2-3-1', '3-4-2*']); // Dm/A, the open Dm
+            // The 5th-string set.
+            expect(strummed('x 5 4 2 x x')).toEqual(['4-3-1']); // D, the C shape
+            expect(strummed('x 5 3 2 x x')).toEqual(['4-2-1']); // Dm
+            expect(strummed('x 5 3 3 x x')).toEqual(['3-1-1']); // B♭/D
+            expect(strummed('x 3 3 2 x x')).toEqual(['2-3-1', '3-4-2']); // F/C
+            expect(strummed('x 5 5 3 x x')).toEqual(['3-3-1', '3-4-1']); // Gm/D
+        });
+        it('open triads take the fingers of the open chord, and the nut rule holds for them', () => {
+            expect(strummed('x x 2 0 1 x')).toEqual(['2-1', '3-2*', '4-3*']); // C
+            expect(strummed('x x 2 1 0 x')).toEqual(['2-1', '3-2*', '4-3*']); // E
+            expect(strummed('x 3 2 0 x x')).toEqual(['2-1', '3-2', '4-3*']); // C, 3-2 as in x32010
+            expect(strummed('x 2 0 0 x x')).toEqual(['1', '2', '3*', '4*']); // G
+            expect(strummed('x x x 2 2 0')).toEqual(['1-1']); // A
+        });
+        it('a power chord is 1-3-3 or 1-3-4, never 1-2-3 or 2-3-4', () => {
+            expect(strummed('x 2 4 4 x x')).toEqual(['1-3-3', '1-3-4']);
+            expect(strummed('7 9 9 x x x')).toEqual(['1-3-3', '1-3-4']);
+            expect(strummed('x 0 2 2 x x')).toEqual(['1-1']);
+            const all = fingerOptions(notesOf('x 2 4 4 x x', 5), STRUM).map((o) => fingersOf(o.p));
+            expect(all).toEqual(['1-3-3', '1-2-3', '1-3-4', '2-3-4', '1-4-4']);
+        });
+        it('the fingertip-per-note fingering beside a ring-finger barre is priced as a choice', () => {
+            // `handCost` reads 3-4 on one fret as a fret of stretch, 2.6: more than a held
+            // note is worth, so one held note could never choose it.
+            const [barre, split] = taughtOptions(notesOf('x x x 5 5 3', 1), STRUM);
+            expect([fingersOf(barre.p), fingersOf(split.p)]).toEqual(['3-3-1', '3-4-1']);
+            expect(split.cost - barre.cost).toBe(1);
+            // C6 x 3 x 2 5 x has the little finger on the 5th fret of the 2nd string, and the C
+            // triad keeps it there; alone it bars.
+            expect(planned(['x 3 x 2 5 x', 5, SHELL], ['x x x 5 5 3', 1, STRUM])).toEqual([
+                '2-1-4',
+                '3-4-1',
+            ]);
+            expect(planned(['x x x 5 5 3', 1, STRUM])).toEqual(['3-3-1']);
+        });
+        it('no ring finger laid flat a fret above the index: F x 3 3 2 x x is not 3-3-1', () => {
+            const all = fingerOptions(notesOf('x 3 3 2 x x', 5), STRUM);
+            const cramped = all.find((o) => fingersOf(o.p) === '3-3-1')!;
+            // Inside the margin, so only this rule keeps it out.
+            expect(Math.round((cramped.cost - all[0].cost) * 10) / 10).toBe(0.8);
+            expect(strummed('x 3 3 2 x x')).not.toContain('3-3-1');
+            // The ukulele's Dm 2 2 1 0 the same: 2-3-1, as every chart prints it.
+            expect(strummed('2 2 1 0')).toEqual(['2-3-1', '3-4-2*']);
+            // Two frets above the index it is the A shape, and three the little finger's.
+            expect(strummed('x x x 4 4 2')[0]).toBe('3-3-1');
+            expect(strummed('3 6 6 4')).toEqual(['1-4-4-2']);
+        });
+        it('no stretch the cheapest does not have: B♭ x 5 3 3 x x is never 4-2-3', () => {
+            const all = fingerOptions(notesOf('x 5 3 3 x x', 5), STRUM).map((o) => fingersOf(o.p));
+            expect(all).toContain('4-2-3');
+            expect(strummed('x 5 3 3 x x')).toEqual(['3-1-1']);
+            // The ukulele's B 4 3 2 2 was 4-3-1-2 beside E 1 4 0 2.
+            expect(strummed('4 3 2 2')).toEqual(['3-2-1-1']);
+            expect(played(UKULELE, [1, 6], undefined, ['B', 'maj'], ['E', 'maj'])).toEqual([
+                '4 3 2 2 [3-2-1-1]',
+                '1 4 0 2 [1-4-0-2]',
+            ]);
+        });
+
+        describe('ukulele: the method-book fingerings', () => {
+            it('C is the ring finger and Am the middle: a finger takes the fret of its number', () => {
+                expect(strummed('0 0 0 3')).toEqual(['3', '1*', '2*', '4*']);
+                expect(strummed('2 0 0 0')).toEqual(['2', '1*', '3*', '4*']);
+                expect(played(UKULELE, [1, 6], undefined, ['C', 'maj'], ['A', 'min'])).toEqual([
+                    '0 0 0 3 [0-0-0-3]',
+                    '2 0 0 0 [2-0-0-0]',
+                ]);
+            });
+            it('Fm 1 0 1 3 is 1-2-4; E♭ 0 3 3 1 is 2-3-1, or the barre, or 3-4-1', () => {
+                expect(strummed('1 0 1 3')).toEqual(['1-2-4', '1-2-3*']);
+                expect(strummed('0 3 3 1')).toEqual(['2-3-1', '3-3-1', '3-4-1']);
+                // In a chart the first of them is the default, though the barre is cheaper.
+                const v = played(
+                    UKULELE,
+                    [1, 6],
+                    undefined,
+                    ['E♭', 'maj'],
+                    ['A♭', 'maj'],
+                    ['B♭', 'maj'],
+                );
+                expect(v).toEqual(['0 3 3 1 [0-2-3-1]', '1 3 4 3 [1-2-4-3]', '3 2 1 1 [3-2-1-1]']);
+            });
+            it('the F shape up the neck is the index barre at every fret: F♯ 3 1 2 1', () => {
+                // The costs take a fingertip each below the 6th fret, as a guitar's D shape does.
+                const cheapest = (tabs: string) =>
+                    fingersOf(fingerOptions(notesOf(tabs, 0), STRUM)[0].p);
+                expect(cheapest('3 1 2 1')).toBe('4-1-3-2');
+                expect(strummed('3 1 2 1')).toEqual(['3-1-2-1', '4-1-3-2*']);
+                expect(strummed('5 3 4 3')).toEqual(['3-1-2-1', '4-1-3-2*']);
+                expect(strummed('12 10 11 10')).toEqual(['3-1-2-1']);
+                // A guitar's D shape is left to the costs: the table is four strings wide.
+                expect(strummed('x x x 2 3 2')[0]).toBe('1-3-2');
+            });
+            it('the chords the costs already finger by the book keep it', () => {
+                expect(strummed('2 0 1 0')).toEqual(['2-1', '3-2*', '4-3*']); // F
+                expect(strummed('2 1 0 0')).toEqual(['2-1', '3-2*', '4-3*']); // A
+                expect(strummed('0 2 3 2')).toEqual(['1-3-2', '2-4-3']); // G
+                expect(strummed('0 2 3 1')).toEqual(['2-3-1', '3-4-2*']); // Gm
+                expect(strummed('0 4 3 2')).toEqual(['3-2-1', '4-3-2']); // Em
+                expect(strummed('2 2 2 0')).toEqual(['1-1-1']); // D
+                expect(strummed('0 3 3 3')).toEqual(['1-1-1']); // Cm
+                expect(strummed('1 4 0 2')).toEqual(['1-4-2']); // E
+                expect(strummed('3 2 1 1')).toEqual(['3-2-1-1']); // B♭
+                expect(strummed('4 2 2 2')).toEqual(['3-1-1-1']); // Bm
+                expect(strummed('1 1 1 4')).toEqual(['1-1-1-4']); // D♭
+                expect(strummed('3 3 2 1')).toEqual(['3-3-2-1', '3-4-2-1']); // E♭m
+            });
+            it('in a chart: C C7 F Fm C, and the finger already down on the C stays', () => {
+                const v = played(
+                    UKULELE,
+                    [1, 6],
+                    undefined,
+                    ['C', 'maj'],
+                    ['C', 'dom7'],
+                    ['F', 'maj'],
+                    ['F', 'min'],
+                    ['C', 'maj'],
+                );
+                expect(v).toEqual([
+                    '0 0 0 3 [0-0-0-3]',
+                    '0 0 0 1 [0-0-0-1]',
+                    '2 0 1 0 [2-0-1-0]',
+                    '1 0 1 3 [1-0-2-4]',
+                    // Fm's little finger is on this C. It is not lifted to match the table.
+                    '0 0 0 3 [0-0-0-4]',
+                ]);
+                // Cm F G Cm: F was 4-0-3-0 here, and Fm 2-0-3-4 with the index idle.
+                expect(
+                    played(UKULELE, [1, 6], undefined, ['C', 'min'], ['F', 'maj'], ['G', 'maj']),
+                ).toEqual(['0 3 3 3 [0-1-1-1]', '2 0 1 0 [2-0-1-0]', '0 2 3 2 [0-1-3-2]']);
+                expect(
+                    played(UKULELE, [1, 6], undefined, ['C', 'min'], ['F', 'min'], ['G', 'maj'])[1],
+                ).toBe('1 0 1 3 [1-0-2-4]');
+            });
+            it('a chord by itself takes the book fingering too', () => {
+                const alone = (tabs: string) => {
+                    const notes = notesOf(tabs, 0);
+                    assignFingers(notes, STRUM);
+                    return notes.map((n) => n.finger).join('-');
+                };
+                expect(alone('0 0 0 3')).toBe('0-0-0-3');
+                expect(alone('0 3 3 1')).toBe('0-2-3-1');
+                expect(alone('3 1 2 1')).toBe('3-1-2-1');
+            });
+        });
+
+        it('every triad and power grip on offer: its default is unmarked and in the options', () => {
+            const STRUMMED = (Object.keys(QUALITIES) as Quality[]).filter(
+                (q) => QUALITIES[q].kind !== 'shell',
+            );
+            for (const inst of [GUITAR, UKULELE]) {
+                for (const root of ROOTS) {
+                    for (const q of STRUMMED) {
+                        for (const v of allPositions(inst, root, q)) {
+                            const fresh = v.notes.map((n) => ({ ...n }));
+                            const offered = taughtOptions(fresh, STRUM);
+                            const all = fingerOptions(fresh, STRUM).map((o) => fingersOf(o.p));
+                            const label = `${v.symbol} ${tab(inst, v)}`;
+                            expect(offered[0].needs, label).toBeUndefined();
+                            expect(offered[0].own, label).not.toContain(true);
+                            for (const o of offered) {
+                                expect(all, label).toContain(fingersOf(o.p));
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        describe('one plan for a chart that mixes shells and triads', () => {
+            it('B♭ x 5 3 3 x x beside Cm7 is the barre, with no pass to hold it there', () => {
+                // E♭maj7 B♭ Cm7 A♭. The triad used to be planned first, with every fingering
+                // open, and frozen; planned with the shells it took 4-2-3 to hold a note of Cm7.
+                const v = played(
+                    GUITAR,
+                    [1, 6],
+                    CLASSIC,
+                    ['E♭', 'maj7'],
+                    ['B♭', 'maj'],
+                    ['C', 'm7'],
+                    ['A♭', 'maj'],
+                );
+                expect([v[1], v[3]]).toEqual(['x 5 3 3 x x [3-1-1]', 'x 3 1 1 x x [3-1-1]']);
+                // The Cm7 between them takes its position fingering to stay on the A♭.
+                expect(v[2]).toBe('x 3 1 3 x x [3-1-4]');
+            });
+            it('a lone open-string note takes the index: Cmaj7 Am Fmaj7 G', () => {
+                const v = played(
+                    GUITAR,
+                    [1, 6],
+                    undefined,
+                    ['C', 'maj7'],
+                    ['A', 'min'],
+                    ['F', 'maj7'],
+                    ['G', 'maj'],
+                );
+                expect([v[1], v[3]]).toEqual(['x 3 2 2 x x [2-1-1]', 'x 2 0 0 x x [1-0-0]']);
+            });
+            it('a shell holds a note of the triad beside it: C7 to F', () => {
+                // The frozen triad was 3-3-1 here, and the 3rd of C7 changed finger.
+                const v = voiced(GUITAR, [1, 6], CLASSIC, ['C', 'dom7'], ['F', 'maj']);
+                expect(v.map((x) => show(GUITAR, x))).toEqual([
+                    'x 3 2 3 x x [2-1-3]',
+                    'x 3 3 2 x x [2-3-1]',
+                ]);
+                expect(staying(GUITAR, v[0], v[1])).toEqual([2]);
+            });
+        });
+
+        describe('one fingering for a grip, unless a held note says otherwise', () => {
+            it('changing fingering costs only the notes that change finger', () => {
+                const [a, b] = taughtOptions(notesOf('3 x 3 3 x x', 6), SHELL);
+                expect([fingersOf(a.p), fingersOf(b.p)]).toEqual(['1-2-3', '2-3-4']);
+                const next = taughtOptions(notesOf('x 5 4 5 x x', 5), SHELL)[0];
+                // No note shared: nothing, whichever fingers come from wherever.
+                expect(fingerTransCost(a, next)).toBe(0);
+                expect(fingerTransCost(b, next)).toBe(0);
+                // The same grip under other fingers: every note re-fingered.
+                expect(fingerTransCost(a, b)).toBe(7.5);
+                expect(fingerTransCost(a, a)).toBe(0);
+            });
+            it('Autumn Leaves in G minor: Gm7 3 x 3 3 x x is 1-2-3 every time', () => {
+                // Bars 7–8 and bar 15. It was 2-3-4 in bar 15, between two D7s it shares no
+                // note with: the fingers that had just played D7 were charged for the trip.
+                const QUALITY: Record<string, Quality> = {
+                    m7: 'm7',
+                    '7': 'dom7',
+                    maj7: 'maj7',
+                    'm7♭5': 'm7b5',
+                };
+                const tune =
+                    'Cm7 F7 B♭maj7 E♭maj7 Am7♭5 D7 Gm7 Gm7 Cm7 F7 B♭maj7 E♭maj7 Am7♭5 D7 Gm7 D7'
+                        .split(' ')
+                        .map((sym): [string, Quality] => {
+                            const [, root, kind] = /^([A-G]♭?)(.*)$/.exec(sym)!;
+                            return [root, QUALITY[kind]];
+                        });
+                const v = played(GUITAR, [1, 6], CLASSIC, ...tune);
+                expect([v[6], v[7], v[14]]).toEqual(Array(3).fill('3 x 3 3 x x [1-2-3]'));
+            });
+            it('a blues in B♭: B♭7 x 1 x 1 3 x is 1-2-3 every time', () => {
+                const blues = 'B♭ B♭ B♭ B♭ E♭ E♭ B♭ B♭ F E♭ B♭ F'
+                    .split(' ')
+                    .map((r): [string, Quality] => [r, 'dom7']);
+                const v = played(GUITAR, [1, 6], undefined, ...blues);
+                expect(v.filter((x) => x.startsWith('x 1 x 1 3 x'))).toEqual(
+                    Array(7).fill('x 1 x 1 3 x [1-2-3]'),
+                );
+                // What does take a second fingering has a finger to keep: E♭7 after F7.
+                expect(v.slice(8, 10)).toEqual(['1 x 1 2 x x [1-2-3]', 'x x 1 x 2 3 [2-3-4]']);
+            });
+            it('in every key, both instruments: a fingering that is not the default holds a note', () => {
+                const PROGRESSIONS: [number, Quality][][] = [
+                    // The blues, Autumn Leaves' A section with a turnaround, as shells.
+                    [0, 0, 0, 0, 5, 5, 0, 0, 7, 5, 0, 7].map((i) => [i, 'dom7']),
+                    [
+                        [2, 'm7'],
+                        [7, 'dom7'],
+                        [0, 'maj7'],
+                        [5, 'maj7'],
+                        [11, 'm7b5'],
+                        [4, 'dom7'],
+                        [9, 'm7'],
+                        [4, 'dom7'],
+                    ],
+                    // Triads, and triads mixed with 7ths.
+                    [
+                        [0, 'maj'],
+                        [7, 'maj'],
+                        [9, 'min'],
+                        [4, 'min'],
+                        [5, 'maj'],
+                        [0, 'maj'],
+                        [5, 'maj'],
+                        [7, 'maj'],
+                    ],
+                    [
+                        [0, 'maj'],
+                        [0, 'dom7'],
+                        [5, 'maj'],
+                        [5, 'min'],
+                        [0, 'maj'],
+                        [9, 'min'],
+                        [2, 'm7'],
+                        [7, 'dom7'],
+                    ],
+                ];
+                const gripOf = (v: Voicing) => v.notes.map((n) => `${n.string}:${n.fret}`).join();
+                const unexplained: string[] = [];
+                let second = 0;
+                for (const inst of [GUITAR, UKULELE]) {
+                    for (const home of [[1, 6], [5, 10], null] as ([number, number] | null)[]) {
+                        for (let key = 0; key < 12; key++) {
+                            for (const bars of PROGRESSIONS) {
+                                const v = voiceChart(
+                                    bars.map(([i, quality]) => ({
+                                        root: ROOTS[(key + i) % 12],
+                                        quality,
+                                    })),
+                                    { instrument: inst, home },
+                                );
+                                v.forEach((g, i) => {
+                                    const alone = g.notes.map((n) => ({ ...n }));
+                                    const shell = g.shape.kind === 'shell';
+                                    assignFingers(
+                                        alone,
+                                        shell ? { rootBarre: inst === GUITAR } : STRUM,
+                                    );
+                                    if (g.notes.every((n, k) => n.finger === alone[k].finger)) {
+                                        return;
+                                    }
+                                    second++;
+                                    // The nearest different grip on either side.
+                                    const beside = [-1, 1].map((step) => {
+                                        let j = i + step;
+                                        while (v[j] && gripOf(v[j]) === gripOf(g)) {
+                                            j += step;
+                                        }
+                                        return v[j];
+                                    });
+                                    const kept = g.notes.some(
+                                        (n, k) =>
+                                            n.fret > 0 &&
+                                            n.finger !== alone[k].finger &&
+                                            beside.some((o) =>
+                                                o?.notes.some(
+                                                    (m) =>
+                                                        m.string === n.string &&
+                                                        m.fret === n.fret &&
+                                                        m.finger === n.finger,
+                                                ),
+                                            ),
+                                    );
+                                    if (!kept) {
+                                        unexplained.push(
+                                            `${inst.name} ${home} #${i + 1} ${show(inst, g)}`,
+                                        );
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
+                expect(unexplained).toEqual([]);
+                // Not vacuous: second fingerings are taken, each for a note it keeps.
+                expect(second).toBeGreaterThan(100);
+            });
         });
     });
 });
