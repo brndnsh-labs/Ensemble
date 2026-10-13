@@ -1,16 +1,17 @@
-import { compileTimeline } from '@band/index';
+import { compileTimeline, type Timeline } from '@band/index';
 import { validateSemanticScore } from '@engine/songbook/score-codec';
 
 /**
  * Can the band engine (`band/`, docs/design/band-engine.md) play the score? Throws the reason
  * if not. Every path that lets a chart onto the stand (open, edit, import, the guided form) asks
  * here, before anything changes. The band plays anything the codec accepts, so it asks only
- * that the score is valid and that its timeline compiles.
+ * that the score is valid and that its timeline compiles. Returns that timeline, so a caller
+ * about to put the chart on the stand does not compile it a second time (#1665).
  */
-export function checkPlayable(score: unknown): void {
+export function checkPlayable(score: unknown): Timeline {
     const checked = validateSemanticScore(score);
     if (checked.kind !== 'ok') {
         throw new Error('The chart is invalid; its source has not been changed.');
     }
-    compileTimeline(checked.value);
+    return compileTimeline(checked.value);
 }

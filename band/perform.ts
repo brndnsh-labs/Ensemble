@@ -11,7 +11,13 @@ import { type BarPlan, fullWindow, type PassWindow, planBars } from './arrange/p
 import { rng } from './core/random.js';
 import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
 import { applyFeel } from './feel/feel.js';
-import { chorusBars, firstSpanAfter, type Timeline } from './form/timeline.js';
+import {
+    barAtTick,
+    type ChordSpan,
+    chorusBars,
+    firstSpanAfter,
+    type Timeline,
+} from './form/timeline.js';
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
 import { LEAD_INSTRUMENTS } from './players/lead/instruments.js';
 import { feelFor, STYLES } from './styles/index.js';
@@ -413,6 +419,9 @@ const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
  * span is replaced by one crash-and-kick, one held bass note, the comp's first chord and the
  * lead's note if it struck one there, all ringing to the end of the (stretched) span. A fermata on a hold ties over: nothing new is
  * struck, and the notes already sounding are extended through it.
+ *
+ * The events are indexed by tick once, so a fermata costs a search and the events it replaces,
+ * not a scan of the whole pass (#1665): a chart may write tens of thousands of them.
  */
 function holdFermatas(
     events: BandEvent[],
@@ -420,82 +429,124 @@ function holdFermatas(
     plans: { lanes: Record<Lane, boolean> }[],
     lastBassBefore: number | undefined,
 ): BandEvent[] {
-    const spans = timeline.spans.filter((s) => s.fermata);
-    if (!spans.length) {
+    const held: { span: ChordSpan; barIndex: number; plan: (typeof plans)[number] }[] = [];
+    for (const span of timeline.spans) {
+        if (span.fermata) {
+            const barIndex = barAtTick(timeline, span.start)?.index ?? -1;
+            const plan = plans[barIndex];
+            // No plan: the fermata is outside this pass's window.
+            if (plan) {
+                held.push({ span, barIndex, plan });
+            }
+        }
+    }
+    if (!held.length) {
         return events;
     }
-    let out = events;
-    for (const span of spans) {
-        const inside = (e: BandEvent) => e.tick >= span.start && e.tick < span.end;
-        const barIndex = timeline.bars.findIndex(
-            (b) => b.start <= span.start && span.start < b.start + b.meter.barTicks,
+    // Every tick an event sits on or a fermata starts at is a slot, in tick order. `live` is
+    // the events still standing in each slot (their places in `out`, in order), and the two
+    // slot sets say which slots hold a bass note and a struck comp chord.
+    const out: (BandEvent | null)[] = events.slice();
+    const ticks = Float64Array.from(
+        new Set([...events.map((e) => e.tick), ...held.map(({ span }) => span.start)]),
+    ).sort();
+    const slots = new Map<number, number>();
+    ticks.forEach((tick, slot) => {
+        slots.set(tick, slot);
+    });
+    const live: number[][] = Array.from(ticks, () => []);
+    events.forEach((e, i) => {
+        live[slots.get(e.tick)!].push(i);
+    });
+    const isBass = (e: BandEvent): e is PitchedNote => e.lane === 'bass';
+    const isStruckComp = (e: BandEvent): e is PitchedNote => e.lane === 'comp' && !e.muted;
+    const bass = slotSet(ticks.length);
+    const comp = slotSet(ticks.length);
+    const mark = (slot: number) => {
+        bass.set(
+            slot,
+            live[slot].some((i) => isBass(out[i]!)),
         );
-        const plan = plans[barIndex];
-        if (!plan) {
-            continue; // outside this pass's window
-        }
-        const compAtStart = out.filter((e) => e.lane === 'comp' && e.tick === span.start);
+        comp.set(
+            slot,
+            live[slot].some((i) => isStruckComp(out[i]!)),
+        );
+    };
+    live.forEach((_, slot) => {
+        mark(slot);
+    });
+
+    for (const { span, barIndex, plan } of held) {
+        const from = slots.get(span.start)!;
+        const atStart = live[from].map((i) => out[i]!);
+        const compAtStart = atStart.filter((e): e is PitchedNote => e.lane === 'comp');
         // The lead's note on the fermata is held with the band; anything after it goes.
-        const leadAtStart = out.filter((e) => e.lane === 'lead' && e.tick === span.start);
-        const before = out.filter((e) => e.tick < span.start);
-        out = out.filter((e) => !inside(e));
+        const leadAtStart = atStart.filter((e): e is PitchedNote => e.lane === 'lead');
+        // The last slots before the span with a bass note and a struck comp chord in them.
+        const bassBefore = bass.lastBefore(from);
+        const compBefore = comp.lastBefore(from);
+        for (let slot = from; slot < ticks.length && ticks[slot] < span.end; slot++) {
+            if (live[slot].length) {
+                for (const i of live[slot]) {
+                    out[i] = null;
+                }
+                live[slot] = [];
+                mark(slot);
+            }
+        }
         if (span.tied) {
             // Extend the last bass note and the last comp chord through the fermata.
-            let bassTick = -1;
-            let compTick = -1;
-            for (const e of before) {
-                if (e.lane === 'bass') {
-                    bassTick = Math.max(bassTick, e.tick);
-                } else if (e.lane === 'comp' && !e.muted) {
-                    compTick = Math.max(compTick, e.tick);
+            const extend = (slot: number, wanted: (e: BandEvent) => e is PitchedNote) => {
+                for (const i of live[slot] ?? []) {
+                    const e = out[i]!;
+                    if (wanted(e)) {
+                        out[i] = { ...e, dur: span.end - e.tick };
+                    }
                 }
-            }
-            out = out.map((e) =>
-                (e.lane === 'bass' && e.tick === bassTick) ||
-                (e.lane === 'comp' && !e.muted && e.tick === compTick)
-                    ? { ...e, dur: span.end - e.tick }
-                    : e,
-            );
+            };
+            extend(bassBefore, isBass);
+            extend(compBefore, isStruckComp);
             continue;
         }
         const length = span.end - span.start;
+        const push = (e: BandEvent) => {
+            live[from].push(out.length);
+            out.push(e);
+        };
         if (plan.lanes.drums) {
-            out.push(
-                {
-                    lane: 'drums',
-                    piece: 'crash',
-                    tick: span.start,
-                    velocity: 100,
-                    offsetMs: 0,
-                    bar: barIndex,
-                },
-                {
-                    lane: 'drums',
-                    piece: 'kick',
-                    tick: span.start,
-                    velocity: 96,
-                    offsetMs: 0,
-                    bar: barIndex,
-                },
-            );
+            push({
+                lane: 'drums',
+                piece: 'crash',
+                tick: span.start,
+                velocity: 100,
+                offsetMs: 0,
+                bar: barIndex,
+            });
+            push({
+                lane: 'drums',
+                piece: 'kick',
+                tick: span.start,
+                velocity: 96,
+                offsetMs: 0,
+                bar: barIndex,
+            });
         }
         if (plan.lanes.bass && span.chord) {
-            // The latest bass note before the span — by tick, since an earlier fermata's held
-            // note is appended after the notes that follow it. None in this pass (it resumed
-            // here) → the one sounded before the pass began.
-            let lastBass: PitchedNote | undefined;
-            for (const e of before) {
-                if (e.lane === 'bass' && (!lastBass || e.tick >= lastBass.tick)) {
-                    lastBass = e;
-                }
-            }
+            // The latest bass note before the span — by tick, and of several on that tick the
+            // last in `out`, since an earlier fermata's held note is appended after the notes
+            // that follow it. None in this pass (it resumed here) → the one sounded before the
+            // pass began.
+            const lastBass = (live[bassBefore] ?? [])
+                .map((i) => out[i]!)
+                .filter(isBass)
+                .at(-1);
             const midi = nearestMidi(
                 span.chord.bass,
                 lastBass?.midi ?? lastBassBefore ?? 38,
                 28,
                 52,
             );
-            out.push({
+            push({
                 lane: 'bass',
                 midi,
                 tick: span.start,
@@ -505,8 +556,51 @@ function holdFermatas(
                 bar: barIndex,
             });
         }
-        out.push(...compAtStart.map((e) => ({ ...e, dur: length })));
-        out.push(...leadAtStart.map((e) => ({ ...e, dur: length })));
+        for (const e of [...compAtStart, ...leadAtStart]) {
+            push({ ...e, dur: length });
+        }
+        mark(from);
     }
-    return out;
+    return out.filter((e) => e !== null);
+}
+
+/**
+ * A set of slots (0 up to `size`) that answers "the last slot in the set before this one" in
+ * logarithmic time while slots come and go: a binary tree over the slots, each node saying
+ * whether any slot under it is in the set.
+ */
+function slotSet(size: number) {
+    let leaves = 1;
+    while (leaves < size) {
+        leaves *= 2;
+    }
+    const has = new Uint8Array(2 * leaves);
+    return {
+        set(slot: number, on: boolean): void {
+            // Up for as long as a node's answer changes.
+            let node = slot + leaves;
+            let value = on ? 1 : 0;
+            while (node >= 1 && has[node] !== value) {
+                has[node] = value;
+                node >>= 1;
+                value = has[2 * node] | has[2 * node + 1];
+            }
+        },
+        /** The last slot in the set before `slot`, or -1. */
+        lastBefore(slot: number): number {
+            // Up until a branch to the left has one, then down that branch's right-hand side.
+            let node = slot + leaves;
+            while (node > 1 && !(node & 1 && has[node - 1])) {
+                node >>= 1;
+            }
+            if (node <= 1) {
+                return -1;
+            }
+            node--;
+            while (node < leaves) {
+                node = has[2 * node + 1] ? 2 * node + 1 : 2 * node;
+            }
+            return node - leaves;
+        },
+    };
 }

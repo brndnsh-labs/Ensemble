@@ -407,3 +407,123 @@ describe('performed span ceiling (#1632)', () => {
         expect(resolveScoreMeasureEvents).not.toHaveBeenCalled();
     });
 });
+
+describe('fermata time (#1665)', () => {
+    const chord = (n: number, d: number, fermata = true): ScoreEvent => ({
+        kind: 'chord',
+        symbol: 'C',
+        duration: [n, d],
+        ...(fermata ? { fermata } : {}),
+    });
+    /** A 4/4 chart of the given bars, played `repeat` times. */
+    const chart = (bars: ScoreEvent[][], repeat = 1): SemanticScore => {
+        const built = score([{ label: 'A', bars: bars.map(() => 'C').join(' | '), repeat }]);
+        built.sections[0].measures.forEach((measure, i) => {
+            measure.content = { kind: 'events', events: bars[i] };
+        });
+        return built;
+    };
+    /** What `secondsAt` answered when it walked every stretch: the reference. */
+    function scanSeconds(t: Timeline, tick: number, bpm: number): number {
+        const perTick = 60 / bpm / PPQ;
+        let seconds = tick * perTick;
+        for (const s of t.stretches) {
+            if (s.start >= tick) {
+                break;
+            }
+            seconds += (Math.min(tick, s.end) - s.start) * perTick * (s.factor - 1);
+        }
+        return seconds;
+    }
+
+    const sixteenths = Array.from({ length: 16 }, (_, i) => chord(1, 4, i % 3 !== 1));
+    // 63 fermatas of half a tick each round up to a tick: they overrun the bar by 31 ticks, so
+    // the next bar's stretches start before these have ended, and before some have begun.
+    const halfTicks = Array.from({ length: 63 }, () => chord(1, 960));
+    const overrun = chart(
+        [
+            [chord(1259, 320), ...halfTicks],
+            [...halfTicks, chord(1259, 320)],
+        ],
+        2,
+    );
+    // Too short for a tick: stretches of no length, all on one tick.
+    const noTicks = Array.from({ length: 5 }, () => chord(1, 1_000_000));
+    const charts: [string, SemanticScore][] = [
+        ['awkward', FIXTURES.awkward],
+        ['some bars', chart([[chord(4, 1)], [chord(4, 1, false)], [chord(2, 1), chord(2, 1)]], 3)],
+        ['sixteenths', chart([sixteenths, sixteenths], 2)],
+        ['overrun', overrun],
+        ['no length', chart([[...noTicks, chord(799_999, 200_000)], [chord(4, 1)]], 2)],
+    ];
+
+    it('the overrun chart really has stretches out of order', () => {
+        const { stretches } = compileTimeline(overrun);
+        expect(stretches.some((s, i) => i > 0 && s.start < stretches[i - 1].start)).toBe(true);
+        expect(stretches.some((s, i) => i > 0 && s.start < stretches[i - 1].end)).toBe(true);
+    });
+
+    it.each(charts)('%s: the search answers what the scan answers', (_name, written) => {
+        const t = compileTimeline(written);
+        expect(t.stretches.length).toBeGreaterThan(0);
+        const ticks = new Set<number>([-1, 0, t.ticks, t.ticks + 1, 1e9]);
+        for (const s of t.stretches) {
+            for (const edge of [s.start, s.end]) {
+                for (const d of [-1, -0.5, 0, 0.5, 1]) {
+                    ticks.add(edge + d);
+                }
+            }
+            ticks.add((s.start + s.end) / 2);
+        }
+        const failures: string[] = [];
+        for (const bpm of [60, 97, 183.5]) {
+            for (const tick of ticks) {
+                // The same time to a part in a million million: the scan summed the same
+                // stretches in a different order.
+                const scanned = scanSeconds(t, tick, bpm);
+                if (Math.abs(secondsAt(t, tick, bpm) - scanned) > 1e-12 * Math.abs(scanned)) {
+                    failures.push(`${tick} at ${bpm}`);
+                }
+            }
+        }
+        expect(failures.slice(0, 10)).toEqual([]);
+    });
+
+    it('is the written time, to the bit, where no fermata has begun', () => {
+        const t = compileTimeline(chart([[chord(4, 1, false)], [chord(4, 1)]]));
+        for (const tick of [0, 1, 479.5, 960, BAR]) {
+            expect(secondsAt(t, tick, 97)).toBe(tick * (60 / 97 / PPQ));
+        }
+    });
+
+    it('does not walk the stretches for each answer', () => {
+        // 64 bars of 64 fermatas. Each stretch counts how often it is read.
+        const dense = Array.from({ length: 64 }, () => chord(1, 16));
+        const t = compileTimeline(chart(Array.from({ length: 64 }, () => dense)));
+        expect(t.stretches).toHaveLength(4096);
+        let reads = 0;
+        const counted: Timeline = {
+            ...t,
+            stretches: t.stretches.map(
+                (s) =>
+                    new Proxy(s, {
+                        get(target, key, receiver) {
+                            reads++;
+                            return Reflect.get(target, key, receiver);
+                        },
+                    }),
+            ),
+        };
+        // The first answer may index them all; the rest must not.
+        secondsAt(counted, t.ticks, 120);
+        reads = 0;
+        const asked = 1000;
+        for (let i = 1; i <= asked; i++) {
+            const tick = Math.floor((t.ticks * i) / asked);
+            expect(secondsAt(counted, tick, 120)).toBeCloseTo(scanSeconds(t, tick, 120), 9);
+        }
+        // A walk reads half of them on average: 2,048 stretches an answer. A search reads a
+        // dozen at most, three fields each.
+        expect(reads / asked).toBeLessThan(3 * Math.log2(t.stretches.length));
+    });
+});

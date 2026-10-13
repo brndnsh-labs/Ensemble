@@ -7,6 +7,7 @@ import {
     STYLE_IDS,
     STYLES,
     type StyleId,
+    type Timeline,
     toMidi,
 } from '@band/index';
 import { transposeKey } from '@engine/controllers/arranger-controller';
@@ -130,6 +131,12 @@ const AUTO_LANES = ['groove', 'bass', 'chords', 'soloist'] as const;
 const STAGED_FEEL_TIMEOUT_MS = 12_000;
 // Authored source belongs to the host document, never to generated runtime state.
 let currentScore: SemanticScore | null = null;
+/**
+ * The timeline the open score compiled to, with the score object it belongs to: the band is
+ * handed it instead of compiling the chart again (`handScore`, #1665). Matched by identity, so
+ * a score replaced by anything but `apply` simply compiles when the band next asks.
+ */
+let currentTimeline: { score: SemanticScore; timeline: Timeline } | null = null;
 
 // ---------------------------------------------------------------- the band engine
 // The band engine (`band/`, docs/design/band-engine.md) plays, through the shared voices,
@@ -180,6 +187,12 @@ function bandHost(): BandHost {
         onEnd: endPerformance,
     });
     return band;
+}
+
+/** Hand the host the chart to play, and its timeline when the open chart already compiled it. */
+function handScore(host: BandHost): void {
+    const score = scoreForBand();
+    host.setScore(score, currentTimeline?.score === score ? currentTimeline.timeline : undefined);
 }
 
 /** The chart as a semantic score; a measure-less (v1) chart converts on the fly. */
@@ -263,7 +276,7 @@ function startBand(freshPlay = false): void {
     const host = bandHost();
     const state = getState();
     const { arranger, playback } = state;
-    host.setScore(scoreForBand());
+    handScore(host);
     // The same take-to-take rule as the old engine: a fresh seed per play unless locked —
     // and the fresh one is recorded, so locking it later reproduces the take you heard.
     if (arranger.randomizeSeed || !arranger.seed) {
@@ -926,13 +939,19 @@ function applyGenre(name: string): void {
     param('bass', 'style', genre.bass ?? 'smart');
 }
 
-function apply(content: DocumentContent): void {
+/**
+ * `compiled` is the timeline `checkPlayable` just compiled from this same score, when the caller
+ * asked: the chart is then compiled once on its way to the stand, not twice (#1665).
+ */
+function apply(content: DocumentContent, compiled?: Timeline): void {
     const score = 'score' in content ? clone(content.score) : null;
     // A score is drawn from the band's own timeline; the old engine's maps derive empty for it
     // (`rebuild`), so nothing stale answers for this chart.
-    const view = score ? bandChart(score, compileTimeline(score)) : null;
+    const timeline = score ? (compiled ?? compileTimeline(score)) : null;
+    const view = score && timeline ? bandChart(score, timeline) : null;
     const arrangement = score ? scoreArrangementView(score) : (content as ChartContent).arrangement;
     currentScore = score;
+    currentTimeline = score && timeline ? { score, timeline } : null;
     bandView = view;
     // By name, like the band below: an old chart's legacy `lastChordPreset` is read by nothing.
     for (const key of [
@@ -978,14 +997,12 @@ function apply(content: DocumentContent): void {
 
 export function load(document: ChartDocument): void {
     const checked = validateDocument(document);
-    if (checked.schemaVersion === 2) {
-        checkPlayable(checked.chart.score);
-    }
+    const timeline = checked.schemaVersion === 2 ? checkPlayable(checked.chart.score) : undefined;
     stop();
     const previous = captureSessionContent();
     loading = true;
     try {
-        apply(checked.chart);
+        apply(checked.chart, timeline);
         // #1405 — a lane on Follow feel stores the sound it last resolved to, which says nothing
         // about this device. Resolve it again against what is installed here, by the same rule a
         // feel change uses.
@@ -1205,7 +1222,7 @@ export function transpose(delta: number): void {
     // when it is handed the chart again; `setScore` restarts the song from the top, as a
     // measure-based chart's key change does (`editScore`).
     if (band?.playing) {
-        band.setScore(scoreForBand());
+        handScore(band);
     }
 }
 /**
@@ -1253,13 +1270,13 @@ export function setChoruses(choruses: number | undefined): void {
     }
 }
 export function editScore(score: SemanticScore): void {
-    checkPlayable(score);
+    const timeline = checkPlayable(score);
     const before = captureSessionContent();
     stop();
     loading = true;
     try {
         const { performance, band } = before;
-        apply({ score, performance, band });
+        apply({ score, performance, band }, timeline);
         rebuild();
     } catch (error) {
         apply(before);
@@ -1350,7 +1367,7 @@ function exportSettings(): ReturnType<typeof bandSettings> {
  */
 export function exportMidi(filename: string): Promise<void> {
     const host = bandHost();
-    host.setScore(scoreForBand());
+    handScore(host);
     const settings = exportSettings();
     const { events, timeline } = host.render(settings);
     const bytes = toMidi(events, timeline, {
@@ -1414,7 +1431,7 @@ export async function exportAudio(
         return;
     }
     const host = bandHost();
-    host.setScore(scoreForBand());
+    handScore(host);
     const bpm = getState().playback.bpm;
     if (kind === 'mix') {
         progress('Rendering mix…');
