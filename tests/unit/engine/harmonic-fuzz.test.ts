@@ -49,8 +49,8 @@ describe('Harmonic Fuzz Testing', () => {
 
             // Additional sanity checks on the result
             arranger.progression.forEach((chord) => {
-                expect(typeof chord.rootMidi).toBe('number');
-                expect(Number.isFinite(chord.rootMidi)).toBe(true);
+                expect(typeof chord.absName).toBe('string');
+                expect(Number.isFinite(chord.beats)).toBe(true);
             });
         }
     });

@@ -75,6 +75,11 @@ export const COMPOSED: Readonly<Record<string, readonly [base: string, ...added:
     minb6: ['m', '6m'],
     min7b6: ['m7', '6m'],
     min9b6: ['m9', '6m'],
+    // The dictionary has no minor seventh with an altered colour above it, so each is its
+    // `m7` plus the one note the symbol names.
+    m7b9: ['m7', '9m'],
+    'm7#11': ['m7', '11A'],
+    m7b13: ['m7', '13m'],
     '7b13sus': ['7sus4', '13m'],
     '7susadd3': ['7sus4', '3M'],
 };

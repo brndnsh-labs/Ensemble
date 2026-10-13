@@ -139,9 +139,9 @@ export interface FormattedChordNames {
 }
 
 /**
- * Canonical parsed-chord type produced by `chords-engine.validateProgression()`: the names, the
- * root and the timing a measure-less chart is drawn from. It holds no voicing; the band voices
- * the chord (`prototypes/v2/lib/legacy-band-chart.ts`'s `legacyChordFacts`). Section-context fields (sectionId, sectionLabel,
+ * Canonical parsed-chord type produced by `chords-engine.validateProgression()`: the names and
+ * the timing a measure-less chart is drawn from. It holds no pitches; the band reads the chord
+ * back from its name (`prototypes/v2/lib/legacy-band-chart.ts`'s `legacyChordFacts`). Section-context fields (sectionId, sectionLabel,
  * localIndex, keyIsMinor, repeatIndex) are tagged on by validateProgression after
  * parsing — they're absent on a freshly parsed chord and present once it's been
  * placed in the arrangement.
@@ -152,13 +152,6 @@ export interface Chord {
     // --- Display ---
     absName: string;
     display: FormattedChordNames;
-
-    // --- Pitch content ---
-    /** The root's pitch in the octave from C4: which pitch class, not how it is voiced. */
-    rootMidi: number;
-
-    // --- Quality ---
-    quality: string;
 
     // --- Temporal / structural ---
     beats: number;

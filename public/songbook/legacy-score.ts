@@ -15,11 +15,47 @@ type ConversionResult =
     | { kind: 'candidate'; source: string; value: ChartDocumentV2; notes: ConversionNote[] }
     | { kind: 'blocked'; source: string; issues: (CodecIssue | ConversionNote)[] };
 
-// Deliberately conservative v1 spelling gate, not the v2 chord vocabulary. V1 uses
-// partial suffix matching (e.g. C-6, C7b9#11), so accepting those as new full tokens
-// would silently change meaning. More aliases need paired legacy/semantic adapter tests.
-const LEGACY_CHORD =
-    /^(?:[#b]?(?:III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)|[#b]?[1-7]|[A-Ga-g][#b]?)(?:maj7|m7b5|m13|m11|m9|m7|m6|m|dim7|dim|7#5|7b5|7b9|7#9|7#11|7b13|sus4|sus2|add9|13|11|9|7|6|5)?(?:\/(?:[#b]?(?:III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)|[#b]?[1-7]|[A-Ga-g][#b]?))?$/;
+const LEGACY_ROOT =
+    '(?:[#b]?(?:III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)|[#b]?[1-7]|[A-Ga-g][#b]?)';
+
+/**
+ * The quality spellings a measure-less chart may hold and still play: with the bare triad,
+ * the whole vocabulary of such a chart. Deliberately conservative, not the v2 chord
+ * vocabulary. V1 uses partial suffix matching (e.g. C-6, C7b9#11), so accepting those as new
+ * full tokens would silently change meaning. More aliases need paired legacy/semantic
+ * adapter tests.
+ */
+export const LEGACY_CHORD_QUALITIES = [
+    'maj7',
+    'm7b5',
+    'm13',
+    'm11',
+    'm9',
+    'm7',
+    'm6',
+    'm',
+    'dim7',
+    'dim',
+    '7#5',
+    '7b5',
+    '7b9',
+    '7#9',
+    '7#11',
+    '7b13',
+    'sus4',
+    'sus2',
+    'add9',
+    '13',
+    '11',
+    '9',
+    '7',
+    '6',
+    '5',
+] as const;
+
+const LEGACY_CHORD = new RegExp(
+    `^${LEGACY_ROOT}(?:${LEGACY_CHORD_QUALITIES.join('|')})?(?:\\/${LEGACY_ROOT})?$`,
+);
 
 /**
  * Pure, source-preserving conversion proposal. Never writes storage or certifies audio

@@ -17,8 +17,8 @@ describe('detached generation state', () => {
             },
             arranger: {
                 ...live.arranger,
-                progression: [{ rootMidi: 60, quality: 'major' }],
-                stepMap: [{ start: 0, end: 16, chord: { rootMidi: 60 } }],
+                progression: [{ absName: 'C', beats: 4 }],
+                stepMap: [{ start: 0, end: 16, chord: { absName: 'C' } }],
             },
             groove: {
                 ...live.groove,

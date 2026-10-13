@@ -9,7 +9,7 @@
  */
 import { type KeyContext, mod12, notePc } from './pitch.js';
 
-// cspell:ignore minb susadd
+// cspell:ignore minb susadd madd
 
 export type ChordFamily =
     | 'major'
@@ -108,7 +108,16 @@ const QUALITY_TABLE: readonly (readonly [spellings: readonly string[], formula: 
     [['m13', 'min13'], '1 b3 5 b7 9 13'],
     [['-6', 'm6'], '1 b3 5 6'],
     [['-69'], '1 b3 5 6 9'],
-    [['-^7'], '1 b3 5 7'],
+    // `mMaj7` is the Real Book's spelling of iReal's `-^7`, and `madd9` a minor triad with a
+    // 9th and no 7th. Both are names the measure-less charts' parser writes (#1662).
+    [['-^7', 'mMaj7'], '1 b3 5 7'],
+    [['madd9'], '1 b3 5 9'],
+    // A minor seventh with one written colour above it: what a lowercase numeral with a
+    // dominant's alteration (`i7b9`, `ii7#11`, `vi7b13`) plays, under the name a measure-less
+    // chart shows for it (#1662). `m7b13` keeps its 5th, as `7b13` does.
+    [['m7b9'], '1 b3 5 b7 b9'],
+    [['m7#11'], '1 b3 5 b7 #11'],
+    [['m7b13'], '1 b3 5 b7 b13'],
     [['-^9'], '1 b3 5 7 9'],
     [['min^11'], '1 b3 5 7 9 11'],
     [['min^13'], '1 b3 5 7 9 13'],
@@ -127,8 +136,9 @@ const QUALITY_TABLE: readonly (readonly [spellings: readonly string[], formula: 
     [['sus', 'sus4'], '1 4 5'],
     [['sus2', '2'], '1 2 5'],
     [['7sus', '7sus4'], '1 4 5 b7'],
-    [['9sus'], '1 4 5 b7 9'],
-    [['13sus'], '1 4 5 b7 9 13'],
+    // `sus` alone is the 4th, so `9sus4` and `13sus4` are the same chords spelled out.
+    [['9sus', '9sus4'], '1 4 5 b7 9'],
+    [['13sus', '13sus4'], '1 4 5 b7 9 13'],
     [['7b9sus'], '1 4 5 b7 b9'],
     [['7b13sus'], '1 4 5 b7 b13'],
     [['7susadd3'], '1 3 4 5 b7'],
