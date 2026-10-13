@@ -1,5 +1,5 @@
 import { ordinal } from './theory';
-import type { InstrumentDef, ShapeDef, ShapeRole } from './types';
+import type { InstrumentDef, Quality, ShapeDef, ShapeRole } from './types';
 
 /**
  * Closed triads (#1588) on three neighbouring strings, low to high, in all three inversions:
@@ -133,12 +133,35 @@ export const GUITAR: InstrumentDef = {
 };
 
 /**
+ * First-position chords that are not a moving shape (#1613): each is the book grip for ONE
+ * chord, made by an open string, and the six shapes of `UKE_TRIADS` cannot reach it — they
+ * voiced Fm as 1543 (a five-fret reach), E as 1442 or 4442 and Cm as 5333. Every ukulele method
+ * prints these three instead.
+ *
+ * Each is held to the one quality it is taught for (`ShapeDef.qualities`) and to the place its
+ * open string rings (`ShapeDef.openOnly`), because moved or re-coloured the same layout is a
+ * grip nobody shows: the Fm form as a major chord is F 2013, a finger more than the book's
+ * 2010, and a fret up it is F♯m 2124 for the book's 2120; the E form as a minor is Em 0402
+ * for the book's 0432. Left free, the costs took all three.
+ */
+const UKE_OPEN_FORMS: ShapeDef[] = [
+    // Fm 1013: A♭ C F C — the 3rd, the open C string's 5th, the root, the 5th again on top.
+    openForm('UTFm', 'Fm form', 2, ['T', 'F', 'R', 'F2'], 'min'),
+    // E 1402: G♯ E E B — the 3rd, the root, the open E string's root, the 5th.
+    openForm('UTEo', 'E form', 3, ['T', 'R', 'R2', 'F'], 'maj'),
+    // Cm 0333: G E♭ G C — the open G string's 5th, the 3rd, the 5th again, the root on top.
+    openForm('UTCm', 'Cm form', 1, ['F', 'T', 'F2', 'R'], 'min'),
+];
+
+/**
  * Ukulele triads (#1588): the standard four-string chords, which are closed triads with one tone
  * doubled so every string rings. Each shape is named for the chord it is in first position; the
  * voicer picks among them. Strings run G C E A (4 → 1), and the re-entrant G means the lowest
  * string is not the lowest note (`inversionOf` reads pitch, not string).
  */
 const UKE_TRIADS: ShapeDef[] = [
+    // The first six move: each is the first-position chord it is named for, and the same grip
+    // up the neck for every other root.
     // C 0003: G C E C — root on the C string, the root again on top.
     uke('UTC', 'C shape', 3, ['F', 'R', 'T', 'R2']),
     // F 2010: A C F A — root on the E string, the 3rd doubled on the A string.
@@ -151,6 +174,10 @@ const UKE_TRIADS: ShapeDef[] = [
     uke('UTD', 'D shape', 3, ['F', 'R', 'T', 'F2']),
     // Em 0432: G E G B — root on the C string, the 3rd doubled on the open G and the E string.
     uke('UTE', 'E shape', 3, ['T', 'R', 'T2', 'F']),
+    ...UKE_OPEN_FORMS,
+    // F♯sus2 1124 / Fsus2 0013: G♯ C♯ F♯ C♯ — the Fm form's layout with the 2nd in the 3rd's
+    // seat, and for a sus2 it is a shape that moves (index across the two low strings).
+    { ...uke('UTFs', 'Fsus2 shape', 2, ['T', 'F', 'R', 'F2']), qualities: ['sus2'] },
 ];
 
 /**
@@ -181,6 +208,17 @@ function uke(id: string, name: string, rootString: number, roles: ShapeRole[]): 
         name,
         voices: roles.map((role, i) => [4 - i, role] as [number, ShapeRole]),
     };
+}
+
+/** A first-position form for one quality: the same layout, offered only on its open string. */
+function openForm(
+    id: string,
+    name: string,
+    rootString: number,
+    roles: ShapeRole[],
+    quality: Quality,
+): ShapeDef {
+    return { ...uke(id, name, rootString, roles), qualities: [quality], openOnly: true };
 }
 
 /**

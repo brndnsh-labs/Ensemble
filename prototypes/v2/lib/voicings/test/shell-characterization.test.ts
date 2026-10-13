@@ -14,7 +14,7 @@
 // The charts (`CASES`) are the input and live here; everything under `chords` is output.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { GUITAR, UKULELE, voiceChart } from '../index';
+import { allPositions, GUITAR, inHome, UKULELE, voiceChart } from '../index';
 import { UKULELE_LOW_G } from '../instruments';
 import type { InstrumentDef } from '../types';
 import { keyRoot, SONG_SHAPES, songChart } from './keys';
@@ -159,6 +159,13 @@ const grid = (
 // pass that keeps a triad's fingers beside a shell is not seen either. Letting 3-1-4 in with
 // no reason turns 17 red, and with any fingering of the neighbour for a reason 2.
 //
+// The last 1 (#1613) is for the book grip a split symbol is held to (`unifyGrips`, `bookGrip`):
+// a ukulele `canon` in A at frets 1–6, whose Amaj7 the plan voices as 1-1-0-0 and as 2-4-4-4.
+// Holding either is inside the tolerance, the closed one cheaper; it plays 1-1-0-0. None of
+// the 369 before it met the rule (in C, F♯ and B♭ no symbol is split between an open grip and
+// a cheaper closed one), so #1613 moved none of them, and with the rule off this chart alone
+// turns red. #1613's triad forms (`UKE_OPEN_FORMS`) are no shell's, and no chart here sees them.
+//
 // So add charts freely, after the ones here, so the fixture's diff is additions only; measure
 // before dropping one (45 of the 436 mutations tried are caught by exactly one chart).
 const classic = (win: number, song: string, key: string): Case => ({
@@ -185,6 +192,7 @@ const CASES: Case[] = [
     ...grid([{ ins: 'guitar', rootSet: 'all' }], [1], ['walk'], ['F']),
     ...grid(SETUPS, [1], [...SONGS, 'plagal', 'minorDim'], KEYS),
     ...REACH_CASES,
+    ...grid([{ ins: 'uke', rootSet: 'all' }], [1], ['canon'], ['A']),
 ];
 
 const label = (c: Case): string =>
@@ -267,5 +275,33 @@ if (process.env.UPDATE_VOICING_GOLDEN === '1') {
                 expect({ ...c, chords: voice(c) }, HINT).toEqual(frozen.get(label(c)));
             });
         }
+    });
+
+    // #1613's acceptance, held on the fixture: a ukulele grip never reaches across five
+    // frets while the chord has a narrower grip inside the same window. None does (nor did
+    // any before #1613: the wide grips it removed were triads, which `engine.test.ts` sweeps).
+    describe('no ukulele grip in golden.json is five frets wide where a narrower one fits', () => {
+        const span = (frets: number[]): number => {
+            const fretted = frets.filter((f) => f > 0);
+            return fretted.length ? Math.max(...fretted) - Math.min(...fretted) : 0;
+        };
+        it('in every ukulele chart', () => {
+            const wide: string[] = [];
+            for (const c of CASES.filter((x) => x.ins !== 'guitar')) {
+                const home: [number, number] | null = c.win === null ? null : [c.win, c.win + 5];
+                const chart = songChart(keyRoot(c.key), SONG_SHAPES[c.song]);
+                frozen.get(label(c))?.chords.forEach((chord, i) => {
+                    const narrower = allPositions(
+                        INSTRUMENTS[c.ins],
+                        chart[i].root,
+                        chart[i].quality,
+                    ).some((v) => inHome(v, home) && span(v.notes.map((n) => n.fret)) < 4);
+                    if (span(chord.notes.map((n) => n[1])) >= 4 && narrower) {
+                        wide.push(`${label(c)}: ${chord.sym}`);
+                    }
+                });
+            }
+            expect(wide).toEqual([]);
+        });
     });
 }

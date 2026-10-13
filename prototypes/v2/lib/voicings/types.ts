@@ -59,6 +59,16 @@ export interface ShapeDef {
     name: string;
     /** [string, role] pairs that make up the grip. */
     voices: Array<[number, ShapeRole]>;
+    /**
+     * The only qualities taught on this shape, where that is fewer than every quality of its
+     * `kind` (`allowedShapes`). Unset on a shape that serves them all.
+     */
+    qualities?: Quality[];
+    /**
+     * A first-position form, not a shape that moves (#1613): built only where one of its
+     * strings rings open (`buildAt`), which is the one root it is the book grip for.
+     */
+    openOnly?: boolean;
 }
 
 export interface InstrumentDef {
