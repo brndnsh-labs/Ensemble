@@ -1297,26 +1297,82 @@ describe('a ukulele chart stays in first position (#1609)', () => {
                 expect(tabs(UKULELE, 'E Fdim F♯m B', home)[1]).toBe('4 5 4 2');
             }
         });
-        it('Ddim is 7 5 4 5, a fret past frets 1–6, where the window holds only 1 2 1 5', () => {
-            // The dim triad stays a triad: 1 2 1 2, the dim7 teachers play there, adds a note
-            // the symbol does not name.
+        it('in first position a reach beats leaving: Ddim stays 1 2 1 5, and so do its neighbours', () => {
+            // 1 2 1 5 is the only D diminished triad inside frets 1–6; the narrow one is
+            // 7 5 4 5. Taking that dragged the chart up after it: B♭ 3 5 6 5, F7 5 5 5 6,
+            // B♭7 3 5 4 5, D♭ 6 5 4 4. (The dim triad stays a triad: 1 2 1 2, the dim7 teachers
+            // play there, adds a note the symbol does not name.)
             for (const home of NUT) {
-                expect(tabs(UKULELE, 'Ddim', home)).toEqual(['7 5 4 5']);
-                expect(tabs(UKULELE, 'C Ddim G', home)).toEqual(['0 0 0 3', '7 5 4 5', '0 2 3 2']);
+                for (const inst of [UKULELE, UKULELE_LOW_G]) {
+                    expect(tabs(inst, 'B♭ Ddim E♭ F', home)).toEqual([
+                        '3 2 1 1',
+                        '1 2 1 5',
+                        '0 3 3 1',
+                        '2 0 1 0',
+                    ]);
+                    expect(tabs(inst, 'F7 Ddim', home)).toEqual(['2 3 1 3', '1 2 1 5']);
+                    expect(tabs(inst, 'B♭ B♭7 Ddim E♭', home)).toEqual([
+                        '3 2 1 1',
+                        '1 2 1 1',
+                        '1 2 1 5',
+                        '0 3 3 1',
+                    ]);
+                    expect(tabs(inst, 'D♭ Ddim E♭m A♭', home)).toEqual([
+                        '1 1 1 4',
+                        '1 2 1 5',
+                        '3 3 2 1',
+                        '1 3 4 3',
+                    ]);
+                    // No hop out of first position and back for one chord.
+                    expect(tabs(inst, 'Cm Ddim G7 Cm', home)).toEqual([
+                        '0 3 3 3',
+                        '1 2 1 5',
+                        G7,
+                        '0 3 3 3',
+                    ]);
+                }
+                expect(tabs(UKULELE, 'Ddim', home)).toEqual(['1 2 1 5']);
             }
-            // The same widening further up: E♭m in frets 2–7 held only 3 3 2 6.
+        });
+        it('a reach gives way in first position only to a grip that stays there: Fdim 4 5 4 2', () => {
+            // Up to the 6th fret, the nut window's own top: 4 5 4 2 has a 5th-fret note and
+            // still counts. Ddim's 7 5 4 5 does not.
+            const narrow = (root: string) =>
+                allPositions(UKULELE, R(root), 'dim')
+                    .filter((v) => span(tab(UKULELE, v)) <= 3 && inHome(v, [1, 6]))
+                    .map((v) => tab(UKULELE, v));
+            expect(narrow('F')).toEqual(['4 5 4 2']);
+            expect(narrow('D')).toEqual([]);
+            // Every other triad has such a grip: Ddim is the one chord the reach is kept for.
+            const kept: string[] = [];
+            for (const root of ROOTS) {
+                for (const q of ['maj', 'min', 'dim', 'aug', 'sus4', 'sus2'] as Quality[]) {
+                    const grips = allPositions(UKULELE, root, q);
+                    if (!grips.some((v) => span(tab(UKULELE, v)) <= 3 && inHome(v, [1, 6]))) {
+                        kept.push(`${root.name}${QUALITIES[q].symbol}`);
+                    }
+                }
+            }
+            expect(kept).toEqual(['Ddim']);
+        });
+        it('up the neck the window widens a fret before a reach is taken', () => {
+            // E♭m in frets 2–7 held only 3 3 2 6.
             expect(tabs(UKULELE, 'E♭m', [2, 7])).toEqual(['8 6 6 6']);
             expect(tabs(UKULELE, 'B♭m E♭m F B♭m', [2, 7])[1]).toBe('3 3 2 1');
+            // Ddim in frets 2–7 has 7 5 4 5 inside and needs no widening.
+            expect(tabs(UKULELE, 'Ddim', [2, 7])).toEqual(['7 5 4 5']);
         });
         it('a grip inside the window comes first: nothing leaves it that need not', () => {
-            // Dm 2 2 1 5 had company in frets 1–6, so the window does not widen for it.
-            expect(tabs(UKULELE, 'Dm Ddim', [1, 6])[0]).toBe('2 2 1 0');
+            // Dm 2 2 1 5 had company in frets 1–6, and it is no longer pulled onto the reach
+            // by the Ddim beside it.
+            expect(tabs(UKULELE, 'Dm Ddim', [1, 6])).toEqual(['2 2 1 0', '1 2 1 5']);
             // C♯m 1 1 0 4 is the C shape on an open string: three frets under the fingers.
             expect(tabs(UKULELE, 'F♯m B E C♯m', [1, 6])[3]).toBe('1 1 0 4');
         });
-        it('no triad alone is five frets wide, in any window from the nut to frets 9–14', () => {
+        it('no triad alone is five frets wide but Ddim at the nut, up to frets 9–14', () => {
             // Unlocked and in each six-fret window. Before, 28 were (the sweep over frets
-            // 1–15); what is left is Bdim in frets 10–15, where the neck ends.
+            // 1–15); what is left is Ddim in first position, kept on purpose, and Bdim in
+            // frets 10–15, where the neck ends.
             const windows: ([number, number] | null)[] = [null];
             for (let w = 1; w <= 9; w++) {
                 windows.push([w, w + 5]);
@@ -1332,12 +1388,14 @@ describe('a ukulele chart stays in first position (#1609)', () => {
                         if (span(tab(UKULELE, v)) > 3) {
                             wide.push(`${v.symbol} ${tab(UKULELE, v)} in ${home}`);
                         }
-                        // And never more than a fret out of the window.
+                        // Never more than a fret out of the window, and never out of a
+                        // window from the nut at all.
                         if (home) {
+                            const reach = home[0] === 1 ? 0 : 1;
                             for (const n of v.notes) {
                                 expect(
                                     n.fret === 0 ||
-                                        (n.fret >= home[0] - 1 && n.fret <= home[1] + 1),
+                                        (n.fret >= home[0] - reach && n.fret <= home[1] + reach),
                                     `${v.symbol} ${tab(UKULELE, v)} in ${home}`,
                                 ).toBe(true);
                             }
@@ -1345,7 +1403,7 @@ describe('a ukulele chart stays in first position (#1609)', () => {
                     }
                 }
             }
-            expect(wide).toEqual([]);
+            expect(wide).toEqual(['Ddim 1 2 1 5 in null', 'Ddim 1 2 1 5 in 1,6']);
             expect(tabs(UKULELE, 'Bdim', [10, 15])).toEqual(['10 11 10 14']);
         });
     });

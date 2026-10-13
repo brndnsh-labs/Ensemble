@@ -26,6 +26,7 @@
  * plan. Nothing here reads a note's `finger`.
  */
 import { assignFingers, type FingerOpts, fingerOptions, fingerSequence } from './fingering';
+import { HOME_FRETS } from './home-window';
 import { DEGREES, mod, QUALITIES } from './theory';
 import type {
     ChartChord,
@@ -457,6 +458,7 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
  * otherwise one is still taken when the costs already favour it (Am7 x-0-x-0-1-x, A7
  * x-0-x-0-2-x); it is not sought.
  */
+// Ukulele-only in effect, and so is every rule gated on it: no guitar shape sounds all six strings.
 const strumsEveryString = (v: { notes: Note[] }, inst: InstrumentDef): boolean =>
     v.notes.length === inst.strings;
 
@@ -745,22 +747,53 @@ const bookGrip = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boo
  * note (Ddim 1-2-1-5, E♭m 3-3-2-6); it is a grip only where strings ring open (C♯m 1-1-0-4).
  * `spanOf` reads fretted notes alone, so both of those stay.
  *
- * A last resort (`candidates`), like a guitar shell's buried root: taken when nothing else is
- * in the window or a fret past it.
+ * A last resort (`candidates`), like a guitar shell's buried root: up the neck it is taken
+ * when nothing else is in the window or a fret past it. In first position it gives way only to
+ * a grip that stays there (`leavesTheNut`).
  */
 const fiveFretReach = (v: Voicing, inst: InstrumentDef): boolean =>
     strumsEveryString(v, inst) && spanOf(v.notes.map((n) => n.fret)) > 3;
 
 /**
- * A strummed ukulele grip no more than a fret (`REACH`) past the window (#1675): what the
- * window widens to when all it holds is a `fiveFretReach`. Ddim in frets 1–6 is 7-5-4-5, one
- * fret past the top, for 1-2-1-5; E♭m in frets 2–7 is 3-3-2-1 or 8-6-6-6 for 3-3-2-6. A
- * guitar shell's reach asks for the root inside (`inReach`), because a shell is built up from
- * its root and the window is where the roots fall. A ukulele chord has no such anchor: its
- * root moves from string to string with the shape, so only the distance is asked.
+ * First position and its reach: frets 1 to `HOME_FRETS`, the window the stand opens a ukulele
+ * on and the one `atTheNut` means. With no window it is the same place: a chart nobody has
+ * placed is aimed there (`unaryCost`).
+ */
+const NUT_WINDOW: HomeWindow = [1, HOME_FRETS];
+
+/**
+ * In first position, a chord whose only grips there are five-fret reaches (#1675): Ddim, whose
+ * 1-2-1-5 is the one D diminished triad inside frets 1–6. There the reach is kept, because
+ * the other choice is to leave first position, and leaving costs the whole chart: with Ddim at
+ * 7-5-4-5 the chords beside it went up after it (B♭ Ddim E♭ F opened on B♭ 3-5-6-5 for
+ * 3-2-1-1, F7 Ddim on 5-5-5-6 for 2-3-1-3; 179 of 631 charts tried), and where they stayed the
+ * hand hopped five frets and back for one chord. A wide grip in place beats that.
+ *
+ * The bound is the nut window's own top, the 6th fret, not the 4th fret a book grip is held to
+ * (`FIRST_POSITION_TOP`): the grip a reach gives way to need only stay where the hand already
+ * may go, and Fdim 4-5-4-2, which replaces 1-5-4-2, has a 5th-fret note. Every other triad has
+ * such a grip, so only Ddim is touched by this.
+ */
+const leavesTheNut = (all: Voicing[], home: HomeWindow | null, inst: InstrumentDef): boolean =>
+    atTheNut(home) &&
+    !all.some(
+        (v) => strumsEveryString(v, inst) && !fiveFretReach(v, inst) && inHome(v, NUT_WINDOW),
+    );
+
+/**
+ * A strummed ukulele grip no more than a fret (`REACH`) past the window (#1675): what a window
+ * up the neck widens to when all it holds is a `fiveFretReach`. E♭m in frets 2–7 is 3-3-2-1
+ * or 8-6-6-6 for 3-3-2-6, F♯m in frets 5–10 6-6-5-4 or 11-9-9-9 for 6-6-5-9. A guitar
+ * shell's reach asks for the root inside (`inReach`), because a shell is built up from its root
+ * and the window is where the roots fall. A ukulele chord has no such anchor: its root moves
+ * from string to string with the shape, so only the distance is asked.
+ *
+ * Never a window from the nut (`atTheNut`): a fret past frets 1–6 is out of first position,
+ * and the chart follows the chord that goes there (`leavesTheNut`).
  */
 const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
     home !== null &&
+    !atTheNut(home) &&
     strumsEveryString(v, inst) &&
     v.notes.every((n) => n.fret === 0 || (n.fret >= home[0] - REACH && n.fret <= home[1] + REACH));
 
@@ -771,10 +804,12 @@ const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): bo
  *    is the chord, whatever stands beside it.
  * 2. Grips inside the hand window that a player would take: every one but those with a buried
  *    root (`rootBuried`), the open-string one-offs of a fretted shape (`openShapeOneOff`) and
- *    a ukulele's five-fret reaches (`fiveFretReach`). Where the window has one, nothing below
- *    is looked at.
+ *    a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
+ *    has another grip there, `leavesTheNut`). Where the window has one, nothing below is
+ *    looked at.
  * 3. Such grips with the window widened by a fret: a shell's with its root in the window
- *    (`inReach`, #1610), a strummed ukulele chord's wherever its root is (`aFretPast`). They
+ *    (`inReach`, #1610), a strummed ukulele chord's wherever its root is, in a window up
+ *    the neck (`aFretPast`). They
  *    are this position's grips for the chord, so they come before the awkward one inside and
  *    before a grip somewhere else on the neck (in frets 1–6, roots on the 6th and 5th strings,
  *    E♭m7♭5 is x-6-7-6-7-x, not x-6-4-6-x-5; E♭maj7, which has no grip inside at all, is
@@ -790,8 +825,8 @@ const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): bo
  * every chord has such a grip in every six-fret window, as every ukulele shell does. A guitar
  * triad or power chord has neither a buried root nor a reach, so for it this is what it
  * always was: the grips inside the window, or every grip when none fits. A ukulele triad gets
- * to step 3 only where the window holds nothing but a five-fret reach, and its two power
- * shapes where the window holds neither.
+ * to step 3 only where a window up the neck holds nothing but a five-fret reach, and its two
+ * power shapes where such a window holds neither.
  *
  * Each step's grips are all inside the window or all outside it (step 3 is only looked at for
  * what step 2 did not find inside, and step 5 when nothing is inside at all), which is why
@@ -801,10 +836,13 @@ function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
     const home = opts.home ?? null;
     const inst = opts.instrument;
     const all = allPositions(inst, c.root, c.quality, { rootStrings: opts.rootStrings });
+    const reachStays = leavesTheNut(all, home, inst);
     const clear = (grips: Voicing[]) =>
         grips.filter(
             (v) =>
-                !rootBuried(v, inst) && !openShapeOneOff(v, all, inst) && !fiveFretReach(v, inst),
+                !rootBuried(v, inst) &&
+                !openShapeOneOff(v, all, inst) &&
+                (reachStays || !fiveFretReach(v, inst)),
         );
     const inside = all.filter((v) => inHome(v, home));
     const tiers = [
