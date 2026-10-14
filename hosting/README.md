@@ -1,45 +1,25 @@
-# Ensemble hosting: shared runtime, separate releases
+# Ensemble hosting: one recipe, two stacks, releases are image tags
 
-Brandon's 2026-09-12 direction was to make test and production "simpler, faster, and more
-consistent." **The production cutover completed 2026-09-13** and has proven stable: prod now
-runs on `docker04` alongside test, and the old LXC hosts (115/116, 192.168.1.239/.224) have
-been retired and deleted from Proxmox. This doc's staged-transition and gated-approval
-language below is kept as historical record of how the migration was executed; the end state
-it describes is now live.
+Test and production run on `docker04` from one reviewed recipe, `static/compose.yml`
+(`render.mjs` materializes it per environment): an `api` service and a `web` service, each an
+immutable image. A release is a tag bump. There is no bind-mounted site, no release directory
+and no file transfer; the earlier `static` nginx container, its `www` directories and the
+`ensemble-deploy` account were retired 2026-10-13 (#1384).
 
-**Since the v2 cutover (#1357) neither host serves `/` from the static layout below.** Both
-run the `ensemble-web` image — the v2 stand built at `ENSEMBLE_V2_BASE=/` — and a release is a
-tag bump, not a file transfer. The bind-mounted runtime is still installed and still holds its
-last release, which is what makes pointing a host's Caddy handle back at it a one-line audition
-path. #1358 deleted v1 and every script that published to this layout (`scripts/deploy.sh`,
-`static-artifact.mjs`, `publish-static.sh`, `prototypes/v2/scripts/deploy.mjs`); the containers
-and their last releases stay up only as the Caddy rollback until they are retired. Read the
-static sections below as that frozen runtime, not as the site.
+Rollback is the previous `ensemble-web` / `ensemble-api` tag, which `ensemble-release` restores
+on its own when a new tag is unhealthy (below), or `git revert` and a PR for a bad commit.
 
-## One static layout
-
-`static/compose.yml` and `static/nginx.conf` are the shared, digest-pinned, non-root runtime.
-Only port, data directory and configuration path vary. No app rebuild or container restart is
-needed to publish static files. The entire parent directory is mounted read-only, so nginx
-sees atomic symlink changes instead of Docker pinning one release's inode.
+## The stacks
 
 ```text
 /opt/docker/{ensembletest,ensemble}/
-  docker-compose.yml          rendered stack: static runtime + api service (#1217)
+  docker-compose.yml          rendered stack: api + web services
   .env                        ENSEMBLE_API_TAG= / ENSEMBLE_WEB_TAG= — written by the release step (#1219, #1356)
 /var/lib/docker-data/{ensembletest,ensemble}/env/api.env   root-only API secret
 /var/lib/docker/volumes/{ensembletest,ensemble}-api-data/   SQLite database (named volume)
-/srv/ensemble-{test,prod}/www/
-  .ensemble-static-root       provisioning marker: ensemble-static-v1
-  .releases/<revision>-<uuid>/ complete, checksum-verified static artifacts
-  current -> .releases/...    atomic activation
-  .v2-previews/...            test: v2 audition releases (from the deleted `deploy.mjs test`)
-  .v2-releases/...            prod: v2 releases — last written before the #1357 cutover; CI
-                              publishes none of this any more
-  v2 -> .v2-{previews,releases}/...  atomic activation of the v2 music stand at /v2/
 ```
 
-### What the cutover's edge config must do (#1355 → #1356)
+### What the edge config must do (#1355 → #1356)
 
 The root-scope service worker and web manifest landed ahead of the web image, and they put five
 hard requirements on whatever serves `/` after the flip. Getting any of them wrong strands a
@@ -87,10 +67,9 @@ until the device reconnects. The beta's cache was always going to be deleted at 
 the five requirements above, and `smoke.mjs`, which turns each of them into an assertion against
 a container that is actually running. Together they build
 `ghcr.io/brndnsh-labs/ensemble-web:sha-<commit>` — the v2 stand exported at
-`ENSEMBLE_V2_BASE=/` (#1354) inside `nginxinc/nginx-unprivileged`, digest-pinned the way
-`static/compose.yml` pins nginx. At the cutover this image replaces the whole layout above: no
-release directory, no `current` symlink, no `v2` symlink, because the release IS the tag and
-rollback is the previous tag rather than a re-activation.
+`ENSEMBLE_V2_BASE=/` (#1354) inside `nginxinc/nginx-unprivileged`, the base image is pinned
+by digest in `hosting/web/Dockerfile`. There is no release directory or symlink, because the
+release IS the tag and rollback is the previous tag.
 
 The Docker build context is `hosting/web`: three small files, of which the Dockerfile copies two
 (`smoke.mjs` lives there because it belongs beside what it tests, and never enters the image).
@@ -133,11 +112,10 @@ That last row is why the redirect assertion parses instead of testing a `/` pref
 `'//evil.example/x'.startsWith('/')` is perfectly true, and an earlier version of this script
 passed against a config that would have sent a returning musician off-origin.
 
-What the config carries over from `static/nginx.conf`: the tmpfs pid/temp paths, `server_tokens
+What the config does: tmpfs pid/temp paths, `server_tokens
 off`, the dotfile and `/api/*` 404s, the no-SPA-fallback `try_files`, and the no-store/no-cache
-policy for workers and mutable entry points. What it drops, and why: the `/current` 404s and
-`disable_symlinks off` were about a bind-mounted release directory that an image does not have,
-and the second `location /v2/` document root is now the redirect. What it adds: the `/v2/sw.js`
+policy for workers and mutable entry points, over a single document root with `/v2/*` as a
+redirect. Beyond that: the `/v2/sw.js`
 carve-out, `absolute_redirect off` (this container speaks plain HTTP on a LAN port behind Caddy
 and Cloudflare, so an absolute `Location` would publish that address to a public browser),
 an open-redirect guard in front of it (a second separator right after `/v2/` means the rest of
@@ -166,7 +144,7 @@ probe that offers only the index types gets a 404 that reads like "private".)
 
 ### Running and releasing the image (#1356, infra half)
 
-`static/compose.yml` carries a `web` service beside `static`, and `render.mjs` renders it as
+`static/compose.yml` carries the `web` service, and `render.mjs` renders it as
 `<stack>-web` — the name `ensemble-release` derives from its `web` argument:
 
 | | ensembletest | ensemble |
@@ -175,10 +153,8 @@ probe that offers only the index types gets a 404 that reads like "private".)
 | Tag variable in the stack's `.env` | `ENSEMBLE_WEB_TAG` | `ENSEMBLE_WEB_TAG` |
 | Routed by Caddy | yes — the host's `/` | yes — the host's `/`, since the flip (#1357) |
 
-It runs **beside** the bind-mounted runtime on its own port rather than replacing it, so moving a
-host onto the image — and back — is one `reverse_proxy` line in Caddy and never a rebuild. No
-environment, no volumes, no secrets; the same `read_only`, `cap_drop: [ALL]`,
-`no-new-privileges`, `tmpfs: /tmp` posture as `static`; uid 101 is the image's default. The
+No environment, no volumes, no secrets; `read_only`, `cap_drop: [ALL]`, `no-new-privileges`
+and `tmpfs: /tmp`; uid 101 is the image's default. The
 healthcheck restates the image's own, command and timings, so the release step's health wait
 is visible from the compose file. `render.mjs` now requires `ENSEMBLE_WEB_TAG` as well as `ENSEMBLE_API_TAG`; each
 becomes a `${VAR:-<pinned>}` default the on-box `.env` overrides.
@@ -211,91 +187,13 @@ public `/build.json` asserted to name that `sourceRevision` afterwards. "Release
 public origin serves it, not that a command exited 0, and a merge cannot report success without
 both checks. Prod before test on purpose: the byte-level canary already ran in `web-image`
 (the pushed tag pulled back and smoke-tested under the stack's own container flags), an absent
-or unhealthy tag is non-destructive on either host, and a staging host — which an operator is
-explicitly allowed to point elsewhere, see below — must not be able to withhold the product's
-release. Within a stack, api before web: server before client.
+or unhealthy tag is non-destructive on either host, and a staging host — which an operator may point
+elsewhere for an audition — must not be able to withhold the product's release. Within a stack, api before web: server before client.
 
 A branch audition is a release too: `scripts/deploy-test.sh [branch]` makes sure
 `ensemble-web:sha-<sha>` exists (dispatching CI to build it if not) and runs `release
 ensembletest web sha-<sha>` as the operator, then checks the test host's `/build.json`. The next
 merge's `deploy` puts the test host back on `main`.
-
-### The #1357 flip checklist
-
-**The workflow deliberately does not tolerate either order.** The in-repo half and the edge
-change are one atomic switch wearing two hats, and each half is broken alone: with the PR merged
-but Caddy still on the bind-mounted runtime, `deploy`'s prod `/build.json` check answers 404 and
-the job goes red before the test release ever runs; with Caddy flipped but `main` still carrying
-the old `deploy`, every subsequent merge dies on `scripts/deploy.sh prod`'s "routed to the
-ensemble-web image" preflight. That is why step 1 is a merge freeze rather than an ordering
-preference — it is what makes the window between steps 2 and 4 safe in the only direction it can
-be walked.
-
-**0. Prerequisites, all owner-side.**
-
-- The prod stack must be **re-rendered and redeployed with the `web` service**. Both stacks are
-  already re-rendered in homelab-maintenance, but prod's `web` container is **not started yet**:
-  `bin/docker-deploy ensemble` is what starts it.
-- **Firewall:** :8095 is deliberately closed in `firewall/304.fw` and must be opened to Caddy
-  (the rule mirrors 8094's). `bin/firewall-deploy 304` applies it, but only inside the owner's
-  JIT grant on the PVE host (`scripts/grant-admin.sh`, time-boxed) — an agent cannot open that
-  window. Check from the Caddy box that :8095 answers before step 2, as the test-host flip did.
-- **Prod registration opens with this PR** (owner decision 2026-09-20: open, at the API's
-  default cap of 25). `ENSEMBLE_REGISTRATION` is rendered by `render.mjs` — `open` on both hosts
-  from this commit — so it reaches the box the same way the `web` service does: re-render the
-  prod recipe from this branch and `bin/docker-deploy ensemble`. Until that deploy, prod's API
-  keeps answering `403 registration_closed`; the accounts UI does not depend on it, and a closed
-  server still signs existing accounts in.
-- **A manual rehearsal release** of `ensemble web sha-<current main>` through the release
-  account, with the container healthy on :8095, before any edge change. This is the one step
-  that proves the prod stack can run the image at all.
-- **Rollback is already rehearsed** — on ensembletest, 2026-09-20: forward, back to the previous
-  tag, and a missing-tag failure, each asserted against both the running image and the public
-  `/build.json`. Rollback for prod is the same command with the previous tag.
-- **The release gate already accepts `web`.** `ensemble-release` was re-provisioned 2026-09-20
-  and takes `release <ensembletest|ensemble> web sha-<40 hex>` on both stacks, so this is a met
-  prerequisite, not a to-do.
-
-**1. Freeze merges to `main`.** See above: needed in both orders, for two different reasons.
-
-**2. Flip prod Caddy's `/` to :8095**, with the same handle shape ensembletest already uses —
-importing **neither** `default_app_policy` nor `ensemble_cache_policy`, because the image owns
-its own cache and framing policy (see the section above). The `/api/*` handles sit above it and
-do not change.
-
-**3. Verify by hand, before merging anything:**
-
-| Check | Expected |
-| --- | --- |
-| `https://ensemble.brndn.zip/build.json` | `sourceRevision` is the rehearsed commit |
-| `https://ensemble.brndn.zip/v2/sw.js` | **200, a file** — no `Location` header (the carve-out) |
-| `https://ensemble.brndn.zip/manifest.json` | 200 at that exact path, `no-cache` |
-| `https://ensemble.brndn.zip/api/auth/session` | 401 — the API is still routed past the image |
-
-**4. Merge the #1357 PR.** Its `deploy` job releases this commit's `ensemble-web` to prod, then
-test, and asserts each origin's `/build.json`. Green means prod serves the merged commit.
-
-**5. Lift the freeze** once that `deploy` is green.
-
-The static root contains no database or credentials. Hidden paths, `/current`, and `/api/*`
-return 404. Both environments used to serve the v2 music stand at `/v2/` from the `v2` symlink;
-on production the scoped `ensemble-deploy` account (which owns the static root) created
-`.v2-releases/` and the symlink itself, so no root provisioning was needed (#1207). Since the
-cutover (#1357) neither hostname routes to any of that — the stand is served at `/` by the
-image, and `/v2/*` is the edge redirect described above. The root
-publisher never touches `v2`, and the v2 publisher never touches `current`. Missing files are real 404s,
-never an SPA fallback. Service workers are no-store and mutable entry points no-cache.
-Old releases are retained for rollback; no automatic deletion/retention job is introduced.
-Retention is not a guarantee that old tabs can lazy-load old chunks through the current root.
-
-## Build once, verify, publish (retired)
-
-The v1 static-artifact pipeline this section described — `npm run build:size`, sealing with
-`scripts/static-artifact.mjs`, publishing with `scripts/deploy.sh` and activating with
-`scripts/publish-static.sh` — was deleted with v1 in #1358. The retained releases under
-`/srv/ensemble-{test,prod}/www/.releases/` are still served by the static containers on
-:8090/:8091, which is what makes the Caddy line a rollback; nothing publishes there any more.
-Every release is now an image tag (above).
 
 ## API is a separate service and a separate release
 
@@ -306,12 +204,12 @@ runs non-root. `/healthz` performs a read-only schema query and returns bounded 
 revision, without cookies or auth-rate-budget use. Keep it on the operator/container network.
 
 The same-origin `/api/*` route points directly from Caddy to this separate service (#1218).
-Static publishing never starts, restarts or migrates it.
+Releasing the web image never starts, restarts or migrates it.
 
 ### The `api` service in the shared stack (#1217)
 
 `static/compose.yml` carries a second service, `api`, that `render.mjs` emits as
-`ensembletest-api` / `ensemble-api` beside the static container in the same homelab stack:
+`ensembletest-api` / `ensemble-api` beside the web container in the same homelab stack:
 
 | Setting | Test | Prod |
 | --- | --- | --- |
@@ -326,7 +224,7 @@ with `openssl rand -hex 32`. Everything else is plain `environment:` in the reci
 the proxy-trust pair: `ENSEMBLE_AUTH_IP_HEADER=x-ensemble-client-ip` (lowercase — the API
 validates the name) and `ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES=192.168.1.244`. That address is
 Caddy's, and it is what the container actually sees as the socket peer: Docker DNATs published
-ports without rewriting the source (measured in the static container's nginx log, 2026-09-15).
+ports without rewriting the source (measured 2026-09-15).
 The API trusts the header from that peer alone; anything else is keyed on its own socket address.
 
 **The two image tags are the only interpolations in a rendered stack, on purpose.** Render with
@@ -350,22 +248,16 @@ Remaining API rollout requirements:
   (#1218). Do not trust caller-supplied X-Forwarded-For or blindly forward CF-Connecting-IP from
   a LAN request. Verify real routed independent rate budgets.
 - WAL-safe backup, actual restore rehearsal and backup-before-migrate (#1220) before durable
-  accounts/songbooks replace the disposable-stage migrate-on-start assumption. Static rollback
-  is not database rollback.
+  accounts/songbooks replace the disposable-stage migrate-on-start assumption. A tag rollback
+  is not a database rollback.
 
 ## Releasing the API from CI (#1219)
 
-CI never gets a shell on docker04. Two scoped accounts, two keys, two jobs of work:
+CI never gets a shell on docker04. One scoped account, one key:
 
 | Account | Key secret | Can do | Cannot do |
 | --- | --- | --- | --- |
-| `ensemble-deploy` | `DEPLOY_SSH_KEY` | write the production static root, activate `current` | sudo, Docker, test root, nginx config |
 | `ensemble-release` | `API_RELEASE_SSH_KEY` | `release <ensembletest\|ensemble> <api\|web> sha-<40 hex>` | anything else — the key is `restrict,command=` to a gate script |
-
-Since the cutover (#1357) CI uses only the second of those: the `deploy` job installs the
-release key alone, and `DEPLOY_SSH_KEY`/`ensemble-deploy` are no longer referenced by any
-workflow. The account and its key stay provisioned for the manual static path (and for #1358 to
-retire) — CI simply has no step that reaches them.
 
 The gate (`homelab-maintenance/docker/ensemble/release/ensemble-release-gate`) parses
 `SSH_ORIGINAL_COMMAND`, refuses anything but that exact shape, and sudoes — via a sudoers rule
@@ -380,48 +272,3 @@ The `deploy` job releases prod then test, and only for the images `api-image` an
 built from the same commit (`deploy` `needs` both). A `workflow_dispatch`
 hosting probe exercises the release account negatively instead: shell, foreign stack, floating
 tag, short tag and wrong service must all be refused.
-
-## Operator rollout and production gate
-
-1. Reconcile the homelab mirror with the live **Ensemble-only** files before deploying. The
-   inspected live test container uses `/opt/docker/ensembletest`, port 8090 and
-   `/srv/ensemble-test/www`; this transition adds its missing stack/config mirror and records
-   its already-live Caddy route without reloading the edge. Never deploy a stale whole
-   Caddy/firewall file to introduce this change; reconcile the live firewall at preflight.
-2. Rehearse the shared Compose runtime locally, including missing/hidden paths, cache headers,
-   current-pointer swaps and test preview isolation. Provision test with its marker and an
-   initial verified root release **before** changing nginx's root to `/site/current`. Preserve
-   the existing preview and legacy root for rollback. Apply only the test stack through
-   homelab config-as-code tooling, leaving its existing Caddy port unchanged.
-3. Stage the same static runtime for production on a confirmed-unused port. Seed it with the
-   exact currently live production bytes first, so hosting migration does not also release v2
-   or unrelated app changes. Record the old route/runtime and exact rollback artifact.
-4. Create a dedicated **non-sudo, non-Docker** deployment account with write access only to the
-   production static release root. Reuse the existing CI public deploy key only after matching
-   its fingerprint; never install it into docker04's full-admin `claude` account.
-5. Update the narrow tailnet grant/test and CI host/user configuration together. The currently
-   checked policy admits `tag:ci` only to `192.168.1.239:22`; the new destination is docker04
-   `192.168.1.52:22`. The current tooling has no tailnet write credential: a policy-console
-   application is an operator step. This is required before changing production CI's target.
-6. Present exact images/config hashes, ports, public cache/SW verification, CI SSH proof,
-   data impact (none for static hosting), and the rollback path. **Stop for production go.**
-   After approval, update only the production route and enable `--atomic` in CD together.
-   Keep the old LXC intact until the public and CI paths are verified; retirement is separate.
-
-The current scoped PVE account could not read the live VM304 firewall (ordinary read denied;
-`sudo -n` requires a grant). Production's new backend-port rule therefore still needs a fresh
-PVE JIT window for read/validate/apply. No firewall edit or elevation was attempted by this work.
-
-Test was converted on 2026-09-12 using the reviewed dirty audition artifact
-`bd6af0b9-6704`. The container is healthy, non-root/read-only, with zero restarts; live config
-hashes match these recipes. Public HTML and canonical worker bytes match the artifact, private
-paths return 404, and the existing v2 fingerprint stayed unchanged. Old configuration files
-are retained under `/srv/ensemble-test/hosting-backup-20260912-atomic`; old root files remain.
-This was a test-only deployment receipt at the time it was written — see the top of this doc
-for the completed production cutover.
-
-**Cutover complete (2026-09-13):** both environments now use the same docker04 atomic release
-layout, and the legacy rsync path / `PROD_DEPLOY_PROFILE` migration selector have been removed
-from `scripts/deploy.sh` and `.github/workflows/ci.yml`. The old LXC hosts (115/116) were
-deleted from Proxmox the same day. Rollback for prod is now the same verified
-previous-release activation described above, not a redeploy to a different host.

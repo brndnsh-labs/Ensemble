@@ -629,7 +629,8 @@ jobs:
   # Since the cutover (#1357) a release is a TAG, not a file transfer. The two rsync
   # publishes this job used to run — the v1 root app and the `/v2` export — are gone, with
   # the artifact downloads, the `static-artifact.mjs verify` step, the Node setup and the
-  # `ensemble-deploy` SSH config that existed only to serve them; #1358 deleted the scripts.
+  # SSH config for the retired `ensemble-deploy` account (#1384) that existed only to serve
+  # them; #1358 deleted the scripts.
   #
   # `web-release` (#1356) is folded in here for the same reason. With the static publish gone
   # the two jobs were the same job — one tailnet join, one scoped key, one forced command —
@@ -646,8 +647,8 @@ jobs:
   # is "compose can bring this tag up", which is the same code path on both stacks and whose
   # failure modes are already non-destructive — an absent tag fails before the container is
   # touched, an unhealthy one is put back on the previous tag. Against that small gain,
-  # test-first lets a staging host withhold the product's release, and hosting/README.md
-  # explicitly allows an operator to point that host's Caddy elsewhere for a v1 audition.
+  # test-first lets a staging host withhold the product's release, and an operator
+  # may point that host's Caddy elsewhere for an audition.
   # Production does not queue behind staging.
   #
   # Within a stack: api, then web. Server before client, so the new stand never meets the
@@ -788,7 +789,7 @@ jobs:
           refused 'release ensemble static sha-'"$GITHUB_SHA"  # wrong service
           refused 'release ensembletest web latest'      # web is accepted (#1356), a floating tag is not
           echo 'ensemble-release refuses every malformed command'
-          for port in 8090 8091 2375 2376; do
+          for port in 8092 8093 8094 8095 2375 2376; do
             if timeout 3 bash -c 'exec 3<>/dev/tcp/$1/$2' _ "$PROD_DEPLOY_HOST" "$port" 2>/dev/null; then
               echo "::error::CI unexpectedly reached backend port $port"; exit 1
             fi
