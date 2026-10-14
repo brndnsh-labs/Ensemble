@@ -92,7 +92,10 @@ const sameRun = (x: Barre | undefined, y: Barre | undefined): boolean =>
 /**
  * What each finger does going from a to b ("stays down", "slides up 1 fret", "lifts off"...). A
  * barre is one finger (#1594): it stays down, slides as a whole, or "bars fret 8 on the top two
- * strings" when it is laid down or changes its strings.
+ * strings" when it is laid down or changes its strings. A barre that gives way to ONE of the
+ * notes it was already on has not moved (#1683): G x-x-x-4-3-3 (2-1-1) to Em x-x-x-4-5-3
+ * (2-3-1) leaves the index on the 1st string, where it was read as moving there from the 2nd,
+ * the string a barre is named by (`fingerMap`).
  */
 export function fingerMoves(
     inst: InstrumentDef,
@@ -115,8 +118,21 @@ export function fingerMoves(
         // A barre that stays a barre on the same strings moves like one finger; a new or
         // reshaped one is named. A barre giving way to one note is that finger's note.
         const sameShape = !by || sameRun(bx, by);
-        if (x && y && x.string === y.string && x.fret === y.fret && sameShape) {
-            moves.push({ finger: f, kind: 'hold', text: 'stays down', from: x, to: y, barre: by });
+        // The note of a's barre that b keeps under the same finger, when b keeps just one.
+        const under =
+            bx && y && !by
+                ? a.notes.find((n) => n.finger === f && n.string === y.string && n.fret === y.fret)
+                : undefined;
+        const was = under ?? x;
+        if (was && y && was.string === y.string && was.fret === y.fret && sameShape) {
+            moves.push({
+                finger: f,
+                kind: 'hold',
+                text: 'stays down',
+                from: was,
+                to: y,
+                barre: by,
+            });
         } else if (y && by && !sameShape) {
             moves.push({
                 finger: f,

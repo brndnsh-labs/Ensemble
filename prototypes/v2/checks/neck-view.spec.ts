@@ -78,7 +78,9 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     // fret, so the line names the note and its two jobs (#1618), then the fingers that move —
     // the 7th slides down to G7's 3rd.
     const fingers = view.locator('.neck-fingers');
-    await expect(fingers).toContainText('F stays: the 3rd becomes the 7th; re-finger it with 2');
+    await expect(fingers).toContainText(
+        'F is in both chords: the 3rd becomes the 7th; finger 2 takes it over',
+    );
     await expect(fingers).not.toContainText('finger 2 moves');
     await expect(fingers).toContainText('finger 1 moves to');
     await expect(fingers).toContainText('finger 3 slides down 1 fret');
