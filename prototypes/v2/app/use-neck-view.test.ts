@@ -313,9 +313,9 @@ describe('neckModel', () => {
         // Dm7 x 5 3 5 x x is 2-1-3, root under the middle finger (#1611). It was 3-2-4, the
         // root under the ring finger so that the middle one could stay on the F ("Finger 2
         // stays down"): a hold no teacher shows. Fingered root first, the 7th slides to G7's 3rd,
-        // and the F is said as the note it is (#1618): it stays, under another finger.
+        // and the F is said as the note it is (#1618): in both chords, under another finger.
         expect(model.fingers).toBe(
-            'F stays: the 3rd becomes the 7th; re-finger it with 2; ' +
+            'F is in both chords: the 3rd becomes the 7th; finger 2 takes it over; ' +
                 'finger 1 moves to the 6th string, fret 3; finger 3 slides down 1 fret.',
         );
     });
@@ -447,8 +447,8 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
     it('a ii–V–I: the note that stays is named with both jobs, finger held or not', () => {
         expect(lines(['Dm7', 'G7', 'Cmaj7'], guitar([2, 7]))).toEqual([
             // Dm7 x 5 3 5 x x (2-1-3) to G7 3 x 3 4 x x (1-2-3): no finger stays on the F, so
-            // the note is what stays, and "re-finger it with 2" is finger 2's whole move.
-            'F stays: the 3rd becomes the 7th; re-finger it with 2; ' +
+            // the note is what is said, and "finger 2 takes it over" is finger 2's whole move.
+            'F is in both chords: the 3rd becomes the 7th; finger 2 takes it over; ' +
                 'finger 1 moves to the 6th string, fret 3; finger 3 slides down 1 fret.',
             // G7 to Cmaj7 x 3 x 4 5 x: the ring finger does stay, and the note it is on is said.
             'Finger 3 stays down on B: the 3rd becomes the 7th; ' +
@@ -477,7 +477,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // A♭ is the barre 3-1-1 (#1617), not 2-1-1 with the middle finger two frets from the
         // index, so the note is named and the ring finger takes it.
         expect(lines(['Am', 'Ab'], guitar(null))[0]).toBe(
-            'C stays; re-finger it with 3; finger 1 slides down 1 fret.',
+            'C is in both chords; finger 3 takes it over; finger 1 slides down 1 fret.',
         );
     });
 
@@ -489,9 +489,10 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
                 'finger 2 goes down on the 2nd string, fret 6.',
         );
         // F to C x x x 5 5 3: the C stays under a new barre, which says its own strings — so no
-        // "re-finger it with 3" beside it.
+        // "finger 3 takes it over" beside it.
         expect(pop[3]).toBe(
-            'C stays: the 5th becomes the root; finger 1 moves to the 1st string, fret 3; ' +
+            'C is in both chords: the 5th becomes the root; ' +
+                'finger 1 moves to the 1st string, fret 3; ' +
                 'finger 3 bars fret 5 on the 3rd and 2nd strings.',
         );
         // Two fingers on two notes, on a ukulele: G7 0 2 1 2 to Em7 0 2 0 2.
@@ -506,7 +507,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         const sub = lines(['Cmaj7', 'C#7', 'F7', 'B7'], guitar(null));
         expect(sub[2]).toBe(
             'Finger 3 stays down on E♭/D♯: the 7th becomes the 3rd; ' +
-                'A stays: the 3rd becomes the 7th; re-finger it with 2; ' +
+                'A is in both chords: the 3rd becomes the 7th; finger 2 takes it over; ' +
                 'finger 1 moves to the 5th string, fret 2.',
         );
     });
@@ -514,7 +515,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
     it('three shared notes are a list, not a lesson: named, without their jobs', () => {
         // Ukulele Bm7♭5 2 2 1 2 to G7 0 2 1 2 keeps D, F and B.
         expect(lines(['Bm7b5', 'G7'], uke)[0]).toBe(
-            'Finger 1 stays down; D and B stay; re-finger them with 2 and 3.',
+            'Finger 1 stays down; D and B are in both chords; fingers 2 and 3 take them over.',
         );
         // Dm7 2 2 1 3 is F6 2 2 1 3: nothing moves, and four jobs are not read out.
         expect(lines(['Dm7', 'F6'], uke)[0]).toBe('Fingers 1, 2, 3 and 4 stay down.');
@@ -525,18 +526,19 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         const [toAm, toF] = lines(['C', 'Am', 'F'], uke);
         expect(toAm).toBe('Finger 2 goes down on the G string, fret 2.');
         // Am to F 2 0 1 0: the fretted A is named; the open strings beside it are not, and
-        // there is no finger 0 to re-finger anything with.
+        // there is no finger 0 to take anything over.
         expect(toF).toBe(
             'Finger 2 stays down on A: the root becomes the 3rd; ' +
                 'finger 1 goes down on the E string, fret 1.',
         );
-        expect([toAm, toF].join(' ')).not.toMatch(/open|with 0|Finger 0/);
+        expect([toAm, toF].join(' ')).not.toMatch(/open|finger 0/i);
     });
 
     it('leaves out a note it has no plain name or job for', () => {
         const dim = lines(['Cdim7', 'B7'], guitar([1, 6]));
         // C°7 x 3 4 2 4 x to B7 x 2 x 2 4 x: the 3rd-string note is C°7's diminished 7th (B♭♭,
-        // B7's A) under another finger. No "B♭♭ stays": that finger's move is said as before.
+        // B7's A) under another finger. No "B♭♭ is in both chords": that finger's move is said
+        // as before.
         expect(dim[0]).toBe(
             'Finger 4 stays down; finger 1 moves to the 5th string, fret 2; ' +
                 'finger 2 moves to the 3rd string, fret 2.',
@@ -559,8 +561,55 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // Cm7 x 3 1 3 x x to F7 1 x 1 2 x x in B♭: the shared note is E♭, never D♯.
         const flat = lines(['Cm7', 'F7'], { ...guitar([1, 6]), rootStrings: 'classic' }, 'Bb');
         expect(flat[0]).toBe(
-            'E♭ stays: the 3rd becomes the 7th; re-finger it with 2; ' +
+            'E♭ is in both chords: the 3rd becomes the 7th; finger 2 takes it over; ' +
                 'finger 1 moves to the 6th string, fret 1; finger 3 slides down 1 fret.',
+        );
+    });
+
+    it('a barre that takes one of two shared notes: only the other is handed to a finger (#1683)', () => {
+        // Dm x 5 3 2 x x (4-2-1) to B♭ x 5 3 3 x x (3-1-1). F goes under the index barre,
+        // which says its own fret and strings; D is the one note the ring finger takes. It
+        // read "re-finger them with 3".
+        const pop = lines(['F', 'C', 'Dm', 'Bb'], guitar(null));
+        expect(pop[2]).toBe(
+            'F and D are in both chords: F becomes the 5th and D the 3rd; ' +
+                'finger 3 takes D over; finger 1 bars fret 3 on the 4th and 3rd strings.',
+        );
+        // Both notes to a fingertip each, and they are still "them": B♭ back to Dm.
+        expect(lines(['Dm', 'Bb'], guitar([1, 6]))[1]).toBe(
+            'F and D are in both chords: F becomes the 3rd and D the root; ' +
+                'fingers 2 and 4 take them over; finger 1 moves to the 3rd string, fret 2.',
+        );
+    });
+
+    it('a barre that gives way to one note it was on has not moved (#1683)', () => {
+        // G x x x 4 3 3 (2-1-1) to Em x x x 4 5 3 (2-3-1): the index was across the top two
+        // strings and stays on the 1st. It read "finger 1 moves to the 1st string, fret 3",
+        // and the G it holds went unsaid.
+        const [toEm, toC] = lines(['G', 'Em', 'C', 'D'], guitar([2, 7]));
+        expect(toEm).toBe(
+            'Fingers 1 and 2 stay down: G becomes the 3rd and B the 5th; ' +
+                'finger 3 goes down on the 2nd string, fret 5.',
+        );
+        // Em to C x x x 5 5 3: the index stays again, and the ring finger is a barre now.
+        expect(toC).toBe(
+            'Finger 1 stays down on G: the 3rd becomes the 5th; ' +
+                'finger 3 bars fret 5 on the 3rd and 2nd strings.',
+        );
+        // Am x 3 2 2 x x (2-1-1) to F x 3 3 2 x x (2-3-1): the index stays on the 3rd string.
+        expect(lines(['Am', 'F'], guitar(null))[0]).toBe(
+            'Fingers 1 and 2 stay down: A becomes the 3rd and C the 5th; ' +
+                'finger 3 goes down on the 4th string, fret 3.',
+        );
+        // The same on a ukulele: B♭ 3 2 1 1 to Gm 0 2 3 1 leaves the index on the A string.
+        expect(lines(['Bb', 'Gm'], uke)[0]).toBe(
+            'Fingers 1 and 2 stay down: B♭ becomes the 3rd and D the 5th; ' +
+                'finger 3 moves to the E string, fret 3.',
+        );
+        // A barre that leaves its fret has moved, whatever it lands on: B♭ x 5 3 3 x x back
+        // to Dm x 5 3 2 x x.
+        expect(lines(['Dm', 'Bb'], guitar([1, 6]))[1]).toContain(
+            'finger 1 moves to the 3rd string, fret 2',
         );
     });
 });

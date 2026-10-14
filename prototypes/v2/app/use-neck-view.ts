@@ -224,8 +224,14 @@ export function rootLine(
  *
  * A note both grips fret in the same place is said as a teacher says it (#1618): the note stays
  * and its job changes. Under the same finger that is "Finger 3 stays down on B: the 3rd becomes
- * the 7th"; under another, "F stays: the 3rd becomes the 7th; re-finger it with 2", which stands
- * in for that finger's own move. A change with no such note reads as it always did.
+ * the 7th"; under another, "F is in both chords: the 3rd becomes the 7th; finger 2 takes it
+ * over", which stands in for that finger's own move. (It read "F stays: …; re-finger it with 2"
+ * until #1683, which told the hand to stay and to change in one breath.) A change with no such
+ * note reads as it always did.
+ *
+ * Where a barre takes one of several such notes, only the notes that go to a fingertip are
+ * handed to it (#1683): Dm x-5-3-2-x-x (4-2-1) to B♭ x-5-3-3-x-x (3-1-1) is "finger 3 takes D
+ * over", and the F is under the barre, which says its own fret and strings.
  */
 export function fingersLine(
     instrument: InstrumentDef,
@@ -261,17 +267,28 @@ export function fingersLine(
         const notes = byName(swapped);
         const become = jobs(notes, told);
         parts.push(
-            `${list(notes.map((s) => s.name))} ${notes.length === 1 ? 'stays' : 'stay'}${become && `: ${become}`}`,
+            `${list(notes.map((s) => s.name))} ${notes.length === 1 ? 'is' : 'are'} in both chords${become && `: ${become}`}`,
         );
         // A barre laid over the note says its own fret and strings below: that is the finger.
-        const fingers = [...new Set(swapped.map((s) => s.to.finger!))].filter(
-            (f) => !barring.has(f),
-        );
+        // So only the notes a fingertip takes are handed to one, by name when they are not
+        // all of them.
+        const taken = swapped.filter((s) => !barring.has(s.to.finger!));
+        const fingers = [...new Set(taken.map((s) => s.to.finger!))];
         if (fingers.length) {
-            parts.push(`re-finger ${swapped.length === 1 ? 'it' : 'them'} with ${list(fingers)}`);
+            const which =
+                taken.length < swapped.length
+                    ? list(byName(taken).map((s) => s.name))
+                    : swapped.length === 1
+                      ? 'it'
+                      : 'them';
+            const who =
+                fingers.length === 1
+                    ? `finger ${fingers[0]} takes`
+                    : `fingers ${list(fingers)} take`;
+            parts.push(`${who} ${which} over`);
         }
     }
-    // "Re-finger it with 2" is finger 2's move, so it is not said twice.
+    // "Finger 2 takes it over" is finger 2's move, so it is not said twice.
     const said = (finger: number, at: Note | undefined) =>
         swapped.some(
             (s) => s.to.finger === finger && s.string === at?.string && s.fret === at?.fret,
