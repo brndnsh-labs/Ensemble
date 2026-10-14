@@ -6,6 +6,7 @@ import type { SemanticScore } from '@engine/songbook/score-types';
 import type { InstrumentVoice } from '@engine/types';
 import { keyDistance } from '@engine/utils';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import {
     computeAdoptCandidates,
     forgetAdoptionDecision,
@@ -1159,7 +1160,12 @@ export default function Ensemble() {
         // hidden page gets no frames, so a slower timer still notices playback stopping there.
         let frame = 0;
         let idle = 0;
-        const follow = () => {
+        // A frame's paint is committed inside that frame (`flushSync`, #1693). State set in an
+        // animation frame is otherwise committed in a later task, and on a busy main thread the
+        // next frame can run first: it sets the next chord, and the one this frame read is never
+        // shown although a frame saw it. The first call runs inside this effect, where React is
+        // already committing and a nested flush is refused, so it commits the ordinary way.
+        const follow = (commit: (paint: () => void) => void) => {
             window.cancelAnimationFrame(frame);
             window.clearTimeout(idle);
             const playingNow = runtime.state().playback.isPlaying;
@@ -1168,24 +1174,27 @@ export default function Ensemble() {
             // read separately once showed the bar just left with the new bar's cue.
             const tick = playingNow ? runtime.songTick() : null;
             const slot = runtime.playheadSlot(tick);
-            setPlaying(playingNow);
-            // No slot while counting in or between two queued segments: the pointer holds.
-            setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
-            setCountInBeat(runtime.countInBeat());
-            // #1458 — a pure engine read off the live song tick, not the ACTIVE bar's rendered DOM
-            // node: React hasn't necessarily committed `active`'s new value yet on the very frame
-            // playback crosses a barline, so reading the OLD bar's DOM attributes here would still
-            // see the bar just left after the engine had already moved on.
-            setNextSoon(runtime.inLastBeat(tick));
-            // The slot this same tick is in, never `active`'s committed value, for the reason
-            // above — and off any slot (-1) there is no chord to be leaving.
-            setChangeSoon(runtime.inLastBeatOfSlot(tick, slot));
+            commit(() => {
+                setPlaying(playingNow);
+                // No slot while counting in or between two queued segments: the pointer holds.
+                setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
+                setCountInBeat(runtime.countInBeat());
+                // #1458 — a pure engine read off the live song tick, not the ACTIVE bar's rendered
+                // DOM node: React hasn't necessarily committed `active`'s new value yet on the very
+                // frame playback crosses a barline, so reading the OLD bar's DOM attributes here
+                // would still see the bar just left after the engine had already moved on.
+                setNextSoon(runtime.inLastBeat(tick));
+                // The slot this same tick is in, never `active`'s committed value, for the reason
+                // above — and off any slot (-1) there is no chord to be leaving.
+                setChangeSoon(runtime.inLastBeatOfSlot(tick, slot));
+            });
             if (playingNow) {
-                frame = window.requestAnimationFrame(follow);
+                frame = window.requestAnimationFrame(inFrame);
             }
-            idle = window.setTimeout(follow, playingNow ? 250 : 60);
+            idle = window.setTimeout(inFrame, playingNow ? 250 : 60);
         };
-        follow();
+        const inFrame = () => follow(flushSync);
+        follow((paint) => paint());
         const preventLoss = (event: BeforeUnloadEvent) => {
             if (volatileDrafts.current.size || pendingText.current) {
                 event.preventDefault();
