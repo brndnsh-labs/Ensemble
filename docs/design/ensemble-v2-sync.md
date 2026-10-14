@@ -433,7 +433,7 @@ Decisions:
 1. **The account API runs as a container on `docker04`**, following the existing GHCR/compose
    convention. Nothing is hand-installed on an LXC.
 2. **The test origin moved to `docker04` first** (2026-09-10, commit `94952e1e`): nginx container
-   at `/opt/docker/ensembletest`, host port 8090, serving the bind mount `/srv/ensemble-test/www`;
+   at `/opt/docker/ensembletest`, host port 8090, serving the bind mount `/srv/ensemble-test/www` (that static runtime was retired 2026-10-13, #1384);
    Caddy's `@ensembletest` block reverse-proxies to it. LXC 116 was verified idle and shut down.
 3. **The API must be a PATH on the existing origin, never a second host.** WebAuthn RP\_ID and
    session cookies are origin-bound, so a separate API hostname would force CORS, `SameSite=None`

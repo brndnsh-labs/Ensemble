@@ -34,6 +34,9 @@ describe.skipIf(!hasCompose)('hosting/static/render.mjs', () => {
             });
             expect(result.status, result.stderr).toBe(0);
             const out = result.stdout;
+            // The stack is exactly api + web: the retired `static` service must not come back.
+            const services = out.slice(out.indexOf('\nservices:\n')).split('\nnetworks:')[0];
+            expect(services.match(/^ {2}\S.*:$/gm)).toEqual([`  ${stack}-api:`, `  ${stack}-web:`]);
             expect(out).toContain(`  ${stack}-api:\n`);
             expect(out).toContain(
                 `image: ghcr.io/brndnsh-labs/ensemble-api:\${ENSEMBLE_API_TAG:-${TAG}}`,
@@ -51,7 +54,7 @@ describe.skipIf(!hasCompose)('hosting/static/render.mjs', () => {
             expect(out).toContain(`published: "${webPort}"`);
             // Registration is a reviewed, per-environment value — never an on-box surprise.
             expect(out).toContain(`ENSEMBLE_REGISTRATION: ${registration}\n`);
-            // The image runs under the same posture as `static`, with nothing mounted into it.
+            // The image runs read-only as uid 101 with nothing mounted into it.
             const web = out.slice(out.indexOf(`  ${stack}-web:\n`)).split(/\n {2}\S/)[0];
             expect(web).toContain('read_only: true');
             expect(web).toContain('user: 101:101');

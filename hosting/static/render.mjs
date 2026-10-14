@@ -40,9 +40,6 @@ const apiEnvStandIn = path.join(scratch, 'api.env');
 writeFileSync(apiEnvStandIn, '');
 const env = {
     ...process.env,
-    ENSEMBLE_STATIC_PORT: environment === 'test' ? '8090' : '8091',
-    ENSEMBLE_STATIC_ROOT: `/srv/ensemble-${environment}/www`,
-    ENSEMBLE_NGINX_CONFIG: `/srv/ensemble-${environment}/nginx.conf`,
     ENSEMBLE_API_PORT: environment === 'test' ? '8092' : '8093',
     ENSEMBLE_HOSTNAME: environment === 'test' ? 'ensembletest.brndn.zip' : 'ensemble.brndn.zip',
     ENSEMBLE_API_ENV_FILE: apiEnvStandIn,
@@ -52,7 +49,6 @@ const env = {
     // than left to the API's closed-when-unset default, so closing it again is a reviewed diff.
     ENSEMBLE_REGISTRATION: 'open',
     ENSEMBLE_API_TAG: TAG_PLACEHOLDER,
-    // Beside the static runtime, not instead of it, until the cutover (#1357).
     ENSEMBLE_WEB_PORT: environment === 'test' ? '8094' : '8095',
     ENSEMBLE_WEB_TAG: WEB_TAG_PLACEHOLDER,
 };
@@ -79,10 +75,6 @@ try {
     rmSync(scratch, { recursive: true, force: true });
     throw error;
 }
-// Preserve the live test stack's Compose identity, so it is replaced rather than
-// left orphaned while a new service attempts to bind the same port.
-model.services[name] = { ...model.services.static, container_name: name };
-delete model.services.static;
 model.services[`${name}-api`] = { ...model.services.api, container_name: `${name}-api` };
 delete model.services.api;
 // `<stack>-web` is the name the release script derives from its `web` argument.

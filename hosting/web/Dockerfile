@@ -48,6 +48,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 
 # Bypass the base image's docker-entrypoint.sh: its /docker-entrypoint.d/ scripts want to
 # write into /etc/nginx, which a read-only rootfs refuses, and this image has no templates for
-# them to expand. Same reason hosting/static/compose.yml overrides the entrypoint.
+# them to expand.
 ENTRYPOINT ["nginx"]
 CMD ["-g", "daemon off;"]
