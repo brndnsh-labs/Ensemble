@@ -230,8 +230,8 @@ export function rootLine(
  * note reads as it always did.
  *
  * Where a barre takes one of several such notes, only the notes that go to a fingertip are
- * handed to it (#1683): Dm x-5-3-2-x-x (4-2-1) to B♭ x-5-3-3-x-x (3-1-1) is "finger 3 takes D
- * over", and the F is under the barre, which says its own fret and strings.
+ * handed to it (#1683): Dm x-5-3-2-x-x (4-2-1) to B♭ x-5-3-3-x-x (3-1-1) is "finger 3 takes
+ * over D", and the F is under the barre, which says its own fret and strings.
  */
 export function fingersLine(
     instrument: InstrumentDef,
@@ -275,17 +275,16 @@ export function fingersLine(
         const taken = swapped.filter((s) => !barring.has(s.to.finger!));
         const fingers = [...new Set(taken.map((s) => s.to.finger!))];
         if (fingers.length) {
-            const which =
-                taken.length < swapped.length
-                    ? list(byName(taken).map((s) => s.name))
-                    : swapped.length === 1
-                      ? 'it'
-                      : 'them';
             const who =
                 fingers.length === 1
                     ? `finger ${fingers[0]} takes`
                     : `fingers ${list(fingers)} take`;
-            parts.push(`${who} ${which} over`);
+            // A name reads better after the verb ("takes over D"); a pronoun inside it.
+            parts.push(
+                taken.length < swapped.length
+                    ? `${who} over ${list(byName(taken).map((s) => s.name))}`
+                    : `${who} ${swapped.length === 1 ? 'it' : 'them'} over`,
+            );
         }
     }
     // "Finger 2 takes it over" is finger 2's move, so it is not said twice.

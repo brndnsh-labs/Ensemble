@@ -573,7 +573,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         const pop = lines(['F', 'C', 'Dm', 'Bb'], guitar(null));
         expect(pop[2]).toBe(
             'F and D are in both chords: F becomes the 5th and D the 3rd; ' +
-                'finger 3 takes D over; finger 1 bars fret 3 on the 4th and 3rd strings.',
+                'finger 3 takes over D; finger 1 bars fret 3 on the 4th and 3rd strings.',
         );
         // Both notes to a fingertip each, and they are still "them": B♭ back to Dm.
         expect(lines(['Dm', 'Bb'], guitar([1, 6]))[1]).toBe(
