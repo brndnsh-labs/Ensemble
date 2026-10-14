@@ -26,12 +26,15 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ## Registry
 
-### 🔴 `prototypes/v2/checks/root-handover.chromium.spec.ts` — "a v1 worker hands the site root over, keeping downloaded sounds and v1 local data"
+### 🟢 `prototypes/v2/checks/root-handover.chromium.spec.ts` — "a v1 worker hands the site root over, keeping downloaded sounds and v1 local data"
 
-- **Class:** e2e-timing (unconfirmed; two observations).
+- **Class:** e2e-timing, in the test.
 - **Symptom:** `v2-suite (2, laptop)` on `main` at `ebbe6a7f` (#1656, run 38195051461, 2026-10-11): `Error: page.reload: Protocol error (Page.reload): Not attached to an active page`, at the reload before `expect(page.locator('body[data-standin="v1"]')).toBeVisible()`. The same commit's PR run was green, and the change (the drum dispatcher) cannot reach this spec.
 - **Not yet diagnosed:** no fail-rate measured. The test swaps service workers under the page, so a candidate is the page being torn down and re-attached by the worker handover at the moment `page.reload()` is issued. It reddened a push to `main`, so that commit's deploy was skipped; the next push deployed.
 - **Second sighting:** same leg, same error, on `main` at `6c782fc1` (#1685, run 38469579107, 2026-10-13). The change (a chord-formula row) cannot reach this spec, and its PR run was green. Both sightings are pushes to `main`, never a PR run. Deploy was skipped until the failed leg was re-run.
+- **Root cause (2026-10-13):** the self-reloading v1 stand-in (`scripts/serve.mjs`, `v1Page(true)`) calls `location.reload()` on `controllerchange`, as v1's `pwa.ts` did. The test waited for "a controller is set" and then called `page.reload()`. That condition is already true in the document the page is about to throw away, so the test's reload could collide with the page's own. Measured with a probe after the poll: in 4 of 40 runs the page was mid-navigation at that moment. The "not yet diagnosed" candidate above was right.
+- **Fix:** the test records, as each document starts, whether a worker already controlled it (`bornControlled`), and waits for a document that loaded under the worker (`loadedUnder`) before its own reload. It waits on the condition; no timeout changed. After: the whole spec 15/15 (180 tests), and this test 40/40 under contention (2 pinned cores, 3 spinners, 3 workers). The original never failed locally in 40 runs, so the fix is argued from the measured window, not from a red-to-green.
+- **Needs a root build to run at all:** the spec skips unless built and run with `ENSEMBLE_V2_BASE=/`; a default local build reports it as skipped.
 - **Last seen:** 2026-10-13 (`main`, `6c782fc1`).
 
 ### 🟢 `prototypes/v2/checks/songbook-home.spec.ts` — "one search returns your songs and the standards, grouped"

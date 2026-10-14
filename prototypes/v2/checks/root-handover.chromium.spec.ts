@@ -61,6 +61,36 @@ function controller(page: Page) {
         .catch(() => null);
 }
 
+/**
+ * Waits for a document that LOADED under the worker at `script`. The self-reloading v1 stand-in
+ * reloads itself the moment a worker first takes control (`controllerchange`), so "a controller
+ * is set" is true in two documents: the one about to be thrown away and the one that replaces
+ * it. A `page.reload()` issued in the first collides with the page's own reload and fails with
+ * "Not attached to an active page" (seen twice on `main`; in 4 of 40 local runs the test reached
+ * its reload while that navigation was in flight). Needs `bornControlled` installed first.
+ */
+async function loadedUnder(page: Page, script: string) {
+    await expect
+        .poll(() =>
+            page
+                .evaluate(() => ({
+                    born: (window as unknown as { bornControlled?: boolean }).bornControlled,
+                    by: navigator.serviceWorker.controller?.scriptURL ?? '',
+                }))
+                .then(({ born, by }) => born === true && by.includes(script))
+                .catch(() => false),
+        )
+        .toBe(true);
+}
+
+/** Records, as each document starts, whether a worker already controlled it. */
+function bornControlled(page: Page) {
+    return page.addInitScript(() => {
+        (window as unknown as { bornControlled: boolean }).bornControlled =
+            !!navigator.serviceWorker.controller;
+    });
+}
+
 function scopes(page: Page) {
     return page
         .evaluate(async () =>
@@ -109,9 +139,11 @@ test('a v1 worker hands the site root over, keeping downloaded sounds and v1 loc
 }) => {
     // Two 30s polls in sequence can outrun the default budget on a slow runner.
     test.setTimeout(90_000);
+    await bornControlled(page);
     await request.post('/__test/legacy?on=1');
     await page.goto('/');
-    await expect.poll(() => controller(page)).toContain('/sw.js');
+    // This stand-in reloads itself when the worker takes control: wait for that reload to land.
+    await loadedUnder(page, '/sw.js');
     // Reload once the stand-in controls, so what follows is the page as a returning musician
     // gets it: served out of v1's precache, not off the network.
     await page.reload();
