@@ -1302,9 +1302,12 @@ dialog textarea {
         justify-content: flex-end;
         flex: 1;
         min-width: 130px;
-        /* Showing the controls mid-song adds "Focus chart" to a row that was already full; it
-           ran Save and the song menu off the right edge, reachable only by scrolling the page
-           sideways (#1700). Wrap instead. */
+    }
+    /* Showing the controls mid-song adds "Focus chart" to a row that was already full; it ran
+       Save and the song menu off the right edge, reachable only by scrolling the page sideways
+       (#1700). Wrap then — only then: the idle row fits with ~10px to spare, and CI's WebKit
+       sets text wider than local, so a row free to wrap at rest wraps there. */
+    .song-actions:has(.focus-toggle) {
         flex-wrap: wrap;
     }
     .song-actions .btn {
