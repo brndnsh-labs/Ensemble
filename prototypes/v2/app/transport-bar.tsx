@@ -17,9 +17,10 @@ interface TransportBarProps {
     onTempo: (bpm: number) => void;
     onKey: (key: string) => void;
     onGenre: (genre: string) => void;
-    onFeel: () => void;
+    /** Opens the Band sheet (#1703) on the tab the musician was last on. */
+    onBand: () => void;
     onToggleLane: (lane: Lane) => void;
-    /** Opens the Trade sheet (the band engine only): trading turns with the band. */
+    /** Opens the Band sheet on its Trade tab: trading turns with the band. */
     onTrade: () => void;
     /** Set when the chart asks to trade but the band can't right now (`runtime.tradeBlocked`). */
     tradeBlocked: string | null;
@@ -34,7 +35,7 @@ export function TransportBar({
     onTempo,
     onKey,
     onGenre,
-    onFeel,
+    onBand,
     onToggleLane,
     onTrade,
     tradeBlocked,
@@ -94,7 +95,7 @@ export function TransportBar({
             </div>
             <div className="genre-setting">
                 <label className="setting-label" htmlFor="genre">
-                    Feel
+                    Style
                 </label>
                 <select
                     id="genre"
@@ -107,20 +108,16 @@ export function TransportBar({
                         <option key={g}>{g}</option>
                     ))}
                 </select>
-                {/* The rest of the feel — swing, humanize, mix, notation — opens from
-                    here rather than the song header, which has no room for a fifth
-                    control on a phone (#1276). */}
+                {/* Everything else about the band — sounds, groove, trading, practice aids —
+                    is one sheet (#1703), opened from here beside the style it follows. */}
                 <button
                     type="button"
-                    className="feel-button"
+                    className="band-button"
                     disabled={busy}
-                    onClick={onFeel}
-                    // The name starts with the visible word (#1700, WCAG 2.5.3 label in name):
-                    // a voice-control user says "click More".
-                    aria-label="More: feel and mix"
-                    title="Feel and mix"
+                    aria-haspopup="dialog"
+                    onClick={onBand}
                 >
-                    More…
+                    Band…
                 </button>
             </div>
             <div className="band-controls" aria-label="Band instruments">

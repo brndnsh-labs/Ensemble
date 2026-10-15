@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { BASE, expect, seedStarters, songLink, test } from './fixtures';
+import { BASE, expect, openBand, seedStarters, songLink, test } from './fixtures';
 
 /**
  * What happens to a browser that has been here before, when the stand takes the site root
@@ -365,11 +365,11 @@ test('a pack still under the old base plays offline on the first load after the 
     test.setTimeout(90_000);
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByRole('button', { name: 'Sounds', exact: true }).click();
+    await openBand(page, 'Players');
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
     await expect(page.getByText('Song sounds available offline', { exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Close sounds' }).click();
+    await page.getByRole('button', { name: 'Close band' }).click();
 
     // Put every downloaded file back under the base a pre-cutover browser wrote it to.
     const moved = await page.evaluate(async () => {
@@ -395,7 +395,7 @@ test('a pack still under the old base plays offline on the first load after the 
     await context.setOffline(true);
     // Re-opening the panel re-runs `soundsAvailableOffline`, which walks the pack through
     // `asset(cachedOnly)` — the read-through path, on this same page load.
-    await page.getByRole('button', { name: 'Sounds', exact: true }).click();
+    await openBand(page, 'Players');
     await expect(page.getByText('Song sounds available offline', { exact: true })).toBeVisible();
     await context.setOffline(false);
     // And the entries it adopted are filed under the new base from then on.

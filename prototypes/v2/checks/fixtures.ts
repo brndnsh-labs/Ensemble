@@ -94,8 +94,8 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
     // bar of clicks before every Play — real product behavior, but it would push back the
     // first note/highlight/audio sample in every OTHER spec in this suite that presses Play
     // without being about count-in at all. Seed the preference OFF here, the same way a real
-    // device that opened the Feel sheet once would read. Only when UNSET — an explicit write
-    // (the Feel sheet checkbox, `count-in.spec.ts`'s own subject) must survive a reload within
+    // device that opened the Band sheet once would read. Only when UNSET — an explicit write
+    // (the Band sheet's Practice checkbox, `count-in.spec.ts`'s own subject) must survive a reload within
     // the same test, not get silently put back on the next navigation.
     //
     // A cheap, suite-wide CSP net (#1395): `window.__cspViolations` collects every
@@ -247,6 +247,18 @@ export const accountTest = test.extend<{ accountApi: AccountApi }>({
         await use(accountApi.origin);
     },
 });
+
+/** Opens the Band sheet (#1703) on `tab` and returns the dialog. */
+export async function openBand(page: Page, tab: 'Players' | 'Groove' | 'Trade' | 'Practice') {
+    const sheet = page.getByRole('dialog', { name: 'Band' });
+    // `open`, not visibility: a sheet sliding shut after a close is still visible for a moment.
+    if ((await page.locator('dialog.band-panel[open]').count()) === 0) {
+        await page.getByRole('button', { name: 'Band…' }).click();
+    }
+    await sheet.getByRole('tab', { name: tab }).click();
+    await expect(sheet.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
+    return sheet;
+}
 
 /**
  * Wait for the editor's reveal-focus to land before typing into any OTHER field (#1235).

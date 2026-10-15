@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, expect, openBand, seedStarters, songLink, test } from './fixtures';
 
 // Same starter facts `checks/midi-export.spec.ts` hardcodes, for the same reason: an
 // independent check on the exporter, not a mirror of the app's own arranger math.
@@ -138,7 +138,7 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
     }, appUrl('packs/grand/manifest.json'));
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByRole('button', { name: 'Sounds', exact: true }).click();
+    await openBand(page, 'Players');
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     // Wait for the picker's OWN install to fully finish (`toBeEnabled`, not just
     // the optimistic `toHaveValue`, which flips the instant the click is made —
@@ -147,7 +147,7 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
     // export's.
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
-    await page.getByRole('button', { name: 'Close sounds' }).click();
+    await page.getByRole('button', { name: 'Close band' }).click();
 
     // Evict what was just installed and arm the delay, so the export's own
     // `prepareSounds` call has real (slow) work to do rather than a cache hit.
@@ -198,11 +198,11 @@ test('A pack that fails to install surfaces an error, never a silent synth fallb
     }, appUrl('packs/grand/'));
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByRole('button', { name: 'Sounds', exact: true }).click();
+    await openBand(page, 'Players');
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
-    await page.getByRole('button', { name: 'Close sounds' }).click();
+    await page.getByRole('button', { name: 'Close band' }).click();
 
     // Evict the just-installed pack and break its re-fetch route, matching
     // `checks/foundation-sounds.spec.ts`'s "partial cache eviction" scenario — a

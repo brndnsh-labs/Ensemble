@@ -176,8 +176,8 @@ test('unsupported text blocks save, export, navigation and transforms without lo
     }
     await page.getByLabel('Key', { exact: true }).selectOption('D');
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('C');
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Blues');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Blues');
     await page.getByLabel('Section', { exact: true }).selectOption('a');
     await expect(page.getByLabel('Chord text')).toHaveValue('Dm7 | G7');
     // Invalid text remains tab-only, and the browser receives an unload guard.

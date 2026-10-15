@@ -1812,7 +1812,7 @@ dialog textarea {
    sat at three different heights before. */
 .setting-select,
 .tempo-control,
-.feel-button {
+.band-button {
     min-height: var(--setting-row, 32px);
 }
 .setting-select {
@@ -1825,7 +1825,7 @@ dialog textarea {
     cursor: pointer;
 }
 /* Opens the Feel sheet (#1276) beside the genre select: same type, muted, no chrome. */
-.feel-button {
+.band-button {
     font-size: 13px;
     font-weight: 650;
     color: var(--muted);
@@ -1833,7 +1833,7 @@ dialog textarea {
     /* A text-only button still needs a finger-sized target (#1700); it was 15–18px tall. Its
        height is the shared setting row's, below. */
 }
-.feel-button:hover {
+.band-button:hover {
     color: var(--ink);
 }
 .section-text {
@@ -2110,24 +2110,6 @@ dialog textarea {
         font-size: 11px;
     }
 }
-.sound-panel {
-    width: min(720px, calc(100vw - 24px));
-    padding: 24px;
-    max-height: calc(100dvh - 32px);
-    overflow: auto;
-}
-.sounds-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-}
-.sounds-heading h2 {
-    margin: 0;
-}
-.sounds-heading p {
-    margin: 6px 0 16px;
-}
 .sound-install {
     background: var(--green-light);
     border-radius: 12px;
@@ -2215,7 +2197,7 @@ dialog textarea {
     color: var(--green);
     margin-bottom: 5px;
 }
-.sound-panel p,
+.band-note,
 .sound-progress {
     font-size: 12px;
 }
@@ -2227,9 +2209,8 @@ dialog textarea {
     display: none;
 }
 
-/* Feel & mix sheet (#1276) — same dialog/heading/close-button shape as `.sound-panel`
-   above, kept as its own scoped block rather than sharing class names across the two
-   unrelated features (per-instrument sound settings vs. band-wide feel settings). */
+/* The Band sheet (#1703) — its dialog, heading and grouped panels. The `feel-` names are from
+   the Feel & mix sheet (#1276) the Band sheet's Groove and Practice tabs grew out of. */
 .feel-panel {
     width: min(480px, calc(100vw - 24px));
     padding: 24px;
@@ -2314,6 +2295,77 @@ dialog textarea {
     flex-direction: row;
     align-items: center;
     gap: 8px;
+}
+/* One height for every tab, so switching tabs doesn't make the sheet jump; the tab's panel
+   scrolls inside it. */
+.band-panel {
+    width: min(640px, calc(100vw - 24px));
+    height: min(680px, calc(100dvh - 32px));
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+}
+.band-panel[open] {
+    display: flex;
+}
+.band-panel .feel-heading {
+    align-items: center;
+    margin-bottom: 12px;
+}
+.band-tabs {
+    display: flex;
+    background: var(--hover);
+    padding: 3px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.band-tabs [role="tab"] {
+    flex: 1 1 0;
+    min-height: 36px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--muted);
+}
+.band-tabs [role="tab"][aria-selected="true"] {
+    background: var(--surface);
+    box-shadow: 0 1px 3px #0001;
+    color: var(--ink);
+    font-weight: 650;
+}
+.band-tab-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 16px;
+}
+.band-panel .error-banner {
+    margin: 12px 0 0;
+}
+.band-lede,
+.band-note {
+    color: var(--muted);
+    margin: 0 0 12px;
+}
+.band-note {
+    margin: 4px 0 0;
+}
+.sound-lane-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.sound-choices .lane-switch {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+}
+.sound-lane.muted > :not(.sound-lane-head) {
+    opacity: 0.55;
 }
 @media (max-width: 760px) {
     .feel-panel {
@@ -2407,8 +2459,7 @@ dialog textarea {
 .performance-focus .mode-switch,
 .performance-focus .save-btn,
 .performance-focus .menu-btn,
-.performance-focus .sounds-button,
-.performance-focus .feel-button {
+.performance-focus .band-button {
     display: none;
 }
 /* One size for idle and playing: a second, larger playing-only scale used to
@@ -2436,9 +2487,6 @@ dialog textarea {
     }
 }
 @media (max-width: 760px) {
-    .sound-panel {
-        padding: 18px;
-    }
     .sound-choices {
         grid-template-columns: minmax(0, 1fr);
     }
@@ -2465,10 +2513,6 @@ dialog textarea {
     .song-open .band-controls {
         order: 2;
         padding-top: 6px;
-    }
-    .sounds-button {
-        margin-left: auto;
-        padding: 8px 10px;
     }
     .song-open .genre-setting {
         margin-left: 0;

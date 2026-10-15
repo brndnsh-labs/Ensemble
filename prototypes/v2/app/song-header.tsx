@@ -21,7 +21,6 @@ interface SongHeaderProps {
     neck: boolean;
     onHome: () => void;
     onToggleTheme: () => void;
-    onSounds: () => void;
     onToggleControls: () => void;
     onShowChart: () => void;
     onShowNeck: () => void;
@@ -47,7 +46,6 @@ export function SongHeader({
     neck,
     onHome,
     onToggleTheme,
-    onSounds,
     onToggleControls,
     onShowChart,
     onShowNeck,
@@ -102,9 +100,6 @@ export function SongHeader({
                         ☾
                     </span>
                     <span className="theme-label">Stage</span>
-                </button>
-                <button className="btn sounds-button" onClick={onSounds}>
-                    Sounds
                 </button>
                 {playbackActive && (
                     <button

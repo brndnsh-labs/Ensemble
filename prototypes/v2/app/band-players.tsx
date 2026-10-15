@@ -1,9 +1,7 @@
-import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
 import { type Lane, visibleLanes } from './band-lanes';
-import { backdropDismiss, whenClosed } from './dialog-close';
 import { useRangeCommit } from './use-range-commit';
 
 interface RangeSettingProps {
@@ -62,64 +60,46 @@ function RangeSetting({ label, ariaLabel, value, disabled, onCommit }: RangeSett
     );
 }
 
-interface SoundsPanelProps {
-    /** Owned by the shell, which drives `showModal()`/`close()` from its `soundMenu` state. */
-    dialogRef: RefObject<HTMLDialogElement | null>;
-    open: boolean;
+interface PlayersTabProps {
     current: ChartDocument;
     busy: boolean;
-    error: string;
     soundProgress: string;
     soundsOffline: boolean | null;
     allSoundsOffline: boolean | null;
     pendingSound: { lane: string; value: string } | null;
-    onClose: () => void;
     onInstallAll: () => void;
     onChooseSound: (lane: Lane, value: string) => void;
     onVolume: (lane: Lane, value: number) => void;
     onReverb: (lane: Lane, value: number) => void;
+    onToggleLane: (lane: Lane) => void;
 }
 
-export function SoundsPanel({
-    dialogRef,
-    open,
+/**
+ * The Band sheet's Players tab (#1703): each lane on or off, its sound, volume and reverb — what
+ * the Sounds panel held, plus the on/off the transport's chips also offer as a quick toggle.
+ */
+export function PlayersTab({
     current,
     busy,
-    error,
     soundProgress,
     soundsOffline,
     allSoundsOffline,
     pendingSound,
-    onClose,
     onInstallAll,
     onChooseSound,
     onVolume,
     onReverb,
-}: SoundsPanelProps) {
+    onToggleLane,
+}: PlayersTabProps) {
     return (
-        <dialog
-            className="sound-panel"
-            ref={dialogRef}
-            aria-labelledby="sounds-title"
-            onClose={whenClosed(onClose)}
-            {...backdropDismiss}
-        >
-            <div className="sounds-heading">
-                <div>
-                    <h2 id="sounds-title">Your band's sound</h2>
-                    <p>Install once. Play anywhere.</p>
-                </div>
-                <button className="icon-button" aria-label="Close sounds" onClick={onClose}>
-                    ✕
-                </button>
-            </div>
+        <>
             <div className="sound-install">
                 <button className="btn primary" disabled={busy} onClick={onInstallAll}>
-                    {busy ? 'Preparing sounds…' : 'Install all & use genre sounds'}
+                    {busy ? 'Preparing sounds…' : 'Install all & use style sounds'}
                 </button>
                 <p>
-                    About {allSoundsSizeMB.toFixed(1)} MB. Chooses sounds for this song's feel;
-                    changing the feel follows along. Save to keep this setup.
+                    About {allSoundsSizeMB.toFixed(1)} MB. Chooses sounds for this song's style;
+                    changing the style follows along. Save to keep this setup.
                 </p>
                 <small>
                     {allSoundsOffline === null
@@ -129,11 +109,6 @@ export function SoundsPanel({
                           : 'Missing downloads will be installed. Completed files are reused.'}
                 </small>
             </div>
-            {error && open && (
-                <div className="error-banner" role="alert">
-                    {error}
-                </div>
-            )}
             <p className="sound-progress" role="status">
                 {soundProgress}
             </p>
@@ -145,14 +120,29 @@ export function SoundsPanel({
                           ? 'Song sounds available offline'
                           : 'Some sounds need downloading'}
                 </span>
-                <span>Or choose each instrument:</span>
             </div>
             <div className="sound-choices">
                 {visibleLanes.map(([lane, label]) => {
                     const band = current.chart.band[lane];
+                    const pack = packsForInstrument(lane).find(
+                        (entry) => band.voice === `pack:${entry.id}`,
+                    );
                     return (
-                        <div className="sound-lane" key={lane}>
-                            <h3>{label}</h3>
+                        <div className={`sound-lane ${band.enabled ? '' : 'muted'}`} key={lane}>
+                            <div className="sound-lane-head">
+                                <h3>{label}</h3>
+                                <label className="lane-switch">
+                                    <input
+                                        type="checkbox"
+                                        role="switch"
+                                        checked={band.enabled}
+                                        disabled={busy}
+                                        aria-label={`${label} playing`}
+                                        onChange={() => onToggleLane(lane)}
+                                    />
+                                    <span>{band.enabled ? 'On' : 'Off'}</span>
+                                </label>
+                            </div>
                             <label>
                                 {label} sound
                                 <select
@@ -167,28 +157,21 @@ export function SoundsPanel({
                                     disabled={busy}
                                     onChange={(event) => onChooseSound(lane, event.target.value)}
                                 >
-                                    <option value="auto">Follow feel</option>
+                                    <option value="auto">Follow style</option>
                                     <option value="synth">Built-in</option>
-                                    {packsForInstrument(lane).map((pack) => (
-                                        <option key={pack.id} value={`pack:${pack.id}`}>
-                                            {pack.name} · {pack.approxSizeMB} MB
+                                    {packsForInstrument(lane).map((entry) => (
+                                        <option key={entry.id} value={`pack:${entry.id}`}>
+                                            {entry.name} · {entry.approxSizeMB} MB
                                         </option>
                                     ))}
                                 </select>
                                 <small>
                                     {band.autoSound && (
                                         <span className="resolved-sound">
-                                            Using{' '}
-                                            {packsForInstrument(lane).find(
-                                                (pack) => band.voice === `pack:${pack.id}`,
-                                            )?.name || 'Built-in'}
+                                            Using {pack?.name || 'Built-in'}
                                         </span>
                                     )}
-                                    {
-                                        packsForInstrument(lane).find(
-                                            (pack) => band.voice === `pack:${pack.id}`,
-                                        )?.attribution
-                                    }
+                                    {pack?.attribution}
                                 </small>
                             </label>
                             <RangeSetting
@@ -209,10 +192,10 @@ export function SoundsPanel({
                     );
                 })}
             </div>
-            <p>
+            <p className="band-note">
                 Choosing a sound downloads it for offline use. Save keeps your choices with this
                 song. Browser storage can still be cleared or evicted.
             </p>
-        </dialog>
+        </>
     );
 }

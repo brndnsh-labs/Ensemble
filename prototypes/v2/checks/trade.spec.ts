@@ -24,7 +24,7 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     );
 
     await page.getByRole('button', { name: 'Trade', exact: true }).click();
-    const sheet = page.getByRole('dialog', { name: 'Trade' });
+    const sheet = page.getByRole('dialog', { name: 'Band' });
     await expect(sheet).toBeVisible();
     // The blues drummer doesn't solo: only the soloist is offered.
     // (An <option>'s own `disabled` attribute: Playwright's enabled-state check reads the
@@ -37,7 +37,7 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     await sheet.getByLabel('Trade with').selectOption('soloist');
     await sheet.getByLabel('Turns', { exact: true }).selectOption('2');
     await sheet.getByLabel('Head returns').selectOption('3');
-    await sheet.getByRole('button', { name: 'Close trade' }).click();
+    await sheet.getByRole('button', { name: 'Close band' }).click();
 
     // Trading with the soloist turns it on; the button shows the turns.
     await expect(page.getByRole('button', { name: 'Soloist', exact: true })).toHaveAttribute(
@@ -64,14 +64,14 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     await expect(paused).toHaveClass(/\boff\b/);
     await paused.click();
     await expect(sheet.getByText('Paused: the soloist is off.')).toBeVisible();
-    await sheet.getByRole('button', { name: 'Close trade' }).click();
+    await sheet.getByRole('button', { name: 'Close band' }).click();
     await page.getByRole('button', { name: 'Soloist', exact: true }).click();
     await expect(trade).toHaveClass(/\bon\b/);
 
     // Off again: the chart saves as it did before trading existed.
     await trade.click();
     await sheet.getByLabel('Trade with').selectOption('off');
-    await sheet.getByRole('button', { name: 'Close trade' }).click();
+    await sheet.getByRole('button', { name: 'Close band' }).click();
     await expect(page.getByRole('button', { name: 'Trade', exact: true })).toHaveText('⇄');
     const off = await exportedSoloist(page);
     expect(off.tradeWith).toBeUndefined();
@@ -89,15 +89,15 @@ test('a jazz band offers trading with the drummer, and starts cleanly with it se
     page.on('pageerror', (error) => errors.push(error.message));
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
 
     await page.getByRole('button', { name: 'Trade', exact: true }).click();
-    const sheet = page.getByRole('dialog', { name: 'Trade' });
+    const sheet = page.getByRole('dialog', { name: 'Band' });
     await expect(sheet.locator('option[value="drums"]')).not.toHaveAttribute('disabled', '');
     await expect(sheet.locator('option[value="drums"]')).toHaveText('The drummer');
     await sheet.getByLabel('Trade with').selectOption('drums');
-    await sheet.getByRole('button', { name: 'Close trade' }).click();
+    await sheet.getByRole('button', { name: 'Close band' }).click();
     await expect(page.getByRole('button', { name: 'Trade: 4 bars with the drummer' })).toHaveText(
         '⇄ 4s',
     );

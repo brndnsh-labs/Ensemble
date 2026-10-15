@@ -1124,7 +1124,7 @@ export async function setGenre(
             rebuild();
             return;
         }
-        progress('Switching feel at the next bar…');
+        progress('Switching style at the next bar…');
         // Wait for the barline that plays it, so the switch reads as pending until it is
         // heard. A Stop inside the wait leaves nothing half-changed: the feel is committed.
         await awaitBandChange();
@@ -1156,7 +1156,7 @@ export async function setGenre(
                 await prepareSounds(previous, progress);
             } catch {
                 throw new Error(
-                    'Could not change feel or resume the previous sounds. Reconnect and press Play.',
+                    'Could not change style or resume the previous sounds. Reconnect and press Play.',
                 );
             }
             if (resumeIntent === playIntent) {

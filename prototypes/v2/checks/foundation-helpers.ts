@@ -1,4 +1,4 @@
-import { appUrl, test as base, expect } from './fixtures';
+import { appUrl, test as base, expect, openBand } from './fixtures';
 
 /** What `foundation.spec.ts` and `foundation-sounds.spec.ts` share. */
 
@@ -64,8 +64,8 @@ export const test = base.extend<{ disconnect: () => Promise<void> }>({
 export const LANES = ['Drums', 'Bass', 'Chords', 'Soloist'];
 
 export async function openSounds(page: import('@playwright/test').Page) {
-    await page.getByRole('button', { name: 'Sounds', exact: true }).click();
+    await openBand(page, 'Players');
 }
 export async function closeSounds(page: import('@playwright/test').Page) {
-    await page.getByRole('button', { name: 'Close sounds' }).click();
+    await page.getByRole('button', { name: 'Close band' }).click();
 }

@@ -95,11 +95,10 @@ dialog[open]::backdrop {
     }
 }
 
-/* On a phone the band's settings sheets — Sounds, Feel & mix, Trade — are bottom sheets: anchored
-   to the edge the thumb is already near, sliding up from it and back down into it, the chart still
-   in view above them. On a wider screen they stay centred dialogs. */
+/* On a phone the Band sheet is a bottom sheet: anchored to the edge the thumb is already near,
+   sliding up from it and back down into it, the chart still in view above it. On a wider screen it
+   stays a centred dialog. */
 @media (max-width: 760px) {
-    dialog.sound-panel,
     dialog.feel-panel {
         margin: auto 0 0;
         width: 100%;
@@ -110,19 +109,16 @@ dialog[open]::backdrop {
         padding-bottom: max(24px, env(safe-area-inset-bottom));
         transform: translateY(100%);
     }
-    dialog.sound-panel[open],
     dialog.feel-panel[open] {
         transform: none;
     }
     @starting-style {
-        dialog.sound-panel[open],
         dialog.feel-panel[open] {
             transform: translateY(100%);
         }
     }
     /* A grab handle, so the sheet reads as one at a glance. Decorative: Escape, the ✕ and the
        backdrop are how it closes. */
-    dialog.sound-panel::before,
     dialog.feel-panel::before {
         content: "";
         display: block;

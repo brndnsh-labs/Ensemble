@@ -102,6 +102,11 @@ import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { SignOutDialog, type SignOutMode } from './account/sign-out';
 import { useAccountSession, useAccountsSwitch } from './account/use-account-session';
 import { AllSongs } from './all-songs';
+import { type FeelSnapshot, GrooveTab, PracticeTab } from './band-groove';
+import type { Lane } from './band-lanes';
+import { PlayersTab } from './band-players';
+import { BandSheet, type BandTab } from './band-sheet';
+import { TradeTab } from './band-trade';
 import { ChartSheet } from './chart-sheet';
 import {
     type CollectionDeleteTarget,
@@ -111,7 +116,6 @@ import {
 } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
 import { EditPanel } from './edit-panel';
-import { FeelSheet, type FeelSnapshot } from './feel-sheet';
 import { ImportDialog } from './import-dialog';
 import type { MeasureEditorHandle } from './measure-editor';
 import { NeckView } from './neck-view';
@@ -119,9 +123,7 @@ import { SongHeader } from './song-header';
 import { SongMenu } from './song-menu';
 import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
 import { type FeaturedSummary, Songbook, type StandardsEntry } from './songbook';
-import { SoundsPanel } from './sounds-panel';
 import { StandardsBrowser } from './standards-browser';
-import { TradeSheet } from './trade-sheet';
 import { TransportBar } from './transport-bar';
 import { useChartView } from './use-chart-view';
 import { useCollections } from './use-collections';
@@ -580,9 +582,11 @@ export default function Ensemble() {
     const [soundProgress, setSoundProgress] = useState('');
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
     const [allSoundsOffline, setAllSoundsOffline] = useState<boolean | null>(null);
-    const [soundMenu, setSoundMenu] = useState(false);
-    const [feelMenu, setFeelMenu] = useState(false);
-    const [tradeMenu, setTradeMenu] = useState(false);
+    // The Band sheet (#1703): closed, or open on one of its tabs. `lastBandTab` is where the
+    // transport's Band button reopens it — the tab the musician was last on.
+    const [bandTab, setBandTab] = useState<BandTab | null>(null);
+    const lastBandTab = useRef<BandTab>('players');
+    const bandOpen = bandTab !== null;
     // `metronome`/`masterVolume` are not part of `current.chart` (`STATE_OWNERSHIP_MANIFEST`:
     // session-only or a device preference, never a document field) — this is the shell's own
     // reactive mirror of the live engine values the Feel sheet reads, refreshed whenever it
@@ -1090,9 +1094,7 @@ export default function Ensemble() {
     const signOutDialogRef = useRef<HTMLDialogElement>(null);
     const adoptDialogRef = useRef<HTMLDialogElement>(null);
     const adoptRemoteDialogRef = useRef<HTMLDialogElement>(null);
-    const soundsDialog = useRef<HTMLDialogElement>(null);
-    const feelDialog = useRef<HTMLDialogElement>(null);
-    const tradeDialog = useRef<HTMLDialogElement>(null);
+    const bandDialog = useRef<HTMLDialogElement>(null);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
     /**
@@ -1702,12 +1704,15 @@ export default function Ensemble() {
         }
     }, [menu]);
     useEffect(() => {
-        if (soundMenu) {
-            soundsDialog.current?.showModal();
+        if (bandOpen) {
+            // Refreshed on every open: these fields can drift from what the sheet last
+            // showed (a different song opened, which resets the energy level).
+            setFeel(feelSnapshot());
+            bandDialog.current?.showModal();
         } else {
-            soundsDialog.current?.close();
+            bandDialog.current?.close();
         }
-    }, [soundMenu]);
+    }, [bandOpen]);
     useEffect(() => {
         if (accountDialog) {
             accountDialogRef.current?.showModal();
@@ -2256,26 +2261,9 @@ export default function Ensemble() {
         };
     }, [ready, onStand, signedIn, sync.owner, sessionOwner, sync.libraryVersion]);
     useEffect(() => {
-        if (feelMenu) {
-            // Refreshed on every open: these fields can drift from what the sheet last
-            // showed (a different song opened, which resets the energy level).
-            setFeel(feelSnapshot());
-            feelDialog.current?.showModal();
-        } else {
-            feelDialog.current?.close();
-        }
-    }, [feelMenu]);
-    useEffect(() => {
-        if (tradeMenu) {
-            tradeDialog.current?.showModal();
-        } else {
-            tradeDialog.current?.close();
-        }
-    }, [tradeMenu]);
-    useEffect(() => {
         let alive = true;
         setAllSoundsOffline(null);
-        if (soundMenu && !busy) {
+        if (bandTab === 'players' && !busy) {
             void allSoundsAvailableOffline().then((available) => {
                 if (alive) {
                     setAllSoundsOffline(available);
@@ -2285,11 +2273,11 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [soundMenu, busy]);
+    }, [bandTab, busy]);
     useEffect(() => {
         let alive = true;
         setSoundsOffline(null);
-        if (current && !busy && soundMenu) {
+        if (current && !busy && bandTab === 'players') {
             void soundsAvailableOffline(current.chart).then((available) => {
                 if (alive) {
                     setSoundsOffline(available);
@@ -2299,7 +2287,7 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [current, soundMenu, busy]);
+    }, [current, bandTab, busy]);
     // "Resume follow" re-applies the look-ahead immediately (Touches #4): forget the last row we
     // scrolled to and the slot we last jumped for, so the two effects below don't mistake picking
     // follow back up for "nothing moved" and sit still.
@@ -2441,7 +2429,7 @@ export default function Ensemble() {
             const next = updateChart();
             setEditing(false);
             setShowControls(false);
-            setSoundMenu(false);
+            setBandTab(null);
             await runtime.toggle(setSoundProgress);
             setPlaying(runtime.state().playback.isPlaying);
             setSoundsOffline(await soundsAvailableOffline(next.chart));
@@ -2857,6 +2845,16 @@ export default function Ensemble() {
             bindStand(null);
             after?.();
         });
+    }
+    /** Opens the Band sheet on `tab` (#1703), or switches to it when the sheet is already open. */
+    function openBand(tab: BandTab) {
+        lastBandTab.current = tab;
+        setBandTab(tab);
+    }
+    function toggleLane(lane: Lane) {
+        if (current) {
+            change(() => runtime.setEnabled(lane, !current.chart.band[lane].enabled));
+        }
     }
     function goHome() {
         closeSong();
@@ -5336,7 +5334,7 @@ export default function Ensemble() {
                     )}
                 </div>
             </header>
-            {error && !soundMenu && (
+            {error && !bandOpen && (
                 <div className="error-banner" role="alert">
                     <span>{error}</span>
                     <button onClick={() => setError('')}>Dismiss</button>
@@ -5733,7 +5731,6 @@ export default function Ensemble() {
                         neck={neck}
                         onHome={goHome}
                         onToggleTheme={toggleTheme}
-                        onSounds={() => setSoundMenu(true)}
                         onToggleControls={() => setShowControls(!showControls)}
                         onShowChart={() => showStand('chart')}
                         onShowNeck={() => showStand('neck')}
@@ -5771,7 +5768,7 @@ export default function Ensemble() {
                             }
                             startPlayback();
                         }}
-                        onFeel={() => setFeelMenu(true)}
+                        onBand={() => openBand(lastBandTab.current)}
                         onTempo={(value) => change(() => runtime.setTempo(value))}
                         onKey={(key) =>
                             change(
@@ -5793,98 +5790,117 @@ export default function Ensemble() {
                                 track('genre_changed', { genre });
                             }, true)
                         }
-                        onToggleLane={(key) =>
-                            change(() => runtime.setEnabled(key, !current.chart.band[key].enabled))
-                        }
-                        onTrade={() => setTradeMenu(true)}
+                        onToggleLane={toggleLane}
+                        onTrade={() => openBand('trade')}
                         tradeBlocked={runtime.tradeBlocked()}
                     />
-                    <TradeSheet
-                        dialogRef={tradeDialog}
-                        current={current}
-                        busy={busy}
-                        partners={runtime.tradePartners()}
-                        blocked={runtime.tradeBlocked()}
-                        onClose={() => setTradeMenu(false)}
-                        onChange={(tradeWith, bars, choruses) =>
-                            change(() => runtime.setTrade(tradeWith, bars, choruses))
-                        }
-                    />
-                    <SoundsPanel
-                        dialogRef={soundsDialog}
-                        open={soundMenu}
-                        current={current}
-                        busy={busy}
-                        error={error}
-                        soundProgress={soundProgress}
-                        soundsOffline={soundsOffline}
-                        allSoundsOffline={allSoundsOffline}
-                        pendingSound={pendingSound}
-                        onClose={() => setSoundMenu(false)}
-                        onInstallAll={() =>
-                            change(async () => {
-                                await installAllSounds(setSoundProgress);
-                                await runtime.applyGenreSounds(setSoundProgress);
-                            })
-                        }
-                        onChooseSound={(lane, value) => {
-                            if (working.current) {
-                                return;
-                            }
-                            setPendingSound({ lane, value });
-                            change(async () => {
-                                try {
-                                    await runtime.setVoice(
-                                        lane,
-                                        value === 'auto'
-                                            ? runtime.recommendedVoice(lane)
-                                            : (value as InstrumentVoice),
-                                        setSoundProgress,
-                                        value === 'auto',
-                                    );
-                                } finally {
-                                    setPendingSound(null);
+                    <BandSheet
+                        dialogRef={bandDialog}
+                        tab={bandTab ?? lastBandTab.current}
+                        onTab={openBand}
+                        onClose={() => setBandTab(null)}
+                        error={bandOpen ? error : ''}
+                        players={
+                            <PlayersTab
+                                current={current}
+                                busy={busy}
+                                soundProgress={soundProgress}
+                                soundsOffline={soundsOffline}
+                                allSoundsOffline={allSoundsOffline}
+                                pendingSound={pendingSound}
+                                onInstallAll={() =>
+                                    change(async () => {
+                                        await installAllSounds(setSoundProgress);
+                                        await runtime.applyGenreSounds(setSoundProgress);
+                                    })
                                 }
-                            });
-                        }}
-                        onVolume={(lane, value) => change(() => runtime.setVolume(lane, value))}
-                        onReverb={(lane, value) => change(() => runtime.setReverb(lane, value))}
-                    />
-                    <FeelSheet
-                        dialogRef={feelDialog}
-                        current={current}
-                        busy={busy}
-                        feel={feel}
-                        onClose={() => setFeelMenu(false)}
-                        onSwing={(value) => change(() => runtime.setSwing(value))}
-                        onSwingSub={(sub) => change(() => runtime.setSwingSub(sub))}
-                        onHumanize={(value) => change(() => runtime.setHumanize(value))}
-                        onBandIntensity={(value) =>
-                            change(() => {
-                                runtime.setBandIntensity(value);
-                                setFeel((f) => ({ ...f, bandIntensity: value }));
-                            })
+                                onChooseSound={(lane, value) => {
+                                    if (working.current) {
+                                        return;
+                                    }
+                                    setPendingSound({ lane, value });
+                                    change(async () => {
+                                        try {
+                                            await runtime.setVoice(
+                                                lane,
+                                                value === 'auto'
+                                                    ? runtime.recommendedVoice(lane)
+                                                    : (value as InstrumentVoice),
+                                                setSoundProgress,
+                                                value === 'auto',
+                                            );
+                                        } finally {
+                                            setPendingSound(null);
+                                        }
+                                    });
+                                }}
+                                onVolume={(lane, value) =>
+                                    change(() => runtime.setVolume(lane, value))
+                                }
+                                onReverb={(lane, value) =>
+                                    change(() => runtime.setReverb(lane, value))
+                                }
+                                onToggleLane={toggleLane}
+                            />
                         }
-                        onAutoIntensity={(auto) => change(() => runtime.setAutoIntensity(auto))}
-                        onMetronome={(enabled) =>
-                            change(() => {
-                                runtime.setMetronome(enabled);
-                                setFeel((f) => ({ ...f, metronome: enabled }));
-                            })
+                        groove={
+                            <GrooveTab
+                                current={current}
+                                busy={busy}
+                                feel={feel}
+                                onSwing={(value) => change(() => runtime.setSwing(value))}
+                                onSwingSub={(sub) => change(() => runtime.setSwingSub(sub))}
+                                onHumanize={(value) => change(() => runtime.setHumanize(value))}
+                                onBandIntensity={(value) =>
+                                    change(() => {
+                                        runtime.setBandIntensity(value);
+                                        setFeel((f) => ({ ...f, bandIntensity: value }));
+                                    })
+                                }
+                                onAutoIntensity={(auto) =>
+                                    change(() => runtime.setAutoIntensity(auto))
+                                }
+                            />
                         }
-                        onMasterVolume={(value) =>
-                            change(() => {
-                                runtime.setMasterVolume(value);
-                                setFeel((f) => ({ ...f, masterVolume: value }));
-                            })
+                        trade={
+                            <TradeTab
+                                current={current}
+                                busy={busy}
+                                partners={runtime.tradePartners()}
+                                blocked={runtime.tradeBlocked()}
+                                onChange={(tradeWith, bars, choruses) =>
+                                    change(() => runtime.setTrade(tradeWith, bars, choruses))
+                                }
+                            />
                         }
-                        onCountIn={(enabled) =>
-                            change(() => {
-                                runtime.setCountIn(enabled);
-                                setFeel((f) => ({ ...f, countIn: enabled }));
-                            })
+                        practice={
+                            <PracticeTab
+                                current={current}
+                                busy={busy}
+                                feel={feel}
+                                onMetronome={(enabled) =>
+                                    change(() => {
+                                        runtime.setMetronome(enabled);
+                                        setFeel((f) => ({ ...f, metronome: enabled }));
+                                    })
+                                }
+                                onMasterVolume={(value) =>
+                                    change(() => {
+                                        runtime.setMasterVolume(value);
+                                        setFeel((f) => ({ ...f, masterVolume: value }));
+                                    })
+                                }
+                                onCountIn={(enabled) =>
+                                    change(() => {
+                                        runtime.setCountIn(enabled);
+                                        setFeel((f) => ({ ...f, countIn: enabled }));
+                                    })
+                                }
+                                onNotation={(notation) =>
+                                    change(() => runtime.setNotation(notation))
+                                }
+                            />
                         }
-                        onNotation={(notation) => change(() => runtime.setNotation(notation))}
                     />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
                         {neckShowing ? (
