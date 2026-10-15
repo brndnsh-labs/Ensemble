@@ -1,0 +1,155 @@
+/* Motion (#1700). One small vocabulary for every transition outside the playback paint path:
+   quick, ease-out, no bounce — the stand is a tool, and motion should explain where a thing came
+   from or went, never perform. Every duration below reads a token, so reduced motion is one
+   override at the bottom rather than a rule per element.
+
+   NOT here, on purpose: the chart pointer, the bar cue and the neck's strong preview. Those are
+   timed against the audio clock (#1590, #1693) and must paint the frame they are asked to; an
+   easing curve on them would put the eye behind the band. `neck.css` keeps its own (it predates
+   this file and is part of that path). */
+:root {
+    --motion-fast: 120ms;
+    --motion-base: 180ms;
+    --motion-slow: 240ms;
+    --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    /* How far a dialog or toast travels as it arrives. Small: it settles, it doesn't fly in. */
+    --motion-rise: 8px;
+}
+
+/* Controls answer the pointer: colour and border ease instead of snapping, and a press sinks a
+   hair so a tap on a phone reads as taken before anything else happens. The chart's bars are
+   excluded: a chord's colour there IS the pointer, and it changes on the audio clock. */
+:where(button, a, select, input, textarea):not(.bars *) {
+    transition:
+        background-color var(--motion-fast) var(--ease-out),
+        border-color var(--motion-fast) var(--ease-out),
+        color var(--motion-fast) var(--ease-out),
+        box-shadow var(--motion-fast) var(--ease-out),
+        filter var(--motion-fast) var(--ease-out),
+        opacity var(--motion-fast) var(--ease-out),
+        transform var(--motion-fast) var(--ease-out);
+}
+:where(button):not(:disabled, .bars *):active {
+    transform: scale(0.97);
+}
+
+/* Dialogs. Every modal is a native `<dialog>` the shell opens with `showModal()` and shuts with
+   `close()`, and stays mounted while closed — so CSS alone can animate both ways:
+   `@starting-style` gives the entry its first frame, and `allow-discrete` holds `display` (and,
+   where the browser has it, `overlay`, which keeps it in the top layer) until the exit has
+   played. A browser without them simply snaps, as before. */
+dialog {
+    opacity: 0;
+    transform: translateY(var(--motion-rise)) scale(0.98);
+    transition:
+        opacity var(--motion-base) var(--ease-in),
+        transform var(--motion-base) var(--ease-in),
+        overlay var(--motion-base) allow-discrete,
+        display var(--motion-base) allow-discrete;
+}
+dialog[open] {
+    opacity: 1;
+    transform: none;
+    transition-timing-function: var(--ease-out);
+}
+@starting-style {
+    dialog[open] {
+        opacity: 0;
+        transform: translateY(var(--motion-rise)) scale(0.98);
+    }
+}
+/* A closing dialog is still painted for one exit; it must not catch the tap meant for what's
+   behind it. */
+dialog:not([open]) {
+    pointer-events: none;
+}
+dialog::backdrop {
+    opacity: 0;
+    transition:
+        opacity var(--motion-base) var(--ease-out),
+        overlay var(--motion-base) allow-discrete,
+        display var(--motion-base) allow-discrete;
+}
+dialog[open]::backdrop {
+    opacity: 1;
+}
+@starting-style {
+    dialog[open]::backdrop {
+        opacity: 0;
+    }
+}
+
+/* Popovers (the chart's section and form-length menus) mount when opened, so a keyframe gives
+   them their entry. They open up OR down depending on room, so they grow from their own centre
+   rather than slide from a side that might be wrong. */
+@keyframes motion-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+}
+.popover {
+    animation: motion-pop var(--motion-fast) var(--ease-out);
+}
+
+/* Toasts rise into the stack. `.stand-toast` stays mounted (a live region, #1440) and collapses
+   when empty, so the animation is attached only while it has something to say — it replays each
+   time a message appears after a quiet spell. */
+@keyframes motion-rise {
+    from {
+        opacity: 0;
+        transform: translateY(var(--motion-rise));
+    }
+}
+.stand-toast:not([data-empty="true"]),
+.stand-sync-failure,
+.resume-follow-pill {
+    animation: motion-rise var(--motion-base) var(--ease-out);
+}
+
+/* The editor arrives from the side it lives on (the right, beside the chart); on a phone it sits
+   under the transport instead, so it rises. */
+@keyframes motion-from-right {
+    from {
+        opacity: 0;
+        transform: translateX(16px);
+    }
+}
+.edit-panel {
+    animation: motion-from-right var(--motion-slow) var(--ease-out);
+}
+/* …without the page growing a horizontal scrollbar for the frames it starts past the edge. */
+.workspace {
+    overflow-x: clip;
+}
+@media (max-width: 760px) {
+    .edit-panel {
+        animation-name: motion-rise;
+    }
+}
+
+/* Opening a song, or going back to the songbook: the new page fades in rather than replacing the
+   old one in a single frame. Opacity only — nothing moves under a pointer that may already be
+   playing (Play from the songbook opens the chart and starts the band together). */
+@keyframes motion-fade {
+    from {
+        opacity: 0;
+    }
+}
+.workspace,
+.home {
+    animation: motion-fade var(--motion-base) var(--ease-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --motion-fast: 0ms;
+        --motion-base: 0ms;
+        --motion-slow: 0ms;
+        --motion-rise: 0px;
+    }
+    :where(button):not(:disabled, .bars *):active {
+        transform: none;
+    }
+}

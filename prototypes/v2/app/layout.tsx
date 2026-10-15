@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { BASE_PATH } from '../lib/base-path';
 import './style.css';
+import './motion.css';
 
 /**
  * The head is one of the few places where being the SITE and being a beta beside it genuinely
