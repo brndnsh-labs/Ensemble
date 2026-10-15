@@ -2775,7 +2775,11 @@ export default function Ensemble() {
         } else if (recovery) {
             setMessage('Recovered your unsaved setup');
         } else {
-            setMessage('Saved on this device');
+            // A plain open has nothing to announce (#1700): the header already says where the
+            // song lives, and a "Saved" toast for a song nobody just saved read as an action that
+            // hadn't happened while covering the chart's last row on a phone. Clearing still
+            // keeps the previous song's sentence from following the musician into this one.
+            setMessage('');
         }
         selectSection(next);
         return { current: onDevice, saved: savedBaseline };
@@ -4303,7 +4307,11 @@ export default function Ensemble() {
             }
         }
         await refreshSongs();
-        setMessage('Saved on this device');
+        // A copy moves the stand onto the new song (`setCurrent(result)` above) — say so by
+        // name, or the musician goes on editing what they think is the original (#1700).
+        setMessage(
+            copy ? `Saved as “${next.title}” · you’re on the copy now` : 'Saved on this device',
+        );
         setMenu(false);
     }
     function newSong() {
