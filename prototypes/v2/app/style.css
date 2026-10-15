@@ -1310,17 +1310,15 @@ dialog textarea {
         justify-content: flex-end;
         flex: 1;
         min-width: 130px;
-    }
-    /* Showing the controls mid-song adds "Focus chart" to a row that was already full; it ran
-       Save and the song menu off the right edge, reachable only by scrolling the page sideways
-       (#1700). Wrap then — only then: the idle row fits with ~10px to spare, and CI's WebKit
-       sets text wider than local, so a row free to wrap at rest wraps there. */
-    .song-actions:has(.focus-toggle) {
+        /* A row that doesn't fit wraps rather than run Save and the song menu off the right edge,
+           where they were reachable only by scrolling the page sideways (#1700) — "Focus chart"
+           mid-song, or "Keep a copy" on CI's WebKit, which sets text wider than local. The
+           buttons' trimmed sides below keep the common rows on one line. */
         flex-wrap: wrap;
     }
     .song-actions .btn {
         font-size: 11px;
-        padding: 8px 10px;
+        padding: 8px 8px;
         min-height: 40px;
     }
     .song-actions .btn svg {
@@ -2477,7 +2475,9 @@ dialog textarea {
         padding: 10px 14px max(100px, calc(var(--stand-stack-height, 0px) + 24px));
     }
     .song-open .tempo-control .step {
-        width: 36px;
+        /* Taller, not wider: the transport row has no width to spare on a phone (Feel wraps
+           to its own line at the first extra pixels on CI's WebKit). */
+        width: 28px;
         height: 36px;
     }
     .song-open .transport-bar {
