@@ -2055,14 +2055,26 @@ dialog textarea {
     border-radius: 10px;
     margin-top: 18px;
 }
+/* The edit panel's "Whole song" group (#1700): after the bar editor, ruled off from it, its
+   explanations as quiet hints under each field instead of three full-width callouts. */
+.panel-group {
+    margin-top: 26px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line);
+}
+.panel-group h3 {
+    font-size: 13px;
+    font-weight: 650;
+    margin: 14px 0 0;
+}
+.field-hint {
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--muted);
+    margin: 6px 0 0;
+}
 .file-input {
     display: none;
-}
-.songbook-empty {
-    padding: 30px;
-    border: 1px dashed var(--line);
-    border-radius: 12px;
-    color: var(--muted);
 }
 /* Every transport setting's control row is one height (#1700) — Tempo's stepper, Key's and Feel's
    selects, the More… button — so the columns come out equal and their labels share a line. They

@@ -91,73 +91,6 @@ export function EditPanel({
             />
             {current.schemaVersion === 2 ? (
                 <>
-                    <label className="panel-label" htmlFor="song-meter">
-                        Song meter
-                    </label>
-                    <select
-                        id="song-meter"
-                        disabled={busy}
-                        value={current.chart.score.meter}
-                        onChange={(e) => onSongMeter(e.target.value)}
-                    >
-                        {[
-                            ...new Set([
-                                ...Object.keys(TIME_SIGNATURES),
-                                current.chart.score.meter,
-                            ]),
-                        ].map((meter) => (
-                            <option key={meter}>{meter}</option>
-                        ))}
-                    </select>
-                    <p className="preview-note">
-                        Chords keep their share of each bar. A section or bar with its own meter
-                        keeps it.
-                    </p>
-                    <label className="panel-label" htmlFor="song-mode">
-                        Song mode
-                    </label>
-                    <select
-                        id="song-mode"
-                        disabled={busy}
-                        value={current.chart.score.isMinor ? 'minor' : 'major'}
-                        onChange={(e) => onSongMode(e.target.value === 'minor')}
-                    >
-                        <option value="major">Major</option>
-                        <option value="minor">Minor</option>
-                    </select>
-                    <p className="preview-note">
-                        Chord names stay as written, and so does the key: for A minor, pick A, then
-                        Minor. A section or bar with its own mode keeps it.
-                    </p>
-                    <label className="panel-label" htmlFor="song-choruses">
-                        Choruses
-                    </label>
-                    <select
-                        id="song-choruses"
-                        disabled={busy}
-                        value={current.chart.score.choruses ?? 'loop'}
-                        onChange={(e) =>
-                            onChoruses(
-                                e.target.value === 'loop' ? undefined : Number(e.target.value),
-                            )
-                        }
-                    >
-                        <option value="loop">Loop</option>
-                        {[
-                            // A chart from elsewhere may count more than the menu offers; it
-                            // still shows its own count, as Song meter shows an unlisted meter.
-                            ...new Set([...CHORUS_COUNTS, current.chart.score.choruses ?? 1]),
-                        ].map((count) => (
-                            <option key={count} value={count}>
-                                {count}
-                            </option>
-                        ))}
-                    </select>
-                    <p className="preview-note">
-                        Loop plays the form until you stop. A number plays it that many times, then
-                        stops: an Intro at the start plays the first time only, and an Outro at the
-                        end or a last-chorus coda the last time only.
-                    </p>
                     <MeasureEditor
                         key={current.id}
                         ref={measureEditorRef}
@@ -202,6 +135,80 @@ export function EditPanel({
                         Save includes all edited bars. Unchecked typing stays in this tab until you
                         update or save.
                     </p>
+                    {/* The whole song's meter, mode and choruses follow the bar being edited
+                        (#1700): editing is mostly bars, and these led the panel, pushing the bar
+                        editor below three help boxes. The title stays on top — a new song is
+                        named first. */}
+                    <section className="panel-group" aria-labelledby="panel-song-heading">
+                        <h3 id="panel-song-heading">Whole song</h3>
+                        <label className="panel-label" htmlFor="song-meter">
+                            Song meter
+                        </label>
+                        <select
+                            id="song-meter"
+                            disabled={busy}
+                            value={current.chart.score.meter}
+                            onChange={(e) => onSongMeter(e.target.value)}
+                        >
+                            {[
+                                ...new Set([
+                                    ...Object.keys(TIME_SIGNATURES),
+                                    current.chart.score.meter,
+                                ]),
+                            ].map((meter) => (
+                                <option key={meter}>{meter}</option>
+                            ))}
+                        </select>
+                        <p className="field-hint">
+                            Chords keep their share of each bar. A section or bar with its own meter
+                            keeps it.
+                        </p>
+                        <label className="panel-label" htmlFor="song-mode">
+                            Song mode
+                        </label>
+                        <select
+                            id="song-mode"
+                            disabled={busy}
+                            value={current.chart.score.isMinor ? 'minor' : 'major'}
+                            onChange={(e) => onSongMode(e.target.value === 'minor')}
+                        >
+                            <option value="major">Major</option>
+                            <option value="minor">Minor</option>
+                        </select>
+                        <p className="field-hint">
+                            Chord names stay as written, and so does the key: for A minor, pick A,
+                            then Minor. A section or bar with its own mode keeps it.
+                        </p>
+                        <label className="panel-label" htmlFor="song-choruses">
+                            Choruses
+                        </label>
+                        <select
+                            id="song-choruses"
+                            disabled={busy}
+                            value={current.chart.score.choruses ?? 'loop'}
+                            onChange={(e) =>
+                                onChoruses(
+                                    e.target.value === 'loop' ? undefined : Number(e.target.value),
+                                )
+                            }
+                        >
+                            <option value="loop">Loop</option>
+                            {[
+                                // A chart from elsewhere may count more than the menu offers; it
+                                // still shows its own count, as Song meter shows an unlisted meter.
+                                ...new Set([...CHORUS_COUNTS, current.chart.score.choruses ?? 1]),
+                            ].map((count) => (
+                                <option key={count} value={count}>
+                                    {count}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="field-hint">
+                            Loop plays the form until you stop. A number plays it that many times,
+                            then stops: an Intro at the start plays the first time only, and an
+                            Outro at the end or a last-chorus coda the last time only.
+                        </p>
+                    </section>
                 </>
             ) : (
                 <>
