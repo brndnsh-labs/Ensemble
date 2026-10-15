@@ -164,11 +164,29 @@ export function ChartSheet({
                 sectionMenuTrigger.current?.focus();
             }
         }
+        // The menu is fixed at the letter's position when it opened; a scroll — the musician's,
+        // or Following's own while the band plays — moves the letter, so the menu follows it
+        // rather than floating over some other bar (#1700). Re-anchored, not closed: Following
+        // scrolls every bar, and a menu that shut itself mid-reach would be unusable.
+        function followTrigger() {
+            const rect = sectionMenuTrigger.current?.getBoundingClientRect();
+            if (rect) {
+                setSectionMenu((open) =>
+                    open && (open.top !== rect.bottom + 6 || open.left !== rect.left)
+                        ? { ...open, top: rect.bottom + 6, left: rect.left }
+                        : open,
+                );
+            }
+        }
         document.addEventListener('pointerdown', closeOnOutsideClick);
         document.addEventListener('keydown', closeOnEscape);
+        document.addEventListener('scroll', followTrigger, true);
+        window.addEventListener('resize', followTrigger);
         return () => {
             document.removeEventListener('pointerdown', closeOnOutsideClick);
             document.removeEventListener('keydown', closeOnEscape);
+            document.removeEventListener('scroll', followTrigger, true);
+            window.removeEventListener('resize', followTrigger);
         };
     }, [sectionMenu]);
 
@@ -240,11 +258,27 @@ export function ChartSheet({
                 formMenuTrigger.current?.focus();
             }
         }
+        // Placed against the footer button when it opened; a scroll of the chart (or a resize)
+        // moves the button out from under it, so the menu closes rather than floating (#1700).
+        // It only opens while stopped, so nothing scrolls the chart but the musician. Its own
+        // list scrolls too, when it is taller than the room — that one is the menu, not the page.
+        function closeOnScroll(event: Event) {
+            if (!formMenuRef.current?.contains(event.target as Node)) {
+                setFormMenu(null);
+            }
+        }
+        function closeOnResize() {
+            setFormMenu(null);
+        }
         document.addEventListener('pointerdown', closeOnOutsidePress);
         document.addEventListener('keydown', closeOnEscape);
+        document.addEventListener('scroll', closeOnScroll, true);
+        window.addEventListener('resize', closeOnResize);
         return () => {
             document.removeEventListener('pointerdown', closeOnOutsidePress);
             document.removeEventListener('keydown', closeOnEscape);
+            document.removeEventListener('scroll', closeOnScroll, true);
+            window.removeEventListener('resize', closeOnResize);
         };
     }, [formMenuOpen]);
 
