@@ -605,6 +605,9 @@ export default function Ensemble() {
     // is NOW, not as the render that made the closure saw it.
     const sharedDraftNow = useRef(false);
     const [sharedDraft, setSharedDraft] = useState(false);
+    // Whether the unsaved draft on the stand came from the standards catalog rather than a shared
+    // link (#1700) — the header said "Opened from a shared link" for a standard.
+    const [standardDraft, setStandardDraft] = useState(false);
     // The standards browse surface (#1439): a second songbook-home view, shown instead of the
     // library list while no chart is on the stand. Opening a standard clears it the same way
     // opening a saved song does.
@@ -1219,6 +1222,7 @@ export default function Ensemble() {
      * since this isn't a library entry yet.
      */
     function landDraftOnStand(document: ChartDocument, note: string) {
+        setStandardDraft(false);
         const withFeel = withFollowFeel(document);
         runtime.load(withFeel);
         setSaved(null);
@@ -4220,6 +4224,7 @@ export default function Ensemble() {
                 throw new Error('Standard no longer exists.');
             }
             landDraftOnStand(buildStandardDocument(entry), 'Opened a standard · not saved yet');
+            setStandardDraft(true);
             setStandardsOpen(false);
             track('chart_opened', { source: 'standard' });
         });
@@ -5375,6 +5380,7 @@ export default function Ensemble() {
                         dirty={dirty}
                         hasPendingText={hasPendingText}
                         sharedDraft={sharedDraft}
+                        standardDraft={standardDraft}
                         recoveryHealthy={recoveryHealthy}
                         totalBars={totalBars}
                         stage={stage}
