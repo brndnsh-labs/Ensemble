@@ -33,11 +33,26 @@ test('the first change keeps a new song, and it survives a reload', async ({ pag
     await page.getByRole('button', { name: 'Faster' }).click();
     // The song is in the songbook now, and the change itself is an unsaved draft over it: only
     // Save commits the musician's own edits.
-    await expect(page.locator('.song-subtitle')).toContainText('Unsaved setup · locally recovered');
+    await expect(page.locator('.song-subtitle')).toContainText(
+        'Practice settings changed · Save to keep',
+    );
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
     await page.reload();
     await expect(page.getByRole('button', { name: /All 4 songs/ })).toBeVisible();
     await expect(songLink(page, 'Untitled song').first()).toBeVisible();
+});
+
+test('a nudge undone by hand on a kept new song leaves nothing unsaved (#1706)', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await newSong(page);
+    await page.getByRole('button', { name: 'Faster' }).click();
+    await expect(page.locator('.song-subtitle')).toContainText('Practice settings changed');
+    // The kept song comes back from storage with its keys in another order; still the same song.
+    await page.getByRole('button', { name: 'Slower' }).click();
+    await expect(page.locator('.song-subtitle > span').first()).toHaveText('Saved on this device');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
 test('leaving a new song with bars typed but not applied keeps them', async ({ page }) => {

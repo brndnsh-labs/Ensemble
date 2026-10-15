@@ -81,7 +81,7 @@ test('signed in, the song menu still brings v1 songs over — into this device�
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     // A change is what puts a new song in the songbook (#1707).
     await page.getByRole('button', { name: 'Faster' }).click();
-    await expect(page.locator('.song-subtitle')).toContainText('Unsaved setup');
+    await expect(page.locator('.song-subtitle')).toContainText('Practice settings changed');
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByTestId('bring-over-v1').click();
 

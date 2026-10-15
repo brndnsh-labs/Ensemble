@@ -557,6 +557,10 @@ html [hidden] {
     color: var(--accent);
     font-weight: 600;
 }
+/* Still unsaved, but only how the song is practised changed: said quietly (#1706). */
+.practice-changed {
+    color: var(--ink);
+}
 .song-actions {
     display: flex;
     align-items: center;
