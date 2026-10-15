@@ -88,7 +88,8 @@ async function buildLookaheadChart(
         repeatA?: boolean;
     } = {},
 ): Promise<void> {
-    const sectionBBars = opts.sectionBBars ?? 40;
+    // 96: past what fits on one page at the smallest step on either project (#1712).
+    const sectionBBars = opts.sectionBBars ?? 96;
     const sectionCBars = 3;
     const bpm = opts.bpm ?? 240;
     await page.goto(appUrl());
@@ -382,7 +383,7 @@ test('the row after the playing row stays fully visible on every bar change, and
     ).toBe(true);
     await startHere(page, 'B');
     const violations: string[] = [];
-    // Section B is 40 plain bars, so the chart overflows well past B18 and the scroll is never
+    // Section B is 96 plain bars, so the chart overflows well past B18 and the scroll is never
     // clamped at the document's end while this samples. B1→B18 is 17 bar changes: four row
     // changes on the laptop's 4-per-row layout, eight on the phone's 2-per-row one. Every sample
     // costs a real second at 240bpm (the tempo ceiling), so this stops there (#1463).
@@ -666,8 +667,9 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
 }) => {
     test.setTimeout(45_000);
     await trackScrollCalls(page);
-    // A short viewport forces this small chart to overflow anyway, so a full lap stays fast.
-    await page.setViewportSize({ width: 1300, height: 350 });
+    // A short viewport forces this small chart to overflow anyway, so a full lap stays fast:
+    // short enough that even the smallest page step (#1712) can't fit its eight bars.
+    await page.setViewportSize({ width: 1300, height: 260 });
     // No repeat on A: a lap is then 8 bars, not 12, and A's second pass is nowhere near the
     // C3 → A1 jump this measures (#1463).
     await buildLookaheadChart(page, { sectionBBars: 1, repeatA: false });
