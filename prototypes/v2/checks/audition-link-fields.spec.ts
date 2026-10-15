@@ -54,7 +54,7 @@ test('an audition link opens at its fixed intensity with the named parts switche
         'true',
     );
 
-    await page.getByRole('button', { name: 'Feel and mix', exact: true }).click();
+    await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
     await expect(page.getByLabel('Auto intensity', { exact: true })).not.toBeChecked();
     await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('82');
 });
@@ -73,7 +73,7 @@ test('a link with no int/bnd opens on auto energy with the genre defaults untouc
         'false',
     );
 
-    await page.getByRole('button', { name: 'Feel and mix', exact: true }).click();
+    await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
     await expect(page.getByLabel('Auto intensity', { exact: true })).toBeChecked();
 });
 
@@ -87,7 +87,7 @@ test('a malformed int/bnd is ignored rather than pinning a level or lane nobody 
         'true',
     );
 
-    await page.getByRole('button', { name: 'Feel and mix', exact: true }).click();
+    await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
     await expect(page.getByLabel('Auto intensity', { exact: true })).toBeChecked();
 });
 

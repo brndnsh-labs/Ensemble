@@ -8,7 +8,7 @@ import { expect, seedStarters, songLink, test } from './fixtures';
 // Mirrors `instrument-settings.spec.ts`'s (#1275) helpers/structure.
 
 async function openFeel(page: import('@playwright/test').Page) {
-    await page.getByRole('button', { name: 'Feel and mix', exact: true }).click();
+    await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
 }
 async function closeFeel(page: import('@playwright/test').Page) {
     await page.getByRole('button', { name: 'Close feel' }).click();
