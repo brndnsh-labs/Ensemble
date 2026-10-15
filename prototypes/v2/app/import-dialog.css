@@ -120,3 +120,17 @@
 .import-refused {
     font-size: 13px;
 }
+/* The file picker's own button wears the app's button style rather than the platform's grey
+   default (#1700), so the one control the dialog opens on looks like it belongs to it. */
+.import-dialog input[type="file"]::file-selector-button {
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    padding: 8px 14px;
+    margin-right: 12px;
+    cursor: pointer;
+}
