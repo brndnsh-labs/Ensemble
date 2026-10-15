@@ -127,6 +127,11 @@ interface ChartSheetProps {
     onChoruses: (choruses: number | undefined) => void;
 }
 
+/** A bar holding more than one chord sets them smaller, as a real book does (#1712). */
+function splitClass(chords: number): string {
+    return chords > 2 ? ' split split-3' : chords > 1 ? ' split' : '';
+}
+
 export function ChartSheet({
     current,
     blocks,
@@ -455,7 +460,7 @@ export function ChartSheet({
                             );
                             return (
                                 <div
-                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selectedMeasureId !== null && measure.chords[0]?.measureId === selectedMeasureId ? 'selected' : ''}`}
+                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selectedMeasureId !== null && measure.chords[0]?.measureId === selectedMeasureId ? 'selected' : ''}${measureRepeat ? '' : splitClass(measure.chords.length)}`}
                                     data-measure-id={writtenBar?.id}
                                     data-active={measure.chords.some(
                                         (c) => c.globalIndex === displayActive,

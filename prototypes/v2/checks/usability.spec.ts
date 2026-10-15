@@ -527,8 +527,12 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
     // as the chart jumping around. One scale now covers both states — toggling
     // performance-focus must not change any of these measurements.
     const measure = (focused: boolean) =>
-        page.evaluate((f) => {
+        page.evaluate(async (f) => {
             document.querySelector('.app-shell')!.classList.toggle('performance-focus', f);
+            // Past the resize the hidden controls cause, so a re-fit on it would show (#1712).
+            for (let i = 0; i < 3; i++) {
+                await new Promise(requestAnimationFrame);
+            }
             const px = (selector: string, property: 'minHeight' | 'fontSize') =>
                 Number.parseFloat(
                     getComputedStyle(document.querySelector(selector) as HTMLElement)[property],
@@ -540,20 +544,30 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
                 noOverflow: document.documentElement.scrollWidth <= innerWidth,
             };
         }, focused);
+    // The stand is a page (#1712): a 12-bar blues takes a step that fills the screen it is on,
+    // four bars to a row everywhere, never under the 18px floor, and a bigger screen never sets
+    // it smaller.
+    let previous = { area: 0, chord: 0 };
     for (const at of [
-        { width: 1300, height: 940, bar: 130, chord: 42, letter: 16 },
-        { width: 1600, height: 1100, bar: 140, chord: 48, letter: 19 },
-        { width: 820, height: 1180, bar: 140, chord: 48, letter: 19 },
-        // Phone portrait is the reference layout and holds its established size.
-        { width: 402, height: 874, bar: 86, chord: 30, letter: 14 },
-        { width: 874, height: 402, bar: 86, chord: 27, letter: 12 },
+        { width: 402, height: 874 },
+        { width: 874, height: 402 },
+        { width: 820, height: 1180 },
+        { width: 1300, height: 940 },
+        { width: 1600, height: 1100 },
     ]) {
         await page.setViewportSize({ width: at.width, height: at.height });
+        await expect(page.locator('.chart-scroll[data-fits="true"]')).toBeVisible();
         const idle = await measure(false);
-        expect(idle.bar, `bar @${at.width}x${at.height}`).toBeGreaterThanOrEqual(at.bar);
-        expect(idle.chord, `chord @${at.width}x${at.height}`).toBeGreaterThanOrEqual(at.chord);
-        expect(idle.letter).toBeGreaterThanOrEqual(at.letter);
+        expect(idle.chord, `chord @${at.width}x${at.height}`).toBeGreaterThanOrEqual(18);
+        expect(idle.letter).toBeGreaterThanOrEqual(11);
         expect(idle.noOverflow).toBe(true);
+        const area = at.width * at.height;
+        if (area > previous.area && at.width >= 820) {
+            expect(idle.chord, `chord @${at.width}x${at.height}`).toBeGreaterThanOrEqual(
+                previous.chord,
+            );
+        }
+        previous = { area, chord: idle.chord };
         const playing = await measure(true);
         expect(playing.bar, `play/pause jump @${at.width}x${at.height}`).toBe(idle.bar);
         expect(playing.chord, `play/pause jump @${at.width}x${at.height}`).toBe(idle.chord);
@@ -564,9 +578,13 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
             path: info.outputPath(`stand-${at.width}x${at.height}.png`),
         });
     }
-    // Phone must not grow: 402px cannot fit larger chords in a two-bar row.
-    await page.setViewportSize({ width: 402, height: 874 });
-    expect((await measure(false)).chord).toBeLessThanOrEqual(31);
+    expect(
+        await page.evaluate(() => {
+            const bars = [...document.querySelectorAll('.bar')];
+            const top = bars[0].getBoundingClientRect().top;
+            return bars.filter((bar) => bar.getBoundingClientRect().top === top).length;
+        }),
+    ).toBe(4);
 
     // The muted treatment (hollow dot, struck label, dropped chrome) existed in the
     // stylesheet but was unreachable: the button emitted no `off` class and rendered

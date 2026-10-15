@@ -125,6 +125,7 @@ import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
 import { type FeaturedSummary, Songbook, type StandardsEntry } from './songbook';
 import { StandardsBrowser } from './standards-browser';
 import { TransportBar } from './transport-bar';
+import { useChartFit } from './use-chart-fit';
 import { useChartView } from './use-chart-view';
 import { useCollections } from './use-collections';
 import { useNeckVoicing } from './use-neck-view';
@@ -1196,6 +1197,8 @@ export default function Ensemble() {
     } = useChartView(current, active);
     const neckShowing = neck && !editing;
     const neckVoicing = useNeckVoicing(followChart, neckShowing);
+    // The chart reads as one page where it can (#1712); editing, it scrolls at a reading size.
+    useChartFit(scroll, !current || neckShowing ? null : editing ? 'edit' : 'page', blocks);
     const hasPendingText = buffers.size > 0 || pendingMeasures;
     const text =
         buffers.get(sectionId) ??
