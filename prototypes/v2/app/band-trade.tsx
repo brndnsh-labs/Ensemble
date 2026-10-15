@@ -3,9 +3,7 @@ import type {
     SoloistTradeChoruses,
     SoloistTradeWith,
 } from '@engine/songbook/types';
-import type { RefObject } from 'react';
 import type { ChartDocument } from '../lib/runtime';
-import { backdropDismiss, whenClosed } from './dialog-close';
 
 const TURNS: { value: SoloistTradeBars; label: string }[] = [
     { value: 2, label: 'Twos (2 bars)' },
@@ -21,16 +19,13 @@ const CHORUSES: { value: SoloistTradeChoruses; label: string }[] = [
     { value: 0, label: 'Never (keep trading)' },
 ];
 
-interface TradeSheetProps {
-    /** Owned by the shell, which drives `showModal()`/`close()` from its own state. */
-    dialogRef: RefObject<HTMLDialogElement | null>;
+interface TradeTabProps {
     current: ChartDocument;
     busy: boolean;
-    /** Who this feel's band can trade with: the drummer solos only in some styles. */
+    /** Who this style's band can trade with: the drummer solos only in some styles. */
     partners: { soloist: boolean; drums: boolean };
     /** Why the band can't trade as asked right now (`runtime.tradeBlocked`), or null. */
     blocked: 'soloist-off' | 'drums-off' | 'drummer-no-solo' | null;
-    onClose: () => void;
     onChange: (
         tradeWith: SoloistTradeWith,
         bars: SoloistTradeBars,
@@ -39,43 +34,21 @@ interface TradeSheetProps {
 }
 
 /**
- * Trading with the band (the band engine's `BandSettings.trade`, docs/design/band-engine.md):
+ * The Band sheet's Trade tab (#1703): trading with the band (the band engine's
+ * `BandSettings.trade`, docs/design/band-engine.md):
  * after the head, the band plays a phrase and leaves the player room to answer, turn about.
  * Saved with the chart, like the rest of the band's settings.
  */
-export function TradeSheet({
-    dialogRef,
-    current,
-    busy,
-    partners,
-    blocked,
-    onClose,
-    onChange,
-}: TradeSheetProps) {
+export function TradeTab({ current, busy, partners, blocked, onChange }: TradeTabProps) {
     const soloist = current.chart.band.soloist;
     const tradeWith = soloist.tradeWith ?? 'off';
     const bars = soloist.tradeBars ?? 4;
     const choruses = soloist.tradeChoruses ?? 2;
     return (
-        <dialog
-            className="feel-panel trade-panel"
-            ref={dialogRef}
-            aria-labelledby="trade-title"
-            onClose={whenClosed(onClose)}
-            {...backdropDismiss}
-        >
-            <div className="feel-heading">
-                <div>
-                    <h2 id="trade-title">Trade</h2>
-                    <p>
-                        After the head, the band plays a phrase and leaves you room to answer,
-                        taking turns.
-                    </p>
-                </div>
-                <button className="icon-button" aria-label="Close trade" onClick={onClose}>
-                    ✕
-                </button>
-            </div>
+        <>
+            <p className="band-lede">
+                After the head, the band plays a phrase and leaves you room to answer, taking turns.
+            </p>
             <div className="feel-groups">
                 <div className="feel-group">
                     <label>
@@ -93,7 +66,7 @@ export function TradeSheet({
                             <option value="drums" disabled={!partners.drums}>
                                 {partners.drums
                                     ? 'The drummer'
-                                    : "The drummer (this feel's drummer doesn't solo yet)"}
+                                    : "The drummer (this style's drummer doesn't solo yet)"}
                             </option>
                         </select>
                     </label>
@@ -103,7 +76,7 @@ export function TradeSheet({
                             : blocked === 'drums-off'
                               ? 'Paused: the drums are off. Turn them on to trade with the drummer.'
                               : blocked === 'drummer-no-solo'
-                                ? "Paused: this feel's drummer doesn't solo yet. The band plays on, and leaves the soloing to you."
+                                ? "Paused: this style's drummer doesn't solo yet. The band plays on, and leaves the soloing to you."
                                 : tradeWith === 'soloist'
                                   ? 'The soloist plays a phrase, then lays out while the band comps for yours.'
                                   : tradeWith === 'drums'
@@ -158,6 +131,6 @@ export function TradeSheet({
                     </label>
                 </div>
             </div>
-        </dialog>
+        </>
     );
 }

@@ -1,5 +1,5 @@
 import { encodeBase64Unicode } from '../../../public/state/share-codec';
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, openBand, test } from './fixtures';
 
 /**
  * The audition-link fields #1382 taught the v2 stand to read: `int` (a fixed band energy),
@@ -54,7 +54,7 @@ test('an audition link opens at its fixed intensity with the named parts switche
         'true',
     );
 
-    await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
+    await openBand(page, 'Groove');
     await expect(page.getByLabel('Auto intensity', { exact: true })).not.toBeChecked();
     await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('82');
 });
@@ -73,7 +73,7 @@ test('a link with no int/bnd opens on auto energy with the genre defaults untouc
         'false',
     );
 
-    await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
+    await openBand(page, 'Groove');
     await expect(page.getByLabel('Auto intensity', { exact: true })).toBeChecked();
 });
 
@@ -87,7 +87,7 @@ test('a malformed int/bnd is ignored rather than pinning a level or lane nobody 
         'true',
     );
 
-    await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
+    await openBand(page, 'Groove');
     await expect(page.getByLabel('Auto intensity', { exact: true })).toBeChecked();
 });
 

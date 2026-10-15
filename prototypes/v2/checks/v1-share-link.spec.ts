@@ -1,4 +1,4 @@
-import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, expect, openBand, seedStarters, songLink, test } from './fixtures';
 
 /**
  * Old v1 `?s=` share links landing on the v2 stand (#1279).
@@ -111,10 +111,10 @@ test("a linked genre swings like the picked genre: a Blues link's swing is the B
     page,
 }) => {
     const swingOf = async () => {
-        await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
+        await openBand(page, 'Groove');
         const swing = await page.getByLabel('Swing', { exact: true }).inputValue();
         const grid = await page.getByLabel('Swing grid', { exact: true }).inputValue();
-        await page.getByRole('button', { name: 'Close feel' }).click();
+        await page.getByRole('button', { name: 'Close band' }).click();
         return { swing, grid };
     };
     await seedStarters(page);

@@ -54,7 +54,7 @@ test.describe('telemetry (#1389)', () => {
         ).toBeVisible();
 
         // Changing feel and starting playback are each a real, distinct event too.
-        await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+        await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
         await expect(
             page.getByRole('button', { name: 'Stop playback', exact: true }),

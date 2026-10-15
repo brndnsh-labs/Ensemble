@@ -158,8 +158,8 @@ test('a fast action never flashes "Updating…" in the toast', async ({ page }) 
         });
     });
     // Built-in sounds both sides — no pack download, so this settles in well under 300ms.
-    await page.getByLabel('Feel', { exact: true }).selectOption('Rock');
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await page.getByLabel('Style', { exact: true }).selectOption('Rock');
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
     await page.waitForTimeout(500);
     const history = await page.evaluate(
         () => (window as unknown as { __toastHistory: string[] }).__toastHistory,

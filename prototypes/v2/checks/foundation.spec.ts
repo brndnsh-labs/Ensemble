@@ -88,7 +88,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
 });
 
 // One test per screen (#1496). The four screens in one test ran 45-47s on a loaded WebKit runner
-// against the suite's 45s budget: each opens and closes the Sounds dialog, plays and stops three
+// against the suite's 45s budget: each opens and closes the Band dialog, plays and stops three
 // times and takes two screenshots, and headless WebKit renders the first frames after a dialog
 // opens at up to a second each, which Playwright's stable-element wait has to sit through.
 for (const [width, height] of [
@@ -111,15 +111,15 @@ for (const [width, height] of [
         expect(firstBar!.y).toBeLessThan(width > 1100 ? 220 : height < 500 ? 210 : 310);
         const chartBefore = await page.locator('.chart-scroll').boundingBox();
         await openSounds(page);
-        await expect(page.getByRole('dialog', { name: "Your band's sound" })).toBeVisible();
+        await expect(page.getByRole('dialog', { name: 'Band' })).toBeVisible();
         expect(await page.locator('.chart-scroll').boundingBox()).toEqual(chartBefore);
         await closeSounds(page);
-        await expect(page.getByRole('button', { name: 'Sounds', exact: true })).toBeFocused();
+        await expect(page.getByRole('button', { name: 'Band…' })).toBeFocused();
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
         await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
         await expect(page.getByRole('button', { name: 'Edit chart', exact: true })).toBeHidden();
         await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeHidden();
-        for (const label of ['Tempo', 'Key', 'Feel']) {
+        for (const label of ['Tempo', 'Key', 'Style']) {
             await expect(page.getByLabel(label, { exact: true })).toBeVisible();
         }
         await expect(page.getByRole('button', { name: 'Bass', exact: true })).toBeVisible();
@@ -127,7 +127,7 @@ for (const [width, height] of [
         expect(focusedChart!.height).toBeGreaterThan(height * 0.5);
         await page.screenshot({ path: `test-results/focused-${width}.png` });
         await page.getByRole('button', { name: 'Show controls' }).click();
-        await expect(page.getByRole('button', { name: 'Sounds', exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Band…' })).toBeVisible();
         await page.getByRole('button', { name: 'Stop playback' }).click();
         await page.screenshot({ path: `test-results/chart-${width}.png` });
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
@@ -276,13 +276,13 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
         .toContain(appUrl('sw.js'));
     await disconnect();
     const genres = await page
-        .getByLabel('Feel', { exact: true })
+        .getByLabel('Style', { exact: true })
         .locator('option')
         .allTextContents();
     expect(genres).toHaveLength(13);
     for (const genre of genres) {
-        await page.getByLabel('Feel', { exact: true }).selectOption(genre);
-        await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+        await page.getByLabel('Style', { exact: true }).selectOption(genre);
+        await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
         await expect(page.locator('.error-banner[role="alert"]')).toHaveCount(0);
     }
     await page.getByLabel('Key', { exact: true }).selectOption('Eb');

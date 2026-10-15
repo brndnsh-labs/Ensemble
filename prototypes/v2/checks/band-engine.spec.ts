@@ -64,7 +64,7 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
     const tempo = page.getByLabel('Tempo', { exact: true });
     await tempo.fill('240');
     await tempo.press('Enter');

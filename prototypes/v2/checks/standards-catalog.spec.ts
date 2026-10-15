@@ -86,8 +86,8 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
     // Key and feel change like any chart, on the unsaved draft.
     await page.getByLabel('Key', { exact: true }).selectOption('D');
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['D7']);
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Jazz');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Jazz');
 
     // It plays.
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
@@ -132,7 +132,7 @@ test('editing an open standard writes nothing to recovery storage', async ({ pag
     await page.getByLabel('Key', { exact: true }).selectOption('D');
     await page.getByLabel('Tempo', { exact: true }).fill('140');
     await page.getByLabel('Tempo', { exact: true }).press('Enter');
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
 
     await expect
         .poll(() =>

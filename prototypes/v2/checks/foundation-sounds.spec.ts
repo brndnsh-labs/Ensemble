@@ -15,6 +15,9 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     page,
     disconnect,
 }) => {
+    // Its neighbours' budget: an offline reload, an export/import round trip and five trips into
+    // the Band sheet ran within a few seconds of the default on CI's WebKit.
+    test.setTimeout(120_000);
     await observeSamples(page);
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
@@ -160,7 +163,7 @@ test('corrupt downloads and storage failures preserve the previous sound', async
     await openSounds(page);
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
     await expect(page.locator('.error-banner')).toContainText('could not be verified');
-    // The starter's own setting, Follow feel (#1405), is what a failed pick leaves in place.
+    // The starter's own setting, Follow style (#1405), is what a failed pick leaves in place.
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('auto');
     await page.evaluate(() => Object.assign(window, { __breakSound: 'quota' }));
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:grand');
@@ -191,8 +194,8 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await songLink(page, 'Blue pocket', 'Blues').click();
     expect(downloads).toEqual([]);
     await openSounds(page);
-    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
-    await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
+    await page.getByRole('button', { name: 'Install all & use style sounds' }).click();
+    await expect(page.getByRole('button', { name: 'Install all & use style sounds' })).toBeEnabled({
         timeout: 60_000,
     });
     await expect(
@@ -211,8 +214,8 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await page.getByLabel('Chords sound', { exact: true }).selectOption('pack:rhodes');
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
     await closeSounds(page);
-    await page.getByLabel('Feel', { exact: true }).selectOption('Funk');
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await page.getByLabel('Style', { exact: true }).selectOption('Funk');
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
     await openSounds(page);
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
     await expect(page.locator('.resolved-sound')).toContainText([
@@ -247,8 +250,8 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await disconnect();
     await page.reload();
     await songLink(page, 'Blue pocket', 'Funk').first().click();
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
     await openSounds(page);
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
     await expect(page.locator('.resolved-sound')).toContainText([
@@ -265,7 +268,7 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await page.getByRole('button', { name: 'Stop playback' }).click();
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Revert to saved' }).click();
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Funk');
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Funk');
     await openSounds(page);
     await expect(page.getByLabel('Drums sound', { exact: true })).toHaveValue('auto');
     // All-ready is derived from bytes, never a durable success flag.
@@ -279,21 +282,21 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await closeSounds(page);
     await openSounds(page);
     await expect(page.getByText('All sound packs available offline', { exact: true })).toBeHidden();
-    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
+    await page.getByRole('button', { name: 'Install all & use style sounds' }).click();
     await expect(page.locator('.error-banner')).toBeVisible();
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
     await closeSounds(page);
     // A failed feel change must roll back the runtime as well as the displayed draft.
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
     await expect(page.locator('.error-banner')).toBeVisible();
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Funk');
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Funk');
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Funk');
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Funk');
     await openSounds(page);
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
 });
 
-test('installed sounds follow the feel after a reload without touching the Sounds panel', async ({
+test('installed sounds follow the feel after a reload without touching the Players tab', async ({
     page,
 }) => {
     // #1405: installing is durable, so activating must be too. After a reload the stand reads
@@ -303,8 +306,8 @@ test('installed sounds follow the feel after a reload without touching the Sound
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
-    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
-    await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
+    await page.getByRole('button', { name: 'Install all & use style sounds' }).click();
+    await expect(page.getByRole('button', { name: 'Install all & use style sounds' })).toBeEnabled({
         timeout: 60_000,
     });
     await closeSounds(page);
@@ -352,7 +355,7 @@ test('failed bulk installation keeps every previous voice and retries completed 
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
-    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
+    await page.getByRole('button', { name: 'Install all & use style sounds' }).click();
     await expect(page.locator('.error-banner')).toContainText('Storage full', { timeout: 60_000 });
     // Starters follow the feel (#1405); a failed install changes none of them.
     for (const label of LANES) {
@@ -372,8 +375,8 @@ test('failed bulk installation keeps every previous voice and retries completed 
         }
     });
     await openSounds(page);
-    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
-    await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
+    await page.getByRole('button', { name: 'Install all & use style sounds' }).click();
+    await expect(page.getByRole('button', { name: 'Install all & use style sounds' })).toBeEnabled({
         timeout: 60_000,
     });
     await expect(
@@ -429,8 +432,8 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
-    await page.getByRole('button', { name: 'Install all & use genre sounds' }).click();
-    await expect(page.getByRole('button', { name: 'Install all & use genre sounds' })).toBeEnabled({
+    await page.getByRole('button', { name: 'Install all & use style sounds' }).click();
+    await expect(page.getByRole('button', { name: 'Install all & use style sounds' })).toBeEnabled({
         timeout: 60_000,
     });
     await closeSounds(page);
@@ -438,7 +441,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
     const chartTop = (await page.locator('.chart-scroll').boundingBox())!.y;
     await hold();
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
     await held();
     await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
@@ -449,11 +452,11 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     const duringPreparation = await sampleStarts(page);
     await expect.poll(() => sampleStarts(page)).toBeGreaterThan(duringPreparation);
     await release();
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Jazz');
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Jazz');
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
-    await page.getByLabel('Feel', { exact: true }).selectOption('Blues');
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await page.getByLabel('Style', { exact: true }).selectOption('Blues');
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
     await page.evaluate(async () => {
         const cache = await caches.open('ensemble-v2-sounds-v1');
         const file = (await cache.keys()).find(
@@ -463,20 +466,20 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     });
     await disconnect();
     const beforeFailure = await sampleStarts(page);
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Blues');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Blues');
     await expect(page.locator('.error-banner')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await expect.poll(() => sampleStarts(page)).toBeGreaterThan(beforeFailure);
     await hold();
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
     await held();
     await page.getByRole('button', { name: 'Stop playback' }).click();
     await release();
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Blues');
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Blues');
     // If the old setup loses files as well, fail visibly instead of silently synthesizing.
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
@@ -487,10 +490,10 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
         )!;
         await cache.delete(file);
     });
-    await page.getByLabel('Feel', { exact: true }).selectOption('Jazz');
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
-    await expect(page.locator('.error-banner')).toContainText('Could not change feel or resume');
+    await expect(page.locator('.error-banner')).toContainText('Could not change style or resume');
 });
 
 test('a feel staged for the next bar settles when the musician stops inside it', async ({
@@ -505,11 +508,11 @@ test('a feel staged for the next bar settles when the musician stops inside it',
     await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
-    await page.getByLabel('Feel', { exact: true }).selectOption('Rock');
+    await page.getByLabel('Style', { exact: true }).selectOption('Rock');
     // #1460 — busy/progress is its own toast tone, pinned open (no auto-dismiss timer runs at
     // all while it's showing, unlike a plain `message`).
     await expect(page.getByTestId('stand-toast')).toHaveAttribute('data-tone', 'busy');
-    await expect(page.getByTestId('stand-toast')).toContainText('Switching feel at the next bar');
+    await expect(page.getByTestId('stand-toast')).toContainText('Switching style at the next bar');
     // Re-review P3 — `showBusy = busy && busyToastVisible`, not `busyToastVisible` alone: the
     // debounce flag flips false via an EFFECT, one render after `busy` itself already reads
     // false, so without the extra check that one render would flash "Updating…" the instant the
@@ -530,13 +533,13 @@ test('a feel staged for the next bar settles when the musician stops inside it',
         });
     });
     await page.getByRole('button', { name: 'Stop playback' }).click();
-    await expect(page.getByLabel('Feel', { exact: true })).toBeEnabled();
+    await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
     await page.waitForTimeout(300);
     const settleHistory = await page.evaluate(
         () => (window as unknown as { __settleHistory: string[] }).__settleHistory,
     );
     expect(settleHistory.some((text) => text.includes('Updating'))).toBe(false);
-    await expect(page.getByLabel('Feel', { exact: true })).toHaveValue('Rock');
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Rock');
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');

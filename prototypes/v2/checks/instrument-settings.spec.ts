@@ -1,16 +1,16 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, expect, openBand, seedStarters, songLink, test } from './fixtures';
 
 // #1275 — per-instrument volume/reverb controls (and, on the old engine, style) in
-// the Sounds panel. Mirrors `foundation-helpers.ts`'s Sounds helpers and
+// the Band sheet's Players tab. Mirrors `foundation-helpers.ts`'s Sounds helpers and
 // `share-link.spec.ts`'s clipboard-less fallback pattern rather than
 // reinventing either.
 
 async function openSounds(page: import('@playwright/test').Page) {
-    await page.getByRole('button', { name: 'Sounds', exact: true }).click();
+    await openBand(page, 'Players');
 }
 async function closeSounds(page: import('@playwright/test').Page) {
-    await page.getByRole('button', { name: 'Close sounds' }).click();
+    await page.getByRole('button', { name: 'Close band' }).click();
 }
 
 /**
