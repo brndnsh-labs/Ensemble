@@ -829,11 +829,22 @@ html [hidden] {
     padding: 3px 2px;
     letter-spacing: -1px;
 }
-.chord sup {
-    font-size: 0.53em;
-    vertical-align: super;
-    letter-spacing: -0.2px;
-    margin-left: 1px;
+/* Real-book chord setting (#1700, `chordSymbol`): the quality small and raised beside the root,
+   lifted by position rather than `vertical-align` so a bar's line box — and so the stand's
+   layout, which must hold still across play/pause — is the same with or without one. */
+.chord-quality {
+    /* Inline-block so the playing chord's underline stays one line under the root, instead of
+       breaking up and riding up with the raised quality. */
+    display: inline-block;
+    position: relative;
+    top: -0.5em;
+    font-size: 0.6em;
+    letter-spacing: 0;
+    margin-left: 0.03em;
+}
+.chord-bass {
+    font-size: 0.78em;
+    letter-spacing: 0;
 }
 .bar.current {
     background: var(--bar-current);
@@ -2492,6 +2503,24 @@ html[data-theme="day"] {
 }
 html[data-theme="stage"] {
     color-scheme: dark;
+}
+/* Stage mode's toggle reads "Stage" where there is room and is a moon on a phone (#1700), where
+   its word was the slack the header row lacked (it wrapped with "Keep a copy" or mid-song). */
+.theme-glyph {
+    display: none;
+    font-size: 15px;
+    line-height: 1;
+}
+@media (max-width: 760px) {
+    .song-actions .theme-toggle {
+        min-width: 40px;
+    }
+    .theme-glyph {
+        display: inline;
+    }
+    .theme-label {
+        display: none;
+    }
 }
 .theme-toggle[aria-pressed="true"] {
     background: var(--ink);

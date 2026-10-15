@@ -123,7 +123,12 @@ export function syncAccountsFlag(): boolean {
         try {
             const url = new URL(window.location.href);
             url.searchParams.delete(ACCOUNTS_PARAM);
-            window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+            // Keeps the shell's history entry (#1700); only the URL is tidied.
+            window.history.replaceState(
+                window.history.state,
+                '',
+                `${url.pathname}${url.search}${url.hash}`,
+            );
         } catch {
             // A refused history write costs only a tidy URL.
         }
