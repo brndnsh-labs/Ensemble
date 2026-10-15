@@ -95,6 +95,9 @@ interface ChartSheetProps {
     writtenBars: Map<string, WrittenBar>;
     writtenSections: Map<string, WrittenSection>;
     editing: boolean;
+    /** The bar the measure editor holds while editing (#1700) — ringed on the chart, so the
+     * musician can see which bar the panel is changing. Null when not editing a measure chart. */
+    selectedMeasureId: string | null;
     busy: boolean;
     playing: boolean;
     playbackActive: boolean;
@@ -104,6 +107,9 @@ interface ChartSheetProps {
     onStartHere: (sectionId: string | undefined) => void;
     onEditSection: (block: ChartBlock) => void;
     onEditBar: (measure: ChartMeasure) => void;
+    /** A tap on a bar while editing (#1700): picks it for the editor and nothing more — unlike
+     * the bar's Edit button, it neither stops the band nor moves focus to the panel. */
+    onSelectBar: (measure: ChartMeasure) => void;
     onAudition: (globalIndex: number) => void;
     /** How many times the band plays the form, then stops (#1511, the footer's menu);
      * `undefined` repeats it continuously. On a text chart the shell makes the measure copy
@@ -121,6 +127,7 @@ export function ChartSheet({
     writtenBars,
     writtenSections,
     editing,
+    selectedMeasureId,
     busy,
     playing,
     playbackActive,
@@ -128,6 +135,7 @@ export function ChartSheet({
     onStartHere,
     onEditSection,
     onEditBar,
+    onSelectBar,
     onAudition,
     onChoruses,
 }: ChartSheetProps) {
@@ -142,8 +150,11 @@ export function ChartSheet({
     const sectionMenuRef = useRef<HTMLDivElement>(null);
     const sectionMenuTrigger = useRef<HTMLButtonElement | null>(null);
 
+    // Keyed on WHICH menu is open, not its object: the effect focuses the item and arms the
+    // listeners once per opening.
+    const sectionMenuId = sectionMenu?.id ?? null;
     useEffect(() => {
-        if (!sectionMenu) {
+        if (sectionMenuId === null) {
             return;
         }
         const first = sectionMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
@@ -160,13 +171,36 @@ export function ChartSheet({
                 sectionMenuTrigger.current?.focus();
             }
         }
+        // The menu is fixed at the letter's position when it opened; a scroll — the musician's,
+        // or Following's own while the band plays — moves the letter, so the menu follows it
+        // rather than floating over some other bar (#1700). Written straight to the menu's own
+        // style, not to state: Following scrolls on the paint path, and a state write would
+        // re-render the whole sheet every frame of it. Once the letter has left the screen the
+        // menu closes rather than follow it off.
+        function followTrigger() {
+            const rect = sectionMenuTrigger.current?.getBoundingClientRect();
+            const menu = sectionMenuRef.current;
+            if (!rect || !menu) {
+                return;
+            }
+            if (rect.bottom < 0 || rect.top > window.innerHeight) {
+                setSectionMenu(null);
+                return;
+            }
+            menu.style.top = `${rect.bottom + 6}px`;
+            menu.style.left = `${rect.left}px`;
+        }
         document.addEventListener('pointerdown', closeOnOutsideClick);
         document.addEventListener('keydown', closeOnEscape);
+        document.addEventListener('scroll', followTrigger, true);
+        window.addEventListener('resize', followTrigger);
         return () => {
             document.removeEventListener('pointerdown', closeOnOutsideClick);
             document.removeEventListener('keydown', closeOnEscape);
+            document.removeEventListener('scroll', followTrigger, true);
+            window.removeEventListener('resize', followTrigger);
         };
-    }, [sectionMenu]);
+    }, [sectionMenuId]);
 
     function openSectionMenu(event: ReactMouseEvent<HTMLButtonElement>, block: ChartBlock) {
         if (!block.id) {
@@ -236,11 +270,27 @@ export function ChartSheet({
                 formMenuTrigger.current?.focus();
             }
         }
+        // Placed against the footer button when it opened; a scroll of the chart (or a resize)
+        // moves the button out from under it, so the menu closes rather than floating (#1700).
+        // It only opens while stopped, so nothing scrolls the chart but the musician. Its own
+        // list scrolls too, when it is taller than the room — that one is the menu, not the page.
+        function closeOnScroll(event: Event) {
+            if (!formMenuRef.current?.contains(event.target as Node)) {
+                setFormMenu(null);
+            }
+        }
+        function closeOnResize() {
+            setFormMenu(null);
+        }
         document.addEventListener('pointerdown', closeOnOutsidePress);
         document.addEventListener('keydown', closeOnEscape);
+        document.addEventListener('scroll', closeOnScroll, true);
+        window.addEventListener('resize', closeOnResize);
         return () => {
             document.removeEventListener('pointerdown', closeOnOutsidePress);
             document.removeEventListener('keydown', closeOnEscape);
+            document.removeEventListener('scroll', closeOnScroll, true);
+            window.removeEventListener('resize', closeOnResize);
         };
     }, [formMenuOpen]);
 
@@ -323,10 +373,17 @@ export function ChartSheet({
                         >
                             {block.label || 'A'}
                         </button>
-                        <span className="section-name">
-                            {arrangementOf(current).sections.find((s) => s.id === block.id)?.key ||
-                                arrangementOf(current).key}
-                        </span>
+                        {/* A bare key beside the section letter read as a second letter ("A  C").
+                            A measure chart already prints key · meter on the section's first bar
+                            (`.bar-context`), so only a text chart says it here, in words (#1700). */}
+                        {current.schemaVersion === 1 && (
+                            <span className="section-name">
+                                Key of{' '}
+                                {arrangementOf(current).sections.find((s) => s.id === block.id)
+                                    ?.key || arrangementOf(current).key}
+                                {arrangementOf(current).isMinor ? ' minor' : ''}
+                            </span>
+                        )}
                         {current.schemaVersion === 2 &&
                             (current.chart.score.sections.find((s) => s.id === block.id)?.repeat ??
                                 1) > 1 && (
@@ -388,13 +445,30 @@ export function ChartSheet({
                             );
                             return (
                                 <div
-                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''}`}
+                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selectedMeasureId !== null && measure.chords[0]?.measureId === selectedMeasureId ? 'selected' : ''}`}
                                     data-measure-id={writtenBar?.id}
                                     data-active={measure.chords.some(
                                         (c) => c.globalIndex === displayActive,
                                     )}
                                     data-next={isNext ? (nextSoon ? 'soon' : 'true') : undefined}
                                     key={measure.chords[0]?.globalIndex}
+                                    // While editing a measure chart the whole bar picks itself
+                                    // for the editor (#1700) — `.editing .bar` already promised
+                                    // that with its pointer cursor and hover fill. Select only: a
+                                    // stray tap must not stop the band or pull a phone's view up
+                                    // to the panel. A chord inside still auditions; the bar's own
+                                    // Edit button stays the keyboard path, and the full reveal.
+                                    onClick={
+                                        current.schemaVersion === 2 && editing && !busy
+                                            ? (event) => {
+                                                  if (
+                                                      !(event.target as Element).closest('button')
+                                                  ) {
+                                                      onSelectBar(measure);
+                                                  }
+                                              }
+                                            : undefined
+                                    }
                                 >
                                     <span className="bar-number">{barNumber}</span>
                                     {navigation.length > 0 && (

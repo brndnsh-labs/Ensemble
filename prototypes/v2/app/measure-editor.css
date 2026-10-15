@@ -31,7 +31,7 @@
     line-height: 1.6;
 }
 .measure-editor textarea:focus-visible {
-    outline: 3px solid #b34e3490;
+    outline: 3px solid var(--focus-ring);
     outline-offset: 3px;
 }
 .measure-editor-context {
@@ -60,7 +60,7 @@
     accent-color: var(--green);
 }
 .measure-editor-toggle:focus-within {
-    outline: 3px solid #b34e3490;
+    outline: 3px solid var(--focus-ring);
     outline-offset: 3px;
 }
 .measure-editor-lengths {

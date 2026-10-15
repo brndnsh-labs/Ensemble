@@ -111,7 +111,7 @@ test("a linked genre swings like the picked genre: a Blues link's swing is the B
     page,
 }) => {
     const swingOf = async () => {
-        await page.getByRole('button', { name: 'Feel and mix', exact: true }).click();
+        await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
         const swing = await page.getByLabel('Swing', { exact: true }).inputValue();
         const grid = await page.getByLabel('Swing grid', { exact: true }).inputValue();
         await page.getByRole('button', { name: 'Close feel' }).click();

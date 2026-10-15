@@ -115,7 +115,9 @@ export function TransportBar({
                     className="feel-button"
                     disabled={busy}
                     onClick={onFeel}
-                    aria-label="Feel and mix"
+                    // The name starts with the visible word (#1700, WCAG 2.5.3 label in name):
+                    // a voice-control user says "click More".
+                    aria-label="More: feel and mix"
                     title="Feel and mix"
                 >
                     More…

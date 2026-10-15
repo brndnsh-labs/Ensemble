@@ -8,7 +8,7 @@ import { expect, seedStarters, songLink, test } from './fixtures';
 // Mirrors `instrument-settings.spec.ts`'s (#1275) helpers/structure.
 
 async function openFeel(page: import('@playwright/test').Page) {
-    await page.getByRole('button', { name: 'Feel and mix', exact: true }).click();
+    await page.getByRole('button', { name: 'More: feel and mix', exact: true }).click();
 }
 async function closeFeel(page: import('@playwright/test').Page) {
     await page.getByRole('button', { name: 'Close feel' }).click();
@@ -286,4 +286,30 @@ test('a slider step with no pointer or key behind it is still applied', async ({
     await closeFeel(page);
     // Applied to the chart, not just shown on the slider: there is something to save.
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+});
+
+// #1700 — a tap on the backdrop closes the sheet (as Escape does); a tap inside it never does.
+test('a tap on the backdrop closes the sheet; a tap inside it does not', async ({ page }) => {
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await openFeel(page);
+    const sheet = page.getByRole('dialog', { name: 'Feel & mix' });
+    await expect(sheet).toBeVisible();
+    // The sheet's own padding, beside its heading: the dialog element is the target there too.
+    const box = (await sheet.boundingBox())!;
+    await page.mouse.click(box.x + 6, box.y + box.height / 2);
+    await expect(sheet).toBeVisible();
+    // A drag that starts inside the sheet and is released over the backdrop (selecting text)
+    // reports a click on the dialog outside its box too — it must not close it.
+    await page.mouse.move(box.x + 6, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(4, 4);
+    await page.mouse.up();
+    await expect(sheet).toBeVisible();
+    // The top-left corner of the page is backdrop on every layout (centred or bottom sheet).
+    await page.mouse.click(4, 4);
+    await expect(sheet).toBeHidden();
+    await expect(
+        page.getByRole('button', { name: 'More: feel and mix', exact: true }),
+    ).toBeFocused();
 });

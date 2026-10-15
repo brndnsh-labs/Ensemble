@@ -605,6 +605,9 @@ export default function Ensemble() {
     // is NOW, not as the render that made the closure saw it.
     const sharedDraftNow = useRef(false);
     const [sharedDraft, setSharedDraft] = useState(false);
+    // Whether the unsaved draft on the stand came from the standards catalog rather than a shared
+    // link (#1700) — the header said "Opened from a shared link" for a standard.
+    const [standardDraft, setStandardDraft] = useState(false);
     // The standards browse surface (#1439): a second songbook-home view, shown instead of the
     // library list while no chart is on the stand. Opening a standard clears it the same way
     // opening a saved song does.
@@ -1219,6 +1222,7 @@ export default function Ensemble() {
      * since this isn't a library entry yet.
      */
     function landDraftOnStand(document: ChartDocument, note: string) {
+        setStandardDraft(false);
         const withFeel = withFollowFeel(document);
         runtime.load(withFeel);
         setSaved(null);
@@ -2775,7 +2779,11 @@ export default function Ensemble() {
         } else if (recovery) {
             setMessage('Recovered your unsaved setup');
         } else {
-            setMessage('Saved on this device');
+            // A plain open has nothing to announce (#1700): the header already says where the
+            // song lives, and a "Saved" toast for a song nobody just saved read as an action that
+            // hadn't happened while covering the chart's last row on a phone. Clearing still
+            // keeps the previous song's sentence from following the musician into this one.
+            setMessage('');
         }
         selectSection(next);
         return { current: onDevice, saved: savedBaseline };
@@ -4216,6 +4224,7 @@ export default function Ensemble() {
                 throw new Error('Standard no longer exists.');
             }
             landDraftOnStand(buildStandardDocument(entry), 'Opened a standard · not saved yet');
+            setStandardDraft(true);
             setStandardsOpen(false);
             track('chart_opened', { source: 'standard' });
         });
@@ -4303,7 +4312,11 @@ export default function Ensemble() {
             }
         }
         await refreshSongs();
-        setMessage('Saved on this device');
+        // A copy moves the stand onto the new song (`setCurrent(result)` above) — say so by
+        // name, or the musician goes on editing what they think is the original (#1700).
+        setMessage(
+            copy ? `Saved as “${next.title}” · you’re on the copy now` : 'Saved on this device',
+        );
         setMenu(false);
     }
     function newSong() {
@@ -4996,7 +5009,11 @@ export default function Ensemble() {
              * was lost, and the sentence says so.
              */}
             {heldWithoutSession && (
-                <div className="error-banner" role="status" data-testid="account-expired-banner">
+                <div
+                    className="error-banner notice"
+                    role="status"
+                    data-testid="account-expired-banner"
+                >
                     <span>{banner.sentence}</span>
                     {/*
                      * Absent after a deletion this tab ran (#1351 patch N1): there is no account
@@ -5047,7 +5064,11 @@ export default function Ensemble() {
              * there is no mismatch to be in.
              */}
             {standMismatch && current && (
-                <div className="error-banner" role="status" data-testid="stand-mismatch-banner">
+                <div
+                    className="error-banner notice"
+                    role="status"
+                    data-testid="stand-mismatch-banner"
+                >
                     <span>{OWNER_MESSAGES.mismatch}</span>
                 </div>
             )}
@@ -5090,8 +5111,9 @@ export default function Ensemble() {
             )}
             {volatileDrafts.current.size > 0 && (
                 <div className="error-banner" role="status">
-                    {volatileDrafts.current.size} draft(s) could not be stored. They are retained in
-                    this tab only. Reopen and export or save them before closing.
+                    {volatileDrafts.current.size === 1
+                        ? "1 draft couldn't be stored on this device. It's kept in this tab only — reopen it and save or export it before you close the tab."
+                        : `${volatileDrafts.current.size} drafts couldn't be stored on this device. They're kept in this tab only — reopen them and save or export them before you close the tab.`}
                 </div>
             )}
             <input
@@ -5127,6 +5149,7 @@ export default function Ensemble() {
                         );
                         await refreshSongs();
                         await open(result);
+                        setMessage('Imported and saved');
                         track('chart_imported', { format: 'file' });
                         track('chart_opened', { source: 'import' });
                     });
@@ -5152,6 +5175,7 @@ export default function Ensemble() {
                         );
                         await refreshSongs();
                         await open(result);
+                        setMessage('Imported and saved');
                         // Both `irealbook`/`irealb` decode the same iReal Pro format; the
                         // telemetry vocabulary tracks the format, not the decoder variant.
                         track('chart_imported', {
@@ -5356,6 +5380,7 @@ export default function Ensemble() {
                         dirty={dirty}
                         hasPendingText={hasPendingText}
                         sharedDraft={sharedDraft}
+                        standardDraft={standardDraft}
                         recoveryHealthy={recoveryHealthy}
                         totalBars={totalBars}
                         stage={stage}
@@ -5552,6 +5577,9 @@ export default function Ensemble() {
                                     writtenBars={writtenBars}
                                     writtenSections={writtenSections}
                                     editing={editing}
+                                    selectedMeasureId={
+                                        editing && current.schemaVersion === 2 ? measureId : null
+                                    }
                                     busy={busy}
                                     playing={playing}
                                     playbackActive={playbackActive}
@@ -5565,6 +5593,9 @@ export default function Ensemble() {
                                         }
                                         revealEditor(block.id);
                                     }}
+                                    onSelectBar={(measure) =>
+                                        setMeasureId(measure.chords[0]?.measureId ?? '')
+                                    }
                                     onEditBar={(measure) => {
                                         setMeasureId(measure.chords[0]?.measureId ?? '');
                                         revealEditor(measure.sectionId);
@@ -5818,6 +5849,9 @@ export default function Ensemble() {
                         );
                         await refreshSongs();
                         await open(copy);
+                        // The stand moves onto the copy; say so, or the musician goes on editing
+                        // what they think is the song they had open (#1700).
+                        setMessage(`Opened “${copy.title}” · the song you had open is unchanged`);
                         setMenu(false);
                     })
                 }

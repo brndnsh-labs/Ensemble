@@ -55,7 +55,7 @@
     accent-color: var(--green);
 }
 .form-controls :is(input, summary):focus-visible {
-    outline: 3px solid #b34e3490;
+    outline: 3px solid var(--focus-ring);
     outline-offset: 3px;
 }
 .form-controls-hint {

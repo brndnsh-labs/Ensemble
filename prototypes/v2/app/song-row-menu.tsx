@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { MAX_COLLECTION_NAME } from '../lib/collections';
-import { whenClosed } from './dialog-close';
+import { backdropDismiss, whenClosed } from './dialog-close';
 
 export interface SongRowMenuTarget {
     id: string;
@@ -101,6 +101,7 @@ export function SongRowMenu({
             aria-labelledby="row-menu-heading"
             onCancel={onClose}
             onClose={whenClosed(onClose)}
+            {...backdropDismiss}
         >
             {song && renaming ? (
                 <form

@@ -231,7 +231,7 @@ test('leaving the All songs page returns focus to its entry link on home', async
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();
     await expect(page.getByRole('heading', { name: /All songs/ })).toBeVisible();
-    await page.getByRole('button', { name: '← Home' }).click();
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(page.getByTestId('all-songs-link')).toBeFocused();
 });
 

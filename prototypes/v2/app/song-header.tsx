@@ -7,6 +7,8 @@ interface SongHeaderProps {
     dirty: boolean;
     hasPendingText: boolean;
     sharedDraft: boolean;
+    /** The draft came from the standards catalog, not a shared link (#1700). */
+    standardDraft: boolean;
     recoveryHealthy: boolean;
     totalBars: number;
     stage: boolean;
@@ -32,6 +34,7 @@ export function SongHeader({
     dirty,
     hasPendingText,
     sharedDraft,
+    standardDraft,
     recoveryHealthy,
     totalBars,
     stage,
@@ -67,7 +70,9 @@ export function SongHeader({
                             {hasPendingText
                                 ? 'Unsaved chord text · this tab only'
                                 : sharedDraft
-                                  ? 'Opened from a shared link · not saved'
+                                  ? standardDraft
+                                      ? 'From the standards · not saved'
+                                      : 'Opened from a shared link · not saved'
                                   : dirty
                                     ? recoveryHealthy
                                         ? 'Unsaved setup · locally recovered'

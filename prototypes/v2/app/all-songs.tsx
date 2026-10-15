@@ -374,11 +374,9 @@ export function AllSongs({
         <main className="home all-songs">
             <div className="home-intro">
                 <div>
-                    <span className="eyebrow">
-                        <button className="all-songs-back" onClick={onBack}>
-                            ← Home
-                        </button>
-                    </span>
+                    <button className="page-back" aria-label="Back to songbook" onClick={onBack}>
+                        ← Songbook
+                    </button>
                     <h1 ref={heading} tabIndex={-1}>
                         All songs{' '}
                         {loaded && <span className="all-songs-count">· {songs.length}</span>}

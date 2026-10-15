@@ -157,7 +157,7 @@ test('duplicates import anyway with the checkbox, and a re-import adds to the sa
 
     // The same playlist again: every song is now a duplicate, and the collection exists — so
     // there is nothing new, and no second "Friday set" is made.
-    await page.getByRole('button', { name: '← Home', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to songbook', exact: true }).click();
     const again = await reviewLink(page, FRIDAY);
     await expect(again.getByTestId('playlist-counts')).toHaveText(
         'No new songs to import, added to your collection “Friday set”, which already exists.',

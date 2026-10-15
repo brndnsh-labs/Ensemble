@@ -10,7 +10,7 @@
     --ink: light-dark(#222923, #f1efe8);
     --on-ink: light-dark(#fffefa, #15181a);
     --muted: light-dark(#72766c, #a3a79c);
-    --muted-soft: light-dark(#8a8d82, #7d837a);
+    --muted-soft: light-dark(#777a70, #8a9087);
     --line: light-dark(#e3e3d9, #33393b);
     --hover: light-dark(#e8e9df, #2a2f32);
     --chip: light-dark(#f2f4ed, #23282b);
@@ -24,7 +24,7 @@
     --danger-bg: light-dark(#f8e6da, #3c2018);
     --bar-line: light-dark(#969d905c, #5d655f80);
     --bar-line-strong: light-dark(#788172, #8a9389);
-    --bar-number: light-dark(#91978a, #8e958b);
+    --bar-number: light-dark(#7a8074, #8e958b);
     --bar-current: light-dark(#e6eadb, #263a2e);
     --bar-repeat-ink: light-dark(#53644c, #b9c8b3);
     /* Following's next-bar cue (#1458) — a blue outline, so it never reads as the green
@@ -55,6 +55,9 @@
     --dot-ink: #ffffff;
     --dot-ink-dark: #241a02;
     --radius: 16px;
+    /* Keyboard focus, one colour on every control (#1700): the accent at ~56%, lifted on the dark
+       stage where the day value read as a dim brick. */
+    --focus-ring: light-dark(#b34e3490, #e0785ab0);
     font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color: var(--ink);
     background: var(--paper);
@@ -91,11 +94,15 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-    outline: 3px solid #b34e3490;
+    outline: 3px solid var(--focus-ring);
     outline-offset: 4px;
 }
-button:hover {
-    filter: brightness(0.96);
+/* Only where a pointer can hover: on a touch screen :hover sticks after the tap, leaving the
+   last button pressed-looking until the next one (#1700). */
+@media (hover: hover) {
+    button:hover {
+        filter: brightness(0.96);
+    }
 }
 a {
     color: inherit;
@@ -180,14 +187,6 @@ html [hidden] {
     border-color: var(--danger);
     color: var(--danger);
 }
-.text-button {
-    font-size: 13px;
-    font-weight: 600;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    padding: 8px 0;
-}
 .dot {
     width: 6px;
     height: 6px;
@@ -260,12 +259,14 @@ html [hidden] {
     border-color: var(--accent);
     color: var(--on-ink);
 }
+/* Quieter than the header's Import / New song (no fill), but the same height and corners, so
+   the three sit on one line as a set rather than one control a size down (#1700). */
 .account-btn {
-    font-size: 12px;
-    font-weight: 650;
+    font-size: 13px;
+    font-weight: 600;
     border: 1px solid var(--line);
-    padding: 8px 11px;
-    border-radius: 8px;
+    padding: 10px 13px;
+    border-radius: 9px;
 }
 .home {
     max-width: 1280px;
@@ -407,10 +408,6 @@ html [hidden] {
     background: #e5e9ed;
     color: #536773;
 }
-.song-glyph.gold {
-    background: #eee5d2;
-    color: #8d713b;
-}
 .song-name {
     display: block;
     font-size: 13px;
@@ -438,18 +435,6 @@ html [hidden] {
     color: var(--muted);
     height: 30px;
     width: 28px;
-}
-.offline-note {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-top: 17px;
-}
-.offline-note svg {
-    height: 14px;
-    width: 14px;
 }
 .jam-tile {
     display: flex;
@@ -590,13 +575,6 @@ html [hidden] {
     border-radius: 6px;
     font-size: 12px;
     color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-.mode-switch button svg {
-    width: 14px;
-    height: 14px;
 }
 .mode-switch button.active {
     background: var(--surface);
@@ -660,9 +638,14 @@ html [hidden] {
     color: var(--muted);
 }
 .tempo-control .step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
     font-size: 17px;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border: 1px solid var(--line);
     border-radius: 5px;
 }
@@ -670,18 +653,6 @@ html [hidden] {
     width: 1px;
     height: 30px;
     background: var(--line);
-}
-.setting-value {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 0;
-}
-.setting-value svg {
-    width: 13px;
-    height: 13px;
 }
 .band-controls {
     margin-left: auto;
@@ -729,9 +700,6 @@ html [hidden] {
     text-decoration: line-through;
     text-decoration-thickness: 1.5px;
     text-decoration-color: var(--muted-soft);
-}
-.more-band {
-    margin-left: 3px;
 }
 /* Trade sits by the Soloist chip: hollow while off or paused (the arrow isn't a muted lane,
    so it isn't struck through), filled with the turn length while the band trades with you.
@@ -784,47 +752,6 @@ html [hidden] {
     margin: 0 auto;
     position: relative;
 }
-.sheet-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 21px;
-    gap: 10px;
-}
-.sheet-meta {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 13px;
-}
-.sheet-meta .meter {
-    font-family: Georgia, serif;
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--ink);
-}
-.sheet-meta .tempo-mark {
-    font-family: Georgia, serif;
-    font-size: 14px;
-    font-style: italic;
-}
-.sheet-tools {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.sheet-tools button {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    gap: 5px;
-    align-items: center;
-}
-.sheet-tools svg {
-    width: 14px;
-    height: 14px;
-}
 .section {
     margin-bottom: 29px;
 }
@@ -863,13 +790,6 @@ html [hidden] {
 .section-name {
     font-size: 11px;
     color: var(--muted);
-}
-.section-direction {
-    font-size: 11px;
-    color: var(--accent);
-    background: var(--accent-light);
-    padding: 4px 8px;
-    border-radius: 4px;
 }
 .bars {
     display: grid;
@@ -996,15 +916,6 @@ html [hidden] {
     font-family: Georgia, serif;
     font-size: 13px;
 }
-.add-section {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin: 22px 0;
-    color: var(--accent);
-    font-size: 12px;
-    padding: 10px 0;
-}
 /* #1460 review P2 #1/#4 — one fixed, bottom-centred STACK holding the message toast, the
    sync-failure notice and the Resume-follow pill, in normal flex-column flow. This is what makes
    the three unable to ever overlap or mask one another: the old single fixed-position toast let
@@ -1117,16 +1028,6 @@ html [hidden] {
     overflow: auto;
     padding: 24px 22px;
 }
-.panel-title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-}
-.panel-title h2 {
-    font-size: 16px;
-    font-weight: 650;
-}
 .edit-panel > p {
     font-size: 12px;
     color: var(--muted);
@@ -1146,95 +1047,9 @@ html [hidden] {
     display: block;
     margin: 20px 0 9px;
 }
-.chord-field {
-    display: flex;
-    align-items: center;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 11px 12px;
-    background: var(--paper);
-}
-.chord-field input {
-    font-family: Georgia, serif;
-    font-size: 28px;
-    width: 100%;
-    border: 0;
-    background: transparent;
-    outline: none;
-    min-width: 0;
-}
-.chord-field button {
-    color: var(--muted);
-}
-.choice-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-}
-.choice-grid button {
-    padding: 9px 3px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    font-size: 11px;
-    background: var(--surface);
-}
-.choice-grid button.active {
-    color: var(--accent);
-    background: var(--accent-light);
-    border-color: #cfaa94;
-}
-.beat-choices {
-    display: flex;
-    gap: 6px;
-}
-.beat-choices button {
-    flex: 1;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    font-size: 12px;
-    padding: 8px;
-}
-.beat-choices .active {
-    background: var(--ink);
-    color: white;
-    border-color: var(--ink);
-}
-.panel-help {
-    font-size: 11px;
-    color: var(--muted);
-    line-height: 1.7;
-    margin: 12px 0;
-}
 .edit-panel > .btn {
     width: 100%;
     margin-top: 12px;
-}
-.discovery-placeholder {
-    border-top: 1px solid var(--line);
-    margin-top: 24px;
-    padding-top: 17px;
-}
-.discovery-placeholder p {
-    font-size: 11px;
-    color: var(--muted);
-    line-height: 1.6;
-    margin-top: 7px;
-}
-.discovery-placeholder .eyebrow {
-    font-size: 9px;
-}
-.editor-actions {
-    display: flex;
-    gap: 5px;
-    margin-left: auto;
-}
-.editor-actions .btn {
-    font-size: 11px;
-    padding: 7px 10px;
-}
-.editor-actions svg {
-    width: 14px;
-    height: 14px;
 }
 .popover {
     position: fixed;
@@ -1260,6 +1075,17 @@ html [hidden] {
     border-radius: 7px;
     font-size: 12px;
 }
+/* The section menu holds one action; a 260px card with 17px of padding around it read as an
+   empty panel (#1700). It sizes to its item. */
+.popover.section-menu {
+    width: auto;
+    min-width: 168px;
+    padding: 6px;
+}
+.section-menu .option {
+    font-size: 13px;
+    font-weight: 600;
+}
 .popover .option:hover {
     background: var(--paper);
 }
@@ -1273,42 +1099,6 @@ html [hidden] {
     display: block;
     color: var(--muted);
     margin-top: 8px;
-}
-.genre-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3px;
-}
-.key-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-}
-.key-grid button {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 9px;
-    font-size: 12px;
-}
-.key-grid button.active {
-    background: var(--green-light);
-    color: var(--green);
-}
-.mix-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 16px;
-    font-size: 12px;
-}
-.mix-row input {
-    min-width: 0;
-    width: 100%;
-    accent-color: var(--green);
-}
-.mix-row label {
-    width: 48px;
-    flex-shrink: 0;
 }
 dialog {
     border: 1px solid var(--line);
@@ -1338,18 +1128,15 @@ dialog p {
     line-height: 1.75;
     margin: 12px 0;
 }
-dialog .close-dialog {
-    position: absolute;
-    right: 14px;
-    top: 14px;
-}
 .dialog-actions {
     display: flex;
     gap: 8px;
     margin-top: 22px;
     flex-wrap: wrap;
 }
-dialog input,
+/* Text-entry fields only: a checkbox or a slider given `width: 100%` draws its box in the middle
+   of a full-width hit area, pushing its label to the far edge (Feel & mix's toggles did). */
+dialog input:where(:not([type="checkbox"], [type="radio"], [type="range"])),
 dialog textarea {
     width: 100%;
     border: 1px solid var(--line);
@@ -1363,23 +1150,6 @@ dialog textarea {
     min-height: 150px;
     line-height: 1.7;
     resize: vertical;
-}
-.dialog-callout {
-    background: var(--green-light);
-    color: var(--green);
-    border-radius: 10px;
-    padding: 13px;
-    font-size: 12px;
-    line-height: 1.65;
-}
-.prototype-toggle {
-    font-size: 10px;
-    color: var(--muted);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-}
-.mobile-only {
-    display: none;
 }
 @media (min-width: 1450px) {
     .chart-scroll {
@@ -1511,9 +1281,11 @@ dialog textarea {
         flex: 1;
         min-width: 200px;
     }
+    /* Phone hit targets (#1700): the row has no width to spare (see the mode switch below), so
+       these grow in height only, toward the 44px a thumb needs. */
     .back-btn {
         width: 30px;
-        height: 32px;
+        height: 40px;
         border: 0;
         background: none;
     }
@@ -1530,17 +1302,20 @@ dialog textarea {
         justify-content: flex-end;
         flex: 1;
         min-width: 130px;
+        /* A row that doesn't fit wraps rather than run Save and the song menu off the right edge,
+           where they were reachable only by scrolling the page sideways (#1700) — "Focus chart"
+           mid-song, or "Keep a copy" on CI's WebKit, which sets text wider than local. The
+           buttons' trimmed sides below keep the common rows on one line. */
+        flex-wrap: wrap;
     }
     .song-actions .btn {
         font-size: 11px;
-        padding: 8px 10px;
+        padding: 8px 8px;
+        min-height: 40px;
     }
     .song-actions .btn svg {
         width: 14px;
         height: 14px;
-    }
-    .song-actions .share-label {
-        display: none;
     }
     .mode-switch {
         margin-right: 0;
@@ -1551,9 +1326,7 @@ dialog textarea {
     .mode-switch button {
         font-size: 11px;
         padding: 8px 6px;
-    }
-    .mode-switch svg {
-        display: none;
+        min-height: 36px;
     }
     /* Chart | Neck | Edit (#1587): three modes fit the phone's header row with the short label. */
     .mode-label-long {
@@ -1561,7 +1334,7 @@ dialog textarea {
     }
     .song-actions .menu-btn {
         width: 28px;
-        height: 30px;
+        height: 40px;
     }
     .transport-bar {
         padding: 11px 16px;
@@ -1595,9 +1368,6 @@ dialog textarea {
     .genre-setting {
         margin-left: auto;
     }
-    .setting-value {
-        font-size: 12px;
-    }
     .key-setting {
         margin-left: 3px;
     }
@@ -1616,11 +1386,6 @@ dialog textarea {
         padding: 8px 5px;
         gap: 4px;
     }
-    .more-band {
-        height: 29px;
-        width: 27px;
-        margin: 0;
-    }
     .trade-toggle {
         flex: 0 0 auto;
         width: 40px;
@@ -1628,19 +1393,6 @@ dialog textarea {
     }
     .chart-scroll {
         padding: 17px 19px 32px;
-    }
-    .sheet-top {
-        margin-bottom: 20px;
-    }
-    .sheet-meta {
-        gap: 9px;
-        font-size: 10px;
-    }
-    .sheet-meta .tempo-mark {
-        font-size: 12px;
-    }
-    .sheet-tools .hide-mobile {
-        display: none;
     }
     .section {
         margin-bottom: 27px;
@@ -1651,10 +1403,6 @@ dialog textarea {
     }
     .section-name {
         font-size: 10px;
-    }
-    .section-direction {
-        font-size: 10px;
-        padding: 3px 5px;
     }
     .section-letter {
         font-size: 11px;
@@ -1727,16 +1475,6 @@ dialog textarea {
     .editing .bars {
         row-gap: 9px;
     }
-    .editor-actions .btn {
-        padding: 5px 7px;
-        font-size: 10px;
-    }
-    .editor-actions .hide-mobile {
-        display: none;
-    }
-    .mobile-only {
-        display: initial;
-    }
     .popover {
         max-height: 65dvh;
         overflow: auto;
@@ -1754,12 +1492,6 @@ dialog textarea {
     }
     .song-actions .mode-switch {
         margin-right: auto;
-    }
-    .sheet-meta .chart-note {
-        display: none;
-    }
-    .discovery-placeholder {
-        margin-bottom: 10px;
     }
 }
 @media (min-width: 761px) and (max-height: 650px) {
@@ -2010,6 +1742,13 @@ dialog textarea {
     text-decoration: underline;
     flex-shrink: 0;
 }
+/* A banner that asks for something rather than reporting a failure (#1700) — a session to renew,
+   a stand that belongs to another account. The accent "a decision is waiting" palette the warning
+   toast and the conflict banner already use; danger stays for what actually went wrong. */
+.error-banner.notice {
+    background: var(--accent-light);
+    color: var(--accent);
+}
 /* A row action's own status while browsing the songbook (#1440) — neutral, unlike `.error-banner`:
    "Renamed to…"/"Duplicated"/"Deleted" are not faults. */
 .status-banner {
@@ -2036,14 +1775,34 @@ dialog textarea {
     border-radius: 10px;
     margin-top: 18px;
 }
+/* The edit panel's "Whole song" group (#1700): after the bar editor, ruled off from it, its
+   explanations as quiet hints under each field instead of three full-width callouts. */
+.panel-group {
+    margin-top: 26px;
+    padding-top: 6px;
+    border-top: 1px solid var(--line);
+}
+.panel-group h3 {
+    font-size: 13px;
+    font-weight: 650;
+    margin: 14px 0 0;
+}
+.field-hint {
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--muted);
+    margin: 6px 0 0;
+}
 .file-input {
     display: none;
 }
-.songbook-empty {
-    padding: 30px;
-    border: 1px dashed var(--line);
-    border-radius: 12px;
-    color: var(--muted);
+/* Every transport setting's control row is one height (#1700) — Tempo's stepper, Key's and Feel's
+   selects, the More… button — so the columns come out equal and their labels share a line. They
+   sat at three different heights before. */
+.setting-select,
+.tempo-control,
+.feel-button {
+    min-height: var(--setting-row, 32px);
 }
 .setting-select {
     border: 0;
@@ -2060,6 +1819,8 @@ dialog textarea {
     font-weight: 650;
     color: var(--muted);
     padding: 0 0 0 6px;
+    /* A text-only button still needs a finger-sized target (#1700); it was 15–18px tall. Its
+       height is the shared setting row's, below. */
 }
 .feel-button:hover {
     color: var(--ink);
@@ -2092,23 +1853,36 @@ dialog textarea {
     background: var(--paper);
     color: var(--ink);
 }
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: var(--backdrop);
-    display: grid;
-    place-items: center;
-    z-index: 80;
-    padding: 20px;
-}
 .modal-box {
     background: var(--surface);
     border: 1px solid var(--line);
     border-radius: 16px;
     padding: 25px;
-    max-width: 480px;
-    width: 100%;
+    /* The phone gutter every other dialog keeps (#1700): a bare `width: 100%` ran these
+       edge to edge, rounded corners against the glass. */
+    width: min(480px, calc(100vw - 32px));
     box-shadow: var(--shadow);
+}
+/* Song actions (#1700): one labelled group per purpose, the labels in the transport's small-caps
+   voice so they read as signposts rather than headings competing with the title. */
+.song-menu-group {
+    margin-top: 22px;
+}
+.song-menu-group h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-weight: 650;
+    margin: 0;
+}
+.modal-box .song-menu-group .dialog-actions {
+    margin-top: 8px;
+}
+.song-menu-close {
+    justify-content: flex-end;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
 }
 .modal-box h2 {
     font-family: Georgia, serif;
@@ -2122,7 +1896,7 @@ dialog textarea {
     line-height: 1.7;
     margin-bottom: 17px;
 }
-.modal-box input {
+.modal-box input:where(:not([type="checkbox"], [type="radio"], [type="range"])) {
     width: 100%;
     border: 1px solid var(--line);
     border-radius: 8px;
@@ -2295,15 +2069,8 @@ dialog textarea {
 .home-actions input {
     display: none;
 }
-.sheet-tools .text-button {
-    font-size: 11px;
-}
 .mode-switch button:disabled {
     opacity: 0.6;
-}
-.new-note {
-    border-left: 2px solid var(--accent);
-    padding: 0 10px;
 }
 @media (max-width: 760px) {
     .preview-note {
@@ -2700,8 +2467,13 @@ dialog textarea {
         padding: 10px 14px max(100px, calc(var(--stand-stack-height, 0px) + 24px));
     }
     .song-open .tempo-control .step {
+        /* Taller, not wider: the transport row has no width to spare on a phone (Feel wraps
+           to its own line at the first extra pixels on CI's WebKit). */
         width: 28px;
-        height: 32px;
+        height: 36px;
+    }
+    .song-open .transport-bar {
+        --setting-row: 36px;
     }
     .song-open .band-toggle {
         min-height: 36px;
@@ -2767,16 +2539,6 @@ html[data-theme="stage"] {
 .account-btn.account-warn {
     border-color: var(--accent);
     color: var(--accent);
-}
-.account-dialog,
-.account-page {
-    /* .modal-box is width:100%/max-width:480px, which at phone width runs edge
-       to edge. The recovery code needs a readable gutter, so this dialog keeps
-       one (same idea as .sound-panel's min()). Two distinct dialogs (#1262's
-       sign-in, #1264's account page) share this rule but NOT a class, since
-       both are mounted at once and `dialog.account-dialog` must resolve to
-       exactly one element for a Playwright strict-mode locator to work. */
-    max-width: min(480px, calc(100vw - 32px));
 }
 .recovery-code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -2858,7 +2620,7 @@ html[data-theme="stage"] {
     background: var(--danger-bg);
     color: var(--danger);
 }
-/* The account page (#1264): passkeys, sessions, recovery code. Reuses .account-dialog's width
+/* The account page (#1264): passkeys, sessions, recovery code. Reuses .modal-box's width
    and the .btn/.dialog-actions vocabulary; only the passkey list and section rhythm are new. */
 .account-page section {
     margin-bottom: 22px;
@@ -2990,12 +2752,22 @@ html[data-theme="stage"] {
 .all-songs {
     max-width: 1100px;
 }
-.all-songs-back {
-    background: none;
-    border: 0;
+/* The way back from a songbook page (All songs, Standards) to the songbook home (#1700): one
+   control, one name, above the page's own eyebrow. */
+.page-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    margin: -8px 0 4px;
     padding: 0;
-    color: inherit;
-    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+}
+@media (hover: hover) {
+    .page-back:hover {
+        text-decoration: underline;
+    }
 }
 .all-songs-count {
     color: var(--muted);

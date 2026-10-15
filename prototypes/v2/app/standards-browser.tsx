@@ -45,6 +45,11 @@ export function StandardsBrowser({ initialShelf, onBack, onOpen }: StandardsBrow
         <main className="home standards-browser">
             <div className="home-intro">
                 <div>
+                    {/* The same way back as All songs (#1700) — it was a full button on the far
+                        side here and an eyebrow link there, under two different names. */}
+                    <button className="page-back" aria-label="Back to songbook" onClick={onBack}>
+                        ← Songbook
+                    </button>
                     <span className="eyebrow">Read-only, never saved</span>
                     <h1 ref={heading} tabIndex={-1}>
                         Standards.
@@ -53,11 +58,6 @@ export function StandardsBrowser({ initialShelf, onBack, onOpen }: StandardsBrow
                         Blues forms, jazz standards and genre grooves. Opening one puts it on the
                         stand as an unsaved draft — Save keeps your own copy.
                     </p>
-                </div>
-                <div className="home-actions">
-                    <button className="btn" onClick={onBack}>
-                        ← Back to songbook
-                    </button>
                 </div>
             </div>
             <div className="shelf-chips" role="group" aria-label="Filter standards by shelf">

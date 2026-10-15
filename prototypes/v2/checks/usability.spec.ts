@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { expect, seedStarters, songLink, test } from './fixtures';
+import { expect, seedStarters, settled, songLink, test } from './fixtures';
 
 async function openEditor(page: Page) {
     await seedStarters(page);
@@ -449,6 +449,8 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
         await page.setViewportSize(viewport);
         await page.getByRole('button', { name: 'Chart', exact: true }).click();
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+        // The panel slides in (#1700); its boxes are measured once it has arrived.
+        await settled(page.locator('.edit-panel'));
         await expect(page.getByLabel('Chord text')).toBeInViewport();
         await expect(page.getByLabel('Chord text')).toBeFocused();
         expect((await page.getByLabel('Song title').boundingBox())!.height).toBeLessThan(65);
@@ -547,6 +549,7 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
     await drums.click();
     await expect(drums).toHaveAttribute('aria-pressed', 'false');
     await expect(drums).toHaveClass(/\boff\b/);
+    await settled(drums);
     const off = await chrome();
     expect(off.background).not.toBe(on.background);
     expect(off.border).not.toBe(on.border);
@@ -669,6 +672,7 @@ test('a muted lane reads as muted at a distance and toggling never reflows the r
     // accessible name stays "Drums" (a toggle's label must not change with its
     // state, per the ARIA button pattern); aria-pressed carries the state.
     await expect(drums).toHaveAttribute('aria-pressed', 'false');
+    await settled(drums);
     const off = await drums.evaluate((element) => {
         const style = getComputedStyle(element);
         const dot = getComputedStyle(element.querySelector('.dot') as HTMLElement);

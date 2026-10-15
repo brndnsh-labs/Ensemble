@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test';
 import { expect, seedStarters, songLink, test } from './fixtures';
 
 /**
@@ -46,13 +47,31 @@ test('the stand never says "Band is playing" or the offline label', async ({ pag
     await page.getByRole('button', { name: 'Stop playback' }).click();
 });
 
-test('opening a song announces a message in the toast that auto-dismisses on its own', async ({
+/** A tempo nudge, then Save: the simplest real action that announces itself in the toast, and
+ * the same sentence every time. */
+async function saveAChange(page: Page) {
+    await page.getByRole('button', { name: 'Faster' }).click();
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+}
+
+test('a plain open announces nothing — the header already says where the song lives', async ({
     page,
 }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket').click();
-    // `open()` always sets a message ("Saved on this device") on every ordinary open — the
-    // simplest real trigger, no dialog involved.
+    await expect(page.locator('.song-subtitle')).toContainText('Saved on this device');
+    // #1700: opening used to toast "Saved on this device" for a song nobody had just saved.
+    // Held for longer than a render, so a late message would have landed by now.
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId('stand-toast')).toHaveAttribute('data-empty', 'true');
+});
+
+test('an action announces a message in the toast that auto-dismisses on its own', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket').click();
+    await saveAChange(page);
     const toast = page.getByTestId('stand-toast');
     await expect(toast).toHaveAttribute('role', 'status');
     await expect(toast).toHaveAttribute('data-tone', 'info');
@@ -75,6 +94,7 @@ test('opening a song announces a message in the toast that auto-dismisses on its
 test('the same message set again inside the first 4s gets a fresh 4s window', async ({ page }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket').click();
+    await saveAChange(page);
     const toast = page.getByTestId('stand-toast');
     await expect(toast).toContainText('Saved on this device');
     // Marks the CURRENT text node so the re-review's node-replacement check below can tell "the
@@ -88,8 +108,7 @@ test('the same message set again inside the first 4s gets a fresh 4s window', as
 
     // Re-set the SAME text well inside the first window's 4s.
     await page.waitForTimeout(1500);
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await songLink(page, 'Blue pocket').click();
+    await saveAChange(page);
     await expect(toast).toContainText('Saved on this device');
 
     // #1460 re-review P2 #2 — a repeat of the identical sentence must still be a genuine node
@@ -251,10 +270,11 @@ test('dismissing a warning while still hovering it does not stick the pause for 
     await dismiss.click();
     await expect(toast).toHaveAttribute('data-empty', 'true');
 
-    // A fresh `info` message (opening a different song) must still auto-dismiss on schedule —
-    // proof `toastHeld` did not stay stuck `true` from the dismiss above.
+    // A fresh `info` message (saving a copy of a different song) must still auto-dismiss on
+    // schedule — proof `toastHeld` did not stay stuck `true` from the dismiss above.
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await page.locator('.song-link', { hasText: 'Minor swing sketch' }).click();
+    await saveAChange(page);
     await expect(toast).toContainText('Saved on this device');
     await expect(toast).toHaveAttribute('data-empty', 'true', { timeout: 6000 });
 });
