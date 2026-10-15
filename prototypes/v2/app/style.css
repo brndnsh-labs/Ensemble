@@ -833,6 +833,9 @@ html [hidden] {
    lifted by position rather than `vertical-align` so a bar's line box — and so the stand's
    layout, which must hold still across play/pause — is the same with or without one. */
 .chord-quality {
+    /* Inline-block so the playing chord's underline stays one line under the root, instead of
+       breaking up and riding up with the raised quality. */
+    display: inline-block;
     position: relative;
     top: -0.5em;
     font-size: 0.6em;
