@@ -1,6 +1,14 @@
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, editorRevealed, expect, seedStarters, songLink, test } from './fixtures';
+import {
+    appUrl,
+    editorRevealed,
+    expect,
+    openWholeSong,
+    seedStarters,
+    songLink,
+    test,
+} from './fixtures';
 
 /**
  * #1511: the chart footer's "N bars · repeats continuously" is the form-length control. It
@@ -77,6 +85,7 @@ async function pick(page: Page, choice: string) {
 /** The Edit panel's Choruses select, read with the panel open, then closed again. */
 async function editPanelChoruses(page: Page): Promise<string> {
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+    await openWholeSong(page);
     const value = await page.getByLabel('Choruses', { exact: true }).inputValue();
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     return value;
@@ -232,6 +241,7 @@ test('on a shared text chart, a count makes the measure copy and counts it (#151
     // The copy is a measure chart: the Edit panel holds the bar editor and agrees on the count.
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await expect(page.getByLabel('Chords in this bar')).toBeVisible();
+    await openWholeSong(page);
     await expect(page.getByLabel('Choruses', { exact: true })).toHaveValue('2');
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
 

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { appUrl, editorRevealed, expect, songLink, test } from './fixtures';
+import { appUrl, editorRevealed, expect, openWholeSong, songLink, test } from './fixtures';
 
 /**
  * #1475: a chart that counts its choruses plays that many and stops; Loop (the default) plays
@@ -68,6 +68,7 @@ test('a chart set to 2 choruses plays two and stops; Loop plays on; the count sa
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two choruses');
     // The new song's four bars (C, G, Am, F) are the form: short, so a pass is quick.
+    await openWholeSong(page);
     const choruses = page.getByLabel('Choruses', { exact: true });
     await expect(choruses).toHaveValue('loop');
     await choruses.selectOption('2');
@@ -104,6 +105,7 @@ test('a chart set to 2 choruses plays two and stops; Loop plays on; the count sa
     await expect(choruses).toHaveValue('2');
 
     // Back to Loop: the band plays on past the second pass.
+    await openWholeSong(page);
     await choruses.selectOption('loop');
     await expect(choruses).toHaveValue('loop');
     await page.getByRole('button', { name: 'Chart', exact: true }).click();

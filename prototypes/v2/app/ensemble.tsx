@@ -1694,6 +1694,15 @@ export default function Ensemble() {
             input?.scrollIntoView({ block: 'nearest' });
         }
     }, [editing, editorRequest, busy]);
+    // The bar being edited stays in view of the chart (#1705) — picked in the editor, by a tap,
+    // or as the panel opens, which on a phone takes the lower part of the screen.
+    useEffect(() => {
+        if (editing && measureId) {
+            scroll.current
+                ?.querySelector('.bar.selected')
+                ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        }
+    }, [editing, measureId]);
     useEffect(() => {
         if (menu) {
             dialog.current?.showModal();
