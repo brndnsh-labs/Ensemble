@@ -88,8 +88,7 @@ async function buildLookaheadChart(
         repeatA?: boolean;
     } = {},
 ): Promise<void> {
-    // 96: past what fits on one page at the smallest step on either project (#1712).
-    const sectionBBars = opts.sectionBBars ?? 96;
+    const sectionBBars = opts.sectionBBars ?? 40;
     const sectionCBars = 3;
     const bpm = opts.bpm ?? 240;
     await page.goto(appUrl());
@@ -375,7 +374,8 @@ test('the row after the playing row stays fully visible on every bar change, and
     page,
 }) => {
     test.setTimeout(50_000);
-    await buildLookaheadChart(page);
+    // Past what fits on one page at any step on either project (#1712): it has to scroll.
+    await buildLookaheadChart(page, { sectionBBars: 96 });
     const scrollEl = page.locator('.chart-scroll');
     expect(
         await scrollEl.evaluate((el) => el.scrollHeight > el.clientHeight + 1),
@@ -383,7 +383,7 @@ test('the row after the playing row stays fully visible on every bar change, and
     ).toBe(true);
     await startHere(page, 'B');
     const violations: string[] = [];
-    // Section B is 96 plain bars, so the chart overflows well past B18 and the scroll is never
+    // Section B is 96 plain bars, so the chart overflows even as a page (#1712) well past B18 and the scroll is never
     // clamped at the document's end while this samples. B1→B18 is 17 bar changes: four row
     // changes on the laptop's 4-per-row layout, eight on the phone's 2-per-row one. Every sample
     // costs a real second at 240bpm (the tempo ceiling), so this stops there (#1463).
@@ -850,7 +850,8 @@ test('a chart that fits never scrolls', async ({ page }) => {
 test('reduced motion scrolls instantly, not smoothly', async ({ page }) => {
     await trackScrollCalls(page);
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await buildLookaheadChart(page);
+    // Long enough to scroll even as a page (#1712).
+    await buildLookaheadChart(page, { sectionBBars: 96 });
     const scrollEl = page.locator('.chart-scroll');
     // The declarative side of the fix (#1458 patch review P1-5): `.chart-scroll`'s base
     // `scroll-behavior: smooth` (a class selector) outranks `* { scroll-behavior: auto }`'s

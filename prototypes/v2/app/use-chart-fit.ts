@@ -116,18 +116,28 @@ function fitsHeight(box: HTMLElement, sheet: HTMLElement): boolean {
     return needed <= room;
 }
 
-/** Every bar's chords on one line, none wider than its bar. */
+/** Every bar's chords on one line, inside its barlines. */
 function oneLine(sheet: HTMLElement): boolean {
     for (const bar of sheet.querySelectorAll<HTMLElement>('.bar')) {
-        if (bar.scrollWidth > bar.clientWidth + 1) {
-            return false;
-        }
         const chords = bar.querySelectorAll<HTMLElement>('.chord');
-        const top = chords[0]?.offsetTop ?? 0;
+        if (!chords.length) {
+            continue;
+        }
+        // Inside the barlines: a chord may use the bar's padding, never cross a line.
+        const style = getComputedStyle(bar);
+        const edge = bar.getBoundingClientRect();
+        const left = edge.left + parseFloat(style.borderLeftWidth);
+        const right = edge.right - parseFloat(style.borderRightWidth);
+        const first = chords[0].getBoundingClientRect();
         for (const chord of chords) {
+            const box = chord.getBoundingClientRect();
             // Centred in the bar, a chord with a raised quality can sit a pixel off its
             // neighbour; a second line is a whole chord lower.
-            if (Math.abs(chord.offsetTop - top) > chord.offsetHeight / 2) {
+            if (
+                box.left < left - 1 ||
+                box.right > right + 1 ||
+                Math.abs(box.top - first.top) > box.height / 2
+            ) {
                 return false;
             }
         }
