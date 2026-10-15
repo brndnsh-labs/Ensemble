@@ -1460,22 +1460,33 @@ dialog textarea {
         font-size: 12px;
         padding: 0 14px;
     }
+    /* Editing on a phone (#1705): the chart above, the editor docked below it like a sheet,
+       each scrolling on its own — so the bar being edited and its editor are on screen together.
+       It used to be one column with the editor above the chart, where editing bar 23 meant
+       scrolling between a form at the top and the bar far below it. `clip`, not `hidden`, so no
+       programmatic scroll moves the two panes as one. */
     .workspace-body.editing {
         display: flex;
         flex-direction: column;
-        overflow: auto;
+        overflow: clip;
     }
     .editing .chart-scroll {
-        overflow: visible;
-        padding-bottom: 10px;
+        flex: 1 1 0;
+        min-height: 0;
+        overflow: auto;
+        padding-bottom: 16px;
     }
     .edit-panel {
-        order: -1;
+        flex: 0 0 auto;
         width: 100%;
+        max-height: 45dvh;
         border-left: 0;
         border-top: 1px solid var(--line);
-        overflow: visible;
-        padding: 16px 20px;
+        border-radius: 16px 16px 0 0;
+        box-shadow: 0 -6px 18px #0000000f;
+        overflow: auto;
+        overscroll-behavior: contain;
+        padding: 16px 20px max(16px, env(safe-area-inset-bottom));
     }
     .edit-panel > p {
         margin-bottom: 15px;
@@ -1603,10 +1614,12 @@ dialog textarea {
         overflow: auto;
     }
     .edit-panel {
-        order: 0;
         width: 260px;
+        max-height: none;
         border-left: 1px solid var(--line);
         border-top: 0;
+        border-radius: 0;
+        box-shadow: none;
         overflow: auto;
     }
     .chord {
@@ -1793,10 +1806,28 @@ dialog textarea {
     padding-top: 6px;
     border-top: 1px solid var(--line);
 }
-.panel-group h3 {
+.panel-group > summary {
     font-size: 13px;
     font-weight: 650;
-    margin: 14px 0 0;
+    padding: 12px 0 6px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    list-style: none;
+}
+.panel-group > summary::-webkit-details-marker {
+    display: none;
+}
+.panel-group > summary::after {
+    content: "▾";
+    color: var(--muted);
+    font-size: 11px;
+    transition: transform var(--motion-fast, 0s) var(--ease-out, ease);
+}
+.panel-group:not([open]) > summary::after {
+    transform: rotate(-90deg);
 }
 .field-hint {
     font-size: 11px;

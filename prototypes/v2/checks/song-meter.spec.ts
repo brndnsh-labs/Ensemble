@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { appUrl, editorRevealed, expect, test } from './fixtures';
+import { appUrl, editorRevealed, expect, openWholeSong, test } from './fixtures';
 
 /**
  * The song's own meter (#1371). The bar editor's "Meter from this bar" is a different control: it
@@ -21,6 +21,7 @@ test('a new song can be put in 3/4, and it plays', async ({ page }) => {
     // An unchecked bar edit is committed with the change, not left beside it.
     await page.getByLabel('Chords in this bar').fill('C Dm');
 
+    await openWholeSong(page);
     await page.getByLabel('Song meter').selectOption('3/4');
 
     await expect(page.locator('.song-subtitle')).toContainText('3/4');
@@ -50,6 +51,7 @@ test('a bar whose written lengths cannot follow blocks the change and is named',
     await page.getByRole('button', { name: 'Update chart', exact: true }).click();
     await page.getByRole('button', { name: 'Next bar', exact: true }).click();
 
+    await openWholeSong(page);
     await page.getByLabel('Song meter').selectOption('3/4');
 
     await expect(alert(page)).toContainText('A · bar 1');

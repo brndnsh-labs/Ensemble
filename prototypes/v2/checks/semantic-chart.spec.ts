@@ -1,7 +1,15 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, test as base, editorRevealed, expect, seedStarters, songLink } from './fixtures';
+import {
+    appUrl,
+    test as base,
+    editorRevealed,
+    expect,
+    openWholeSong,
+    seedStarters,
+    songLink,
+} from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -299,6 +307,7 @@ test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({ 
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
+    await openWholeSong(page);
     const mode = page.getByLabel('Song mode');
 
     await mode.selectOption('minor');
@@ -340,6 +349,7 @@ test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears i
     // 4/4 has one natural grouping, so there is nothing to choose.
     await expect(page.getByLabel('Beat grouping from this bar')).toHaveCount(0);
 
+    await openWholeSong(page);
     await page.getByLabel('Song meter').selectOption('5/4');
     const grouping = page.getByLabel('Beat grouping from this bar');
     await expect(grouping.locator('option')).toHaveText(['Continue (3+2)', '3+2', '2+3']);
@@ -354,6 +364,7 @@ test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears i
     expect(saved.chart.score.sections[0].measures[0].grouping).toEqual([2, 3]);
 
     // The existing rule: a meter change resets a grouping written for the old meter.
+    await openWholeSong(page);
     await page.getByLabel('Song meter').selectOption('4/4');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();

@@ -137,10 +137,11 @@ export function EditPanel({
                     </p>
                     {/* The whole song's meter, mode and choruses follow the bar being edited
                         (#1700): editing is mostly bars, and these led the panel, pushing the bar
-                        editor below three help boxes. The title stays on top — a new song is
-                        named first. */}
-                    <section className="panel-group" aria-labelledby="panel-song-heading">
-                        <h3 id="panel-song-heading">Whole song</h3>
+                        editor below three help boxes. Folded away until asked for (#1705): set
+                        once a song, and on a phone the panel shares the screen with the chart.
+                        The title stays on top — a new song is named first. */}
+                    <details className="panel-group">
+                        <summary>Whole song</summary>
                         <label className="panel-label" htmlFor="song-meter">
                             Song meter
                         </label>
@@ -208,7 +209,7 @@ export function EditPanel({
                             then stops: an Intro at the start plays the first time only, and an
                             Outro at the end or a last-chorus coda the last time only.
                         </p>
-                    </section>
+                    </details>
                 </>
             ) : (
                 <>

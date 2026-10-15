@@ -414,3 +414,11 @@ export async function seedGuestDocuments(page: Page, docs: unknown[], path = '')
     }, docs);
     await page.goto(appUrl(path));
 }
+
+/** Unfolds the edit panel's "Whole song" group (#1705): song meter, mode and choruses. */
+export async function openWholeSong(page: Page): Promise<void> {
+    const group = page.locator('.edit-panel details.panel-group');
+    if (!(await group.evaluate((node: HTMLDetailsElement) => node.open))) {
+        await group.locator('summary').click();
+    }
+}

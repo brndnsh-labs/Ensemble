@@ -30,3 +30,42 @@ test('editing rings the bar the editor holds, and a tap on a bar picks it', asyn
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     await expect(page.locator('.bar.selected')).toHaveCount(0);
 });
+
+/** Whether `locator` is wholly inside the window — not merely scrolled-to inside its pane. */
+async function onScreen(locator: import('@playwright/test').Locator) {
+    return locator.evaluate((node) => {
+        const box = node.getBoundingClientRect();
+        return box.top >= 0 && box.bottom <= window.innerHeight && box.height > 0;
+    });
+}
+
+test('the bar being edited and its editor are on screen together, wherever the bar is (#1705)', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Browse all →' }).click();
+    const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
+    await row.getByRole('button', { name: 'Open' }).click();
+    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+    const editor = page.getByLabel('Bar to edit');
+    await expect(editor).toBeVisible();
+
+    // The last bar, picked from the editor: the chart brings it into view beside the editor.
+    const options = await editor.locator('option').count();
+    await editor.selectOption({ index: options - 1 });
+    const last = page.locator('.bar').last();
+    await expect(last).toHaveClass(/\bselected\b/);
+    await expect.poll(() => onScreen(last)).toBe(true);
+    await expect.poll(() => onScreen(editor)).toBe(true);
+
+    // A tap on another bar retargets the editor without closing it.
+    const other = page.locator('.bar').nth(options - 3);
+    await other.click({ position: { x: 6, y: 6 } });
+    await expect(other).toHaveClass(/\bselected\b/);
+    await expect.poll(() => onScreen(editor)).toBe(true);
+
+    // The whole-song settings are folded away, one tap from open.
+    await expect(page.getByLabel('Song meter')).toBeHidden();
+    await page.getByText('Whole song', { exact: true }).click();
+    await expect(page.getByLabel('Song meter')).toBeVisible();
+});

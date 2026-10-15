@@ -463,7 +463,10 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
                 .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
         ).toBeGreaterThanOrEqual(16);
         if (viewport.width === 402) {
-            await expect(page.getByRole('heading', { name: 'Edit your chart' })).toBeInViewport();
+            // A phone docks the editor below the chart (#1705): both are on screen, the panel
+            // scrolled to its input rather than to its heading.
+            await expect(page.locator('.edit-panel')).toBeInViewport();
+            await expect(page.locator('.chart-scroll')).toBeInViewport();
         }
         await page.getByRole('button', { name: 'Edit section', exact: true }).first().click();
         await expect(page.getByLabel('Chord text')).toBeInViewport();
