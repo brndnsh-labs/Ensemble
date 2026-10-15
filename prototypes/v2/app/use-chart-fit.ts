@@ -18,15 +18,21 @@ import { type RefObject, useLayoutEffect } from 'react';
  * state: a try is a write and a read in one synchronous pass, and nothing else renders from it.
  *
  * The step is chosen again when the box changes size or the chart changes, never on play/stop:
- * the "Tap a chord" line under the chart hides while playing, so its room is held back always
- * ({@link BOTTOM_RESERVE}) rather than measured, and the height the hidden controls give the
+ * the "Tap a chord" line under the chart hides while playing, so the room it took when last
+ * shown is held back for it ({@link bottomReserve}), and the height the hidden controls give the
  * chart while playing is not used, so the chart holds still across play/pause.
  */
 const FIT_STEPS = 9;
 /** The largest step a chart that scrolls is shown at. */
 const COMFORT = 3;
-/** Room kept under the last section for the line beneath the chart (`.chart-bottom`). */
-const BOTTOM_RESERVE = 58;
+/**
+ * Room under the last section for the line beneath the chart (`.chart-bottom`), as last measured
+ * on this box while it showed: on a narrow phone its hint and button stack into two rows. Held
+ * while it hides for playing, so the step doesn't change under the band.
+ */
+const bottomReserve = new WeakMap<HTMLElement, number>();
+/** Before the line has ever been measured (a chart opened mid-playback): one row of it. */
+const DEFAULT_RESERVE = 58;
 
 export type ChartFitMode = 'page' | 'edit' | null;
 
@@ -111,8 +117,15 @@ function fitsHeight(box: HTMLElement, sheet: HTMLElement): boolean {
     }
     const style = getComputedStyle(box);
     const room = box.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+    const sectionsEnd = last.getBoundingClientRect().bottom;
+    const line = sheet.querySelector<HTMLElement>('.chart-bottom');
+    if (line && !line.hidden) {
+        bottomReserve.set(box, line.getBoundingClientRect().bottom - sectionsEnd);
+    }
     const needed =
-        last.getBoundingClientRect().bottom - sheet.getBoundingClientRect().top + BOTTOM_RESERVE;
+        sectionsEnd -
+        sheet.getBoundingClientRect().top +
+        (bottomReserve.get(box) ?? DEFAULT_RESERVE);
     return needed <= room;
 }
 
