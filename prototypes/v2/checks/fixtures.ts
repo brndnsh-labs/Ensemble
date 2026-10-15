@@ -254,9 +254,14 @@ export async function openBand(page: Page, tab: 'Players' | 'Groove' | 'Trade' |
     // `open`, not visibility: a sheet sliding shut after a close is still visible for a moment.
     if ((await page.locator('dialog.band-panel[open]').count()) === 0) {
         await page.getByRole('button', { name: 'Band…' }).click();
+        await settled(sheet);
     }
-    await sheet.getByRole('tab', { name: tab }).click();
-    await expect(sheet.getByRole('tab', { name: tab })).toHaveAttribute('aria-selected', 'true');
+    const button = sheet.getByRole('tab', { name: tab });
+    // Already on it (the sheet reopens on its last tab): no click into a sheet still sliding in.
+    if ((await button.getAttribute('aria-selected')) !== 'true') {
+        await button.click();
+    }
+    await expect(button).toHaveAttribute('aria-selected', 'true');
     return sheet;
 }
 
