@@ -1,4 +1,4 @@
-import type { SyntheticEvent } from 'react';
+import type { MouseEvent, SyntheticEvent } from 'react';
 
 /**
  * A `<dialog>`'s `close` event is QUEUED by `close()`, not fired inside it (HTML spec: "queue an
@@ -15,4 +15,28 @@ export function whenClosed(onClose: () => void) {
             onClose();
         }
     };
+}
+
+/**
+ * A tap on the backdrop closes the dialog (#1700) — for the ones where nothing is lost by it:
+ * the band's settings sheets and the song/row menus. A native modal `<dialog>` does not do this
+ * by itself (`closedby="any"` is not in every engine yet). The backdrop is painted by the dialog
+ * element, so a click there targets the dialog itself, at a point outside its own box; a click on
+ * the dialog's padding also targets it, but inside the box. `close()` fires the ordinary `close`
+ * event, so the shell hears it the same way it hears Escape.
+ */
+export function closeOnBackdrop(event: MouseEvent<HTMLDialogElement>) {
+    const dialog = event.currentTarget;
+    if (event.target !== dialog) {
+        return;
+    }
+    const box = dialog.getBoundingClientRect();
+    const outside =
+        event.clientX < box.left ||
+        event.clientX > box.right ||
+        event.clientY < box.top ||
+        event.clientY > box.bottom;
+    if (outside) {
+        dialog.close();
+    }
 }

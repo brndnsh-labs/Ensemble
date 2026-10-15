@@ -1,7 +1,7 @@
 import type { ReactNode, RefObject } from 'react';
 import type * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
-import { whenClosed } from './dialog-close';
+import { closeOnBackdrop, whenClosed } from './dialog-close';
 import { downloadImportSource } from './import-dialog';
 
 type Recovery = ReturnType<typeof repository.recoveriesFor>[number];
@@ -91,6 +91,7 @@ export function SongMenu({
             data-testid="song-menu"
             onCancel={onClose}
             onClose={whenClosed(onClose)}
+            onClick={closeOnBackdrop}
         >
             {/* Grouped by what each action is FOR (#1700): it was one flat wall of eleven equal
                 buttons under a heading ("Keep a good take.") that named none of them, with the

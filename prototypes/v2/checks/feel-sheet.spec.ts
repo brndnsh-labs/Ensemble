@@ -287,3 +287,22 @@ test('a slider step with no pointer or key behind it is still applied', async ({
     // Applied to the chart, not just shown on the slider: there is something to save.
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
 });
+
+// #1700 — a tap on the backdrop closes the sheet (as Escape does); a tap inside it never does.
+test('a tap on the backdrop closes the sheet; a tap inside it does not', async ({ page }) => {
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await openFeel(page);
+    const sheet = page.getByRole('dialog', { name: 'Feel & mix' });
+    await expect(sheet).toBeVisible();
+    // The sheet's own padding, beside its heading: the dialog element is the target there too.
+    const box = (await sheet.boundingBox())!;
+    await page.mouse.click(box.x + 6, box.y + box.height / 2);
+    await expect(sheet).toBeVisible();
+    // The top-left corner of the page is backdrop on every layout (centred or bottom sheet).
+    await page.mouse.click(4, 4);
+    await expect(sheet).toBeHidden();
+    await expect(
+        page.getByRole('button', { name: 'More: feel and mix', exact: true }),
+    ).toBeFocused();
+});
