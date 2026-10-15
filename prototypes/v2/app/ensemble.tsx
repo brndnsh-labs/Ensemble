@@ -5144,6 +5144,7 @@ export default function Ensemble() {
                         );
                         await refreshSongs();
                         await open(result);
+                        setMessage('Imported and saved');
                         track('chart_imported', { format: 'file' });
                         track('chart_opened', { source: 'import' });
                     });
@@ -5169,6 +5170,7 @@ export default function Ensemble() {
                         );
                         await refreshSongs();
                         await open(result);
+                        setMessage('Imported and saved');
                         // Both `irealbook`/`irealb` decode the same iReal Pro format; the
                         // telemetry vocabulary tracks the format, not the decoder variant.
                         track('chart_imported', {
@@ -5585,6 +5587,9 @@ export default function Ensemble() {
                                         }
                                         revealEditor(block.id);
                                     }}
+                                    onSelectBar={(measure) =>
+                                        setMeasureId(measure.chords[0]?.measureId ?? '')
+                                    }
                                     onEditBar={(measure) => {
                                         setMeasureId(measure.chords[0]?.measureId ?? '');
                                         revealEditor(measure.sectionId);
@@ -5838,6 +5843,9 @@ export default function Ensemble() {
                         );
                         await refreshSongs();
                         await open(copy);
+                        // The stand moves onto the copy; say so, or the musician goes on editing
+                        // what they think is the song they had open (#1700).
+                        setMessage(`Opened “${copy.title}” · the song you had open is unchanged`);
                         setMenu(false);
                     })
                 }

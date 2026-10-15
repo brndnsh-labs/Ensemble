@@ -107,6 +107,9 @@ interface ChartSheetProps {
     onStartHere: (sectionId: string | undefined) => void;
     onEditSection: (block: ChartBlock) => void;
     onEditBar: (measure: ChartMeasure) => void;
+    /** A tap on a bar while editing (#1700): picks it for the editor and nothing more — unlike
+     * the bar's Edit button, it neither stops the band nor moves focus to the panel. */
+    onSelectBar: (measure: ChartMeasure) => void;
     onAudition: (globalIndex: number) => void;
     /** How many times the band plays the form, then stops (#1511, the footer's menu);
      * `undefined` repeats it continuously. On a text chart the shell makes the measure copy
@@ -132,6 +135,7 @@ export function ChartSheet({
     onStartHere,
     onEditSection,
     onEditBar,
+    onSelectBar,
     onAudition,
     onChoruses,
 }: ChartSheetProps) {
@@ -146,8 +150,11 @@ export function ChartSheet({
     const sectionMenuRef = useRef<HTMLDivElement>(null);
     const sectionMenuTrigger = useRef<HTMLButtonElement | null>(null);
 
+    // Keyed on WHICH menu is open, not its object: the effect focuses the item and arms the
+    // listeners once per opening.
+    const sectionMenuId = sectionMenu?.id ?? null;
     useEffect(() => {
-        if (!sectionMenu) {
+        if (sectionMenuId === null) {
             return;
         }
         const first = sectionMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
@@ -166,17 +173,22 @@ export function ChartSheet({
         }
         // The menu is fixed at the letter's position when it opened; a scroll — the musician's,
         // or Following's own while the band plays — moves the letter, so the menu follows it
-        // rather than floating over some other bar (#1700). Re-anchored, not closed: Following
-        // scrolls every bar, and a menu that shut itself mid-reach would be unusable.
+        // rather than floating over some other bar (#1700). Written straight to the menu's own
+        // style, not to state: Following scrolls on the paint path, and a state write would
+        // re-render the whole sheet every frame of it. Once the letter has left the screen the
+        // menu closes rather than follow it off.
         function followTrigger() {
             const rect = sectionMenuTrigger.current?.getBoundingClientRect();
-            if (rect) {
-                setSectionMenu((open) =>
-                    open && (open.top !== rect.bottom + 6 || open.left !== rect.left)
-                        ? { ...open, top: rect.bottom + 6, left: rect.left }
-                        : open,
-                );
+            const menu = sectionMenuRef.current;
+            if (!rect || !menu) {
+                return;
             }
+            if (rect.bottom < 0 || rect.top > window.innerHeight) {
+                setSectionMenu(null);
+                return;
+            }
+            menu.style.top = `${rect.bottom + 6}px`;
+            menu.style.left = `${rect.left}px`;
         }
         document.addEventListener('pointerdown', closeOnOutsideClick);
         document.addEventListener('keydown', closeOnEscape);
@@ -188,7 +200,7 @@ export function ChartSheet({
             document.removeEventListener('scroll', followTrigger, true);
             window.removeEventListener('resize', followTrigger);
         };
-    }, [sectionMenu]);
+    }, [sectionMenuId]);
 
     function openSectionMenu(event: ReactMouseEvent<HTMLButtonElement>, block: ChartBlock) {
         if (!block.id) {
@@ -369,7 +381,7 @@ export function ChartSheet({
                                 Key of{' '}
                                 {arrangementOf(current).sections.find((s) => s.id === block.id)
                                     ?.key || arrangementOf(current).key}
-                                {arrangementOf(current).isMinor ? 'm' : ''}
+                                {arrangementOf(current).isMinor ? ' minor' : ''}
                             </span>
                         )}
                         {current.schemaVersion === 2 &&
@@ -442,16 +454,17 @@ export function ChartSheet({
                                     key={measure.chords[0]?.globalIndex}
                                     // While editing a measure chart the whole bar picks itself
                                     // for the editor (#1700) — `.editing .bar` already promised
-                                    // that with its pointer cursor and hover fill. A chord inside
-                                    // still auditions; the bar's own Edit button stays the
-                                    // keyboard path.
+                                    // that with its pointer cursor and hover fill. Select only: a
+                                    // stray tap must not stop the band or pull a phone's view up
+                                    // to the panel. A chord inside still auditions; the bar's own
+                                    // Edit button stays the keyboard path, and the full reveal.
                                     onClick={
                                         current.schemaVersion === 2 && editing && !busy
                                             ? (event) => {
                                                   if (
                                                       !(event.target as Element).closest('button')
                                                   ) {
-                                                      onEditBar(measure);
+                                                      onSelectBar(measure);
                                                   }
                                               }
                                             : undefined

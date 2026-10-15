@@ -299,6 +299,13 @@ test('a tap on the backdrop closes the sheet; a tap inside it does not', async (
     const box = (await sheet.boundingBox())!;
     await page.mouse.click(box.x + 6, box.y + box.height / 2);
     await expect(sheet).toBeVisible();
+    // A drag that starts inside the sheet and is released over the backdrop (selecting text)
+    // reports a click on the dialog outside its box too — it must not close it.
+    await page.mouse.move(box.x + 6, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(4, 4);
+    await page.mouse.up();
+    await expect(sheet).toBeVisible();
     // The top-left corner of the page is backdrop on every layout (centred or bottom sheet).
     await page.mouse.click(4, 4);
     await expect(sheet).toBeHidden();

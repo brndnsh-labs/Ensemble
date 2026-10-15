@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
 import { type Lane, visibleLanes } from './band-lanes';
-import { closeOnBackdrop, whenClosed } from './dialog-close';
+import { backdropDismiss, whenClosed } from './dialog-close';
 import { useRangeCommit } from './use-range-commit';
 
 interface RangeSettingProps {
@@ -102,7 +102,7 @@ export function SoundsPanel({
             ref={dialogRef}
             aria-labelledby="sounds-title"
             onClose={whenClosed(onClose)}
-            onClick={closeOnBackdrop}
+            {...backdropDismiss}
         >
             <div className="sounds-heading">
                 <div>

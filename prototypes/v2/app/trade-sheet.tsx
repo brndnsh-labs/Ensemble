@@ -5,7 +5,7 @@ import type {
 } from '@engine/songbook/types';
 import type { RefObject } from 'react';
 import type { ChartDocument } from '../lib/runtime';
-import { closeOnBackdrop, whenClosed } from './dialog-close';
+import { backdropDismiss, whenClosed } from './dialog-close';
 
 const TURNS: { value: SoloistTradeBars; label: string }[] = [
     { value: 2, label: 'Twos (2 bars)' },
@@ -62,7 +62,7 @@ export function TradeSheet({
             ref={dialogRef}
             aria-labelledby="trade-title"
             onClose={whenClosed(onClose)}
-            onClick={closeOnBackdrop}
+            {...backdropDismiss}
         >
             <div className="feel-heading">
                 <div>

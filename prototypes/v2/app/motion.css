@@ -19,7 +19,8 @@
 
 /* Controls answer the pointer: colour and border ease instead of snapping, and a press sinks a
    hair so a tap on a phone reads as taken before anything else happens. The chart's bars are
-   excluded: a chord's colour there IS the pointer, and it changes on the audio clock. */
+   excluded: a chord's colour there IS the pointer, and it changes on the audio clock. So is a
+   menu's trigger from the sink: the menu is placed from its box on that same click. */
 :where(button, a, select, input, textarea):not(.bars *) {
     transition:
         background-color var(--motion-fast) var(--ease-out),
@@ -30,7 +31,7 @@
         opacity var(--motion-fast) var(--ease-out),
         transform var(--motion-fast) var(--ease-out);
 }
-:where(button):not(:disabled, .bars *):active {
+:where(button):not(:disabled, .bars *, [aria-haspopup]):active {
     transform: scale(0.97);
 }
 
@@ -38,15 +39,24 @@
    `close()`, and stays mounted while closed — so CSS alone can animate both ways:
    `@starting-style` gives the entry its first frame, and `allow-discrete` holds `display` (and,
    where the browser has it, `overlay`, which keeps it in the top layer) until the exit has
-   played. A browser without them simply snaps, as before. */
+   played. The exit is gated on `overlay`: without it `close()` drops the dialog out of the top
+   layer at once, and holding `display` would paint it for one exit in its in-flow position,
+   unstyled as a modal — so a browser without `overlay` animates the entry and snaps shut. */
 dialog {
     opacity: 0;
     transform: translateY(var(--motion-rise)) scale(0.98);
     transition:
         opacity var(--motion-base) var(--ease-in),
-        transform var(--motion-base) var(--ease-in),
-        overlay var(--motion-base) allow-discrete,
-        display var(--motion-base) allow-discrete;
+        transform var(--motion-base) var(--ease-in);
+}
+@supports (overlay: auto) {
+    dialog {
+        transition:
+            opacity var(--motion-base) var(--ease-in),
+            transform var(--motion-base) var(--ease-in),
+            overlay var(--motion-base) allow-discrete,
+            display var(--motion-base) allow-discrete;
+    }
 }
 dialog[open] {
     opacity: 1;
@@ -66,10 +76,15 @@ dialog:not([open]) {
 }
 dialog::backdrop {
     opacity: 0;
-    transition:
-        opacity var(--motion-base) var(--ease-out),
-        overlay var(--motion-base) allow-discrete,
-        display var(--motion-base) allow-discrete;
+    transition: opacity var(--motion-base) var(--ease-out);
+}
+@supports (overlay: auto) {
+    dialog::backdrop {
+        transition:
+            opacity var(--motion-base) var(--ease-out),
+            overlay var(--motion-base) allow-discrete,
+            display var(--motion-base) allow-discrete;
+    }
 }
 dialog[open]::backdrop {
     opacity: 1;
@@ -188,7 +203,7 @@ dialog[open]::backdrop {
         --motion-slow: 0ms;
         --motion-rise: 0px;
     }
-    :where(button):not(:disabled, .bars *):active {
+    :where(button):not(:disabled, .bars *, [aria-haspopup]):active {
         transform: none;
     }
 }

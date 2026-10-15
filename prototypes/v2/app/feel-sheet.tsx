@@ -4,7 +4,7 @@ import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
-import { closeOnBackdrop, whenClosed } from './dialog-close';
+import { backdropDismiss, whenClosed } from './dialog-close';
 import { useRangeCommit } from './use-range-commit';
 
 /**
@@ -147,7 +147,7 @@ export function FeelSheet({
             ref={dialogRef}
             aria-labelledby="feel-title"
             onClose={whenClosed(onClose)}
-            onClick={closeOnBackdrop}
+            {...backdropDismiss}
         >
             <div className="feel-heading">
                 <div>
