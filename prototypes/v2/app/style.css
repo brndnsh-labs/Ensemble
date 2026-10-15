@@ -2022,6 +2022,13 @@ dialog textarea {
     text-decoration: underline;
     flex-shrink: 0;
 }
+/* A banner that asks for something rather than reporting a failure (#1700) — a session to renew,
+   a stand that belongs to another account. The accent "a decision is waiting" palette the warning
+   toast and the conflict banner already use; danger stays for what actually went wrong. */
+.error-banner.notice {
+    background: var(--accent-light);
+    color: var(--accent);
+}
 /* A row action's own status while browsing the songbook (#1440) — neutral, unlike `.error-banner`:
    "Renamed to…"/"Duplicated"/"Deleted" are not faults. */
 .status-banner {

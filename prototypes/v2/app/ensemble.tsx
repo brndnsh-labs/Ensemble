@@ -5004,7 +5004,11 @@ export default function Ensemble() {
              * was lost, and the sentence says so.
              */}
             {heldWithoutSession && (
-                <div className="error-banner" role="status" data-testid="account-expired-banner">
+                <div
+                    className="error-banner notice"
+                    role="status"
+                    data-testid="account-expired-banner"
+                >
                     <span>{banner.sentence}</span>
                     {/*
                      * Absent after a deletion this tab ran (#1351 patch N1): there is no account
@@ -5055,7 +5059,11 @@ export default function Ensemble() {
              * there is no mismatch to be in.
              */}
             {standMismatch && current && (
-                <div className="error-banner" role="status" data-testid="stand-mismatch-banner">
+                <div
+                    className="error-banner notice"
+                    role="status"
+                    data-testid="stand-mismatch-banner"
+                >
                     <span>{OWNER_MESSAGES.mismatch}</span>
                 </div>
             )}
@@ -5098,8 +5106,9 @@ export default function Ensemble() {
             )}
             {volatileDrafts.current.size > 0 && (
                 <div className="error-banner" role="status">
-                    {volatileDrafts.current.size} draft(s) could not be stored. They are retained in
-                    this tab only. Reopen and export or save them before closing.
+                    {volatileDrafts.current.size === 1
+                        ? "1 draft couldn't be stored on this device. It's kept in this tab only — reopen it and save or export it before you close the tab."
+                        : `${volatileDrafts.current.size} drafts couldn't be stored on this device. They're kept in this tab only — reopen them and save or export them before you close the tab.`}
                 </div>
             )}
             <input
