@@ -829,11 +829,19 @@ html [hidden] {
     padding: 3px 2px;
     letter-spacing: -1px;
 }
-.chord sup {
-    font-size: 0.53em;
-    vertical-align: super;
-    letter-spacing: -0.2px;
-    margin-left: 1px;
+/* Real-book chord setting (#1700, `chordSymbol`): the quality small and raised beside the root,
+   lifted by position rather than `vertical-align` so a bar's line box — and so the stand's
+   layout, which must hold still across play/pause — is the same with or without one. */
+.chord-quality {
+    position: relative;
+    top: -0.5em;
+    font-size: 0.6em;
+    letter-spacing: 0;
+    margin-left: 0.03em;
+}
+.chord-bass {
+    font-size: 0.78em;
+    letter-spacing: 0;
 }
 .bar.current {
     background: var(--bar-current);

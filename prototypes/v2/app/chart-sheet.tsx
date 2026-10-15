@@ -3,6 +3,7 @@ import type { ChartNotation } from '@engine/songbook/types';
 import {
     type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
+    type ReactNode,
     useEffect,
     useRef,
     useState,
@@ -47,12 +48,21 @@ function chorusChoice(choruses: number | undefined): string {
  * same shared field v1's `ChordVisualizer.tsx` read — so switching notation is a
  * pure read-time choice, never a re-analysis of the chord.
  */
-function chordSymbol(chord: ChartChord, notation: ChartNotation): string {
+function chordSymbol(chord: ChartChord, notation: ChartNotation): ReactNode {
     const disp = chord.display?.[notation];
     if (!disp) {
         return chord.absName;
     }
-    return `${disp.root}${disp.suffix}${disp.bass ? `/${disp.bass}` : ''}`;
+    // Set the way a real book sets it (#1700): the root full size, the quality small and raised
+    // beside it, a slash bass after. Read at a distance, the root is the fact that matters; the
+    // quality qualifies it. Spans with no space between them, so the text is still "Cmaj7/E".
+    return (
+        <>
+            <span className="chord-root">{disp.root}</span>
+            {disp.suffix && <span className="chord-quality">{disp.suffix}</span>}
+            {disp.bass && <span className="chord-bass">/{disp.bass}</span>}
+        </>
+    );
 }
 
 /**
@@ -60,7 +70,7 @@ function chordSymbol(chord: ChartChord, notation: ChartNotation): string {
  * chord before it rings on), N.C. is printed as charts print it, and a fermata sits over the
  * symbol it holds. Only the band engine can open charts with these (`lib/band-chart.ts`).
  */
-function eventText(chord: ChartChord, notation: ChartNotation): string {
+function eventText(chord: ChartChord, notation: ChartNotation): ReactNode {
     return chord.kind === 'hold'
         ? '/'
         : chord.kind === 'no-chord'
