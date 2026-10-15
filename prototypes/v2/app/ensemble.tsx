@@ -606,6 +606,12 @@ export default function Ensemble() {
     // is NOW, not as the render that made the closure saw it.
     const sharedDraftNow = useRef(false);
     const [sharedDraft, setSharedDraft] = useState(false);
+    // A draft that is a brand-new song (#1707), not a stranger's chart: nothing is written until
+    // the musician changes it, and then it is kept by itself (`keepNewSong`) — a New song backed
+    // straight out of leaves no "Untitled song" behind. Written with `sharedDraftNow`, by
+    // `markSharedDraft`, for the same same-tick reason.
+    const newSongNow = useRef(false);
+    const [newSongDraft, setNewSongDraft] = useState(false);
     // Whether the unsaved draft on the stand came from the standards catalog rather than a shared
     // link (#1700) — the header said "Opened from a shared link" for a standard.
     const [standardDraft, setStandardDraft] = useState(false);
@@ -1152,7 +1158,11 @@ export default function Ensemble() {
             ? arrangementOf(current).sections.find((section) => section.id === sectionId)?.value
             : '') ??
         '';
-    const dirty = hasPendingText || sharedDraft || !!(current && saved && !same(current, saved));
+    // An untouched new song is not unsaved work: there is nothing in it to lose (#1707).
+    const dirty =
+        hasPendingText ||
+        (sharedDraft && !newSongDraft) ||
+        !!(current && saved && !same(current, saved));
     const playbackActive = playing || playbackPending;
     const focused = playbackActive && !showControls && !editing;
 
@@ -1398,6 +1408,7 @@ export default function Ensemble() {
             ? { kind: 'all', collection: allSongsCollection }
             : { kind: 'home' };
     const navViewKey = navKey(navView);
+
     const navViewRef = useRef(navView);
     navViewRef.current = navView;
     /** Writes the history step that reaches `view` from the entry on top now (#1700). */
@@ -1508,6 +1519,29 @@ export default function Ensemble() {
             applyNavRef.current(target, navEntry.current);
         }
     }, [busy]);
+    // A new song is kept on its first change (#1707). After the change's own `run()` has
+    // finished, so this one isn't turned away by the shell's one-action-at-a-time lock — and
+    // declared after the pending-Back effect above, so a Back pressed during that change is
+    // applied first (`closeSong` keeps the song itself). A keep the store refuses leaves the
+    // stand an ordinary unsaved draft — "Keep a copy" and the leave warning — rather than
+    // retrying on every render.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `keepNewSong`/`run` are new each render; `current`, `busy` and the flag are what decide.
+    useEffect(() => {
+        if (!newSongDraft || busy || !current || untouchedNewSong(current)) {
+            return;
+        }
+        void run(async () => {
+            if (!newSongNow.current) {
+                return;
+            }
+            try {
+                await keepNewSong(current, false);
+            } catch (error) {
+                markSharedDraft(true);
+                throw error;
+            }
+        });
+    }, [newSongDraft, busy, current]);
     // `startPlayback` is a component-scope function declaration, a new reference every render;
     // listing it would re-arm the listeners on every render while a link's autoplay is
     // pending, the same convention the shared-link effect above documents for `openSharedDraft`.
@@ -2426,9 +2460,11 @@ export default function Ensemble() {
         setStandStore(next);
     }
     /** The ONE writer of the shared-draft flag (#1512): the ref and its state mirror together. */
-    function markSharedDraft(shared: boolean) {
+    function markSharedDraft(shared: boolean, newSong = false) {
         sharedDraftNow.current = shared;
         setSharedDraft(shared);
+        newSongNow.current = shared && newSong;
+        setNewSongDraft(shared && newSong);
     }
     /**
      * The songbook this device writes to right now, bound to the account the SESSION names
@@ -2797,12 +2833,24 @@ export default function Ensemble() {
      * now showing).
      */
     function closeSong(after?: () => void, onStay?: () => void) {
-        void run(() => {
+        void run(async () => {
+            let candidate: ChartDocument;
             try {
-                updateChart();
+                candidate = updateChart();
             } catch (error) {
                 onStay?.();
                 throw error;
+            }
+            if (newSongNow.current && !untouchedNewSong(candidate)) {
+                // Typed into but not yet applied: leaving keeps it, as leaving a saved song keeps
+                // its unsaved bars in recovery. Refused, the stand stays — and so does its entry.
+                try {
+                    await keepNewSong(candidate, false);
+                } catch (error) {
+                    markSharedDraft(true);
+                    onStay?.();
+                    throw error;
+                }
             }
             runtime.stop();
             setCurrent(null);
@@ -2843,6 +2891,8 @@ export default function Ensemble() {
         if (
             current &&
             sharedDraftNow.current &&
+            // A new song is kept by `closeSong` the moment it holds anything: nothing to warn of.
+            !newSongNow.current &&
             !leaveDraftWarned.current &&
             (hasPendingText ||
                 (draftBaseline.current !== null && !same(current, draftBaseline.current)))
@@ -4569,21 +4619,61 @@ export default function Ensemble() {
     }
     function newSong() {
         void run(async () => {
-            // `template` always has a value (`defaultTemplate` is the last-resort fallback), so
-            // a brand-new song belongs to whichever songbook is live right now, not to whatever
-            // was last on the stand — set before `storeSave` so its expiry guard reads the truth.
-            // Its owner claim is null for the same reason (#1311): these bars are nobody's yet.
-            // From the SESSION (`liveStand`), never `sync.owner`: New song is reachable from the
-            // songbook the moment the session reports an owner, which is BEFORE `attach()` has
-            // published one, and a binding taken from the loop there would be unfenced.
-            bindStand(liveStand());
+            // A draft until it holds something (#1707): `keepNewSong` writes it on the first
+            // change, so a New song backed straight out of leaves the songbook as it was.
             const document = repository.validated(blankSong(template));
-            const created = await storeSave(document, null, { owner: null, stand: false });
-            await refreshSongs();
-            await open(created);
-            track('chart_created');
-            revealEditor(arrangementOf(created).sections[0].id);
+            landDraftOnStand(document, '');
+            markSharedDraft(true, true);
+            revealEditor(arrangementOf(document).sections[0].id);
         });
+    }
+    /** Whether the new song on the stand is still exactly as New song made it (#1707). */
+    function untouchedNewSong(candidate: ChartDocument) {
+        return draftBaseline.current !== null && same(candidate, draftBaseline.current);
+    }
+    /**
+     * Puts the new song on the stand into the songbook (#1707) and keeps it on the stand as an
+     * ordinary saved song. Same id, so the editor (`key={current.id}`) keeps whatever is typed but
+     * not yet applied.
+     *
+     * `commit` is an explicit Save, which commits `next` as it is. Otherwise — the first change, or
+     * leaving with bars typed — only the blank song New song made is committed, exactly what New
+     * song used to commit the moment it was pressed, and `next` is retained over it as an unsaved
+     * draft like any other: an explicit Save is still the only thing that commits the musician's
+     * own music.
+     */
+    async function keepNewSong(next: ChartDocument, commit: boolean) {
+        const blank = draftBaseline.current;
+        // `template` always has a value, so a brand-new song belongs to whichever songbook is
+        // live right now, not to whatever was last on the stand — bound before `storeSave` so its
+        // expiry guard reads the truth. Its owner claim is null for the same reason (#1311):
+        // these bars are nobody's yet. From the SESSION (`liveStand`), never `sync.owner`: New
+        // song is reachable from the songbook the moment the session reports an owner, which is
+        // BEFORE `attach()` has published one, and a binding taken from the loop there would be
+        // unfenced.
+        bindStand(liveStand());
+        const created = await storeSave(
+            { ...(commit || !blank ? next : blank), revision: 0 },
+            null,
+            {
+                owner: null,
+                stand: false,
+            },
+        );
+        markSharedDraft(false);
+        draftBaseline.current = null;
+        setSaved(created);
+        rememberOpened(created.id);
+        setRecoveryHealthy(true);
+        if (commit || !blank || same(next, created)) {
+            setCurrent(created);
+        } else {
+            // The edit on top of the committed blank: `next` at the committed revision.
+            draft({ ...next, revision: created.revision, updatedAt: created.updatedAt }, created);
+        }
+        await refreshSongs();
+        track('chart_created');
+        return created;
     }
     /**
      * Copy the offered v1 songs into the GUEST songbook (#1274).
@@ -4740,7 +4830,11 @@ export default function Ensemble() {
                 // and arming the offer before it would leave the card set but never shown —
                 // the musician back on a stand with an editor error and an invisible import
                 // waiting behind it. Same path the header's Home button takes.
-                updateChart();
+                const candidate = updateChart();
+                if (newSongNow.current && !untouchedNewSong(candidate)) {
+                    // A new song with bars in it is kept, as leaving it any other way keeps it.
+                    await keepNewSong(candidate, false);
+                }
                 runtime.stop();
                 setCurrent(null);
                 bindStand(null);
@@ -5629,6 +5723,7 @@ export default function Ensemble() {
                         hasPendingText={hasPendingText}
                         sharedDraft={sharedDraft}
                         standardDraft={standardDraft}
+                        newSongDraft={newSongDraft}
                         recoveryHealthy={recoveryHealthy}
                         totalBars={totalBars}
                         stage={stage}
@@ -5643,7 +5738,18 @@ export default function Ensemble() {
                         onShowChart={() => showStand('chart')}
                         onShowNeck={() => showStand('neck')}
                         onEditChart={() => revealEditor()}
-                        onSave={() => void run(() => (sharedDraft ? keepSharedCopy() : save()))}
+                        onSave={() =>
+                            void run(async () => {
+                                if (newSongNow.current) {
+                                    await keepNewSong(updateChart(), true);
+                                    setMessage('Saved on this device');
+                                } else if (sharedDraft) {
+                                    await keepSharedCopy();
+                                } else {
+                                    await save();
+                                }
+                            })
+                        }
                         onMenu={() =>
                             void run(async () => {
                                 setRecoveryOptions(await recoveryOptionsFor(current));

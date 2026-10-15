@@ -193,7 +193,9 @@ test('a fresh device shows the first visit; after one save, the everyday layout'
     await expect(page.getByRole('button', { name: 'All 11 jazz standards →' })).toBeFocused();
 
     await page.getByRole('button', { name: /Write a new song/ }).click();
-    // New song saves the blank chart itself and opens it in the editor.
+    // New song is kept once it holds something (#1707): one change puts it in the songbook.
+    await page.getByRole('button', { name: 'Faster' }).click();
+    await expect(page.locator('.song-subtitle')).toContainText('Unsaved setup');
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(
         page.getByRole('heading', { name: 'Pick a tune. The band comes in.' }),
