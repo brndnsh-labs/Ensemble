@@ -449,6 +449,8 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
         await page.setViewportSize(viewport);
         await page.getByRole('button', { name: 'Chart', exact: true }).click();
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+        // The panel slides in (#1700); its boxes are measured once it has arrived.
+        await settled(page.locator('.edit-panel'));
         await expect(page.getByLabel('Chord text')).toBeInViewport();
         await expect(page.getByLabel('Chord text')).toBeFocused();
         expect((await page.getByLabel('Song title').boundingBox())!.height).toBeLessThan(65);
