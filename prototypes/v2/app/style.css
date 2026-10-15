@@ -267,12 +267,14 @@ html [hidden] {
     border-color: var(--accent);
     color: var(--on-ink);
 }
+/* Quieter than the header's Import / New song (no fill), but the same height and corners, so
+   the three sit on one line as a set rather than one control a size down (#1700). */
 .account-btn {
-    font-size: 12px;
-    font-weight: 650;
+    font-size: 13px;
+    font-weight: 600;
     border: 1px solid var(--line);
-    padding: 8px 11px;
-    border-radius: 8px;
+    padding: 10px 13px;
+    border-radius: 9px;
 }
 .home {
     max-width: 1280px;
@@ -1265,6 +1267,17 @@ html [hidden] {
     border-radius: 7px;
     font-size: 12px;
 }
+/* The section menu holds one action; a 260px card with 17px of padding around it read as an
+   empty panel (#1700). It sizes to its item. */
+.popover.section-menu {
+    width: auto;
+    min-width: 168px;
+    padding: 6px;
+}
+.section-menu .option {
+    font-size: 13px;
+    font-weight: 600;
+}
 .popover .option:hover {
     background: var(--paper);
 }
@@ -2155,7 +2168,7 @@ dialog textarea {
 /* Song actions (#1700): one labelled group per purpose, the labels in the transport's small-caps
    voice so they read as signposts rather than headings competing with the title. */
 .song-menu-group {
-    margin-top: 18px;
+    margin-top: 22px;
 }
 .song-menu-group h3 {
     font-size: 10px;
@@ -2165,7 +2178,7 @@ dialog textarea {
     font-weight: 650;
     margin: 0;
 }
-.song-menu-group .dialog-actions {
+.modal-box .song-menu-group .dialog-actions {
     margin-top: 8px;
 }
 .song-menu-close {
