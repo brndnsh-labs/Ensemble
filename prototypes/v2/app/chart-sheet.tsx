@@ -327,10 +327,17 @@ export function ChartSheet({
                         >
                             {block.label || 'A'}
                         </button>
-                        <span className="section-name">
-                            {arrangementOf(current).sections.find((s) => s.id === block.id)?.key ||
-                                arrangementOf(current).key}
-                        </span>
+                        {/* A bare key beside the section letter read as a second letter ("A  C").
+                            A measure chart already prints key · meter on the section's first bar
+                            (`.bar-context`), so only a text chart says it here, in words (#1700). */}
+                        {current.schemaVersion === 1 && (
+                            <span className="section-name">
+                                Key of{' '}
+                                {arrangementOf(current).sections.find((s) => s.id === block.id)
+                                    ?.key || arrangementOf(current).key}
+                                {arrangementOf(current).isMinor ? 'm' : ''}
+                            </span>
+                        )}
                         {current.schemaVersion === 2 &&
                             (current.chart.score.sections.find((s) => s.id === block.id)?.repeat ??
                                 1) > 1 && (
