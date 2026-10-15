@@ -79,7 +79,9 @@ test('signed in, the song menu still brings v1 songs over â€” into this deviceâ€
     // Nothing opens by itself over the account songbook; the way in is the menu.
     await expect(page.getByTestId('v1-import')).toHaveCount(0);
     await page.getByRole('button', { name: 'ï¼‹ New song', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
+    // A change is what puts a new song in the songbook (#1707).
+    await page.getByRole('button', { name: 'Faster' }).click();
+    await expect(page.locator('.song-subtitle')).toContainText('Unsaved setup');
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByTestId('bring-over-v1').click();
 
@@ -94,7 +96,7 @@ test('signed in, the song menu still brings v1 songs over â€” into this deviceâ€
     );
 
     // The counter has to be proven live, or "nothing was sent" is `0 === 0` the day this
-    // endpoint is renamed (#1274 patch N7). The New song above is a real account Save.
+    // endpoint is renamed (#1274 patch N7). The New song above, once changed, is a real account Save.
     await expect.poll(saves).toBeGreaterThan(0);
     const before = saves();
     await card.getByRole('button', { name: 'Import' }).click();

@@ -9,6 +9,8 @@ interface SongHeaderProps {
     sharedDraft: boolean;
     /** The draft came from the standards catalog, not a shared link (#1700). */
     standardDraft: boolean;
+    /** The draft is a brand-new song, kept on its first change (#1707). */
+    newSongDraft: boolean;
     recoveryHealthy: boolean;
     totalBars: number;
     stage: boolean;
@@ -35,6 +37,7 @@ export function SongHeader({
     hasPendingText,
     sharedDraft,
     standardDraft,
+    newSongDraft,
     recoveryHealthy,
     totalBars,
     stage,
@@ -69,15 +72,17 @@ export function SongHeader({
                         <span className={dirty ? 'unsaved' : ''}>
                             {hasPendingText
                                 ? 'Unsaved chord text · this tab only'
-                                : sharedDraft
-                                  ? standardDraft
-                                      ? 'From the standards · not saved'
-                                      : 'Opened from a shared link · not saved'
-                                  : dirty
-                                    ? recoveryHealthy
-                                        ? 'Unsaved setup · locally recovered'
-                                        : 'Unsaved setup · this tab only'
-                                    : 'Saved on this device'}
+                                : newSongDraft
+                                  ? 'New song · kept once you change it'
+                                  : sharedDraft
+                                    ? standardDraft
+                                        ? 'From the standards · not saved'
+                                        : 'Opened from a shared link · not saved'
+                                    : dirty
+                                      ? recoveryHealthy
+                                          ? 'Unsaved setup · locally recovered'
+                                          : 'Unsaved setup · this tab only'
+                                      : 'Saved on this device'}
                         </span>
                         <span>{totalBars} bars</span>
                         <span>{arrangementOf(current).timeSignature}</span>
@@ -128,7 +133,7 @@ export function SongHeader({
                     </button>
                 </div>
                 <button className="btn primary save-btn" disabled={busy || !dirty} onClick={onSave}>
-                    {sharedDraft ? 'Keep a copy' : 'Save'}
+                    {sharedDraft && !newSongDraft ? 'Keep a copy' : 'Save'}
                 </button>
                 <button
                     className="icon-button menu-btn"
