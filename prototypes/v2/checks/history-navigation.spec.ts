@@ -131,3 +131,44 @@ test('Back from a shared link lands on the songbook with the link consumed', asy
     await home(page);
     expect(new URL(page.url()).hash).toBe('');
 });
+
+test('Back on an edited standard says it is unsaved once; the next Back leaves it', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Browse all →' }).click();
+    const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
+    await row.getByRole('button', { name: 'Open' }).click();
+    await onSong(page, '12-Bar Blues');
+    // An untouched standard leaves on the first Back…
+    await page.goBack();
+    await expect(page.locator('main.standards-browser')).toBeVisible();
+    await page.goForward();
+    await onSong(page, '12-Bar Blues');
+    // …an edited one is held once, with the reason.
+    await page.getByRole('button', { name: 'Faster' }).click();
+    await page.goBack();
+    await onSong(page, '12-Bar Blues');
+    await expect(page.getByTestId('stand-toast')).toContainText("This draft isn't saved");
+    await page.goBack();
+    await expect(page.locator('main.standards-browser')).toBeVisible();
+});
+
+test('Back with a dialog open keeps Forward intact', async ({ page }) => {
+    await seedStarters(page);
+    await page.getByRole('button', { name: /All 3 songs/ }).click();
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await home(page);
+    // All songs is ahead of the songbook now. A dialog over the songbook, then Back…
+    await songLink(page, 'Blue pocket').first().click();
+    await onSong(page, 'Blue pocket');
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.goBack();
+    await expect(page.getByTestId('song-menu')).toBeHidden();
+    await onSong(page, 'Blue pocket');
+    await page.goBack();
+    await home(page);
+    // …and Forward still reaches the song, not a duplicate of the page under it.
+    await page.goForward();
+    await onSong(page, 'Blue pocket');
+});
