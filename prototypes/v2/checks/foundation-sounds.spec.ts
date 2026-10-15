@@ -15,6 +15,9 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     page,
     disconnect,
 }) => {
+    // Its neighbours' budget: an offline reload, an export/import round trip and seven trips into
+    // the Band sheet ran within a few seconds of the default on CI's WebKit.
+    test.setTimeout(120_000);
     await observeSamples(page);
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
