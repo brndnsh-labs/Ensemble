@@ -1349,7 +1349,9 @@ dialog .close-dialog {
     margin-top: 22px;
     flex-wrap: wrap;
 }
-dialog input,
+/* Text-entry fields only: a checkbox or a slider given `width: 100%` draws its box in the middle
+   of a full-width hit area, pushing its label to the far edge (Feel & mix's toggles did). */
+dialog input:not([type="checkbox"], [type="radio"], [type="range"]),
 dialog textarea {
     width: 100%;
     border: 1px solid var(--line);
@@ -2122,7 +2124,7 @@ dialog textarea {
     line-height: 1.7;
     margin-bottom: 17px;
 }
-.modal-box input {
+.modal-box input:not([type="checkbox"], [type="radio"], [type="range"]) {
     width: 100%;
     border: 1px solid var(--line);
     border-radius: 8px;
