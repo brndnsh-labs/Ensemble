@@ -80,6 +80,45 @@ dialog[open]::backdrop {
     }
 }
 
+/* On a phone the band's settings sheets — Sounds, Feel & mix, Trade — are bottom sheets: anchored
+   to the edge the thumb is already near, sliding up from it and back down into it, the chart still
+   in view above them. On a wider screen they stay centred dialogs. */
+@media (max-width: 760px) {
+    dialog.sound-panel,
+    dialog.feel-panel {
+        margin: auto 0 0;
+        width: 100%;
+        max-width: none;
+        max-height: 88dvh;
+        border-radius: 18px 18px 0 0;
+        border-bottom: 0;
+        padding-bottom: max(24px, env(safe-area-inset-bottom));
+        transform: translateY(100%);
+    }
+    dialog.sound-panel[open],
+    dialog.feel-panel[open] {
+        transform: none;
+    }
+    @starting-style {
+        dialog.sound-panel[open],
+        dialog.feel-panel[open] {
+            transform: translateY(100%);
+        }
+    }
+    /* A grab handle, so the sheet reads as one at a glance. Decorative: Escape, the ✕ and the
+       backdrop are how it closes. */
+    dialog.sound-panel::before,
+    dialog.feel-panel::before {
+        content: "";
+        display: block;
+        width: 36px;
+        height: 4px;
+        border-radius: 2px;
+        background: var(--line);
+        margin: -12px auto 8px;
+    }
+}
+
 /* Popovers (the chart's section and form-length menus) mount when opened, so a keyframe gives
    them their entry. They open up OR down depending on room, so they grow from their own centre
    rather than slide from a side that might be wrong. */
