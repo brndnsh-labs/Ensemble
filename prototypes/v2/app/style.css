@@ -1521,7 +1521,7 @@ dialog textarea {
     /* Phone hit targets (#1700): the row has no width to spare (see the mode switch below), so
        these grow in height only, toward the 44px a thumb needs. */
     .back-btn {
-        width: 36px;
+        width: 30px;
         height: 40px;
         border: 0;
         background: none;
@@ -1539,6 +1539,10 @@ dialog textarea {
         justify-content: flex-end;
         flex: 1;
         min-width: 130px;
+        /* Showing the controls mid-song adds "Focus chart" to a row that was already full; it
+           ran Save and the song menu off the right edge, reachable only by scrolling the page
+           sideways (#1700). Wrap instead. */
+        flex-wrap: wrap;
     }
     .song-actions .btn {
         font-size: 11px;
@@ -1568,7 +1572,7 @@ dialog textarea {
         display: none;
     }
     .song-actions .menu-btn {
-        width: 32px;
+        width: 28px;
         height: 40px;
     }
     .transport-bar {
@@ -2128,6 +2132,27 @@ dialog textarea {
        edge to edge, rounded corners against the glass. */
     width: min(480px, calc(100vw - 32px));
     box-shadow: var(--shadow);
+}
+/* Song actions (#1700): one labelled group per purpose, the labels in the transport's small-caps
+   voice so they read as signposts rather than headings competing with the title. */
+.song-menu-group {
+    margin-top: 18px;
+}
+.song-menu-group h3 {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-weight: 650;
+    margin: 0;
+}
+.song-menu-group .dialog-actions {
+    margin-top: 8px;
+}
+.song-menu-close {
+    justify-content: flex-end;
+    border-top: 1px solid var(--line);
+    padding-top: 16px;
 }
 .modal-box h2 {
     font-family: Georgia, serif;

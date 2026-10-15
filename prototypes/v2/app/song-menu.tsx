@@ -92,11 +92,16 @@ export function SongMenu({
             onCancel={onClose}
             onClose={whenClosed(onClose)}
         >
-            <h2>Keep a good take.</h2>
-            <p>
-                Saved setups and recovered drafts stay on this device. Export a file to move a song
-                to another computer.
-            </p>
+            {/* Grouped by what each action is FOR (#1700): it was one flat wall of eleven equal
+                buttons under a heading ("Keep a good take.") that named none of them, with the
+                audio export's progress and Cancel landing below the whole wall. */}
+            <h2>Song actions</h2>
+            {!inAccount && (
+                <p>
+                    Saved songs and recovered drafts stay on this device. Export a file to move a
+                    song to another computer.
+                </p>
+            )}
             {/* #1460 — the three sync facts, moved here from the stand's now-removed footer. */}
             {syncStatus && (
                 <div className="song-menu-status" data-testid="song-menu-status">
@@ -104,75 +109,95 @@ export function SongMenu({
                     {syncStatus}
                 </div>
             )}
-            <div className="dialog-actions">
-                <button className="btn primary" disabled={busy} onClick={onShare}>
-                    Copy link
-                </button>
-                <button className="btn" disabled={busy || !saved} onClick={onSaveCopy}>
-                    Save a copy
-                </button>
-                <button className="btn" disabled={busy} onClick={onExport}>
-                    Export file
-                </button>
-                <button className="btn" disabled={busy} onClick={onExportMidi}>
-                    Export MIDI
-                </button>
-                <button className="btn" disabled={busy} onClick={onExportAudioMix}>
-                    Export audio (mix)
-                </button>
-                <button className="btn" disabled={busy} onClick={onExportAudioStems}>
-                    Export audio (stems)
-                </button>
-                {current?.schemaVersion === 2 && current.importSource && (
-                    <button
-                        className="btn"
-                        disabled={busy}
-                        onClick={() => downloadImportSource(current.importSource!.text)}
-                    >
-                        Download original source
+            <section className="song-menu-group" aria-labelledby="song-menu-share">
+                <h3 id="song-menu-share">Share</h3>
+                <div className="dialog-actions">
+                    <button className="btn primary" disabled={busy} onClick={onShare}>
+                        Copy link
                     </button>
-                )}
-                <button className="btn" disabled={busy} onClick={onImport}>
-                    Import chart
-                </button>
-                {v1Available && (
-                    <button
-                        className="btn"
-                        data-testid="bring-over-v1"
-                        disabled={busy}
-                        onClick={onBringOverV1}
-                    >
-                        Bring over old Ensemble songs
+                </div>
+            </section>
+            <section className="song-menu-group" aria-labelledby="song-menu-export">
+                <h3 id="song-menu-export">Export</h3>
+                <div className="dialog-actions">
+                    <button className="btn" disabled={busy} onClick={onExport}>
+                        Export file
                     </button>
-                )}
-                <button className="btn" disabled={busy || !dirty || !saved} onClick={onRevert}>
-                    Revert to saved
-                </button>
-                {inAccount && (
-                    // Offered only for a song the cloud actually holds, and disabled rather than
-                    // hidden while offline — a control that vanishes teaches nothing, and the
-                    // reason lives in the confirm step (#1270).
-                    <button
-                        className="btn"
-                        data-testid="delete-from-account"
-                        disabled={busy}
-                        onClick={onDeleteFromAccount}
-                    >
-                        Delete from my account
+                    <button className="btn" disabled={busy} onClick={onExportMidi}>
+                        Export MIDI
                     </button>
+                    <button className="btn" disabled={busy} onClick={onExportAudioMix}>
+                        Export audio (mix)
+                    </button>
+                    <button className="btn" disabled={busy} onClick={onExportAudioStems}>
+                        Export audio (stems)
+                    </button>
+                    {current?.schemaVersion === 2 && current.importSource && (
+                        <button
+                            className="btn"
+                            disabled={busy}
+                            onClick={() => downloadImportSource(current.importSource!.text)}
+                        >
+                            Download original source
+                        </button>
+                    )}
+                </div>
+                {exportingAudio && (
+                    <p className="sound-progress" role="status">
+                        {exportAudioProgress || 'Preparing sounds…'}
+                        <button className="btn" onClick={onCancelExportAudio}>
+                            Cancel
+                        </button>
+                    </p>
                 )}
+            </section>
+            <section className="song-menu-group" aria-labelledby="song-menu-song">
+                <h3 id="song-menu-song">This song</h3>
+                <div className="dialog-actions">
+                    <button className="btn" disabled={busy || !saved} onClick={onSaveCopy}>
+                        Save a copy
+                    </button>
+                    <button className="btn" disabled={busy || !dirty || !saved} onClick={onRevert}>
+                        Revert to saved
+                    </button>
+                    {inAccount && (
+                        // Offered only for a song the cloud actually holds, and disabled rather
+                        // than hidden while offline — a control that vanishes teaches nothing, and
+                        // the reason lives in the confirm step (#1270).
+                        <button
+                            className="btn danger"
+                            data-testid="delete-from-account"
+                            disabled={busy}
+                            onClick={onDeleteFromAccount}
+                        >
+                            Delete from my account
+                        </button>
+                    )}
+                </div>
+            </section>
+            <section className="song-menu-group" aria-labelledby="song-menu-bring">
+                <h3 id="song-menu-bring">Bring in songs</h3>
+                <div className="dialog-actions">
+                    <button className="btn" disabled={busy} onClick={onImport}>
+                        Import chart
+                    </button>
+                    {v1Available && (
+                        <button
+                            className="btn"
+                            data-testid="bring-over-v1"
+                            disabled={busy}
+                            onClick={onBringOverV1}
+                        >
+                            Bring over old Ensemble songs
+                        </button>
+                    )}
+                </div>
+            </section>
+            <div className="dialog-actions song-menu-close">
                 <button className="btn" onClick={onClose}>
                     Close
                 </button>
             </div>
-            {exportingAudio && (
-                <p className="sound-progress" role="status">
-                    {exportAudioProgress || 'Preparing sounds…'}
-                    <button className="btn" onClick={onCancelExportAudio}>
-                        Cancel
-                    </button>
-                </p>
-            )}
             {shareLinkFallback && (
                 <p className="share-link-fallback">
                     <label htmlFor="share-link-url">
