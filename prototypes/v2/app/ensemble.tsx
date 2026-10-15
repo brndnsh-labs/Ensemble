@@ -55,6 +55,7 @@ import {
     v1ImportContext,
     v1ImportOffer,
 } from '../lib/import-v1';
+import { isNavEntry, type NavEntry, type NavView, navKey, stepTo } from '../lib/navigation';
 import { collectionWrite, framePace, type PlaylistImport } from '../lib/playlist-import';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
@@ -622,6 +623,20 @@ export default function Ensemble() {
     // Which home entry point opened the standards browser (#1441) — "Browse all →" or one
     // shelf's link — so the browser opens on that shelf and focus comes back to that button.
     const [standardsEntry, setStandardsEntry] = useState<StandardsEntry>('all');
+    /**
+     * Browser history (#1700). Each view — the songbook, All songs, Standards, a song — is one
+     * history entry (`lib/navigation.ts`), so Back returns to where the musician came from
+     * instead of leaving the app. State-only entries: the URL never changes, because the hash
+     * already belongs to `#chart=` links and a song id means nothing on another device.
+     * `navEntry` is the entry this view stands on; `silentPops` counts the `history.go()`s the
+     * shell made itself, whose popstate must not be read as the musician pressing Back.
+     */
+    const navEntry = useRef<NavEntry | null>(null);
+    const silentPops = useRef(0);
+    const pendingNav = useRef<NavEntry | null>(null);
+    const navStarted = useRef(false);
+    /** Which standard the draft on the stand was built from, so its entry can rebuild it. */
+    const standardOnStand = useRef<{ documentId: string; standardId: string } | null>(null);
     // Where focus returns on leaving either sub-view (#1440 review P3). Held HERE, not inside
     // `StandardsBrowser`/`AllSongs`: this shell survives the view swap that remounts `Songbook`
     // (and its entry buttons) on every return, so a ref captured inside the sub-view itself would
@@ -1304,7 +1319,8 @@ export default function Ensemble() {
         // would just let the next reload apply it instead). Everything else survives.
         const consumeLink = () =>
             window.history.replaceState(
-                null,
+                // Keeps the shell's history entry (#1700); only the URL is tidied.
+                window.history.state,
                 '',
                 window.location.pathname +
                     stripV1ShareParams(stripAccountsParam(window.location.search)),
@@ -1355,6 +1371,118 @@ export default function Ensemble() {
             alive = false;
         };
     }, [ready, template]);
+
+    // Where the musician is, as a history entry names it (#1700).
+    const navView: NavView = current
+        ? {
+              kind: 'song',
+              ref:
+                  standardOnStand.current?.documentId === current.id
+                      ? { kind: 'standard', id: standardOnStand.current.standardId }
+                      : sharedDraft
+                        ? { kind: 'draft' }
+                        : { kind: 'song', id: current.id },
+          }
+        : standardsOpen
+          ? { kind: 'standards', entry: standardsEntry }
+          : allSongsOpen
+            ? { kind: 'all', collection: allSongsCollection }
+            : { kind: 'home' };
+    const navViewKey = navKey(navView);
+    // Every view change writes history: deeper pushes, shallower goes back (so Forward still
+    // reopens what was left), level replaces. The first run claims the page's entry in place —
+    // a reload lands on the songbook whatever entry it reloaded on.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `navViewKey` names `navView` exactly.
+    useEffect(() => {
+        if (!ready) {
+            return;
+        }
+        const history = window.history;
+        if (!navStarted.current) {
+            navStarted.current = true;
+            const entry: NavEntry = {
+                ensemble: 1,
+                depth: navView.kind === 'home' ? 0 : 1,
+                view: navView,
+            };
+            history.replaceState(entry, '');
+            navEntry.current = entry;
+            return;
+        }
+        const step = stepTo(navView, history.state);
+        if (step.kind === 'none') {
+            navEntry.current = history.state as NavEntry;
+        } else if (step.kind === 'replace') {
+            history.replaceState(step.entry, '');
+            navEntry.current = step.entry;
+        } else if (step.kind === 'push') {
+            history.pushState(step.entry, '');
+            navEntry.current = step.entry;
+        } else {
+            // The entry it lands on is the right place already; its own state is rewritten when
+            // the popstate arrives, so a level that changed meanwhile (Standards → All songs)
+            // is recorded as what is now on screen.
+            silentPops.current += 1;
+            navEntry.current = step.entry;
+            history.go(step.delta);
+        }
+    }, [ready, navViewKey]);
+
+    // Browser Back and Forward (#1700). Reuses the in-app paths — `closeSong`, `openSong`,
+    // `openStandard`, the sub-views' own setters — so an unchecked chart, a recovered draft or a
+    // missing song behaves exactly as it does from a button.
+    // The handler reads only refs, and `applyNav` through `applyNavRef`'s latest closure.
+    useEffect(() => {
+        if (!ready) {
+            return;
+        }
+        function onPopState(event: PopStateEvent) {
+            if (silentPops.current > 0) {
+                silentPops.current -= 1;
+                if (navEntry.current) {
+                    window.history.replaceState(navEntry.current, '');
+                }
+                return;
+            }
+            const target = event.state;
+            if (!isNavEntry(target)) {
+                // A fragment navigation the shell didn't write (`location.hash = …`).
+                return;
+            }
+            const from = navEntry.current;
+            const open = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')];
+            if (open.length > 0) {
+                // Back closes what is open over the page first, as a phone's Back does, and the
+                // page itself stays: put its entry back.
+                for (const dialog of open) {
+                    if (dialog.dispatchEvent(new Event('cancel', { cancelable: true }))) {
+                        dialog.close();
+                    }
+                }
+                if (from) {
+                    window.history.pushState(from, '');
+                }
+                return;
+            }
+            if (working.current) {
+                pendingNav.current = target;
+                return;
+            }
+            applyNavRef.current(target, from);
+        }
+        window.addEventListener('popstate', onPopState);
+        return () => window.removeEventListener('popstate', onPopState);
+    }, [ready]);
+    const applyNavRef = useRef<(target: NavEntry, from: NavEntry | null) => void>(() => {});
+    applyNavRef.current = applyNav;
+    // A Back pressed while the shell was busy is applied once it settles.
+    useEffect(() => {
+        if (!busy && pendingNav.current) {
+            const target = pendingNav.current;
+            pendingNav.current = null;
+            applyNavRef.current(target, navEntry.current);
+        }
+    }, [busy]);
     // `startPlayback` is a component-scope function declaration, a new reference every render;
     // listing it would re-arm the listeners on every render while a link's autoplay is
     // pending, the same convention the shared-link effect above documents for `openSharedDraft`.
@@ -2637,13 +2765,70 @@ export default function Ensemble() {
             throw error;
         }
     }
-    function goHome() {
+    /**
+     * Leaves the stand — the one way off it, for the in-app back button and for browser Back
+     * (#1700) alike, so both capture an unchecked chart the same way. `after` runs once the stand
+     * has gone; `onStay` runs instead when the chart can't be left (invalid text the editor is
+     * now showing).
+     */
+    function closeSong(after?: () => void, onStay?: () => void) {
         void run(() => {
-            updateChart();
+            try {
+                updateChart();
+            } catch (error) {
+                onStay?.();
+                throw error;
+            }
             runtime.stop();
             setCurrent(null);
             bindStand(null);
+            after?.();
         });
+    }
+    function goHome() {
+        closeSong();
+    }
+    /** Shows the view a history entry names (#1700) — the popstate handler's one action. */
+    function applyNav(target: NavEntry, from: NavEntry | null) {
+        navEntry.current = target;
+        const view = target.view;
+        const browse = () => {
+            if (view.kind === 'standards') {
+                setAllSongsOpen(false);
+                setStandardsEntry((view.entry ?? 'all') as StandardsEntry);
+                setStandardsOpen(true);
+            } else if (view.kind === 'all') {
+                setStandardsOpen(false);
+                openAllSongs(view.collection);
+            } else {
+                setStandardsOpen(false);
+                setAllSongsOpen(false);
+            }
+        };
+        if (view.kind !== 'song') {
+            if (current) {
+                closeSong(browse, () => {
+                    // The chart couldn't be left — the editor is showing why — so the stand
+                    // stays, and so does its entry.
+                    if (from) {
+                        navEntry.current = from;
+                        window.history.pushState(from, '');
+                    }
+                });
+            } else {
+                browse();
+            }
+            return;
+        }
+        if (view.ref.kind === 'song') {
+            openSong(view.ref.id);
+        } else if (view.ref.kind === 'standard') {
+            openStandard(view.ref.id);
+        } else if (from) {
+            // A shared draft lived only on the stand it was opened on; Forward can't rebuild it.
+            navEntry.current = from;
+            window.history.replaceState(from, '');
+        }
     }
     function selectSection(document: ChartDocument, id?: string) {
         const section =
@@ -4223,7 +4408,9 @@ export default function Ensemble() {
             if (!entry) {
                 throw new Error('Standard no longer exists.');
             }
-            landDraftOnStand(buildStandardDocument(entry), 'Opened a standard · not saved yet');
+            const document = buildStandardDocument(entry);
+            landDraftOnStand(document, 'Opened a standard · not saved yet');
+            standardOnStand.current = { documentId: document.id, standardId: id };
             setStandardDraft(true);
             setStandardsOpen(false);
             track('chart_opened', { source: 'standard' });
