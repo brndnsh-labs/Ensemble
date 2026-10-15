@@ -3027,12 +3027,22 @@ html[data-theme="stage"] {
 .all-songs {
     max-width: 1100px;
 }
-.all-songs-back {
-    background: none;
-    border: 0;
+/* The way back from a songbook page (All songs, Standards) to the songbook home (#1700): one
+   control, one name, above the page's own eyebrow. */
+.page-back {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    margin: -8px 0 4px;
     padding: 0;
-    color: inherit;
-    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+}
+@media (hover: hover) {
+    .page-back:hover {
+        text-decoration: underline;
+    }
 }
 .all-songs-count {
     color: var(--muted);

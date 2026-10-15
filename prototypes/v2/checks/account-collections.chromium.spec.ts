@@ -52,7 +52,7 @@ test('a guest collection arrives in the account on sign-in, and an unsent collec
     await addTo(page, 'Blue pocket', 'Friday gig');
     await page.getByRole('button', { name: 'Star Minor swing sketch' }).click();
     await expect(page.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
-    await page.getByRole('button', { name: '← Home' }).click();
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
 
     await createAccountThroughDialog(page);
     await page.getByTestId('recovery-not-now').click();
@@ -82,7 +82,7 @@ test('a guest collection arrives in the account on sign-in, and an unsent collec
     await expect(page.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 2');
 
     // The sign-out step says so, apart from songs, and offers the sync that would send it.
-    await page.getByRole('button', { name: '← Home' }).click();
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
     await page.getByTestId('account-sign-out').click();
     await expect(page.getByTestId('sign-out-collections')).toContainText('to your collections');
     await expect(page.getByTestId('sign-out-clear')).toHaveCount(0);
@@ -130,7 +130,7 @@ test('a device whose songs are already in the account is offered its collections
         await second.getByTestId('all-songs-link').click();
         await second.getByRole('button', { name: 'Star Blue pocket' }).click();
         await expect(second.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
-        await second.getByRole('button', { name: '← Home' }).click();
+        await second.getByRole('button', { name: 'Back to songbook' }).click();
 
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
@@ -178,7 +178,7 @@ test('a device whose songs are already in the account is offered its collections
         await expect(second.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
         await second.getByRole('button', { name: /^Starred/ }).click();
         await expect(rows(second)).toHaveText(['Blue pocket']);
-        await second.getByRole('button', { name: '← Home' }).click();
+        await second.getByRole('button', { name: 'Back to songbook' }).click();
 
         // Asked again, there is nothing left to add — songs or collections.
         await second.getByTestId('account-open').click();
