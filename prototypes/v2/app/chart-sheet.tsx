@@ -95,6 +95,9 @@ interface ChartSheetProps {
     writtenBars: Map<string, WrittenBar>;
     writtenSections: Map<string, WrittenSection>;
     editing: boolean;
+    /** The bar the measure editor holds while editing (#1700) — ringed on the chart, so the
+     * musician can see which bar the panel is changing. Null when not editing a measure chart. */
+    selectedMeasureId: string | null;
     busy: boolean;
     playing: boolean;
     playbackActive: boolean;
@@ -121,6 +124,7 @@ export function ChartSheet({
     writtenBars,
     writtenSections,
     editing,
+    selectedMeasureId,
     busy,
     playing,
     playbackActive,
@@ -388,13 +392,29 @@ export function ChartSheet({
                             );
                             return (
                                 <div
-                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''}`}
+                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selectedMeasureId !== null && measure.chords[0]?.measureId === selectedMeasureId ? 'selected' : ''}`}
                                     data-measure-id={writtenBar?.id}
                                     data-active={measure.chords.some(
                                         (c) => c.globalIndex === displayActive,
                                     )}
                                     data-next={isNext ? (nextSoon ? 'soon' : 'true') : undefined}
                                     key={measure.chords[0]?.globalIndex}
+                                    // While editing a measure chart the whole bar picks itself
+                                    // for the editor (#1700) — `.editing .bar` already promised
+                                    // that with its pointer cursor and hover fill. A chord inside
+                                    // still auditions; the bar's own Edit button stays the
+                                    // keyboard path.
+                                    onClick={
+                                        current.schemaVersion === 2 && editing && !busy
+                                            ? (event) => {
+                                                  if (
+                                                      !(event.target as Element).closest('button')
+                                                  ) {
+                                                      onEditBar(measure);
+                                                  }
+                                              }
+                                            : undefined
+                                    }
                                 >
                                     <span className="bar-number">{barNumber}</span>
                                     {navigation.length > 0 && (

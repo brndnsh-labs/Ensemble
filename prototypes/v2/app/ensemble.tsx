@@ -5560,6 +5560,9 @@ export default function Ensemble() {
                                     writtenBars={writtenBars}
                                     writtenSections={writtenSections}
                                     editing={editing}
+                                    selectedMeasureId={
+                                        editing && current.schemaVersion === 2 ? measureId : null
+                                    }
                                     busy={busy}
                                     playing={playing}
                                     playbackActive={playbackActive}
