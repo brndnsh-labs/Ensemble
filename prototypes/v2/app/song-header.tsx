@@ -88,10 +88,15 @@ export function SongHeader({
                 <button
                     className="btn theme-toggle"
                     aria-pressed={stage}
+                    // One name in every layout: the phone shows only the moon (#1700).
+                    aria-label="Stage"
                     title={stage ? 'Switch to day mode' : 'Switch to stage mode'}
                     onClick={onToggleTheme}
                 >
-                    Stage
+                    <span className="theme-glyph" aria-hidden="true">
+                        ☾
+                    </span>
+                    <span className="theme-label">Stage</span>
                 </button>
                 <button className="btn sounds-button" onClick={onSounds}>
                     Sounds

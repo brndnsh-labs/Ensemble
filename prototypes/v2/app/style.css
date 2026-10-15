@@ -2504,6 +2504,24 @@ html[data-theme="day"] {
 html[data-theme="stage"] {
     color-scheme: dark;
 }
+/* Stage mode's toggle reads "Stage" where there is room and is a moon on a phone (#1700), where
+   its word was the slack the header row lacked (it wrapped with "Keep a copy" or mid-song). */
+.theme-glyph {
+    display: none;
+    font-size: 15px;
+    line-height: 1;
+}
+@media (max-width: 760px) {
+    .song-actions .theme-toggle {
+        min-width: 40px;
+    }
+    .theme-glyph {
+        display: inline;
+    }
+    .theme-label {
+        display: none;
+    }
+}
 .theme-toggle[aria-pressed="true"] {
     background: var(--ink);
     color: var(--on-ink);
