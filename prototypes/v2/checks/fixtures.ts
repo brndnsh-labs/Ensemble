@@ -278,6 +278,19 @@ export function songLink(scope: Page, title: string, detail?: string): Locator {
     return link;
 }
 
+/**
+ * Waits for every running animation and transition on this element to finish (#1700). Controls
+ * ease their colour and border on a state change now, so a spec that reads a computed style right
+ * after a click must read the SETTLED value, not a frame of the fade.
+ */
+export async function settled(locator: Locator): Promise<void> {
+    await locator.evaluate((element) =>
+        Promise.all(
+            element.getAnimations({ subtree: true }).map((animation) => animation.finished),
+        ),
+    );
+}
+
 export async function editorRevealed(page: Page): Promise<void> {
     await expect(page.locator('.edit-panel textarea').first()).toBeFocused();
 }

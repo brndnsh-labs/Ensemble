@@ -10,7 +10,7 @@
     --ink: light-dark(#222923, #f1efe8);
     --on-ink: light-dark(#fffefa, #15181a);
     --muted: light-dark(#72766c, #a3a79c);
-    --muted-soft: light-dark(#8a8d82, #7d837a);
+    --muted-soft: light-dark(#777a70, #8a9087);
     --line: light-dark(#e3e3d9, #33393b);
     --hover: light-dark(#e8e9df, #2a2f32);
     --chip: light-dark(#f2f4ed, #23282b);
@@ -24,7 +24,7 @@
     --danger-bg: light-dark(#f8e6da, #3c2018);
     --bar-line: light-dark(#969d905c, #5d655f80);
     --bar-line-strong: light-dark(#788172, #8a9389);
-    --bar-number: light-dark(#91978a, #8e958b);
+    --bar-number: light-dark(#7a8074, #8e958b);
     --bar-current: light-dark(#e6eadb, #263a2e);
     --bar-repeat-ink: light-dark(#53644c, #b9c8b3);
     /* Following's next-bar cue (#1458) — a blue outline, so it never reads as the green
@@ -55,6 +55,9 @@
     --dot-ink: #ffffff;
     --dot-ink-dark: #241a02;
     --radius: 16px;
+    /* Keyboard focus, one colour on every control (#1700): the accent at ~56%, lifted on the dark
+       stage where the day value read as a dim brick. */
+    --focus-ring: light-dark(#b34e3490, #e0785ab0);
     font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     color: var(--ink);
     background: var(--paper);
@@ -91,11 +94,15 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 select:focus-visible {
-    outline: 3px solid #b34e3490;
+    outline: 3px solid var(--focus-ring);
     outline-offset: 4px;
 }
-button:hover {
-    filter: brightness(0.96);
+/* Only where a pointer can hover: on a touch screen :hover sticks after the tap, leaving the
+   last button pressed-looking until the next one (#1700). */
+@media (hover: hover) {
+    button:hover {
+        filter: brightness(0.96);
+    }
 }
 a {
     color: inherit;
@@ -590,13 +597,6 @@ html [hidden] {
     border-radius: 6px;
     font-size: 12px;
     color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-}
-.mode-switch button svg {
-    width: 14px;
-    height: 14px;
 }
 .mode-switch button.active {
     background: var(--surface);
@@ -660,9 +660,14 @@ html [hidden] {
     color: var(--muted);
 }
 .tempo-control .step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
     font-size: 17px;
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     border: 1px solid var(--line);
     border-radius: 5px;
 }
@@ -1513,9 +1518,11 @@ dialog textarea {
         flex: 1;
         min-width: 200px;
     }
+    /* Phone hit targets (#1700): the row has no width to spare (see the mode switch below), so
+       these grow in height only, toward the 44px a thumb needs. */
     .back-btn {
-        width: 30px;
-        height: 32px;
+        width: 36px;
+        height: 40px;
         border: 0;
         background: none;
     }
@@ -1536,6 +1543,7 @@ dialog textarea {
     .song-actions .btn {
         font-size: 11px;
         padding: 8px 10px;
+        min-height: 40px;
     }
     .song-actions .btn svg {
         width: 14px;
@@ -1553,17 +1561,15 @@ dialog textarea {
     .mode-switch button {
         font-size: 11px;
         padding: 8px 6px;
-    }
-    .mode-switch svg {
-        display: none;
+        min-height: 36px;
     }
     /* Chart | Neck | Edit (#1587): three modes fit the phone's header row with the short label. */
     .mode-label-long {
         display: none;
     }
     .song-actions .menu-btn {
-        width: 28px;
-        height: 30px;
+        width: 32px;
+        height: 40px;
     }
     .transport-bar {
         padding: 11px 16px;
@@ -2047,6 +2053,14 @@ dialog textarea {
     border-radius: 12px;
     color: var(--muted);
 }
+/* Every transport setting's control row is one height (#1700) — Tempo's stepper, Key's and Feel's
+   selects, the More… button — so the columns come out equal and their labels share a line. They
+   sat at three different heights before. */
+.setting-select,
+.tempo-control,
+.feel-button {
+    min-height: var(--setting-row, 32px);
+}
 .setting-select {
     border: 0;
     background: transparent;
@@ -2062,6 +2076,8 @@ dialog textarea {
     font-weight: 650;
     color: var(--muted);
     padding: 0 0 0 6px;
+    /* A text-only button still needs a finger-sized target (#1700); it was 15–18px tall. Its
+       height is the shared setting row's, below. */
 }
 .feel-button:hover {
     color: var(--ink);
@@ -2108,8 +2124,9 @@ dialog textarea {
     border: 1px solid var(--line);
     border-radius: 16px;
     padding: 25px;
-    max-width: 480px;
-    width: 100%;
+    /* The phone gutter every other dialog keeps (#1700): a bare `width: 100%` ran these
+       edge to edge, rounded corners against the glass. */
+    width: min(480px, calc(100vw - 32px));
     box-shadow: var(--shadow);
 }
 .modal-box h2 {
@@ -2702,8 +2719,11 @@ dialog textarea {
         padding: 10px 14px max(100px, calc(var(--stand-stack-height, 0px) + 24px));
     }
     .song-open .tempo-control .step {
-        width: 28px;
-        height: 32px;
+        width: 36px;
+        height: 36px;
+    }
+    .song-open .transport-bar {
+        --setting-row: 36px;
     }
     .song-open .band-toggle {
         min-height: 36px;
@@ -2769,16 +2789,6 @@ html[data-theme="stage"] {
 .account-btn.account-warn {
     border-color: var(--accent);
     color: var(--accent);
-}
-.account-dialog,
-.account-page {
-    /* .modal-box is width:100%/max-width:480px, which at phone width runs edge
-       to edge. The recovery code needs a readable gutter, so this dialog keeps
-       one (same idea as .sound-panel's min()). Two distinct dialogs (#1262's
-       sign-in, #1264's account page) share this rule but NOT a class, since
-       both are mounted at once and `dialog.account-dialog` must resolve to
-       exactly one element for a Playwright strict-mode locator to work. */
-    max-width: min(480px, calc(100vw - 32px));
 }
 .recovery-code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
@@ -2860,7 +2870,7 @@ html[data-theme="stage"] {
     background: var(--danger-bg);
     color: var(--danger);
 }
-/* The account page (#1264): passkeys, sessions, recovery code. Reuses .account-dialog's width
+/* The account page (#1264): passkeys, sessions, recovery code. Reuses .modal-box's width
    and the .btn/.dialog-actions vocabulary; only the passkey list and section rhythm are new. */
 .account-page section {
     margin-bottom: 22px;

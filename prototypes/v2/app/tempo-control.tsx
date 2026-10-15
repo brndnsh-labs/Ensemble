@@ -73,7 +73,7 @@ export function TempoControl({
                     onPointerDown={(event) => event.preventDefault()}
                     onClick={() => commit(5)}
                 >
-                    ＋
+                    +
                 </button>
             </div>
         </div>
