@@ -679,6 +679,27 @@ export function ChartSheet({
                     </div>
                 </section>
             ))}
+            {/* The form's first line again, faded, after its last (#1713): reading ahead into
+                the next time through. Shown by CSS only when the chart scrolls; never a bar —
+                not counted, focused, selected or read out. */}
+            {blocks[0] && (
+                <div className="next-chorus" aria-hidden="true" inert>
+                    <div className="next-chorus-head">
+                        <span className="next-chorus-letter">{blocks[0].label || 'A'}</span>
+                    </div>
+                    <div className="next-chorus-bars">
+                        {blocks[0].measures.slice(0, 4).map((measure) => (
+                            <div className="next-chorus-bar" key={measure.chords[0]?.globalIndex}>
+                                {measure.chords.map((c) => (
+                                    <span className="next-chorus-chord" key={c.globalIndex}>
+                                        {eventText(c, notation)}
+                                    </span>
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
             <div className="chart-bottom" hidden={playbackActive}>
                 <span>Tap a chord to hear it while stopped.</span>
                 <button

@@ -116,6 +116,7 @@ import {
 } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
 import { EditPanel } from './edit-panel';
+import { FormStrip } from './form-strip';
 import { ImportDialog } from './import-dialog';
 import type { MeasureEditorHandle } from './measure-editor';
 import { NeckView } from './neck-view';
@@ -5980,65 +5981,75 @@ export default function Ensemble() {
                                 onPrefs={neckVoicing.setPrefs}
                             />
                         ) : (
-                            <div
-                                className="chart-scroll"
-                                ref={scroll}
-                                onWheel={() => setFollowing(false)}
-                                onTouchMove={() => setFollowing(false)}
-                                onKeyDown={(e) => {
-                                    if (
-                                        [
-                                            'ArrowDown',
-                                            'ArrowUp',
-                                            'PageDown',
-                                            'PageUp',
-                                            'Home',
-                                            'End',
-                                        ].includes(e.key)
-                                    ) {
-                                        setFollowing(false);
-                                    }
-                                }}
-                                tabIndex={0}
-                                aria-label="Chord chart"
-                            >
-                                <ChartSheet
-                                    current={current}
+                            <>
+                                <div
+                                    className="chart-scroll"
+                                    ref={scroll}
+                                    onWheel={() => setFollowing(false)}
+                                    onTouchMove={() => setFollowing(false)}
+                                    onKeyDown={(e) => {
+                                        if (
+                                            [
+                                                'ArrowDown',
+                                                'ArrowUp',
+                                                'PageDown',
+                                                'PageUp',
+                                                'Home',
+                                                'End',
+                                            ].includes(e.key)
+                                        ) {
+                                            setFollowing(false);
+                                        }
+                                    }}
+                                    tabIndex={0}
+                                    aria-label="Chord chart"
+                                >
+                                    <ChartSheet
+                                        current={current}
+                                        blocks={blocks}
+                                        displayActive={displayActive}
+                                        displayNext={displayNext}
+                                        nextSoon={nextSoon}
+                                        activeEvent={activeEvent}
+                                        writtenBars={writtenBars}
+                                        writtenSections={writtenSections}
+                                        editing={editing}
+                                        selectedMeasureId={
+                                            editing && current.schemaVersion === 2
+                                                ? measureId
+                                                : null
+                                        }
+                                        busy={busy}
+                                        playing={playing}
+                                        playbackActive={playbackActive}
+                                        totalBars={totalBars}
+                                        onStartHere={startHereSection}
+                                        onEditSection={(block) => {
+                                            if (current.schemaVersion === 2) {
+                                                setMeasureId(
+                                                    block.measures[0]?.chords[0]?.measureId ?? '',
+                                                );
+                                            }
+                                            revealEditor(block.id);
+                                        }}
+                                        onSelectBar={(measure) =>
+                                            setMeasureId(measure.chords[0]?.measureId ?? '')
+                                        }
+                                        onEditBar={(measure) => {
+                                            setMeasureId(measure.chords[0]?.measureId ?? '');
+                                            revealEditor(measure.sectionId);
+                                        }}
+                                        onAudition={(index) => runtime.audition(index)}
+                                        onChoruses={changeChoruses}
+                                    />
+                                </div>
+                                <FormStrip
                                     blocks={blocks}
                                     displayActive={displayActive}
-                                    displayNext={displayNext}
-                                    nextSoon={nextSoon}
-                                    activeEvent={activeEvent}
-                                    writtenBars={writtenBars}
-                                    writtenSections={writtenSections}
-                                    editing={editing}
-                                    selectedMeasureId={
-                                        editing && current.schemaVersion === 2 ? measureId : null
-                                    }
-                                    busy={busy}
-                                    playing={playing}
-                                    playbackActive={playbackActive}
-                                    totalBars={totalBars}
-                                    onStartHere={startHereSection}
-                                    onEditSection={(block) => {
-                                        if (current.schemaVersion === 2) {
-                                            setMeasureId(
-                                                block.measures[0]?.chords[0]?.measureId ?? '',
-                                            );
-                                        }
-                                        revealEditor(block.id);
-                                    }}
-                                    onSelectBar={(measure) =>
-                                        setMeasureId(measure.chords[0]?.measureId ?? '')
-                                    }
-                                    onEditBar={(measure) => {
-                                        setMeasureId(measure.chords[0]?.measureId ?? '');
-                                        revealEditor(measure.sectionId);
-                                    }}
-                                    onAudition={(index) => runtime.audition(index)}
-                                    onChoruses={changeChoruses}
+                                    scroll={scroll}
+                                    onNavigate={() => setFollowing(false)}
                                 />
-                            </div>
+                            </>
                         )}
                         <EditPanel
                             panelRef={editPanel}

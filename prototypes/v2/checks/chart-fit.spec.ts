@@ -112,3 +112,47 @@ test('editing leaves the page: section heads above their bars, still four to a r
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     await expect(page.locator('.chart-scroll[data-page]')).toHaveCount(1);
 });
+
+test('a chart that scrolls shows the next time through and where it is in the form (#1713)', async ({
+    page,
+}, testInfo) => {
+    await openStandard(page, 'Cherokee');
+    await expect(page.locator('.chart-scroll[data-fits="false"]')).toBeVisible();
+    // The form's first line again after its last: faded, and never a bar.
+    const ghost = page.locator('.next-chorus');
+    await expect(ghost).toBeVisible();
+    await expect(ghost).toHaveAttribute('aria-hidden', 'true');
+    await expect(page.locator('.sheet .bar')).toHaveCount(64);
+    await expect(page.locator('.chart-bottom')).toContainText('64 bars');
+
+    const strip = page.getByRole('navigation', { name: 'Form' });
+    await expect(strip).toBeVisible();
+    await expect(strip.getByRole('button')).toHaveCount(4);
+    // A segment takes the chart to its section.
+    const last = page.locator('.section').last();
+    await strip.getByRole('button', { name: 'Go to section A3' }).click();
+    await expect(last).toBeInViewport();
+    await strip.getByRole('button', { name: 'Go to section A', exact: true }).click();
+    await expect(page.locator('.section').first()).toBeInViewport();
+    await expect(last).not.toBeInViewport();
+
+    if (testInfo.project.name === 'laptop') {
+        // The band's place in the form.
+        await expect(page.locator('.form-strip-band')).toHaveCount(0);
+        await page.getByRole('button', { name: 'Start playback' }).click();
+        await expect(page.locator('.form-strip-band')).toHaveCount(1);
+        await page.getByRole('button', { name: 'Stop playback' }).click();
+    }
+
+    // Editing has neither.
+    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+    await expect(ghost).toBeHidden();
+    await expect(strip).toBeHidden();
+});
+
+test('a chart that fits shows neither the next-chorus line nor the strip', async ({ page }) => {
+    await openStandard(page, 'Autumn Leaves');
+    await expect(page.locator('.chart-scroll[data-fits="true"]')).toBeVisible();
+    await expect(page.locator('.next-chorus')).toBeHidden();
+    await expect(page.getByRole('navigation', { name: 'Form' })).toBeHidden();
+});
