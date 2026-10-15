@@ -187,14 +187,6 @@ html [hidden] {
     border-color: var(--danger);
     color: var(--danger);
 }
-.text-button {
-    font-size: 13px;
-    font-weight: 600;
-    display: inline-flex;
-    gap: 6px;
-    align-items: center;
-    padding: 8px 0;
-}
 .dot {
     width: 6px;
     height: 6px;
@@ -416,10 +408,6 @@ html [hidden] {
     background: #e5e9ed;
     color: #536773;
 }
-.song-glyph.gold {
-    background: #eee5d2;
-    color: #8d713b;
-}
 .song-name {
     display: block;
     font-size: 13px;
@@ -447,18 +435,6 @@ html [hidden] {
     color: var(--muted);
     height: 30px;
     width: 28px;
-}
-.offline-note {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    gap: 6px;
-    align-items: center;
-    margin-top: 17px;
-}
-.offline-note svg {
-    height: 14px;
-    width: 14px;
 }
 .jam-tile {
     display: flex;
@@ -678,18 +654,6 @@ html [hidden] {
     height: 30px;
     background: var(--line);
 }
-.setting-value {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    font-size: 13px;
-    font-weight: 600;
-    padding: 0;
-}
-.setting-value svg {
-    width: 13px;
-    height: 13px;
-}
 .band-controls {
     margin-left: auto;
     display: flex;
@@ -736,9 +700,6 @@ html [hidden] {
     text-decoration: line-through;
     text-decoration-thickness: 1.5px;
     text-decoration-color: var(--muted-soft);
-}
-.more-band {
-    margin-left: 3px;
 }
 /* Trade sits by the Soloist chip: hollow while off or paused (the arrow isn't a muted lane,
    so it isn't struck through), filled with the turn length while the band trades with you.
@@ -791,47 +752,6 @@ html [hidden] {
     margin: 0 auto;
     position: relative;
 }
-.sheet-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 21px;
-    gap: 10px;
-}
-.sheet-meta {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    align-items: center;
-    gap: 13px;
-}
-.sheet-meta .meter {
-    font-family: Georgia, serif;
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--ink);
-}
-.sheet-meta .tempo-mark {
-    font-family: Georgia, serif;
-    font-size: 14px;
-    font-style: italic;
-}
-.sheet-tools {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-.sheet-tools button {
-    font-size: 11px;
-    color: var(--muted);
-    display: flex;
-    gap: 5px;
-    align-items: center;
-}
-.sheet-tools svg {
-    width: 14px;
-    height: 14px;
-}
 .section {
     margin-bottom: 29px;
 }
@@ -870,13 +790,6 @@ html [hidden] {
 .section-name {
     font-size: 11px;
     color: var(--muted);
-}
-.section-direction {
-    font-size: 11px;
-    color: var(--accent);
-    background: var(--accent-light);
-    padding: 4px 8px;
-    border-radius: 4px;
 }
 .bars {
     display: grid;
@@ -1003,15 +916,6 @@ html [hidden] {
     font-family: Georgia, serif;
     font-size: 13px;
 }
-.add-section {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    margin: 22px 0;
-    color: var(--accent);
-    font-size: 12px;
-    padding: 10px 0;
-}
 /* #1460 review P2 #1/#4 — one fixed, bottom-centred STACK holding the message toast, the
    sync-failure notice and the Resume-follow pill, in normal flex-column flow. This is what makes
    the three unable to ever overlap or mask one another: the old single fixed-position toast let
@@ -1124,16 +1028,6 @@ html [hidden] {
     overflow: auto;
     padding: 24px 22px;
 }
-.panel-title {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-}
-.panel-title h2 {
-    font-size: 16px;
-    font-weight: 650;
-}
 .edit-panel > p {
     font-size: 12px;
     color: var(--muted);
@@ -1153,95 +1047,9 @@ html [hidden] {
     display: block;
     margin: 20px 0 9px;
 }
-.chord-field {
-    display: flex;
-    align-items: center;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 11px 12px;
-    background: var(--paper);
-}
-.chord-field input {
-    font-family: Georgia, serif;
-    font-size: 28px;
-    width: 100%;
-    border: 0;
-    background: transparent;
-    outline: none;
-    min-width: 0;
-}
-.chord-field button {
-    color: var(--muted);
-}
-.choice-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 6px;
-}
-.choice-grid button {
-    padding: 9px 3px;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    font-size: 11px;
-    background: var(--surface);
-}
-.choice-grid button.active {
-    color: var(--accent);
-    background: var(--accent-light);
-    border-color: #cfaa94;
-}
-.beat-choices {
-    display: flex;
-    gap: 6px;
-}
-.beat-choices button {
-    flex: 1;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    font-size: 12px;
-    padding: 8px;
-}
-.beat-choices .active {
-    background: var(--ink);
-    color: white;
-    border-color: var(--ink);
-}
-.panel-help {
-    font-size: 11px;
-    color: var(--muted);
-    line-height: 1.7;
-    margin: 12px 0;
-}
 .edit-panel > .btn {
     width: 100%;
     margin-top: 12px;
-}
-.discovery-placeholder {
-    border-top: 1px solid var(--line);
-    margin-top: 24px;
-    padding-top: 17px;
-}
-.discovery-placeholder p {
-    font-size: 11px;
-    color: var(--muted);
-    line-height: 1.6;
-    margin-top: 7px;
-}
-.discovery-placeholder .eyebrow {
-    font-size: 9px;
-}
-.editor-actions {
-    display: flex;
-    gap: 5px;
-    margin-left: auto;
-}
-.editor-actions .btn {
-    font-size: 11px;
-    padding: 7px 10px;
-}
-.editor-actions svg {
-    width: 14px;
-    height: 14px;
 }
 .popover {
     position: fixed;
@@ -1292,42 +1100,6 @@ html [hidden] {
     color: var(--muted);
     margin-top: 8px;
 }
-.genre-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 3px;
-}
-.key-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-}
-.key-grid button {
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    padding: 9px;
-    font-size: 12px;
-}
-.key-grid button.active {
-    background: var(--green-light);
-    color: var(--green);
-}
-.mix-row {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-top: 16px;
-    font-size: 12px;
-}
-.mix-row input {
-    min-width: 0;
-    width: 100%;
-    accent-color: var(--green);
-}
-.mix-row label {
-    width: 48px;
-    flex-shrink: 0;
-}
 dialog {
     border: 1px solid var(--line);
     border-radius: 18px;
@@ -1356,11 +1128,6 @@ dialog p {
     line-height: 1.75;
     margin: 12px 0;
 }
-dialog .close-dialog {
-    position: absolute;
-    right: 14px;
-    top: 14px;
-}
 .dialog-actions {
     display: flex;
     gap: 8px;
@@ -1383,23 +1150,6 @@ dialog textarea {
     min-height: 150px;
     line-height: 1.7;
     resize: vertical;
-}
-.dialog-callout {
-    background: var(--green-light);
-    color: var(--green);
-    border-radius: 10px;
-    padding: 13px;
-    font-size: 12px;
-    line-height: 1.65;
-}
-.prototype-toggle {
-    font-size: 10px;
-    color: var(--muted);
-    text-decoration: underline;
-    text-underline-offset: 3px;
-}
-.mobile-only {
-    display: none;
 }
 @media (min-width: 1450px) {
     .chart-scroll {
@@ -1566,9 +1316,6 @@ dialog textarea {
         width: 14px;
         height: 14px;
     }
-    .song-actions .share-label {
-        display: none;
-    }
     .mode-switch {
         margin-right: 0;
     }
@@ -1620,9 +1367,6 @@ dialog textarea {
     .genre-setting {
         margin-left: auto;
     }
-    .setting-value {
-        font-size: 12px;
-    }
     .key-setting {
         margin-left: 3px;
     }
@@ -1641,11 +1385,6 @@ dialog textarea {
         padding: 8px 5px;
         gap: 4px;
     }
-    .more-band {
-        height: 29px;
-        width: 27px;
-        margin: 0;
-    }
     .trade-toggle {
         flex: 0 0 auto;
         width: 40px;
@@ -1653,19 +1392,6 @@ dialog textarea {
     }
     .chart-scroll {
         padding: 17px 19px 32px;
-    }
-    .sheet-top {
-        margin-bottom: 20px;
-    }
-    .sheet-meta {
-        gap: 9px;
-        font-size: 10px;
-    }
-    .sheet-meta .tempo-mark {
-        font-size: 12px;
-    }
-    .sheet-tools .hide-mobile {
-        display: none;
     }
     .section {
         margin-bottom: 27px;
@@ -1676,10 +1402,6 @@ dialog textarea {
     }
     .section-name {
         font-size: 10px;
-    }
-    .section-direction {
-        font-size: 10px;
-        padding: 3px 5px;
     }
     .section-letter {
         font-size: 11px;
@@ -1752,16 +1474,6 @@ dialog textarea {
     .editing .bars {
         row-gap: 9px;
     }
-    .editor-actions .btn {
-        padding: 5px 7px;
-        font-size: 10px;
-    }
-    .editor-actions .hide-mobile {
-        display: none;
-    }
-    .mobile-only {
-        display: initial;
-    }
     .popover {
         max-height: 65dvh;
         overflow: auto;
@@ -1779,12 +1491,6 @@ dialog textarea {
     }
     .song-actions .mode-switch {
         margin-right: auto;
-    }
-    .sheet-meta .chart-note {
-        display: none;
-    }
-    .discovery-placeholder {
-        margin-bottom: 10px;
     }
 }
 @media (min-width: 761px) and (max-height: 650px) {
@@ -2146,15 +1852,6 @@ dialog textarea {
     background: var(--paper);
     color: var(--ink);
 }
-.modal-backdrop {
-    position: fixed;
-    inset: 0;
-    background: var(--backdrop);
-    display: grid;
-    place-items: center;
-    z-index: 80;
-    padding: 20px;
-}
 .modal-box {
     background: var(--surface);
     border: 1px solid var(--line);
@@ -2371,15 +2068,8 @@ dialog textarea {
 .home-actions input {
     display: none;
 }
-.sheet-tools .text-button {
-    font-size: 11px;
-}
 .mode-switch button:disabled {
     opacity: 0.6;
-}
-.new-note {
-    border-left: 2px solid var(--accent);
-    padding: 0 10px;
 }
 @media (max-width: 760px) {
     .preview-note {
