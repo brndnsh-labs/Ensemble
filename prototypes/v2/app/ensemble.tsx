@@ -1409,19 +1409,6 @@ export default function Ensemble() {
             : { kind: 'home' };
     const navViewKey = navKey(navView);
 
-    // A new song is kept on its first change (#1707). After the change's own `run()` has
-    // finished, so this one isn't turned away by the shell's one-action-at-a-time lock.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `keepNewSong`/`run` are new each render; `current`, `busy` and the flag are what decide.
-    useEffect(() => {
-        if (!newSongDraft || busy || !current || untouchedNewSong(current)) {
-            return;
-        }
-        void run(async () => {
-            if (newSongNow.current) {
-                await keepNewSong(current, false);
-            }
-        });
-    }, [newSongDraft, busy, current]);
     const navViewRef = useRef(navView);
     navViewRef.current = navView;
     /** Writes the history step that reaches `view` from the entry on top now (#1700). */
@@ -1532,6 +1519,29 @@ export default function Ensemble() {
             applyNavRef.current(target, navEntry.current);
         }
     }, [busy]);
+    // A new song is kept on its first change (#1707). After the change's own `run()` has
+    // finished, so this one isn't turned away by the shell's one-action-at-a-time lock — and
+    // declared after the pending-Back effect above, so a Back pressed during that change is
+    // applied first (`closeSong` keeps the song itself). A keep the store refuses leaves the
+    // stand an ordinary unsaved draft — "Keep a copy" and the leave warning — rather than
+    // retrying on every render.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `keepNewSong`/`run` are new each render; `current`, `busy` and the flag are what decide.
+    useEffect(() => {
+        if (!newSongDraft || busy || !current || untouchedNewSong(current)) {
+            return;
+        }
+        void run(async () => {
+            if (!newSongNow.current) {
+                return;
+            }
+            try {
+                await keepNewSong(current, false);
+            } catch (error) {
+                markSharedDraft(true);
+                throw error;
+            }
+        });
+    }, [newSongDraft, busy, current]);
     // `startPlayback` is a component-scope function declaration, a new reference every render;
     // listing it would re-arm the listeners on every render while a link's autoplay is
     // pending, the same convention the shared-link effect above documents for `openSharedDraft`.
@@ -2833,8 +2843,14 @@ export default function Ensemble() {
             }
             if (newSongNow.current && !untouchedNewSong(candidate)) {
                 // Typed into but not yet applied: leaving keeps it, as leaving a saved song keeps
-                // its unsaved bars in recovery.
-                await keepNewSong(candidate, false);
+                // its unsaved bars in recovery. Refused, the stand stays — and so does its entry.
+                try {
+                    await keepNewSong(candidate, false);
+                } catch (error) {
+                    markSharedDraft(true);
+                    onStay?.();
+                    throw error;
+                }
             }
             runtime.stop();
             setCurrent(null);
@@ -4814,7 +4830,11 @@ export default function Ensemble() {
                 // and arming the offer before it would leave the card set but never shown —
                 // the musician back on a stand with an editor error and an invisible import
                 // waiting behind it. Same path the header's Home button takes.
-                updateChart();
+                const candidate = updateChart();
+                if (newSongNow.current && !untouchedNewSong(candidate)) {
+                    // A new song with bars in it is kept, as leaving it any other way keeps it.
+                    await keepNewSong(candidate, false);
+                }
                 runtime.stop();
                 setCurrent(null);
                 bindStand(null);

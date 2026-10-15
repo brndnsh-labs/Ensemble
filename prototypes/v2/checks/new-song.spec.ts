@@ -59,3 +59,27 @@ test('Save on a new song commits it as it stands', async ({ page }) => {
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(page.getByRole('button', { name: /All 4 songs/ })).toBeVisible();
 });
+
+test('a new song the store refuses stays an unsaved draft the musician can still leave', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await newSong(page);
+    await page.evaluate(() => {
+        const put = IDBObjectStore.prototype.put;
+        IDBObjectStore.prototype.put = function (...args) {
+            const request = Reflect.apply(put, this, args);
+            if (this.name === 'documents') {
+                this.transaction.abort();
+            }
+            return request;
+        };
+    });
+    await page.getByRole('button', { name: 'Faster' }).click();
+    await expect(page.locator('.error-banner')).toBeVisible();
+    // Refused once, it falls back to a draft like a standard's — not a keep retried forever.
+    await expect(page.getByRole('button', { name: 'Keep a copy', exact: true })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Back to songbook' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(page.getByRole('button', { name: /All 3 songs/ })).toBeVisible();
+});
