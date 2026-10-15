@@ -3699,3 +3699,131 @@ html[data-theme="stage"] {
         left: 5px;
     }
 }
+
+/* ── A chart that scrolls (#1713) ────────────────────────────────────────────
+   Both pieces show only on the reading page when it does not fit (`useChartFit`). */
+.next-chorus,
+.form-strip {
+    display: none;
+}
+/* The form's first line again after its last, faded: the next time through. */
+.song-open .chart-scroll[data-page][data-fits="false"] .next-chorus {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: start;
+    margin-bottom: var(--section-gap);
+    opacity: 0.38;
+    pointer-events: none;
+    user-select: none;
+}
+.next-chorus-head {
+    display: flex;
+    justify-content: center;
+    padding-top: calc(var(--bar-pad) - 4px);
+}
+.next-chorus-letter {
+    font-size: var(--section-letter-size, 12px);
+    font-weight: 750;
+    border: 1.5px dashed var(--ink);
+    border-radius: 2px;
+    min-width: 2em;
+    height: 1.9em;
+    display: grid;
+    place-content: center;
+    padding: 0 4px;
+}
+.next-chorus-bars {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.next-chorus-bar {
+    min-height: var(--bar-min);
+    padding: var(--bar-pad) 8px 4px 10px;
+    border-left: 1px solid var(--bar-line);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 7px;
+    overflow: hidden;
+}
+.next-chorus-chord {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: var(--chord-size);
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    letter-spacing: -1px;
+}
+/* Where you are in the whole form: a strip at the chart's right edge. */
+.song-open .chart-scroll[data-page][data-fits="false"] {
+    padding-right: 44px;
+}
+.song-open .chart-scroll[data-page][data-fits="false"] ~ .form-strip {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    right: 8px;
+    width: 26px;
+    gap: 2px;
+    z-index: 2;
+}
+.form-strip-section {
+    flex-basis: 0;
+    min-height: 24px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--muted);
+    font:
+        700 10px Inter,
+        sans-serif;
+    display: grid;
+    place-content: start center;
+    padding: 4px 0 0;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.form-strip-section:hover {
+    border-color: var(--muted);
+    color: var(--ink);
+}
+.form-strip-section:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+.form-strip-view {
+    position: absolute;
+    left: -3px;
+    right: -3px;
+    border: 1.5px solid var(--ink);
+    border-radius: 5px;
+    pointer-events: none;
+    transition: top 120ms ease-out;
+}
+.form-strip-band {
+    position: absolute;
+    left: -5px;
+    right: -5px;
+    height: 3px;
+    margin-top: -1.5px;
+    background: var(--green);
+    border-radius: 2px;
+    pointer-events: none;
+}
+@media (max-width: 760px) {
+    .song-open .chart-scroll[data-page][data-fits="false"] {
+        padding-right: 36px;
+    }
+    .song-open .chart-scroll[data-page][data-fits="false"] ~ .form-strip {
+        right: 5px;
+        width: 22px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .form-strip-view {
+        transition: none;
+    }
+}
