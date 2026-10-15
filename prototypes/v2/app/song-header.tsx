@@ -11,6 +11,8 @@ interface SongHeaderProps {
     standardDraft: boolean;
     /** The draft is a brand-new song, kept on its first change (#1707). */
     newSongDraft: boolean;
+    /** Only practice settings (tempo, style, energy, mix) differ from the saved version (#1706). */
+    practiceOnly: boolean;
     recoveryHealthy: boolean;
     totalBars: number;
     stage: boolean;
@@ -37,6 +39,7 @@ export function SongHeader({
     sharedDraft,
     standardDraft,
     newSongDraft,
+    practiceOnly,
     recoveryHealthy,
     totalBars,
     stage,
@@ -67,7 +70,9 @@ export function SongHeader({
                 <div>
                     <h1 className="song-title">{current.title}</h1>
                     <div className="song-subtitle">
-                        <span className={dirty ? 'unsaved' : ''}>
+                        <span
+                            className={practiceOnly ? 'practice-changed' : dirty ? 'unsaved' : ''}
+                        >
                             {hasPendingText
                                 ? 'Unsaved chord text · this tab only'
                                 : newSongDraft
@@ -76,11 +81,15 @@ export function SongHeader({
                                     ? standardDraft
                                         ? 'From the standards · not saved'
                                         : 'Opened from a shared link · not saved'
-                                    : dirty
+                                    : practiceOnly
                                       ? recoveryHealthy
-                                          ? 'Unsaved setup · locally recovered'
-                                          : 'Unsaved setup · this tab only'
-                                      : 'Saved on this device'}
+                                          ? 'Practice settings changed · Save to keep'
+                                          : 'Practice settings changed · this tab only'
+                                      : dirty
+                                        ? recoveryHealthy
+                                            ? 'Unsaved changes · locally recovered'
+                                            : 'Unsaved changes · this tab only'
+                                        : 'Saved on this device'}
                         </span>
                         <span>{totalBars} bars</span>
                         <span>{arrangementOf(current).timeSignature}</span>

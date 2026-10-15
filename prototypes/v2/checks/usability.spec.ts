@@ -73,6 +73,43 @@ test('typed chords are unsaved work: Save includes every edited section without 
     expect((await savedBlue(page)).chart.arrangement.sections[0].value).toBe('Am7 | D7');
 });
 
+test('a practice nudge is said apart from a chart change, and both wait for Save (#1706)', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    const status = page.locator('.song-subtitle > span').first();
+    const save = page.getByRole('button', { name: 'Save', exact: true });
+    await expect(status).toHaveText('Saved on this device');
+
+    await page.getByRole('button', { name: 'Faster', exact: true }).click();
+    await expect(status).toHaveText('Practice settings changed · Save to keep');
+    await expect(status).toHaveClass('practice-changed');
+    await expect(save).toBeEnabled();
+    // Undone by hand, nothing is left to keep.
+    await page.getByRole('button', { name: 'Slower', exact: true }).click();
+    await expect(status).toHaveText('Saved on this device');
+    await expect(save).toBeDisabled();
+
+    // Transposing rewrites the chords: a chart change, whatever else changed with it.
+    await page.getByRole('button', { name: 'Faster', exact: true }).click();
+    const key = page.getByLabel('Key', { exact: true });
+    const before = await key.inputValue();
+    await key.selectOption(before === 'D' ? 'E' : 'D');
+    await expect(status).toHaveText('Unsaved changes · locally recovered');
+    await expect(status).toHaveClass('unsaved');
+
+    // Nothing was written until Save, which keeps both.
+    const stored = await savedBlue(page);
+    expect(stored.chart.arrangement.key).not.toBe(before === 'D' ? 'E' : 'D');
+    await save.click();
+    await expect(save).toBeDisabled();
+    await expect(status).toHaveText('Saved on this device');
+    const kept = await savedBlue(page);
+    expect(kept.chart.performance.bpm).toBe(stored.chart.performance.bpm + 5);
+    expect(kept.chart.arrangement.key).toBe(before === 'D' ? 'E' : 'D');
+});
+
 test('export and Save a copy include typed text but do not overwrite the original save', async ({
     page,
 }) => {

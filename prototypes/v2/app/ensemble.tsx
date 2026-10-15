@@ -132,13 +132,56 @@ import { useOfflineInstall } from './use-offline-install';
 import { useStageTheme } from './use-stage-theme';
 
 /**
+ * Deep equality over plain JSON data that ignores the order of object keys: a chart read back
+ * from storage can list its keys in another order than the one the stand built (#1706).
+ */
+function sameData(a: unknown, b: unknown): boolean {
+    if (a === b) {
+        return true;
+    }
+    if (typeof a !== 'object' || typeof b !== 'object' || a === null || b === null) {
+        return false;
+    }
+    if (Array.isArray(a) || Array.isArray(b)) {
+        return (
+            Array.isArray(a) &&
+            Array.isArray(b) &&
+            a.length === b.length &&
+            a.every((item, index) => sameData(item, b[index]))
+        );
+    }
+    const left = a as Record<string, unknown>;
+    const right = b as Record<string, unknown>;
+    // An `undefined` field is absent, as it would be once stored.
+    const keys = (value: Record<string, unknown>) =>
+        Object.keys(value).filter((key) => value[key] !== undefined);
+    const leftKeys = keys(left);
+    return (
+        leftKeys.length === keys(right).length &&
+        leftKeys.every((key) => sameData(left[key], right[key]))
+    );
+}
+
+/**
  * Compared as written today (`writtenChart`), not as stored: a change undone by hand on an old
  * chart, which still carries its legacy fields, must not read as an edit — which would
  * otherwise hold an account draft against every later remote advance.
  */
 const same = (a: ChartDocument, b: ChartDocument) =>
+    a.title === b.title && sameData(writtenChart(a.chart), writtenChart(b.chart));
+
+/**
+ * `same` with the practice settings left out — tempo, energy, style and the band's mix (the
+ * chart's `performance` and `band`). Two documents that differ only there differ in how the
+ * song is practised, not in what is written (#1706). A key change is a chart change: transposing
+ * rewrites the chord symbols.
+ */
+const sameMusic = (a: ChartDocument, b: ChartDocument) =>
     a.title === b.title &&
-    JSON.stringify(writtenChart(a.chart)) === JSON.stringify(writtenChart(b.chart));
+    sameData(
+        { ...writtenChart(a.chart), performance: null, band: null },
+        { ...writtenChart(b.chart), performance: null, band: null },
+    );
 
 /**
  * Which songbook the chart on the stand came from — and, for an account chart, WHOSE account
@@ -1165,6 +1208,15 @@ export default function Ensemble() {
         hasPendingText ||
         (sharedDraft && !newSongDraft) ||
         !!(current && saved && !same(current, saved));
+    // Unsaved all the same — only Save commits it — but said apart, so a practice nudge doesn't
+    // read like unsaved chart work (#1706).
+    const practiceOnly =
+        dirty &&
+        !hasPendingText &&
+        !sharedDraft &&
+        !!current &&
+        !!saved &&
+        sameMusic(current, saved);
     const playbackActive = playing || playbackPending;
     const focused = playbackActive && !showControls && !editing;
 
@@ -3078,7 +3130,7 @@ export default function Ensemble() {
                 tone: 'warning',
             });
         } else if (recovery) {
-            setMessage('Recovered your unsaved setup');
+            setMessage('Recovered your unsaved changes');
         } else {
             // A plain open has nothing to announce (#1700): the header already says where the
             // song lives, and a "Saved" toast for a song nobody just saved read as an action that
@@ -5731,6 +5783,7 @@ export default function Ensemble() {
                         sharedDraft={sharedDraft}
                         standardDraft={standardDraft}
                         newSongDraft={newSongDraft}
+                        practiceOnly={practiceOnly}
                         recoveryHealthy={recoveryHealthy}
                         totalBars={totalBars}
                         stage={stage}

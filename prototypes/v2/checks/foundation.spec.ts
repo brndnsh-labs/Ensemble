@@ -230,13 +230,17 @@ test('failed recovery stays in memory through navigation and is never labelled r
         };
     });
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
-    await expect(page.getByText('Unsaved setup · this tab only', { exact: true })).toBeVisible();
+    await expect(
+        page.getByText('Practice settings changed · this tab only', { exact: true }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await songLink(page, 'After hours', 'Bossa').click();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
-    await expect(page.getByText('Unsaved setup · this tab only', { exact: true })).toBeVisible();
+    await expect(
+        page.getByText('Practice settings changed · this tab only', { exact: true }),
+    ).toBeVisible();
 });
 
 test('an older competing draft remains explicitly recoverable after another tab saves', async ({
