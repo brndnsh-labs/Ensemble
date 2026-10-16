@@ -29,6 +29,8 @@ interface SongHeaderProps {
     onEditChart: () => void;
     onSave: () => void;
     onMenu: () => void;
+    /** The title typed in the header while editing (#1726): an unsaved change, kept by Save. */
+    onTitle: (title: string) => void;
 }
 
 export function SongHeader({
@@ -55,6 +57,7 @@ export function SongHeader({
     onEditChart,
     onSave,
     onMenu,
+    onTitle,
 }: SongHeaderProps) {
     return (
         <div className="song-header">
@@ -68,7 +71,26 @@ export function SongHeader({
                     ←
                 </button>
                 <div>
-                    <h1 className="song-title">{current.title}</h1>
+                    {/* Editing, the title is typed where it is read (#1726), as the edit
+                        panel's "Song title" field was: each keystroke an unsaved change, Save
+                        the commit. */}
+                    <h1 className="song-title">
+                        {editing ? (
+                            <input
+                                id="title"
+                                className="song-title-input"
+                                aria-label="Song title"
+                                maxLength={160}
+                                disabled={busy}
+                                value={current.title}
+                                spellCheck={false}
+                                autoComplete="off"
+                                onChange={(event) => onTitle(event.target.value)}
+                            />
+                        ) : (
+                            current.title
+                        )}
+                    </h1>
                     <div className="song-subtitle">
                         <span
                             className={practiceOnly ? 'practice-changed' : dirty ? 'unsaved' : ''}

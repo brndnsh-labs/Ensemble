@@ -25,6 +25,7 @@ import {
     splitRange,
     stepSplit,
 } from './bar-ruler';
+import { FormControls } from './form-controls';
 import type { BarDraft } from './use-bar-drafts';
 
 type EffectiveContext = ReturnType<typeof resolveScoreContext>;
@@ -210,11 +211,12 @@ function BarRuler({
 }
 
 /**
- * The bar menu (#1725): a bar's structure, on the bar being typed rather than in a panel —
- * chord lengths, key or meter from here, repeats and endings, the fermata, and adding or
- * removing a bar. Everything in it edits the bar's draft as typing does (unsaved; applied on
- * leaving the bar, kept by Save), except the bar actions, which commit pending bars first as the
- * panel's ＋ Bar and − Bar do. A popover beside the bar on a laptop, a sheet on a phone.
+ * The bar menu (#1725): a bar's structure, on the bar being typed rather than in a panel — chord
+ * lengths, key or meter from here, repeats and endings (the guide, and the per-bar markers under
+ * Advanced), the fermata, and adding or removing a bar. Everything in it edits the bar's draft as
+ * typing does (unsaved; applied on leaving the bar, kept by Save), except the bar actions, which
+ * commit pending bars first as every chart edit does. A popover beside the bar on a laptop, a sheet
+ * on a phone.
  */
 export function BarMenu({
     bar,
@@ -387,6 +389,22 @@ export function BarMenu({
             >
                 Repeat or ending… <span aria-hidden="true">›</span>
             </button>
+            {/* The low-level markers for a form the guide cannot edit (#1726, from the old edit
+                panel): a draft change like the rest of the menu. */}
+            <div className="bar-menu-advanced">
+                {draft.form ? (
+                    <FormControls
+                        value={draft.form}
+                        disabled={busy}
+                        onChange={(form) => onDraft({ ...draft, form })}
+                    />
+                ) : (
+                    <p className="bar-menu-caption">
+                        This bar has repeat boundaries these controls cannot edit. Its notation is
+                        preserved.
+                    </p>
+                )}
+            </div>
             {/* The band holds a fermata's chord through a stretched span with the drums
                 crashing (docs/design/band-engine.md). */}
             <label className="bar-menu-item bar-menu-toggle">

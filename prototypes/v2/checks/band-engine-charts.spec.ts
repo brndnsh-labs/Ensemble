@@ -1,7 +1,16 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocumentV2 } from '../../../public/songbook/score-types';
-import { appUrl, closeBarDock, editorRevealed, expect, test } from './fixtures';
+import {
+    appUrl,
+    barField,
+    editorRevealed,
+    expect,
+    leaveBar,
+    openBar,
+    test,
+    typeBar,
+} from './fixtures';
 
 async function exportCurrent(page: Page): Promise<ChartDocumentV2> {
     await page.getByRole('button', { name: 'Song actions' }).click();
@@ -38,10 +47,7 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Held and free');
     for (const [i, text] of ['C', 'F', 'G7', 'C'].entries()) {
-        await page.getByLabel('Chords in this bar').fill(text);
-        if (i < 3) {
-            await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-        }
+        await typeBar(page, i + 1, text);
     }
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -110,36 +116,33 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
 
     // Editing is open to them too: type a hold into a bar, then save the chart.
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page.getByRole('button', { name: 'Edit bar 3', exact: true }).click();
-    await expect(page.getByLabel('Chords in bar 3', { exact: true })).toBeFocused();
-    // The panel is a phone's again once its bar dock is closed (#1724).
-    await closeBarDock(page);
-    await page.getByLabel('Chords in this bar').fill('F /');
-    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
+    await typeBar(page, 3, 'F /');
+    await leaveBar(page);
     await expect(sheetBars.nth(2).locator('.chord')).toHaveText(['F', '/']);
 
     // The last bar's own fermata (authored by the import, not the UI) is no longer read-only:
-    // its chords stay editable text, and the toggle reflects and can clear the flag.
-    await page.getByRole('button', { name: 'Edit bar 4', exact: true }).click();
-    await expect(page.getByLabel('Chords in bar 4', { exact: true })).toBeFocused();
-    // The panel is a phone's again once its bar dock is closed (#1724).
-    await closeBarDock(page);
-    const fermataToggle = page.getByLabel('Fermata (hold the last chord)', { exact: true });
-    await expect(fermataToggle).toBeChecked();
-    await expect(page.getByLabel('Chords in this bar')).toBeEditable();
-    await fermataToggle.uncheck();
-    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
+    // its chords stay editable text, and the bar menu's "Hold last chord" reflects and can clear
+    // the flag (#1726).
+    const fermataToggle = async () => {
+        await openBar(page, 4);
+        await page.getByRole('button', { name: 'Bar menu', exact: true }).click();
+        return page.getByLabel('Hold last chord', { exact: true });
+    };
+    let toggle = await fermataToggle();
+    await expect(toggle).toBeChecked();
+    await toggle.uncheck();
+    await page.keyboard.press('Escape');
+    await expect(barField(page, 4)).toBeEditable();
+    await leaveBar(page);
     await expect(sheetBars.nth(3).locator('.chord')).toHaveText(['Dm7', 'G7', 'C']);
     await expect(sheetBars.nth(3).locator('.fermata')).toHaveCount(0);
 
     // Setting it again, through the toggle alone, puts the 𝄐 back without retyping the chords.
-    await page.getByRole('button', { name: 'Edit bar 4', exact: true }).click();
-    await expect(page.getByLabel('Chords in bar 4', { exact: true })).toBeFocused();
-    // The panel is a phone's again once its bar dock is closed (#1724).
-    await closeBarDock(page);
-    await expect(fermataToggle).not.toBeChecked();
-    await fermataToggle.check();
-    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
+    toggle = await fermataToggle();
+    await expect(toggle).not.toBeChecked();
+    await toggle.check();
+    await page.keyboard.press('Escape');
+    await leaveBar(page);
     await expect(sheetBars.nth(3).locator('.chord')).toHaveText(['Dm7', 'G7', '𝄐C']);
     await expect(sheetBars.nth(3).locator('.fermata')).toHaveCount(1);
 
@@ -164,7 +167,9 @@ test('repeats and endings: the stand keeps its written bars while the band walks
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two endings study');
-    await page.getByRole('button', { name: 'Repeats and endings', exact: true }).click();
+    await openBar(page, 1);
+    await page.getByRole('button', { name: 'Bar menu', exact: true }).click();
+    await page.getByRole('button', { name: /^Repeat or ending/ }).click();
     const guide = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
     await guide.getByLabel('Repeated body end bar').selectOption({ value: '1' });
     await guide.getByRole('button', { name: 'Add first and second endings', exact: true }).click();

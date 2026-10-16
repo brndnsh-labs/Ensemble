@@ -1,18 +1,33 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, editorRevealed, expect, songLink, test } from './fixtures';
+import {
+    appUrl,
+    barField,
+    editorRevealed,
+    expect,
+    leaveBar,
+    openBar,
+    songLink,
+    test,
+    typeBar,
+} from './fixtures';
 
 async function start(page: Page, title = 'Guided study') {
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
     await editorRevealed(page);
     await page.getByLabel('Song title').fill(title);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
 }
-async function openGuide(page: Page) {
-    await page.getByRole('button', { name: 'Repeats and endings', exact: true }).click();
+/** The guide opens from a bar's menu (#1725): the bar opened, ⋯, "Repeat or ending…". */
+async function openGuide(page: Page, bar = 1) {
+    const menu = page.getByRole('button', { name: 'Bar menu', exact: true });
+    if (!(await menu.isVisible())) {
+        await openBar(page, bar);
+    }
+    await menu.click();
+    await page.getByRole('button', { name: /^Repeat or ending/ }).click();
     return page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
 }
 async function exported(page: Page): Promise<ChartDocument> {
@@ -36,13 +51,8 @@ test('keyboard range selection creates, edits and removes a repeat; cancel keeps
     page,
 }) => {
     await start(page);
-    await page.getByLabel('Chords in this bar').fill('Dm');
-    // Opened from the keyboard, so there is an opener to hand focus back to (a tap does not
-    // focus a button on WebKit).
-    const opener = page.getByRole('button', { name: 'Repeats and endings', exact: true });
-    await opener.focus();
-    await page.keyboard.press('Enter');
-    let dialog = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
+    await typeBar(page, 1, 'Dm');
+    let dialog = await openGuide(page);
     await dialog.getByRole('button', { name: 'Select bar 1', exact: true }).focus();
     await page.keyboard.press('Enter');
     await page.keyboard.press('Tab');
@@ -51,16 +61,18 @@ test('keyboard range selection creates, edits and removes a repeat; cancel keeps
     await expect(dialog.getByLabel('Repeated body end bar')).toHaveValue('2');
     await expect(dialog.getByTestId('guided-playback-route')).toHaveText('1–2–3 → 1–2–3–4');
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-    // Closing returns focus to the button that opened the guide, not to the top of the page.
-    await expect(opener).toBeFocused();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('Dm');
-    await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
+    // Closing hands focus back to the bar's field, with the pending chords still in it.
+    await expect(barField(page, 1)).toBeFocused();
+    await expect(barField(page, 1)).toHaveValue('Dm');
+    // Cancel changed nothing: bar 1 is still open with its typing, the rest are as written.
+    await expect(page.locator('.bar .chord')).toHaveText(['G', 'Am', 'F']);
     await expect(page.locator('.bar.repeat-start')).toHaveCount(0);
     dialog = await openGuide(page);
     await dialog.getByLabel('Repeated body end bar').selectOption({ value: '1' });
     await dialog.getByLabel('Play times total').fill('3');
     await expect(dialog.getByTestId('guided-playback-route')).toHaveText('1–2 → 1–2 → 1–2–3–4');
     await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+    await leaveBar(page);
     await expect(page.locator('.bar .chord')).toHaveText(['Dm', 'G', 'Am', 'F']);
     await expect(
         page.locator('.bar').nth(1).getByLabel('End repeat, 3 total passes', { exact: true }),
@@ -79,6 +91,7 @@ test('keyboard range selection creates, edits and removes a repeat; cancel keeps
     await dialog.getByRole('button', { name: 'Remove form markers', exact: true }).click();
     await expect(dialog.getByTestId('guided-playback-route')).toHaveText('1–2–3–4');
     await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
+    await leaveBar(page);
     await expect(page.locator('.bar.repeat-start')).toHaveCount(0);
     await expect(page.locator('.bar .chord')).toHaveText(['Dm', 'G', 'Am', 'F']);
 });
@@ -219,17 +232,22 @@ test('opening the guide preserves complex forms and failed validation retains pe
     await expect(dialog.getByRole('alert')).toContainText('nested or nonstandard');
     await expect(dialog.getByRole('button', { name: 'Apply', exact: true })).toBeDisabled();
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    // The advanced markers sit in a bar's menu (#1726): bar 1 opens the nested repeat.
+    await openBar(page, 1);
+    await page.getByRole('button', { name: 'Bar menu', exact: true }).click();
     await page.getByText('Advanced · per-bar repeat and ending markers', { exact: true }).click();
     await expect(page.getByLabel('Start repeat here', { exact: true })).toBeChecked();
+    await page.keyboard.press('Escape');
+    await leaveBar(page);
     expect((await exported(page)).chart).toEqual(source.chart);
     await start(page, 'Pending validation');
     // Six counts in a 4/4 bar, which no engine plays (the band plays off-grid lengths). The
     // pending bar is checked before the guide opens: it stays closed, names the bar, and keeps
     // the typing.
-    await page.getByLabel('Chords in this bar').fill('C:3 Dm:3');
+    await typeBar(page, 1, 'C:3 Dm:3');
     const invalid = await openGuide(page);
     await expect(invalid).toHaveCount(0);
     await expect(page.getByRole('alert').filter({ hasText: 'A · bar 1' })).toContainText(/counts/i);
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C:3 Dm:3');
-    await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
+    await expect(barField(page, 1)).toHaveValue('C:3 Dm:3');
+    await expect(page.locator('.bar .chord')).toHaveText(['G', 'Am', 'F']);
 });

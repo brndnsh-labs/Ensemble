@@ -170,7 +170,7 @@ There is no visualizer, and no state for one.
 
 ### UI (`prototypes/v2/app/`)
 
-The music stand: songbook home, chart sheet, transport, edit panel and sounds panel. Ownership and boundaries per surface are in `prototypes/v2/CLAUDE.md`'s navigation table — read it before a UI story.
+The music stand: songbook home, chart sheet (edited in place: bars typed on the chart with their bar menu, a section from its letter, the whole song from the Song menu — #1726; only an old text chart keeps a small editor beside it), transport and sounds panel. Ownership and boundaries per surface are in `prototypes/v2/CLAUDE.md`'s navigation table — read it before a UI story.
 
 ### Data / Config split
 

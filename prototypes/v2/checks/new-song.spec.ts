@@ -1,4 +1,4 @@
-import { expect, seedStarters, songLink, test } from './fixtures';
+import { editorRevealed, expect, seedStarters, songLink, test, typeBar } from './fixtures';
 
 /**
  * New song is a draft until it holds something (#1707): backing straight out leaves the songbook
@@ -7,7 +7,9 @@ import { expect, seedStarters, songLink, test } from './fixtures';
 
 const newSong = async (page: import('@playwright/test').Page) => {
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
+    await editorRevealed(page);
+    // Four bars to type over, the first of them C, and nothing open until one is pressed.
+    await expect(page.locator('.chord')).toHaveText(['C', 'G', 'Am', 'F']);
     await expect(page.locator('.song-subtitle')).toContainText('New song');
 };
 
@@ -58,7 +60,7 @@ test('a nudge undone by hand on a kept new song leaves nothing unsaved (#1706)',
 test('leaving a new song with bars typed but not applied keeps them', async ({ page }) => {
     await seedStarters(page);
     await newSong(page);
-    await page.getByLabel('Chords in this bar').fill('Dm7');
+    await typeBar(page, 1, 'Dm7');
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(page.getByRole('button', { name: /All 4 songs/ })).toBeVisible();
     await songLink(page, 'Untitled song').first().click();
@@ -68,7 +70,7 @@ test('leaving a new song with bars typed but not applied keeps them', async ({ p
 test('Save on a new song commits it as it stands', async ({ page }) => {
     await seedStarters(page);
     await newSong(page);
-    await page.getByLabel('Chords in this bar').fill('Dm7');
+    await typeBar(page, 1, 'Dm7');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.locator('.song-subtitle')).toContainText('Saved on this device');
     await page.getByRole('button', { name: 'Back to songbook' }).click();
@@ -97,4 +99,25 @@ test('a new song the store refuses stays an unsaved draft the musician can still
     await expect(page.getByRole('button', { name: 'Back to songbook' })).toBeEnabled();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(page.getByRole('button', { name: /All 3 songs/ })).toBeVisible();
+});
+
+test('a title typed straight through the new song being kept lands whole (#1726 review)', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await newSong(page);
+    const title = page.getByLabel('Song title');
+    await title.fill('');
+    await title.pressSequentially('Blue');
+    // Past the pause that starts the keep: the rest is typed while it is being written.
+    await page.waitForTimeout(800);
+    await title.pressSequentially(' pocket two', { delay: 60 });
+    await expect(title).toBeFocused();
+    await expect(title).toBeEnabled();
+    await expect(page.locator('.song-subtitle')).toContainText('Unsaved changes');
+    await expect(title).toHaveValue('Blue pocket two');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.locator('.song-subtitle')).toContainText('Saved on this device');
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(songLink(page, 'Blue pocket two')).toBeVisible();
 });

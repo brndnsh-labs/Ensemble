@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { appUrl, editorRevealed, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, editorRevealed, expect, seedStarters, songLink, test, typeBar } from './fixtures';
 
 /**
  * The most of each preview element on the board in any frame over `ms` of playback: the preview
@@ -42,10 +42,7 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Neck study');
     for (const [i, bar] of ['Dm7', 'G7', 'Cmaj7', 'Cmaj7'].entries()) {
-        await page.getByLabel('Chords in this bar').fill(bar);
-        if (i < 3) {
-            await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-        }
+        await typeBar(page, i + 1, bar);
     }
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -289,11 +286,10 @@ test('two chords in a bar: each change is previewed on its own last beat (#1590)
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two to the bar');
     // `| Dm7 G7 | Cmaj7 | Cmaj7 | Cmaj7 |`: the change to G7 lands on beat 3, inside the bar.
-    await page.getByLabel('Chords in this bar').fill('Dm7 G7');
+    await typeBar(page, 1, 'Dm7 G7');
     // A new song is four bars: the other three are all Cmaj7, one run with no change inside it.
-    for (let bar = 0; bar < 3; bar++) {
-        await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-        await page.getByLabel('Chords in this bar').fill('Cmaj7');
+    for (let bar = 2; bar <= 4; bar++) {
+        await typeBar(page, bar, 'Cmaj7');
     }
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();

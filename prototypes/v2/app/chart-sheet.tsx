@@ -10,20 +10,21 @@ import {
     useState,
 } from 'react';
 import { flushSync } from 'react-dom';
-import { arrangementOf } from '../lib/documents';
+import { arrangementOf, type SectionChange } from '../lib/documents';
 import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
 import { BarDock, usePhoneWidth } from './bar-dock';
 import { BarMenu, type BarMenuBar } from './bar-menu';
+import { SectionMenu } from './section-menu';
 import type { BarDraft } from './use-bar-drafts';
 
 type WrittenSection = SemanticScore['sections'][number];
 type WrittenBar = WrittenSection['measures'][number];
 
 /**
- * The counts the footer's form-length menu offers (#1511): a short list of the Edit panel's
- * 1–16 (`CHORUS_COUNTS` in `edit-panel.tsx`), plus the chart's own count when it is not listed.
+ * The counts the footer's form-length menu offers (#1511): a short list of the Song menu's
+ * 1–16 (`CHORUS_COUNTS` in `song-menu.tsx`), plus the chart's own count when it is not listed.
  */
 const STAND_CHORUS_COUNTS = [1, 2, 3, 4, 6, 8, 12, 16];
 /** The popover's width (`.popover` in `style.css`), for placing it inside the viewport. */
@@ -117,6 +118,8 @@ export interface BarEditing {
     problem: (measureId: string) => string | null;
     /** Changed since the chart was last saved, or pending: the dot by the bar number. */
     edited: (measureId: string) => boolean;
+    /** Typed but not applied yet, though it reads (#1726): tinted until the chart takes it. */
+    pending: (measureId: string) => boolean;
     /** A click or tap on the bar: select it, and open its field where it has one. */
     onOpen: (measureId: string) => void;
     onText: (measureId: string, text: string) => void;
@@ -134,9 +137,25 @@ export interface BarEditing {
     /** "Repeat or ending…": today's Repeats and endings dialog, opened on this bar. False when
      * it could not open (a pending bar does not read; the shell says which). */
     onRepeats: (from: OpenBar) => boolean;
-    /** "Insert bar after" and "Delete bar": pending bars commit first, as ＋ Bar and − Bar do. */
+    /** "Insert bar after" and "Delete bar": pending bars commit first, as every chart edit does. */
     onInsertAfter: (from: OpenBar) => void;
     onDelete: (from: OpenBar) => void;
+}
+
+/**
+ * What the section letter's menu edits while editing a measure chart (#1726): the section's
+ * settings, and adding or deleting a section. Each commits pending bars first, as every chart edit
+ * does. Null outside Edit, and for a text chart.
+ */
+export interface SectionEditing {
+    score: SemanticScore;
+    onChange: (sectionId: string, changes: readonly SectionChange[]) => void;
+    /** Each action takes the section's name or count still typed in its field (`pending`), so
+     * the field's commit and the action are one: on WebKit a press does not take focus, and a
+     * commit made on its own as the menu closed would turn the action away. */
+    onAddAfter: (sectionId: string, pending: readonly SectionChange[]) => void;
+    onDelete: (sectionId: string, pending: readonly SectionChange[]) => void;
+    onStartHere: (sectionId: string, pending: readonly SectionChange[]) => void;
 }
 
 interface ChartSheetProps {
@@ -156,8 +175,8 @@ interface ChartSheetProps {
     writtenBars: Map<string, WrittenBar>;
     writtenSections: Map<string, WrittenSection>;
     editing: boolean;
-    /** The bar the measure editor holds while editing (#1700) — ringed on the chart, so the
-     * musician can see which bar the panel is changing. Null when not editing a measure chart. */
+    /** The bar selected while editing (#1700) — ringed on the chart, the bar its field opens
+     * in. Null when not editing a measure chart. */
     selectedMeasureId: string | null;
     busy: boolean;
     playing: boolean;
@@ -166,9 +185,13 @@ interface ChartSheetProps {
     /** Section tap menu's "Start here" (#1422) — jumps playback to the section's first
      * performed bar, starting it if stopped. */
     onStartHere: (sectionId: string | undefined) => void;
+    /** A text chart's "Edit section" link while editing: that section in its text editor. A
+     * measure chart has none; its section letter opens the section's menu (#1726). */
     onEditSection: (block: ChartBlock) => void;
     /** Set while editing a measure chart (#1723); null otherwise. */
     barEdit: BarEditing | null;
+    /** Set while editing a measure chart (#1726); null otherwise. */
+    sectionEdit: SectionEditing | null;
     onAudition: (globalIndex: number) => void;
     /** How many times the band plays the form, then stops (#1511, the footer's menu);
      * `undefined` repeats it continuously. On a text chart the shell makes the measure copy
@@ -199,6 +222,7 @@ export function ChartSheet({
     onStartHere,
     onEditSection,
     barEdit,
+    sectionEdit,
     onAudition,
     onChoruses,
 }: ChartSheetProps) {
@@ -212,12 +236,43 @@ export function ChartSheet({
     } | null>(null);
     const sectionMenuRef = useRef<HTMLDivElement>(null);
     const sectionMenuTrigger = useRef<HTMLButtonElement | null>(null);
+    // The open section menu's own close (#1726), which commits a field still being typed in
+    // before it goes: the letter's toggle closes through it, as a press elsewhere does.
+    const sectionMenuCloser = useRef<((refocus: boolean) => void) | null>(null);
+    // After "Delete section" (#1726): the section deleted, and the one whose letter takes focus
+    // once it has gone. A refused delete leaves it, and nothing moves.
+    const refocusSection = useRef<{ deleted: string; to: string | null } | null>(null);
+    useEffect(() => {
+        const pending = refocusSection.current;
+        if (!pending) {
+            return;
+        }
+        refocusSection.current = null;
+        if (blocks.some((block) => block.id === pending.deleted)) {
+            return;
+        }
+        const active = document.activeElement;
+        if (active && active !== document.body) {
+            return;
+        }
+        Array.from(document.querySelectorAll<HTMLElement>('.section-letter[data-section-id]'))
+            .find((node) => node.dataset.sectionId === pending.to)
+            ?.focus();
+    }, [blocks]);
 
+    // While editing a measure chart the letter opens the section's own menu instead (#1726),
+    // which arms its own listeners; leaving Edit closes it.
+    const editingSections = sectionEdit !== null;
+    useEffect(() => {
+        if (!editingSections) {
+            setSectionMenu(null);
+        }
+    }, [editingSections]);
     // Keyed on WHICH menu is open, not its object: the effect focuses the item and arms the
     // listeners once per opening.
     const sectionMenuId = sectionMenu?.id ?? null;
     useEffect(() => {
-        if (sectionMenuId === null) {
+        if (sectionMenuId === null || editingSections) {
             return;
         }
         const first = sectionMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
@@ -263,10 +318,20 @@ export function ChartSheet({
             document.removeEventListener('scroll', followTrigger, true);
             window.removeEventListener('resize', followTrigger);
         };
-    }, [sectionMenuId]);
+    }, [sectionMenuId, editingSections]);
 
     function openSectionMenu(event: ReactMouseEvent<HTMLButtonElement>, block: ChartBlock) {
         if (!block.id) {
+            return;
+        }
+        // The letter toggles the section's menu; its own press is not outside it (#1726). It
+        // closes through the menu, so a name still being typed is committed, not dropped.
+        if (editingSections && sectionMenu?.id === block.id) {
+            if (sectionMenuCloser.current) {
+                sectionMenuCloser.current(true);
+            } else {
+                closeSectionMenu();
+            }
             return;
         }
         const rect = event.currentTarget.getBoundingClientRect();
@@ -523,7 +588,8 @@ export function ChartSheet({
     }
     // At phone width the open bar is typed in a field docked on the keyboard (#1724), not in
     // the bar: the bar shows its text live, the dock holds the one input.
-    const docked = usePhoneWidth() && barEdit !== null;
+    const phone = usePhoneWidth();
+    const docked = phone && barEdit !== null;
     const openText = open && barEdit ? barEdit.text(open.id) : null;
     let openNumber = 0;
     if (docked && open && selectedMeasureId === open.id && openText !== null) {
@@ -553,16 +619,31 @@ export function ChartSheet({
     return (
         <article className="sheet" ref={sheet}>
             {blocks.map((block) => (
-                <section className="section" key={block.measures[0]?.chords[0]?.globalIndex}>
+                <section
+                    className="section"
+                    // By the section's own id (#1726): a section deleted or added before another
+                    // must not hand that one its DOM (and its focus).
+                    key={block.id ?? `at-${block.measures[0]?.chords[0]?.globalIndex}`}
+                >
                     <div className="section-head">
                         <button
                             type="button"
                             className="section-letter"
+                            data-section-id={block.id}
                             aria-label={`Section ${block.label || 'A'}`}
-                            aria-haspopup="menu"
+                            aria-haspopup={editingSections ? 'dialog' : 'menu'}
                             aria-expanded={sectionMenu?.id === block.id}
                             // Enter/Space reach the same handler (native button semantics).
                             onClick={(event) => openSectionMenu(event, block)}
+                            // Pressed with a bar open (#1726), focus stays in its field on the way
+                            // down: a blur there would leave the bar, fold the phone's dock away
+                            // and move the letter out from under the press before its click. The
+                            // menu then takes focus, which leaves the bar.
+                            onMouseDown={(event) => {
+                                if (open) {
+                                    event.preventDefault();
+                                }
+                            }}
                         >
                             {block.label || 'A'}
                         </button>
@@ -588,7 +669,7 @@ export function ChartSheet({
                                     }
                                 </span>
                             )}
-                        {editing && (
+                        {editing && current.schemaVersion === 1 && (
                             <button
                                 className="section-edit"
                                 disabled={busy}
@@ -653,9 +734,10 @@ export function ChartSheet({
                                 open !== null && selected && open.id === measureId && typeable;
                             const problem = barEdit?.problem(measureId) ?? null;
                             const edited = barEdit?.edited(measureId) ?? false;
+                            const pending = !problem && (barEdit?.pending(measureId) ?? false);
                             return (
                                 <div
-                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selected ? 'selected' : ''}${typing ? ' typing' : ''}${problem ? ' unreadable' : ''}${edited ? ' edited' : ''}${measureRepeat ? '' : splitClass(measure.chords.length)}`}
+                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selected ? 'selected' : ''}${typing ? ' typing' : ''}${problem ? ' unreadable' : ''}${pending ? ' pending' : ''}${edited ? ' edited' : ''}${measureRepeat ? '' : splitClass(measure.chords.length)}`}
                                     data-measure-id={writtenBar?.id}
                                     data-active={measure.chords.some(
                                         (c) => c.globalIndex === displayActive,
@@ -666,8 +748,8 @@ export function ChartSheet({
                                     // (#1700, #1723): a press anywhere on it selects it and opens
                                     // its field, on the press, so focus never passes through
                                     // anything else on the way (no blur, no stray apply) — and
-                                    // never stopping the band or pulling a phone's view up to
-                                    // the panel. A press inside the open field is the caret's.
+                                    // never stopping the band. A press inside the open field is
+                                    // the caret's.
                                     // The click covers a keyboard press of the bar's number.
                                     onMouseDown={
                                         barEdit && !busy
@@ -1037,7 +1119,48 @@ export function ChartSheet({
                     </div>
                 </div>
             )}
-            {sectionMenu && (
+            {sectionMenu &&
+                sectionEdit &&
+                (() => {
+                    const written = sectionEdit.score.sections.find(
+                        (section) => section.id === sectionMenu.id,
+                    );
+                    return written ? (
+                        <SectionMenu
+                            key={written.id}
+                            score={sectionEdit.score}
+                            section={written}
+                            busy={busy}
+                            sheet={phone}
+                            anchor={() =>
+                                sectionMenuTrigger.current?.isConnected
+                                    ? sectionMenuTrigger.current
+                                    : null
+                            }
+                            closer={sectionMenuCloser}
+                            onStartHere={(pending) => sectionEdit.onStartHere(written.id, pending)}
+                            onChange={(changes) => sectionEdit.onChange(written.id, changes)}
+                            onAddAfter={(pending) => sectionEdit.onAddAfter(written.id, pending)}
+                            onDelete={(pending) => {
+                                // Focus goes to the section before it (or after, for the
+                                // first) once it has gone, not to the page.
+                                const at = blocks.findIndex((b) => b.id === written.id);
+                                refocusSection.current = {
+                                    deleted: written.id,
+                                    to: blocks[at > 0 ? at - 1 : at + 1]?.id ?? null,
+                                };
+                                sectionEdit.onDelete(written.id, pending);
+                            }}
+                            onClose={(refocus) => {
+                                setSectionMenu(null);
+                                if (refocus) {
+                                    sectionMenuTrigger.current?.focus();
+                                }
+                            }}
+                        />
+                    ) : null;
+                })()}
+            {sectionMenu && !sectionEdit && (
                 <div
                     ref={sectionMenuRef}
                     role="menu"

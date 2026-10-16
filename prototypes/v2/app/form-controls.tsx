@@ -10,7 +10,11 @@ interface FormControlsProps {
     disabled?: boolean;
 }
 
-/** No shadow drafts: the measure editor owns raw values through selection, Save and recovery. */
+/**
+ * A bar's own repeat and ending markers, field by field, for the nested and nonstandard forms
+ * the guide (`GuidedForm`) leaves alone. In the bar menu since #1726. No shadow drafts: the
+ * bar's draft (`useBarDrafts`) owns the raw values through leaving the bar, Save and recovery.
+ */
 export function FormControls({ value, onChange, disabled = false }: FormControlsProps) {
     const id = useId();
     return (
@@ -78,7 +82,7 @@ export function FormControls({ value, onChange, disabled = false }: FormControls
                 </label>
                 <p id={`${id}-help`} className="form-controls-hint">
                     The repeat sign closes a first ending. Mark the end of the final ending
-                    explicitly. Set every affected bar before updating the chart.
+                    explicitly. Set every affected bar before leaving the last of them.
                 </p>
             </fieldset>
         </details>

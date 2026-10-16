@@ -2,8 +2,11 @@ import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import {
     appUrl,
+    closeSongMenu,
     editorRevealed,
     expect,
+    leaveBar,
+    openBar,
     openWholeSong,
     seedStarters,
     songLink,
@@ -12,7 +15,7 @@ import {
 
 /**
  * #1511: the chart footer's "N bars · repeats continuously" is the form-length control. It
- * sets the same `score.choruses` the Edit panel's Choruses select does (#1475), and on a text
+ * sets the same `score.choruses` the Song menu's Choruses select does (#1475, #1726), and on a text
  * (schema 1) chart a pick first makes the measure copy "Try the bar editor · keep original"
  * makes. Passes are counted from the chart's own pointer, as `choruses.spec.ts` does.
  */
@@ -82,11 +85,12 @@ async function pick(page: Page, choice: string) {
     await expect(formMenu(page)).toHaveCount(0);
 }
 
-/** The Edit panel's Choruses select, read with the panel open, then closed again. */
-async function editPanelChoruses(page: Page): Promise<string> {
+/** The Song menu's Choruses select, read in Edit with the menu open, then closed again. */
+async function songMenuChoruses(page: Page): Promise<string> {
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await openWholeSong(page);
     const value = await page.getByLabel('Choruses', { exact: true }).inputValue();
+    await closeSongMenu(page);
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     return value;
 }
@@ -172,9 +176,9 @@ test('the footer sets how many times a measure chart plays, and the band stops a
         menu.getByRole('menuitemradio', { name: 'Plays 2 times', exact: true }),
     ).toHaveAttribute('aria-checked', 'true');
     await page.keyboard.press('Escape');
-    expect(await editPanelChoruses(page)).toBe('2');
+    expect(await songMenuChoruses(page)).toBe('2');
 
-    // One unsaved edit, which Save keeps like the Edit panel's.
+    // One unsaved edit, which Save keeps like the Song menu's.
     const save = page.getByRole('button', { name: 'Save', exact: true });
     await expect(save).toBeEnabled();
     await save.click();
@@ -202,10 +206,10 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     expect(heard.at(-1)).toBe('F');
     await expect(footer).toHaveText('4 bars · plays 2 times, then ends');
 
-    // "Repeats continuously" clears the count, in the document and the Edit panel.
+    // "Repeats continuously" clears the count, in the document and the Song menu.
     await pick(page, 'Repeats continuously');
     await expect(footer).toHaveText('4 bars · repeats continuously');
-    expect(await editPanelChoruses(page)).toBe('loop');
+    expect(await songMenuChoruses(page)).toBe('loop');
     await save.click();
     await expect(save).toBeDisabled();
     const cleared = (await documents(page)).find((d) => d.title === 'Footer choruses');
@@ -238,11 +242,15 @@ test('on a shared text chart, a count makes the measure copy and counts it (#151
     await expect(page.getByTestId('stand-toast')).toContainText('Editable copy created');
     await expect(footer).toHaveText('4 bars · plays 2 times, then ends');
     await expect(page.locator('.chart-bottom')).not.toContainText('repeats continuously');
-    // The copy is a measure chart: the Edit panel holds the bar editor and agrees on the count.
+    // The copy is a measure chart: Edit opens its bars, not the text panel, and the Song menu
+    // agrees on the count.
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toBeVisible();
+    await expect(page.locator('.edit-panel')).toHaveCount(0);
+    await expect(await openBar(page, 1)).toBeVisible();
+    await leaveBar(page);
     await openWholeSong(page);
     await expect(page.getByLabel('Choruses', { exact: true })).toHaveValue('2');
+    await closeSongMenu(page);
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
 
     // What the conversion stored is the button's copy, with the count as one unsaved edit on
@@ -287,7 +295,7 @@ test('on a saved text chart, a count converts a copy and leaves the original unt
 
     await pick(page, 'Plays 3 times');
     await expect(footer).toHaveText('12 bars · plays 3 times, then ends');
-    expect(await editPanelChoruses(page)).toBe('3');
+    expect(await songMenuChoruses(page)).toBe('3');
     const stored = await documents(page);
     // The original is exactly as it was; the copy is a new measure chart beside it.
     expect(stored.find((d) => d.id === 'starter-blues')).toEqual(original);

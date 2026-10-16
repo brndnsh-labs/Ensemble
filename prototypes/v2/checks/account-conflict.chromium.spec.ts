@@ -14,7 +14,7 @@ import {
     songTitles,
     uploadOf,
 } from './account-helpers';
-import { expect, accountTest as test } from './fixtures';
+import { expect, leaveBar, openBar, accountTest as test, typeBar } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -348,8 +348,7 @@ test('a bar typed but not applied survives keeping both, and its retained draft 
         );
 
         // ...and THEN the musician types a bar and reaches for the banner without applying it.
-        const bar = second.getByLabel('Chords in this bar');
-        await bar.fill('F');
+        await typeBar(second, 1, 'F');
         await openSongActions(second);
         await expect(second.getByTestId('sync-local')).toHaveText('Unsaved changes');
         await closeSongActions(second);
@@ -365,7 +364,8 @@ test('a bar typed but not applied survives keeping both, and its retained draft 
         await expect(
             second.getByRole('heading', { name: 'Study mine — kept', exact: true }),
         ).toBeVisible();
-        await expect(bar).toHaveValue('F');
+        await expect(await openBar(second, 1)).toHaveValue('F');
+        await leaveBar(second);
         await openSongActions(second);
         await expect(second.getByTestId('sync-local')).toHaveText('Unsaved changes');
         await closeSongActions(second);
@@ -385,7 +385,7 @@ test('a bar typed but not applied survives keeping both, and its retained draft 
         await expect(second.getByTestId('library-loading')).toHaveCount(0);
         await openExactSong(second, 'Study mine — kept');
         await revealEditor(second);
-        await expect(second.getByLabel('Chords in this bar')).toHaveValue('F');
+        await expect(await openBar(second, 1)).toHaveValue('F');
     } finally {
         await fresh.close();
     }

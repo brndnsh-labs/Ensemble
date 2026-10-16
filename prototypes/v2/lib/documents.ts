@@ -185,27 +185,45 @@ export function blankSong(base: ChartDocument) {
 }
 
 /**
- * Appends one bar — to a new section, or to the section holding `measureId` — filled with the
- * tonic of the key and meter in force at that point. Returns a changed copy of `score`.
+ * Adds a section straight after `sectionId` (the section letter's "Add section after", #1726),
+ * holding one bar of the song's tonic — a section starts from the song's key and meter. Named
+ * with the first letter no section has yet (`nextSectionLabel`). Refused where the result does not
+ * validate (a repeat or ending running across the seam). A refusal changes nothing.
  */
-export function extendedScore(source: SemanticScore, measureId: string, newSection: boolean) {
+export function withSectionAfter(source: SemanticScore, sectionId: string): RemovalResult {
     const score = structuredClone(source);
-    const selectedSection =
-        score.sections.find((s) => s.measures.some((m) => m.id === measureId)) ?? score.sections[0];
-    const section = newSection
-        ? {
-              id: crypto.randomUUID(),
-              label: String.fromCharCode(65 + (score.sections.length % 26)),
-              repeat: 1,
-              measures: [],
-          }
-        : selectedSection;
-    if (newSection) {
-        score.sections.push(section);
+    const index = score.sections.findIndex((s) => s.id === sectionId);
+    if (index < 0) {
+        return { kind: 'blocked', message: 'Pick a section to add one after.' };
     }
-    const added = tonicBar(score, section, section.measures.length);
-    section.measures.push(added);
-    return { score, measureId: added.id, sectionId: section.id };
+    const section: ScoreSection = {
+        id: crypto.randomUUID(),
+        label: nextSectionLabel(score),
+        repeat: 1,
+        measures: [],
+    };
+    section.measures.push(tonicBar(score, section, 0));
+    score.sections.splice(index + 1, 0, section);
+    if (validateSemanticScore(score).kind !== 'ok') {
+        return {
+            kind: 'blocked',
+            message:
+                'A section here would break the repeats and endings around it. Change them first with Repeat or ending…',
+        };
+    }
+    return { kind: 'ok', score, measureId: section.measures[0].id, sectionId: section.id };
+}
+
+/** The first of A–Z no section is named yet; past Z, the new section's number. */
+function nextSectionLabel(score: SemanticScore): string {
+    const used = new Set(score.sections.map((section) => section.label));
+    for (let code = 65; code < 91; code++) {
+        const letter = String.fromCharCode(code);
+        if (!used.has(letter)) {
+            return letter;
+        }
+    }
+    return String(score.sections.length + 1);
 }
 
 /** A new bar holding the tonic for the key and meter in force before `section.measures[at]`. */
@@ -231,15 +249,17 @@ function tonicBar(score: SemanticScore, section: ScoreSection, at: number): Scor
 
 /**
  * Inserts one bar straight after `measureId`, in its section (the bar menu's "Insert bar after",
- * #1725), filled as `extendedScore` fills one: the tonic, in the key and meter that bar leaves in
- * force. It writes no key or meter of its own, so every later bar sounds as it did. Its form is
- * the bars' around it: a mark sits on a bar's start or end, so a bar inserted inside a repeat or
- * an ending lengthens it.
+ * #1725), filled as `withSectionAfter` fills a new section's: the tonic, in the key and meter
+ * that bar leaves in force. It writes no key or meter of its own, so every later bar sounds as it
+ * did. Its form is the bars' around it: a mark sits on a bar's start or end, so a bar inserted
+ * inside a repeat or an ending lengthens it.
  *
- * Refused after a bar that ENDS a repeat or an ending: whether the new bar belongs inside it or
- * after it is the musician's call, and after a one-bar first ending it would land between the
- * endings, which no chart can play (#1725 review). Refused too, as a backstop, wherever the
- * result does not validate. A refusal changes nothing.
+ * After a section's LAST bar it goes after everything that bar closes — outside the repeat or
+ * ending — as the old ＋ Bar appended (#1726 review). Refused after any other bar that ENDS a
+ * repeat or an ending: whether the new bar belongs inside it or after it is the musician's call,
+ * and after a one-bar first ending it would land between the endings, which no chart can play
+ * (#1725 review). Refused too, as a backstop, wherever the result does not validate. A refusal
+ * changes nothing.
  */
 export function withBarAfter(source: SemanticScore, measureId: string): RemovalResult {
     const score = structuredClone(source);
@@ -249,6 +269,7 @@ export function withBarAfter(source: SemanticScore, measureId: string): RemovalR
     }
     const at = section.measures.findIndex((m) => m.id === measureId) + 1;
     if (
+        at < section.measures.length &&
         section.measures[at - 1].end?.some(
             (mark) => mark.kind === 'repeat-end' || mark.kind === 'ending-end',
         )
@@ -265,7 +286,7 @@ export function withBarAfter(source: SemanticScore, measureId: string): RemovalR
         return {
             kind: 'blocked',
             message:
-                'A bar here would break the repeats and endings around it. Change them first with Repeat or ending….',
+                'A bar here would break the repeats and endings around it. Change them first with Repeat or ending…',
         };
     }
     return { kind: 'ok', score, measureId: added.id, sectionId: section.id };

@@ -3,13 +3,19 @@ import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import {
     appUrl,
+    barField,
     test as base,
-    closeBarDock,
+    closeSongMenu,
     editorRevealed,
     expect,
+    leaveBar,
+    openBar,
+    openSectionContext,
+    openSectionMenu,
     openWholeSong,
     seedStarters,
     songLink,
+    typeBar,
 } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
@@ -58,8 +64,27 @@ async function convertBlue(page: Page) {
     await page
         .getByRole('button', { name: 'Try the bar editor · keep original', exact: true })
         .click();
-    await expect(page.getByLabel('Chords in this bar')).toBeVisible();
     await editorRevealed(page);
+    await expect(page.locator('.sheet .bar').first()).toBeVisible();
+}
+
+/** The open bar's menu (#1725): ⋯ on the bar, or in the dock on a phone. */
+async function openBarMenu(page: Page, bar: number) {
+    await page.getByRole('button', { name: 'Bar menu', exact: true }).click();
+    const menu = page.getByRole('dialog', { name: `Bar ${bar} menu`, exact: true });
+    await expect(menu).toBeVisible();
+    return menu;
+}
+
+/** Unfolds the open bar menu's "Key or meter from here" group. */
+async function openKeyOrMeter(page: Page) {
+    await page.locator('summary', { hasText: 'Key or meter from here' }).click();
+}
+
+/** Closes the bar menu back to typing (Esc), leaving the bar's field open. */
+async function closeBarMenu(page: Page) {
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: /^Bar \d+ menu$/ })).toHaveCount(0);
 }
 
 async function exportCurrent(page: Page): Promise<ChartDocument> {
@@ -79,13 +104,12 @@ test('2+1+1 editor saves a source-preserving copy, transposes and reopens offlin
     await convertBlue(page);
     const original = (await documents(page)).find((document) => document.id === 'starter-blues');
     await page.getByLabel('Song title').fill('Uneven blues');
-    await page.getByLabel('Chords in this bar').fill('C Dm G7');
-    await page.getByLabel('Length of chord 1 (C)', { exact: true }).selectOption('2');
-    await page.getByLabel('Length of chord 2 (Dm)', { exact: true }).selectOption('1');
-    await page.getByLabel('Length of chord 3 (G7)', { exact: true }).selectOption('1');
-    // A transform must commit pending measures before it transposes, then retire the old buffers.
+    await typeBar(page, 1, 'C:2 Dm:1 G7:1');
+    // Leaving the bar applies it; the transpose then carries it (and retires the old buffers).
+    await leaveBar(page);
     await page.getByLabel('Key', { exact: true }).selectOption('D');
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('D:2 Em:1 A7:1');
+    await expect(await openBar(page, 1)).toHaveValue('D:2 Em:1 A7:1');
+    await leaveBar(page);
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['D', 'Em', 'A7']);
     expect(
         await page
@@ -143,25 +167,37 @@ test('unfinished bars survive selection, errors and hidden editor; Save commits 
 }) => {
     await convertBlue(page);
     const original = await documents(page);
-    await page.getByLabel('Chords in this bar').fill('C Dm G7');
-    await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-    await page.getByLabel('Chords in this bar').fill('not-a-chord');
-    await page.getByRole('button', { name: 'Previous bar', exact: true }).click();
+    await typeBar(page, 1, 'C Dm G7');
+    // Moving on applies bar 1; bar 2's unreadable text stays pending on its bar.
+    await typeBar(page, 2, 'not-a-chord');
+    await leaveBar(page);
+    await expect(page.locator('.bar.unreadable')).toHaveCount(1);
     for (const name of ['Save', 'Back to songbook', 'Start playback']) {
         // A refused change opens the bar that needs fixing; on a phone that is the bar dock,
-        // which folds the transport and panel away until Done (#1724).
-        await closeBarDock(page);
+        // which folds the transport away until Done (#1724).
+        await leaveBar(page);
         await page.getByRole('button', { name, exact: true }).click();
         await expect(page.locator('.error-banner')).toBeVisible();
+        await expect(barField(page, 2)).toBeFocused();
         expect(await documents(page)).toEqual(original);
     }
-    await closeBarDock(page);
-    await page.getByRole('button', { name: 'Previous bar', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C Dm G7');
-    await page.getByLabel('Chords in this bar').fill('C:2 Dm:1 G7:1');
-    await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-    await page.getByLabel('Chords in this bar').fill('F A7');
+    await leaveBar(page);
+    // With the editor hidden, the unreadable bar is still pending: Save refuses it and opens it.
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    await expect(page.locator('.bar.unreadable')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.locator('.error-banner')).toBeVisible();
+    await expect(barField(page, 2)).toBeFocused();
+    expect(await documents(page)).toEqual(original);
+    await leaveBar(page);
+    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C', 'Dm', 'G7']);
+    await typeBar(page, 1, 'C:2 Dm:1 G7:1');
+    await typeBar(page, 2, 'F A7');
+    // Out of the editor with bar 2 still open: pressing Chart leaves the bar, which applies it
+    // (a bar still pending once the editor is hidden is in semantic-form-editor.spec.ts).
+    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    await expect(page.locator('.bar-input, .bar-dock')).toHaveCount(0);
+    await expect(page.locator('.bar').nth(1).locator('.chord')).toHaveText(['F', 'A7']);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const exported = await exportCurrent(page);
@@ -188,10 +224,13 @@ test('unfinished bars survive selection, errors and hidden editor; Save commits 
         ],
     );
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page.getByLabel('Chords in this bar').fill('unwanted');
+    await typeBar(page, 1, 'unwanted');
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Revert to saved' }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C:2 Dm:1 G7:1');
+    await expect(page.locator('.bar.unreadable')).toHaveCount(0);
+    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C', 'Dm', 'G7']);
+    await expect(await openBar(page, 1)).toHaveValue('C:2 Dm:1 G7:1');
+    await leaveBar(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
@@ -202,24 +241,38 @@ test('new charts support bar key/meter changes, growing the chart, recovery and 
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Mixed meter sketch');
-    await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-    await page.getByText('Key or meter change', { exact: true }).click();
+    await openBar(page, 2);
+    await openBarMenu(page, 2);
+    await openKeyOrMeter(page);
     await page.getByLabel('Key from this bar').selectOption('G');
     await page.getByLabel('Meter from this bar').selectOption('3/4');
-    await page.getByLabel('Chords in this bar').fill('I V');
-    await page.getByRole('button', { name: 'Next bar', exact: true }).click();
+    await closeBarMenu(page);
+    await barField(page, 2).fill('I V');
+    await openBar(page, 3);
+    await openBarMenu(page, 3);
+    await openKeyOrMeter(page);
     await page.getByLabel('Meter from this bar').selectOption('4/4');
-    await page.getByLabel('Chords in this bar').fill('I');
-    await page.getByRole('button', { name: '＋ Bar', exact: true }).click();
+    await closeBarMenu(page);
+    await barField(page, 3).fill('I');
+    // Grow the chart: a bar after the last one (the bar menu), then a section (the letter's menu).
+    await openBar(page, 4);
+    await openBarMenu(page, 4);
+    await page.getByRole('button', { name: 'Insert bar after', exact: true }).click();
     await expect(page.locator('.bar')).toHaveCount(5);
-    await page.getByRole('button', { name: '＋ Section', exact: true }).click();
+    await leaveBar(page);
+    await (await openSectionMenu(page, 'A'))
+        .getByRole('button', { name: 'Add section after', exact: true })
+        .click();
     await expect(page.locator('.bar')).toHaveCount(6);
+    await leaveBar(page);
     const exported = await exportCurrent(page);
     if (exported.schemaVersion !== 2) {
         throw new Error('Expected semantic document');
     }
     expect(exported.chart.score.sections[0].measures[1]).toMatchObject({ key: 'G', meter: '3/4' });
     expect(exported.chart.score.sections[0].measures[2]).toMatchObject({ meter: '4/4' });
+    // The new song is kept on its first change (#1707): wait for it before leaving the page.
+    await expect.poll(async () => (await documents(page)).length).toBeGreaterThan(0);
     await page.reload();
     await songLink(page, 'Untitled song').click();
     await expect(page.locator('.song-title')).toHaveText('Mixed meter sketch');
@@ -238,10 +291,13 @@ test('new charts support bar key/meter changes, growing the chart, recovery and 
 test('a mode-only change is visible on the music stand and survives Save', async ({ page }) => {
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-    await page.getByText('Key or meter change', { exact: true }).click();
+    await editorRevealed(page);
+    await openBar(page, 2);
+    await openBarMenu(page, 2);
+    await openKeyOrMeter(page);
     await page.getByLabel('Mode from this bar').selectOption('minor');
-    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
+    await closeBarMenu(page);
+    await leaveBar(page);
     await expect(page.locator('.bar').nth(1).locator('.bar-context')).toHaveText('Cm · 4/4');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -263,14 +319,17 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     await second.goto(appUrl());
     await songLink(second, original.title, 'Blues').click();
     await second.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page.getByLabel('Chords in this bar').fill('C:2 Dm:1 G7:1');
+    await typeBar(page, 1, 'C:2 Dm:1 G7:1');
+    await leaveBar(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const newer = (await documents(page)).find((document) => document.id === original.id)!;
-    await second.getByLabel('Chords in this bar').fill('F:3 G7:1');
+    // Saved straight from the open bar, not left first: Save commits what is typed.
+    await typeBar(second, 1, 'F:3 G7:1');
     await second.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(second.locator('.error-banner')).toContainText('saved in another tab');
-    await expect(second.getByLabel('Chords in this bar')).toHaveValue('F:3 G7:1');
+    await expect(await openBar(second, 1)).toHaveValue('F:3 G7:1');
+    await leaveBar(second);
     expect((await documents(page)).find((document) => document.id === original.id)).toEqual(newer);
     await second.getByRole('button', { name: 'Song actions' }).click();
     await second.getByRole('button', { name: 'Save a copy', exact: true }).click();
@@ -312,12 +371,13 @@ test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({ 
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
-    await openWholeSong(page);
-    const mode = page.getByLabel('Song mode');
+    const menu = await openWholeSong(page);
+    const mode = menu.getByLabel('Song mode');
 
     await mode.selectOption('minor');
 
-    await expect(page.locator('.measure-editor-context')).toHaveText('C minor · 4/4');
+    await closeSongMenu(page);
+    await expect(page.locator('.bar-context').first()).toHaveText('Cm · 4/4');
     // The transport's Key select already names a minor key with its "m".
     await expect(page.getByLabel('Key', { exact: true }).locator('option:checked')).toHaveText(
         'Cm',
@@ -326,12 +386,21 @@ test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({ 
     await expect(page.locator('.chord')).toHaveText(['C', 'G', 'Am', 'F']);
 
     // A section that states its own mode keeps it through a song-level change.
-    await page.getByText('Section settings · A').click();
-    await page.getByLabel('Section mode').selectOption('major');
-    await expect(page.locator('.measure-editor-context')).toHaveText('C major · 4/4');
+    const section = await openSectionMenu(page, 'A');
+    await openSectionContext(section);
+    await section.getByLabel('Section mode').selectOption('major');
+    await expect(page.locator('.bar-context').first()).toHaveText('C · 4/4');
+    await section.press('Escape');
+    await expect(section).toBeHidden();
+    await openWholeSong(page);
     await mode.selectOption('major');
     await mode.selectOption('minor');
-    await expect(page.getByLabel('Section mode')).toHaveValue('major');
+    await closeSongMenu(page);
+    const again = await openSectionMenu(page, 'A');
+    await openSectionContext(again);
+    await expect(again.getByLabel('Section mode')).toHaveValue('major');
+    await again.press('Escape');
+    await expect(again).toBeHidden();
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -350,16 +419,25 @@ test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears i
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
-    await page.getByText('Key or meter change', { exact: true }).click();
+    await openBar(page, 1);
+    await openBarMenu(page, 1);
+    await openKeyOrMeter(page);
     // 4/4 has one natural grouping, so there is nothing to choose.
     await expect(page.getByLabel('Beat grouping from this bar')).toHaveCount(0);
+    await closeBarMenu(page);
+    await leaveBar(page);
 
-    await openWholeSong(page);
-    await page.getByLabel('Song meter').selectOption('5/4');
+    const menu = await openWholeSong(page);
+    await menu.getByLabel('Song meter').selectOption('5/4');
+    await closeSongMenu(page);
+    await openBar(page, 1);
+    await openBarMenu(page, 1);
+    await openKeyOrMeter(page);
     const grouping = page.getByLabel('Beat grouping from this bar');
     await expect(grouping.locator('option')).toHaveText(['Continue (3+2)', '3+2', '2+3']);
     await grouping.selectOption('2+3');
-    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
+    await closeBarMenu(page);
+    await leaveBar(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const saved = (await documents(page)).find((document) => document.schemaVersion === 2);
@@ -369,8 +447,9 @@ test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears i
     expect(saved.chart.score.sections[0].measures[0].grouping).toEqual([2, 3]);
 
     // The existing rule: a meter change resets a grouping written for the old meter.
-    await openWholeSong(page);
-    await page.getByLabel('Song meter').selectOption('4/4');
+    const again = await openWholeSong(page);
+    await again.getByLabel('Song meter').selectOption('4/4');
+    await closeSongMenu(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const resaved = (await documents(page)).find((document) => document.id === saved.id);

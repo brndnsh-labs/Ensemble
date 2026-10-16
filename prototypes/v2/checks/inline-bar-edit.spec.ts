@@ -5,7 +5,8 @@ import { appUrl, expect, test } from './fixtures';
 /**
  * #1723 — typing on the chart. In Edit chart a click on a bar opens a field in it; Tab, Shift-Tab
  * and Enter move bar to bar, and leaving a bar applies its chords as an unsaved change, with no
- * "Update chart". Chords that don't read stay pending on their bar, and Save refuses them.
+ * apply button (the edit panel is retired, #1726). Chords that don't read stay pending on their
+ * bar, and Save refuses them.
  */
 
 async function documents(page: Page): Promise<ChartDocument[]> {
@@ -75,9 +76,8 @@ test('typing in bars applies each one on leaving it, and Save keeps them (#1723)
     expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
-    // The panel holds the same draft.
     await page.keyboard.type('b9');
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('D7b9');
+    await expect(field(page, 6)).toHaveValue('D7b9');
 
     // Tab: bar 7, its chords selected, so typing replaces them. Space types a space, it does
     // not start the band.
@@ -99,11 +99,9 @@ test('typing in bars applies each one on leaving it, and Save keeps them (#1723)
     await expect(bars.nth(6).locator('.chord')).toHaveCount(2);
     await expect(bars.nth(6).locator('.chord').nth(1)).toHaveText('C7');
 
-    // No "Update chart" was needed: nothing is pending, and the header says it is unsaved.
-    // (The panel's, hidden on a phone while a bar is typed: #1724.)
-    await expect(
-        page.getByRole('button', { name: 'Update chart', exact: true, includeHidden: true }),
-    ).toBeDisabled();
+    // No apply button was needed: nothing is pending (bar 6 was applied on leaving), and the
+    // header says the chart is unsaved, not that chord text is waiting.
+    await expect(page.locator('.song-subtitle')).not.toContainText('Unsaved chord text');
     await expect(page.locator('.song-subtitle .unsaved')).toBeVisible();
     await expect(bars.nth(5)).toHaveClass(/\bedited\b/);
 
@@ -168,8 +166,8 @@ test('Esc puts the bar back and closes its field; Shift-Tab goes back across sec
     await expect(bars.nth(1)).not.toHaveClass(/\bunreadable\b/);
     await expect(bars.nth(1).locator('.chord')).toHaveText(['F7']);
     await expect(page.getByRole('button', { name: 'Edit bar 2', exact: true })).toBeFocused();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('F7');
-    await expect(page.getByRole('button', { name: 'Update chart', exact: true })).toBeDisabled();
+    // Nothing is left pending: the header holds no "Unsaved chord text".
+    await expect(page.locator('.song-subtitle')).not.toContainText('Unsaved chord text');
 
     // The bar number opens the field from the keyboard.
     await page.keyboard.press('Enter');

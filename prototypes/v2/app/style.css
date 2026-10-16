@@ -919,6 +919,11 @@ html [hidden] {
     overflow-wrap: anywhere;
     white-space: pre-wrap;
 }
+/* Typed but not applied, though it reads (#1726): a repeat or ending still being built bar by
+   bar. Lightly tinted until the chart takes it, or Save says what is missing. */
+.bar.pending:not(.typing) {
+    background: var(--accent-light);
+}
 /* Chords that don't read: the bar tinted, the reason under them. Kept as typed; Save refuses. */
 .bar.unreadable,
 .bar.selected.unreadable {
@@ -1533,8 +1538,9 @@ dialog textarea {
         font-size: 12px;
         padding: 0 14px;
     }
-    /* Editing on a phone (#1705): the chart above, the editor docked below it like a sheet,
-       each scrolling on its own — so the bar being edited and its editor are on screen together.
+    /* Editing on a phone (#1705): the chart above, a text chart's editor docked below it like a
+       sheet, each scrolling on its own — so the section being edited and its editor are on screen
+       together (a measure chart has no editor beside it since #1726).
        It used to be one column with the editor above the chart, where editing bar 23 meant
        scrolling between a form at the top and the bar far below it. `clip`, not `hidden`, so no
        programmatic scroll moves the two panes as one. */
@@ -1565,12 +1571,11 @@ dialog textarea {
         margin-bottom: 15px;
     }
     /* Typing a bar on a phone (#1724): its field is docked on the keyboard (`bar-dock.css`), so
-       the transport row and the edit panel fold away while it is up and the chart keeps two or
-       three rows above it. The panel is back after Done. The chart's padding lets its last bar
+       the transport row folds away while it is up and the chart keeps two or three rows above
+       it; it is back after Done. The chart's padding lets its last bar
        scroll clear of the dock and keyboard (`--bar-dock-space`, set by the dock), and its
        scroll padding keeps the bar being typed above them when it is scrolled into view. */
-    .workspace[data-bar-open] .transport-bar,
-    .workspace[data-bar-open] .edit-panel {
+    .workspace[data-bar-open] .transport-bar {
         display: none;
     }
     .workspace[data-bar-open] .chart-scroll {
@@ -1773,10 +1778,24 @@ dialog textarea {
         inset 0 -3px var(--green),
         inset 0 0 0 3px var(--bar-next-soon);
 }
-.edit-panel .title-input {
-    min-height: 0;
-    font-family: inherit;
-    line-height: 1.4;
+/* The title, typed in the header while editing (#1726): the heading's own type, with a rule
+   under it so it reads as a field. */
+.song-title-input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    border-bottom: 1px dashed var(--line);
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    padding: 0 0 1px;
+}
+.song-title-input:focus-visible {
+    outline: none;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0;
 }
 .modal-box::backdrop {
     background: var(--backdrop);
@@ -1890,36 +1909,6 @@ dialog textarea {
     border-radius: 10px;
     margin-top: 18px;
 }
-/* The edit panel's "Whole song" group (#1700): after the bar editor, ruled off from it, its
-   explanations as quiet hints under each field instead of three full-width callouts. */
-.panel-group {
-    margin-top: 26px;
-    padding-top: 6px;
-    border-top: 1px solid var(--line);
-}
-.panel-group > summary {
-    font-size: 13px;
-    font-weight: 650;
-    padding: 12px 0 6px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    list-style: none;
-}
-.panel-group > summary::-webkit-details-marker {
-    display: none;
-}
-.panel-group > summary::after {
-    content: "▾";
-    color: var(--muted);
-    font-size: 11px;
-    transition: transform var(--motion-fast, 0s) var(--ease-out, ease);
-}
-.panel-group:not([open]) > summary::after {
-    transform: rotate(-90deg);
-}
 .field-hint {
     font-size: 11px;
     line-height: 1.6;
@@ -2016,6 +2005,28 @@ dialog textarea {
 }
 .modal-box .song-menu-group .dialog-actions {
     margin-top: 8px;
+}
+/* The whole song's meter, mode and choruses (#1726). */
+.song-menu-fields {
+    display: grid;
+    gap: 4px;
+    margin-top: 8px;
+}
+.song-menu-fields label {
+    font-size: 12px;
+    font-weight: 650;
+    margin-top: 8px;
+}
+.song-menu-fields select {
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    /* 16px or more, or iOS zooms the page in on focus. */
+    font-size: 16px;
 }
 .song-menu-close {
     justify-content: flex-end;

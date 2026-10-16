@@ -1,5 +1,6 @@
-/* The bar menu (#1725). On a laptop a `.popover` beside the bar (placed by `bar-menu.tsx`); on a
-   phone a sheet from the screen's foot, over the bar dock (`bar-dock.css`, z-index 50). */
+/* The bar menu (#1725), and the section letter's menu built the same way (#1726). On a laptop a
+   `.popover` beside the bar (placed by `bar-menu.tsx`); on a phone a sheet from the screen's foot,
+   over the bar dock (`bar-dock.css`, z-index 50). */
 .bar-menu.popover {
     width: 290px;
     padding: 8px;
@@ -107,7 +108,8 @@
     font-size: 12px;
     color: var(--muted);
 }
-.bar-menu-fields select {
+.bar-menu-fields select,
+.bar-menu-fields input {
     width: 100%;
     min-height: 36px;
     border: 1px solid var(--line);
@@ -118,14 +120,16 @@
     font: inherit;
     font-size: 13px;
 }
-.bar-menu-sheet .bar-menu-fields select {
+.bar-menu-sheet .bar-menu-fields select,
+.bar-menu-sheet .bar-menu-fields input {
     min-height: 44px;
     /* 16px or more, or iOS zooms the page in on focus. */
     font-size: 16px;
 }
 /* An iPad (or any touch screen) wider than a phone gets the popover, and the same zoom. */
 @media (pointer: coarse) {
-    .bar-menu-fields select {
+    .bar-menu-fields select,
+    .bar-menu-fields input {
         min-height: 44px;
         font-size: 16px;
     }
@@ -245,4 +249,20 @@
 .bar-menu-button:focus-visible {
     outline: 3px solid var(--focus-ring);
     outline-offset: 1px;
+}
+
+/* Advanced · per-bar repeat and ending markers (`form-controls.tsx`), in the menu since #1726. */
+.bar-menu-advanced {
+    padding: 0 8px;
+}
+.bar-menu-advanced .form-controls {
+    border-top: 0;
+}
+.bar-menu-advanced .form-controls summary {
+    min-height: 36px;
+    padding: 8px 0;
+}
+.bar-menu-sheet .bar-menu-advanced input {
+    /* 16px or more, or iOS zooms the page in on focus. */
+    font-size: 16px;
 }

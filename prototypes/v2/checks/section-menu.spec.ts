@@ -1,4 +1,4 @@
-import { appUrl, editorRevealed, expect, test } from './fixtures';
+import { appUrl, barField, editorRevealed, expect, openSectionMenu, test } from './fixtures';
 
 /**
  * The section tap menu (#1422): a tap on the section letter opens "Start here". The section
@@ -11,8 +11,11 @@ async function newTwoSectionSong(page: import('@playwright/test').Page) {
     await page.getByLabel('Song title').fill('Section menu study');
     // A second section with a chord name that never appears in A, so landing on it is
     // unambiguous from the chart's own active-chord highlight.
-    await page.getByRole('button', { name: '＋ Section', exact: true }).click();
-    await page.getByLabel('Chords in this bar').fill('Dm7');
+    await (await openSectionMenu(page, 'A'))
+        .getByRole('button', { name: 'Add section after', exact: true })
+        .click();
+    // The new section's one bar (the chart's fifth) opens for typing.
+    await barField(page, 5).fill('Dm7');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Chart', exact: true }).click();

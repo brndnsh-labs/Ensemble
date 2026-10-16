@@ -84,7 +84,7 @@ test('the test edit by taps: a bar, an ending key, ›, Done, and Save (#1724)',
     await expect(bars.nth(5).locator('.bar-draft')).toHaveText('D7');
 
     // The dock sits at the screen's foot, the bar being typed above it, and the transport row
-    // and the edit panel have folded away for the chart.
+    // has folded away for the chart.
     const viewport = page.viewportSize();
     const docked = await dock(page).boundingBox();
     expect(viewport && docked).toBeTruthy();
@@ -94,7 +94,6 @@ test('the test edit by taps: a bar, an ending key, ›, Done, and Save (#1724)',
         expect(bar && bar.y + bar.height <= docked.y).toBe(true);
     }
     await expect(page.locator('.transport-bar')).toBeHidden();
-    await expect(page.locator('.edit-panel')).toBeHidden();
     expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);
@@ -115,11 +114,10 @@ test('the test edit by taps: a bar, an ending key, ›, Done, and Save (#1724)',
     await page.keyboard.type('Gm7 C7');
     await expect(field(page, 7)).toHaveValue('Gm7 C7');
 
-    // Done: bar 7 applied, the dock gone, the transport and panel back.
+    // Done: bar 7 applied, the dock gone, the transport back.
     await key(page, 'Done').tap();
     await expect(dock(page)).toHaveCount(0);
     await expect(page.locator('.transport-bar')).toBeVisible();
-    await expect(page.locator('.edit-panel')).toBeVisible();
     await expect(bars.nth(6).locator('.chord')).toHaveText(['Gm7', 'C7']);
     await expect(bars.nth(5).locator('.chord')).toHaveText([/^D7(b|♭)9$/]);
     await expect(page.locator('.song-subtitle .unsaved')).toBeVisible();

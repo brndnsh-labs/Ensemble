@@ -41,7 +41,7 @@ new/import. The chart is a music stand during playback. Tempo, genre, instrument
 transport are primary controls; key is one obvious action away. Loop/start belongs at the
 relevant section. How many times the form plays belongs at the end of the form (#1511): the
 chart footer's "N bars · repeats continuously" is a button that sets it, the same setting as the
-Edit panel's Choruses, and on a text chart a pick first makes the measure copy "Try the bar
+Song menu's Choruses (#1726), and on a text chart a pick first makes the measure copy "Try the bar
 editor · keep original" makes, leaving the original as it was. Detailed band, sound, practice
 and device controls get deliberate homes.
 
@@ -85,7 +85,9 @@ The #1174 follow-on connects existing sound packs, explicit install-all, Follow 
 offline verification and focused playback. Whole-library cloud sync remains later work.
 The #1175 usability slice makes typed chords part of Save/copy/export, preserves section buffers,
 reveals editing on compact screens, and separates tempo typing and last-opened preference from
-document commits. Update chart is an optional preview; unsupported text is retained for correction.
+document commits. In a text chart's editor, Update chart is an optional preview; unsupported text is
+retained for correction. (A measure chart is typed on the chart itself since #1723/#1726: leaving a
+bar applies it, Save commits every pending bar.)
 Unchecked text is tab-only, with an unload warning, rather than a new durable recovery format.
 Checkpoint 2: explicit rhythmic chart representation, measure editing and bounded form/import
 are implemented; extend compatibility only in fixture-backed stages, with missing semantics

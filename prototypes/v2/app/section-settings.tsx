@@ -1,7 +1,7 @@
 import { TIME_SIGNATURES } from '@engine/config';
 import { resolveScoreContext } from '@engine/songbook/score-context';
 import type { ScoreSection, SemanticScore } from '@engine/songbook/score-types';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SECTION_NAME_MAX, type SectionChange } from '../lib/documents';
 import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
 
@@ -9,56 +9,61 @@ const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 interface SectionSettingsProps {
     score: SemanticScore;
-    /** The section holding the bar selected in the bar editor. */
+    /** The section the settings are for: the one whose letter was pressed (#1726). */
     section: ScoreSection;
     disabled: boolean;
     onChange: (change: SectionChange) => void;
 }
 
+/** Which typed field a pending change is from. */
+export type SectionField = 'label' | 'repeat';
+
+interface SectionNameFieldsProps extends SectionSettingsProps {
+    /** What a field holds that it has not committed yet (null: nothing), so an action pressed
+     * while it is being typed can take it with it (`SectionMenu`). */
+    onPending: (field: SectionField, change: SectionChange | null) => void;
+}
+
 /**
- * One section settings surface (#1374): the section's name, how many times it plays, and its
- * key / mode / meter as either the song's or its own. Each control commits on its own through the
- * shell's `updateChart()` → `applyScore`; a text field commits on blur or Enter, never per keystroke.
- * Lives in the Edit panel only — the section badge on the stand is reserved for the conductor lens.
+ * A section's name and how many times it plays (#1374), in the section letter's menu since #1726.
+ * Each commits on its own through the shell's `updateChart()` → `applyScore`, on blur or Enter,
+ * never per keystroke.
  */
-export function SectionSettings({ score, section, disabled, onChange }: SectionSettingsProps) {
-    // Keyed by the committed values, so an accepted or refused edit resets the field.
+export function SectionNameFields({
+    section,
+    disabled,
+    onChange,
+    onPending,
+}: SectionNameFieldsProps) {
+    // Keyed by the section only, so a commit keeps the field (and its focus) where it is.
     return (
-        <details className="measure-editor-settings section-settings">
-            <summary>Section settings · {section.label}</summary>
-            <div className="measure-editor-settings-grid">
-                <CommitField
-                    key={`name-${section.id}-${section.label}`}
-                    label="Section name"
-                    value={section.label}
-                    maxLength={SECTION_NAME_MAX}
-                    disabled={disabled}
-                    onCommit={(label) => onChange({ label })}
-                />
-                <CommitField
-                    key={`plays-${section.id}-${section.repeat}`}
-                    label="Section plays"
-                    value={String(section.repeat)}
-                    inputMode="numeric"
-                    disabled={disabled}
-                    onCommit={(value) => onChange({ repeat: Number(value) })}
-                />
-                <SectionSelects
-                    score={score}
-                    section={section}
-                    disabled={disabled}
-                    onChange={onChange}
-                />
-            </div>
-            <p className="measure-editor-hint">
-                A bar with its own key or meter keeps it. Changing the section's meter re-fits bars
-                of equal lengths and resets its beat grouping; chord names are not transposed.
-            </p>
-        </details>
+        <>
+            <CommitField
+                key={`name-${section.id}`}
+                label="Section name"
+                value={section.label}
+                maxLength={SECTION_NAME_MAX}
+                disabled={disabled}
+                change={(label) => ({ label })}
+                onCommit={onChange}
+                onPending={(change) => onPending('label', change)}
+            />
+            <CommitField
+                key={`plays-${section.id}`}
+                label="Section plays"
+                value={String(section.repeat)}
+                inputMode="numeric"
+                disabled={disabled}
+                change={(value) => ({ repeat: Number(value) })}
+                onCommit={onChange}
+                onPending={(change) => onPending('repeat', change)}
+            />
+        </>
     );
 }
 
-function SectionSelects({ score, section, disabled, onChange }: SectionSettingsProps) {
+/** A section's key, mode, meter and beat grouping, each either the song's or its own (#1374). */
+export function SectionSelects({ score, section, disabled, onChange }: SectionSettingsProps) {
     const song = resolveScoreContext(score, {});
     const effective = resolveScoreContext(score, section);
     // #1376 — the section's beat grouping, where its meter has more than one idiomatic split.
@@ -151,19 +156,42 @@ interface CommitFieldProps {
     maxLength?: number;
     inputMode?: 'numeric';
     disabled: boolean;
-    onCommit: (value: string) => void;
+    change: (text: string) => SectionChange;
+    onCommit: (change: SectionChange) => void;
+    onPending: (change: SectionChange | null) => void;
 }
 
-/** A text field that commits once — on blur or Enter — and only when its value changed. */
-function CommitField({ label, value, maxLength, inputMode, disabled, onCommit }: CommitFieldProps) {
+/**
+ * A text field that commits once — on blur or Enter — and only when its value changed. While a
+ * change is being made it is read-only, not disabled: a disabled field drops its focus, and Esc
+ * and the chart's keys would go with it (#1726).
+ */
+function CommitField({
+    label,
+    value,
+    maxLength,
+    inputMode,
+    disabled,
+    change,
+    onCommit,
+    onPending,
+}: CommitFieldProps) {
     const [text, setText] = useState(value);
+    // An accepted edit (or one made elsewhere) arrives as a new value.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: only a new committed value resets it.
+    useEffect(() => {
+        setText(value);
+        onPending(null);
+    }, [value]);
     const commit = () => {
-        if (text !== value) {
-            onCommit(text);
-            // An accepted edit re-keys this field with the new value; a refused one (the shell
-            // shows why) must not leave the rejected text looking committed.
-            setText(value);
+        if (disabled || text === value) {
+            return;
         }
+        onPending(null);
+        onCommit(change(text));
+        // A refused edit (the shell shows why) must not leave the rejected text looking
+        // committed; an accepted one comes back as the new value.
+        setText(value);
     };
     return (
         <label>
@@ -172,8 +200,12 @@ function CommitField({ label, value, maxLength, inputMode, disabled, onCommit }:
                 value={text}
                 maxLength={maxLength}
                 inputMode={inputMode}
-                disabled={disabled}
-                onChange={(event) => setText(event.target.value)}
+                readOnly={disabled}
+                aria-disabled={disabled || undefined}
+                onChange={(event) => {
+                    setText(event.target.value);
+                    onPending(event.target.value === value ? null : change(event.target.value));
+                }}
                 onBlur={commit}
                 onKeyDown={(event) => {
                     if (event.key === 'Enter') {

@@ -20,8 +20,8 @@ interface BarContextFieldsProps {
 }
 
 /**
- * A bar's "Key or meter from this bar" selects: the edit panel's (`MeasureEditor`) and the bar
- * menu's (#1725), one control in two places so both write a bar's draft the same way.
+ * A bar's "Key or meter from here" selects, in the bar menu (#1725): they write the bar's draft,
+ * as typing in its field does.
  */
 export function BarContextFields({
     context,
