@@ -34,6 +34,7 @@ import {
     extendedScore,
     genreOf,
     type SectionChange,
+    withBarAfter,
     withFollowFeel,
     withoutMeasure,
     withoutSection,
@@ -117,6 +118,7 @@ import {
 import { DeleteGuestSongDialog } from './delete-guest-song';
 import { EditPanel } from './edit-panel';
 import { FormStrip } from './form-strip';
+import { GuidedForm } from './guided-form';
 import { ImportDialog } from './import-dialog';
 import type { MeasureEditorHandle } from './measure-editor';
 import { NeckView } from './neck-view';
@@ -614,6 +616,11 @@ export default function Ensemble() {
     });
     // The bar whose field is open on the chart (#1723), or null.
     const [openBar, setOpenBar] = useState<OpenBar | null>(null);
+    // The bar menu's "Repeat or ending…" (#1725): the Repeats and endings dialog over the chart,
+    // reviewing every pending bar as the panel's button does, on the bar it was opened from.
+    const [barForm, setBarForm] = useState<{ score: SemanticScore; measureId: string } | null>(
+        null,
+    );
     const [editorRequest, setEditorRequest] = useState(0);
     const revealedEditorRequest = useRef(0);
     // #1440 — set just before an `editorRequest` bump that should focus the title field instead
@@ -1248,6 +1255,7 @@ export default function Ensemble() {
     useEffect(() => {
         if (!typeOnChart) {
             setOpenBar(null);
+            setBarForm(null);
         }
     }, [typeOnChart]);
     // The bars changed since the chart was last kept, for the dot by each bar number: against the
@@ -2987,6 +2995,28 @@ export default function Ensemble() {
                 return true;
             },
             canMove: (id, step) => stepFrom(id, step) !== null,
+            menu(id) {
+                const field = barField(score, drafts, id);
+                const holding = score.sections.find((s) => s.measures.some((m) => m.id === id));
+                return field && field.text !== null
+                    ? {
+                          draft: field.draft,
+                          inherited: field.entry.inherited,
+                          effective: field.entry.effective,
+                          // `withoutMeasure` takes a section's only bar with the section.
+                          wholeSection: holding?.measures.length === 1 && score.sections.length > 1,
+                      }
+                    : null;
+            },
+            onDraft(id, next) {
+                const field = barField(score, barDrafts.latest(), id);
+                if (field && field.text !== null && !busy) {
+                    barDrafts.put(id, draftChange(field.original, next));
+                }
+            },
+            onRepeats: (from) => openBarForm(from.id),
+            onInsertAfter: (from) => insertBarAfter(from.id),
+            onDelete: (from) => deleteBar(from.id),
             onRevert(from) {
                 const pending = barDrafts.latest();
                 const field = barField(score, pending, from.id);
@@ -3002,6 +3032,89 @@ export default function Ensemble() {
                 setOpenBar((open) => (open === from ? null : open));
             },
         };
+    }
+    /**
+     * The bar menu's "Repeat or ending…" (#1725): every pending bar checked first and reviewed
+     * together, unapplied — as the panel's Repeats and endings button does — so the dialog edits
+     * the chart as typed. A bar that does not read opens instead, as Save opens it.
+     */
+    function openBarForm(measureId: string): boolean {
+        if (current?.schemaVersion !== 2 || working.current) {
+            return false;
+        }
+        try {
+            setBarForm({
+                score: commitBarDrafts(current.chart.score, barDrafts.latest()),
+                measureId,
+            });
+            setError('');
+            return true;
+        } catch (reason) {
+            setError(reason instanceof Error ? reason.message : String(reason));
+            if (reason instanceof BarDraftError && reason.measureId && !reason.inForm) {
+                openBarField(reason.measureId);
+            }
+            return false;
+        }
+    }
+    /** The Repeats and endings dialog's Apply, from the panel or the bar menu. */
+    function applyForm(score: SemanticScore) {
+        if (working.current) {
+            throw new Error('Wait for the current change, then Apply again.');
+        }
+        applyScore(score);
+    }
+    /**
+     * The bar menu's "Insert bar after" (#1725): pending bars commit first, as ＋ Bar's do, then
+     * a bar goes in straight after this one, open for typing with its tonic selected.
+     */
+    function insertBarAfter(after: string) {
+        void run(() => {
+            const next = updateChart();
+            if (next.schemaVersion !== 2) {
+                return;
+            }
+            const inserted = withBarAfter(next.chart.score, after);
+            if (inserted.kind === 'blocked') {
+                throw new Error(inserted.message);
+            }
+            applyScore(inserted.score);
+            setMeasureId(inserted.measureId);
+            setSectionId(inserted.sectionId);
+            setOpenBar({ id: inserted.measureId, select: 'all' });
+        });
+    }
+    /**
+     * The bar menu's "Delete bar" (#1725): − Bar's rules (`withoutMeasure`) for this bar, after
+     * pending bars commit; the bar before it (or after, for a first bar) opens for typing. Where
+     * that bar has no field (a measure repeat), the nearest one that has opens instead, before
+     * it first, so focus and the phone's dock never drop away (#1725 review).
+     */
+    function deleteBar(measureId: string) {
+        void run(() => {
+            const next = updateChart();
+            if (next.schemaVersion !== 2) {
+                return;
+            }
+            const result = withoutMeasure(next.chart.score, measureId);
+            if (result.kind === 'blocked') {
+                throw new Error(result.message);
+            }
+            applyScore(result.score);
+            setMeasureId(result.measureId);
+            setSectionId(result.sectionId);
+            const ids = result.score.sections.flatMap((s) => s.measures.map((m) => m.id));
+            const from = ids.indexOf(result.measureId);
+            const nearest = [...ids.slice(0, from + 1).reverse(), ...ids.slice(from + 1)].find(
+                (id) => barField(result.score, barDrafts.latest(), id)?.text != null,
+            );
+            if (nearest) {
+                setMeasureId(nearest);
+                setOpenBar({ id: nearest, select: 'end' });
+            } else {
+                setOpenBar(null);
+            }
+        });
     }
     function updateChart(): ChartDocument {
         if (!current) {
@@ -6314,6 +6427,14 @@ export default function Ensemble() {
                                 />
                             </>
                         )}
+                        {barForm && (
+                            <GuidedForm
+                                score={barForm.score}
+                                selectedMeasureId={barForm.measureId}
+                                onClose={() => setBarForm(null)}
+                                onApply={applyForm}
+                            />
+                        )}
                         <EditPanel
                             panelRef={editPanel}
                             measureEditorRef={measureEditor}
@@ -6343,14 +6464,7 @@ export default function Ensemble() {
                                     applyScore(score);
                                 })
                             }
-                            onApplyForm={(score) => {
-                                if (working.current) {
-                                    throw new Error(
-                                        'Wait for the current change, then Apply again.',
-                                    );
-                                }
-                                applyScore(score);
-                            }}
+                            onApplyForm={applyForm}
                             onExtend={extendScore}
                             onRemove={shrinkScore}
                             onSectionChange={changeSection}

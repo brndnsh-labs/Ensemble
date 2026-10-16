@@ -7,7 +7,13 @@ import { validateSemanticScore } from '@engine/songbook/score-codec';
 import type { ChartDocumentV2, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
 import type { ChartDocument as LegacyDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
-import { composerOf, withoutMeasure, withoutSection, withSectionSettings } from './documents';
+import {
+    composerOf,
+    withBarAfter,
+    withoutMeasure,
+    withoutSection,
+    withSectionSettings,
+} from './documents';
 
 const bar = (id: string, extra: Partial<ScoreMeasure> = {}, beats = 4): ScoreMeasure => ({
     id,
@@ -195,6 +201,84 @@ describe('withoutMeasure', () => {
                     'This bar carries repeat or navigation marks. Remove them first, or remove the whole section.',
             });
         });
+    });
+});
+
+describe('withBarAfter (#1725)', () => {
+    const chart = () =>
+        song([
+            section('a', [bar('a1'), bar('a2', { key: 'F', isMinor: true }), bar('a3')]),
+            section('b', [bar('b1')]),
+        ]);
+    const added = (score: SemanticScore, measureId: string) =>
+        score.sections.flatMap((s) => s.measures).find((m) => m.id === measureId)!;
+
+    it('inserts straight after the bar, in its section, and selects the new bar', () => {
+        const result = ok(withBarAfter(chart(), 'a1'));
+        expect(validateSemanticScore(result.score).kind).toBe('ok');
+        expect(ids(result.score)).toEqual([['a1', result.measureId, 'a2', 'a3'], ['b1']]);
+        expect(result.sectionId).toBe('a');
+    });
+
+    it('fills it with the tonic in force after the bar, and writes no key of its own', () => {
+        const result = ok(withBarAfter(chart(), 'a2'));
+        const inserted = added(result.score, result.measureId);
+        expect(inserted.content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'Fm', duration: [4, 1] }],
+        });
+        expect(inserted.key).toBeUndefined();
+        expect(ids(result.score)[0]).toEqual(['a1', 'a2', result.measureId, 'a3']);
+    });
+
+    it('fills the meter in force there', () => {
+        const source = song([section('a', [bar('a1', { meter: '3/4' }, 3), bar('a2', {}, 3)])]);
+        const result = ok(withBarAfter(source, 'a2'));
+        expect(validateSemanticScore(result.score).kind).toBe('ok');
+        const content = added(result.score, result.measureId).content;
+        expect(content.kind === 'events' && content.events[0].duration).toEqual([3, 1]);
+    });
+
+    describe('around repeats and endings', () => {
+        // ||: r1 | e1 (1st ending, :||) | e2 (2nd ending) | after
+        const form = () =>
+            song([
+                section('a', [
+                    bar('r1', { start: [{ kind: 'repeat-start' }] }),
+                    bar('e1', {
+                        start: [{ kind: 'ending-start', passes: [1] }],
+                        end: [{ kind: 'repeat-end', times: 2 }],
+                    }),
+                    bar('e2', { start: [{ kind: 'ending-start', passes: [2] }] }),
+                    bar('after'),
+                ]),
+            ]);
+
+        it('is a valid form to start from', () => {
+            expect(validateSemanticScore(form()).kind).toBe('ok');
+        });
+
+        it('refuses after a bar that ends a repeat or an ending, changing nothing', () => {
+            const source = form();
+            const before = structuredClone(source);
+            const result = withBarAfter(source, 'e1');
+            expect(result.kind).toBe('blocked');
+            expect(result.kind === 'blocked' && result.message).toMatch(/Repeat or ending…/);
+            expect(source).toEqual(before);
+        });
+
+        it('lengthens the repeated body from inside it', () => {
+            const result = ok(withBarAfter(form(), 'r1'));
+            expect(ids(result.score)).toEqual([['r1', result.measureId, 'e1', 'e2', 'after']]);
+        });
+    });
+
+    it('is refused for an unknown bar, and does not change its argument', () => {
+        const source = chart();
+        const before = structuredClone(source);
+        expect(withBarAfter(source, 'nope').kind).toBe('blocked');
+        withBarAfter(source, 'a3');
+        expect(source).toEqual(before);
     });
 });
 

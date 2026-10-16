@@ -1,0 +1,248 @@
+/* The bar menu (#1725). On a laptop a `.popover` beside the bar (placed by `bar-menu.tsx`); on a
+   phone a sheet from the screen's foot, over the bar dock (`bar-dock.css`, z-index 50). */
+.bar-menu.popover {
+    width: 290px;
+    padding: 8px;
+    max-height: calc(100dvh - 16px);
+    overflow: auto;
+    font-size: 13px;
+}
+.bar-menu-sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 60;
+    max-height: 80dvh;
+    overflow: auto;
+    overscroll-behavior: contain;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    border-radius: 14px 14px 0 0;
+    box-shadow: var(--shadow);
+    padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+        max(10px, env(safe-area-inset-left));
+    font-size: 15px;
+}
+.bar-menu hr {
+    border: 0;
+    height: 1px;
+    background: var(--line);
+    margin: 5px 4px;
+}
+.bar-menu-heading {
+    margin: 0;
+    padding: 4px 8px 6px;
+    color: var(--muted);
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+.bar-menu-group > .bar-menu-heading {
+    padding-top: 0;
+}
+.bar-menu-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 8px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.bar-menu-sheet .bar-menu-item {
+    min-height: 44px;
+}
+.bar-menu-item:hover {
+    background: var(--hover);
+}
+.bar-menu-item:focus-visible,
+.bar-menu-toggle:focus-within {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: -1px;
+}
+.bar-menu-item span {
+    color: var(--muted);
+    font-size: 12px;
+}
+.bar-menu-item[aria-disabled="true"] {
+    opacity: 0.5;
+}
+.bar-menu-danger {
+    color: var(--danger);
+}
+.bar-menu-back {
+    justify-content: center;
+    font-weight: 600;
+}
+.bar-menu-toggle input {
+    width: 18px;
+    height: 18px;
+    margin: 0;
+    accent-color: var(--green);
+}
+.bar-menu-details summary {
+    list-style: none;
+}
+.bar-menu-details summary::-webkit-details-marker {
+    display: none;
+}
+.bar-menu-fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 4px 8px 6px;
+}
+.bar-menu-fields label {
+    display: grid;
+    gap: 4px;
+    min-width: 0;
+    font-size: 12px;
+    color: var(--muted);
+}
+.bar-menu-fields select {
+    width: 100%;
+    min-height: 36px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: var(--surface);
+    color: var(--ink);
+    padding: 4px 6px;
+    font: inherit;
+    font-size: 13px;
+}
+.bar-menu-sheet .bar-menu-fields select {
+    min-height: 44px;
+    /* 16px or more, or iOS zooms the page in on focus. */
+    font-size: 16px;
+}
+/* An iPad (or any touch screen) wider than a phone gets the popover, and the same zoom. */
+@media (pointer: coarse) {
+    .bar-menu-fields select {
+        min-height: 44px;
+        font-size: 16px;
+    }
+}
+.bar-menu-caption {
+    margin: 0;
+    padding: 2px 8px 4px;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* The beat ruler: the bar as its counts, one span per chord, a handle on each split. The counts
+   are ticked over the spans (`--counts`, set by the ruler). */
+.bar-ruler {
+    position: relative;
+    display: flex;
+    height: 40px;
+    margin: 2px 8px 6px;
+    border: 1px solid var(--bar-line-strong);
+    border-radius: 6px;
+    background: var(--accent-light);
+}
+.bar-menu-sheet .bar-ruler {
+    height: 48px;
+}
+.bar-ruler::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background: repeating-linear-gradient(
+        to right,
+        transparent 0,
+        transparent calc(100% / var(--counts) - 1px),
+        var(--bar-line) calc(100% / var(--counts) - 1px),
+        var(--bar-line) calc(100% / var(--counts))
+    );
+}
+.bar-ruler-span {
+    flex-basis: 0;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    line-height: 1.1;
+}
+.bar-ruler-chord {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding: 0 4px;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 16px;
+    color: var(--ink);
+}
+.bar-ruler-span small {
+    color: var(--muted);
+    font-size: 10px;
+}
+/* A wide, invisible hit area around a thin visible split line, so a finger finds it. */
+.bar-ruler-split {
+    position: absolute;
+    top: -6px;
+    bottom: -6px;
+    width: 28px;
+    margin-left: -14px;
+    z-index: 1;
+    cursor: ew-resize;
+    touch-action: none;
+    border-radius: 6px;
+}
+.bar-ruler-split::before {
+    content: "";
+    position: absolute;
+    top: 4px;
+    bottom: 4px;
+    left: 12px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--accent);
+}
+.bar-ruler-split:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: -3px;
+}
+.bar-ruler-split[aria-disabled="true"] {
+    cursor: default;
+    opacity: 0.5;
+}
+
+/* The ⋯ on the bar being typed (#1725), top-right where the bar's corner is free. */
+.bar-menu-button {
+    position: absolute;
+    top: 1px;
+    right: 3px;
+    min-width: 28px;
+    height: 20px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 5px;
+    background: none;
+    color: var(--accent);
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+.bar-menu-button:hover,
+.bar-menu-button[aria-expanded="true"] {
+    background: var(--accent-light);
+}
+.bar-menu-button:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 1px;
+}

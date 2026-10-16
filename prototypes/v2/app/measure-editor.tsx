@@ -1,11 +1,10 @@
 'use client';
 
-import { TIME_SIGNATURES } from '@engine/config';
 import { durationToSteps, scoreDuration, scoreMeter } from '@engine/songbook/score-duration';
 import { parseChordBar } from '@engine/songbook/score-text';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
-import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
+import { BarContextFields } from './bar-context-fields';
 import { FormControls } from './form-controls';
 import { GuidedForm } from './guided-form';
 import './measure-editor.css';
@@ -147,43 +146,6 @@ export function MeasureEditor({
     }
     const selectedIndex = entries.indexOf(selected);
     const lengthChoices = Array.from({ length: counts * 2 }, (_, index) => countText(index + 1, 2));
-    const keys = [
-        ...new Set(
-            [
-                'C',
-                'Db',
-                'D',
-                'Eb',
-                'E',
-                'F',
-                'F#',
-                'G',
-                'Ab',
-                'A',
-                'Bb',
-                'B',
-                draft.context.key,
-            ].filter((key): key is string => Boolean(key)),
-        ),
-    ];
-    const meters = [...new Set([...Object.keys(TIME_SIGNATURES), meter])];
-    // #1376 — offered only where the bar's meter has more than one idiomatic split. What
-    // "Continue" plays: the grouping this bar inherits, unless it writes a meter, which resets
-    // grouping to the meter's own default.
-    const written = draft.context.grouping;
-    const groupings = groupingsFor(meter);
-    // An imported grouping the table does not list is still shown, never silently swapped.
-    if (
-        groupings.length &&
-        written &&
-        !groupings.some((g) => groupingText(g) === groupingText(written))
-    ) {
-        groupings.push(written);
-    }
-    const continuedGrouping =
-        (draft.context.meter === undefined ? selected.inherited.grouping : null) ??
-        defaultGrouping(meter);
-
     return (
         <div className="measure-editor">
             <div className="measure-editor-navigation">
@@ -345,116 +307,14 @@ export function MeasureEditor({
                             Changes start at this bar and continue through this section until
                             changed again. Chord names are not transposed.
                         </p>
-                        <div className="measure-editor-settings-grid">
-                            <label>
-                                Key from this bar
-                                <select
-                                    aria-label="Key from this bar"
-                                    value={draft.context.key ?? ''}
-                                    disabled={disabled}
-                                    onChange={(event) => {
-                                        const context = { ...draft.context };
-                                        if (event.target.value) {
-                                            context.key = event.target.value;
-                                        } else {
-                                            delete context.key;
-                                        }
-                                        updateDraft({ ...draft, context });
-                                    }}
-                                >
-                                    <option value="">Continue ({selected.inherited.key})</option>
-                                    {keys.map((key) => (
-                                        <option key={key}>{key}</option>
-                                    ))}
-                                </select>
-                            </label>
-                            <label>
-                                Mode from this bar
-                                <select
-                                    aria-label="Mode from this bar"
-                                    value={
-                                        draft.context.isMinor === undefined
-                                            ? ''
-                                            : draft.context.isMinor
-                                              ? 'minor'
-                                              : 'major'
-                                    }
-                                    disabled={disabled}
-                                    onChange={(event) => {
-                                        const context = { ...draft.context };
-                                        if (event.target.value) {
-                                            context.isMinor = event.target.value === 'minor';
-                                        } else {
-                                            delete context.isMinor;
-                                        }
-                                        updateDraft({ ...draft, context });
-                                    }}
-                                >
-                                    <option value="">
-                                        Continue ({selected.inherited.isMinor ? 'minor' : 'major'})
-                                    </option>
-                                    <option value="major">Major</option>
-                                    <option value="minor">Minor</option>
-                                </select>
-                            </label>
-                            <label>
-                                Meter from this bar
-                                <select
-                                    aria-label="Meter from this bar"
-                                    value={draft.context.meter ?? ''}
-                                    disabled={disabled}
-                                    onChange={(event) => {
-                                        const context = { ...draft.context };
-                                        if (event.target.value) {
-                                            context.meter = event.target.value;
-                                        } else {
-                                            delete context.meter;
-                                        }
-                                        delete context.grouping;
-                                        updateDraft({ ...draft, context });
-                                    }}
-                                >
-                                    <option value="">Continue ({selected.inherited.meter})</option>
-                                    {meters.map((value) => (
-                                        <option key={value}>{value}</option>
-                                    ))}
-                                </select>
-                            </label>
-                            {groupings.length > 0 && (
-                                <label>
-                                    Beat grouping from this bar
-                                    <select
-                                        aria-label="Beat grouping from this bar"
-                                        value={
-                                            draft.context.grouping
-                                                ? groupingText(draft.context.grouping)
-                                                : ''
-                                        }
-                                        disabled={disabled}
-                                        onChange={(event) => {
-                                            const context = { ...draft.context };
-                                            if (event.target.value) {
-                                                context.grouping = parseGrouping(
-                                                    event.target.value,
-                                                );
-                                            } else {
-                                                delete context.grouping;
-                                            }
-                                            updateDraft({ ...draft, context });
-                                        }}
-                                    >
-                                        <option value="">
-                                            Continue ({groupingText(continuedGrouping ?? [])})
-                                        </option>
-                                        {groupings.map((grouping) => (
-                                            <option key={groupingText(grouping)}>
-                                                {groupingText(grouping)}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </label>
-                            )}
-                        </div>
+                        <BarContextFields
+                            className="measure-editor-settings-grid"
+                            context={draft.context}
+                            inherited={selected.inherited}
+                            meter={meter}
+                            disabled={disabled}
+                            onChange={(context) => updateDraft({ ...draft, context })}
+                        />
                         <p className="measure-editor-hint">
                             A meter change resets custom beat grouping. Every affected bar must
                             still fit its meter before you update the chart.

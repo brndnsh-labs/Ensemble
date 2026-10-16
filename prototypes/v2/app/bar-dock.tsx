@@ -122,6 +122,9 @@ interface BarDockProps {
     onDone: () => void;
     /** Put the bar being typed back in view: the keyboard came up or went down under the dock. */
     onReveal: () => void;
+    /** ⋯: the bar menu (#1725), as a sheet over the dock. */
+    onMenu: () => void;
+    menuOpen: boolean;
 }
 
 /**
@@ -144,6 +147,8 @@ export function BarDock({
     onStep,
     onDone,
     onReveal,
+    onMenu,
+    menuOpen,
 }: BarDockProps) {
     const dock = useRef<HTMLDivElement>(null);
     const field = useRef<HTMLInputElement | null>(null);
@@ -265,7 +270,6 @@ export function BarDock({
                 >
                     ‹
                 </button>
-                {/* Room after › stays free for the bar menu (⋯, #1724's slice 3). */}
                 <label className={`bar-dock-field${invalid ? ' invalid' : ''}`}>
                     <span className="bar-dock-bar" aria-hidden="true">
                         Bar {bar}
@@ -297,6 +301,22 @@ export function BarDock({
                     onClick={() => !busy && canNext && onStep(1)}
                 >
                     ›
+                </button>
+                {/* The bar menu (#1725). Its press keeps the field's focus like every dock key,
+                    so the bar stays open; the sheet then takes focus itself, and the keyboard
+                    goes down for it. */}
+                <button
+                    type="button"
+                    className="bar-dock-button"
+                    aria-label="Bar menu"
+                    aria-haspopup="dialog"
+                    aria-expanded={menuOpen}
+                    aria-disabled={busy || undefined}
+                    data-bar-menu-trigger=""
+                    onMouseDown={keepFocus}
+                    onClick={() => !busy && onMenu()}
+                >
+                    ⋯
                 </button>
                 <button
                     type="button"
