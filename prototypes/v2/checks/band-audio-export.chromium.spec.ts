@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { appUrl, editorRevealed, expect, test } from './fixtures';
+import { appUrl, editorRevealed, expect, test, typeBar } from './fixtures';
 
 /**
  * Chromium-only, same reasoning as `audio-export.chromium.spec.ts`: this exercises a real
@@ -51,10 +51,7 @@ async function newBandChart(page: Page, title: string): Promise<void> {
     await editorRevealed(page);
     await page.getByLabel('Song title').fill(title);
     for (const [i, bar] of ['C', 'F', 'G7', 'C'].entries()) {
-        await page.getByLabel('Chords in this bar').fill(bar);
-        if (i < 3) {
-            await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-        }
+        await typeBar(page, i + 1, bar);
     }
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();

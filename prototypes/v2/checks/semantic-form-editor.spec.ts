@@ -1,7 +1,15 @@
 import { readFile } from 'node:fs/promises';
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, test as base, editorRevealed, expect, songLink } from './fixtures';
+import {
+    appUrl,
+    test as base,
+    editorRevealed,
+    expect,
+    leaveBar,
+    openBar,
+    songLink,
+} from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -45,26 +53,51 @@ async function savedDocuments(page: Page): Promise<ChartDocument[]> {
 async function newSong(page: Page, title: string) {
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
-    await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
     await editorRevealed(page);
+    await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
     await page.getByLabel('Song title').fill(title);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
-    await expect(page.getByLabel('Start repeat here', { exact: true })).not.toBeVisible();
-    await page.getByText('Advanced · per-bar repeat and ending markers', { exact: true }).click();
+    // The title is the song's first change, which keeps it (#1707): wait for that save.
+    await expect.poll(async () => (await savedDocuments(page)).length).toBeGreaterThan(0);
 }
 
-async function selectBar(page: Page, index: number) {
-    await page.getByLabel('Bar to edit', { exact: true }).selectOption({ index });
+/**
+ * Bar `bar`'s menu (#1725), opened on its "Advanced · per-bar repeat and ending markers" (#1726:
+ * the edit panel's form controls moved here). The markers are a draft change like the bar's
+ * chords: applied on leaving the bar, kept by Save.
+ */
+async function barForm(page: Page, bar: number): Promise<Locator> {
+    await openBar(page, bar);
+    const menu = page.getByRole('dialog', { name: `Bar ${bar} menu`, exact: true });
+    if (!(await menu.isVisible())) {
+        await page.getByRole('button', { name: 'Bar menu', exact: true }).click();
+    }
+    await expect(menu).toBeVisible();
+    const details = menu.locator('details.form-controls');
+    if (!(await details.evaluate((node: HTMLDetailsElement) => node.open))) {
+        await expect(menu.getByLabel('Start repeat here', { exact: true })).not.toBeVisible();
+        await details.locator('summary').click();
+    }
+    await expect(menu.getByLabel('Start repeat here', { exact: true })).toBeVisible();
+    return menu;
 }
 
+/** Closes the open bar menu back to typing (Esc); the bar's field stays open. */
+async function closeBarMenu(page: Page) {
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: /^Bar \d+ menu$/ })).toHaveCount(0);
+}
+
+/** Sets bar 3 to end a repeat after ending 1, and bar 4 to be ending 2, through their menus. */
 async function addEndings(page: Page) {
-    await selectBar(page, 2);
-    await page.getByLabel('Ending passes', { exact: true }).fill('1');
-    await page.getByLabel('Total repeat passes', { exact: true }).fill('2');
-    await selectBar(page, 3);
-    await page.getByLabel('Ending passes', { exact: true }).fill('2');
-    await page.getByLabel('End ending here', { exact: true }).check();
+    let menu = await barForm(page, 3);
+    await menu.getByLabel('Ending passes', { exact: true }).fill('1');
+    await menu.getByLabel('Total repeat passes', { exact: true }).fill('2');
+    await closeBarMenu(page);
+    menu = await barForm(page, 4);
+    await menu.getByLabel('Ending passes', { exact: true }).fill('2');
+    await menu.getByLabel('End ending here', { exact: true }).check();
+    await closeBarMenu(page);
 }
 
 async function exportCurrent(page: Page): Promise<ChartDocument> {
@@ -118,33 +151,59 @@ async function expectWrittenStand(page: Page, symbols: string[]) {
     ).toBeVisible();
 }
 
-test('pending forms save atomically from the hidden editor, transpose and reopen offline as four written bars', async ({
+test('a form built bar by bar applies without a refusal, saves from the hidden editor, transposes and reopen offline as four written bars', async ({
     page,
     disconnect,
 }, info) => {
     await newSong(page, 'Two ending study');
     const before = await savedDocuments(page);
-    await page.getByLabel('Start repeat here', { exact: true }).check();
+    await (await barForm(page, 1)).getByLabel('Start repeat here', { exact: true }).check();
+    await closeBarMenu(page);
 
-    for (const action of ['Update chart', 'Save']) {
-        await page.getByRole('button', { name: action, exact: true }).click();
-        await expect(page.locator('.error-banner')).toContainText(/repeat/i);
-        await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
-        await expect(page.getByLabel('Start repeat here', { exact: true })).toBeChecked();
-        await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
-        await expect(page.locator('.bar.repeat-start')).toHaveCount(0);
-        expect(await savedDocuments(page)).toEqual(before);
-        await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
-    }
-
-    await addEndings(page);
-    await selectBar(page, 0);
-    await expect(page.getByLabel('Start repeat here', { exact: true })).toBeChecked();
-    await selectBar(page, 2);
-    await expect(page.getByLabel('Ending passes', { exact: true })).toHaveValue('1');
-    await expect(page.getByLabel('Total repeat passes', { exact: true })).toHaveValue('2');
+    // A repeat start with no end is half a form (#1726): leaving the bar keeps it pending — the
+    // bar lightly tinted, no refusal while the form is still being built.
+    await leaveBar(page);
+    await expect(page.locator('.bar').nth(0)).toHaveClass(/\bpending\b/);
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+    await expect(page.locator('.bar.repeat-start')).toHaveCount(0);
+    // Still pending with the editor hidden — never applied — it is in what Save commits: Save
+    // says what is missing, commits nothing, and brings the editor back.
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).not.toBeVisible();
+    await expect(page.locator('.workspace-body.editing')).toHaveCount(0);
+    await expect(page.locator('.bar.repeat-start')).toHaveCount(0);
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.locator('.error-banner')).toContainText(/repeat/i);
+    await expect(page.locator('.workspace-body.editing')).toHaveCount(1);
+    await expect(page.locator('.bar').nth(0)).toHaveClass(/\bpending\b/);
+    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
+    await expect(page.locator('.bar.repeat-start')).toHaveCount(0);
+    expect(await savedDocuments(page)).toEqual(before);
+    await page.getByRole('button', { name: 'Dismiss', exact: true }).click();
+    await expect(
+        (await barForm(page, 1)).getByLabel('Start repeat here', { exact: true }),
+    ).toBeChecked();
+    await closeBarMenu(page);
+
+    // The rest of the form, bar by bar: no refusal on any leave on the way.
+    await addEndings(page);
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+    await expect(
+        (await barForm(page, 1)).getByLabel('Start repeat here', { exact: true }),
+    ).toBeChecked();
+    await closeBarMenu(page);
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+    const third = await barForm(page, 3);
+    await expect(third.getByLabel('Ending passes', { exact: true })).toHaveValue('1');
+    await expect(third.getByLabel('Total repeat passes', { exact: true })).toHaveValue('2');
+    await closeBarMenu(page);
+    // The finished form applied as the bars were left: on the chart before any Save.
+    await expect(
+        page.locator('.bar').nth(0).getByLabel('Start repeat', { exact: true }),
+    ).toBeVisible();
+    // Out of the editor with bar 3 still open, then Save.
+    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    await expect(page.locator('.bar-input')).toHaveCount(0);
+    await expect(page.locator('.error-banner')).toHaveCount(0);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await expectWrittenStand(page, ['C', 'G', 'Am', 'F']);
@@ -171,10 +230,10 @@ test('pending forms save atomically from the hidden editor, transpose and reopen
     }
     expect(saved.chart.score.sections[0].measures.map((bar) => bar.id)).toEqual(writtenIds);
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await selectBar(page, 2);
-    await expect(page.getByLabel('Ending passes', { exact: true })).toHaveValue('1');
-    await expect(page.getByLabel('Total repeat passes', { exact: true })).toHaveValue('2');
-    await page.locator('.form-controls').scrollIntoViewIfNeeded();
+    const reopened = await barForm(page, 3);
+    await expect(reopened.getByLabel('Ending passes', { exact: true })).toHaveValue('1');
+    await expect(reopened.getByLabel('Total repeat passes', { exact: true })).toHaveValue('2');
+    await reopened.locator('.form-controls').scrollIntoViewIfNeeded();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
     );
@@ -189,10 +248,9 @@ test('pending forms save atomically from the hidden editor, transpose and reopen
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
     await expectWrittenStand(page, ['D', 'A', 'Bm', 'G']);
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page.getByText('Advanced · per-bar repeat and ending markers', { exact: true }).click();
-    await selectBar(page, 3);
-    await expect(page.getByLabel('Ending passes', { exact: true })).toHaveValue('2');
-    await expect(page.getByLabel('End ending here', { exact: true })).toBeChecked();
+    const fourth = await barForm(page, 4);
+    await expect(fourth.getByLabel('Ending passes', { exact: true })).toHaveValue('2');
+    await expect(fourth.getByLabel('End ending here', { exact: true })).toBeChecked();
     expect((await savedDocuments(page)).find((document) => document.id === saved.id)).toEqual(
         saved,
     );
@@ -202,35 +260,48 @@ test('invalid raw form edits survive failed Save until Revert, and malformed for
     page,
 }) => {
     await newSong(page, 'Protected form');
-    await page.getByLabel('Start repeat here', { exact: true }).check();
+    await (await barForm(page, 1)).getByLabel('Start repeat here', { exact: true }).check();
+    await closeBarMenu(page);
     await addEndings(page);
+    await leaveBar(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const saved = await exportCurrent(page);
     expectWrittenForm(saved, ['C', 'G', 'Am', 'F']);
     const before = await savedDocuments(page);
 
-    await selectBar(page, 2);
-    await page.getByLabel('Total repeat passes', { exact: true }).fill('2oops');
-    await selectBar(page, 3);
-    await page.getByLabel('Ending passes', { exact: true }).fill('2,');
+    await (await barForm(page, 3)).getByLabel('Total repeat passes', { exact: true }).fill('2oops');
+    await closeBarMenu(page);
+    await (await barForm(page, 4)).getByLabel('Ending passes', { exact: true }).fill('2,');
+    await closeBarMenu(page);
+    await leaveBar(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.locator('.error-banner')).toContainText('whole number from 1 to 64');
-    await expect(page.getByLabel('Total repeat passes', { exact: true })).toHaveValue('2oops');
-    await selectBar(page, 3);
-    await expect(page.getByLabel('Ending passes', { exact: true })).toHaveValue('2,');
+    // The raw text stays in the bars' drafts until Revert.
+    await expect(
+        (await barForm(page, 3)).getByLabel('Total repeat passes', { exact: true }),
+    ).toHaveValue('2oops');
+    await closeBarMenu(page);
+    await expect((await barForm(page, 4)).getByLabel('Ending passes', { exact: true })).toHaveValue(
+        '2,',
+    );
+    await closeBarMenu(page);
+    await leaveBar(page);
     expect(await savedDocuments(page)).toEqual(before);
     await expectWrittenStand(page, ['C', 'G', 'Am', 'F']);
 
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Revert to saved' }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await selectBar(page, 2);
-    await expect(page.getByLabel('Total repeat passes', { exact: true })).toHaveValue('2');
-    await expect(page.getByLabel('Ending passes', { exact: true })).toHaveValue('1');
-    await selectBar(page, 3);
-    await expect(page.getByLabel('Ending passes', { exact: true })).toHaveValue('2');
-    await expect(page.getByLabel('End ending here', { exact: true })).toBeChecked();
+    const third = await barForm(page, 3);
+    await expect(third.getByLabel('Total repeat passes', { exact: true })).toHaveValue('2');
+    await expect(third.getByLabel('Ending passes', { exact: true })).toHaveValue('1');
+    await closeBarMenu(page);
+    const fourth = await barForm(page, 4);
+    await expect(fourth.getByLabel('Ending passes', { exact: true })).toHaveValue('2');
+    await expect(fourth.getByLabel('End ending here', { exact: true })).toBeChecked();
+    await closeBarMenu(page);
+    await leaveBar(page);
     expect(await savedDocuments(page)).toEqual(before);
 
     const invalid = structuredClone(saved);
@@ -248,7 +319,7 @@ test('invalid raw form edits survive failed Save until Revert, and malformed for
     await expect(page.locator('.error-banner')).toContainText(/repeat/i);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
     expect(await savedDocuments(page)).toEqual(before);
-    await expect(page.locator('.song-title')).toHaveText('Protected form');
+    await expect(page.getByLabel('Song title')).toHaveValue('Protected form');
     await expectWrittenStand(page, ['C', 'G', 'Am', 'F']);
 });
 

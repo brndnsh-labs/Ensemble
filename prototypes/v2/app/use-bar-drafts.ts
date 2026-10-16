@@ -11,9 +11,9 @@ import { useEffect, useRef, useState } from 'react';
 import { applyMeasureForm, type FormDraft, readMeasureForm } from '../lib/form-editing';
 
 /**
- * What one bar has been changed to but not yet applied to the chart: its chord text and the
- * panel's per-bar settings. One draft per bar, shared by the bar's own field on the chart and the
- * panel's "Chords in this bar" (#1723) — typing in either is typing in both.
+ * What one bar has been changed to but not yet applied to the chart: its chord text and its
+ * per-bar settings. One draft per bar, shared by the bar's own field on the chart (or the phone's
+ * dock, #1724) and its bar menu (#1725) — a change in either is a change in both.
  */
 export interface BarDraft {
     text: string;
@@ -249,7 +249,7 @@ export function barFields(
  * The chart with pending bars folded in, validated as a whole. `only` folds in that one bar's
  * draft and leaves the rest pending — what leaving a bar on the chart applies (#1723), so an
  * unreadable bar elsewhere never blocks, or yanks the musician back from, the one just typed.
- * Without `only` every pending bar goes in: Save, "Update chart", and every other commit.
+ * Without `only` every pending bar goes in: Save, and every other commit (`updateChart`).
  */
 export function commitBarDrafts(
     score: SemanticScore,
@@ -335,9 +335,9 @@ export interface BarDrafts {
 }
 
 /**
- * The pending bars of the open document, owned by the shell so the chart's in-bar field and the
- * panel's `MeasureEditor` read and write one draft per bar (#1723). Drafts belong to
- * `documentId`: another document starts with none, as a remount of the editor used to give it.
+ * The pending bars of the open document, owned by the shell so the chart's in-bar field, the
+ * phone's dock and the bar menu read and write one draft per bar (#1723). Drafts belong to
+ * `documentId`: another document starts with none.
  * `onPendingChange` hears every change synchronously, so a same-turn Save or navigation sees it.
  */
 export function useBarDrafts(

@@ -3,9 +3,9 @@ import { parseChordBar } from '@engine/songbook/score-text';
 
 /**
  * The bar menu's beat ruler (#1725): a bar's chords as spans of its counts, and the text that
- * writes them back. Lengths are held in HALF counts — the finest length the panel's per-chord
- * selects offered (`lengthChoices` in `measure-editor.tsx`) — so the ruler can show any bar
- * those selects could make. Pure: the menu draws it, `parseChordBar` stays the one reader.
+ * writes them back. Lengths are held in HALF counts — the finest length the old edit panel's
+ * per-chord selects offered — so the ruler can show any bar those selects could make. Pure: the
+ * menu draws it, `parseChordBar` stays the one reader.
  */
 
 /** One chord's share of the bar: its text as typed (`Bb7`, `C[Am]`, `N.C.`) and its length in

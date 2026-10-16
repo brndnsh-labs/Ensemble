@@ -12,6 +12,7 @@ import {
     withBarAfter,
     withoutMeasure,
     withoutSection,
+    withSectionAfter,
     withSectionSettings,
 } from './documents';
 
@@ -204,6 +205,48 @@ describe('withoutMeasure', () => {
     });
 });
 
+describe('withSectionAfter (#1726)', () => {
+    const chart = () =>
+        song([
+            section('a', [bar('a1', { key: 'F', isMinor: true })], { key: 'D' }),
+            section('b', [bar('b1')]),
+        ]);
+
+    it('adds a section straight after the one named, with one bar of the song tonic', () => {
+        const result = ok(withSectionAfter(chart(), 'a'));
+        expect(validateSemanticScore(result.score).kind).toBe('ok');
+        expect(result.score.sections.map((s) => s.id)).toEqual(['a', result.sectionId, 'b']);
+        const added = result.score.sections[1];
+        // The first letter no section has: A and B are taken.
+        expect(added.label).toBe('C');
+        expect(added.measures.map((m) => m.id)).toEqual([result.measureId]);
+        // The song's key and meter, not the section's or a bar's before it.
+        expect(added.measures[0].content).toEqual({
+            kind: 'events',
+            events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
+        });
+    });
+
+    it('adds after the last section too', () => {
+        const result = ok(withSectionAfter(chart(), 'b'));
+        expect(result.score.sections.map((s) => s.id)).toEqual(['a', 'b', result.sectionId]);
+    });
+
+    it('names it with the first letter not already used, not by counting sections', () => {
+        // A and C, two sections: counting would name a third "C" again.
+        const source = song([section('a', [bar('a1')]), section('c', [bar('c1')])]);
+        const result = ok(withSectionAfter(source, 'c'));
+        expect(result.score.sections.map((s) => s.label)).toEqual(['A', 'C', 'B']);
+    });
+
+    it('refuses an unknown section, changing nothing', () => {
+        const source = chart();
+        const before = structuredClone(source);
+        expect(withSectionAfter(source, 'nope').kind).toBe('blocked');
+        expect(source).toEqual(before);
+    });
+});
+
 describe('withBarAfter (#1725)', () => {
     const chart = () =>
         song([
@@ -265,6 +308,26 @@ describe('withBarAfter (#1725)', () => {
             expect(result.kind).toBe('blocked');
             expect(result.kind === 'blocked' && result.message).toMatch(/Repeat or ending…/);
             expect(source).toEqual(before);
+        });
+
+        it("after a section's last bar that closes a repeat, adds the bar outside it", () => {
+            // ||: r1 | r2 :||, the section's last bar closing the repeat (#1726 review).
+            const source = song([
+                section('a', [
+                    bar('r1', { start: [{ kind: 'repeat-start' }] }),
+                    bar('r2', { end: [{ kind: 'repeat-end', times: 2 }] }),
+                ]),
+            ]);
+            const result = ok(withBarAfter(source, 'r2'));
+            expect(validateSemanticScore(result.score).kind).toBe('ok');
+            expect(ids(result.score)).toEqual([['r1', 'r2', result.measureId]]);
+            const added = result.score.sections[0].measures[2];
+            expect(added.start).toBeUndefined();
+            expect(added.end).toBeUndefined();
+            // The repeat still closes on r2.
+            expect(result.score.sections[0].measures[1].end).toEqual([
+                { kind: 'repeat-end', times: 2 },
+            ]);
         });
 
         it('lengthens the repeated body from inside it', () => {

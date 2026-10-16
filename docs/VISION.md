@@ -51,7 +51,7 @@ Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are f
 
 ## UI direction
 
-One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, the standards catalog, new/import), the chart sheet, the transport, an edit panel and a sounds panel. Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
+One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, the standards catalog, new/import), the chart sheet, the transport, a sounds panel, and editing on the chart itself (#1726: a bar typed in place with its bar menu, a section from its letter, the whole song from the Song menu; only an old text chart keeps a small editor beside it). Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
 
 The stand has three modes — Chart, Neck and Edit chart. Neck (#1587) puts a guitar or ukulele fretboard in place of the chart: the grip for the chord sounding now (a shell voicing for a 7th chord, a closed triad or a power chord otherwise), a preview of the next grip on the last beat before the change, and one line saying how the hand gets there.
 

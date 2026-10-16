@@ -185,8 +185,8 @@ export async function signUp(page: Page): Promise<void> {
 /** A new song on the stand, with its editor revealed and the shell no longer working. */
 export async function newSongOnTheStand(page: Page): Promise<void> {
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await expect(page.getByLabel('Chords in this bar')).toHaveValue('C');
     await editorRevealed(page);
+    await expect(page.locator('.sheet .chord').first()).toHaveText('C');
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
 }
 
@@ -272,8 +272,8 @@ export async function openSong(page: Page, title: string): Promise<void> {
 }
 
 /**
- * Reveal the edit panel. Opening an existing song leaves the chart showing rather than the editor
- * (`open()` sets `editing` false), so the title field only exists after this.
+ * Into Edit chart. Opening an existing song leaves the chart showing rather than the editor
+ * (`open()` sets `editing` false), so the header's title field only exists after this (#1726).
  */
 export async function revealEditor(page: Page): Promise<void> {
     await page.getByRole('button', { name: 'Edit chart' }).click();

@@ -111,8 +111,9 @@ playback restriction must not retroactively invalidate untouched legacy songs.
 - Save includes pending text, as it does now. Invalid text is retained with a measure-specific
   explanation. Switching editing modes must not discard invalid buffers or silently fix them.
 - Section names, repeat counts and key/mode/meter overrides get one section settings surface
-  (shipped #1374, in the Edit panel — `app/section-settings.tsx`). Preserve the reserved
-  conductor gestures; do not overload playback section taps.
+  (shipped #1374; since #1726 opened from the section letter in Edit chart, `app/section-menu.tsx`
+  with `app/section-settings.tsx`'s fields). Preserve the reserved conductor gestures; outside
+  Edit the letter's tap stays "Start here".
 
 ## Legacy-code evidence (unchanged v1 path)
 
@@ -215,8 +216,8 @@ one section, so its intro is not a labelled section and is not affected.
 The band plays a counted chart once and stops (#1475): every chorus, the last-chorus coda on
 the final one, then the transport returns to stopped at the end of the last bar, its notes
 ringing out as they do at the end of an export. `.mid` and audio export render
-the whole counted performance. The Edit panel's **Choruses** select sets the count: Loop (the
-default, which removes the field) or 1–16; a chart that already counts more keeps its number.
+the whole counted performance. The Song menu's **Choruses** select sets the count (#1726): Repeats
+continuously (the default, which removes the field) or 1–16; a chart that already counts more keeps its number.
 
 iReal coda signs with no D.C./D.S. text (#1476) import as a last-chorus coda, after iReal Pro's
 own rule (https://irealpro.com/how-the-coda-symbol-works-in-ireal-pro/). Its worked example,
@@ -381,7 +382,7 @@ fixture for this specific export, not general import or by-ear compatibility.
 | D.C./D.S., coda, Fine | Native global traversal, al-Nth-ending destinations, last-chorus codas and conservative unambiguous import implemented | Jumps inside repeats, repeats replayed after a jump, ambiguous import repeat policy and physical-device audition. |
 | N.C., holds, alternate chords, fermatas | Authored events represented; playback pending | Per-lane meaning, editing and faithful import mapping. |
 | Other rhythmic notation, rests and pushes | Inventory and represent without guessing equivalence | Current protocol/app fixtures and explicit lane semantics. |
-| Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested; the song's own meter is set from the Edit panel (#1371), re-dividing equal-length bars and blocking — never rounding — on a bar whose written lengths cannot follow | Real-device and audible acceptance; source import mapping; a section-level key/meter surface. |
+| Meter/key changes | Native bar editing, sticky contexts and supported-meter playback tested; the song's own meter is set from the Song menu (#1371, #1726), re-dividing equal-length bars and blocking — never rounding — on a bar whose written lengths cannot follow | Real-device and audible acceptance; source import mapping. A section's own key/meter is set from its letter in Edit (#1374, #1726). |
 | Unsupported meters or off-grid timing | Block, explain location | Never substitute 4/4 or round durations. |
 | Long charts | No fixed page limit | Synthetic 64/128-bar layouts and explicit input/expansion bounds. |
 | Playlist HTML | Bounded supported-envelope selection/diagnostics implemented; a whole playlist (up to 2,000 songs, the account cap) imports as a collection named after it (#1478) | Additional real playlist envelopes; no silent first-song-only import. |

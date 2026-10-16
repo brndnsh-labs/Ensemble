@@ -1,4 +1,4 @@
-import { appUrl, editorRevealed, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, editorRevealed, expect, seedStarters, songLink, test, typeBar } from './fixtures';
 
 declare global {
     interface Window {
@@ -56,10 +56,7 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Band engine study');
     for (const [i, bar] of ['C', 'F', 'G7', 'C'].entries()) {
-        await page.getByLabel('Chords in this bar').fill(bar);
-        if (i < 3) {
-            await page.getByRole('button', { name: 'Next bar', exact: true }).click();
-        }
+        await typeBar(page, i + 1, bar);
     }
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();

@@ -124,7 +124,8 @@ test('export and Save a copy include typed text but do not overwrite the origina
     await page.getByLabel('Chord text').fill('Am7 | D7 | Gmaj7');
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
-    await expect(page.locator('.song-title')).toHaveText('Blue pocket — copy');
+    // While editing, the title is the header's input (#1726).
+    await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket — copy');
     expect((await exportCurrent(page)).chart.arrangement.sections[0].value).toBe(
         'Am7 | D7 | Gmaj7',
     );
@@ -468,7 +469,8 @@ test('a revision conflict retains typed chords and allows an independent copy', 
     expect(await savedBlue(page)).toEqual(newer);
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
-    await expect(page.locator('.song-title')).toHaveText('Blue pocket — copy');
+    // While editing, the title is the header's input (#1726).
+    await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket — copy');
     expect((await exportCurrent(page)).chart.arrangement.sections[0].value).toBe('Dm7 | G7');
     expect(await savedBlue(page)).toEqual(newer);
 });

@@ -1,11 +1,19 @@
 import type { Page } from '@playwright/test';
-import { appUrl, editorRevealed, expect, openWholeSong, songLink, test } from './fixtures';
+import {
+    appUrl,
+    closeSongMenu,
+    editorRevealed,
+    expect,
+    openWholeSong,
+    songLink,
+    test,
+} from './fixtures';
 
 /**
- * #1475: a chart that counts its choruses plays that many and stops; Loop (the default) plays
- * on. Observed through the chart's own pointer — every time its first chord becomes current is
- * one more pass of the form — and the transport's Play/Stop button, never by sampling the
- * clock, so a slow CI WebKit only takes longer.
+ * #1475: a chart that counts its choruses plays that many and stops; "Repeats continuously" (the
+ * default, option value `loop`) plays on. Observed through the chart's own pointer — every time its
+ * first chord becomes current is one more pass of the form — and the transport's Play/Stop button,
+ * never by sampling the clock, so a slow CI WebKit only takes longer.
  */
 
 declare global {
@@ -73,6 +81,7 @@ test('a chart set to 2 choruses plays two and stops; Loop plays on; the count sa
     await expect(choruses).toHaveValue('loop');
     await choruses.selectOption('2');
     await expect(choruses).toHaveValue('2');
+    await closeSongMenu(page);
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     const tempo = page.getByLabel('Tempo', { exact: true });
     await tempo.fill('240');
@@ -102,12 +111,13 @@ test('a chart set to 2 choruses plays two and stops; Loop plays on; the count sa
     await page.reload();
     await songLink(page, 'Two choruses').first().click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+    await openWholeSong(page);
     await expect(choruses).toHaveValue('2');
 
     // Back to Loop: the band plays on past the second pass.
-    await openWholeSong(page);
     await choruses.selectOption('loop');
     await expect(choruses).toHaveValue('loop');
+    await closeSongMenu(page);
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     await arm(page);
     await play.click();

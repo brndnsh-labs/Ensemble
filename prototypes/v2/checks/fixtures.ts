@@ -267,17 +267,6 @@ export async function openBand(page: Page, tab: 'Players' | 'Groove' | 'Trade' |
 }
 
 /**
- * Wait for the editor's reveal-focus to land before typing into any OTHER field (#1235).
- *
- * `revealEditor` in app/ensemble.tsx bumps `editorRequest`, and an effect gated on `!busy`
- * then focuses the edit panel's first textarea. That effect can fire in the middle of a
- * `fill()` on a different control: Playwright focuses its target and inserts the text as a
- * separate step, so a focus steal in between sends the keystrokes to the textarea instead —
- * observed on `webkit-phone` under three workers as `Chords in this bar` holding
- * "Guided offlineC" while `Song title` stayed "Untitled song". Asserting the steal has already
- * happened is both the barrier and a real assertion about the reveal contract.
- */
-/**
  * A song's row link — on the songbook home, the All songs page or in search results — by its
  * EXACT title and, when given, the one muted fact under it (#1441). The rows used to be selected
  * by their accessible name, "<title> <genre> · Saved locally"; #1441 says where songs live once,
@@ -309,8 +298,101 @@ export async function settled(locator: Locator): Promise<void> {
     );
 }
 
+/**
+ * Wait for the editor's reveal-focus to land before typing into any OTHER field (#1235).
+ *
+ * `revealEditor` in app/ensemble.tsx bumps `editorRequest`, and an effect gated on `!busy`
+ * then focuses a text chart's chord text. That effect can fire in the middle of a `fill()` on a
+ * different control: Playwright focuses its target and inserts the text as a separate step, so a
+ * focus steal in between sends the keystrokes to the textarea instead — observed on
+ * `webkit-phone` under three workers as the chords holding "Guided offlineC" while `Song title`
+ * stayed "Untitled song". Asserting the steal has already happened is both the barrier and a real
+ * assertion about the reveal contract. A measure chart focuses nothing on the way in (#1726: a
+ * bar opens when pressed), so there the barrier is the header's title field, enabled once the
+ * editor is no longer busy.
+ */
 export async function editorRevealed(page: Page): Promise<void> {
-    await expect(page.locator('.edit-panel textarea').first()).toBeFocused();
+    await expect(page.locator('#title')).toBeEnabled();
+    const text = page.locator('.edit-panel textarea');
+    if ((await text.count()) > 0) {
+        await expect(text.first()).toBeFocused();
+    }
+}
+
+/** Whether the page is at the app's phone width (`bar-dock.tsx`'s 760px), where a bar is typed
+ * in the dock on the keyboard (#1724) rather than in the bar. */
+export function phoneWidth(page: Page): boolean {
+    return (page.viewportSize()?.width ?? 1280) <= 760;
+}
+
+/**
+ * Bar `bar`'s chord field (#1723): in the bar on a laptop, the dock on a phone (#1724) — both
+ * named "Chords in bar N", counted from 1 across the whole chart.
+ */
+export function barField(page: Page, bar: number): Locator {
+    return page.getByLabel(`Chords in bar ${bar}`, { exact: true });
+}
+
+/**
+ * Opens bar `bar` for typing, as a musician does — a press on it (a tap at phone width) — unless
+ * its field is already up, and waits for the field to take focus.
+ */
+export async function openBar(page: Page, bar: number): Promise<Locator> {
+    const field = barField(page, bar);
+    if (!(await field.isVisible())) {
+        const target = page.locator('.sheet .bar').nth(bar - 1);
+        if (phoneWidth(page)) {
+            await target.tap();
+        } else {
+            await target.click();
+        }
+    }
+    await expect(field).toBeFocused();
+    return field;
+}
+
+/** Types `text` over bar `bar`'s chords (#1723): the bar opened, then its field filled. Unapplied
+ * until the bar is left (`leaveBar`, Tab/Enter, another bar) or Save commits it. */
+export async function typeBar(page: Page, bar: number, text: string): Promise<void> {
+    await (await openBar(page, bar)).fill(text);
+}
+
+/**
+ * Leaves the open bar, which applies it (#1723) — what "Update chart" did for one bar. On a phone
+ * the dock's Done; on a laptop a press on the chart beside the bars, so focus leaves the field
+ * the way a musician's click elsewhere takes it. A no-op with no bar open.
+ */
+export async function leaveBar(page: Page): Promise<void> {
+    if (await page.locator('.bar-dock').isVisible()) {
+        await closeBarDock(page);
+        return;
+    }
+    const field = page.locator('.bar-input');
+    if ((await field.count()) > 0) {
+        await page.locator('.chart-bottom > span').click();
+        await expect(field).toHaveCount(0);
+    }
+}
+
+/**
+ * Opens the section letter's menu (#1726) for section `label` while editing a measure chart —
+ * its settings, Add section after and Delete section — and returns it.
+ */
+export async function openSectionMenu(page: Page, label: string): Promise<Locator> {
+    const menu = page.getByRole('dialog', { name: `Section ${label} menu`, exact: true });
+    if (!(await menu.isVisible())) {
+        await page.getByRole('button', { name: `Section ${label}`, exact: true }).click();
+    }
+    await expect(menu).toBeVisible();
+    return menu;
+}
+
+/** The section menu's "Key, mode or meter" group, unfolded. */
+export async function openSectionContext(menu: Locator): Promise<void> {
+    const details = menu.locator('details');
+    if (!(await details.evaluate((node: HTMLDetailsElement) => node.open))) {
+        await details.locator('summary').click();
+    }
 }
 
 /**
@@ -433,17 +515,33 @@ export async function seedGuestDocuments(page: Page, docs: unknown[], path = '')
     await page.goto(appUrl(path));
 }
 
-/** Unfolds the edit panel's "Whole song" group (#1705): song meter, mode and choruses. */
-export async function openWholeSong(page: Page): Promise<void> {
-    const group = page.locator('.edit-panel details.panel-group');
-    if (!(await group.evaluate((node: HTMLDetailsElement) => node.open))) {
-        await group.locator('summary').click();
+/**
+ * Opens the Song menu (•••) on its whole-song settings (#1726): Song meter, Song mode and
+ * Choruses, which the edit panel's "Whole song" group held. Returns the menu; `closeSongMenu`
+ * closes it again (it is modal: nothing behind it takes a click while it is open).
+ */
+export async function openWholeSong(page: Page): Promise<Locator> {
+    const menu = page.getByTestId('song-menu');
+    if (!(await menu.isVisible())) {
+        await page.getByRole('button', { name: 'Song actions', exact: true }).click();
+    }
+    await expect(menu.getByRole('heading', { name: 'Chart', exact: true })).toBeVisible();
+    await expect(menu.getByLabel('Song meter')).toBeEnabled();
+    return menu;
+}
+
+/** Closes the Song menu if it is open. */
+export async function closeSongMenu(page: Page): Promise<void> {
+    const menu = page.getByTestId('song-menu');
+    if (await menu.isVisible()) {
+        await menu.getByRole('button', { name: 'Close', exact: true }).click();
+        await expect(menu).toBeHidden();
     }
 }
 
 /**
  * Closes the phone's bar dock if it is up (#1724): at phone width an open bar is typed in the dock,
- * and the edit panel is hidden until Done. A no-op on the laptop, where the bar holds its field.
+ * and the transport is hidden until Done. A no-op on the laptop, where the bar holds its field.
  */
 export async function closeBarDock(page: Page): Promise<void> {
     const dock = page.locator('.bar-dock');

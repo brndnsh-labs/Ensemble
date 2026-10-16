@@ -188,26 +188,34 @@ Existing songs/starters keep their legacy editor. In Edit chart, **Try the bar e
 original** creates a separate editable copy; it never replaces the old record. Charts whose
 legacy meaning/timing cannot be converted exactly stay in the original editor with an explanation.
 
-Select a bar, type chords and optionally choose each chord's length. For example, `C Dm G7`
-in 4/4 needs an explicit timing choice: choose lengths 2, 1, 1 or type `C:2 Dm:1 G7:1`.
-Key or meter change applies from that bar through the section; it does not transpose chord names.
-Where the bar's meter has more than one idiomatic split (5, 7, 8, 9, 10, 11 or 12 counts —
-`lib/grouping.ts`), **Beat grouping from this bar** picks one, such as 2+3 in 5/4; Section
-settings offers the same at section scope (#1376). Any meter change resets it.
-Global Key transposes the entire score. Song mode (Edit panel, beside Song meter) sets the song's own major/minor (#1375) without rewriting chord names or moving the key: A minor is A, then Minor, not a relative-key swap to C. Song meter (Edit panel) sets the song's own meter:
-equal-length bars re-divide, a section or bar with its own meter keeps it, and a bar whose
-written lengths cannot follow blocks the change and is opened for you — nothing is rounded.
-Add bar appends to the selected section; Add section
-starts in the global key/meter. **− Bar** removes the selected bar (a key/meter change it wrote
-passes to the next bar, so the rest of the section sounds the same; a section's only bar takes
-the section with it) and **− Section** removes the section holding it (#1373). Both refuse,
-changing nothing, when it would remove the chart's last bar or section, music another bar
-repeats, half of a two-bar repeat, or a bar carrying repeat/navigation marks — remove the marks
-or the whole section instead. **Section settings** (Edit panel, for the section holding the
-selected bar, #1374) names the section (1–24 characters), sets how many times it plays (1–64),
-and gives it its own key, mode or meter or returns each to the song's. A section meter change
-re-fits that section's bars by Song meter's rule and resets its beat grouping; a bar with its own
-override keeps it. Save includes pending measures even with the editor hidden.
+In Edit chart a measure chart has no side panel (#1726): there is the chart. Press a bar and
+type its chords into it (on a phone, into the field docked on the keyboard); Tab or Enter moves on,
+and leaving a bar applies it. For example, `C Dm G7` in 4/4 needs an explicit timing choice: type
+`C:2 Dm:1 G7:1`, or drag the splits on the bar menu's beat ruler. The bar menu (⋯ on the bar, or
+Ctrl/⌘+.) holds **Key or meter from here**, which applies from that bar through the section and
+does not transpose chord names; where the bar's meter has more than one idiomatic split (5, 7, 8,
+9, 10, 11 or 12 counts — `lib/grouping.ts`), its beat grouping picks one, such as 2+3 in 5/4, and
+the section's settings offer the same at section scope (#1376). Any meter change resets it. The
+menu also holds **Repeat or ending…**, **Advanced · per-bar repeat and ending markers**, **Hold
+last chord**, **Insert bar after** and **Delete bar**.
+Global Key transposes the entire score. The song's title is typed in the header while editing.
+**Song mode** (the Song menu ••• → Chart, beside Song meter) sets the song's own major/minor
+(#1375) without rewriting chord names or moving the key: A minor is A, then Minor, not a
+relative-key swap to C. **Song meter** sets the song's own meter: equal-length bars re-divide, a
+section or bar with its own meter keeps it, and a bar whose written lengths cannot follow blocks
+the change and is selected for you — nothing is rounded. **Choruses** counts how many times the
+form plays (or Repeats continuously).
+Delete bar removes the bar (a key/meter change it wrote passes to the next bar, so the rest of the
+section sounds the same; a section's only bar takes the section with it) and the section letter's
+**Delete section** removes the whole section (#1373). Both refuse, changing nothing, when it would
+remove the chart's last bar or section, music another bar repeats, half of a two-bar repeat, or a
+bar carrying repeat/navigation marks — remove the marks or the whole section instead. Pressing the
+section letter in Edit opens that section's menu (#1374, #1726): it names the section (1–24
+characters), sets how many times it plays (1–64), gives it its own key, mode or meter or returns
+each to the song's, and adds a section after it (one bar in the song's key and meter) or deletes
+it. A section meter change re-fits that section's bars by Song meter's rule and resets its beat
+grouping; a bar with its own override keeps it. Save includes pending bars even with the editor
+hidden.
 
 Under **Repeats and endings**, select an existing bar range with two clicks/taps or Tab and
 Enter (or use From/Through), then **Repeat these bars** and choose the total plays, default 2.
@@ -217,9 +225,11 @@ edit its range/count or remove only its form markers. Cancel keeps unrelated pen
 text. Apply adopts the complete validated draft; explicit Save updates the songbook.
 The [guided interaction note](../../docs/design/ensemble-v2-guided-form.md) describes the boundaries.
 
-**Advanced · per-bar repeat and ending markers** keeps the low-level fields for nested and
-nonstandard forms. Set every affected bar before Update chart or Save; unfinished form stays
-in the current tab. Complex sections are preserved by the guide and remain editable here.
+**Advanced · per-bar repeat and ending markers** (in the bar menu) keeps the low-level fields for
+nested and nonstandard forms. Set each affected bar in turn: a bar whose markers make no form yet
+stays pending (lightly tinted, no error), and the form applies as soon as the bars together make
+one; Save says what is still missing. Complex sections are preserved by the guide and remain
+editable here.
 The stand shows each written bar once, with repeat signs and ending labels; highlighting
 returns to that same bar on later passes. Saved/exported charts never contain unfolded copies.
 

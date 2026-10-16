@@ -173,8 +173,8 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 ## UI (the v2 app)
 
-`prototypes/v2/app/` holds every surface (songbook, chart sheet, transport, edit panel, sounds
-panel, account pages) and `prototypes/v2/lib/` the runtime bridge, songbook repository and
+`prototypes/v2/app/` holds every surface (songbook, chart sheet with its in-place bar, bar and
+section menus, transport, Song menu, sounds panel, a text chart's editor, account pages) and `prototypes/v2/lib/` the runtime bridge, songbook repository and
 account sync. Per-surface ownership is the navigation table in `prototypes/v2/CLAUDE.md`.
 
 ## High-Level Controllers & Integration

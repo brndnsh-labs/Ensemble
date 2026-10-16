@@ -1,4 +1,4 @@
-import { appUrl, editorRevealed, expect, test } from './fixtures';
+import { appUrl, editorRevealed, expect, test, typeBar } from './fixtures';
 
 type Paint = { step: number; at: number };
 /** One animation frame: its wall time, and the band's audio clock as that frame read it. */
@@ -45,7 +45,7 @@ test('a sixteenth-note chord at 240 bpm is painted', async ({ page }) => {
     await page.getByLabel('Song title').fill('Sixteenths');
     // Sixteen chords share the first 4/4 bar equally: one step each.
     const names = 'C Db D Eb E F Gb G Ab A Bb B C7 D7 E7 F7'.split(' ');
-    await page.getByLabel('Chords in this bar').fill(names.join(' '));
+    await typeBar(page, 1, names.join(' '));
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Chart', exact: true }).click();

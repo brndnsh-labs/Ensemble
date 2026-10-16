@@ -11,7 +11,8 @@ import {
 } from 'react';
 import './bar-dock.css';
 
-/** The app's phone width: `style.css`'s `max-width: 760px`, where the edit panel docks (#1705). */
+/** The app's phone width: `style.css`'s `max-width: 760px`, where a bar is typed in the dock
+ * (#1724). */
 const PHONE_WIDTH = '(max-width: 760px)';
 
 function subscribePhoneWidth(onChange: () => void): () => void {

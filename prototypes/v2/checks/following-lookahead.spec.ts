@@ -5,7 +5,15 @@ import type {
     ScoreDuration,
     ScoreMeasure,
 } from '../../../public/songbook/score-types';
-import { appUrl, editorRevealed, expect, test } from './fixtures';
+import {
+    appUrl,
+    barField,
+    editorRevealed,
+    expect,
+    leaveBar,
+    openSectionMenu,
+    test,
+} from './fixtures';
 
 /**
  * Following's look-ahead scroll (#1458): a look-ahead row scroll, a next-bar cue that strengthens
@@ -95,10 +103,17 @@ async function buildLookaheadChart(
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Lookahead study');
-    await page.getByRole('button', { name: '＋ Section', exact: true }).click();
-    await page.getByLabel('Chords in this bar').fill('C');
-    await page.getByRole('button', { name: '＋ Section', exact: true }).click();
-    await page.getByLabel('Chords in this bar').fill('C');
+    // Sections B and C, each added after the last (#1726): its one bar opens for typing.
+    for (const [last, bar] of [
+        ['A', 5],
+        ['B', 6],
+    ] as const) {
+        await (await openSectionMenu(page, last))
+            .getByRole('button', { name: 'Add section after', exact: true })
+            .click();
+        await barField(page, bar).fill('C');
+        await leaveBar(page);
+    }
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 

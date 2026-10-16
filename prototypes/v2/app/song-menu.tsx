@@ -1,3 +1,4 @@
+import { TIME_SIGNATURES } from '@engine/config';
 import type { ReactNode, RefObject } from 'react';
 import type * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
@@ -5,6 +6,9 @@ import { backdropDismiss, whenClosed } from './dialog-close';
 import { downloadImportSource } from './import-dialog';
 
 type Recovery = ReturnType<typeof repository.recoveriesFor>[number];
+
+/** The Choruses control's counts (#1475). The chart format allows up to 64 (`score-codec.ts`). */
+const CHORUS_COUNTS = Array.from({ length: 16 }, (_, i) => i + 1);
 
 interface SongMenuProps {
     /** Owned by the shell, which drives `showModal()`/`close()` from its `menu` state. */
@@ -54,6 +58,12 @@ interface SongMenuProps {
      * only place a musician can learn their Save didn't reach the cloud.
      */
     syncStatus: ReactNode;
+    /** The song's own meter (`score.meter`), not a section's or a bar's. Measure charts only. */
+    onSongMeter: (meter: string) => void;
+    /** The song's own major/minor (`score.isMinor`, #1375), never a section or bar override. */
+    onSongMode: (isMinor: boolean) => void;
+    /** How many choruses the band plays, then stops (#1475); `undefined` repeats continuously. */
+    onChoruses: (choruses: number | undefined) => void;
 }
 
 export function SongMenu({
@@ -81,7 +91,11 @@ export function SongMenu({
     onCancelExportAudio,
     onDeleteFromAccount,
     syncStatus,
+    onSongMeter,
+    onSongMode,
+    onChoruses,
 }: SongMenuProps) {
+    const score = current?.schemaVersion === 2 ? current.chart.score : null;
     return (
         <dialog
             ref={dialogRef}
@@ -174,6 +188,74 @@ export function SongMenu({
                     )}
                 </div>
             </section>
+            {/* The whole song's meter, mode and choruses (#1726): set once a song, so they live
+                here rather than where bars are typed. Each is one unsaved change, as a bar is. */}
+            {score && (
+                <section className="song-menu-group" aria-labelledby="song-menu-chart">
+                    <h3 id="song-menu-chart">Chart</h3>
+                    <div className="song-menu-fields">
+                        <label htmlFor="song-meter">Song meter</label>
+                        <select
+                            id="song-meter"
+                            disabled={busy}
+                            value={score.meter}
+                            onChange={(e) => onSongMeter(e.target.value)}
+                        >
+                            {[...new Set([...Object.keys(TIME_SIGNATURES), score.meter])].map(
+                                (meter) => (
+                                    <option key={meter}>{meter}</option>
+                                ),
+                            )}
+                        </select>
+                        <p className="field-hint">
+                            Chords keep their share of each bar. A section or bar with its own meter
+                            keeps it.
+                        </p>
+                        <label htmlFor="song-mode">Song mode</label>
+                        <select
+                            id="song-mode"
+                            disabled={busy}
+                            value={score.isMinor ? 'minor' : 'major'}
+                            onChange={(e) => onSongMode(e.target.value === 'minor')}
+                        >
+                            <option value="major">Major</option>
+                            <option value="minor">Minor</option>
+                        </select>
+                        <p className="field-hint">
+                            Chord names stay as written, and so does the key: for A minor, pick A,
+                            then Minor. A section or bar with its own mode keeps it.
+                        </p>
+                        <label htmlFor="song-choruses">Choruses</label>
+                        <select
+                            id="song-choruses"
+                            disabled={busy}
+                            value={score.choruses ?? 'loop'}
+                            onChange={(e) =>
+                                onChoruses(
+                                    e.target.value === 'loop' ? undefined : Number(e.target.value),
+                                )
+                            }
+                        >
+                            {/* Named as the chart footer's form-length menu names it. */}
+                            <option value="loop">Repeats continuously</option>
+                            {[
+                                // A chart from elsewhere may count more than the menu offers; it
+                                // still shows its own count, as Song meter shows an unlisted meter.
+                                ...new Set([...CHORUS_COUNTS, score.choruses ?? 1]),
+                            ].map((count) => (
+                                <option key={count} value={count}>
+                                    {count}
+                                </option>
+                            ))}
+                        </select>
+                        <p className="field-hint">
+                            Repeats continuously plays the form until you stop. A number plays it
+                            that many times, then stops: an Intro at the start plays the first time
+                            only, and an Outro at the end or a last-chorus coda the last time only.
+                        </p>
+                    </div>
+                </section>
+            )}
             {/* Importing a chart starts from the songbook home; from here the menu only offers
                 the old app's songs, which are about this device rather than this song. */}
             {v1Available && (
