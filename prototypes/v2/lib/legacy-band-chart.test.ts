@@ -10,7 +10,6 @@
 import { type ChordFacts, notePc, PPQ, parseChord } from '@band/index';
 import { TIME_SIGNATURES } from '@engine/config';
 import { buildLeadSheetSections } from '@engine/song/lead-sheet-model';
-import { LEGACY_CHORD_QUALITIES } from '@engine/songbook/legacy-score';
 import type { ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { firstVoicedSlot, neckModel, nextVoicedSlot } from '../app/use-neck-view';
@@ -142,7 +141,7 @@ describe('legacyChordFacts', () => {
  * (`parseChord`); the chart sheet, a tap and the neck read the name the old parser gives it
  * (`absName`, through `legacyChordFacts`). They are held to each other here over everything a
  * measure-less chart can hold and still play: every root spelling, every quality in
- * `LEGACY_CHORD_QUALITIES`, with and without a slash bass. The lowercase numerals are where
+ * `QUALITIES` below, with and without a slash bass. The lowercase numerals are where
  * they once disagreed (`vii` showed Bm7b5 over a B minor triad, `i7b9` a C7b9 over a minor
  * third) and where a tap was silent (`imaj7`, `iadd9`).
  */
@@ -155,7 +154,38 @@ describe('a measure-less chart shows the chord the band plays', () => {
         ...accidentals(['1', '2', '3', '4', '5', '6', '7']),
         ...['A', 'B', 'C', 'D', 'E', 'F', 'G'].flatMap((n) => [n, `${n}#`, `${n}b`]),
     ];
-    const QUALITIES = ['', ...LEGACY_CHORD_QUALITIES];
+    // The everyday qualities, each spelled as the chart vocabulary spells it, so the band plays
+    // the token as written. The rest of the old parser's spellings — the ones the converter
+    // respells, or where the band now plays a tone the old parser dropped — are held to the old
+    // parser by `tests/unit/songbook/legacy-score.test.ts` (#1737).
+    const QUALITIES = [
+        '',
+        'maj7',
+        'm7b5',
+        'm13',
+        'm11',
+        'm9',
+        'm7',
+        'm6',
+        'm',
+        'dim7',
+        'dim',
+        '7#5',
+        '7b5',
+        '7b9',
+        '7#9',
+        '7#11',
+        '7b13',
+        'sus4',
+        'sus2',
+        'add9',
+        '13',
+        '11',
+        '9',
+        '7',
+        '6',
+        '5',
+    ];
     /** The chord as pitch classes over its bass: what is heard, whatever it is called. */
     const sounding = (facts: ChordFacts) => {
         const pitchClasses = new Set(facts.intervals.map((n) => (facts.root + n) % 12));

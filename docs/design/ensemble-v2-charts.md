@@ -305,9 +305,15 @@ chart editor. No claim of a full-score text serialization is made yet.
 
 The pure `proposeLegacyScoreConversion` API returns either a detached candidate or a blocked
 report, always alongside the exact original JSON string. It does not persist anything or
-certify audible equivalence. It accepts a conservative full-token legacy spelling subset
-and exact-grid lengths, retains section/band settings, and reports the detached preset
-association. Timing anomalies and uncertain spellings produce no partial candidate.
+certify audible equivalence. Since #1737 it converts everything the old parser
+(`validateProgression`) read and played: each token as written when the chart vocabulary holds
+it, else respelled to the chord the old parser played; each bar's chords at the old parser's
+rounded onsets, the last chord filling the bar; empty bars and sections dropped, as the old
+parser gave them no time. It retains section/band settings and reports the detached preset
+association. What the old parser only guessed at (no root or quality it knew, a bar whose
+onsets run past its end) blocks the song, with a reason per bar (song, section, bar, why);
+there is no partial candidate. `tests/unit/songbook/legacy-score.test.ts` is the old-vs-new
+differential.
 
 ### Engine bridge and gates
 

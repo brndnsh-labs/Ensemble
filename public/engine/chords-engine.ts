@@ -306,6 +306,9 @@ const SUFFIX_QUALITIES = new Map<string, string>([
 // hand-ordering a ~160-row alternation is exactly how `ma` came to match inside `madd9`.
 const SUFFIX_SPELLINGS = [...SUFFIX_QUALITIES.keys()].sort((a, b) => b.length - a.length);
 
+/** Every quality spelling the parser's table matches, for the text-chart converter's differential (#1737). */
+export const LEGACY_QUALITY_SPELLINGS: readonly string[] = SUFFIX_SPELLINGS;
+
 /**
  * Case/notation normalisation applied to the START of a chord suffix, in order, once.
  *
@@ -791,6 +794,72 @@ function minorReading(quality: string, is7th: boolean): string {
 }
 
 /**
+ * Split one chord token at its slash bass. A slash inside a chord symbol is only a BASS note
+ * when what follows it is actually a root — `Am/G`, `Imaj7/V`, `F/A`. Otherwise the slash is
+ * notation inside the quality (`C6/9`, `Cm/maj7`, `Cm6/9`) and the token stays whole, before
+ * the bass branch reads that text as a root. #780 solved this for `6/9` with a literal
+ * `bassPart === '9'` test; #1329 generalises it, because `Cm/maj7` hit the same trap the other
+ * way — the suffix became a bare `m` (a plain Cm) and `maj7` was resolved as a bass note, which
+ * silently falls back to the KEY root when nothing matches. Text after a second slash is ignored.
+ */
+function splitSlashBass(part: string): { chordPart: string; bassPart?: string } {
+    const [chordPart, bassPart] = part.split('/');
+    return bassPart !== undefined && looksLikeChordRoot(bassPart)
+        ? { chordPart, bassPart }
+        : { chordPart: part };
+}
+
+/** The quality a written suffix plays: under a lowercase roman numeral, its minor reading. */
+function playedQuality(
+    details: ChordDetails,
+    romanMatch: RegExpMatchArray | null,
+): { quality: string; is7th: boolean } {
+    const lowercase = romanMatch !== null && romanMatch[2] === romanMatch[2].toLowerCase();
+    return {
+        quality: lowercase ? minorReading(details.quality, details.is7th) : details.quality,
+        is7th: details.is7th,
+    };
+}
+
+/** How the measure-less charts' parser reads one chord token (#1737): see {@link readLegacyChordToken}. */
+export interface LegacyChordToken {
+    /** The written root; '' when no root grammar matched (the parser then plays the key's root). */
+    root: string;
+    /** The slash bass's root as written, when the slash names one. */
+    bass?: string;
+    /** The slash bass text as written, which may run past its root (`C/G7` plays C/G). */
+    bassText?: string;
+    /** The written quality suffix, before any normalisation. */
+    written: string;
+    /** The parser's reading of {@link written}: which spelling matched, and whether all of it. */
+    details: ChordDetails;
+    /** The letter-name suffix of the chord it plays: the suffix in its `absName`. */
+    suffix: string;
+}
+
+/**
+ * One chord token as `validateProgression` reads it, written root kept: the same slash, root
+ * and quality steps `parseProgressionPart` takes, without a key. For the text-chart converter
+ * (`songbook/legacy-score.ts`), which must turn each token into the chord this parser plays.
+ */
+export function readLegacyChordToken(part: string): LegacyChordToken {
+    const { chordPart, bassPart } = splitSlashBass(part);
+    const { rootPart, romanMatch } = resolveChordRoot(chordPart, 0, 0);
+    const written = chordPart.slice(rootPart.length);
+    const details = getChordDetails(written);
+    const { quality, is7th } = playedQuality(details, romanMatch);
+    return {
+        root: rootPart,
+        ...(bassPart !== undefined
+            ? { bass: resolveChordRoot(bassPart, 0, 0).rootPart, bassText: bassPart }
+            : {}),
+        written,
+        details,
+        suffix: getFormattedChordNames('', '', '', quality, is7th).name.suffix,
+    };
+}
+
+/**
  * Parses a single progression string part (e.g., from one section).
  */
 function parseProgressionPart(
@@ -820,21 +889,7 @@ function parseProgressionPart(
         chordTokens.forEach((token) => {
             if (token.trim().length > 0) {
                 const part = token.trim();
-                const slashParts = part.split('/');
-                let chordPart = slashParts[0];
-                let bassPart: string | undefined = slashParts[1];
-                // A slash inside a chord symbol is only a BASS note when what follows it is
-                // actually a root — `Am/G`, `Imaj7/V`, `F/A`. Otherwise the slash is
-                // notation inside the quality (`C6/9`, `Cm/maj7`, `Cm6/9`) and the token has
-                // to be recombined before the bass branch below reads that text as a root.
-                // #780 solved this for `6/9` with a literal `bassPart === '9'` test; #1329
-                // generalises it, because `Cm/maj7` hit the same trap the other way — the
-                // suffix became a bare `m` (a plain Cm) and `maj7` was resolved as a bass
-                // note, which silently falls back to the KEY root when nothing matches.
-                if (bassPart !== undefined && !looksLikeChordRoot(bassPart)) {
-                    chordPart = part;
-                    bassPart = undefined;
-                }
+                const { chordPart, bassPart } = splitSlashBass(part);
 
                 const { rootMidi, rootPart, romanMatch, nnsMatch, noteMatch } = resolveChordRoot(
                     chordPart,
@@ -870,11 +925,10 @@ function parseProgressionPart(
                     bassNameRom = (INTERVAL_TO_ROMAN as Record<number, string>)[bassInterval];
                 }
 
-                const suffixPart = chordPart.slice(rootPart.length);
-                const { quality: written, is7th } = getChordDetails(suffixPart);
-                const lowercase =
-                    romanMatch !== null && romanMatch[2] === romanMatch[2].toLowerCase();
-                const quality = lowercase ? minorReading(written, is7th) : written;
+                const { quality, is7th } = playedQuality(
+                    getChordDetails(chordPart.slice(rootPart.length)),
+                    romanMatch,
+                );
 
                 const interval = (rootMidi - keyRootMidi + 24) % 12;
                 const rootNNS = (INTERVAL_TO_NNS as Record<number, string>)[interval];
