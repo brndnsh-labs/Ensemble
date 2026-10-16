@@ -48,7 +48,7 @@ test('search, genre filter, every sort order and the A–Z index', async ({ page
 
     // The genre dropdown lists only genres present, alphabetically.
     const genreOptions = await page.locator('.all-songs-toolbar select').first().locator('option');
-    await expect(genreOptions).toHaveText(['All genres', 'Blues', 'Bossa', 'Jazz']);
+    await expect(genreOptions).toHaveText(['All styles', 'Blues', 'Bossa', 'Jazz']);
 
     // Default sort is Title.
     await expect(page.locator('.all-songs-table .song-name')).toHaveText([
@@ -308,8 +308,8 @@ test('deleting the last song of the filtered genre falls back to every genre', a
     await page.getByTestId('delete-guest-song-confirm').click();
 
     // Bossa is no longer an option, so it is no longer the filter either: the select and the
-    // list agree, instead of "All genres" over "No songs match."
-    await expect(genre.locator('option')).toHaveText(['All genres', 'Blues', 'Jazz']);
+    // list agree, instead of "All styles" over "No songs match."
+    await expect(genre.locator('option')).toHaveText(['All styles', 'Blues', 'Jazz']);
     await expect(genre).toHaveValue('');
     await expect(page.locator('.all-songs-table .song-name')).toHaveText([
         'Blue pocket',

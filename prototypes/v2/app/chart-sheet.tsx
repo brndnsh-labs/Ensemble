@@ -372,6 +372,7 @@ export function ChartSheet({
     ];
     const notation = arrangementOf(current).notation;
     let barNumber = 0;
+    let lastContext: string | null = null;
     return (
         <article className="sheet">
             {blocks.map((block) => (
@@ -440,6 +441,13 @@ export function ChartSheet({
                             const owningSection = writtenSections.get(measure.sectionId ?? '');
                             const sectionSeam =
                                 measure.isSeamlessStart && measure.sectionId !== block.id;
+                            // Key and meter are marked at the chart's first bar and then only
+                            // where they change, across sections too: a tune that never leaves
+                            // Gm · 4/4 says so once, not at every section (UI audit).
+                            const first = measure.chords[0];
+                            const context = `${first?.key}${first?.keyIsMinor ? 'm' : ''} ${first?.timeSignature}`;
+                            const previousContext = lastContext;
+                            lastContext = context;
                             const repeatStart = writtenBar?.start?.some(
                                 (mark) => mark.kind === 'repeat-start',
                             );
@@ -542,15 +550,7 @@ export function ChartSheet({
                                         </button>
                                     )}
                                     {current.schemaVersion === 2 &&
-                                        (i === 0 ||
-                                            sectionSeam ||
-                                            measure.chords[0]?.key !==
-                                                block.measures[i - 1]?.chords[0]?.key ||
-                                            measure.chords[0]?.keyIsMinor !==
-                                                block.measures[i - 1]?.chords[0]?.keyIsMinor ||
-                                            measure.chords[0]?.timeSignature !==
-                                                block.measures[i - 1]?.chords[0]
-                                                    ?.timeSignature) && (
+                                        (sectionSeam || context !== previousContext) && (
                                             <span className="bar-context">
                                                 {sectionSeam && owningSection && (
                                                     <b

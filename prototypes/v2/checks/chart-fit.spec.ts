@@ -155,4 +155,7 @@ test('a chart that fits shows neither the next-chorus line nor the strip', async
     await expect(page.locator('.chart-scroll[data-fits="true"]')).toBeVisible();
     await expect(page.locator('.next-chorus')).toBeHidden();
     await expect(page.getByRole('navigation', { name: 'Form' })).toBeHidden();
+    // Never leaves Gm · 4/4, so it says so once, at bar 1, not at every section (UI audit).
+    await expect(page.locator('.bar-context')).toHaveCount(1);
+    await expect(page.locator('.bar').first().locator('.bar-context')).toHaveText('Gm · 4/4');
 });

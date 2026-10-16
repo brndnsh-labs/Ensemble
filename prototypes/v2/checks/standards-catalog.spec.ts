@@ -75,9 +75,9 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
     await row.getByRole('button', { name: 'Open' }).click();
 
     await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
-    await expect(page.getByTestId('stand-toast')).toContainText(
-        'Opened a standard · not saved yet',
-    );
+    // The header says it; a toast over the chart saying it again was cut (UI audit).
+    await expect(page.locator('.song-subtitle')).toBeVisible();
+    await expect(page.getByText('Opened a standard')).toHaveCount(0);
     // #1700 — the header said "Opened from a shared link" for a standard.
     await expect(page.locator('.song-subtitle')).toContainText('From the standards · not saved');
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C7']);
