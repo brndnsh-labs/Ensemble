@@ -107,7 +107,7 @@ import type { Lane } from './band-lanes';
 import { PlayersTab } from './band-players';
 import { BandSheet, type BandTab } from './band-sheet';
 import { TradeTab } from './band-trade';
-import { ChartSheet } from './chart-sheet';
+import { type BarEditing, ChartSheet, type OpenBar } from './chart-sheet';
 import {
     type CollectionDeleteTarget,
     CollectionNameDialog,
@@ -126,6 +126,17 @@ import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
 import { type FeaturedSummary, Songbook, type StandardsEntry } from './songbook';
 import { StandardsBrowser } from './standards-browser';
 import { TransportBar } from './transport-bar';
+import {
+    BarDraftError,
+    barField,
+    barFields,
+    barProblem,
+    commitBarDrafts,
+    dependsOnPending,
+    draftChange,
+    initialDraft,
+    useBarDrafts,
+} from './use-bar-drafts';
 import { useChartFit } from './use-chart-fit';
 import { useChartView } from './use-chart-view';
 import { useCollections } from './use-collections';
@@ -595,6 +606,14 @@ export default function Ensemble() {
     const [pendingMeasures, setPendingMeasures] = useState(false);
     const measureEditor = useRef<MeasureEditorHandle>(null);
     const pendingText = useRef(false);
+    // The bars typed but not yet applied (#1723), one draft per bar, shared by the chart's
+    // in-bar field and the panel's `MeasureEditor`.
+    const barDrafts = useBarDrafts(current?.id ?? '', (pending) => {
+        pendingText.current = pending;
+        setPendingMeasures(pending);
+    });
+    // The bar whose field is open on the chart (#1723), or null.
+    const [openBar, setOpenBar] = useState<OpenBar | null>(null);
     const [editorRequest, setEditorRequest] = useState(0);
     const revealedEditorRequest = useRef(0);
     // #1440 — set just before an `editorRequest` bump that should focus the title field instead
@@ -1223,6 +1242,42 @@ export default function Ensemble() {
         !!saved &&
         sameMusic(current, saved);
     const playbackActive = playing || playbackPending;
+    // Typing on the chart (#1723) is for a measure chart in the editor; leaving it closes the
+    // field (what it held is applied or still pending, never lost).
+    const typeOnChart = editing && current?.schemaVersion === 2;
+    useEffect(() => {
+        if (!typeOnChart) {
+            setOpenBar(null);
+        }
+    }, [typeOnChart]);
+    // The bars changed since the chart was last kept, for the dot by each bar number: against the
+    // saved song, or the draft as it landed (a standard, a shared link) when there is none.
+    const keptBaseline = saved ?? draftBaseline.current;
+    const keptBars = useMemo(
+        () =>
+            new Map(
+                keptBaseline?.schemaVersion === 2
+                    ? keptBaseline.chart.score.sections.flatMap((section) =>
+                          section.measures.map((m) => [m.id, JSON.stringify(m)] as const),
+                      )
+                    : [],
+            ),
+        [keptBaseline],
+    );
+    const liveScore = typeOnChart && current?.schemaVersion === 2 ? current.chart.score : null;
+    const liveBars = useMemo(
+        () =>
+            new Map(
+                liveScore?.sections.flatMap((section) =>
+                    section.measures.map((m) => [m.id, JSON.stringify(m)] as const),
+                ) ?? [],
+            ),
+        [liveScore],
+    );
+    const chartFields = useMemo(
+        () => (liveScore ? barFields(liveScore, barDrafts.drafts) : new Map()),
+        [liveScore, barDrafts.drafts],
+    );
     const focused = playbackActive && !showControls && !editing;
 
     useEffect(() => {
@@ -2818,7 +2873,9 @@ export default function Ensemble() {
         showEditor();
         setEditorRequest((request) => request + 1);
     }
-    function applyScore(score: SemanticScore): ChartDocument {
+    /** Adopt `score` as the chart. `onlyBar` names the one pending bar it folded in (leaving a
+     * bar on the chart, #1723), and only that draft retires; otherwise every draft does. */
+    function applyScore(score: SemanticScore, onlyBar?: string): ChartDocument {
         if (current?.schemaVersion !== 2) {
             throw new Error('Open a measure-based chart first.');
         }
@@ -2826,12 +2883,123 @@ export default function Ensemble() {
         runtime.load(candidate);
         const next = runtime.captureDocument(candidate);
         draft(next);
+        if (onlyBar !== undefined) {
+            barDrafts.retire([onlyBar]);
+            return next;
+        }
         pendingText.current = false;
         setPendingMeasures(false);
         // A subsequent transpose may immediately replace the accepted score again.
         // Retire these raw buffers on successful runtime adoption, not object equality.
         measureEditor.current?.reset();
         return next;
+    }
+    /**
+     * Leaving a bar on the chart applies it (#1723): its draft alone, as an unsaved change, the
+     * way "Update chart" does. A bar whose chords do not read stays pending — tinted on the
+     * chart, and Save refuses it — and so does any bar while another change is in flight.
+     */
+    function applyBar(measureId: string) {
+        if (current?.schemaVersion !== 2 || working.current) {
+            return;
+        }
+        const pending = barDrafts.latest();
+        const score = current.chart.score;
+        if (!pending.has(measureId) || barProblem(score, pending, measureId)) {
+            return;
+        }
+        try {
+            // A bar that reads differently once another pending bar's key or meter change counts
+            // can only be applied together with it: every pending bar goes, as Update chart does.
+            if (dependsOnPending(score, pending, measureId)) {
+                applyScore(commitBarDrafts(score, pending));
+            } else {
+                applyScore(commitBarDrafts(score, pending, measureId), measureId);
+            }
+            setError('');
+        } catch (reason) {
+            // Its chords read, but the chart does not (a meter change a later bar no longer
+            // fits): kept pending, and said where the shell says a refused change.
+            setError(reason instanceof Error ? reason.message : String(reason));
+        }
+    }
+    /** Select a bar and, where the quick editor can edit it, open its field on the chart. */
+    function openBarField(measureId: string, select: OpenBar['select'] = 'end') {
+        if (current?.schemaVersion !== 2) {
+            return;
+        }
+        if (openBar?.id === measureId) {
+            return;
+        }
+        if (openBar) {
+            applyBar(openBar.id);
+        }
+        setMeasureId(measureId);
+        const field = barField(current.chart.score, barDrafts.latest(), measureId);
+        setOpenBar(field && field.text !== null ? { id: measureId, select } : null);
+    }
+    /** What the chart's in-bar field asks of the shell (#1723); null unless it can be used. */
+    function barEditing(): BarEditing | null {
+        if (!typeOnChart || current?.schemaVersion !== 2) {
+            return null;
+        }
+        const score = current.chart.score;
+        const drafts = barDrafts.drafts;
+        return {
+            open: openBar,
+            text: (id) => chartFields.get(id)?.text ?? null,
+            problem: (id) => chartFields.get(id)?.problem ?? null,
+            edited: (id) =>
+                drafts.has(id) || (keptBars.size > 0 && keptBars.get(id) !== liveBars.get(id)),
+            onOpen: (id) => openBarField(id),
+            onText(id, text) {
+                const field = barField(score, barDrafts.latest(), id);
+                if (field && field.text !== null && !busy) {
+                    barDrafts.put(id, draftChange(field.original, { ...field.draft, text }));
+                }
+            },
+            onLeave(from, step) {
+                applyBar(from.id);
+                if (step === 0) {
+                    setOpenBar((open) => (open === from ? null : open));
+                    return false;
+                }
+                // Tab/Enter pass over a bar the quick editor cannot edit; at either end, stay.
+                const ids = score.sections.flatMap((section) => section.measures.map((m) => m.id));
+                const pending = barDrafts.latest();
+                let at = ids.indexOf(from.id) + step;
+                while (
+                    at >= 0 &&
+                    at < ids.length &&
+                    barField(score, pending, ids[at])?.text == null
+                ) {
+                    at += step;
+                }
+                if (at < 0 || at >= ids.length) {
+                    // Past either end there is no bar to go to: the field closes, and Tab carries
+                    // on through the page's own focus order (review P2).
+                    setOpenBar((open) => (open === from ? null : open));
+                    return false;
+                }
+                setMeasureId(ids[at]);
+                setOpenBar({ id: ids[at], select: 'all' });
+                return true;
+            },
+            onRevert(from) {
+                const pending = barDrafts.latest();
+                const field = barField(score, pending, from.id);
+                if (field && pending.has(from.id)) {
+                    barDrafts.put(
+                        from.id,
+                        draftChange(field.original, {
+                            ...field.draft,
+                            text: initialDraft(field.original).text,
+                        }),
+                    );
+                }
+                setOpenBar((open) => (open === from ? null : open));
+            },
+        };
     }
     function updateChart(): ChartDocument {
         if (!current) {
@@ -2849,6 +3017,21 @@ export default function Ensemble() {
             } catch (error) {
                 setMenu(false);
                 showEditor();
+                // The bar that needs fixing opens on the chart, its text ready to correct
+                // (#1723). A fresh opening, so the blur of the field Save was pressed from
+                // cannot close it.
+                if (error instanceof BarDraftError && error.measureId) {
+                    const field = barField(
+                        current.chart.score,
+                        barDrafts.latest(),
+                        error.measureId,
+                    );
+                    setOpenBar(
+                        field && field.text !== null
+                            ? { id: error.measureId, select: 'end' }
+                            : null,
+                    );
+                }
                 throw error;
             }
         }
@@ -6107,13 +6290,7 @@ export default function Ensemble() {
                                             }
                                             revealEditor(block.id);
                                         }}
-                                        onSelectBar={(measure) =>
-                                            setMeasureId(measure.chords[0]?.measureId ?? '')
-                                        }
-                                        onEditBar={(measure) => {
-                                            setMeasureId(measure.chords[0]?.measureId ?? '');
-                                            revealEditor(measure.sectionId);
-                                        }}
+                                        barEdit={barEditing()}
                                         onAudition={(index) => runtime.audition(index)}
                                         onChoruses={changeChoruses}
                                     />
@@ -6140,11 +6317,16 @@ export default function Ensemble() {
                             onSongMeter={changeSongMeter}
                             onSongMode={(isMinor) => change(() => runtime.setMode(isMinor), true)}
                             onChoruses={changeChoruses}
-                            onSelectMeasure={setMeasureId}
-                            onPendingChange={(pending) => {
-                                pendingText.current = pending;
-                                setPendingMeasures(pending);
+                            onSelectMeasure={(id) => {
+                                // A bar picked in the panel leaves the chart's open field the same
+                                // way a press on another bar does (review P2).
+                                if (openBar && openBar.id !== id) {
+                                    applyBar(openBar.id);
+                                    setOpenBar(null);
+                                }
+                                setMeasureId(id);
                             }}
+                            barDrafts={barDrafts}
                             onApply={(score) =>
                                 void run(() => {
                                     applyScore(score);

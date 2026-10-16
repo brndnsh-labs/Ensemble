@@ -111,7 +111,7 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     // Editing is open to them too: type a hold into a bar, then save the chart.
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await page.getByRole('button', { name: 'Edit bar 3', exact: true }).click();
-    await editorRevealed(page);
+    await expect(page.getByLabel('Chords in bar 3', { exact: true })).toBeFocused();
     await page.getByLabel('Chords in this bar').fill('F /');
     await page.getByRole('button', { name: 'Update chart', exact: true }).click();
     await expect(sheetBars.nth(2).locator('.chord')).toHaveText(['F', '/']);
@@ -119,7 +119,7 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     // The last bar's own fermata (authored by the import, not the UI) is no longer read-only:
     // its chords stay editable text, and the toggle reflects and can clear the flag.
     await page.getByRole('button', { name: 'Edit bar 4', exact: true }).click();
-    await editorRevealed(page);
+    await expect(page.getByLabel('Chords in bar 4', { exact: true })).toBeFocused();
     const fermataToggle = page.getByLabel('Fermata (hold the last chord)', { exact: true });
     await expect(fermataToggle).toBeChecked();
     await expect(page.getByLabel('Chords in this bar')).toBeEditable();
@@ -130,7 +130,7 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
 
     // Setting it again, through the toggle alone, puts the 𝄐 back without retyping the chords.
     await page.getByRole('button', { name: 'Edit bar 4', exact: true }).click();
-    await editorRevealed(page);
+    await expect(page.getByLabel('Chords in bar 4', { exact: true })).toBeFocused();
     await expect(fermataToggle).not.toBeChecked();
     await fermataToggle.check();
     await page.getByRole('button', { name: 'Update chart', exact: true }).click();

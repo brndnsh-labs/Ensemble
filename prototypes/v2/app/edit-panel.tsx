@@ -5,6 +5,7 @@ import { arrangementOf, type SectionChange } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import { MeasureEditor, type MeasureEditorHandle } from './measure-editor';
 import { SectionSettings } from './section-settings';
+import type { BarDrafts } from './use-bar-drafts';
 
 /** The Choruses control's counts (#1475). The chart format allows up to 64 (`score-codec.ts`). */
 const CHORUS_COUNTS = Array.from({ length: 16 }, (_, i) => i + 1);
@@ -29,7 +30,8 @@ interface EditPanelProps {
     /** How many choruses the band plays, then stops (#1475); `undefined` is Loop. */
     onChoruses: (choruses: number | undefined) => void;
     onSelectMeasure: (id: string) => void;
-    onPendingChange: (pending: boolean) => void;
+    /** The pending bars, shared with the chart's in-bar field (#1723). */
+    barDrafts: BarDrafts;
     onApply: (score: SemanticScore) => void;
     onApplyForm: (score: SemanticScore) => void;
     onExtend: (newSection: boolean) => void;
@@ -59,7 +61,7 @@ export function EditPanel({
     onSongMode,
     onChoruses,
     onSelectMeasure,
-    onPendingChange,
+    barDrafts,
     onApply,
     onApplyForm,
     onExtend,
@@ -98,7 +100,7 @@ export function EditPanel({
                         selectedMeasureId={measureId}
                         onSelect={onSelectMeasure}
                         disabled={busy}
-                        onPendingChange={onPendingChange}
+                        barDrafts={barDrafts}
                         onApply={onApply}
                         onApplyForm={onApplyForm}
                     />

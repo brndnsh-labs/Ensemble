@@ -9,7 +9,7 @@ import {
     useState,
 } from 'react';
 import { arrangementOf } from '../lib/documents';
-import type { ChartBlock, ChartChord, ChartMeasure } from '../lib/lead-sheet';
+import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
 
@@ -78,14 +78,48 @@ function eventText(chord: ChartChord, notation: ChartNotation): ReactNode {
           : chordSymbol(chord, notation);
 }
 
-function eventLabel(chord: ChartChord): string {
+/** `audition` false while editing: a chord there opens its bar's field instead of sounding. */
+function eventLabel(chord: ChartChord, audition = true): string {
     const what =
         chord.kind === 'hold'
             ? 'Hold the chord before'
             : chord.kind === 'no-chord'
               ? 'No chord'
-              : `Audition ${chord.absName}`;
+              : audition
+                ? `Audition ${chord.absName}`
+                : chord.absName;
     return chord.fermata ? `${what}, with a fermata` : what;
+}
+
+/** The bar whose chords are being typed on the chart (#1723), and where its caret starts: at the
+ * end (a click), or over the whole text (Tab/Enter from the bar before, so typing replaces it).
+ * A new object per opening — what a leave or a focus is matched against. */
+export interface OpenBar {
+    id: string;
+    select: 'end' | 'all';
+}
+
+/**
+ * Typing chords straight into a bar (#1723), while editing a measure chart. The shell owns the
+ * drafts (`useBarDrafts`) and what a leave applies; the sheet draws the field and reads its keys.
+ */
+export interface BarEditing {
+    open: OpenBar | null;
+    /** What the bar's field holds — its draft, else its chords — or null where the quick editor
+     * cannot edit the bar (a measure repeat, or a fermata off the last chord): no field there. */
+    text: (measureId: string) => string | null;
+    /** Why the bar's pending chords cannot be read ("Can't read “X”"), or null. */
+    problem: (measureId: string) => string | null;
+    /** Changed since the chart was last saved, or pending: the dot by the bar number. */
+    edited: (measureId: string) => boolean;
+    /** A click or tap on the bar: select it, and open its field where it has one. */
+    onOpen: (measureId: string) => void;
+    onText: (measureId: string, text: string) => void;
+    /** Leaving `from`: apply its chords if they read, then move a bar (Tab/Enter) or close. */
+    /** Leaves the bar, and for ±1 moves to the next one; false when there was none to move to. */
+    onLeave: (from: OpenBar, step: -1 | 0 | 1) => boolean;
+    /** Esc: the bar's chords back as last applied, and the field closed. */
+    onRevert: (from: OpenBar) => void;
 }
 
 interface ChartSheetProps {
@@ -116,10 +150,8 @@ interface ChartSheetProps {
      * performed bar, starting it if stopped. */
     onStartHere: (sectionId: string | undefined) => void;
     onEditSection: (block: ChartBlock) => void;
-    onEditBar: (measure: ChartMeasure) => void;
-    /** A tap on a bar while editing (#1700): picks it for the editor and nothing more — unlike
-     * the bar's Edit button, it neither stops the band nor moves focus to the panel. */
-    onSelectBar: (measure: ChartMeasure) => void;
+    /** Set while editing a measure chart (#1723); null otherwise. */
+    barEdit: BarEditing | null;
     onAudition: (globalIndex: number) => void;
     /** How many times the band plays the form, then stops (#1511, the footer's menu);
      * `undefined` repeats it continuously. On a text chart the shell makes the measure copy
@@ -149,8 +181,7 @@ export function ChartSheet({
     totalBars,
     onStartHere,
     onEditSection,
-    onEditBar,
-    onSelectBar,
+    barEdit,
     onAudition,
     onChoruses,
 }: ChartSheetProps) {
@@ -370,11 +401,78 @@ export function ChartSheet({
             (a, b) => a - b,
         ),
     ];
+    // The in-bar field (#1723). Focused, with its caret placed, once per opening; focused again
+    // if a re-render remounts it while it had focus (a bar's key moves when an edit before it
+    // changes how many chords come first), but never pulled back once focus has gone elsewhere.
+    const open = barEdit?.open ?? null;
+    const placedFor = useRef<OpenBar | null>(null);
+    const fieldNode = useRef<HTMLInputElement | null>(null);
+    const sheet = useRef<HTMLElement>(null);
+    const refocusBar = useRef<string | null>(null);
+    function fieldRef(node: HTMLInputElement | null) {
+        if (!node || !open) {
+            return;
+        }
+        const fresh = placedFor.current !== open;
+        const dropped =
+            fieldNode.current !== node &&
+            (document.activeElement === null || document.activeElement === document.body);
+        fieldNode.current = node;
+        placedFor.current = open;
+        if (fresh || dropped) {
+            node.focus();
+        }
+        if (fresh) {
+            if (open.select === 'all') {
+                node.select();
+            } else {
+                node.setSelectionRange(node.value.length, node.value.length);
+            }
+        }
+    }
+    // Esc closes the field; focus lands on the bar's own number, so the keyboard stays there.
+    useEffect(() => {
+        if (open || !refocusBar.current) {
+            return;
+        }
+        const id = refocusBar.current;
+        refocusBar.current = null;
+        sheet.current
+            ?.querySelector<HTMLElement>(`[data-measure-id="${CSS.escape(id)}"] .bar-number`)
+            ?.focus();
+    }, [open]);
+    function onFieldKey(event: ReactKeyboardEvent<HTMLInputElement>, from: OpenBar) {
+        if (!barEdit || event.nativeEvent.isComposing) {
+            return;
+        }
+        // The chart's own keys (an arrow browsing away from Following) are not the field's.
+        event.stopPropagation();
+        if (event.key === 'Tab' || event.key === 'Enter') {
+            const moved = barEdit.onLeave(from, event.key === 'Tab' && event.shiftKey ? -1 : 1);
+            // Tab past the first or last bar is the page's again; within the chart it is ours.
+            if (moved || event.key === 'Enter') {
+                event.preventDefault();
+            }
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            refocusBar.current = from.id;
+            barEdit.onRevert(from);
+        }
+    }
+    function onFieldBlur(from: OpenBar) {
+        // Focus going elsewhere on the page is leaving the bar; the window losing focus (another
+        // app, another tab) is not. A press on another bar never gets here: it keeps focus off
+        // the way (`onMouseDown`) and leaves through `onOpen`. Matched on the opening, not the
+        // bar, so a newer opening of the same bar (Save landing on it) is not closed by this.
+        if (document.hasFocus()) {
+            barEdit?.onLeave(from, 0);
+        }
+    }
     const notation = arrangementOf(current).notation;
     let barNumber = 0;
     let lastContext: string | null = null;
     return (
-        <article className="sheet">
+        <article className="sheet" ref={sheet}>
             {blocks.map((block) => (
                 <section className="section" key={block.measures[0]?.chords[0]?.globalIndex}>
                     <div className="section-head">
@@ -466,34 +564,81 @@ export function ChartSheet({
                             const isNext = measure.chords.some(
                                 (c) => c.globalIndex === displayNext,
                             );
+                            // Typing on the chart (#1723): the bar is the target while editing a
+                            // measure chart, and the selected one holds the field once opened.
+                            const measureId = measure.chords[0]?.measureId ?? '';
+                            const selected =
+                                selectedMeasureId !== null && measureId === selectedMeasureId;
+                            const typeable = barEdit !== null && barEdit.text(measureId) !== null;
+                            const typing =
+                                open !== null && selected && open.id === measureId && typeable;
+                            const problem = barEdit?.problem(measureId) ?? null;
+                            const edited = barEdit?.edited(measureId) ?? false;
                             return (
                                 <div
-                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selectedMeasureId !== null && measure.chords[0]?.measureId === selectedMeasureId ? 'selected' : ''}${measureRepeat ? '' : splitClass(measure.chords.length)}`}
+                                    className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selected ? 'selected' : ''}${typing ? ' typing' : ''}${problem ? ' unreadable' : ''}${edited ? ' edited' : ''}${measureRepeat ? '' : splitClass(measure.chords.length)}`}
                                     data-measure-id={writtenBar?.id}
                                     data-active={measure.chords.some(
                                         (c) => c.globalIndex === displayActive,
                                     )}
                                     data-next={isNext ? (nextSoon ? 'soon' : 'true') : undefined}
                                     key={measure.chords[0]?.globalIndex}
-                                    // While editing a measure chart the whole bar picks itself
-                                    // for the editor (#1700) — `.editing .bar` already promised
-                                    // that with its pointer cursor and hover fill. Select only: a
-                                    // stray tap must not stop the band or pull a phone's view up
-                                    // to the panel. A chord inside still auditions; the bar's own
-                                    // Edit button stays the keyboard path, and the full reveal.
-                                    onClick={
-                                        current.schemaVersion === 2 && editing && !busy
+                                    // While editing a measure chart the whole bar is the target
+                                    // (#1700, #1723): a press anywhere on it selects it and opens
+                                    // its field, on the press, so focus never passes through
+                                    // anything else on the way (no blur, no stray apply) — and
+                                    // never stopping the band or pulling a phone's view up to
+                                    // the panel. A press inside the open field is the caret's.
+                                    // The click covers a keyboard press of the bar's number.
+                                    onMouseDown={
+                                        barEdit && !busy
                                             ? (event) => {
                                                   if (
-                                                      !(event.target as Element).closest('button')
+                                                      event.button !== 0 ||
+                                                      (event.target as Element).closest(
+                                                          '.bar-input',
+                                                      )
                                                   ) {
-                                                      onSelectBar(measure);
+                                                      return;
+                                                  }
+                                                  if (typeable) {
+                                                      event.preventDefault();
+                                                  }
+                                                  barEdit.onOpen(measureId);
+                                              }
+                                            : undefined
+                                    }
+                                    onClick={
+                                        barEdit && !busy
+                                            ? (event) => {
+                                                  if (
+                                                      !(event.target as Element).closest(
+                                                          '.bar-input',
+                                                      ) &&
+                                                      (typeable ||
+                                                          !(event.target as Element).closest(
+                                                              '.chord-button',
+                                                          ))
+                                                  ) {
+                                                      barEdit.onOpen(measureId);
                                                   }
                                               }
                                             : undefined
                                     }
                                 >
-                                    <span className="bar-number">{barNumber}</span>
+                                    {barEdit ? (
+                                        // The keyboard's way to a bar, one stop per bar.
+                                        <button
+                                            type="button"
+                                            className="bar-number"
+                                            disabled={busy}
+                                            aria-label={`Edit bar ${barNumber}`}
+                                        >
+                                            {barNumber}
+                                        </button>
+                                    ) : (
+                                        <span className="bar-number">{barNumber}</span>
+                                    )}
                                     {navigation.length > 0 && (
                                         <span className="bar-navigation">
                                             {navigation.map(directionLabel).join(' · ')}
@@ -539,16 +684,6 @@ export function ChartSheet({
                                             )}
                                         </span>
                                     )}
-                                    {current.schemaVersion === 2 && editing && (
-                                        <button
-                                            className="bar-edit"
-                                            disabled={busy}
-                                            aria-label={`Edit bar ${barNumber}`}
-                                            onClick={() => onEditBar(measure)}
-                                        >
-                                            Edit
-                                        </button>
-                                    )}
                                     {current.schemaVersion === 2 &&
                                         (sectionSeam || context !== previousContext) && (
                                             <span className="bar-context">
@@ -577,8 +712,33 @@ export function ChartSheet({
                                                 {note.text}
                                             </span>
                                         ))}
+                                    {typing && open && (
+                                        <input
+                                            ref={fieldRef}
+                                            className="bar-input"
+                                            aria-label={`Chords in bar ${barNumber}`}
+                                            aria-invalid={problem ? true : undefined}
+                                            value={barEdit?.text(measureId) ?? ''}
+                                            maxLength={4000}
+                                            readOnly={busy}
+                                            spellCheck={false}
+                                            autoCapitalize="off"
+                                            autoCorrect="off"
+                                            autoComplete="off"
+                                            enterKeyHint="next"
+                                            onChange={(event) =>
+                                                barEdit?.onText(measureId, event.target.value)
+                                            }
+                                            onKeyDown={(event) => onFieldKey(event, open)}
+                                            onBlur={() => onFieldBlur(open)}
+                                        />
+                                    )}
+                                    {problem && <span className="bar-problem">{problem}</span>}
                                     {measure.chords
-                                        .filter((_, index) => !measureRepeat || index === 0)
+                                        .filter(
+                                            (_, index) =>
+                                                !typing && (!measureRepeat || index === 0),
+                                        )
                                         .map((c) => (
                                             <button
                                                 className={`chord chord-button${c.kind && c.kind !== 'chord' ? ` ${c.kind}` : ''}${c.fermata ? ' has-fermata' : ''}`}
@@ -627,17 +787,22 @@ export function ChartSheet({
                                                         : undefined
                                                 }
                                                 key={c.globalIndex}
+                                                // An editable bar's chords open its field while
+                                                // editing (#1723): not a stop of their own (the
+                                                // bar number is), and live while the band plays.
+                                                tabIndex={typeable ? -1 : undefined}
                                                 disabled={
-                                                    playing ||
-                                                    busy ||
-                                                    c.globalIndex < 0 ||
-                                                    // A hold or N.C. has no chord of its own to audition.
-                                                    (!!c.kind && c.kind !== 'chord')
+                                                    !typeable &&
+                                                    (playing ||
+                                                        busy ||
+                                                        c.globalIndex < 0 ||
+                                                        // A hold or N.C. has no chord of its own to audition.
+                                                        (!!c.kind && c.kind !== 'chord'))
                                                 }
                                                 aria-label={
                                                     measureRepeat
                                                         ? `Repeated bar: ${measure.chords.map((event) => event.absName).join(', ')}`
-                                                        : eventLabel(c)
+                                                        : eventLabel(c, !typeable)
                                                 }
                                                 title={
                                                     measureRepeat
@@ -646,7 +811,11 @@ export function ChartSheet({
                                                               .join(' · ')
                                                         : undefined
                                                 }
-                                                onClick={() => onAudition(c.globalIndex)}
+                                                onClick={
+                                                    typeable
+                                                        ? undefined
+                                                        : () => onAudition(c.globalIndex)
+                                                }
                                             >
                                                 {c.fermata && !measureRepeat && (
                                                     <span className="fermata" aria-hidden="true">
