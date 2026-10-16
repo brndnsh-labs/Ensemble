@@ -4,6 +4,7 @@ import type { ChartDocument } from '../lib/documents';
 import {
     appUrl,
     test as base,
+    closeBarDock,
     editorRevealed,
     expect,
     openWholeSong,
@@ -147,10 +148,14 @@ test('unfinished bars survive selection, errors and hidden editor; Save commits 
     await page.getByLabel('Chords in this bar').fill('not-a-chord');
     await page.getByRole('button', { name: 'Previous bar', exact: true }).click();
     for (const name of ['Save', 'Back to songbook', 'Start playback']) {
+        // A refused change opens the bar that needs fixing; on a phone that is the bar dock,
+        // which folds the transport and panel away until Done (#1724).
+        await closeBarDock(page);
         await page.getByRole('button', { name, exact: true }).click();
         await expect(page.locator('.error-banner')).toBeVisible();
         expect(await documents(page)).toEqual(original);
     }
+    await closeBarDock(page);
     await page.getByRole('button', { name: 'Previous bar', exact: true }).click();
     await expect(page.getByLabel('Chords in this bar')).toHaveValue('C Dm G7');
     await page.getByLabel('Chords in this bar').fill('C:2 Dm:1 G7:1');

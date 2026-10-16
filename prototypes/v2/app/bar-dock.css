@@ -1,0 +1,107 @@
+/* The phone's bar field (#1724), docked on top of the on-screen keyboard: `bottom` is set from
+   `visualViewport` (`bar-dock.tsx`). With the keyboard down it sits at the screen's foot, clear
+   of the home indicator; with it up, straight on top of it. */
+.bar-dock {
+    position: fixed;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--paper-raised);
+    border-top: 1px solid var(--line);
+    box-shadow: 0 -6px 18px #0000000f;
+    padding: 6px max(6px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom))
+        max(6px, env(safe-area-inset-left));
+}
+.bar-dock[data-keyboard] {
+    padding-bottom: 4px;
+}
+.bar-dock-row {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.bar-dock-button {
+    flex: none;
+    min-width: 44px;
+    height: 44px;
+    border-radius: 9px;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1;
+}
+.bar-dock-button[aria-disabled="true"] {
+    opacity: 0.4;
+}
+.bar-dock-done {
+    padding: 0 12px;
+    font-size: 14px;
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--on-ink);
+}
+.bar-dock-field {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 10px;
+    border-radius: 9px;
+    border: 2px solid var(--accent);
+    background: var(--surface);
+}
+.bar-dock-field.invalid {
+    border-color: var(--danger);
+}
+.bar-dock-bar {
+    flex: none;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 600;
+}
+.bar-dock-input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    /* 16px or more, or iOS zooms the page in on focus. */
+    font-size: 19px;
+    caret-color: var(--accent);
+}
+.bar-dock-input:focus-visible {
+    outline: none;
+}
+/* The endings scroll sideways inside their row, never the page. */
+.bar-dock-keys {
+    display: flex;
+    gap: 5px;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 6px 0 2px;
+    scrollbar-width: none;
+}
+.bar-dock-keys::-webkit-scrollbar {
+    display: none;
+}
+.bar-dock-key {
+    flex: none;
+    min-width: 40px;
+    height: 36px;
+    padding: 0 11px;
+    border-radius: 8px;
+    border: 0;
+    background: var(--chip);
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 17px;
+}
+.bar-dock-key[aria-disabled="true"] {
+    opacity: 0.4;
+}

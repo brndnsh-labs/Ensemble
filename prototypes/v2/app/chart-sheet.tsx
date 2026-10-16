@@ -8,10 +8,12 @@ import {
     useRef,
     useState,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { arrangementOf } from '../lib/documents';
 import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
+import { BarDock, usePhoneWidth } from './bar-dock';
 
 type WrittenSection = SemanticScore['sections'][number];
 type WrittenBar = WrittenSection['measures'][number];
@@ -118,6 +120,8 @@ export interface BarEditing {
     /** Leaving `from`: apply its chords if they read, then move a bar (Tab/Enter) or close. */
     /** Leaves the bar, and for ±1 moves to the next one; false when there was none to move to. */
     onLeave: (from: OpenBar, step: -1 | 0 | 1) => boolean;
+    /** Whether there is a bar to move to from `measureId`, for the phone's ‹ and › (#1724). */
+    canMove: (measureId: string, step: -1 | 1) => boolean;
     /** Esc: the bar's chords back as last applied, and the field closed. */
     onRevert: (from: OpenBar) => void;
 }
@@ -468,6 +472,26 @@ export function ChartSheet({
             barEdit?.onLeave(from, 0);
         }
     }
+    // At phone width the open bar is typed in a field docked on the keyboard (#1724), not in
+    // the bar: the bar shows its text live, the dock holds the one input.
+    const docked = usePhoneWidth() && barEdit !== null;
+    const openText = open && barEdit ? barEdit.text(open.id) : null;
+    let openNumber = 0;
+    if (docked && open && selectedMeasureId === open.id && openText !== null) {
+        openNumber =
+            blocks
+                .flatMap((block) => block.measures)
+                .findIndex((measure) => measure.chords[0]?.measureId === open.id) + 1;
+    }
+    /** A bar's press opens it. On a phone the dock mounts and its field takes focus within the
+     * press itself (`flushSync`), as iOS raises its keyboard only for a focus a tap makes. */
+    function openOnPress(measureId: string) {
+        if (docked) {
+            flushSync(() => barEdit?.onOpen(measureId));
+        } else {
+            barEdit?.onOpen(measureId);
+        }
+    }
     const notation = arrangementOf(current).notation;
     let barNumber = 0;
     let lastContext: string | null = null;
@@ -604,7 +628,7 @@ export function ChartSheet({
                                                   if (typeable) {
                                                       event.preventDefault();
                                                   }
-                                                  barEdit.onOpen(measureId);
+                                                  openOnPress(measureId);
                                               }
                                             : undefined
                                     }
@@ -620,7 +644,7 @@ export function ChartSheet({
                                                               '.chord-button',
                                                           ))
                                                   ) {
-                                                      barEdit.onOpen(measureId);
+                                                      openOnPress(measureId);
                                                   }
                                               }
                                             : undefined
@@ -712,7 +736,13 @@ export function ChartSheet({
                                                 {note.text}
                                             </span>
                                         ))}
-                                    {typing && open && (
+                                    {typing && docked && (
+                                        // The dock's text, live in the bar it goes to.
+                                        <span className="bar-draft">
+                                            {barEdit?.text(measureId)}
+                                        </span>
+                                    )}
+                                    {typing && open && !docked && (
                                         <input
                                             ref={fieldRef}
                                             className="bar-input"
@@ -942,6 +972,32 @@ export function ChartSheet({
                         Start here
                     </button>
                 </div>
+            )}
+            {openNumber > 0 && open && barEdit && (
+                <BarDock
+                    bar={openNumber}
+                    value={openText ?? ''}
+                    invalid={barEdit.problem(open.id) !== null}
+                    busy={busy}
+                    inputRef={fieldRef}
+                    canPrevious={barEdit.canMove(open.id, -1)}
+                    canNext={barEdit.canMove(open.id, 1)}
+                    onText={(text) => barEdit.onText(open.id, text)}
+                    onKeyDown={(event) => onFieldKey(event, open)}
+                    onBlur={() => onFieldBlur(open)}
+                    onStep={(step) => barEdit.onLeave(open, step)}
+                    onDone={() => {
+                        // As Esc does, focus lands on the bar's number: off the field, so the
+                        // keyboard goes down, and still on the bar.
+                        refocusBar.current = open.id;
+                        barEdit.onLeave(open, 0);
+                    }}
+                    onReveal={() =>
+                        sheet.current
+                            ?.querySelector('.bar.typing')
+                            ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+                    }
+                />
             )}
         </article>
     );

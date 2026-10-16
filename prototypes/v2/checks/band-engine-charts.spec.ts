@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import type { ChartDocumentV2 } from '../../../public/songbook/score-types';
-import { appUrl, editorRevealed, expect, test } from './fixtures';
+import { appUrl, closeBarDock, editorRevealed, expect, test } from './fixtures';
 
 async function exportCurrent(page: Page): Promise<ChartDocumentV2> {
     await page.getByRole('button', { name: 'Song actions' }).click();
@@ -112,6 +112,8 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await page.getByRole('button', { name: 'Edit bar 3', exact: true }).click();
     await expect(page.getByLabel('Chords in bar 3', { exact: true })).toBeFocused();
+    // The panel is a phone's again once its bar dock is closed (#1724).
+    await closeBarDock(page);
     await page.getByLabel('Chords in this bar').fill('F /');
     await page.getByRole('button', { name: 'Update chart', exact: true }).click();
     await expect(sheetBars.nth(2).locator('.chord')).toHaveText(['F', '/']);
@@ -120,6 +122,8 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     // its chords stay editable text, and the toggle reflects and can clear the flag.
     await page.getByRole('button', { name: 'Edit bar 4', exact: true }).click();
     await expect(page.getByLabel('Chords in bar 4', { exact: true })).toBeFocused();
+    // The panel is a phone's again once its bar dock is closed (#1724).
+    await closeBarDock(page);
     const fermataToggle = page.getByLabel('Fermata (hold the last chord)', { exact: true });
     await expect(fermataToggle).toBeChecked();
     await expect(page.getByLabel('Chords in this bar')).toBeEditable();
@@ -131,6 +135,8 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     // Setting it again, through the toggle alone, puts the 𝄐 back without retyping the chords.
     await page.getByRole('button', { name: 'Edit bar 4', exact: true }).click();
     await expect(page.getByLabel('Chords in bar 4', { exact: true })).toBeFocused();
+    // The panel is a phone's again once its bar dock is closed (#1724).
+    await closeBarDock(page);
     await expect(fermataToggle).not.toBeChecked();
     await fermataToggle.check();
     await page.getByRole('button', { name: 'Update chart', exact: true }).click();

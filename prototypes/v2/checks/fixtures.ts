@@ -440,3 +440,15 @@ export async function openWholeSong(page: Page): Promise<void> {
         await group.locator('summary').click();
     }
 }
+
+/**
+ * Closes the phone's bar dock if it is up (#1724): at phone width an open bar is typed in the dock,
+ * and the edit panel is hidden until Done. A no-op on the laptop, where the bar holds its field.
+ */
+export async function closeBarDock(page: Page): Promise<void> {
+    const dock = page.locator('.bar-dock');
+    if (await dock.isVisible()) {
+        await dock.getByRole('button', { name: 'Done', exact: true }).click();
+        await expect(dock).toHaveCount(0);
+    }
+}
