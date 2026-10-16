@@ -54,7 +54,7 @@ vi.mock('../../../prototypes/v2/lib/repository.js', () => ({ list, listCollectio
 
 function guestSong(id: string) {
     return {
-        schemaVersion: 1 as const,
+        schemaVersion: 2 as const,
         id,
         title: `Song ${id}`,
         revision: 0,

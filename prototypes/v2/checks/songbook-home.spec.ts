@@ -62,7 +62,7 @@ test('the home renders its rows without a full-library read', async ({ page }) =
     // A corrupt document a FULL read trips over (`repository.list()` refuses a songbook it cannot
     // wholly read) — keyed to sort after every other id, so the home's bounded reads (by id, then
     // a cursor fill that stops at eight rows) never reach it.
-    const corrupt = { schemaVersion: 1, id: 'zz-corrupt', title: 42, chart: null };
+    const corrupt = { schemaVersion: 2, id: 'zz-corrupt', title: 42, chart: null };
     await countFullReads(page);
     await seedGuestDocuments(page, [...manySongs(12), corrupt]);
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
@@ -85,7 +85,7 @@ test('an opened song that will not read leaves no gap: the list is topped up', a
     // Eight opened songs, one of them corrupt: seven readable opened rows, and the fill adds one
     // more from the rest of the songbook rather than leaving the list short.
     const songs = manySongs(12);
-    const corrupt = { schemaVersion: 1, id: 'home-song-03', title: 42, chart: null };
+    const corrupt = { schemaVersion: 2, id: 'home-song-03', title: 42, chart: null };
     const opened = Object.fromEntries(
         songs
             .slice(0, 8)
@@ -106,7 +106,7 @@ test('an opened song that will not read leaves no gap: the list is topped up', a
 test('a corrupt song the home does read is left out and said, never blanking the page', async ({
     page,
 }) => {
-    const corrupt = { schemaVersion: 1, id: 'aa-corrupt', title: 42, chart: null };
+    const corrupt = { schemaVersion: 2, id: 'aa-corrupt', title: 42, chart: null };
     await seedGuestDocuments(page, [...starterDocuments(), corrupt]);
     await expect(page.locator('.home-table .song-row')).toHaveCount(3);
     await expect(page.getByTestId('home-unreadable')).toContainText('couldn’t be read');
@@ -162,8 +162,10 @@ test('Continue shows the song’s own first bars, and Play starts it without the
         page.getByRole('heading', { name: 'Minor swing sketch', exact: true }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
-    // Not the editor: the edit panel stays closed while the band plays.
-    await expect(page.locator('.edit-panel')).toBeHidden();
+    // Not the editor: no bar is open for typing and the title is not a field while the band
+    // plays (a measure chart has no edit panel, #1726).
+    await expect(page.locator('.bar-input, .bar-dock')).toHaveCount(0);
+    await expect(page.getByLabel('Song title')).toHaveCount(0);
     await page.getByRole('button', { name: 'Stop playback' }).click();
 });
 

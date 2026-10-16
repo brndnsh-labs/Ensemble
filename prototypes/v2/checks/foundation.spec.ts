@@ -1,4 +1,17 @@
-import { appUrl, editorRevealed, expect, seedStarters, songLink } from './fixtures';
+import {
+    appUrl,
+    closeBarDock,
+    editorRevealed,
+    expect,
+    leaveBar,
+    measureSong,
+    openBar,
+    seedGuestDocuments,
+    seedStarters,
+    songLink,
+    starterDocuments,
+    typeBar,
+} from './fixtures';
 import { closeSounds, openSounds, test } from './foundation-helpers';
 
 test('real runtime, local saves, reload recovery and offline playback', async ({
@@ -131,14 +144,17 @@ for (const [width, height] of [
         await page.getByRole('button', { name: 'Stop playback' }).click();
         await page.screenshot({ path: `test-results/chart-${width}.png` });
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-        await expect(page.getByLabel('Chord text')).toBeVisible();
-        const unapplied = 'Dm7 | G7 | Cmaj7 | A7';
-        await page.getByLabel('Chord text').fill(unapplied);
+        // A bar typed and not left: playback takes it, and it is still there after.
+        const typed = 'Dm7 G7';
+        await typeBar(page, 1, typed);
+        // On a phone the transport is hidden while the bar dock is up (#1724).
+        await closeBarDock(page);
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-        await expect(page.getByLabel('Chord text')).toBeHidden();
+        await expect(page.locator('.bar-input, .bar-dock')).toHaveCount(0);
         await page.getByRole('button', { name: 'Stop playback' }).click();
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-        await expect(page.getByLabel('Chord text')).toHaveValue(unapplied);
+        await expect(await openBar(page, 1)).toHaveValue(typed);
+        await leaveBar(page);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
             true,
         );
@@ -190,9 +206,9 @@ test('file export/import is detached; invalid input never changes the active son
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('My writing sketch');
-    await page.getByLabel('Chord text').fill('Am7 | D7 | Gmaj7 | Cmaj7');
-    await page.getByRole('button', { name: 'Update chart' }).click();
-    await expect(page.locator('.bar')).toHaveCount(4);
+    await typeBar(page, 1, 'Am7 D7');
+    await leaveBar(page);
+    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['Am7', 'D7']);
     await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
     await page.getByRole('button', { name: 'Export file' }).click();
@@ -206,6 +222,7 @@ test('file export/import is detached; invalid input never changes the active son
     await expect(
         page.getByRole('heading', { name: 'My writing sketch', exact: true }),
     ).toBeVisible();
+    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['Am7', 'D7']);
     await page.getByLabel('Import Ensemble document').setInputFiles({
         name: 'invalid.ensemble',
         mimeType: 'application/json',
@@ -273,7 +290,20 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
     page,
     disconnect,
 }) => {
-    await seedStarters(page);
+    // A 64-bar measure chart beside the starters, older than all of them (#1733: a text chart
+    // grew to 64 bars by typing them into the edit panel, which a measure chart does not have).
+    const long = measureSong(
+        [
+            'long-chart',
+            'Long chart',
+            'Jazz',
+            'C',
+            Array.from({ length: 64 }, (_, i) => ['Cmaj7', 'Am7', 'Dm7', 'G7'][i % 4]).join(' | '),
+            110,
+        ],
+        new Date(Date.now() - 60_000).toISOString(),
+    );
+    await seedGuestDocuments(page, [...starterDocuments(), long]);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
@@ -300,14 +330,8 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
         'aria-pressed',
         'false',
     );
-    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page
-        .getByLabel('Chord text')
-        .fill(
-            Array.from({ length: 64 }, (_, i) => ['Cmaj7', 'Am7', 'Dm7', 'G7'][i % 4]).join(' | '),
-        );
-    await page.getByRole('button', { name: 'Update chart' }).click();
-    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await songLink(page, 'Long chart').click();
     await page.setViewportSize({ width: 402, height: 874 });
     await expect(page.locator('.bar')).toHaveCount(64);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(

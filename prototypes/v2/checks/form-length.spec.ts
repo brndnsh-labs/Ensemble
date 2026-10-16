@@ -8,7 +8,6 @@ import {
     leaveBar,
     openBar,
     openWholeSong,
-    seedStarters,
     songLink,
     test,
 } from './fixtures';
@@ -281,25 +280,4 @@ test('on a shared text chart, a count makes the measure copy and counts it (#151
     expect(stored).toHaveLength(1);
     expect(stored[0].schemaVersion === 2 && stored[0].chart.score.choruses).toBe(2);
     expect(pageErrors).toEqual([]);
-});
-
-test('on a saved text chart, a count converts a copy and leaves the original untouched', async ({
-    page,
-}) => {
-    await seedStarters(page);
-    const original = (await documents(page)).find((d) => d.id === 'starter-blues');
-    expect(original?.schemaVersion).toBe(1);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    const footer = footerButton(page);
-    await expect(footer).toHaveText('12 bars · repeats continuously');
-
-    await pick(page, 'Plays 3 times');
-    await expect(footer).toHaveText('12 bars · plays 3 times, then ends');
-    expect(await songMenuChoruses(page)).toBe('3');
-    const stored = await documents(page);
-    // The original is exactly as it was; the copy is a new measure chart beside it.
-    expect(stored.find((d) => d.id === 'starter-blues')).toEqual(original);
-    expect(stored.filter((d) => d.schemaVersion === 2).map((d) => d.title)).toEqual([
-        'Blue pocket — editable copy',
-    ]);
 });

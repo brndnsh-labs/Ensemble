@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, test, typeBar } from './fixtures';
 
 /**
  * Browser history (#1700): each view — the songbook, All songs, Standards, a song — is one
@@ -105,7 +105,8 @@ test('an unsaved edit survives Back the way it survives the back button', async 
     await songLink(page, 'Blue pocket').first().click();
     await onSong(page, 'Blue pocket');
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page.getByLabel('Chord text').fill('Dm7 | G7 | Cmaj7 | A7');
+    // A bar typed and not left (#1723), as the edit panel's chord text was never applied.
+    await typeBar(page, 1, 'Dm7');
     await page.goBack();
     await home(page);
     await songLink(page, 'Blue pocket').first().click();

@@ -4,8 +4,11 @@ import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { writtenSettings } from '@engine/songbook/codec';
+import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
+import type { ChartDocumentV2 } from '@engine/songbook/score-types';
+import type { ChartDocument as LegacyDocument } from '@engine/songbook/types';
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
-import type { ChartDocument } from '../lib/documents';
 import { validateDocument } from '../lib/documents';
 import { bandForGenre } from '../lib/standards';
 
@@ -329,7 +332,8 @@ export async function openBar(page: Page, bar: number): Promise<Locator> {
     const field = barField(page, bar);
     if (!(await field.isVisible())) {
         const target = page.locator('.sheet .bar').nth(bar - 1);
-        if (phoneWidth(page)) {
+        // A tap where the page takes touch; a laptop project narrowed to phone width has none.
+        if (phoneWidth(page) && (await page.evaluate(() => navigator.maxTouchPoints > 0))) {
             await target.tap();
         } else {
             await target.click();
@@ -392,7 +396,7 @@ export async function openSectionContext(menu: Locator): Promise<void> {
  * (`starter-<genre>`) two independently-fresh device profiles used to land on by construction —
  * `checks/account-adopt-guest.chromium.spec.ts`'s P0 depends on that.
  */
-const STARTER_SAMPLES = [
+const STARTER_SAMPLES: readonly SampleSong[] = [
     [
         'starter-blues',
         'Blue pocket',
@@ -419,40 +423,93 @@ const STARTER_SAMPLES = [
     ],
 ] as const;
 
-export function starterDocuments(): ChartDocument[] {
-    const base = Date.now();
-    // Distinct, DESCENDING timestamps in listed order (blues newest) — `repository.list()` sorts
-    // by `updatedAt` descending, and a spec that opens "the" featured/continue-card song expects
-    // it to be `starter-blues` (the old fallback `songs.find(s => s.id === 'starter-blues')`
-    // named explicitly), the same way three sequential `lib/starters.ts` saves used to land.
-    return STARTER_SAMPLES.map(([id, title, genre, key, value, bpm], index) => {
-        const stamp = new Date(base - index * 1000).toISOString();
-        return validateDocument({
-            schemaVersion: 1,
-            id,
-            title,
-            createdAt: stamp,
-            updatedAt: stamp,
-            revision: 0,
-            chart: {
-                arrangement: {
-                    key,
-                    isMinor: key === 'A',
-                    timeSignature: '4/4',
-                    grouping: null,
-                    notation: 'name',
-                    sections: [{ id: 'a', label: 'A', value, repeat: 1 }],
-                },
-                // `randomizeSeed: false` here is a deliberate TEST-fixture divergence from what
-                // `lib/starters.ts` used to write (`randomizeSeed: true`, the engine's own
-                // default) — this fixture's job is reproducible clickable data across runs, not
-                // modelling real seed-randomization behavior, and several specs assert exact
-                // durations/output against these songs.
-                performance: { bpm, seed: '', randomizeSeed: false },
-                band: bandForGenre(genre),
+/** One song as `STARTER_SAMPLES` lists it: id, title, genre, key, the bars' chord text, bpm. */
+export type SampleSong = readonly [string, string, string, string, string, number];
+
+/** One sample song as a text chart (schemaVersion 1), the shape `lib/starters.ts` wrote. */
+function textChart([id, title, genre, key, value, bpm]: SampleSong, stamp: string): LegacyDocument {
+    const document = validateDocument({
+        schemaVersion: 1,
+        id,
+        title,
+        createdAt: stamp,
+        updatedAt: stamp,
+        revision: 0,
+        chart: {
+            arrangement: {
+                key,
+                isMinor: key === 'A',
+                timeSignature: '4/4',
+                grouping: null,
+                notation: 'name',
+                sections: [{ id: 'a', label: 'A', value, repeat: 1 }],
             },
-        });
+            // `randomizeSeed: false` here is a deliberate TEST-fixture divergence from what
+            // `lib/starters.ts` used to write (`randomizeSeed: true`, the engine's own
+            // default) — this fixture's job is reproducible clickable data across runs, not
+            // modelling real seed-randomization behavior, and several specs assert exact
+            // durations/output against these songs.
+            performance: { bpm, seed: '', randomizeSeed: false },
+            band: bandForGenre(genre),
+        },
     });
+    if (document.schemaVersion !== 1) {
+        throw new Error('A text-chart sample must stay schema 1.');
+    }
+    return document;
+}
+
+/**
+ * One sample song as a measure chart (schemaVersion 2, #1733): its text chart through the app's
+ * own converter (`proposeLegacyScoreConversion`), so the bars are exactly what the text said,
+ * under the same id, title and timestamps, and the codec, not this file, decides what a valid
+ * measure chart is. Written as a chart is today (`writtenSettings`).
+ */
+export function measureSong(sample: SampleSong, stamp = new Date().toISOString()): ChartDocumentV2 {
+    const legacy = textChart(sample, stamp);
+    const proposal = proposeLegacyScoreConversion(JSON.stringify(legacy));
+    if (proposal.kind !== 'candidate') {
+        throw new Error(`Sample "${legacy.title}" did not convert to a measure chart.`);
+    }
+    const document = validateDocument({
+        ...proposal.value,
+        id: legacy.id,
+        title: legacy.title,
+        createdAt: legacy.createdAt,
+        updatedAt: legacy.updatedAt,
+        revision: 0,
+        chart: { ...proposal.value.chart, ...writtenSettings(proposal.value.chart) },
+    });
+    if (document.schemaVersion !== 2) {
+        throw new Error('A sample song must be a measure chart.');
+    }
+    return document;
+}
+
+/**
+ * Distinct, DESCENDING timestamps in listed order (blues newest) — `repository.list()` sorts by
+ * `updatedAt` descending, and a spec that opens "the" featured/continue-card song expects it to
+ * be `starter-blues` (the old fallback `songs.find(s => s.id === 'starter-blues')` named
+ * explicitly), the same way three sequential `lib/starters.ts` saves used to land.
+ */
+function starterStamps(): string[] {
+    const base = Date.now();
+    return STARTER_SAMPLES.map((_, index) => new Date(base - index * 1000).toISOString());
+}
+
+/** The three starter songs as measure charts — what every spec but the text chart's seeds. */
+export function starterDocuments(): ChartDocumentV2[] {
+    const stamps = starterStamps();
+    return STARTER_SAMPLES.map((sample, index) => measureSong(sample, stamps[index]));
+}
+
+/**
+ * The same three songs as text charts (schemaVersion 1). Only `checks/text-chart.spec.ts` seeds
+ * these: the text-chart UI's own spec, deleted with it (#1739).
+ */
+export function starterTextCharts(): LegacyDocument[] {
+    const stamps = starterStamps();
+    return STARTER_SAMPLES.map((sample, index) => textChart(sample, stamps[index]));
 }
 
 /**

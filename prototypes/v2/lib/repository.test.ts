@@ -12,11 +12,12 @@
  * `lib/session.test.ts` and `tests/unit/songbook/v1-import.test.ts` use stands in for it.
  */
 
-import type { ChartContent } from '@engine/songbook/types';
+import type { ChartDocumentV2 } from '@engine/songbook/score-types';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type FakeIndexedDB, installFakeIndexedDB } from '../../../tests/utils/fake-indexeddb';
 import { homeRequest } from './home';
 import { get, home, list, recoverySlotCount, remove, rename, save } from './repository';
+import { buildStandardDocument, standardFor } from './standards';
 
 const localStore = new Map<string, string>();
 Object.defineProperty(window, 'localStorage', {
@@ -37,79 +38,9 @@ beforeEach(() => {
     localStore.clear();
 });
 
-function chart(): ChartContent {
-    return {
-        arrangement: {
-            sections: [{ id: 'a', label: 'A', value: 'I | IV | V | I', repeat: 1 }],
-            key: 'C',
-            timeSignature: '4/4',
-            grouping: null,
-            isMinor: false,
-            notation: 'name',
-            lastChordPreset: 'Test',
-        },
-        performance: { bpm: 100, complexity: 0.3, seed: '', randomizeSeed: true },
-        band: {
-            chords: {
-                enabled: true,
-                voice: 'synth',
-                autoSound: false,
-                volume: 1,
-                reverb: 0.3,
-                style: 'smart',
-                octave: 48,
-                density: 'standard',
-            },
-            bass: {
-                enabled: true,
-                voice: 'synth',
-                autoSound: false,
-                volume: 1,
-                reverb: 0.05,
-                style: 'smart',
-                octave: 36,
-            },
-            soloist: {
-                enabled: false,
-                voice: 'synth',
-                autoSound: false,
-                volume: 1,
-                reverb: 0.6,
-                style: 'smart',
-                preset: 'trumpet',
-                octave: 72,
-                mode: 'monophonic',
-                autoMode: true,
-                phrasingIntensity: 0.5,
-                tradeMode: 'manual',
-            },
-            harmony: {
-                enabled: false,
-                voice: 'synth',
-                autoSound: false,
-                volume: 1,
-                reverb: 0.4,
-                style: 'smart',
-                octave: 60,
-                complexity: 0.5,
-            },
-            groove: {
-                enabled: true,
-                voice: 'synth',
-                autoSound: false,
-                volume: 1,
-                reverb: 0.2,
-                measures: 1,
-                swing: 0,
-                swingSub: '8th',
-                humanize: 20,
-                lastDrumPreset: 'Basic Rock',
-                genreFeel: 'Rock',
-                lastSmartGenre: 'Rock',
-                pattern: [],
-            },
-        },
-    };
+/** A measure chart's content (#1733): the catalog's 12-bar blues, as the app builds it. */
+function chart(): ChartDocumentV2['chart'] {
+    return buildStandardDocument(standardFor('standard-12-bar-blues')!).chart;
 }
 
 let fake: FakeIndexedDB;
@@ -122,7 +53,7 @@ describe('repository.save createdAt provenance (#1274 P2-2)', () => {
         const authoredAt = '2020-01-01T00:00:00.000Z';
         const saved = await save(
             {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 id: 'repo-createdat-new',
                 title: 'Imported song',
                 createdAt: authoredAt,
@@ -138,7 +69,7 @@ describe('repository.save createdAt provenance (#1274 P2-2)', () => {
     it('keeps the ORIGINAL row createdAt on an update, ignoring the candidate’s own field', async () => {
         const first = await save(
             {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 id: 'repo-createdat-update',
                 title: 'Original title',
                 createdAt: '2019-05-01T00:00:00.000Z',
@@ -169,7 +100,7 @@ describe('repository.remove (#1440)', () => {
     it('deletes the row', async () => {
         const saved = await save(
             {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 id: 'repo-remove-1',
                 title: 'To delete',
                 createdAt: '2020-01-01T00:00:00.000Z',
@@ -187,7 +118,7 @@ describe('repository.remove (#1440)', () => {
     it('clears every recovery slot for the deleted id, never another song’s', async () => {
         const kept = await save(
             {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 id: 'repo-remove-kept',
                 title: 'Keep me',
                 createdAt: '2020-01-01T00:00:00.000Z',
@@ -199,7 +130,7 @@ describe('repository.remove (#1440)', () => {
         );
         const doomed = await save(
             {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 id: 'repo-remove-doomed',
                 title: 'Doomed',
                 createdAt: '2020-01-01T00:00:00.000Z',
@@ -230,7 +161,7 @@ describe('repository.rename (#1440)', () => {
     it('changes the title only, bumping revision/updatedAt through the normal save path', async () => {
         const saved = await save(
             {
-                schemaVersion: 1,
+                schemaVersion: 2,
                 id: 'repo-rename-1',
                 title: 'Original',
                 createdAt: '2020-01-01T00:00:00.000Z',
@@ -258,7 +189,7 @@ describe('repository.home — the songbook home reads only what it shows (#1441)
     const id = (i: number) => `s${String(i).padStart(2, '0')}`;
     function song(key: string, minutes: number) {
         return {
-            schemaVersion: 1,
+            schemaVersion: 2,
             id: key,
             title: `Song ${key}`,
             createdAt: at(minutes),
@@ -294,7 +225,7 @@ describe('repository.home — the songbook home reads only what it shows (#1441)
             fake.rows.set(id(i), song(id(i), i));
         }
         // Sorts last by key, so the bounded fill never reaches it either.
-        fake.rows.set('zz-corrupt', { schemaVersion: 1, id: 'zz-corrupt', title: 42 });
+        fake.rows.set('zz-corrupt', { schemaVersion: 2, id: 'zz-corrupt', title: 42 });
         const opened = new Map(Array.from({ length: 8 }, (_, i) => [id(i), at(100 + i)]));
         const slice = await home(homeRequest(opened, null));
         expect(slice.count).toBe(13);
@@ -305,7 +236,7 @@ describe('repository.home — the songbook home reads only what it shows (#1441)
 
     it('leaves out and counts an unreadable document it did read, rather than blanking the page', async () => {
         fake.rows.set('good', song('good', 1));
-        fake.rows.set('bad', { schemaVersion: 1, id: 'bad', title: 42 });
+        fake.rows.set('bad', { schemaVersion: 2, id: 'bad', title: 42 });
         const opened = new Map([
             ['bad', at(20)],
             ['good', at(10)],
