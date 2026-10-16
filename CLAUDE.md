@@ -42,7 +42,7 @@ releases it: the CI `deploy` job publishes no files at all any more — it relea
   songbook codecs, engine hooks and state slices very much included, since the v2 export
   compiles `public/`, so `v2-checks` must stay green. v1's own UI shell is gone (#1358).
 - **The cutover is a hard cut.** No `/v1/` grace path. v1's browser data is reachable only
-  through v2's import (#1274), and an old `?s=` share link opens best-effort (#1279). The plan
+  through v2's import (#1274); an old `?s=` share link is ignored (#1735). The plan
   and its decisions are [`docs/design/ensemble-v2-rollout.md`](docs/design/ensemble-v2-rollout.md)
   (DECISION 2026-09-15): API online → document API → accounts in the product → core parity →
   hard cut.

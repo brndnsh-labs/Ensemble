@@ -97,7 +97,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/state/groove.ts` | Genre, swing, humanize and the drum lane's mix. | `groove` |
 | `public/state/instruments.ts` | Per-instrument synthesis parameters. | `bass`, `soloist`, `chords` |
 | `public/state/set-param.ts` | The one write `SET_PARAM` makes: only to a field the slice declares. | `writeDeclaredParam` |
-| `public/state/share-codec.ts` | Share-URL / preset wire format: Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `tryDecompressSections`, `encodeBase64Unicode`, `generateId` |
+| `public/state/share-codec.ts` | v1's section payload (saved presets), read by v2's v1 import (#1274) and going with it (#1736): Unicode-safe Base64 + the minified section payload, plus the section-id generator deserialization mints. Main thread only. | `compressSections`, `tryDecompressSections`, `encodeBase64Unicode`, `generateId` |
 | `public/state/state-effects.ts` | Cross-module state side effects (Inversion of Control). | `handleEffects` |
 | `public/state/state-hydration.ts` | v1's reading rules, kept for v2's v1 import (#1274); v1's own load/save layer went in #1424. | `validateSections`, `sanitizeDisplayString`, `clamp` |
 
@@ -121,7 +121,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `public/songbook/legacy-score.ts` | Pure conservative v1 conversion proposals retaining original JSON, with blocking timing/spelling diagnostics. | `proposeLegacyScoreConversion` |
 | `public/songbook/structural-limits.ts` | Pre-schema input ceilings for byte size, nesting depth, visited nodes, and section count. | `inspectSongbookStructure`, `SONGBOOK_MAX_INPUT_BYTES` |
 | `public/songbook/state-ownership.ts` | Exhaustive document/preferences/runtime ownership for every top-level state field. | `STATE_OWNERSHIP_MANIFEST` |
-| `public/songbook/chart-link.ts` | v2 shareable-link codec: `#chart=<base64url(deflate(JSON))>` whole-document envelope (v1 or v2), distinct from `state/share-codec.ts`'s v1 sections-only `?s=` payload. Fails closed on any malformed/oversized/schema-invalid fragment. | `encodeChartLink`, `decodeChartLink` |
+| `public/songbook/chart-link.ts` | v2 shareable-link codec: `#chart=<base64url(deflate(JSON))>` whole-document envelope (v1 or v2), distinct from `state/share-codec.ts`'s v1 sections-only payload. Fails closed on any malformed/oversized/schema-invalid fragment. | `encodeChartLink`, `decodeChartLink` |
 
 ## Chords & Notation
 

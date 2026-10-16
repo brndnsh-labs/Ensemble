@@ -699,3 +699,74 @@ test('on a saved text chart, a count converts a copy and leaves the original unt
         'Blue pocket — editable copy',
     ]);
 });
+
+// From form-length.spec.ts, where it opened a schema-1 draft through a v1 `?prog=` link (#1735).
+// Seeded as a saved text chart instead, so the original stays beside the copy.
+test('on an opened text chart, a count makes the measure copy and counts it (#1511)', async ({
+    page,
+}) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    await seedTextCharts(page);
+    const original = (await documents(page)).find((d) => d.id === 'starter-blues');
+    expect(original?.schemaVersion).toBe(1);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    const footer = footerButton(page);
+    await expect(footer).toHaveText('12 bars · repeats continuously');
+
+    await footer.click();
+    const menu = formMenu(page);
+    await expect(page.locator('.form-length-note')).toHaveText(
+        'Counting choruses turns this chart into bars; the original is kept.',
+    );
+    await expect(menu).toHaveAttribute('aria-describedby', 'form-length-note');
+    await expect(
+        menu.getByRole('menuitemradio', { name: 'Repeats continuously', exact: true }),
+    ).toHaveAttribute('aria-checked', 'true');
+    await menu.getByRole('menuitemradio', { name: 'Plays 2 times', exact: true }).click();
+
+    await expect(page.getByTestId('stand-toast')).toContainText('Editable copy created');
+    await expect(footer).toHaveText('12 bars · plays 2 times, then ends');
+    await expect(page.locator('.chart-bottom')).not.toContainText('repeats continuously');
+    // The copy is a measure chart: Edit opens its bars, not the text panel, and the Song menu
+    // agrees on the count.
+    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
+    await expect(page.locator('.edit-panel')).toHaveCount(0);
+    await expect(await openBar(page, 1)).toBeVisible();
+    await leaveBar(page);
+    await openWholeSong(page);
+    await expect(page.getByLabel('Choruses', { exact: true })).toHaveValue('2');
+    await closeSongMenu(page);
+    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+
+    // What the conversion stored is the button's copy, with the count as one unsaved edit on
+    // top; the original is untouched beside it.
+    let stored = await documents(page);
+    expect(stored.find((d) => d.id === 'starter-blues')).toEqual(original);
+    const copies = stored.filter((d) => d.schemaVersion === 2);
+    expect(copies.map((d) => d.title)).toEqual(['Blue pocket — editable copy']);
+    expect(copies[0].schemaVersion === 2 && 'choruses' in copies[0].chart.score).toBe(false);
+    // That unsaved count is retained like any edit to a library song: one recovery slot, the
+    // copy's, so closing the tab before Save does not lose it.
+    const copyId = copies[0].id;
+    const recoveryKeys = () =>
+        page.evaluate(() =>
+            Object.keys(localStorage).filter((key) =>
+                key.startsWith('ensemble-v2-preview:recovery:'),
+            ),
+        );
+    await expect.poll(recoveryKeys).toHaveLength(1);
+    expect((await recoveryKeys())[0].endsWith(`:${copyId}`)).toBe(true);
+    await page.reload();
+    await songLink(page, 'Blue pocket — editable copy').first().click();
+    await expect(footer).toHaveText('12 bars · plays 2 times, then ends');
+    const save = page.getByRole('button', { name: 'Save', exact: true });
+    await save.click();
+    await expect(save).toBeDisabled();
+    stored = await documents(page);
+    expect(stored).toHaveLength(4);
+    const saved = stored.find((d) => d.id === copyId);
+    expect(saved?.schemaVersion === 2 && saved.chart.score.choruses).toBe(2);
+    expect(stored.find((d) => d.id === 'starter-blues')).toEqual(original);
+    expect(pageErrors).toEqual([]);
+});

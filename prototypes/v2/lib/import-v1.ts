@@ -267,12 +267,8 @@ const MAX_PRESETS = 500;
 const PROTOTYPE_MEMBER_NAMES: ReadonlySet<string> = new Set(
     Object.getOwnPropertyNames(Object.prototype),
 );
-/**
- * v1's three chord spellings, as its own readers validate them. Exported because the old-link
- * path (`lib/v1-link.ts`) has to answer the identical question about a `?notation=` parameter,
- * and two copies of one keyspace is exactly how the v1 readers drifted apart before (#1266).
- */
-export const NOTATIONS = ['roman', 'name', 'nns'];
+/** v1's three chord spellings, as its own readers validate them. */
+const NOTATIONS = ['roman', 'name', 'nns'];
 
 /**
  * The bytes a digest is taken over differ by item kind, and deliberately stay that way: the

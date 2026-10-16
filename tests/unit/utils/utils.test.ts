@@ -145,13 +145,13 @@ describe('Utility Functions', () => {
         });
 
         // why (#1258): the decoder's output went straight into state with no
-        // `validateSections` pass, so its section-meter guard is the only one on the `?s=`
-        // path — and it checked LENGTH, not membership, so '__proto__' (9 chars),
+        // `validateSections` pass, so its section-meter guard is the only one on the v1
+        // section path — and it checked LENGTH, not membership, so '__proto__' (9 chars),
         // 'toString' (8) and 'valueOf' (7) all slipped under `length < 10`. Two readers of
         // one field disagreeing on its keyspace is the defect; `validateSections` requires
         // table membership, so this now does too.
         it.each(['__proto__', 'toString', 'valueOf', 'constructor', 'not-a-meter'])(
-            'drops a section timeSignature of %s on the ?s= path',
+            'drops a section timeSignature of %s in a v1 section payload',
             (bad) => {
                 const compressed = compressSections([
                     { id: '1', label: 'Verse', value: 'C', timeSignature: bad },
@@ -161,10 +161,10 @@ describe('Utility Functions', () => {
             },
         );
 
-        // #1132: the `?s=` reader must agree with `validateSections` on the key's keyspace —
+        // #1132: the v1 section reader must agree with `validateSections` on the key's keyspace —
         // a normalized KEY_ORDER member, else ''.
         it.each(['constructor', '__proto__', 'toString', 'H', '<b>C</b>'])(
-            'drops a section key of %s on the ?s= path',
+            'drops a section key of %s in a v1 section payload',
             (bad) => {
                 const compressed = compressSections([
                     { id: '1', label: 'Verse', value: 'C', key: bad },

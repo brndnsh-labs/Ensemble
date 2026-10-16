@@ -68,59 +68,6 @@ export function isChordDensity(value: unknown): value is ChordDensity {
 }
 
 /**
- * The `?bnd=` share-URL wire payload — the base64'd JSON v1's `compressBandSettings`
- * emitted (its writer went with the v1 shell, #1358) and v1's `decompressBandSettings` read
- * back (gone with v1's load/save layer, #1424). `npm run audition-link` still writes it.
- * Keys are deliberately terse; the URL carried them on every share link.
- *
- * WHY THIS EXISTS (#1264). v1's `decompressBandSettings` used to return `any`, so every
- * `band.*` read was untyped and `Object.assign(slice, {...})` accepted it even where
- * the slice field was a narrowed union. Writer/reader keyspace drift was therefore
- * invisible to `tsc`, and the only way to find it was by hand, one field at a time —
- * which is how all three known instances were found:
- *
- *   - `g.ss` — writer emitted `'8th' | '16th'`, reader validated `[4, 8, 16].includes(...)`
- *   - `c.d`  — writer emitted `'thin' | 'standard' | 'rich'`, reader ran a numeric `clamp`
- *   - `c.s`  — reader validated against the picker list, rejecting the genre-routed `'arp'`
- *
- * All three shipped and survived for months (#1257 fixed the instances; this types the
- * cause). BOTH sides are annotated with this interface, which is the point: a writer
- * that starts emitting a different keyspace fails to compile against the reader's
- * expectation, instead of silently landing a default on every recipient's session.
- *
- * This does NOT replace runtime validation — the payload is untrusted input and every
- * reader still guards. It removes the *silent* case, where a guard checks a keyspace
- * the writer never produces and `tsc` says nothing.
- */
-export interface SharedBandPayload {
-    /** Mixer-settings schema version; volumes/reverbs are ignored unless it matches. */
-    mv?: number;
-    /** Legacy alias for `mv` accepted by the reader. */
-    mixerVersion?: number;
-    /** Soloist lane (plus the arranger seed, which rides along here). */
-    s?: {
-        e?: 0 | 1;
-        s?: string;
-        p?: string;
-        o?: number;
-        v?: number;
-        r?: number;
-        m?: string;
-        am?: 0 | 1;
-        /** Arranger seed — sanitized and length-capped on read. */
-        sd?: string;
-    };
-    /** Bass lane. */
-    b?: { e?: 0 | 1; s?: string; o?: number; v?: number; r?: number };
-    /** Chords lane. `d` is a keyspace, not a 0..1 scale — see {@link ChordDensity}. */
-    c?: { e?: 0 | 1; s?: string; o?: number; v?: number; r?: number; d?: ChordDensity };
-    /** Harmony lane. */
-    h?: { e?: 0 | 1; s?: string; o?: number; v?: number; r?: number; c?: number };
-    /** Groove lane. `ss` is a subdivision keyspace — see {@link SwingSub}. */
-    g?: { e?: 0 | 1; v?: number; r?: number; sw?: number; ss?: SwingSub; hu?: number };
-}
-
-/**
  * One component of a chord display string (root + suffix, with optional slash bass).
  */
 export interface ChordNamePart {

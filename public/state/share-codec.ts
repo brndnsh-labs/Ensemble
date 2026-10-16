@@ -1,11 +1,12 @@
 /**
- * share-codec.ts — main-thread persistence / share-URL codec.
+ * share-codec.ts — v1's section payload codec.
  *
- * What belongs here: the wire format for getting a chart *out of* and *back
- * into* the app — Unicode-safe Base64, the minified section payload used by
- * share URLs and saved presets, and the section-id generator that
- * deserialization has to mint. These are main-thread concerns only; the band
- * and the voices never encode or decode a share payload.
+ * What belongs here: Unicode-safe Base64, the minified section payload v1 wrote
+ * into saved presets (and once into `?s=` share links, which nothing opens any
+ * more, #1735), and the section-id generator that deserialization has to mint.
+ * Its one production reader is the v1 import (`prototypes/v2/lib/import-v1.ts`);
+ * `compressSections` (the writer) survives only for the tests that round-trip
+ * the decoder. All of it goes with that import (#1736).
  *
  * What does NOT belong here: musical/timing math (`../utils.js`), seeded RNG
  * and hashing (`../engine/hash-utils.js`), or raw string sanitization
@@ -20,9 +21,9 @@ import type { Section } from './arranger.js';
 
 /**
  * Unicode-safe Base64 encode: JSON string → UTF-8 bytes → binary string → btoa.
- * Shared by the share-URL payloads (sections + band settings).
+ * Used by `compressSections`.
  */
-export function encodeBase64Unicode(json: string): string {
+function encodeBase64Unicode(json: string): string {
     const bytes = new TextEncoder().encode(json);
     const binString = Array.from(bytes, (byte) => String.fromCodePoint(byte)).join('');
     return btoa(binString);
@@ -32,7 +33,7 @@ export function encodeBase64Unicode(json: string): string {
  * Unicode-safe Base64 decode: atob → binary string → UTF-8 bytes → JSON string.
  * The inverse of {@link encodeBase64Unicode}. Callers own size guards and JSON.parse.
  */
-export function decodeBase64Unicode(str: string): string {
+function decodeBase64Unicode(str: string): string {
     const binString = atob(str);
     const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0) || 0);
     return new TextDecoder().decode(bytes);
@@ -100,7 +101,7 @@ export function compressSections(sections: Section[]): string {
  * Strictly decompresses a Base64 section payload. Callers that need to reject
  * invalid persisted records use the null result instead of fabricating data.
  */
-/** A share-URL section key as `validateSections` accepts it: a normalized KEY_ORDER member, else ''. */
+/** A v1 section key as `validateSections` accepts it: a normalized KEY_ORDER member, else ''. */
 function safeSectionKey(raw: string): string {
     const key = normalizeKey(raw);
     return KEY_ORDER.includes(key) ? key : '';
@@ -154,7 +155,7 @@ export function tryDecompressSections(str: string): Section[] | null {
                 repeat: Math.min(Math.max(1, parseInt(s.r, 10) || 1), 64), // Clamp repeats
                 // Membership, not just length (#1258): '__proto__' (9), 'toString' (8) and
                 // 'valueOf' (7) all slipped under a `length < 10` check. This is the only
-                // meter guard a `?s=` payload gets, and `validateSections` requires table
+                // meter guard a v1 section payload gets, and `validateSections` requires table
                 // membership, so this does too.
                 timeSignature: typeof s.t === 'string' && TIME_SIGNATURES[s.t] ? s.t : '',
                 seamless: !!s.s,

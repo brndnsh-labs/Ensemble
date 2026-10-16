@@ -20,8 +20,6 @@
  * see `accountsEnabled`.
  */
 
-import { hasV1SharePayload } from '../v1-link';
-
 const ACCOUNTS_FLAG = 'ensemble-v2-preview:accounts';
 const ACCOUNTS_PARAM = 'accounts';
 
@@ -76,18 +74,15 @@ export function setAccountsEnabled(enabled: boolean): void {
  * shared song would otherwise have this device's account UI flipped — since #1357 the side effect
  * worth naming is `?accounts=off`, which would silently take the product's account surfaces away
  * from whoever followed the link. So the request is ignored outright — not merely left unpersisted — whenever the URL is a share link,
- * whatever it asked for. There are two shapes of one, and both are refused:
- *
- * - a v2 payload, which lives in the hash (`ensemble.tsx`'s `decodeChartLink`) — any non-empty
- *   hash, since a `#chart=` that fails to decode is still somebody's attempt at a share link;
- * - an old v1 payload (#1279), which is a QUERY-string link with no hash at all, so the hash
- *   test above cannot see it — `hasV1SharePayload` is what recognises `/v2/?s=…&accounts=on`.
+ * whatever it asked for. A share link's payload lives in the hash (`ensemble.tsx`'s
+ * `decodeChartLink`), so any non-empty hash counts: a `#chart=` that fails to decode is still
+ * somebody's attempt at a share link. (Old v1 `?s=` links are no longer read at all, #1735.)
  *
  * Refusing to APPLY it is only half: the shell also strips the parameter when it consumes a
  * share link (`stripAccountsParam` below), so a reload of the tidied URL cannot apply it either.
  */
 export function accountsFlagRequest(search: string, hash: string): AccountsFlagRequest {
-    if (hash !== '' || hasV1SharePayload(search)) {
+    if (hash !== '') {
         return null;
     }
     return accountsFlagFromSearch(search);

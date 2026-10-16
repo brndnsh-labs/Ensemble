@@ -12,6 +12,9 @@ import {
     expect,
     leaveBar,
     openSectionMenu,
+    seedGuestDocuments,
+    songLink,
+    starterTextCharts,
     test,
 } from './fixtures';
 
@@ -22,22 +25,6 @@ import {
  * `app/use-chart-view.ts`'s `displayNext` are the surfaces under test; `lib/band-chart.ts`'s
  * `BandChart.bars` and `lib/runtime.ts`'s `inLastBeat()` are the engine reads behind it.
  */
-
-/**
- * A v1 `?s=` share link (#1279) — the only way this suite can land a genuinely MEASURE-LESS
- * chart on the stand, since every v2-authored song is schemaVersion 2. Built the way v1's own
- * `compressSections` builds it (`checks/v1-share-link.spec.ts`'s own copy, duplicated locally per
- * this repo's norm rather than exported from a sibling spec file).
- */
-function v1Link(sections: Array<Record<string, unknown>>, params: Record<string, string>): string {
-    const search = new URLSearchParams({
-        s: Buffer.from(JSON.stringify(sections), 'utf8').toString('base64'),
-    });
-    for (const [name, value] of Object.entries(params)) {
-        search.set(name, value);
-    }
-    return appUrl(`?${search.toString()}`);
-}
 
 async function exportCurrent(page: Page): Promise<ChartDocumentV2> {
     await page.getByRole('button', { name: 'Song actions' }).click();
@@ -613,19 +600,25 @@ test('a measure-less (v1) chart gets the next-bar cue and "soon" too', async ({ 
     // through the identical engine timeline and deserves the identical cue. A v1 chart carries no
     // `data-measure-id` at all (`writtenBars` is schemaVersion-2-only in `use-chart-view.ts`), so
     // this identifies bars by their (distinct) chord text instead of `sampleChart`'s usual id.
-    await page.goto(
-        v1Link([{ l: 'A', v: 'C7 | D7 | E7 | F7' }], {
-            key: 'C',
-            ts: '4/4',
-            bpm: '240',
-            genre: 'Jazz',
-            style: 'jazz',
-            int: '0.40',
-            comp: '0.55',
-            notation: 'name',
-            accounts: 'off',
-        }),
-    );
+    const [starter] = starterTextCharts();
+    await seedGuestDocuments(page, [
+        {
+            ...starter,
+            id: 'lookahead-text',
+            title: 'Lookahead text chart',
+            chart: {
+                ...starter.chart,
+                arrangement: {
+                    ...starter.chart.arrangement,
+                    key: 'C',
+                    isMinor: false,
+                    sections: [{ id: 'a', label: 'A', value: 'C7 | D7 | E7 | F7', repeat: 1 }],
+                },
+                performance: { ...starter.chart.performance, bpm: 240 },
+            },
+        },
+    ]);
+    await songLink(page, 'Lookahead text chart').click();
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C7']);
 
     async function sampleV1() {
