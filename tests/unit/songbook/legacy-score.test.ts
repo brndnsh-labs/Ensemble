@@ -9,7 +9,7 @@
  * Where the converter deliberately plays something else, the difference is one of a few named
  * kinds (`Verdict`), each with its reason; anything else is a failure.
  */
-// cspell:ignore mmaj Majadd MAJadd Maadd MAadd Calt Cnope
+// cspell:ignore mmaj Majadd MAJadd Maadd MAadd Calt Cnope Cmin
 
 import { type ChordFacts, parseChord } from '../../../band/theory/chord.js';
 import { notePc } from '../../../band/theory/pitch.js';
@@ -113,10 +113,25 @@ const TWO_ALTERATIONS = new Set(['7#9#5', '7#9b5', '7b9#5', '7b9b5']);
  * - `literal-minor`: a lowercase numeral on `maj7#11`, `maj7#5`, `maj7b5` or `7alt`, which the
  *   old parser had no minor reading for and played with a major third. The band reads a
  *   lowercase numeral literally as minor (DECISION 2026-10-12, #1662).
+ * - `misread-alteration`: the old parser read only the start of the suffix and sounded a tone
+ *   the rest of it alters (`Cmin9b5` played Cm9, a natural 5 against the written b5; it has a
+ *   row for `m9b5` but not this spelling). The converted chord is the whole written chord,
+ *   spelled with no tone changed.
  */
-type Verdict = 'same' | 'written-tones' | 'two-alterations' | 'literal-minor';
+type Verdict =
+    | 'same'
+    | 'written-tones'
+    | 'two-alterations'
+    | 'literal-minor'
+    | 'misread-alteration';
 
-function verdict(token: string, v1Name: string, symbol: string, keyName: string, minor: boolean) {
+function verdict(
+    token: string,
+    v1Name: string,
+    { symbol, change }: { symbol: string; change: string },
+    keyName: string,
+    minor: boolean,
+) {
     const key = { tonic: notePc(keyName), minor };
     const v1Facts = parseChord(v1Name, key);
     const v2Facts = parseChord(symbol, key);
@@ -129,7 +144,6 @@ function verdict(token: string, v1Name: string, symbol: string, keyName: string,
         return 'same' as Verdict;
     }
     const read = readLegacyChordToken(token);
-    const asWritten = symbol === token || symbol === token.replace(/[()]/g, '');
     if (LOWERCASE_NUMERAL.test(read.root) && /^(?:maj7#11|maj7#5|maj7b5|7alt)$/.test(read.suffix)) {
         return 'literal-minor' as Verdict;
     }
@@ -137,25 +151,46 @@ function verdict(token: string, v1Name: string, symbol: string, keyName: string,
     if (read.suffix === '7alt' && TWO_ALTERATIONS.has(tail)) {
         return 'two-alterations' as Verdict;
     }
-    if (
-        asWritten &&
-        v1.pcs.every((pc) => v2.pcs.includes(pc)) &&
-        (v1.bass === v2.bass || v1.bass === v1.root)
-    ) {
+    if (v1.pcs.every((pc) => v2.pcs.includes(pc)) && (v1.bass === v2.bass || v1.bass === v1.root)) {
         return 'written-tones' as Verdict;
+    }
+    const readAll = read.details.recognised && read.details.suffix === read.normalised;
+    if (!readAll && change !== 'tones-dropped') {
+        return 'misread-alteration' as Verdict;
     }
     return `${token}: old ${v1Name} [${v1.pcs}/${v1.bass}], new ${symbol} [${v2.pcs}/${v2.bass}]`;
 }
 
-/** Every token through the old parser and the converter, one bar each, in one key. */
+const NAMED: readonly string[] = [
+    'same',
+    'written-tones',
+    'two-alterations',
+    'literal-minor',
+    'misread-alteration',
+];
+
+/**
+ * Every token through the old parser and the converter, one bar each, in one key. A refusal
+ * passes only where the old parser guessed — it read no root, or no quality at all — or where
+ * its chord would sound a 3rd the written sus rules out; any other refusal is reported.
+ */
 function differential(tokens: string[], keyName: string, minor: boolean) {
     const { progression } = v1Parse(tokens.join(' | '), keyName, '4/4', minor);
     expect(progression).toHaveLength(tokens.length);
     return tokens.map((token, i) => {
         const converted = convertLegacyChordToken(token);
-        return converted.kind === 'ok'
-            ? verdict(token, progression[i].absName, converted.symbol, keyName, minor)
-            : `${token}: refused — ${converted.why}`;
+        if (converted.kind === 'chord') {
+            return verdict(token, progression[i].absName, converted, keyName, minor);
+        }
+        const read = readLegacyChordToken(token);
+        const guessed =
+            !read.root ||
+            (!read.details.suffix && !read.details.recognised) ||
+            // The old parser itself dropped a written sus (or no3) and sounded the 3rd.
+            (/sus|no|omit/.test(read.normalised) && !/sus/.test(read.suffix));
+        return converted.kind === 'refused' && guessed
+            ? 'refused'
+            : `${token}: ${converted.kind === 'refused' ? converted.why : converted.kind}`;
     });
 }
 
@@ -202,8 +237,38 @@ const KEYS = [
 ] as const;
 
 describe('every quality the old parser read converts to the chord it played (#1737)', () => {
+    // Spellings outside the table that a chart writes: the old parser read a prefix of each (or,
+    // for `M`, nothing, and played the major triad it means).
+    const OFF_TABLE = [
+        'M',
+        'M7#11',
+        'Maj9#11',
+        'maj9#11',
+        'm6/9',
+        'mMaj9',
+        'm(maj9)',
+        '+maj7',
+        '7sus4b9',
+        'm7b6',
+        'm9b6',
+        '7(b9,#11)',
+        '7#11b9',
+        '7b5#9',
+        '7#5b9',
+        '7#9b13',
+        '9b13',
+        '13b9#11',
+        '13#11b9',
+        '7b9#11b13',
+        '7#9#11b13',
+        'maj7#11b13',
+        'm11b5',
+        'm7add11',
+        '7add13',
+        'add4',
+    ];
     const tokens = ROOTS.flatMap((root) =>
-        LEGACY_QUALITY_SPELLINGS.flatMap(variants).flatMap((quality) =>
+        [...LEGACY_QUALITY_SPELLINGS.flatMap(variants), ...OFF_TABLE].flatMap((quality) =>
             BASSES.map((bass) => root + quality + bass),
         ),
     );
@@ -222,9 +287,7 @@ describe('every quality the old parser read converts to the chord it played (#17
         'none refused, and none sounds other than a named difference, in %s (minor: %s)',
         (key, minor) => {
             const verdicts = differential(tokens, key, minor);
-            const unexplained = verdicts.filter(
-                (v) => !['same', 'written-tones', 'two-alterations', 'literal-minor'].includes(v),
-            );
+            const unexplained = verdicts.filter((v) => !NAMED.includes(v));
             expect(unexplained).toEqual([]);
         },
     );
@@ -243,24 +306,48 @@ describe('every quality the old parser read converts to the chord it played (#17
             ].sort();
         expect(differences('C')).toEqual(
             [
+                '+9: written-tones',
                 '-69: written-tones',
-
+                '13#11b9: written-tones',
                 '13#9: written-tones',
                 '13b9: written-tones',
+                '7#5#9: two-alterations',
                 '7#9#5: two-alterations',
                 '7#9b5: two-alterations',
                 '7b13sus: written-tones',
+                '7b5b9: two-alterations',
                 '7b9#5: two-alterations',
                 '7b9b5: two-alterations',
                 '7b9sus: written-tones',
                 '9#11: written-tones',
                 '9#5: written-tones',
                 '9b5: written-tones',
+                'add4: written-tones',
+                'aug9: written-tones',
                 'h9: written-tones',
+                'm69: written-tones',
+                'm9b5: written-tones',
+                'majadd4: written-tones',
+                'min69: written-tones',
+                'mmaj11: written-tones',
+                'mmaj13: written-tones',
+                'mmaj9: written-tones',
             ].sort(),
         );
         expect(differences('ii')).toEqual(
             [
+                '+9: written-tones',
+                '13#11b9: written-tones',
+                'add4: written-tones',
+                'aug9: written-tones',
+                'm69: written-tones',
+                'm9b5: written-tones',
+                'maj69: written-tones',
+                'majadd4: written-tones',
+                'min69: written-tones',
+                'mmaj11: written-tones',
+                'mmaj13: written-tones',
+                'mmaj9: written-tones',
                 '-69: written-tones',
 
                 '13#9: written-tones',
@@ -304,24 +391,72 @@ describe('every quality the old parser read converts to the chord it played (#17
             (token) => convertLegacyChordToken(token),
         );
         expect(symbols).toEqual([
-            { kind: 'ok', symbol: 'Cmaj9', respelled: false },
-            { kind: 'ok', symbol: 'C6/9', respelled: false },
-            { kind: 'ok', symbol: 'CΔ', respelled: false },
-            { kind: 'ok', symbol: 'CmMaj7', respelled: true },
-            { kind: 'ok', symbol: 'Calt', respelled: false },
-            { kind: 'ok', symbol: 'C7b9#11', respelled: false },
-            { kind: 'ok', symbol: 'C-7b5', respelled: true },
+            { kind: 'chord', symbol: 'Cmaj9', change: 'none' },
+            { kind: 'chord', symbol: 'C6/9', change: 'none' },
+            { kind: 'chord', symbol: 'CΔ', change: 'none' },
+            { kind: 'chord', symbol: 'CmMaj7', change: 'notation' },
+            { kind: 'chord', symbol: 'Calt', change: 'none' },
+            { kind: 'chord', symbol: 'C7b9#11', change: 'none' },
+            { kind: 'chord', symbol: 'C-7b5', change: 'notation' },
         ]);
     });
 
+    it.each([
+        // Notation only: commas, case, the order of alterations, an equivalent spelling.
+        ['C7(b9,#11)', 'C7b9#11', 'notation'],
+        ['C7#11b9', 'C7b9#11', 'notation'],
+        ['C7b5#9', 'C7#9b5', 'notation'],
+        ['C7#5b9', 'C7b9#5', 'notation'],
+        ['C13#11b9', 'C13b9#11', 'notation'],
+        ['Cm69', 'C-69', 'notation'],
+        ['Cm6/9', 'C-69', 'notation'],
+        ['Cm(maj9)', 'C-^9', 'notation'],
+        ['CmMaj9', 'C-^9', 'notation'],
+        ['C+maj7', 'Cmaj7#5', 'notation'],
+        ['C7sus4b9', 'C7b9sus', 'notation'],
+        ['Cm7b6', 'Cmin7b6', 'notation'],
+        ['Cmaj9#11', 'C^9#11', 'notation'],
+        ['CMaj9(#11)', 'C^9#11', 'notation'],
+        ['CM', 'C', 'notation'],
+        ['CMAJ7', 'Cmaj7', 'notation'],
+        // Unicode accidentals, read as written.
+        ['D♭7', 'D♭7', 'none'],
+        ['C♯m', 'C♯m', 'none'],
+        // The jazz dominants the vocabulary now holds (#1737).
+        ['C7#9b13', 'C7#9b13', 'none'],
+        ['C9b13', 'C9b13', 'none'],
+        ['C13b9#11', 'C13b9#11', 'none'],
+        // No spelling holds the whole chord: the longest written part that is one.
+        ['C7b9#11b13', 'C7b9#11', 'tones-dropped'],
+        ['C7#9#11b13', 'C7#9#11', 'tones-dropped'],
+        ['Cmaj7#11b13', 'Cmaj7#11', 'tones-dropped'],
+        ['Cm11b5', 'Cm7b5', 'tones-dropped'],
+        ['C/G7', 'C/G', 'tones-dropped'],
+    ])('%s becomes %s (%s)', (token, symbol, change) => {
+        expect(convertLegacyChordToken(token)).toEqual({ kind: 'chord', symbol, change });
+    });
+
+    it('reads N.C. as no chord', () => {
+        expect(convertLegacyChordToken('N.C.')).toEqual({ kind: 'no-chord' });
+        expect(convertLegacyChordToken('NC')).toEqual({ kind: 'no-chord' });
+    });
+
     it('refuses what the old parser guessed at, saying why', () => {
-        for (const token of ['N.C.', '%', 'Xm7', 'C♯m', 'Cnope', 'C:2', 'C/G7']) {
+        for (const token of ['%', 'Xm7', 'Cnope', 'C:2']) {
             expect(convertLegacyChordToken(token)).toMatchObject({ kind: 'refused' });
         }
-        expect(convertLegacyChordToken('C♯m')).toEqual({
+        expect(convertLegacyChordToken('Cnope')).toEqual({
             kind: 'refused',
-            why: 'The old parser read no chord quality in “♯m” of “C♯m” (it played a plain major chord).',
+            why: 'The old parser read no chord quality in “nope” of “Cnope” (it played a plain major chord).',
         });
+    });
+
+    it('refuses a sus with a major 7th rather than write the 3rd it leaves out', () => {
+        // The old parser played Cmaj7sus4 as Cmaj7; no chart spelling keeps both the 4th and
+        // the major 7th, and Cmaj7 sounds the E the sus excludes.
+        for (const token of ['Cmaj7sus4', 'CMaj7sus', 'C^7sus4']) {
+            expect(convertLegacyChordToken(token)).toMatchObject({ kind: 'refused' });
+        }
     });
 });
 
@@ -378,15 +513,11 @@ describe('fuzzed tokens', () => {
         'convert to the old chord or a named difference, or refuse, in %s',
         (key, minor) => {
             const verdicts = differential(tokens, key, minor);
-            const unexplained = verdicts.filter(
-                (v) =>
-                    !['same', 'written-tones', 'two-alterations', 'literal-minor'].includes(v) &&
-                    !v.includes(': refused — '),
-            );
+            const unexplained = verdicts.filter((v) => !NAMED.includes(v) && v !== 'refused');
             expect(unexplained).toEqual([]);
             // The fuzz reaches every outcome, so it is not vacuous.
-            for (const outcome of ['same', 'written-tones', ': refused — ']) {
-                expect(verdicts.some((v) => v.includes(outcome))).toBe(true);
+            for (const outcome of ['same', 'written-tones', 'refused']) {
+                expect(verdicts).toContain(outcome);
             }
         },
     );
@@ -422,14 +553,18 @@ function chartDifferences(chart: LegacyChart): string[] {
             const from = v1.stepMap[chord].start;
             for (const [k, token] of bar.entries()) {
                 const event = events[k];
+                const converted = convertLegacyChordToken(token);
                 const v = verdict(
                     token,
                     v1.progression[chord].absName,
-                    event.kind === 'chord' ? event.symbol : '',
+                    {
+                        symbol: event.kind === 'chord' ? event.symbol : '',
+                        change: converted.kind === 'chord' ? converted.change : 'none',
+                    },
                     key,
                     minor,
                 );
-                if (!['same', 'written-tones', 'two-alterations', 'literal-minor'].includes(v)) {
+                if (!NAMED.includes(v)) {
                     out.push(`${chart.title} ${section.label} bar ${b + 1}: ${v}`);
                 }
                 const onset = steps.slice(0, k).reduce((a, n) => a + n, 0);
@@ -497,8 +632,13 @@ describe('timing: a bar splits the way the old parser rounded it, snapped to the
         ['C Dm Em F G', '4/4', [3, 3, 3, 3, 3], [3, 3, 3, 3, 4]],
         // Two in 3/4 divide evenly: unchanged.
         ['C G7', '3/4', [6, 6], [6, 6]],
-        // Six in 4/4: 3 each, a bar two sixteenths LONG; every onset kept, the last cut short.
-        ['C D E F G A', '4/4', [3, 3, 3, 3, 3, 3], [3, 3, 3, 3, 3, 1]],
+        // Six in 4/4: 3 each, a bar two sixteenths LONG. Keeping the onsets would leave the
+        // last chord one sixteenth, so the six spread evenly, onsets rounded up.
+        ['C D E F G A', '4/4', [3, 3, 3, 3, 3, 3], [3, 3, 2, 3, 3, 2]],
+        // Ten in 4/4: 2 each, the old onsets running past the bar's end; spread evenly.
+        ['C D E F G A B C D E', '4/4', Array(10).fill(2), [2, 2, 1, 2, 1, 2, 2, 1, 2, 1]],
+        // Seven in 4/4: 2 each, the last takes the 4 left: every old onset kept.
+        ['C D E F G A B', '4/4', Array(7).fill(2), [2, 2, 2, 2, 2, 2, 4]],
         // Two in 6/8: 6 + 6.
         ['Am Dm', '6/8', [6, 6], [6, 6]],
         // Three in 7/8: 14 sixteenths, 4.67 each → 5 + 5 + 4.
@@ -520,13 +660,13 @@ describe('timing: a bar splits the way the old parser rounded it, snapped to the
         ).toEqual(converted);
     });
 
-    it('refuses a bar whose old onsets run past its end, naming it', () => {
-        // Ten chords in 4/4: 2 sixteenths each, the tenth starting after the bar is over.
-        expect(legacyBarSteps(10, '4/4')).toBeNull();
+    it('refuses a bar with more chords than sixteenths, naming it', () => {
+        expect(legacyBarSteps(16, '4/4')).toEqual(Array(16).fill(1));
+        expect(legacyBarSteps(17, '4/4')).toBeNull();
         const result = proposeLegacyScoreConversion(
             v1Document({
                 title: 'Busy',
-                sections: [{ label: 'Verse', value: `C | ${'C '.repeat(10)}` }],
+                sections: [{ label: 'Verse', value: `| C | | ${'C '.repeat(17)}` }],
             }),
         );
         expect(result).toMatchObject({
@@ -536,8 +676,9 @@ describe('timing: a bar splits the way the old parser rounded it, snapped to the
                     code: 'off-grid',
                     song: 'Busy',
                     section: 'Verse',
+                    // The second bar the sheet shows: the leading `|` and the empty bar are not bars.
                     bar: 2,
-                    path: '$.chart.arrangement.sections[0].value.bars[1]',
+                    path: '$.chart.arrangement.sections[0].value.bars[3]',
                 },
             ],
         });
@@ -565,9 +706,21 @@ describe('empty bars and sections', () => {
                     : [],
             ),
         ).toEqual([['C'], ['G7']]);
-        expect(result.notes.filter((n) => n.code === 'empty-bar').map((n) => n.bar)).toEqual([
-            2, 4,
+        // Only the empty bar between two chords is said; the text after the trailing `|` is
+        // not a bar.
+        expect(result.notes.filter((n) => n.code === 'empty-bar')).toEqual([
+            expect.objectContaining({
+                path: '$.chart.arrangement.sections[0].value.bars[1]',
+                message: expect.stringContaining('after bar 1'),
+            }),
         ]);
+    });
+
+    it('says nothing about a leading or trailing `|`', () => {
+        const result = proposeLegacyScoreConversion(
+            v1Document({ sections: [{ label: 'A', value: ' | C | G7 | ' }] }),
+        );
+        expect(result).toMatchObject({ kind: 'candidate', notes: [] });
     });
 
     it('drops an empty section: it played no time, and a score section needs a bar', () => {
@@ -606,7 +759,7 @@ describe('refusals name the bar', () => {
                 title: 'Mixed',
                 sections: [
                     { label: 'A', value: 'C | Cnope | G7' },
-                    { label: 'B', value: 'F | N.C. Xm7' },
+                    { label: 'B', value: '| | F | | N.C. Xm7 Cnope' },
                 ],
             }),
         );
@@ -626,10 +779,56 @@ describe('refusals name the bar', () => {
                     song: 'Mixed',
                     section: 'B',
                     bar: 2,
-                    text: 'N.C. Xm7',
-                    message: expect.stringMatching(/“N\.C\.”.*“Xm7”/),
+                    text: 'N.C. Xm7 Cnope',
+                    message: expect.stringMatching(/“Xm7”.*“Cnope”/),
                 },
             ],
         });
+    });
+});
+
+describe('N.C. and %', () => {
+    function measures(value: string) {
+        const result = proposeLegacyScoreConversion(
+            v1Document({ sections: [{ label: 'A', value }] }),
+        );
+        if (result.kind !== 'candidate') {
+            throw new Error(JSON.stringify(result.issues));
+        }
+        return result.value.chart.score.sections[0].measures;
+    }
+
+    it('converts N.C. to no chord, the way it reads', () => {
+        // The old parser read no root in `N.C.` and played the key's own chord there.
+        expect(v1Parse('N.C.').progression[0].absName).toBe('C');
+        expect(measures('C | N.C. | G7 N.C.').map((m) => m.content)).toEqual([
+            { kind: 'events', events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }] },
+            { kind: 'events', events: [{ kind: 'no-chord', duration: [4, 1] }] },
+            {
+                kind: 'events',
+                events: [
+                    { kind: 'chord', symbol: 'G7', duration: [2, 1] },
+                    { kind: 'no-chord', duration: [2, 1] },
+                ],
+            },
+        ]);
+    });
+
+    it('converts a bar of % to a repeat of the bar before it', () => {
+        const converted = measures('C F | % | G7 | %');
+        expect(converted.map((m) => m.content)).toEqual([
+            expect.objectContaining({ kind: 'events' }),
+            { kind: 'repeat', measureId: converted[0].id, display: 'one-bar' },
+            expect.objectContaining({ kind: 'events' }),
+            { kind: 'repeat', measureId: converted[2].id, display: 'one-bar' },
+        ]);
+    });
+
+    it('refuses a % with nothing before it, or among chords', () => {
+        for (const value of ['% | C', 'C | C %']) {
+            expect(
+                proposeLegacyScoreConversion(v1Document({ sections: [{ label: 'A', value }] })),
+            ).toMatchObject({ kind: 'blocked', issues: [{ code: 'legacy-syntax' }] });
+        }
     });
 });

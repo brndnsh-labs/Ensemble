@@ -59,6 +59,10 @@ const QUALITIES = new Set([
     '7b9#5',
     '7b9#9',
     '7b9b13',
+    // #1737: jazz dominants a measure-less chart could hold, so its conversion can keep them.
+    '7#9b13',
+    '9b13',
+    '13b9#11',
     '7alt',
     '13',
     '13#11',

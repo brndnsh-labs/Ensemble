@@ -306,7 +306,10 @@ const SUFFIX_QUALITIES = new Map<string, string>([
 // hand-ordering a ~160-row alternation is exactly how `ma` came to match inside `madd9`.
 const SUFFIX_SPELLINGS = [...SUFFIX_QUALITIES.keys()].sort((a, b) => b.length - a.length);
 
-/** Every quality spelling the parser's table matches, for the text-chart converter's differential (#1737). */
+/**
+ * Every quality spelling the parser's table matches, for the text-chart converter's differential
+ * (#1737). Only tests read it; it goes with this parser when the measure-less charts retire (#1740).
+ */
 export const LEGACY_QUALITY_SPELLINGS: readonly string[] = SUFFIX_SPELLINGS;
 
 /**
@@ -831,6 +834,8 @@ export interface LegacyChordToken {
     bassText?: string;
     /** The written quality suffix, before any normalisation. */
     written: string;
+    /** {@link written} as the parser's table reads it: case folded, `()`, `/` and spaces gone. */
+    normalised: string;
     /** The parser's reading of {@link written}: which spelling matched, and whether all of it. */
     details: ChordDetails;
     /** The letter-name suffix of the chord it plays: the suffix in its `absName`. */
@@ -854,6 +859,7 @@ export function readLegacyChordToken(part: string): LegacyChordToken {
             ? { bass: resolveChordRoot(bassPart, 0, 0).rootPart, bassText: bassPart }
             : {}),
         written,
+        normalised: normalizeChordSuffix(written),
         details,
         suffix: getFormattedChordNames('', '', '', quality, is7th).name.suffix,
     };

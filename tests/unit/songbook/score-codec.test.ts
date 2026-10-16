@@ -568,11 +568,11 @@ describe('pure legacy conversion proposals', () => {
     it.each([
         // What the old parser guessed at rather than read (#1737): `tests/unit/songbook/
         // legacy-score.test.ts` holds what does convert to the old parser's own playing.
-        ['C '.repeat(10), 'off-grid'],
+        ['C '.repeat(17), 'off-grid'],
         ['Cnope', 'legacy-syntax'],
         ['C:2 G7:2', 'legacy-syntax'],
-        ['C♯m', 'legacy-syntax'],
-        ['N.C.', 'legacy-syntax'],
+        ['Xm7', 'legacy-syntax'],
+        ['Cmaj7sus4', 'legacy-syntax'],
     ])('keeps all original data and offers no partial conversion for %s', (bar, code) => {
         const source = JSON.stringify(legacyFixture(bar));
         const result = proposeLegacyScoreConversion(source);

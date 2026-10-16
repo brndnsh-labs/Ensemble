@@ -307,13 +307,17 @@ The pure `proposeLegacyScoreConversion` API returns either a detached candidate 
 report, always alongside the exact original JSON string. It does not persist anything or
 certify audible equivalence. Since #1737 it converts everything the old parser
 (`validateProgression`) read and played: each token as written when the chart vocabulary holds
-it, else respelled to the chord the old parser played; each bar's chords at the old parser's
-rounded onsets, the last chord filling the bar; empty bars and sections dropped, as the old
-parser gave them no time. It retains section/band settings and reports the detached preset
-association. What the old parser only guessed at (no root or quality it knew, a bar whose
-onsets run past its end) blocks the song, with a reason per bar (song, section, bar, why);
-there is no partial candidate. `tests/unit/songbook/legacy-score.test.ts` is the old-vs-new
-differential.
+it, else respelled with no tone changed (case, `()`, `,`, alteration order, an equivalent
+spelling: a `respelled` note), else the longest written part the vocabulary holds or the chord
+the old parser played (a `tones-dropped` note); `N.C.` as no chord and a bar of `%` as a
+measure repeat. Each bar's chords sit at the old parser's rounded onsets, the last filling the
+bar, unless that would leave it under half the others' length, when they spread evenly. Empty
+bars and sections are dropped, as the old parser gave them no time. It retains section/band
+settings and reports the detached preset association. What the old parser only guessed at
+(no root or quality it knew), a sus with no spelling that keeps it, and a bar with more chords
+than sixteenths block the song, with a reason per bar (song, section, bar as the sheet numbers
+it, why); there is no partial candidate. `tests/unit/songbook/legacy-score.test.ts` is the
+old-vs-new differential. For it the vocabulary gained `7#9b13`, `9b13` and `13b9#11`.
 
 ### Engine bridge and gates
 
