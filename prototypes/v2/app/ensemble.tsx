@@ -1518,6 +1518,9 @@ export default function Ensemble() {
             }
             return;
         }
+        // `?autoplay=1` on a `#chart=` link (#1732) arms playback exactly as it does on an old
+        // link; read before `consumeLink` strips it.
+        const wantsAutoplay = new URLSearchParams(search).get('autoplay') === '1';
         void decodeChartLink(hash).then((document) => {
             consumeLink();
             if (!alive) {
@@ -1525,6 +1528,9 @@ export default function Ensemble() {
             }
             if (document) {
                 openSharedDraft(document, 'Opened from a shared link · not saved yet', false);
+                if (wantsAutoplay) {
+                    setPendingAutoplay(true);
+                }
             } else {
                 setError(
                     'This link could not be opened. It may be corrupted or made with a different version of the app.',

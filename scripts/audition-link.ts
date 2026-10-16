@@ -1,10 +1,10 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { buildStandardDocument } from '../prototypes/v2/lib/standards.js';
 import { TIME_SIGNATURES } from '../public/config.js';
 import { GENRE_NAMES } from '../public/data/smart-genres.js';
-import { bass, chords, MIXER_SETTINGS_VERSION, soloist } from '../public/state/instruments.js';
-import { encodeBase64Unicode } from '../public/state/share-codec.js';
-import type { ChordDensity, SharedBandPayload } from '../public/types.js';
+import { encodeChartLink } from '../public/songbook/chart-link.js';
+import type { ChartDocumentV2 } from '../public/songbook/score-types.js';
 import { DEFAULT_MIX_REPORT_SCENES } from './mix-report-utils.js';
 
 interface SceneShape {
@@ -26,7 +26,11 @@ type Part = (typeof SWITCHABLE_PARTS)[number];
 // The old engine's harmony lane is gone (#1436), but written listen menus still pass
 // `--off=chords,harmony`: accepted and ignored, with a note, rather than an error.
 const RETIRED_PART = 'harmony';
-const DENSITIES: readonly ChordDensity[] = ['thin', 'standard', 'rich'];
+// `--density` was inert even on the old `?prog=` links (a chart carries no chord density), so
+// it is no longer a flag. Written listen menus may still pass it: accepted, ignored, noted.
+const DENSITIES = ['thin', 'standard', 'rich'] as const;
+// A link with no `--bpm` still needs a tempo (a chart always carries one): the engine default.
+const DEFAULT_BPM = 120;
 
 interface CliArgs {
     scene: string | null;
@@ -40,7 +44,8 @@ interface CliArgs {
     bpm?: number | null;
     ts?: string | null;
     intensity?: number | null;
-    density?: ChordDensity | null;
+    /** `--density` was named, which the link ignores. */
+    retiredDensity?: boolean;
     on?: Part[];
     off?: Part[];
     /** `--on`/`--off` named the retired harmony lane, which the link then ignores. */
@@ -48,17 +53,11 @@ interface CliArgs {
 }
 
 // The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at the site root.
-// Since the cutover (#1357) the v2 stand opens these links through its old-link reader
-// (`prototypes/v2/lib/v1-link.ts`, #1279), which takes the chart, key, meter, tempo, genre,
-// `int` and `bnd` (DECISION 2026-09-26, #1382) and starts playback on `autoplay=1` after the
-// first gesture. `?seed=` stays inert (v2 re-rolls it on play) — that one was never part of
-// `V2_DROPPED`, since it is a documented no-op rather than an unread field.
+// The link is a schema-2 chart in a `#chart=` fragment (#1732), the same envelope the stand's
+// "Copy link" writes, so it opens as an unsaved draft through the shell's ordinary shared-link
+// path; `?autoplay=1` arms playback on the first gesture. `?seed=` is not carried: the chart's
+// seed re-rolls on every play (`randomizeSeed`), so it could only ever be a line that does nothing.
 const DEFAULT_BASE_URL = 'http://localhost:3100/';
-
-// Link fields the v2 stand does not read. Empty since #1382 (`int`, `bnd` and `autoplay`
-// joined the supported set); kept as a named mechanism for the next field this script grows
-// before the reader does.
-const V2_DROPPED: string[] = [];
 
 function parseParts(flag: string, value: string): Part[] {
     return value
@@ -117,11 +116,10 @@ function parseArgs(argv: string[]): CliArgs {
         } else if (arg.startsWith('--int=')) {
             out.intensity = parseNumber('--int', arg.slice('--int='.length));
         } else if (arg.startsWith('--density=')) {
-            const density = DENSITIES.find((d) => d === arg.slice('--density='.length));
-            if (!density) {
+            if (!(DENSITIES as readonly string[]).includes(arg.slice('--density='.length))) {
                 throw new Error(`--density: expected one of ${DENSITIES.join(', ')}`);
             }
-            out.density = density;
+            out.retiredDensity = true;
         } else if (arg.startsWith('--on=') || arg.startsWith('--off=')) {
             const flag = arg.startsWith('--on=') ? '--on' : '--off';
             const value = arg.slice(flag.length + 1);
@@ -145,10 +143,14 @@ function printUsage(): void {
             'Usage:',
             '  npm run --silent audition-link -- --scene=<id> [--seed=<seed>] [--base-url=<url>] [--no-autoplay]',
             '  npm run --silent audition-link -- --prog="Cm7 | Cm7#5" --genre=Jazz [--key=C] [--ts=6/8] [--bpm=120]',
-            '      [--int=0.35] [--density=thin|standard|rich] [--on=soloist,…] [--off=chords,…]',
+            '      [--int=0.35] [--on=soloist,…] [--off=chords,…]',
             '',
+            '  The link is a #chart= schema-2 chart (an unsaved draft); --prog bars are |-separated.',
             `  --on / --off take: ${SWITCHABLE_PARTS.join(', ')} (the soloist is OFF by default).`,
-            '  --scene flags also accept --int/--density/--on/--off as overrides.',
+            '  --scene flags also accept --int/--on/--off as overrides.',
+            '  --density is accepted and ignored: a chart carries no chord density.',
+            '  --seed is accepted and ignored: the seed re-rolls on every play.',
+            `  Without --bpm the tempo is ${DEFAULT_BPM}.`,
             '',
             'Available scenes:',
             ...DEFAULT_MIX_REPORT_SCENES.map(
@@ -159,99 +161,71 @@ function printUsage(): void {
     );
 }
 
-/**
- * The `bnd` blob for the parts a link switches, or null when it switches none.
- *
- * v1's reader applied each band block WHOLESALE — a block that carries only `e` would reset that
- * part's octave to its fallback (48 for chords, where the app default was 65) — so every
- * emitted block is the part's full default config with just the requested field changed. Blocks
- * for untouched parts are omitted so they keep whatever the genre sets up. The octave, preset
- * and density are v1's own defaults, written as literals since the state fields went (#1424).
- */
-function buildBandParam(args: CliArgs): string | null {
-    const switched = new Map<Part, boolean>();
-    for (const part of args.on || []) {
-        switched.set(part, true);
+/** A key name ('Eb', 'F#m') as the score holds it: the tonic, and whether the key is minor. */
+function parseKey(key: string): { tonic: string; isMinor: boolean } {
+    const match = /^([A-G][#b]?)(m|min)?$/.exec(key);
+    if (!match) {
+        throw new Error(`--key: "${key}" is not a key (C, Eb, F#m, ...)`);
     }
-    for (const part of args.off || []) {
-        switched.set(part, false);
-    }
-    if (switched.size === 0 && !args.density) {
-        return null;
-    }
-    const flag = (part: Part, fallback: boolean): 0 | 1 =>
-        (switched.has(part) ? switched.get(part) : fallback) ? 1 : 0;
-
-    const band: SharedBandPayload = { mv: MIXER_SETTINGS_VERSION };
-    if (switched.has('soloist')) {
-        band.s = {
-            e: flag('soloist', soloist.enabled),
-            p: 'trumpet',
-            o: 72,
-            v: soloist.volume,
-            r: soloist.reverb,
-            m: soloist.mode,
-            am: soloist.autoMode ? 1 : 0,
-            sd: '',
-        };
-    }
-    if (switched.has('bass')) {
-        band.b = {
-            e: flag('bass', bass.enabled),
-            s: bass.style,
-            o: 38,
-            v: bass.volume,
-            r: bass.reverb,
-        };
-    }
-    if (switched.has('chords') || args.density) {
-        band.c = {
-            e: flag('chords', chords.enabled),
-            s: chords.style,
-            o: 65,
-            v: chords.volume,
-            r: chords.reverb,
-            d: args.density || 'standard',
-        };
-    }
-    return encodeBase64Unicode(JSON.stringify(band));
+    return { tonic: match[1], isMinor: Boolean(match[2]) };
 }
 
-export function buildAuditionLink(scene: SceneShape, args: CliArgs): string {
-    const params = new URLSearchParams();
-    // Single-section progression — state-hydration.ts accepts a raw `prog`
-    // string and normalizes it into a Main section.
-    const progression = scene.sections.map((section) => section.value).join(' | ');
-    params.set('prog', progression);
-    params.set('key', scene.key);
-    params.set('ts', args.ts || '4/4');
-    if (scene.bpm > 0) {
-        params.set('bpm', String(scene.bpm));
+/**
+ * The chart a link opens: the scene's bars as one section, built by the standards catalog's own
+ * `buildStandardDocument` (so the band is the genre's catalog band, and every bar goes through
+ * `parseChordBar`), then the two things a link pins on top — `performance.energy` and the lane
+ * on/off switches. Drums are deliberately not switchable: the groove block also carries
+ * swing/humanize, and the genre's own feel is the thing most auditions are listening for.
+ */
+export function buildAuditionDocument(scene: SceneShape, args: CliArgs): ChartDocumentV2 {
+    const bars = scene.sections
+        .flatMap((section) => section.value.split('|'))
+        .map((bar) => bar.trim())
+        .filter(Boolean);
+    const { tonic, isMinor } = parseKey(scene.key);
+    let document: ChartDocumentV2;
+    try {
+        document = buildStandardDocument({
+            id: crypto.randomUUID(),
+            title: 'Audition',
+            shelf: 'grooves',
+            genre: scene.genreFeel,
+            bpm: scene.bpm > 0 ? scene.bpm : DEFAULT_BPM,
+            key: tonic,
+            isMinor,
+            meter: args.ts || '4/4',
+            sections: [{ label: 'A', bars }],
+        });
+    } catch (error) {
+        // The catalog builder names its own file in the message; say what the caller typed.
+        const reason = error instanceof Error ? error.message : String(error);
+        throw new Error(`--prog: ${reason.replace(/^Standards catalog bar /, 'bar ')}`);
     }
-    params.set('genre', scene.genreFeel);
-    params.set('int', (args.intensity ?? scene.intensity).toFixed(2));
-    const band = buildBandParam(args);
-    if (band) {
-        params.set('bnd', band);
+    const { chart } = document;
+    chart.performance.energy = Math.min(1, Math.max(0, args.intensity ?? scene.intensity));
+    for (const part of args.on || []) {
+        chart.band[part].enabled = true;
     }
-    if (args.seed) {
-        params.set('seed', args.seed);
+    for (const part of args.off || []) {
+        chart.band[part].enabled = false;
     }
-    if (args.autoplay) {
-        params.set('autoplay', '1');
-    }
+    return document;
+}
 
-    const dropped = V2_DROPPED.filter((name) => params.has(name));
-    if (dropped.length > 0) {
-        process.stderr.write(`note: the v2 stand ignores ${dropped.join(', ')} in this link\n`);
-    }
+export async function buildAuditionLink(scene: SceneShape, args: CliArgs): Promise<string> {
+    const fragment = await encodeChartLink(buildAuditionDocument(scene, args));
     if (args.retiredPart) {
         process.stderr.write(
             "note: the v2 stand has no harmony lane; this link's harmony switch has no effect\n",
         );
     }
+    if (args.retiredDensity) {
+        process.stderr.write('note: --density does nothing (a chart carries no chord density)\n');
+    }
     const base = args.baseUrl.endsWith('/') ? args.baseUrl : `${args.baseUrl}/`;
-    return `${base}?${params.toString()}`;
+    // Autoplay rides the query string, outside the chart: it is a request to this page load,
+    // not part of the song, and the shell consumes it with the fragment.
+    return `${base}${args.autoplay ? '?autoplay=1' : ''}${fragment}`;
 }
 
 /** An ad-hoc scenario as a scene. `bpm: 0` means "leave the tempo to the app". */
@@ -266,10 +240,10 @@ function adHocScene(args: CliArgs): SceneShape {
     };
 }
 
-export function runAuditionLink(argv: string[] = process.argv.slice(2)): number {
+export async function runAuditionLink(argv: string[] = process.argv.slice(2)): Promise<number> {
     const args = parseArgs(argv);
     if (args.prog) {
-        process.stdout.write(`${buildAuditionLink(adHocScene(args), args)}\n`);
+        process.stdout.write(`${await buildAuditionLink(adHocScene(args), args)}\n`);
         return 0;
     }
     if (!args.scene) {
@@ -284,11 +258,11 @@ export function runAuditionLink(argv: string[] = process.argv.slice(2)): number 
         return 2;
     }
 
-    const url = buildAuditionLink(scene as SceneShape, args);
+    const url = await buildAuditionLink(scene as SceneShape, args);
     process.stdout.write(`${url}\n`);
     return 0;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-    process.exitCode = runAuditionLink();
+    process.exitCode = await runAuditionLink();
 }

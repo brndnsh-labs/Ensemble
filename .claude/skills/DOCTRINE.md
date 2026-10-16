@@ -302,8 +302,8 @@ lightweight residual check instead of gating the merge on it:
 - `verify-by-ear` — a musical-correctness change whose idiom is captured by a critique
   test; ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new) in which
   **every line is a link**: `npm run --silent audition-link -- --base-url=<host>/ --prog="…"
-  --genre=… [--key --ts --int --density --on=soloist --off=chords,harmony]` opens the scenario
-  pre-set behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
+  --genre=… [--key --ts --bpm --int --on=soloist --off=chords]` opens the scenario
+  pre-set (an unsaved `#chart=` draft) behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
   PR's 🎧 section **and** post them as a `**[claude]**` comment on the issue. The
   test is the correctness gate, the listen is *confirmation* — a follow-up tweak if it
   feels off, never a rollback (musical diffs are reversible).

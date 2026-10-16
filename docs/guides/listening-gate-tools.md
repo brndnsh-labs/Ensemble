@@ -375,7 +375,7 @@ the progression, press play."
 
 ```bash
 npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA
-# → http://localhost:3100/?prog=Dm7+%7C+G7+...
+# → http://localhost:3100/?autoplay=1#chart=eJx...
 ```
 
 The default base is the v2 dev server (`npm run dev --prefix prototypes/v2`)
@@ -383,20 +383,21 @@ at the site root; for the site use `--base-url=https://ensemble.brndn.zip/`.
 Available scenes are the same four shipped with `mix:report`:
 `rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pocket`.
 
-**What the app reads (#1358, extended #1382).** Since the cutover the link is opened by
-v2's old-link reader (`prototypes/v2/lib/v1-link.ts`, #1279), which takes
-`prog`, `key`, `ts`, `bpm` and `genre` and opens them as an unsaved
-shared chart. It also reads `int` — the chart opens with its energy pinned to that
-level instead of `'auto'` — and `bnd`'s `--on`/`--off` part switches for `soloist`,
-`bass` and `chords`, applied as that lane's mute state. `autoplay=1` doesn't play
-immediately (browsers block audio before a gesture): the stand shows a "tap anywhere
-to play" hint and starts on the first pointer or key event anywhere on the page.
-`--density` and everything else `bnd` can carry (style, octave, volume, reverb) stay
-**ignored** — those are the genre's own settings, re-picked in the Feel/Sounds panels,
-not something a link should override. `--on=`/`--off=harmony` is accepted by the CLI
-but has no effect and the script says so on stderr: the band engine has no harmony
-lane and no v2 surface shows a control to mute one. `?seed=` is inert too (v2 re-rolls
-it on play) and always was — that one was never part of the dropped-fields warning.
+**What the app reads (#1732).** The link is a schema-2 chart in a `#chart=` fragment, the
+same envelope the stand's "Copy link" writes, so it opens as an unsaved draft through the
+shell's ordinary shared-link path. The script builds the chart with the standards catalog's
+own `buildStandardDocument` (`prototypes/v2/lib/standards.ts`): each `|`-separated bar goes
+through `parseChordBar`, and the band is the genre's catalog band. On top of that the link pins
+`--key` (a trailing `m` makes it minor), `--ts`, `--bpm` (default 120 when omitted),
+`--int` as `performance.energy` (a fixed level, clamped 0-1, instead of `'auto'`), and the
+`--on`/`--off` part switches for `soloist`, `bass` and `chords` as that lane's `enabled`.
+`autoplay=1` rides the query string and doesn't play immediately (browsers block audio
+before a gesture): the stand shows a "tap anywhere to play" hint and starts on the first
+pointer or key event anywhere on the page. Chord spellings must be ones `parseChordBar`
+accepts (`Cmb6`, not `Cm(b6)`); a bad bar fails the script with the bar named.
+`--density`, `--seed` and `--on=`/`--off=harmony` are accepted but do nothing (`--help` says
+so; density and harmony also note it on stderr): a chart carries no chord density, the seed
+re-rolls on every play, and the band engine has no harmony lane.
 
 ### Ad-hoc scenarios — a link per listen-checklist line
 
@@ -411,15 +412,13 @@ npm run --silent audition-link -- --base-url=https://ensemble.brndn.zip/ \
     --prog="Cm | Cmb6 | Cm6 | Cmb6" --genre=Neo-Soul --ts=6/8 --bpm=90
 ```
 
-Flags the app reads: `--genre` (one of the 13, validated), `--key`,
-`--ts` (e.g. `6/8`), `--bpm` (omit to leave tempo to the app), `--int`
-(clamped 0-1), and `--on=`/`--off=` with `soloist`, `bass` or `chords`
-(switched on or off on open). Flags it still ignores: `--density=thin|standard|rich`
-and `--on=`/`--off=harmony` (no harmony lane in the band engine).
-`tests/scripts/audition-link-roundtrip.test.ts` feeds generated links
-through the app's reader, `lib/v1-link.ts` (v1's `loadFromUrl` is gone, #1424); the v2
-Playwright suite (`prototypes/v2/checks/audition-link-fields.spec.ts`) checks the
-fields it applies in the browser.
+Flags the link carries: `--genre` (one of the 13, validated), `--key`,
+`--ts` (e.g. `6/8`), `--bpm`, `--int` (clamped 0-1), and `--on=`/`--off=` with `soloist`,
+`bass` or `chords`. Ignored, with a note: `--density`, `--seed`, `--on=`/`--off=harmony`.
+`tests/scripts/audition-link.test.ts` decodes generated links with the app's own
+`decodeChartLink` and checks every field; the v2 Playwright suite
+(`prototypes/v2/checks/audition-link-fields.spec.ts`) opens them in the browser and checks
+the chart on the stand per field, plus `autoplay`.
 
 ## `npm run mix:analyze -- <file> [<file> ...]`
 

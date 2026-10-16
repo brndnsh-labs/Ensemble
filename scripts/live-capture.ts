@@ -173,7 +173,7 @@ async function buildBridgeExport(): Promise<void> {
 type Scene = (typeof DEFAULT_MIX_REPORT_SCENES)[number] & { timeSignature?: string };
 
 /** The link `audition-link` builds for a scene, lane switches included. */
-export function sceneUrl(base: string, scene: Scene, off: Options['off'] = []): string {
+export function sceneUrl(base: string, scene: Scene, off: Options['off'] = []): Promise<string> {
     return buildAuditionLink(scene, {
         scene: scene.id,
         seed: null,
@@ -229,7 +229,7 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
     try {
         const page = await browser.newPage();
         page.on('pageerror', (error) => log.write(`page error: ${error.message}\n`));
-        await page.goto(sceneUrl(`http://127.0.0.1:${port}`, scene, options.off), {
+        await page.goto(await sceneUrl(`http://127.0.0.1:${port}`, scene, options.off), {
             waitUntil: 'networkidle',
         });
         await page.waitForFunction(

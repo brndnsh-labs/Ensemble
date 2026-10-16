@@ -18,9 +18,9 @@
  * - `int` (band intensity) IS read (DECISION 2026-09-26, #1382): a link that carries it opens
  *   with `ChartPerformance.energy` pinned to that level (clamped 0-1) instead of `'auto'`. This
  *   supersedes the auto-vs-fixed ambiguity noted below for a genuine v1 session (v1 sent `int`
- *   whether or not its own band was on auto intensity) — `npm run audition-link` is the only
- *   sender of `int` in practice, and it always means a fixed level: the whole point of pinning
- *   intensity in a listening-gate link is to audition that exact number.
+ *   whether or not its own band was on auto intensity) — a hand-written link that
+ *   carries `int` means a fixed level. (`npm run audition-link` no longer sends this shape: it
+ *   writes a `#chart=` link, #1732.)
  * - `bnd` (the compressed per-lane band payload, `SharedBandPayload`) is read for exactly one
  *   thing: each lane's `e` (enabled) flag, applied as `ChartBand.<lane>.enabled` on top of
  *   whatever the genre otherwise sets up. Nothing else in the payload is read — style, octave,
