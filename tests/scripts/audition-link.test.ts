@@ -16,7 +16,7 @@ const scene = {
 const base = (over: Record<string, unknown> = {}) => ({
     scene: 'jazz-ride',
     seed: null,
-    baseUrl: 'http://localhost:3100/v2/',
+    baseUrl: 'http://localhost:3100/',
     autoplay: true,
     ...over,
 });
@@ -33,7 +33,7 @@ describe('buildAuditionLink', () => {
     it('emits the scene as a schema-2 #chart= link with autoplay armed by default', async () => {
         const url = await buildAuditionLink(scene, base());
         const parsed = new URL(url);
-        expect(parsed.pathname).toBe('/v2/');
+        expect(parsed.pathname).toBe('/');
         expect(parsed.searchParams.get('autoplay')).toBe('1');
         expect(parsed.searchParams.get('prog')).toBeNull();
         expect(parsed.searchParams.get('s')).toBeNull();

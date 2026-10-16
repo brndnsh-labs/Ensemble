@@ -67,7 +67,7 @@ until the device reconnects. The beta's cache was always going to be deleted at 
 the five requirements above, and `smoke.mjs`, which turns each of them into an assertion against
 a container that is actually running. Together they build
 `ghcr.io/brndnsh-labs/ensemble-web:sha-<commit>` — the v2 stand exported at
-`ENSEMBLE_V2_BASE=/` (#1354) inside `nginxinc/nginx-unprivileged`, the base image is pinned
+`/` (#1734) inside `nginxinc/nginx-unprivileged`, the base image is pinned
 by digest in `hosting/web/Dockerfile`. There is no release directory or symlink, because the
 release IS the tag and rollback is the previous tag.
 
@@ -80,7 +80,7 @@ are the bytes the v2 gates ran against — and only those, since the Dockerfile 
 document root first, which is what retires the base image's own `50x.html`.
 
 ```sh
-ENSEMBLE_V2_BASE=/ npm run build --prefix prototypes/v2
+npm run build --prefix prototypes/v2
 docker build hosting/web --build-context site=prototypes/v2/out \
     --build-arg REVISION="$(git rev-parse HEAD)" --tag ensemble-web:local
 node hosting/web/smoke.mjs ensemble-web:local "$(git rev-parse HEAD)"

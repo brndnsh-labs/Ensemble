@@ -42,7 +42,7 @@ export default function AdminPage() {
 }
 
 function Overview({ overview }: { overview: AdminOverview }) {
-    const { accounts, documents } = overview;
+    const { accounts, documents, charts } = overview;
     return (
         <>
             <section className="admin-stats" aria-label="Totals">
@@ -76,6 +76,22 @@ function Overview({ overview }: { overview: AdminOverview }) {
                     value={String(overview.authFailuresLast24Hours)}
                     detail="last 24 hours"
                 />
+            </section>
+            <section aria-labelledby="admin-formats">
+                <h2 id="admin-formats">Chart formats</h2>
+                <ul className="admin-formats">
+                    {Object.entries(charts.bySchemaVersion)
+                        .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+                        .map(([version, n]) => (
+                            <li key={version}>
+                                {version === 'unknown'
+                                    ? `Charts with no format version: ${n}`
+                                    : `Format ${version} charts: ${n}`}
+                            </li>
+                        ))}
+                    <li>Old-format charts: {charts.bySchemaVersion['1'] ?? 0}</li>
+                    <li>Charts with old band settings: {charts.withLegacyFields}</li>
+                </ul>
             </section>
             <section aria-labelledby="admin-accounts">
                 <h2 id="admin-accounts">Accounts</h2>

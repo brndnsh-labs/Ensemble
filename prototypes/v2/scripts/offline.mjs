@@ -3,19 +3,12 @@ import { createHash } from 'node:crypto';
 import { cp, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { basePathFromEnv } from './base-path.mjs';
 
 const root = path.resolve('out');
-// Where this artifact will be served from — `/v2` today, `''` at the cutover. The same value
-// `next.config.mjs` gave the export, so the worker's scope and the asset keys cannot disagree
-// with the URLs the app actually loads. See scripts/base-path.mjs.
-const base = basePathFromEnv();
-const scope = `${base}/`;
-// Everything gated on this is the phase-5 cutover's alone (#1355). At `/v2` the stand is a beta
-// living beside v1 and must stay exactly what it is today: no second installable identity, no
-// opinion about v1's caches, no worker at anyone else's scope. At `/` it inherits v1's URL, its
-// registration and its returning browsers, and has to clean up after both of them.
-const atSiteRoot = base === '';
+// The stand is served from the site root and nowhere else (#1734), so the worker's scope and the
+// asset keys are `/…`. It inherited v1's URL, its registration and its returning browsers at the
+// cutover (#1355), and the handover code below cleans up after both of them.
+const scope = '/';
 // Where the old beta lived. The tombstone below is emitted under it, and the paths it forwards
 // are its own minus this prefix.
 const PREVIEW_BASE = '/v2';
@@ -53,34 +46,32 @@ const WEB_MANIFEST_ICONS = [
     { file: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
     { file: 'icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
 ];
-if (atSiteRoot) {
-    for (const icon of WEB_MANIFEST_ICONS) {
-        await cp(path.resolve('../../public', icon.file), path.join(root, icon.file));
-    }
-    await writeFile(
-        path.join(root, 'manifest.json'),
-        `${JSON.stringify(
-            {
-                name: 'Ensemble',
-                short_name: 'Ensemble',
-                id: '/',
-                start_url: '/',
-                scope: '/',
-                display: 'standalone',
-                background_color: '#14110d',
-                theme_color: '#14110d',
-                icons: WEB_MANIFEST_ICONS.map(({ file, sizes, type, purpose }) => ({
-                    src: `/${file}`,
-                    sizes,
-                    type,
-                    purpose,
-                })),
-            },
-            null,
-            4,
-        )}\n`,
-    );
+for (const icon of WEB_MANIFEST_ICONS) {
+    await cp(path.resolve('../../public', icon.file), path.join(root, icon.file));
 }
+await writeFile(
+    path.join(root, 'manifest.json'),
+    `${JSON.stringify(
+        {
+            name: 'Ensemble',
+            short_name: 'Ensemble',
+            id: '/',
+            start_url: '/',
+            scope: '/',
+            display: 'standalone',
+            background_color: '#14110d',
+            theme_color: '#14110d',
+            icons: WEB_MANIFEST_ICONS.map(({ file, sizes, type, purpose }) => ({
+                src: `/${file}`,
+                sizes,
+                type,
+                purpose,
+            })),
+        },
+        null,
+        4,
+    )}\n`,
+);
 
 // --- Content-Security-Policy: a build-time <meta>, not an nginx header (#1395) -------------
 //
@@ -201,10 +192,7 @@ const manifest = {
 await writeFile(path.join(root, 'build.json'), JSON.stringify(manifest, null, 2));
 
 // ---------------------------------------------------------------------------------------------
-// The root-only parts of the worker below (#1355). Each one is the empty string — or, for the
-// activate body, character-for-character today's text — in a `/v2` build, so the published
-// worker keeps the code it has apart from the fingerprint. The beta's behaviour is not up for
-// revision in a cutover story.
+// The handover parts of the worker below (#1355).
 // ---------------------------------------------------------------------------------------------
 
 // The shell cache's namespace, and why there are two of them (#1355 review R5).
@@ -217,7 +205,7 @@ await writeFile(path.join(root, 'build.json'), JSON.stringify(manifest, null, 2)
 // `ensemble-v2-root-` is the site. The tombstone can then delete every preview cache with no
 // exception at all, and each root worker retires older root shells itself. Both stay inside
 // `ensemble-v2-`, so the v1 rule below still cannot reach either of them.
-const shellCaches = atSiteRoot ? 'ensemble-v2-root-' : 'ensemble-v2-preview-';
+const shellCaches = 'ensemble-v2-root-';
 
 // Which caches belong to v1, exactly.
 //
@@ -231,13 +219,11 @@ const shellCaches = atSiteRoot ? 'ensemble-v2-root-' : 'ensemble-v2-preview-';
 // must survive the cut intact. The v2 test is therefore first and by prefix — no v1 rule can
 // reach past it — and both halves are plain string prefixes on strings out of `caches.keys()`,
 // with no table to index and nothing to inherit.
-const legacyCacheRule = atSiteRoot
-    ? `
+const legacyCacheRule = `
 const PREVIEW_CACHES = 'ensemble-v2-preview-';
 const ROOT_CACHES = 'ensemble-v2-root-';
 const V2_CACHES = 'ensemble-v2-';
-const isLegacyShellCache = name => !name.startsWith(V2_CACHES) && (name.startsWith('ensemble-') || name.startsWith('workbox-'));`
-    : '';
+const isLegacyShellCache = name => !name.startsWith(V2_CACHES) && (name.startsWith('ensemble-') || name.startsWith('workbox-'));`;
 
 // The handover itself. At `/` this script is served from `/sw.js` — v1's own script URL and
 // scope — so the browser runs its ordinary update check and this becomes an UPDATE of v1's
@@ -260,18 +246,13 @@ const isLegacyShellCache = name => !name.startsWith(V2_CACHES) && (name.startsWi
 // OTHER root shell cache exists: `replacingRoot` means a root v2 worker already ran here, and
 // what this update replaces is that worker, whatever else is lying in Cache Storage. This build's
 // own cache is excluded because `install` has just created it.
-const replacingRootRule = atSiteRoot
-    ? `
-const replacingRoot = names => names.some(name => name.startsWith(ROOT_CACHES) && name !== CACHE);`
-    : '';
-const installHandover = atSiteRoot
-    ? `
+const replacingRootRule = `
+const replacingRoot = names => names.some(name => name.startsWith(ROOT_CACHES) && name !== CACHE);`;
+const installHandover = `
     const present = await caches.keys().catch(() => []);
-    if (present.some(isLegacyShellCache) && !replacingRoot(present)) await self.skipWaiting();`
-    : '';
+    if (present.some(isLegacyShellCache) && !replacingRoot(present)) await self.skipWaiting();`;
 
-// Activate. The `/v2` branch is today's text verbatim; the root branch is its own thing, because
-// three of this review's findings live in it and surgical fragments would have made it unreadable.
+// Activate. Three of the #1355 review's findings live in it.
 //
 // R4 — one read of the cache index, BEFORE anything is deleted, is both the sweep list and the
 // answer to "did this replace v1?" (`isLegacyShellCache` evidence and not `replacingRoot`, the same
@@ -291,36 +272,28 @@ const installHandover = atSiteRoot
 // not in a build older than #1048) — and the v2 shell, if it is already the document, has no such
 // listener at all. The cost when both fire is one extra page load; the cost when neither does is a
 // window rendering a shell whose assets have been deleted from the origin.
-const activateBody = atSiteRoot
-    ? `
+const activateBody = `
     const names = await caches.keys().catch(() => []);
     const handover = names.some(isLegacyShellCache) && !replacingRoot(names);
     for (const name of names) if (name.startsWith(PREVIEW_CACHES) || (name.startsWith(ROOT_CACHES) && name !== CACHE) || isLegacyShellCache(name)) await caches.delete(name).catch(() => {});
     await self.clients.claim();
-    if (handover) for (const client of await self.clients.matchAll({ type: 'window' }).catch(() => [])) void client.navigate(client.url).catch(() => {});`
-    : `
-    for (const name of await caches.keys()) if (name.startsWith('ensemble-v2-preview-') && name !== CACHE) await caches.delete(name);
-    await self.clients.claim();`;
+    if (handover) for (const client of await self.clients.matchAll({ type: 'window' }).catch(() => [])) void client.navigate(client.url).catch(() => {});`;
 
-// What an in-scope navigation gets when it is not in the cache. At `/v2/` the scope was this
-// artifact and nothing else, so falling through to the network was the whole story. At `/` the
-// scope is the origin, and `/anything` now reaches this handler. The rule: a navigation that the
+// What an in-scope navigation gets when it is not in the cache. The scope is the origin, so
+// `/anything` reaches this handler. The rule: a navigation that the
 // NETWORK refuses falls back to the cached shell, so `/?s=…`, `/?accounts=on` and a bookmarked
 // `/v2/…` all still open a working stand on a train. A 404 is a fetch that SUCCEEDED, so a real
 // missing path stays a real missing path, and a subresource request is never given HTML.
-const navigationFallback = atSiteRoot
-    ? `
+const navigationFallback = `
         if (event.request.mode === 'navigate') {
             return await cache.match(key) || await fetch(event.request).catch(async () => await cache.match(SCOPE) || Response.error());
-        }`
-    : '';
+        }`;
 
 // One atomic cache installation: a partial download never earns offline-ready.
 // Waiting updates do not replace a running band's code. Close all tabs to update.
 //
-// SCOPE is `/v2/` today and `/` at the cutover, so the prefix test alone stops excluding the
-// account API the moment the stand takes the site root: at `/` it matches everything on the
-// origin. PASSES names that exclusion explicitly instead of inheriting it from the `/v2/`
+// SCOPE is `/`, so the prefix test alone matches everything on the origin, the account API
+// included. PASSES names that exclusion explicitly instead of inheriting it from a narrower
 // prefix by accident (`lib/account/api.ts` documents the reader's side of the same rule).
 // `/api/*` is the whole list on purpose — it is the only non-artifact path this origin serves
 // (Caddy splits it to the account API; see hosting/README.md), its replies are private and
@@ -356,7 +329,7 @@ self.addEventListener('fetch', event => {
 `,
 );
 
-// The tombstone for the beta's own worker (#1355), emitted by the ROOT build only.
+// The tombstone for the beta's own worker (#1355).
 //
 // After the flip `/v2/*` redirects to `/` (#1356), which does nothing for a browser that still
 // holds the preview registration: that worker is cache-first over the whole of `/v2/`, so a
@@ -381,11 +354,10 @@ self.addEventListener('fetch', event => {
 // The navigations are fired, not awaited, for the same reason as the root worker's belt: this one
 // escapes the deadlock today only because its targets are outside its own scope, which is a
 // property of the URLs rather than of the code.
-if (atSiteRoot) {
-    await mkdir(path.join(root, PREVIEW_BASE.slice(1)), { recursive: true });
-    await writeFile(
-        path.join(root, PREVIEW_BASE.slice(1), 'sw.js'),
-        `
+await mkdir(path.join(root, PREVIEW_BASE.slice(1)), { recursive: true });
+await writeFile(
+    path.join(root, PREVIEW_BASE.slice(1), 'sw.js'),
+    `
 const PREVIEW_CACHES = 'ensemble-v2-preview-';
 const PREVIEW_BASE = ${JSON.stringify(PREVIEW_BASE)};
 self.addEventListener('install', () => self.skipWaiting());
@@ -403,8 +375,7 @@ self.addEventListener('activate', event => event.waitUntil((async () => {
     await self.registration.unregister();
 })()));
 `,
-    );
-}
+);
 console.log(
     `V2 artifact ${fingerprint.slice(0, 16)} · ${paths.length} deployed assets (sounds download on demand)`,
 );

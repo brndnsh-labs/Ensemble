@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# The `ensemble-web` image (#1356): the v2 music stand, built at `ENSEMBLE_V2_BASE=/`, inside
+# The `ensemble-web` image (#1356): the v2 music stand, built at `/`, inside
 # an unprivileged nginx. Decision 1 of docs/design/ensemble-v2-rollout.md — the static site
 # becomes an immutable artifact released by tag like the API, and rollback is the previous tag.
 #
@@ -10,7 +10,7 @@
 # holding node_modules, .next and the whole app is a thing to get wrong, not a thing to
 # maintain:
 #
-#   ENSEMBLE_V2_BASE=/ npm run build --prefix prototypes/v2
+#   npm run build --prefix prototypes/v2
 #   docker build hosting/web --build-context site=prototypes/v2/out \
 #       --build-arg REVISION="$(git rev-parse HEAD)" --tag ensemble-web:local
 #

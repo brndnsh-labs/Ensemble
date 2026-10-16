@@ -26,8 +26,8 @@ worker engine no longer runs in the app.
     for the browser (the Web Audio globals, the sample packs read from `public/packs/`, and
     a shim for the library's differences — see *Rendering in node* below). No build, no
     browser; metrics are measured with `scripts/audio-analysis.ts`.
-  - **`--engine=chromium`.** Unless `--no-build` (a no-op on the node engine), `mix:report` builds `prototypes/v2` at
-    `ENSEMBLE_V2_BASE=/` with `NEXT_PUBLIC_RENDER_BRIDGE=1` (`next build --webpack` +
+  - **`--engine=chromium`.** Unless `--no-build` (a no-op on the node engine), `mix:report` builds `prototypes/v2` with
+    `NEXT_PUBLIC_RENDER_BRIDGE=1` (`next build --webpack` +
     `scripts/offline.mjs`, which copies the sample packs), serves `prototypes/v2/out`, and
     drives Chromium; the bridge is on `window.ensemble` and the metrics are measured in the
     page. This is the render the app itself makes — use it for the final check of a change
@@ -375,11 +375,11 @@ the progression, press play."
 
 ```bash
 npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA
-# → http://localhost:3100/v2/?autoplay=1#chart=eJx...
+# → http://localhost:3100/?autoplay=1#chart=eJx...
 ```
 
 The default base is the v2 dev server (`npm run dev --prefix prototypes/v2`)
-at its default `/v2` base; for the site use `--base-url=https://ensemble.brndn.zip/`.
+at the site root; for the site use `--base-url=https://ensemble.brndn.zip/`.
 Available scenes are the same four shipped with `mix:report`:
 `rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pocket`.
 

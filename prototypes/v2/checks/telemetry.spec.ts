@@ -5,7 +5,7 @@ import { expect, seedStarters, songLink, test } from './fixtures';
  *
  * `lib/telemetry.ts` only installs the tracker in a production BUILD (`NEXT_PUBLIC_TELEMETRY=1`,
  * baked into the one `ensemble-web` image CI releases) on the canonical HOST
- * (`ensemble.brndn.zip`). Neither is true of this suite's own build (`ENSEMBLE_V2_BASE=/`, no
+ * (`ensemble.brndn.zip`). Neither is true of this suite's own build (no
  * telemetry flag, served from `127.0.0.1`) — which is deliberate: it's what keeps the normal v2
  * export silent (the second test below). To still exercise the real script-injection and
  * tracking-call path in CI, the first test sets `window.__ENSEMBLE_TELEMETRY_TEST_OVERRIDE__`

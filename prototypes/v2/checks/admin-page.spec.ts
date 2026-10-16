@@ -28,6 +28,7 @@ test('a listed account sees accounts against the cap and the account list', asyn
                     signedInLast7Days: 2,
                 },
                 documents: { total: 12, bytes: 48_000 },
+                charts: { total: 11, bySchemaVersion: { '1': 4, '2': 7 }, withLegacyFields: 5 },
                 authFailuresLast24Hours: 0,
                 list: [
                     {
@@ -67,6 +68,10 @@ test('a listed account sees accounts against the cap and the account list', asyn
     const totals = page.getByRole('region', { name: 'Totals' });
     await expect(totals).toContainText('3 of 25');
     await expect(totals).toContainText('22 sign-ups left');
+    const formats = page.getByRole('region', { name: 'Chart formats' });
+    await expect(formats).toContainText('Format 2 charts: 7');
+    await expect(formats).toContainText('Old-format charts: 4');
+    await expect(formats).toContainText('Charts with old band settings: 5');
     const rows = page.locator('.admin-table tbody tr');
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(1)).toContainText('mineAcct');
@@ -77,4 +82,29 @@ test('a listed account sees accounts against the cap and the account list', asyn
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('a malformed chart count is a failed load, not a half-rendered page', async ({ page }) => {
+    await page.route('**/api/admin/overview', (route) =>
+        route.fulfill({
+            json: {
+                accounts: {
+                    total: 1,
+                    cap: 25,
+                    remaining: 24,
+                    newLast7Days: 0,
+                    newLast30Days: 0,
+                    signedInLast7Days: 0,
+                },
+                documents: { total: 0, bytes: 0 },
+                charts: { total: 'many', bySchemaVersion: {}, withLegacyFields: 0 },
+                authFailuresLast24Hours: 0,
+                list: [],
+                listTruncated: false,
+            },
+        }),
+    );
+    await page.goto(appUrl('admin/'));
+    await expect(page.locator('.admin-note')).toContainText("Couldn't reach the server");
+    await expect(page.getByRole('region', { name: 'Chart formats' })).toHaveCount(0);
 });

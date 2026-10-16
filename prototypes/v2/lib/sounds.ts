@@ -8,7 +8,6 @@ import { ensurePackLoaded } from '@engine/engine/pack-runtime';
 import { type PackManifest, setPackAssetFetcher, withRevToken } from '@engine/engine/sample-loader';
 import type { ChartContent } from '@engine/songbook/types';
 import type { InstrumentModule, InstrumentVoice } from '@engine/types';
-import { BASE_PATH, withBase } from './base-path';
 
 export { packsForInstrument };
 export const allSoundsSizeMB = SOUND_PACKS.reduce((total, pack) => total + pack.approxSizeMB, 0);
@@ -22,7 +21,7 @@ const digest = async (bytes: ArrayBuffer) =>
 
 async function files(): Promise<Record<string, string>> {
     if (!index) {
-        index = fetch(withBase('/pack-files.json'), { signal: AbortSignal.timeout(20_000) })
+        index = fetch('/pack-files.json', { signal: AbortSignal.timeout(20_000) })
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error('Sound catalog unavailable. Reconnect and retry.');
@@ -45,12 +44,12 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
     if (url.origin !== location.origin || !hash || !/^[a-f0-9]{64}$/.test(hash)) {
         throw new Error('This sound references an unsupported file.');
     }
-    // The key IS the served URL, so it carries the build's base (#1354). `CACHE` survives app-
-    // shell upgrades by design, and moving the base moves every key in it — which is why the
-    // cutover re-keys them rather than letting them go cold (`migrateSoundCacheBase`, #1355).
-    // A key change is only ever acceptable WITH that migration; as a drive-by in a `/v2` build
-    // it silently orphans everyone's sounds.
-    const key = `${withBase(url.pathname)}?asset=${hash}`;
+    // The key IS the served URL, so it is the site-root path. `CACHE` survives app-shell
+    // upgrades by design, and moving a key moves every entry in it — which is why the cutover
+    // re-keyed them rather than letting them go cold (`migrateSoundCacheBase`, #1355). A key
+    // change is only ever acceptable WITH a migration; as a drive-by it silently orphans
+    // everyone's sounds.
+    const key = `${url.pathname}?asset=${hash}`;
     const cache = await caches.open(CACHE);
     const cached = await cache.match(key);
     if (cached && (await digest(await cached.clone().arrayBuffer())) === hash) {
@@ -63,20 +62,17 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
     // makes the background pass pure tidy-up rather than a race the musician can lose on a gig.
     // The digest is the same one this function already trusts, so an adopted entry is verified
     // exactly as a cached one is, and a failure falls through to the network path below.
-    // `BASE_PATH` is a build constant, so this whole block is eliminated from the `/v2` bundle.
-    if (BASE_PATH === '') {
-        try {
-            const legacy = await cache.match(`/v2${url.pathname}?asset=${hash}`);
-            if (legacy && (await digest(await legacy.clone().arrayBuffer())) === hash) {
-                await cache.put(key, legacy.clone());
-                // Tidy-up only, so never awaited into the result: once the new key holds the
-                // verified bytes this read has succeeded, whatever becomes of the old entry.
-                void cache.delete(`/v2${url.pathname}?asset=${hash}`).catch(() => {});
-                return legacy;
-            }
-        } catch {
-            // The old entry stays where it is and the pack downloads again. Never a hard failure.
+    try {
+        const legacy = await cache.match(`/v2${url.pathname}?asset=${hash}`);
+        if (legacy && (await digest(await legacy.clone().arrayBuffer())) === hash) {
+            await cache.put(key, legacy.clone());
+            // Tidy-up only, so never awaited into the result: once the new key holds the
+            // verified bytes this read has succeeded, whatever becomes of the old entry.
+            void cache.delete(`/v2${url.pathname}?asset=${hash}`).catch(() => {});
+            return legacy;
         }
+    } catch {
+        // The old entry stays where it is and the pack downloads again. Never a hard failure.
     }
     if (cachedOnly) {
         throw new Error('Sound download is incomplete. Reconnect and retry.');
@@ -128,16 +124,14 @@ async function seed(): Promise<void> {
         }
         const cache = await caches.open(CACHE);
         const keys = await cache.keys();
-        // On the root build, an entry `migrateSoundCacheBase` has not moved yet still sits under
-        // `/v2`, and `asset()` adopts it on read, so it counts as installed here too.
+        // An entry `migrateSoundCacheBase` has not moved yet still sits under `/v2`, and
+        // `asset()` adopts it on read, so it counts as installed here too.
         const pathOf = (request: Request) => {
             const { pathname } = new URL(request.url);
-            return BASE_PATH === '' && pathname.startsWith('/v2/packs/')
-                ? pathname.slice('/v2'.length)
-                : pathname;
+            return pathname.startsWith('/v2/packs/') ? pathname.slice('/v2'.length) : pathname;
         };
         const present = new Set(keys.map(pathOf));
-        const path = (source: string) => withBase(new URL(source, location.origin).pathname);
+        const path = (source: string) => new URL(source, location.origin).pathname;
         for (const pack of SOUND_PACKS) {
             try {
                 const manifestPath = path(`/packs/${pack.id}/manifest.json`);
@@ -165,13 +159,13 @@ async function seed(): Promise<void> {
  * again (#1355).
  *
  * `asset()` keys this cache by the URL it fetched, which carries the build's base, so every
- * entry a `/v2` build wrote is filed under `/v2/packs/…` and a root build looks straight past
+ * entry a `/v2` build wrote is filed under `/v2/packs/…` and the root build looks straight past
  * it. Re-keying is safe precisely because the keys are content-addressed: the `?asset=<sha256>`
  * that survives the move is the same digest `asset()` verifies the bytes against on every read,
  * so a move that corrupted anything would be caught at the next read rather than played.
  * Someone who installed every pack for a gig keeps them through the flip.
  *
- * Root build only, never awaited by startup, and safe to run twice: an entry is removed from
+ * Never awaited by startup, and safe to run twice: an entry is removed from
  * its old key only once the new one reads back, so a failure part-way leaves the cache whole
  * and the next page load finishes the job. `asset()` carries the same move as a read-through, so
  * nothing here is on anyone's critical path.
@@ -182,7 +176,7 @@ async function seed(): Promise<void> {
  * later page load would abandon at exactly the same place and never finish the job.
  */
 export async function migrateSoundCacheBase(): Promise<void> {
-    if (BASE_PATH !== '' || typeof caches === 'undefined') {
+    if (typeof caches === 'undefined') {
         return;
     }
     let cache: Cache;

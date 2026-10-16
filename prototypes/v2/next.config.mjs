@@ -1,25 +1,18 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { basePathFromEnv } from './scripts/base-path.mjs';
 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const revision = execFileSync('git', ['rev-parse', '--short', 'HEAD']).toString().trim();
-// `/v2` today, `''` (the site root) once ENSEMBLE_V2_BASE=/ is the cutover build. Published to
-// the browser as NEXT_PUBLIC_BASE_PATH so `lib/base-path.ts` reads the same one value; Next
-// rewrites its own links and `_next/*` assets from `basePath` alone.
-const basePath = basePathFromEnv();
 
 export default {
     output: 'export',
-    basePath,
     trailingSlash: true,
     outputFileTracingRoot: path.resolve(directory, '../..'),
     reactStrictMode: true,
     experimental: { externalDir: true },
     env: {
         NEXT_PUBLIC_SOURCE_REV: revision,
-        NEXT_PUBLIC_BASE_PATH: basePath,
         // Always DEFINED, so Next inlines it and webpack drops the render-bridge branch (and its
         // chunk) from every build that doesn't ask for it; an unset NEXT_PUBLIC_* would stay a
         // runtime lookup and ship the bridge unreachable. `scripts/mix-report.ts` sets it (#1358).

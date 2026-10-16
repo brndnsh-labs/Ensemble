@@ -78,14 +78,10 @@ npm run build --prefix prototypes/v2
 npm run test:e2e --prefix prototypes/v2
 ```
 
-Those three commands build and check the app at the default `/v2` base. `ENSEMBLE_V2_BASE`
-moves the whole app to another base in one value (#1354), and `scripts/serve.mjs`, the
-Playwright fixtures and the generated service worker all follow it. The site is the
-`ENSEMBLE_V2_BASE=/` build, and CI's `v2-suite` builds and tests exactly that (#1400) — set it
-on both the build and the test command to reproduce CI, including the root-only
-`root-handover.chromium.spec.ts`, which skips at `/v2`.
+Those three commands build and check the app, which is served from the site root and nowhere
+else (#1734). They are what CI's `v2-suite` runs, including `root-handover.chromium.spec.ts`.
 
-For UI development, `npm run dev --prefix prototypes/v2`, then visit `http://localhost:3100/v2/`.
+For UI development, `npm run dev --prefix prototypes/v2`, then visit `http://localhost:3100/`.
 Sound-pack assets and their integrity index are assembled by the build script: use the built
 export (`node scripts/serve.mjs` in this directory) to exercise downloads and offline playback.
 Offline installation only works against the built export, not the development server. The
@@ -309,8 +305,7 @@ coexistence/production migration has not shipped. Prefer a corrective release an
 
 ## Deployment
 
-Both hosts serve the **`ensemble-web`** image: this export built with `ENSEMBLE_V2_BASE=/`,
-on unprivileged nginx (`../../hosting/web/`), beside the `ensemble-api` container. A release is
+Both hosts serve the **`ensemble-web`** image: this export, on unprivileged nginx (`../../hosting/web/`), beside the `ensemble-api` container. A release is
 a tag, verified through the host's public `/build.json` (`sourceRevision` = the commit):
 
 - **Production** — every merge to `main`: the CI `deploy` job releases the merged commit's

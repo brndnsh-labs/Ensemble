@@ -52,12 +52,12 @@ interface CliArgs {
     retiredPart?: boolean;
 }
 
-// The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at its default `/v2` base.
+// The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at the site root.
 // The link is a schema-2 chart in a `#chart=` fragment (#1732), the same envelope the stand's
 // "Copy link" writes, so it opens as an unsaved draft through the shell's ordinary shared-link
 // path; `?autoplay=1` arms playback on the first gesture. `?seed=` is not carried: the chart's
 // seed re-rolls on every play (`randomizeSeed`), so it could only ever be a line that does nothing.
-const DEFAULT_BASE_URL = 'http://localhost:3100/v2/';
+const DEFAULT_BASE_URL = 'http://localhost:3100/';
 
 function parseParts(flag: string, value: string): Part[] {
     return value
