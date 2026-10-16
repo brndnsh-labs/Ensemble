@@ -1859,17 +1859,22 @@ dialog textarea {
     max-width: 125px;
     cursor: pointer;
 }
-/* Opens the Feel sheet (#1276) beside the genre select: same type, muted, no chrome. */
+/* Opens the Band sheet (#1703) beside the style select. Bordered like the other buttons in the
+   bar: as muted text with no chrome it read as a cut-off label, not a button (UI audit). Its
+   height is the shared setting row's, above. */
 .band-button {
     font-size: 13px;
     font-weight: 650;
-    color: var(--muted);
-    padding: 0 0 0 6px;
-    /* A text-only button still needs a finger-sized target (#1700); it was 15–18px tall. Its
-       height is the shared setting row's, below. */
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 12px;
+    margin-left: 6px;
+    cursor: pointer;
 }
 .band-button:hover {
-    color: var(--ink);
+    background: var(--hover);
 }
 .section-text {
     width: 100%;

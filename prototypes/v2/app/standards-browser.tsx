@@ -77,7 +77,7 @@ export function StandardsBrowser({ initialShelf, onBack, onOpen }: StandardsBrow
                     <tr>
                         <th>Title</th>
                         <th className="hide-mobile">First bars</th>
-                        <th>Genre</th>
+                        <th>Style</th>
                         <th className="hide-mobile">Tempo</th>
                         <th>
                             <span className="sr">Open</span>

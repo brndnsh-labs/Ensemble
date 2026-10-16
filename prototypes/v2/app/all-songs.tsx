@@ -219,7 +219,7 @@ export function AllSongs({
     }, [songs]);
     // The picked genre, while a song of it is still here. Deleting the last one drops the
     // option; left alone, the stale pick would keep filtering an empty list under a select
-    // that reads "All genres".
+    // that reads "All styles".
     const activeGenre = genres.includes(genre) ? genre : '';
 
     const starredCount = useMemo(
@@ -393,9 +393,9 @@ export function AllSongs({
                     />
                 </label>
                 <label className="all-songs-select">
-                    <span className="sr">Filter by genre</span>
+                    <span className="sr">Filter by style</span>
                     <select value={activeGenre} onChange={(event) => setGenre(event.target.value)}>
-                        <option value="">All genres</option>
+                        <option value="">All styles</option>
                         {genres.map((option) => (
                             <option key={option} value={option}>
                                 {option}

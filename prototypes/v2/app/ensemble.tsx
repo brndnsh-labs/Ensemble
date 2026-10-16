@@ -4583,7 +4583,8 @@ export default function Ensemble() {
                 throw new Error('Standard no longer exists.');
             }
             const document = buildStandardDocument(entry);
-            landDraftOnStand(document, 'Opened a standard · not saved yet');
+            // No toast: the header already says "From the standards · not saved" (UI audit).
+            landDraftOnStand(document, '');
             standardOnStand.current = { documentId: document.id, standardId: id };
             setStandardDraft(true);
             setStandardsOpen(false);
@@ -6251,10 +6252,6 @@ export default function Ensemble() {
                 onExportAudioMix={() => void exportAudioFile('mix')}
                 onExportAudioStems={() => void exportAudioFile('stems')}
                 onCancelExportAudio={() => runtime.cancelExportAudio()}
-                onImport={() => {
-                    setMenu(false);
-                    setImporting(true);
-                }}
                 v1Available={v1Present}
                 onBringOverV1={openV1Import}
                 onRevert={() =>

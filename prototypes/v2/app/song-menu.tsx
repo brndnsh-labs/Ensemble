@@ -36,7 +36,6 @@ interface SongMenuProps {
     onSaveCopy: () => void;
     onExport: () => void;
     onExportMidi: () => void;
-    onImport: () => void;
     onRevert: () => void;
     onOpenRecovery: (record: Recovery) => void;
     /** #1278 — audio export is a distinct busy state from `busy` so its Cancel
@@ -73,7 +72,6 @@ export function SongMenu({
     onSaveCopy,
     onExport,
     onExportMidi,
-    onImport,
     onRevert,
     onOpenRecovery,
     exportingAudio,
@@ -176,13 +174,12 @@ export function SongMenu({
                     )}
                 </div>
             </section>
-            <section className="song-menu-group" aria-labelledby="song-menu-bring">
-                <h3 id="song-menu-bring">Bring in songs</h3>
-                <div className="dialog-actions">
-                    <button className="btn" disabled={busy} onClick={onImport}>
-                        Import chart
-                    </button>
-                    {v1Available && (
+            {/* Importing a chart starts from the songbook home; from here the menu only offers
+                the old app's songs, which are about this device rather than this song. */}
+            {v1Available && (
+                <section className="song-menu-group" aria-labelledby="song-menu-bring">
+                    <h3 id="song-menu-bring">Bring in songs</h3>
+                    <div className="dialog-actions">
                         <button
                             className="btn"
                             data-testid="bring-over-v1"
@@ -191,9 +188,9 @@ export function SongMenu({
                         >
                             Bring over old Ensemble songs
                         </button>
-                    )}
-                </div>
-            </section>
+                    </div>
+                </section>
+            )}
             <div className="dialog-actions song-menu-close">
                 <button className="btn" onClick={onClose}>
                     Close
