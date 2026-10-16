@@ -1,5 +1,10 @@
 import { useEffect, useRef } from 'react';
-import type { UpgradeNote, UpgradeOutcome, UpgradeStoreKind } from '../lib/upgrade';
+import {
+    UPGRADE_SKIPS,
+    type UpgradeNote,
+    type UpgradeOutcome,
+    type UpgradeStoreKind,
+} from '../lib/upgrade';
 
 /**
  * "Upgrade old songs" (#1738) as the songbook home shows it. Counts and copy only; the shell owns
@@ -267,6 +272,12 @@ export function UpgradeCard({
                                     ).map(([key, entry]) => (
                                         <li key={key}>
                                             <strong>{entry.title}</strong> (draft) — {entry.reason}
+                                            {entry.reason === UPGRADE_SKIPS.draftLive && (
+                                                <>
+                                                    {' '}
+                                                    {openButton(entry.store, entry.id, entry.title)}
+                                                </>
+                                            )}
                                         </li>
                                     ))}
                                 </ul>

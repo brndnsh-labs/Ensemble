@@ -326,7 +326,8 @@ export const draftBackupKey = (store: UpgradeStoreKind, draft: UpgradeDraft) =>
 
 export const UPGRADE_SKIPS = {
     unsaved: 'It has unsaved changes. Open it, then Save or discard them, and upgrade again.',
-    changed: 'It changed after the backup was made. Upgrade again to back it up first.',
+    changed:
+        'It is not in the backup just made (it changed since, or its file could not be written). Upgrade again.',
     elsewhere: 'It was saved somewhere else while upgrading. Upgrade again.',
     draftLive: 'Unsaved changes in the old format. Open the song, then Save or discard them.',
     draftRefused:

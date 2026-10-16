@@ -256,7 +256,16 @@ test('a song with unsaved edits is left alone, its draft untouched, until it is 
     );
 
     // Open recovers the edit; saving it commits the musician's own text, and then it upgrades.
-    await card(page).getByRole('button', { name: 'Open Work in progress' }).click();
+    // Its unsaved draft is listed too, with the same way in.
+    await expect(
+        card(page)
+            .getByTestId('upgrade-drafts')
+            .getByRole('button', { name: 'Open Work in progress' }),
+    ).toBeVisible();
+    await card(page)
+        .getByTestId('upgrade-skipped')
+        .getByRole('button', { name: 'Open Work in progress' })
+        .click();
     await expect(page.getByLabel('Chord text')).toHaveValue('C | F | G7 | C');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
