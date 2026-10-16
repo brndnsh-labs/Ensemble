@@ -1,4 +1,5 @@
 /** `scripts/live-capture.ts`: the argument parser and the link it opens the stand on. */
+import { decodeChartLink } from '../../public/songbook/chart-link.js';
 import { parseLiveCaptureArgs, sceneUrl } from '../../scripts/live-capture.js';
 import { DEFAULT_MIX_REPORT_SCENES } from '../../scripts/mix-report-utils.js';
 
@@ -39,15 +40,19 @@ describe('live:capture', () => {
         expect(() => parseLiveCaptureArgs(['--loud'])).toThrow(/unknown argument/);
     });
 
-    it('opens the stand on the scene the way audition-link does, lane switches included', () => {
+    it('opens the stand on the scene the way audition-link does, lane switches included', async () => {
         const scene = DEFAULT_MIX_REPORT_SCENES.find((s) => s.id === 'funk-pocket')!;
-        const url = new URL(sceneUrl('http://127.0.0.1:4321', scene, ['chords']));
-        expect(url.searchParams.get('genre')).toBe('Funk');
-        expect(url.searchParams.get('bpm')).toBe(String(scene.bpm));
-        expect(url.searchParams.get('key')).toBe(scene.key);
-        expect(url.searchParams.get('int')).toBe(scene.intensity.toFixed(2));
-        expect(url.searchParams.get('prog')).toContain('|');
-        expect(url.searchParams.get('bnd')).not.toBeNull(); // the chords switch rides in `bnd`
+        const url = new URL(await sceneUrl('http://127.0.0.1:4321', scene, ['chords']));
+        const doc = await decodeChartLink(url.hash);
+        if (doc?.schemaVersion !== 2) {
+            throw new Error('expected a schema-2 chart link');
+        }
+        expect(doc.chart.band.groove.genre).toBe('Funk');
+        expect(doc.chart.performance.bpm).toBe(scene.bpm);
+        expect(doc.chart.score.key).toBe(scene.key);
+        expect(doc.chart.performance.energy).toBeCloseTo(scene.intensity);
+        expect(doc.chart.score.sections[0].measures.length).toBeGreaterThan(1);
+        expect(doc.chart.band.chords.enabled).toBe(false); // the chords switch
         expect(url.searchParams.get('autoplay')).toBeNull(); // the script presses Play itself
     });
 });

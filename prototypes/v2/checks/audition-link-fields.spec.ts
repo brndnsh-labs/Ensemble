@@ -1,101 +1,115 @@
-import { encodeBase64Unicode } from '../../../public/state/share-codec';
-import { appUrl, expect, openBand, test } from './fixtures';
+import { execFile } from 'node:child_process';
+import path from 'node:path';
+import { promisify } from 'node:util';
+import { appUrl, expect, openBand, openWholeSong, test } from './fixtures';
 
 /**
- * The audition-link fields #1382 taught the v2 stand to read: `int` (a fixed band energy),
- * `bnd`'s part switches (soloist/bass/chords mute) and `autoplay` (play after the first
- * gesture). These ride the same `?prog=`/`bnd=` envelope `npm run audition-link` writes and
- * `prototypes/v2/lib/v1-link.ts` already opens for the older fields
- * (`v1-share-link.spec.ts` covers `s`/`prog`/`key`/`ts`/`bpm`/`genre`/`notation`); this spec
- * is the "each field" acceptance criterion for the three #1382 adds.
+ * `npm run audition-link` writes a schema-2 `#chart=` link (#1732), the envelope the stand's
+ * own "Copy link" writes, so the stand opens it as an unsaved draft through its ordinary
+ * shared-link path. This spec builds links by running the real CLI and asserts, per
+ * field, that the opened chart is the one asked for: genre, key, meter, tempo, energy, the
+ * lane switches and `autoplay`.
  */
-function auditionLink(params: Record<string, string>): string {
-    const search = new URLSearchParams({
-        prog: 'C7 | F7 | C7 | C7',
-        genre: 'Blues',
-        key: 'C',
-        ...params,
-    });
-    return appUrl(`?${search.toString()}`);
+interface LinkOptions {
+    prog?: string;
+    genre?: string;
+    key?: string;
+    ts?: string;
+    bpm?: number;
+    intensity?: number;
+    on?: ('soloist' | 'bass' | 'chords')[];
+    off?: ('soloist' | 'bass' | 'chords')[];
+    autoplay?: boolean;
 }
 
-/**
- * A `bnd` payload switching only the lanes named — the same envelope
- * `scripts/audition-link.ts`'s `buildBandParam` writes, minified to just the `e` (enabled)
- * flag each lane's block needs; the reader ignores everything else a real payload would carry
- * (style/octave/volume/reverb), so a minimal object round-trips identically.
- */
-function bnd(switches: Partial<Record<'s' | 'b' | 'c', 0 | 1>>): string {
-    const payload: Record<string, { e: 0 | 1 }> = {};
-    for (const [lane, e] of Object.entries(switches)) {
-        payload[lane] = { e: e as 0 | 1 };
-    }
-    return encodeBase64Unicode(JSON.stringify(payload));
+const execFileAsync = promisify(execFile);
+const REPO_ROOT = path.resolve(__dirname, '../../..');
+
+/** Runs the real CLI (`tsx scripts/audition-link.ts`) and returns the one link it prints. */
+async function auditionLink(options: LinkOptions = {}): Promise<string> {
+    const flags: Array<[string, string | number | undefined]> = [
+        ['prog', options.prog ?? 'C7 | F7 | C7 | C7'],
+        ['genre', options.genre ?? 'Blues'],
+        ['base-url', appUrl('')],
+        ['key', options.key],
+        ['ts', options.ts],
+        ['bpm', options.bpm],
+        ['int', options.intensity],
+        ['on', options.on?.join(',')],
+        ['off', options.off?.join(',')],
+    ];
+    const argv = flags.flatMap(([name, value]) =>
+        value === undefined ? [] : [`--${name}=${value}`],
+    );
+    argv.push(...(options.autoplay ? [] : ['--no-autoplay']));
+    const { stdout } = await execFileAsync(
+        path.join(REPO_ROOT, 'node_modules/.bin/tsx'),
+        ['scripts/audition-link.ts', ...argv],
+        { cwd: REPO_ROOT },
+    );
+    return stdout.trim();
 }
+
+const lane = (page: import('@playwright/test').Page, name: string) =>
+    page.getByRole('button', { name, exact: true });
+
+test('an audition link opens as an unsaved draft with its genre, key, meter and tempo', async ({
+    page,
+}) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(
+        await auditionLink({
+            prog: 'Cm7 | Fm7 | G7 | Cm7',
+            genre: 'Jazz',
+            key: 'Eb',
+            ts: '3/4',
+            bpm: 92,
+        }),
+    );
+    await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
+    await expect(page.locator('.song-subtitle')).toContainText('Opened from a shared link');
+    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['Cm7']);
+    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Jazz');
+    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('Eb');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('92');
+    const menu = await openWholeSong(page);
+    await expect(menu.getByLabel('Song meter')).toHaveValue('3/4');
+    // Consumed on load: a reload lands on the songbook, not the draft again.
+    expect(new URL(page.url()).hash).toBe('');
+    expect(errors).toEqual([]);
+});
 
 test('an audition link opens at its fixed intensity with the named parts switched', async ({
     page,
 }) => {
-    await page.goto(auditionLink({ int: '0.82', bnd: bnd({ c: 0, s: 1 }) }));
-    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    await page.goto(await auditionLink({ intensity: 0.82, on: ['soloist'], off: ['chords'] }));
+    await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
 
-    // Chords muted, soloist switched on — the two lanes the payload named.
-    await expect(page.getByRole('button', { name: 'Chords', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-    );
-    await expect(page.getByRole('button', { name: 'Soloist', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-    );
-    // Bass wasn't named in `bnd`: left on the genre's own default (on).
-    await expect(page.getByRole('button', { name: 'Bass', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-    );
+    // Chords muted, soloist switched on — the two lanes the link named.
+    await expect(lane(page, 'Chords')).toHaveAttribute('aria-pressed', 'false');
+    await expect(lane(page, 'Soloist')).toHaveAttribute('aria-pressed', 'true');
+    // Bass wasn't named: left on the genre's own default (on).
+    await expect(lane(page, 'Bass')).toHaveAttribute('aria-pressed', 'true');
 
     await openBand(page, 'Groove');
     await expect(page.getByLabel('Auto intensity', { exact: true })).not.toBeChecked();
     await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('82');
 });
 
-test('a link with no int/bnd opens on auto energy with the genre defaults untouched', async ({
-    page,
-}) => {
-    await page.goto(auditionLink({}));
-    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Bass', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-    );
-    await expect(page.getByRole('button', { name: 'Soloist', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-    );
-
-    await openBand(page, 'Groove');
-    await expect(page.getByLabel('Auto intensity', { exact: true })).toBeChecked();
-});
-
-test('a malformed int/bnd is ignored rather than pinning a level or lane nobody asked for', async ({
-    page,
-}) => {
-    await page.goto(auditionLink({ int: 'not-a-number', bnd: 'not-base64!!!' }));
-    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Bass', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-    );
-
-    await openBand(page, 'Groove');
-    await expect(page.getByLabel('Auto intensity', { exact: true })).toBeChecked();
+test('a link that switches nothing leaves the genre defaults untouched', async ({ page }) => {
+    await page.goto(await auditionLink());
+    await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
+    await expect(lane(page, 'Bass')).toHaveAttribute('aria-pressed', 'true');
+    await expect(lane(page, 'Chords')).toHaveAttribute('aria-pressed', 'true');
+    await expect(lane(page, 'Soloist')).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('autoplay=1 hints and starts the band on the first gesture, not before', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(auditionLink({ autoplay: '1' }));
-    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    await page.goto(await auditionLink({ autoplay: true }));
+    await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
     const status = page.getByTestId('stand-toast');
     await expect(status).toContainText('tap anywhere to play');
     // Not playing yet: no gesture has happened, so autoplay must not have started itself.
@@ -111,8 +125,8 @@ test('autoplay=1 hints and starts the band on the first gesture, not before', as
 });
 
 test('a link without autoplay never shows the tap-to-play hint', async ({ page }) => {
-    await page.goto(auditionLink({}));
-    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    await page.goto(await auditionLink());
+    await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
     await expect(page.getByTestId('stand-toast')).not.toContainText('tap anywhere to play');
 });
 
@@ -131,8 +145,8 @@ test('clicking Play on an armed autoplay link plays — it does not start and im
 }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(auditionLink({ autoplay: '1' }));
-    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    await page.goto(await auditionLink({ autoplay: true }));
+    await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
     const status = page.getByTestId('stand-toast');
     await expect(status).toContainText('tap anywhere to play');
 
@@ -152,8 +166,8 @@ test('pressing Enter on the focused Play button plays an armed autoplay link the
     // Keyboard-focus interaction; webkit-phone's iPhone emulation doesn't drive Tab/Enter
     // focus the way a laptop keyboard does, so this one is laptop-only per the review note.
     test.skip(testInfo.project.name !== 'laptop', 'keyboard-focus interaction, laptop only');
-    await page.goto(auditionLink({ autoplay: '1' }));
-    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    await page.goto(await auditionLink({ autoplay: true }));
+    await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
     const status = page.getByTestId('stand-toast');
     await expect(status).toContainText('tap anywhere to play');
 
