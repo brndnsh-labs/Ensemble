@@ -360,7 +360,7 @@ test('a guest songbook that will not read whole says the offer cannot be compare
     await seedV1Profile(page);
     await seedGuestDocuments(page, [
         ...starterDocuments(),
-        { schemaVersion: 1, id: 'zz-corrupt', title: 42, chart: null },
+        { schemaVersion: 2, id: 'zz-corrupt', title: 42, chart: null },
     ]);
     const card = page.getByTestId('v1-import');
     await expect(

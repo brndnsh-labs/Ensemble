@@ -57,13 +57,12 @@ async function documents(page: Page): Promise<ChartDocument[]> {
     });
 }
 
-async function convertBlue(page: Page) {
+/** Blue pocket, a measure chart (#1733), open in Edit chart. Converting a text chart with "Try
+ * the bar editor · keep original" is `text-chart.spec.ts`'s. */
+async function editBlue(page: Page) {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page
-        .getByRole('button', { name: 'Try the bar editor · keep original', exact: true })
-        .click();
     await editorRevealed(page);
     await expect(page.locator('.sheet .bar').first()).toBeVisible();
 }
@@ -97,12 +96,13 @@ async function exportCurrent(page: Page): Promise<ChartDocument> {
     return document;
 }
 
-test('2+1+1 editor saves a source-preserving copy, transposes and reopens offline', async ({
+test('2+1+1 editor saves the song, transposes and reopens offline', async ({
     page,
     disconnect,
 }, info) => {
-    await convertBlue(page);
-    const original = (await documents(page)).find((document) => document.id === 'starter-blues');
+    await editBlue(page);
+    const before = await documents(page);
+    const original = before.find((document) => document.id === 'starter-blues')!;
     await page.getByLabel('Song title').fill('Uneven blues');
     await typeBar(page, 1, 'C:2 Dm:1 G7:1');
     // Leaving the bar applies it; the transpose then carries it (and retires the old buffers).
@@ -146,8 +146,11 @@ test('2+1+1 editor saves a source-preserving copy, transposes and reopens offlin
             { kind: 'chord', symbol: 'A7', duration: [1, 1] },
         ],
     });
-    expect((await documents(page)).find((document) => document.id === 'starter-blues')).toEqual(
-        original,
+    // Save writes the song itself, one revision on; no other song is touched.
+    expect(saved.id).toBe('starter-blues');
+    expect(saved.revision).toBe(original.revision + 1);
+    expect((await documents(page)).filter((document) => document.id !== saved.id)).toEqual(
+        before.filter((document) => document.id !== saved.id),
     );
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL))
@@ -165,7 +168,7 @@ test('2+1+1 editor saves a source-preserving copy, transposes and reopens offlin
 test('unfinished bars survive selection, errors and hidden editor; Save commits every bar', async ({
     page,
 }) => {
-    await convertBlue(page);
+    await editBlue(page);
     const original = await documents(page);
     await typeBar(page, 1, 'C Dm G7');
     // Moving on applies bar 1; bar 2's unreadable text stays pending on its bar.
@@ -313,8 +316,8 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     page,
     context,
 }) => {
-    await convertBlue(page);
-    const original = (await documents(page)).find((document) => document.schemaVersion === 2)!;
+    await editBlue(page);
+    const original = (await documents(page)).find((document) => document.id === 'starter-blues')!;
     const second = await context.newPage();
     await second.goto(appUrl());
     await songLink(second, original.title, 'Blues').click();

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { afterPress } from './after-press';
 
 /** Keep intermediate keystrokes local; changing the band is a committed user action. */
 export function TempoControl({
@@ -55,7 +56,8 @@ export function TempoControl({
                     value={text}
                     disabled={disabled}
                     onChange={(event) => setText(event.target.value)}
-                    onBlur={() => commit()}
+                    // A press that took the focus lands before the commit moves the page (#1733).
+                    onBlur={() => afterPress(() => commit())}
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') {
                             event.preventDefault();
