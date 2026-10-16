@@ -151,6 +151,9 @@ for (const [width, height] of [
         await closeBarDock(page);
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
         await expect(page.locator('.bar-input, .bar-dock')).toHaveCount(0);
+        // Playing folds the controls away (focus mode), as above.
+        await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
+        await page.getByRole('button', { name: 'Show controls' }).click();
         await page.getByRole('button', { name: 'Stop playback' }).click();
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
         await expect(await openBar(page, 1)).toHaveValue(typed);
