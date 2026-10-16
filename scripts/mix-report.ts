@@ -940,9 +940,9 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
         log.write('Building the v2 stand for mix analysis...\n');
         // The offline render drives `window.ensemble` (`prototypes/v2/lib/render-bridge.ts`),
         // which the v2 runtime installs only in a build made with NEXT_PUBLIC_RENDER_BRIDGE=1 —
-        // real prod builds never set it (#656, #1358). Built at the root base so the page and `/packs/` serve from `/`;
+        // real prod builds never set it (#656, #1358). The page and `/packs/` serve from `/`;
         // `offline.mjs` is what copies the sample packs into the export.
-        const buildEnv = { NEXT_PUBLIC_RENDER_BRIDGE: '1', ENSEMBLE_V2_BASE: '/' };
+        const buildEnv = { NEXT_PUBLIC_RENDER_BRIDGE: '1' };
         for (const [command, args] of [
             ['npx', ['next', 'build', '--webpack']],
             ['node', ['scripts/offline.mjs']],

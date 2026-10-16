@@ -19,12 +19,10 @@ export default defineConfig({
     // static-assets dir and emit "served at the root path" noise for every
     // engine module. We serve no static assets here, so disable it.
     publicDir: false,
-    // A browser test that reaches the preview's modules needs its engine alias and Next's inlined
-    // base path (see `vitest.sync.config.ts`).
+    // A browser test that reaches the preview's modules needs its engine alias.
     resolve: {
         alias: { '@engine': fileURLToPath(new URL('./public', import.meta.url)) },
     },
-    define: { 'process.env.NEXT_PUBLIC_BASE_PATH': JSON.stringify('/v2') },
     test: {
         include: ['tests/browser/**/*.test.ts'],
         // `npm run test:sync` runs these in Chromium and WebKit; here they would run in Chromium a

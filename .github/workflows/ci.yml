@@ -159,10 +159,7 @@ jobs:
   # ones — the export compiles public/ through webpack, so any engine change can
   # break it. Starts alongside `checks`, not after it (#1223).
   #
-  # It builds at `/`, the base production serves (#1400). The default `/v2` base is what a
-  # local `npm run build` still produces, but nothing publishes it since the cutover (#1357),
-  # and a separate root-base workflow used to re-run this whole suite at `/` beside it — twice
-  # the minutes, with the shipped base outside the required gate. Now the root-only specs
+  # It builds at `/`, the only base there is (#1734). The root-only specs
   # (`root-handover.chromium.spec.ts`) run here, and `v2-root-image.yml` keeps only the image
   # smoke test.
   #
@@ -242,9 +239,6 @@ jobs:
     if: needs.changes.outputs.app == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    env:
-      # Read by the build AND by checks/fixtures.ts, so the suite drives the base it built.
-      ENSEMBLE_V2_BASE: /
     strategy:
       # Every leg always runs: a red leg must not hide another.
       fail-fast: false
@@ -530,9 +524,6 @@ jobs:
       packages: write
     env:
       IMAGE: ghcr.io/brndnsh-labs/ensemble-web
-      # The cutover build: the stand at the site root, not at /v2. This is the ONE value that
-      # changes what gets built (prototypes/v2/scripts/base-path.mjs, #1354).
-      ENSEMBLE_V2_BASE: /
       # #1389 — this is the ONE build baked into the `ensemble-web` tag released to BOTH prod
       # and ensembletest, so the flag can't (and doesn't need to) differ per host: it only rules
       # out dev, the Playwright export (`v2-suite` below never sets it) and a render-bridge

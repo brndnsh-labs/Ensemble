@@ -24,7 +24,7 @@ handoff for Claude, Codex and other agents; no previous conversation or private 
 is required.
 
 **The v2 music stand IS the site (cutover #1357).** `ensemble.brndn.zip/` serves the
-`prototypes/v2/` Next static export built at `ENSEMBLE_V2_BASE=/`, inside the `ensemble-web`
+`prototypes/v2/` Next static export built at `/`, inside the `ensemble-web`
 image; `/v2/*` is an edge redirect to the same path without the prefix. A merge to `main`
 releases it: the CI `deploy` job publishes no files at all any more — it releases this commit's
 `ensemble-web` and `ensemble-api` tags to prod and then test, and asserts each host's public
@@ -81,7 +81,7 @@ npm run validate         # format + jscpd + `npm run ci` (typecheck, typecheck:t
 npm run depcheck         # circular-import gate (Biome noImportCycles) — RUNTIME cycles only
 
 # The app (prototypes/v2), from the repo root:
-npm run dev --prefix prototypes/v2       # Next dev server on http://localhost:3100/v2/
+npm run dev --prefix prototypes/v2       # Next dev server on http://localhost:3100/
 npm run build --prefix prototypes/v2     # root + v2 typecheck, next build, offline.mjs → prototypes/v2/out
 npm run test:e2e --prefix prototypes/v2  # v2 Playwright suite against the BUILT export (build first)
 ```
@@ -101,8 +101,8 @@ npx vitest run band/perform.test.ts -t "specific test name"
 (cd prototypes/v2 && npx playwright test checks/band-engine.spec.ts --project=laptop)
 ```
 
-Local-dev note: the v2 dev server serves the default `/v2` base (`ENSEMBLE_V2_BASE` unset;
-production builds at `/`). Offline install and sound-pack downloads only work against the built
+Local-dev note: the v2 dev server serves at `http://localhost:3100/`, the same base as
+production. Offline install and sound-pack downloads only work against the built
 export, served by `node scripts/serve.mjs` in `prototypes/v2/` — see `prototypes/v2/README.md`.
 There is no local deploy script: a merge to `main` is the release (see above).
 

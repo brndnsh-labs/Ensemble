@@ -17,7 +17,7 @@ describe('buildAuditionLink', () => {
         const url = buildAuditionLink(scene, {
             scene: 'jazz-ride',
             seed: null,
-            baseUrl: 'http://localhost:3100/v2/',
+            baseUrl: 'http://localhost:3100/',
             autoplay: true,
         });
 
@@ -35,7 +35,7 @@ describe('buildAuditionLink', () => {
         const url = buildAuditionLink(scene, {
             scene: 'jazz-ride',
             seed: 'ALPHA',
-            baseUrl: 'http://localhost:3100/v2/',
+            baseUrl: 'http://localhost:3100/',
             autoplay: true,
         });
         expect(new URL(url).searchParams.get('seed')).toBe('ALPHA');
@@ -45,7 +45,7 @@ describe('buildAuditionLink', () => {
         const url = buildAuditionLink(scene, {
             scene: 'jazz-ride',
             seed: null,
-            baseUrl: 'http://localhost:3100/v2/',
+            baseUrl: 'http://localhost:3100/',
             autoplay: false,
         });
         expect(new URL(url).searchParams.get('autoplay')).toBeNull();

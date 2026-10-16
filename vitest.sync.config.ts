@@ -35,8 +35,6 @@ export default defineConfig({
             '@engine': fileURLToPath(new URL('./public', import.meta.url)),
         },
     },
-    // Next inlines this at build time (`lib/base-path.ts`); a browser test has no `process`.
-    define: { 'process.env.NEXT_PUBLIC_BASE_PATH': JSON.stringify('/v2') },
     test: {
         include: SYNC_FILES,
         browser: {
