@@ -1,6 +1,7 @@
 import type { SemanticScore } from '@engine/songbook/score-types';
 import type { ChartNotation } from '@engine/songbook/types';
 import {
+    type FocusEvent as ReactFocusEvent,
     type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
     type ReactNode,
@@ -14,6 +15,8 @@ import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
 import { BarDock, usePhoneWidth } from './bar-dock';
+import { BarMenu, type BarMenuBar } from './bar-menu';
+import type { BarDraft } from './use-bar-drafts';
 
 type WrittenSection = SemanticScore['sections'][number];
 type WrittenBar = WrittenSection['measures'][number];
@@ -124,6 +127,16 @@ export interface BarEditing {
     canMove: (measureId: string, step: -1 | 1) => boolean;
     /** Esc: the bar's chords back as last applied, and the field closed. */
     onRevert: (from: OpenBar) => void;
+    /** The bar menu's view of a bar (#1725): its draft and the context it reads in. */
+    menu: (measureId: string) => BarMenuBar | null;
+    /** A change made in the bar menu, kept as the bar's draft as typing is. */
+    onDraft: (measureId: string, draft: BarDraft) => void;
+    /** "Repeat or ending…": today's Repeats and endings dialog, opened on this bar. False when
+     * it could not open (a pending bar does not read; the shell says which). */
+    onRepeats: (from: OpenBar) => boolean;
+    /** "Insert bar after" and "Delete bar": pending bars commit first, as ＋ Bar and − Bar do. */
+    onInsertAfter: (from: OpenBar) => void;
+    onDelete: (from: OpenBar) => void;
 }
 
 interface ChartSheetProps {
@@ -413,6 +426,27 @@ export function ChartSheet({
     const fieldNode = useRef<HTMLInputElement | null>(null);
     const sheet = useRef<HTMLElement>(null);
     const refocusBar = useRef<string | null>(null);
+    // The bar menu (#1725), open for one opening of a bar: another bar, or the field closing,
+    // closes it with nothing to clean up. While it is open focus is in it, and the field's blur
+    // is not leaving the bar.
+    const [menuFor, setMenuFor] = useState<OpenBar | null>(null);
+    const menuOpen = open !== null && menuFor === open;
+    const menuNode = useRef<HTMLDivElement | null>(null);
+    // Set as "Repeat or ending…" opens its dialog over the bar: the field's next blur is to the
+    // dialog, which hands focus back to it on closing, so the bar stays open beneath.
+    const holdForDialog = useRef(false);
+    function openMenu() {
+        if (open && barEdit && !busy) {
+            setMenuFor(open);
+        }
+    }
+    /** Close the menu; `refocus` puts focus back in the bar's field (Esc, Back to typing). */
+    function closeMenu(refocus: boolean) {
+        setMenuFor(null);
+        if (refocus) {
+            fieldNode.current?.focus({ preventScroll: true });
+        }
+    }
     function fieldRef(node: HTMLInputElement | null) {
         if (!node || !open) {
             return;
@@ -461,9 +495,24 @@ export function ChartSheet({
             event.preventDefault();
             refocusBar.current = from.id;
             barEdit.onRevert(from);
+        } else if (event.key === '.' && (event.metaKey || event.ctrlKey)) {
+            // ⌘. / Ctrl+. opens the bar menu (#1725), as ⋯ does.
+            event.preventDefault();
+            openMenu();
         }
     }
-    function onFieldBlur(from: OpenBar) {
+    function onFieldBlur(from: OpenBar, event: ReactFocusEvent<HTMLInputElement>) {
+        // Into the bar menu, or the dialog it opened, is not leaving the bar (#1725).
+        const to = event.relatedTarget;
+        if (to instanceof Node && menuNode.current?.contains(to)) {
+            return;
+        }
+        if (holdForDialog.current) {
+            holdForDialog.current = false;
+            if (!(to instanceof Element) || to.closest('dialog')) {
+                return;
+            }
+        }
         // Focus going elsewhere on the page is leaving the bar; the window losing focus (another
         // app, another tab) is not. A press on another bar never gets here: it keeps focus off
         // the way (`onMouseDown`) and leaves through `onOpen`. Matched on the opening, not the
@@ -483,6 +532,12 @@ export function ChartSheet({
                 .flatMap((block) => block.measures)
                 .findIndex((measure) => measure.chords[0]?.measureId === open.id) + 1;
     }
+    const menuView = menuOpen && open && barEdit ? barEdit.menu(open.id) : null;
+    const menuNumber = menuOpen
+        ? blocks
+              .flatMap((block) => block.measures)
+              .findIndex((measure) => measure.chords[0]?.measureId === open?.id) + 1
+        : 0;
     /** A bar's press opens it. On a phone the dock mounts and its field takes focus within the
      * press itself (`flushSync`), as iOS raises its keyboard only for a focus a tap makes. */
     function openOnPress(measureId: string) {
@@ -760,8 +815,38 @@ export function ChartSheet({
                                                 barEdit?.onText(measureId, event.target.value)
                                             }
                                             onKeyDown={(event) => onFieldKey(event, open)}
-                                            onBlur={() => onFieldBlur(open)}
+                                            onBlur={(event) => onFieldBlur(open, event)}
+                                            aria-keyshortcuts="Control+. Meta+."
                                         />
+                                    )}
+                                    {typing && open && !docked && (
+                                        // The bar menu (#1725), on the bar being typed. Its press
+                                        // keeps the field's focus (the menu takes it on opening),
+                                        // and is not the bar's own press.
+                                        <button
+                                            type="button"
+                                            className="bar-menu-button"
+                                            tabIndex={-1}
+                                            title="Bar menu (Ctrl+.)"
+                                            aria-label="Bar menu"
+                                            aria-haspopup="dialog"
+                                            aria-expanded={menuOpen}
+                                            data-bar-menu-trigger=""
+                                            onMouseDown={(event) => {
+                                                event.preventDefault();
+                                                event.stopPropagation();
+                                            }}
+                                            onClick={(event) => {
+                                                event.stopPropagation();
+                                                if (menuOpen) {
+                                                    closeMenu(true);
+                                                } else {
+                                                    openMenu();
+                                                }
+                                            }}
+                                        >
+                                            ⋯
+                                        </button>
                                     )}
                                     {problem && <span className="bar-problem">{problem}</span>}
                                     {measure.chords
@@ -984,7 +1069,7 @@ export function ChartSheet({
                     canNext={barEdit.canMove(open.id, 1)}
                     onText={(text) => barEdit.onText(open.id, text)}
                     onKeyDown={(event) => onFieldKey(event, open)}
-                    onBlur={() => onFieldBlur(open)}
+                    onBlur={(event) => onFieldBlur(open, event)}
                     onStep={(step) => barEdit.onLeave(open, step)}
                     onDone={() => {
                         // As Esc does, focus lands on the bar's number: off the field, so the
@@ -997,6 +1082,50 @@ export function ChartSheet({
                             ?.querySelector('.bar.typing')
                             ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
                     }
+                    onMenu={() => (menuOpen ? closeMenu(true) : openMenu())}
+                    menuOpen={menuOpen}
+                />
+            )}
+            {menuOpen && open && barEdit && menuView && (
+                <BarMenu
+                    bar={menuNumber}
+                    view={menuView}
+                    busy={busy}
+                    sheet={docked}
+                    anchor={() =>
+                        sheet.current?.querySelector(
+                            `[data-measure-id="${CSS.escape(open.id)}"]`,
+                        ) ?? null
+                    }
+                    menuRef={menuNode}
+                    onDraft={(next) => barEdit.onDraft(open.id, next)}
+                    onClose={() => closeMenu(true)}
+                    onDismiss={(target, byFocus) => {
+                        closeMenu(false);
+                        // On this bar or its dock it is typing again. A press on another bar
+                        // opens that bar (its own press does); anything else, and focus moving
+                        // anywhere else, is leaving the bar.
+                        const here = target?.closest('.bar.typing, .bar-dock');
+                        if (here) {
+                            if (target !== fieldNode.current) {
+                                fieldNode.current?.focus({ preventScroll: true });
+                            }
+                        } else if (byFocus || !target?.closest('.bar')) {
+                            barEdit.onLeave(open, 0);
+                        }
+                    }}
+                    onRepeats={() => {
+                        closeMenu(true);
+                        holdForDialog.current = barEdit.onRepeats(open);
+                    }}
+                    onInsertAfter={() => {
+                        closeMenu(true);
+                        barEdit.onInsertAfter(open);
+                    }}
+                    onDelete={() => {
+                        closeMenu(true);
+                        barEdit.onDelete(open);
+                    }}
                 />
             )}
         </article>

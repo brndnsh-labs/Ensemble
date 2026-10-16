@@ -1,9 +1,15 @@
 import { chartGenre, writtenSettings } from '@engine/songbook/codec';
 import { validateAnyChartDocument } from '@engine/songbook/document-v2';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
+import { validateSemanticScore } from '@engine/songbook/score-codec';
 import { resolveScoreContext } from '@engine/songbook/score-context';
 import { scoreMeter } from '@engine/songbook/score-duration';
-import type { ChartDocumentV2, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
+import type {
+    ChartDocumentV2,
+    ScoreMeasure,
+    ScoreSection,
+    SemanticScore,
+} from '@engine/songbook/score-types';
 import type { ChartContent, ChartDocument as LegacyDocument } from '@engine/songbook/types';
 import { withSectionMeter } from './song-meter';
 
@@ -197,13 +203,19 @@ export function extendedScore(source: SemanticScore, measureId: string, newSecti
     if (newSection) {
         score.sections.push(section);
     }
+    const added = tonicBar(score, section, section.measures.length);
+    section.measures.push(added);
+    return { score, measureId: added.id, sectionId: section.id };
+}
+
+/** A new bar holding the tonic for the key and meter in force before `section.measures[at]`. */
+function tonicBar(score: SemanticScore, section: ScoreSection, at: number): ScoreMeasure {
     let context = resolveScoreContext(score, section);
-    for (const measure of section.measures) {
+    for (const measure of section.measures.slice(0, at)) {
         context = resolveScoreContext(context, measure);
     }
-    const id = crypto.randomUUID();
-    section.measures.push({
-        id,
+    return {
+        id: crypto.randomUUID(),
         content: {
             kind: 'events',
             events: [
@@ -214,8 +226,49 @@ export function extendedScore(source: SemanticScore, measureId: string, newSecti
                 },
             ],
         },
-    });
-    return { score, measureId: id, sectionId: section.id };
+    };
+}
+
+/**
+ * Inserts one bar straight after `measureId`, in its section (the bar menu's "Insert bar after",
+ * #1725), filled as `extendedScore` fills one: the tonic, in the key and meter that bar leaves in
+ * force. It writes no key or meter of its own, so every later bar sounds as it did. Its form is
+ * the bars' around it: a mark sits on a bar's start or end, so a bar inserted inside a repeat or
+ * an ending lengthens it.
+ *
+ * Refused after a bar that ENDS a repeat or an ending: whether the new bar belongs inside it or
+ * after it is the musician's call, and after a one-bar first ending it would land between the
+ * endings, which no chart can play (#1725 review). Refused too, as a backstop, wherever the
+ * result does not validate. A refusal changes nothing.
+ */
+export function withBarAfter(source: SemanticScore, measureId: string): RemovalResult {
+    const score = structuredClone(source);
+    const section = score.sections.find((s) => s.measures.some((m) => m.id === measureId));
+    if (!section) {
+        return { kind: 'blocked', message: 'Select a bar to add one after.' };
+    }
+    const at = section.measures.findIndex((m) => m.id === measureId) + 1;
+    if (
+        section.measures[at - 1].end?.some(
+            (mark) => mark.kind === 'repeat-end' || mark.kind === 'ending-end',
+        )
+    ) {
+        return {
+            kind: 'blocked',
+            message:
+                'This bar ends a repeat or an ending. Insert after an earlier bar, then use Repeat or ending… to move the repeat.',
+        };
+    }
+    const added = tonicBar(score, section, at);
+    section.measures.splice(at, 0, added);
+    if (validateSemanticScore(score).kind !== 'ok') {
+        return {
+            kind: 'blocked',
+            message:
+                'A bar here would break the repeats and endings around it. Change them first with Repeat or ending….',
+        };
+    }
+    return { kind: 'ok', score, measureId: added.id, sectionId: section.id };
 }
 
 export type RemovalResult =
