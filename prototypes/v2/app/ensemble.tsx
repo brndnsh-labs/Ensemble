@@ -87,7 +87,6 @@ import type { SavedSong } from '../lib/sync/protocol';
 import type { KeepBothResolution } from '../lib/sync/repository';
 import type { Progress } from '../lib/sync/status';
 import { initializeTelemetry, track } from '../lib/telemetry';
-import { hasV1SharePayload, openV1ShareLink, stripV1ShareParams } from '../lib/v1-link';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
 import { AdoptGuestDialog } from './account/adopt-guest';
@@ -1391,8 +1390,8 @@ export default function Ensemble() {
     }, []);
     /**
      * Lands `document` on the stand as an unsaved draft — belonging to no songbook until "Keep a
-     * copy"/Save decides one. Shared by every entry that opens a chart this way: a `#chart=` or
-     * v1 share link (below), and opening a standard from the catalog (`openStandard`, #1439).
+     * copy"/Save decides one. Shared by every entry that opens a chart this way: a `#chart=`
+     * share link (below), and opening a standard from the catalog (`openStandard`, #1439).
      * Deliberately not `open()`: no `saved` baseline (so it can't masquerade as already
      * committed), no recovery-storage write (the id may be untrusted, or a catalog id that is
      * never meant to collide with a recovery key), and `lastOpened`/`rememberSong` are left alone
@@ -1440,32 +1439,21 @@ export default function Ensemble() {
         // every run: a same-document fragment navigation (pasting a `#chart=` URL into the
         // tab the musician is already working in — the browser does nothing) followed by any
         // re-run would then open the stranger's chart over the stand and discard unsaved
-        // chord text. `template` is in the dependency array for `useExhaustiveDependencies`
-        // and is harmless with the latch in front of it; it is already resolved on the first
-        // `ready` render, since `start()`'s `.then` batches `setGuestSongs` with `setReady`.
+        // chord text.
         sharedLinkHandled.current = true;
         const hash = window.location.hash;
         const search = window.location.search;
-        // Which entry, if either, owns this page load (#1279 patch R5) — in order:
-        //   1. a `#chart=` fragment, so the modern link always wins where both are present;
-        //   2. otherwise a v1 `?s=`/`?prog=` payload, INCLUDING under an unrelated fragment
-        //      (a `#:~:text=` scroll anchor, a chat client's `#`) that is nobody's share link;
-        //   3. otherwise any other non-empty hash, which stays on the v2 path so a corrupt
-        //      `#chart=…` still says so.
-        // The `chart` key is `public/songbook/chart-link.ts`'s `CHART_LINK_KEY`, which is not
-        // exported; read here rather than exported because `public/` is live production code.
-        const chartFragment = new URLSearchParams(hash.replace(/^#/, '')).has('chart');
-        const entry = chartFragment ? 'v2' : hasV1SharePayload(search) ? 'v1' : hash ? 'v2' : null;
-        if (!entry) {
+        // A `#chart=` fragment is the only share link. Any other non-empty hash stays on this
+        // path too, so a corrupt `#chart=…` still says so. An old v1 `?s=`/`?prog=` link has no
+        // fragment and is ignored (#1735): the page opens as the songbook, URL untouched.
+        if (!hash) {
             return;
         }
         let alive = true;
-        // `landDraftOnStand` handles both entries so they open the SAME draft rather than two
-        // drifting copies of it. `track` stays here rather than inside that shared helper: this
-        // is the one call site that knows `legacy`, and `openStandard` (#1439) tracks its own
-        // `chart_opened` event instead of `share_opened`.
-        const openSharedDraft = (link: ChartDocument, note: string, legacy: boolean) => {
-            track('share_opened', { legacy });
+        // `track` stays here rather than inside `landDraftOnStand`: `openStandard` (#1439)
+        // tracks its own `chart_opened` event instead of `share_opened`.
+        const openSharedDraft = (link: ChartDocument, note: string) => {
+            track('share_opened');
             // A link that decodes can still be one the band refuses (`checkPlayable`: too long
             // to play, #1632). This runs outside `run()`, so say why here instead of leaving
             // an unhandled rejection and a silent page.
@@ -1477,49 +1465,19 @@ export default function Ensemble() {
         };
         // Consumed on load either way: a corrupt/foreign payload must not resurrect on
         // reload, and a successfully opened draft must not resurrect after "Keep a copy"
-        // replaces it with a saved document. The hash goes, the v1 parameters go (#1279),
-        // and so does the account flag — a share link must never carry a feature-flag side
-        // effect (`accountsFlagRequest` refuses to APPLY one; leaving it in the tidied URL
-        // would just let the next reload apply it instead). Everything else survives.
+        // replaces it with a saved document. The hash goes, and so does the account flag — a
+        // share link must never carry a feature-flag side effect (`accountsFlagRequest` refuses
+        // to APPLY one; leaving it in the tidied URL would just let the next reload apply it
+        // instead). Everything else survives.
         const consumeLink = () =>
             window.history.replaceState(
                 // Keeps the shell's history entry (#1700); only the URL is tidied.
                 window.history.state,
                 '',
-                window.location.pathname +
-                    stripV1ShareParams(stripAccountsParam(window.location.search)),
+                window.location.pathname + stripAccountsParam(window.location.search),
             );
-        if (entry === 'v1') {
-            // The band and tempo defaults for the two fields v1 never persisted; see
-            // `linkSession` for how little else of this actually reaches the chart. A
-            // songbook with nothing in it yet falls back to the live engine's defaults.
-            const older = openV1ShareLink(
-                search,
-                template
-                    ? { performance: template.chart.performance, band: template.chart.band }
-                    : runtime.captureContent(),
-            );
-            consumeLink();
-            if (older.kind === 'ok') {
-                // #1460 review P2 #3 — "tap anywhere to play" is no longer baked into this note:
-                // it is derived reactively from `pendingAutoplay` (`pendingAutoplayHint`) so it
-                // stays lit for exactly as long as autoplay is armed, not just the ~4s an `info`
-                // message gets.
-                openSharedDraft(
-                    older.document,
-                    'Opened from an older shared link · not saved yet',
-                    true,
-                );
-                if (older.autoplay) {
-                    setPendingAutoplay(true);
-                }
-            } else {
-                setError("This older link couldn't be opened");
-            }
-            return;
-        }
-        // `?autoplay=1` on a `#chart=` link (#1732) arms playback exactly as it does on an old
-        // link; read before `consumeLink` strips it.
+        // `?autoplay=1` on a `#chart=` link (#1732) arms playback; read before `consumeLink`
+        // strips it.
         const wantsAutoplay = new URLSearchParams(search).get('autoplay') === '1';
         void decodeChartLink(hash).then((document) => {
             consumeLink();
@@ -1527,7 +1485,7 @@ export default function Ensemble() {
                 return;
             }
             if (document) {
-                openSharedDraft(document, 'Opened from a shared link · not saved yet', false);
+                openSharedDraft(document, 'Opened from a shared link · not saved yet');
                 if (wantsAutoplay) {
                     setPendingAutoplay(true);
                 }
@@ -1540,7 +1498,7 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [ready, template]);
+    }, [ready]);
 
     // Where the musician is, as a history entry names it (#1700).
     const navView: NavView = current

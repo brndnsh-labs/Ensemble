@@ -62,7 +62,7 @@ never a chart title, chord content, account id or email:
 | `chart_created` | — | `newSong` |
 | `chart_imported` | `{ format: ireal \| v1 \| file }` | The iReal import dialog, the v1 importer, a dropped `.ensemble`/`.json` file |
 | `share_created` | — | Copying a `#chart=` link |
-| `share_opened` | `{ legacy }` | Opening a `#chart=` or an older v1 `?s=`/`?prog=` link |
+| `share_opened` | none | Opening a `#chart=` link |
 | `account_signed_in` / `account_registered` | — | The sign-in dialog, on success — no identifiers |
 | `sync_conflict_shown` | — | The refused-Save/candidate banner above the stand |
 | `midi_exported` | — | `runtime.exportMidi` |

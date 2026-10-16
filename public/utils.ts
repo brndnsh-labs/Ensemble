@@ -109,7 +109,7 @@ export function getMidi(freq: number): number | null {
 //
 // encodeBase64Unicode / decodeBase64Unicode / compressSections /
 // tryDecompressSections / generateId live in `public/state/share-codec.ts` —
-// persistence + share-URL wire format, also #1179.
+// v1's section payload codec, also #1179.
 //
 // createPRNG lives in `public/engine/hash-utils.ts` beside its `stringHash33`
 // fold and the other determinism primitives (#1179).

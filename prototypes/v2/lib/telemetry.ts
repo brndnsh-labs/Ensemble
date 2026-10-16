@@ -33,7 +33,7 @@ interface TelemetryEventData {
     chart_created: undefined;
     chart_imported: { format: 'ireal' | 'v1' | 'file' };
     share_created: undefined;
-    share_opened: { legacy: boolean };
+    share_opened: undefined;
     account_signed_in: undefined;
     account_registered: undefined;
     sync_conflict_shown: undefined;

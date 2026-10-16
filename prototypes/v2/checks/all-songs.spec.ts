@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
+import { encodeChartLink } from '../../../public/songbook/chart-link';
 import { backToSongbook, newSongOnTheStand, saveAs } from './account-helpers';
-import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, starterDocuments, test } from './fixtures';
 import { seedGuestSongs } from './large-library';
 
 /**
@@ -426,9 +427,14 @@ test('a Rename that opens the song retains its new title after a shared link was
         );
     await expect.poll(titlesRetained).toEqual(['Blue pocket edited']);
 
-    // A v1 `?prog=` link lands as an unsaved shared draft; leaving it keeps the songbook's
+    // A `#chart=` link lands as an unsaved shared draft; leaving it keeps the songbook's
     // songs, and the draft above, as they were.
-    await page.goto(appUrl(`?prog=${encodeURIComponent('C7 | F7 | C7 | G7')}&key=C&bpm=120`));
+    await page.goto(
+        appUrl(await encodeChartLink({ ...starterDocuments()[0], title: 'Shared song' })),
+    );
+    // Only the fragment differs from the page already open, which the browser treats as a
+    // same-document navigation; a pasted link opens on a page LOAD.
+    await page.reload();
     await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
     await backToSongbook(page);
 

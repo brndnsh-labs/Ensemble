@@ -28,7 +28,7 @@ synced chart bodies), **the account boundary**, and **dependency CVEs**.
   DOM); the service worker caching a private API/auth response or personalized HTML; session,
   step-up or recovery-code checks the server skips; any unsanitized user-derived string reaching
   the DOM.
-- **Where:** `prototypes/v2/lib/v1-link.ts`, `lib/import-v1.ts`, `public/songbook/` codecs,
+- **Where:** `prototypes/v2/lib/import-v1.ts`, `public/songbook/` codecs,
   `lib/account/`, `lib/sync/`, `prototypes/v2-api/src/`, the generated service worker
   (`prototypes/v2/scripts/offline.mjs`).
 - **Landmines:** a **CVE bump with green gates** is `burndown` (it's `/dep-update`-shaped). A
