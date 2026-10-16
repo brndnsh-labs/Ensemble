@@ -187,8 +187,7 @@ export interface ArrangerState {
  * voice (the reworked synth-audit voice — the permanent fallback); a
  * `pack:<id>` value names an installed sample pack (synth-audit Epic 6). The
  * legacy `current`/`new` A/B voices were retired in #649 — the reworked voice
- * is now the only synth voice, and persisted `current`/`new` values migrate to
- * `synth` on hydrate (see `hydrateVoice`).
+ * is now the only synth voice.
  */
 export type InstrumentVoice = 'synth' | `pack:${string}`;
 

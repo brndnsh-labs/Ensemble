@@ -8,8 +8,7 @@ import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
  * lane's generator needs.
  *
  * What does NOT belong here (#1179 split): seeded RNG/hashing lives in
- * `engine/hash-utils.ts`; share-URL and preset encoding lives in
- * `state/share-codec.ts`; HTML escaping and display glyph formatting live in
+ * `engine/hash-utils.ts`; dangerous-character stripping and display glyph formatting live in
  * `sanitize.ts`; Web Audio graph helpers live in `engine/audio-graph-utils.ts`.
  * Anything DOM-touching would break the node-side callers (tests, scripts, the band) — keep it out.
  */
@@ -103,13 +102,9 @@ export function getMidi(freq: number): number | null {
 // `synth-utils.ts` first (#1176) to sit beside their peers, but that formed an
 // import cycle with `sample-voice.ts`, so #1192 split them into a leaf module.
 
-// escapeHTML / stripDangerousChars live in
+// stripDangerousChars lives in
 // `public/sanitize.ts` — DOM-adjacent display concerns, main-thread only, moved
 // out in #1179 so nothing DOM-shaped can drift back into this DOM-free module.
-//
-// encodeBase64Unicode / decodeBase64Unicode / compressSections /
-// tryDecompressSections / generateId live in `public/state/share-codec.ts` —
-// v1's section payload codec, also #1179.
 //
 // createPRNG lives in `public/engine/hash-utils.ts` beside its `stringHash33`
 // fold and the other determinism primitives (#1179).

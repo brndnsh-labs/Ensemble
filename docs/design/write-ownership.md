@@ -224,7 +224,7 @@ playback:
    document field it composes with.
 5. **Grep `STATE_OWNERSHIP_MANIFEST` before adding a new dispatch site that touches an existing
    field** — if the target field is already `document`/`preferences` and the writer isn't a UI
-   component or `state-hydration.ts`, that's the smell this document exists to catch.
+   component, that's the smell this document exists to catch.
 
 There is currently no static gate enforcing this — it is prose ratification only (tracked
 separately as a possible follow-up: a reducer-scanning check that a `document`/`preferences`

@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
     __resetPackCacheForTest,
     getPackBuffer,
-    hydrateVoice,
     isPackLoaded,
     packIdFromVoice,
     registerPackBuffer,
@@ -80,30 +79,5 @@ describe('instrument-registry — pack buffer cache', () => {
         expect(getPackBuffer('grand', 'C4')).toBe(buf);
         expect(getPackBuffer('grand', 'missing')).toBeNull();
         expect(getPackBuffer('other', 'C4')).toBeNull();
-    });
-});
-
-describe('instrument-registry — hydrateVoice', () => {
-    it('keeps the synth voice as-is', () => {
-        expect(hydrateVoice('synth')).toBe('synth');
-    });
-
-    it('migrates the retired A/B voices (#649) to synth', () => {
-        // A saved session from before the A/B retirement keeps working and just
-        // sounds like the (only) reworked synth voice.
-        expect(hydrateVoice('new')).toBe('synth');
-        expect(hydrateVoice('current')).toBe('synth');
-    });
-
-    it('preserves a pack selection across reloads', () => {
-        expect(hydrateVoice('pack:grand')).toBe('pack:grand');
-    });
-
-    it('collapses an empty/garbage pack value and non-strings to synth', () => {
-        expect(hydrateVoice('pack:')).toBe('synth');
-        expect(hydrateVoice('bogus')).toBe('synth');
-        expect(hydrateVoice(undefined)).toBe('synth');
-        expect(hydrateVoice(null)).toBe('synth');
-        expect(hydrateVoice(42)).toBe('synth');
     });
 });

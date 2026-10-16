@@ -1,18 +1,17 @@
 /**
  * hash-utils.ts — canonical deterministic hash + seeded-RNG helpers shared
- * across the voices (sample, soloist, drums) and the v1 import. (The generative
+ * across the voices (sample, soloist, drums). (The generative
  * engines it was written for — bass, drums/groove, harmony, accompaniment,
  * soloist/drum seeders, conductor — are gone, #1404.)
  *
- * What belongs here: pure, dependency-free determinism primitives — string
- * folds, stateless scrambles, and seeded generators. Nothing in this module may
+ * What belongs here: pure, dependency-free determinism primitives — stateless
+ * scrambles. Nothing in this module may
  * import anything else in the repo; it is deliberately a leaf so any caller
  * (voices, scripts, tests) can use it freely.
  *
  * What does NOT belong here: musical interpretation of a seeded draw (that's
  * the engine that owns the decision), step/meter math (`../utils.js`), string
- * sanitization (`../sanitize.js`), or share/persistence encoding
- * (`../state/share-codec.js`).
+ * sanitization (`../sanitize.js`).
  *
  * **`scrambleHash` is *stateless*, indexed by an explicit seed tuple** — see
  * `public/engine/CLAUDE.md` §27. It used to sit beside `createPRNG`, a *stateful,
@@ -20,23 +19,8 @@
  * engine (the band draws from `rng(seed, …keys)`, `band/core/random.ts`). Do not
  * change how many draws any call path consumes.
  *
- * Before Epic 11 S9 `scrambleHash` was copy-pasted into four engines
- * (bass-engine, groove-engine, harmonies, plus accompaniment's
- * `compScrambleHash`) and the string hash had drifted into two divergent
- * variants. Consolidating here keeps the *observable* per-engine distribution
- * identical — see notes on `stringHash33` vs `stringHash31` below — while
- * removing the dead-helper duplication.
- *
  * `scrambleHash` is defined here and nowhere else (the old engine's generators that
  * shared it were deleted, #1404; the synth voices still use it).
- *
- * why two string hashes, not one: changing which djb2 variant an engine feeds
- * into its seeded RNG shifts the distribution flowing into the critique gates
- * (the `feedback_prng_migration_dead_gates` trap). The old engine's bass + groove
- * section hashing depended on the 33-from-5381 variant; accompaniment cell-bank
- * picking and groove instrument-name folding on the 31-from-0 variant
- * (`prototypes/v2/lib/import-v1.ts` still calls both).
- * Both are exported so every call site keeps its exact prior output.
  */
 
 /**
@@ -54,40 +38,4 @@ export const scrambleHash = (seed: number): number => {
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
     return ((t ^ (t >>> 14)) >>> 0) / 0x100000000;
-};
-
-/**
- * djb2 string hash, ×33 multiplier seeded from 5381 (the classic djb2
- * constants). Returns a signed 32-bit int (`| 0`).
- *
- * The old engine's bass and drums folded section ids with it; today the v1 import's
- * content digest (`import-v1.ts`) pairs it with `stringHash31`. The signed result is
- * intentional.
- */
-export const stringHash33 = (str: string): number => {
-    let h = 5381 | 0;
-    for (let i = 0; i < str.length; i++) {
-        h = (Math.imul(h, 33) + str.charCodeAt(i)) | 0;
-    }
-    return h;
-};
-
-/**
- * djb2-style string hash, ×31 multiplier seeded from 0. Returns a signed
- * 32-bit int (`| 0`); callers that need a non-negative value apply
- * `Math.abs` themselves.
- *
- * Used by accompaniment cell-bank picking and groove instrument-name folding.
- * Kept distinct from `stringHash33` so those engines' seeded distributions —
- * and the critique gates downstream of them — survive the consolidation
- * unchanged.
- */
-// Also serves as a general string→int32 fold for call sites (e.g. the soloist
-// seed keying) that just need a stable, well-mixed integer per distinct label.
-export const stringHash31 = (str: string): number => {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) {
-        h = (h * 31 + str.charCodeAt(i)) | 0;
-    }
-    return h;
 };

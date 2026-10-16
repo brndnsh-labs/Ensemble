@@ -34,7 +34,7 @@ You do not edit code. You read, grep, reason, and report.
 
 ## What to read
 
-- **The diff first.** Anything under `public/state/`, `public/state/state-effects.ts`, `public/state/state-hydration.ts`, `public/controllers/`, `prototypes/v2/lib/runtime.ts`, `prototypes/v2/app/`, or any engine file that touches signals.
+- **The diff first.** Anything under `public/state/`, `public/state/state-effects.ts`, `public/controllers/`, `prototypes/v2/lib/runtime.ts`, `prototypes/v2/app/`, or any engine file that touches signals.
 - **`public/state.ts`** — the dispatch entrypoint and `ACTIONS` table.
 - **`public/types.ts`** — slice shapes and the `Mutable<T>` helper.
 - **`prototypes/v2/lib/runtime.ts`'s `syncBand`** — how a state change reaches the band engine (it re-reads the settings it plays from on every dispatch).

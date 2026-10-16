@@ -19,9 +19,7 @@ import type { Mutable } from '../../public/types.js';
  * in #1424, and nothing else ever dispatched it. This is what several test
  * files used it for instead: a clean baseline between cases sharing one
  * module-level slice singleton. It writes slice fields directly rather than
- * through a reducer, which is the same class of write real production code
- * uses at boot (`state-hydration.ts`'s pre-mount `@direct-mutation` exception)
- * — there is no live `dispatch` path this could stand in for.
+ * through a reducer — a test-only reset; there is no live `dispatch` path this could stand in for.
  *
  * Keep in sync with each slice's own `deepSignal<T>({ ... })` initializer if a
  * default changes; this is intentionally NOT derived from it (a shared

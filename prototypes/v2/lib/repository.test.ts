@@ -1,15 +1,12 @@
 // @vitest-environment happy-dom
 /**
  * `repository.save()`'s `createdAt` provenance (#1274 P2-2), and the guest `remove()`/`rename()`
- * (#1440), through the real read-modify-write path — not just `convertV1`'s own
- * candidate-building.
+ * (#1440), through the real read-modify-write path.
  *
  * Node/happy-dom ship no IndexedDB, so this runs against `tests/utils/fake-indexeddb.ts` —
- * the smallest fake that `open()`/`save()`/`remove()`/`rename()` actually drive, shared with the
- * v1 import's own through-the-repository tests (`tests/unit/songbook/v1-import.test.ts`) rather
- * than copied into each of them. `remove()` also touches `localStorage` (clearing recovery
- * slots), and happy-dom ships no Storage implementation either — the same manual mock
- * `lib/session.test.ts` and `tests/unit/songbook/v1-import.test.ts` use stands in for it.
+ * the smallest fake that `open()`/`save()`/`remove()`/`rename()` actually drive. `remove()` also
+ * touches `localStorage` (clearing recovery slots), and happy-dom ships no Storage
+ * implementation either — the same manual mock `lib/session.test.ts` uses stands in for it.
  */
 
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';

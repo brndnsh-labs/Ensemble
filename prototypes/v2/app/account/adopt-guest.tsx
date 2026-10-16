@@ -19,15 +19,11 @@ import { whenClosed } from '../dialog-close';
  * `showModal()`/`close()` from `open`, which gives this the browser's own focus trap, Escape
  * handling and focus restore for free.
  *
- * Opened three ways, all driven by the shell: automatically once per sign-in, once this device has
+ * Opened two ways, both driven by the shell: automatically once per sign-in, once this device has
  * downloaded the account library at least once and found candidates and the offer has not been
- * answered yet (`hasDecidedAdoption`); manually from the account page's "Add this device's songs"
- * button at any time after that; and straight after a signed-in v1 import that actually put songs
- * in the guest songbook (#1359), which is the same gesture as that button — the musician asked for
- * these songs, so the once-per-owner answer is not consulted to OPEN it. Answering it is recorded
- * like any other answer (`rememberAdoptionDecision` below), which also retires the sign-in offer
- * for that owner. All three paths render this same component; only how `open` gets set, and
- * whether `scopeGuestIds` narrows it, differs. The download gate lives in the shell
+ * answered yet (`hasDecidedAdoption`); and manually from the account page's "Add this device's
+ * songs" button at any time after that. Both render this same component; only how `open` gets
+ * set differs. The download gate lives in the shell
  * (`libraryDownloaded` in `lib/account/adopt-guest.ts`) because every entry point needs it:
  * candidates are computed by diffing against the ACCOUNT library, and an empty not-yet-downloaded
  * library re-offers songs the account already has.
@@ -44,16 +40,6 @@ export interface AdoptGuestDialogProps {
     ownerId: string | null;
     /** Copy only — the outbox queues locally either way; this never blocks on a connection. */
     online: boolean;
-    /**
-     * The guest songs this particular offer is about (#1359), or null for the whole guest
-     * songbook. Set only by the post-import path, where the honest question is about the songs
-     * that import just brought over — asking about a songbook's worth of unrelated music because
-     * somebody imported one v1 tune is a different question than the one they asked.
-     *
-     * A stable value from the shell's state, never a fresh array per render: it is a dependency of
-     * the effect that computes the offer.
-     */
-    scopeGuestIds: readonly string[] | null;
     onClose: () => void;
 }
 
@@ -85,13 +71,10 @@ export function AdoptGuestDialog({
     open,
     ownerId,
     online,
-    scopeGuestIds,
     onClose,
 }: AdoptGuestDialogProps) {
     const [phase, setPhase] = useState<Phase>({ kind: 'loading' });
     const openRef = useRef(false);
-    /** True while this offer is about the songs a v1 import just brought over (#1359). */
-    const scoped = scopeGuestIds !== null;
 
     useEffect(() => {
         openRef.current = open;
@@ -100,16 +83,13 @@ export function AdoptGuestDialog({
         }
         setPhase({ kind: 'loading' });
         let alive = true;
-        void computeAdoptCandidates(
-            ownerId,
-            scopeGuestIds === null ? null : new Set(scopeGuestIds),
-        ).then(
+        void computeAdoptCandidates(ownerId).then(
             async (offer) => {
                 // With no song to offer, the guest's collections are the question instead (#1477
-                // review R3) — never for a scoped offer, which is about one import's songs. An
+                // review R3). An
                 // unreadable store is not evidence of anything to add: it offers nothing.
                 const collections =
-                    offer.candidates.length === 0 && scopeGuestIds === null
+                    offer.candidates.length === 0
                         ? await pendingGuestCollections(ownerId).catch(() => 0)
                         : 0;
                 if (!alive) {
@@ -147,7 +127,7 @@ export function AdoptGuestDialog({
         return () => {
             alive = false;
         };
-    }, [open, ownerId, scopeGuestIds]);
+    }, [open, ownerId]);
 
     function decline() {
         if (ownerId !== null) {
@@ -171,11 +151,10 @@ export function AdoptGuestDialog({
             }
         });
         // The guest's collections come along with its songs (#1477), remapped to the ids those
-        // songs were just adopted under — but only for the WHOLE-songbook offer. A scoped offer
-        // (#1359) is about the songs one v1 import brought over, not about this device's lists.
+        // songs were just adopted under.
         let collectionFailures = 0;
         let collectionsAdopted = 0;
-        if (!scoped && ownerId !== null) {
+        if (ownerId !== null) {
             try {
                 const adopted = await adoptGuestCollections(ownerId);
                 collectionFailures = adopted.failures.length;
@@ -292,17 +271,7 @@ export function AdoptGuestDialog({
                             ? 'Add this device’s collections to your account?'
                             : 'Nothing new to add'}
                     </h2>
-                    {/* Scoped, this is reached by a v1 rerun as well as by a repeat Add: the
-                        import UPDATES the one `v1-session` document in place, and adoption
-                        deduplicates by deterministic document id rather than by content (#1268),
-                        so an account copy made earlier stays at the version it was copied at.
-                        "Already in your account" alone would be a lie on top of a card reading
-                        "1 updated". */}
-                    <p>
-                        {scoped
-                            ? 'Your account already has these songs. A song you’ve already added keeps the version you added — later changes on this device stay on this device.'
-                            : 'Every song on this device is already in your account.'}
-                    </p>
+                    <p>Every song on this device is already in your account.</p>
                     {collectionsOffer(phase.collections)}
                     <div className="dialog-actions">{dismiss(phase.collections)}</div>
                 </>
@@ -321,15 +290,8 @@ export function AdoptGuestDialog({
             )}
             {phase.kind === 'ask' && (
                 <>
-                    {/* Scoped, this is the answer to the import the musician just ran, so it says
-                        so: "your N songs on this device" would name a songbook they did not ask
-                        about (#1359). */}
                     <h2 id="adopt-guest-title">
-                        {scoped
-                            ? phase.candidates.length === 1
-                                ? 'Add the song you just brought over to your account?'
-                                : `Add the ${phase.candidates.length} songs you just brought over to your account?`
-                            : `Add your ${phase.candidates.length} ${phase.candidates.length === 1 ? 'song' : 'songs'} on this device to your account?`}
+                        {`Add your ${phase.candidates.length} ${phase.candidates.length === 1 ? 'song' : 'songs'} on this device to your account?`}
                     </h2>
                     <p>
                         Each becomes its own saved copy in your account. The songs on this device
