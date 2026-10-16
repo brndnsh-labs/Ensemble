@@ -623,6 +623,7 @@ export default function Ensemble() {
     const [following, setFollowing] = useState(true);
     const offline = useOfflineInstall();
     const [menu, setMenu] = useState(false);
+    const standKeys = useRef<((event: KeyboardEvent) => void) | null>(null);
     const [importing, setImporting] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
@@ -2481,6 +2482,16 @@ export default function Ensemble() {
      * callers can't drift: an autoplay link is otherwise indistinguishable from a musician
      * pressing Play themselves.
      */
+    /** The Play/Stop button, and Space on the stand (`standKeys`). */
+    function togglePlayback() {
+        if (runtime.state().playback.isPlaying || playbackPending) {
+            runtime.stop();
+            setPlaying(false);
+            setPlaybackPending(false);
+            return;
+        }
+        startPlayback();
+    }
     function startPlayback() {
         void run(async () => {
             // #1460 — a hint like "tap anywhere to play" is stale the instant the band actually
@@ -5318,6 +5329,77 @@ export default function Ensemble() {
         }
     }, [toastText]);
 
+    // Keys on the stand (UI audit): Space plays and stops, and PageDown/PageUp step through the
+    // chart a section at a time — what a page-turn pedal sends. Only on the stand's chart, with no
+    // sheet or dialog open, and never while typing: Space on a focused button or control is that
+    // control's own, so it is left alone. Read through a ref so the listener, added once, always
+    // sees this render's state.
+    standKeys.current = (event: KeyboardEvent) => {
+        if (!current || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
+            return;
+        }
+        if (document.querySelector('dialog[open]')) {
+            return;
+        }
+        const target = event.target instanceof Element ? event.target : null;
+        if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
+            return;
+        }
+        if (event.key === ' ') {
+            if (target?.closest('button, a, [role="button"], [role="tab"], [role="menuitem"]')) {
+                return;
+            }
+            event.preventDefault();
+            if (!busy || playbackActive) {
+                togglePlayback();
+            }
+            return;
+        }
+        if ((event.key === 'PageDown' || event.key === 'PageUp') && !editing && !neckShowing) {
+            const box = scroll.current;
+            if (!box) {
+                return;
+            }
+            const sections = [...box.querySelectorAll<HTMLElement>('.section')].map(
+                (section) =>
+                    section.getBoundingClientRect().top -
+                    box.getBoundingClientRect().top +
+                    box.scrollTop -
+                    8,
+            );
+            // The next section's top, or one screen on when that is nearer: a page turn that
+            // never skips bars, in a long section as much as between short ones. A section
+            // within a row's height of the view's top is the one being read: the chart's own
+            // padding puts the first one a few pixels down.
+            const at = box.scrollTop;
+            const near = 24;
+            const page = box.clientHeight * 0.85;
+            const down = event.key === 'PageDown';
+            const section = down
+                ? sections.find((top) => top > at + near)
+                : sections.filter((top) => top < at - near).at(-1);
+            const to = down
+                ? Math.min(section ?? Infinity, at + page)
+                : Math.max(section ?? -Infinity, at - page);
+            const max = box.scrollHeight - box.clientHeight;
+            if ((down && at >= max - 1) || (!down && at <= 0)) {
+                return;
+            }
+            event.preventDefault();
+            setFollowing(false);
+            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            box.scrollTo({
+                top: Math.max(0, Math.min(max, to)),
+                behavior: reduce ? 'instant' : 'smooth',
+            });
+        }
+    };
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => standKeys.current?.(event);
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
     // The songbook home itself, not the stand or one of its two sub-views (#1441): the top bar's
     // search, Import chart and New song belong to this view only.
     const homeView = ready && !current && !standardsOpen && !allSongsOpen;
@@ -5826,15 +5908,7 @@ export default function Ensemble() {
                         busy={busy}
                         playbackActive={playbackActive}
                         countInBeat={countInBeat}
-                        onPlayToggle={() => {
-                            if (runtime.state().playback.isPlaying || playbackPending) {
-                                runtime.stop();
-                                setPlaying(false);
-                                setPlaybackPending(false);
-                                return;
-                            }
-                            startPlayback();
-                        }}
+                        onPlayToggle={togglePlayback}
                         onBand={() => openBand(lastBandTab.current)}
                         onTempo={(value) => change(() => runtime.setTempo(value))}
                         onKey={(key) =>
