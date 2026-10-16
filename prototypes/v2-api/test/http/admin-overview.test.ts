@@ -181,6 +181,75 @@ describe('GET /api/admin/overview', () => {
         }
     });
 
+    it('counts charts by schema version and those with legacy fields, once each', async () => {
+        const { db, admin, stranger, make } = await setUp();
+        const doc = db.prepare(
+            'INSERT INTO documents (owner_id, document_id, revision, body, updated_at) VALUES (?, ?, ?, ?, 1)',
+        );
+        type Band = Record<string, Record<string, unknown>>;
+        const chart = (
+            schemaVersion: unknown,
+            patch: (band: Band, chart: Band) => void = () => {},
+        ) => {
+            const band: Band = {
+                chords: { enabled: true },
+                bass: { enabled: true },
+                soloist: { enabled: true, mode: 'bebop' },
+                groove: { swing: 0, genre: 'Rock' },
+            };
+            const content: Band = { arrangement: {}, performance: { bpm: 100 } };
+            patch(band, content);
+            return JSON.stringify({ schemaVersion, chart: { ...content, band } });
+        };
+        let n = 0;
+        const put = (body: string, owner = admin.id) => doc.run(owner, `d${n++}`, 'r', body);
+        put(chart(2));
+        put(chart(2), stranger.id);
+        put(chart(1));
+        put(chart(1, (band) => delete band.groove.genre)); // missing genre: legacy
+        put(chart(1, (band) => (band.groove.genreFeel = 'Rock')));
+        put(chart('x')); // no usable version
+        put('not json at all'); // not a chart
+        put(JSON.stringify({ kind: 'collection', schemaVersion: 1, name: 'Set' })); // collection
+        // One chart per legacy field family (each also bumps only the legacy count).
+        const families: Array<(band: Band, content: Band) => void> = [
+            (_b, c) => (c.arrangement.lastChordPreset = 'Pop'),
+            (_b, c) => (c.performance.complexity = 0.5),
+            (b) => (b.harmony = { style: 'x' }),
+            (b) => (b.chords.style = 'x'),
+            (b) => (b.chords.instrument = 'x'),
+            (b) => (b.chords.octave = 4),
+            (b) => (b.chords.density = 'rich'),
+            (b) => (b.bass.style = 'x'),
+            (b) => (b.bass.octave = 2),
+            (b) => (b.soloist.style = 'x'),
+            (b) => (b.soloist.preset = 'trumpet'),
+            (b) => (b.soloist.octave = 5),
+            (b) => (b.soloist.phrasingIntensity = 0.5),
+            (b) => (b.soloist.tradeMode = 'loop'),
+            (b) => (b.groove.measures = 2),
+            (b) => (b.groove.lastDrumPreset = 'x'),
+            (b) => (b.groove.lastSmartGenre = 'Rock'),
+            (b) => (b.groove.pattern = []),
+        ];
+        for (const patch of families) {
+            put(chart(2, patch));
+        }
+        // A deleted chart leaves a tombstone, not a document row: it counts nowhere.
+        db.prepare(
+            "INSERT INTO tombstones (owner_id, document_id, revision, deleted_at) VALUES (?, 'gone', 'r', 1)",
+        ).run(admin.id);
+
+        const body = await (await get(make([admin.id]), OVERVIEW, admin.jar.header())).json();
+        expect(body.charts).toEqual({
+            // 2 clean v2, 3 v1, 1 with no usable version, and one v2 per legacy family
+            total: 2 + 3 + 1 + families.length,
+            bySchemaVersion: { '1': 3, '2': 2 + families.length, unknown: 1 },
+            withLegacyFields: 2 + families.length,
+        });
+        expect(body.documents.total).toBe(2 + 3 + 1 + 2 + families.length);
+    });
+
     it('says when the list stops short of every account', async () => {
         const { db, admin, make } = await setUp();
         const insert = db.prepare('INSERT INTO accounts (id, created_at) VALUES (?, ?)');

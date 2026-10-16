@@ -32,6 +32,80 @@ export interface AdminAccountRow {
     you: boolean;
 }
 
+/**
+ * What the stored charts still carry from older formats (#1731) — the evidence for deleting the
+ * old-format readers. Chart documents only: a collection (a body with a string `kind`, as
+ * `listManifest` reads it) is not a chart, and a deleted document has no `documents` row (it
+ * leaves a tombstone), so each live document's current body is counted exactly once.
+ */
+export interface AdminChartCounts {
+    total: number;
+    /** Chart count per `schemaVersion`, keyed by the version as text; `unknown` = none/non-integer. */
+    bySchemaVersion: Record<string, number>;
+    /** Charts carrying at least one of `LEGACY_CHART_PATHS`, or no groove `genre`. */
+    withLegacyFields: number;
+}
+
+/**
+ * Every field the songbook codec (`public/songbook/codec.ts`, `legacy()`) still accepts but no
+ * build writes — the "Legacy ... read, never written" fields of `public/songbook/types.ts`.
+ * Paths are JSON paths into the stored `ChartDocument`.
+ */
+const LEGACY_CHART_PATHS: readonly string[] = [
+    '$.chart.arrangement.lastChordPreset',
+    '$.chart.performance.complexity',
+    '$.chart.band.harmony',
+    '$.chart.band.chords.style',
+    '$.chart.band.chords.instrument',
+    '$.chart.band.chords.octave',
+    '$.chart.band.chords.density',
+    '$.chart.band.bass.style',
+    '$.chart.band.bass.octave',
+    '$.chart.band.soloist.style',
+    '$.chart.band.soloist.preset',
+    '$.chart.band.soloist.octave',
+    '$.chart.band.soloist.phrasingIntensity',
+    '$.chart.band.soloist.tradeMode',
+    '$.chart.band.groove.measures',
+    '$.chart.band.groove.lastDrumPreset',
+    '$.chart.band.groove.genreFeel',
+    '$.chart.band.groove.lastSmartGenre',
+    '$.chart.band.groove.pattern',
+];
+/** The new format stores the genre once, as `genre`; a groove without it is an old chart. */
+const GENRE_PATH = '$.chart.band.groove.genre';
+
+// A row whose body is not JSON, or has a string `kind`, is not a chart. Path literals are
+// constants above, never input.
+const IS_CHART = `json_valid(body) AND COALESCE(json_type(body, '$.kind'), '') <> 'text'`;
+const HAS_LEGACY = `(${[
+    ...LEGACY_CHART_PATHS.map((path) => `json_type(body, '${path}') IS NOT NULL`),
+    `json_type(body, '${GENRE_PATH}') IS NULL`,
+].join(' OR ')})`;
+
+function readChartCounts(db: DatabaseSync): AdminChartCounts {
+    const versions = db
+        .prepare(
+            `SELECT CASE WHEN json_type(body, '$.schemaVersion') = 'integer'
+                         THEN CAST(json_extract(body, '$.schemaVersion') AS TEXT)
+                         ELSE 'unknown' END AS version,
+                    COUNT(*) AS n
+               FROM documents WHERE ${IS_CHART} GROUP BY version`,
+        )
+        .all() as unknown as Array<{ version: string; n: number }>;
+    const bySchemaVersion: Record<string, number> = {};
+    let total = 0;
+    for (const { version, n } of versions) {
+        bySchemaVersion[version] = n;
+        total += n;
+    }
+    const withLegacyFields = count(
+        db,
+        `SELECT COUNT(*) AS n FROM documents WHERE ${IS_CHART} AND ${HAS_LEGACY}`,
+    );
+    return { total, bySchemaVersion, withLegacyFields };
+}
+
 export interface AdminOverview {
     accounts: {
         total: number;
@@ -42,6 +116,7 @@ export interface AdminOverview {
         signedInLast7Days: number;
     };
     documents: { total: number; bytes: number };
+    charts: AdminChartCounts;
     authFailuresLast24Hours: number;
     list: AdminAccountRow[];
     listTruncated: boolean;
@@ -103,6 +178,7 @@ export function readAdminOverview(
             ),
         },
         documents: { total: documents.total, bytes: documents.bytes },
+        charts: readChartCounts(db),
         authFailuresLast24Hours: count(
             db,
             "SELECT COUNT(*) AS n FROM auth_security_events WHERE event = 'auth_failure' AND created_at >= ?",

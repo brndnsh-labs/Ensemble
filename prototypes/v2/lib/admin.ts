@@ -26,6 +26,14 @@ export interface AdminOverview {
         signedInLast7Days: number;
     };
     documents: { total: number; bytes: number };
+    /** Chart documents only (collections excluded), counted once each (#1731). */
+    charts: {
+        total: number;
+        /** Chart count per `schemaVersion` as text; `unknown` is none or non-integer. */
+        bySchemaVersion: Record<string, number>;
+        /** Charts carrying any legacy band/performance field, or lacking a groove `genre`. */
+        withLegacyFields: number;
+    };
     authFailuresLast24Hours: number;
     list: AdminAccountRow[];
     listTruncated: boolean;
@@ -41,9 +49,36 @@ export type AdminLoad =
     | { status: 'busy' }
     | { status: 'failed' };
 
+const isCount = (value: unknown): value is number =>
+    typeof value === 'number' && Number.isInteger(value) && value >= 0;
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/**
+ * Strict check of the part of the response added after the page first shipped (#1731): a
+ * malformed answer is a failed load, never a half-rendered page. Only `charts` is checked here;
+ * the rest of the shape is trusted as it always was.
+ */
+export function hasValidChartCounts(value: unknown): boolean {
+    if (!isRecord(value) || !isRecord(value.charts)) {
+        return false;
+    }
+    const { total, bySchemaVersion, withLegacyFields } = value.charts;
+    return (
+        isCount(total) &&
+        isCount(withLegacyFields) &&
+        isRecord(bySchemaVersion) &&
+        Object.values(bySchemaVersion).every(isCount)
+    );
+}
+
 export async function loadAdminOverview(): Promise<AdminLoad> {
     const result = await accountApi.get<AdminOverview>('/api/admin/overview');
     if (result.ok) {
+        if (!hasValidChartCounts(result.value)) {
+            return { status: 'failed' };
+        }
         return { status: 'ok', overview: result.value };
     }
     const { error } = result;
