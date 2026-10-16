@@ -9,7 +9,7 @@
  * Where the converter deliberately plays something else, the difference is one of a few named
  * kinds (`Verdict`), each with its reason; anything else is a failure.
  */
-// cspell:ignore mmaj Majadd MAJadd Maadd MAadd Calt Cnope Cmin
+// cspell:ignore mmaj Majadd MAJadd Maadd MAadd Calt Cnope Cmin madd Cmadd iiadd iimaj iimin iialt iimadd iima
 
 import { type ChordFacts, parseChord } from '../../../band/theory/chord.js';
 import { notePc } from '../../../band/theory/pitch.js';
@@ -25,10 +25,12 @@ import {
     proposeLegacyScoreConversion,
 } from '../../../public/songbook/legacy-score.js';
 import { durationToSteps } from '../../../public/songbook/score-duration.js';
+import { SCORE_CHORD_QUALITIES } from '../../../public/songbook/score-text.js';
 import type { ScoreEvent } from '../../../public/songbook/score-types.js';
 import type { ChartDocument } from '../../../public/songbook/types.js';
 import presetsCorpus from '../../fixtures/v1/chord-presets.json';
 import sessionsFixture from '../../fixtures/v1/sessions.json';
+import { referenceQuality } from '../../oracle/chord-reference.js';
 import { makeMulberry32 } from '../../utils/seeded-random.js';
 
 interface LegacySection {
@@ -106,24 +108,68 @@ const TWO_ALTERATIONS = new Set(['7#9#5', '7#9b5', '7b9#5', '7b9b5']);
  *
  * - `same`: the same pitch classes over the same bass.
  * - `written-tones`: the chart wrote tones the old parser dropped (`C13b9` played C7b9,
- *   `C6/9/E` lost its bass), and the converted chord is the written token, which the band plays
- *   in full: everything the old parser played, plus what it dropped.
+ *   `C6/9/E` lost its bass), and the converted chord is the written chord with no tone changed
+ *   (`none` or `notation`): everything the old parser played, plus what it dropped.
+ * - `some-written-tones`: the same, but no chart spelling holds the whole written chord, so
+ *   the conversion keeps part of what the old parser dropped (`tones-dropped`).
  * - `two-alterations`: `C7#9b5` and its kin played the old parser's `7alt` (b9, #9 and b13 all
  *   at once, a #5 against a written b5); the band plays the alterations written.
  * - `literal-minor`: a lowercase numeral on `maj7#11`, `maj7#5`, `maj7b5` or `7alt`, which the
  *   old parser had no minor reading for and played with a major third. The band reads a
  *   lowercase numeral literally as minor (DECISION 2026-10-12, #1662).
  * - `misread-alteration`: the old parser read only the start of the suffix and sounded a tone
- *   the rest of it alters (`Cmin9b5` played Cm9, a natural 5 against the written b5; it has a
- *   row for `m9b5` but not this spelling). The converted chord is the whole written chord,
- *   spelled with no tone changed.
+ *   the rest of it alters (`Cmin9b5` played Cm9, a natural 5 against the written b5; `Cm7-5`
+ *   played Cm7). The converted chord must sound what the chord dictionary reads in the written
+ *   spelling (`dictionaryTones`), not merely what the converter claims. Where no spelling holds
+ *   all of it (`tones-dropped`), the part kept must start the written spelling and sound as the
+ *   dictionary reads that part.
+ * - `added-tone`: a 9 in parentheses straight after the root (`C(9)`, `Cm(9)`) is an added
+ *   tone, by its intent; the old parser read it as a 9th chord and added a b7 never written.
  */
 type Verdict =
     | 'same'
     | 'written-tones'
+    | 'some-written-tones'
     | 'two-alterations'
     | 'literal-minor'
-    | 'misread-alteration';
+    | 'misread-alteration'
+    | 'added-tone';
+
+/**
+ * The written suffix as the chord dictionary spells it, folded here by hand and independently
+ * of the converter: parentheses, commas and slashes dropped, the minor prefixes, a fake book's
+ * `-`/`+` alterations after a digit, the Brazilian `7M` and capitalised `Maj`.
+ */
+function dictionarySpelling(written: string): string {
+    return (
+        written
+            // A tone in parentheses straight after the root is an added one.
+            .replace(/^(m|-|min|mi)?\((?:9|2)\)$/, (_, minor) => (minor ? 'madd9' : 'add9'))
+            .replace(/[()\s,/]/g, '')
+            .replace(/^(?:MIN|Min|min|MI|Mi|mi|-)/, 'm')
+            .replace(/^(m?)7M/, (_, minor) => (minor ? 'mMaj7' : 'maj7'))
+            .replace(/(?<=\d)-(?=5|9|13)/g, 'b')
+            .replace(/(?<=\d)\+(?=5|9|11|13)/g, '#')
+            .replace(/^(?:MAJ|Maj|MA|Ma)/, 'maj')
+            // Natural tensions over a 7th chord, in the dictionary's names: 7(9) is a 9th.
+            .replace(/^(m|maj)?7913(?!\d)/, '$113')
+            .replace(/^(m)?7911(?!\d)/, '$111')
+            .replace(/^(m|maj|mMaj)?79(?!\d)/, '$19')
+            .replace(/^713(?!\d)/, '7add13')
+            // A bare `+` is a raised 5th: `9+` is 9#5, `m+` a minor triad with a ♯5.
+            .replace(/(?<=\d)\+(?!\d)/g, '#5')
+            .replace(/^m\+(?!\d)/, 'm#5')
+    );
+}
+
+/** The written chord's tones above its root (0–11), from the dictionary; null if unknown. */
+function dictionaryTones(written: string): number[] | null {
+    const reference = referenceQuality(dictionarySpelling(written));
+    return reference ? [...reference.tones].sort((a, b) => a - b) : null;
+}
+
+const toneSet = (facts: ChordFacts) =>
+    [...new Set(facts.intervals.map((n) => n % 12))].sort((a, b) => a - b);
 
 function verdict(
     token: string,
@@ -152,21 +198,51 @@ function verdict(
         return 'two-alterations' as Verdict;
     }
     if (v1.pcs.every((pc) => v2.pcs.includes(pc)) && (v1.bass === v2.bass || v1.bass === v1.root)) {
-        return 'written-tones' as Verdict;
+        return (change === 'tones-dropped' ? 'some-written-tones' : 'written-tones') as Verdict;
     }
     const readAll = read.details.recognised && read.details.suffix === read.normalised;
-    if (!readAll && change !== 'tones-dropped') {
+    // A lowercase numeral names a minor third over whatever the suffix spells (#1662).
+    const written = dictionaryTones(read.written)?.map((n) =>
+        LOWERCASE_NUMERAL.test(read.root) && n === 4 ? 3 : n,
+    );
+    // The band keeps a 5th the dictionary sometimes leaves out (its 7b13), so a 5th alone
+    // is no difference.
+    const differs = (a: number[], b: number[]) =>
+        [...a.filter((n) => !b.includes(n)), ...b.filter((n) => !a.includes(n))].some(
+            (n) => n !== 7,
+        );
+    const asWritten = written && change !== 'tones-dropped' && !differs(written, toneSet(v2Facts));
+    if (asWritten && /^(?:m|-|min|mi)?\((?:9|2)\)$/.test(read.written)) {
+        return 'added-tone' as Verdict;
+    }
+    if (asWritten && !readAll) {
         return 'misread-alteration' as Verdict;
     }
-    return `${token}: old ${v1Name} [${v1.pcs}/${v1.bass}], new ${symbol} [${v2.pcs}/${v2.bass}]`;
+    // Or no spelling holds all of it: what it keeps must start the written spelling, and sound
+    // as the dictionary reads that start.
+    const kept = dictionaryTones(tail)?.map((n) =>
+        LOWERCASE_NUMERAL.test(read.root) && n === 4 ? 3 : n,
+    );
+    if (
+        !readAll &&
+        change === 'tones-dropped' &&
+        kept &&
+        dictionarySpelling(read.written).startsWith(dictionarySpelling(tail)) &&
+        !differs(kept, toneSet(v2Facts))
+    ) {
+        return 'misread-alteration' as Verdict;
+    }
+    return `${token}: old ${v1Name} [${v1.pcs}/${v1.bass}], new ${symbol} [${v2.pcs}/${v2.bass}], written [${written}]`;
 }
 
 const NAMED: readonly string[] = [
     'same',
     'written-tones',
+    'some-written-tones',
     'two-alterations',
     'literal-minor',
     'misread-alteration',
+    'added-tone',
 ];
 
 /**
@@ -266,6 +342,28 @@ describe('every quality the old parser read converts to the chord it played (#17
         'm7add11',
         '7add13',
         'add4',
+        // A fake book's `-`/`+` alterations, the Brazilian 7M and natural tensions in
+        // parentheses.
+        'm7-5',
+        'm7(-5)',
+        '7-9',
+        '7-5',
+        '7b9+5',
+        '7(+11)',
+        '7+5',
+        '7M',
+        '7M(9)',
+        'm7M',
+        '7(9)',
+        '7(9,13)',
+        '7(9,#11)',
+        'm7(9)',
+        'm7(11)',
+        '7(13)',
+        'maj7(9)',
+        '6(9)',
+        '(9)',
+        'm(9)',
     ];
     const tokens = ROOTS.flatMap((root) =>
         [...LEGACY_QUALITY_SPELLINGS.flatMap(variants), ...OFF_TABLE].flatMap((quality) =>
@@ -386,6 +484,301 @@ describe('every quality the old parser read converts to the chord it played (#17
         );
     });
 
+    it('every difference beyond the table rows, and what each becomes', () => {
+        // The case and notation variants and the off-table spellings, so every verdict that is
+        // not `same` is visible here, with the symbol it converts to.
+        const differences = (root: string) =>
+            [
+                ...new Set(
+                    [
+                        ...LEGACY_QUALITY_SPELLINGS.flatMap((q) => variants(q).slice(1)),
+                        ...OFF_TABLE,
+                    ].flatMap((quality) => {
+                        const v = differential([root + quality], 'C', false)[0];
+                        const c = convertLegacyChordToken(root + quality);
+                        const to = c.kind === 'chord' ? c.symbol : c.kind;
+                        return v === 'same' ? [] : [`${quality} → ${to}: ${v}`];
+                    }),
+                ),
+            ].sort();
+        expect(differences('C')).toEqual([
+            '(9) → Cadd9: added-tone',
+            '+maj7 → Cmaj7#5: written-tones',
+            '-69 → C-69: written-tones',
+            '-9b5 → Ch9: misread-alteration',
+            '-^11 → Cmin^11: written-tones',
+            '-^13 → Cmin^13: written-tones',
+            '-^9 → C-^9: written-tones',
+            '-maj11 → Cmin^11: written-tones',
+            '-maj13 → Cmin^13: written-tones',
+            '-maj9 → C-^9: written-tones',
+            '13#11b9 → C13b9#11: written-tones',
+            '13(#11b9) → C13b9#11: written-tones',
+            '13(#9) → C13#9: written-tones',
+            '13(b9) → C13b9: written-tones',
+            '13b9#11 → C13b9#11: written-tones',
+            '7#11b9 → C7b9#11: written-tones',
+            '7#5b9 → C7b9#5: written-tones',
+            '7#9#11b13 → C7#9#11: some-written-tones',
+            '7#9b13 → C7#9b13: written-tones',
+            '7(#5#9) → C7#9#5: two-alterations',
+            '7(#9#5) → C7#9#5: two-alterations',
+            '7(#9b5) → C7#9b5: two-alterations',
+            '7(+11) → C7#11: misread-alteration',
+            '7(13) → C7(add13): written-tones',
+            '7(9) → C9: written-tones',
+            '7(9,#11) → C9#11: written-tones',
+            '7(9,13) → C13: written-tones',
+            '7(b13sus) → C7b13sus: written-tones',
+            '7(b5b9) → C7b9b5: two-alterations',
+            '7(b9#5) → C7b9#5: two-alterations',
+            '7(b9,#11) → C7b9#11: written-tones',
+            '7(b9b5) → C7b9b5: two-alterations',
+            '7(b9sus) → C7b9sus: written-tones',
+            '7-5 → C7b5: misread-alteration',
+            '7-9 → C7b9: written-tones',
+            '7M → Cmaj7: misread-alteration',
+            '7M(9) → Cmaj9: misread-alteration',
+            '7add13 → C7(add13): written-tones',
+            '7b5#9 → C7#9b5: written-tones',
+            '7b9#11b13 → C7b9#11: some-written-tones',
+            '7b9+5 → C7b9#5: misread-alteration',
+            '7sus4b9 → C7b9sus: written-tones',
+            '9(#11) → C9#11: written-tones',
+            '9(#5) → C9#5: written-tones',
+            '9(b5) → C9b5: written-tones',
+            '9b13 → C9b13: written-tones',
+            'ADD4 → Cmaj(add4): written-tones',
+            'AUG9 → C9#5: written-tones',
+            'Add4 → Cmaj(add4): written-tones',
+            'Aug9 → C9#5: written-tones',
+            'MI69 → C-69: written-tones',
+            'MIN69 → C-69: written-tones',
+            'Maj9#11 → C^9#11: written-tones',
+            'Mi69 → C-69: written-tones',
+            'Mi9b5 → Ch9: written-tones',
+            'Min69 → C-69: written-tones',
+            'add4 → Cmaj(add4): written-tones',
+            'm(9) → Cmadd9: added-tone',
+            'm(maj11) → Cmin^11: written-tones',
+            'm(maj13) → Cmin^13: written-tones',
+            'm(maj9) → C-^9: written-tones',
+            'm/maj11 → Cmin^11: written-tones',
+            'm/maj13 → Cmin^13: written-tones',
+            'm/maj9 → C-^9: written-tones',
+            'm6/9 → C-69: written-tones',
+            'm7(-5) → Cm7b5: misread-alteration',
+            'm7(9) → Cm9: written-tones',
+            'm7-5 → Cm7b5: misread-alteration',
+            'm7M → CmMaj7: misread-alteration',
+            'm7b6 → Cmin7b6: written-tones',
+            'm9(b5) → Ch9: written-tones',
+            'm9b6 → Cmin9b6: written-tones',
+            'mM11 → Cmin^11: written-tones',
+            'mM13 → Cmin^13: written-tones',
+            'mM9 → C-^9: written-tones',
+            'mMaj11 → Cmin^11: written-tones',
+            'mMaj13 → Cmin^13: written-tones',
+            'mMaj9 → C-^9: written-tones',
+            'm^11 → Cmin^11: written-tones',
+            'm^13 → Cmin^13: written-tones',
+            'm^9 → C-^9: written-tones',
+            'maj7(9) → Cmaj9: written-tones',
+            'maj9#11 → C^9#11: written-tones',
+            'mi69 → C-69: written-tones',
+            'mi9b5 → Ch9: written-tones',
+            'min69 → C-69: written-tones',
+            'min9b5 → Ch9: misread-alteration',
+            'minMaj11 → Cmin^11: written-tones',
+            'minMaj13 → Cmin^13: written-tones',
+            'minMaj9 → C-^9: written-tones',
+        ]);
+        expect(differences('ii')).toEqual([
+            '(9) → iiadd9: added-tone',
+            '+maj7 → iimaj7#5: written-tones',
+            '-69 → ii-69: written-tones',
+            '-9b5 → iih9: misread-alteration',
+            '-^11 → iimin^11: written-tones',
+            '-^13 → iimin^13: written-tones',
+            '-^9 → ii-^9: written-tones',
+            '-maj11 → iimin^11: written-tones',
+            '-maj13 → iimin^13: written-tones',
+            '-maj9 → ii-^9: written-tones',
+            '13#11b9 → ii13b9#11: written-tones',
+            '13(#11b9) → ii13b9#11: written-tones',
+            '13(#9) → ii13#9: written-tones',
+            '13(b9) → ii13b9: written-tones',
+            '13b9#11 → ii13b9#11: written-tones',
+            '6(9) → ii69: written-tones',
+            '7#11b9 → ii7b9#11: written-tones',
+            '7#5b9 → ii7b9#5: written-tones',
+            '7#9#11b13 → ii7#9#11: some-written-tones',
+            '7#9b13 → ii7#9b13: written-tones',
+            '7(#5#9) → ii7#9#5: literal-minor',
+            '7(#9#5) → ii7#9#5: literal-minor',
+            '7(#9b5) → ii7#9b5: literal-minor',
+            '7(+11) → ii7#11: misread-alteration',
+            '7(13) → ii7(add13): written-tones',
+            '7(9) → ii9: written-tones',
+            '7(9,#11) → ii9#11: written-tones',
+            '7(9,13) → ii13: written-tones',
+            '7(b13sus) → ii7b13sus: written-tones',
+            '7(b5b9) → ii7b9b5: literal-minor',
+            '7(b9#5) → ii7b9#5: literal-minor',
+            '7(b9,#11) → ii7b9#11: written-tones',
+            '7(b9b5) → ii7b9b5: literal-minor',
+            '7(b9sus) → ii7b9sus: written-tones',
+            '7-5 → ii7b5: misread-alteration',
+            '7-9 → ii7b9: written-tones',
+            '7M → iimaj7: misread-alteration',
+            '7M(9) → iimaj9: misread-alteration',
+            '7add13 → ii7(add13): written-tones',
+            '7b9#11b13 → ii7b9#11: some-written-tones',
+            '7b9+5 → ii7b9#5: misread-alteration',
+            '7sus4b9 → ii7b9sus: written-tones',
+            '9(#11) → ii9#11: written-tones',
+            '9(#5) → ii9#5: written-tones',
+            '9(b5) → ii9b5: written-tones',
+            '9b13 → ii9b13: written-tones',
+            'ADD4 → iimaj(add4): written-tones',
+            'ALT → iialt: literal-minor',
+            'AUG9 → ii9#5: written-tones',
+            'Add4 → iimaj(add4): written-tones',
+            'Alt → iialt: literal-minor',
+            'Aug9 → ii9#5: written-tones',
+            'M11 → iimaj11: written-tones',
+            'M13 → iimaj13: written-tones',
+            'M69 → ii69: written-tones',
+            'M7#11 → iimaj7#11: literal-minor',
+            'M7#5 → iiM7#5: literal-minor',
+            'M7+ → iiM7+: literal-minor',
+            'M7b5 → iimaj7b5: literal-minor',
+            'M9 → iimaj9: written-tones',
+            'M9b5 → iimaj7b5: literal-minor',
+            'MA11 → iimaj11: written-tones',
+            'MA13 → iimaj13: written-tones',
+            'MA69 → ii69: written-tones',
+            'MA7#11 → iimaj7#11: literal-minor',
+            'MA7#5 → iimaj7#5: literal-minor',
+            'MA7+ → iimaj7+: literal-minor',
+            'MA7b5 → iimaj7b5: literal-minor',
+            'MA9 → iimaj9: written-tones',
+            'MA9b5 → iimaj7b5: literal-minor',
+            'MAJ11 → iimaj11: written-tones',
+            'MAJ13 → iimaj13: written-tones',
+            'MAJ69 → ii69: written-tones',
+            'MAJ7#11 → iimaj7#11: literal-minor',
+            'MAJ7#5 → iimaj7#5: literal-minor',
+            'MAJ7+ → iimaj7+: literal-minor',
+            'MAJ7b5 → iimaj7b5: literal-minor',
+            'MAJ9 → iimaj9: written-tones',
+            'MAJ9b5 → iimaj7b5: literal-minor',
+            'MI69 → ii-69: written-tones',
+            'MIN69 → ii-69: written-tones',
+            'Ma11 → iimaj11: written-tones',
+            'Ma13 → iimaj13: written-tones',
+            'Ma69 → ii69: written-tones',
+            'Ma7#11 → iimaj7#11: literal-minor',
+            'Ma7#5 → iimaj7#5: literal-minor',
+            'Ma7+ → iimaj7+: literal-minor',
+            'Ma7b5 → iimaj7b5: literal-minor',
+            'Ma9 → iimaj9: written-tones',
+            'Ma9b5 → iimaj7b5: literal-minor',
+            'Maj11 → iimaj11: written-tones',
+            'Maj13 → iimaj13: written-tones',
+            'Maj69 → ii69: written-tones',
+            'Maj7#11 → iimaj7#11: literal-minor',
+            'Maj7#5 → iimaj7#5: literal-minor',
+            'Maj7+ → iimaj7+: literal-minor',
+            'Maj7b5 → iimaj7b5: literal-minor',
+            'Maj9 → iimaj9: written-tones',
+            'Maj9#11 → ii^9#11: written-tones',
+            'Maj9b5 → iimaj7b5: literal-minor',
+            'Mi69 → ii-69: written-tones',
+            'Mi9b5 → iih9: written-tones',
+            'Min69 → ii-69: written-tones',
+            '^7(#11) → ii^7#11: literal-minor',
+            '^7(#5) → ii^7#5: literal-minor',
+            'add4 → iimaj(add4): written-tones',
+            'm(9) → iimadd9: added-tone',
+            'm(maj11) → iimin^11: written-tones',
+            'm(maj13) → iimin^13: written-tones',
+            'm(maj9) → ii-^9: written-tones',
+            'm/maj11 → iimin^11: written-tones',
+            'm/maj13 → iimin^13: written-tones',
+            'm/maj9 → ii-^9: written-tones',
+            'm6/9 → ii-69: written-tones',
+            'm7(-5) → iim7b5: misread-alteration',
+            'm7(9) → iim9: written-tones',
+            'm7-5 → iim7b5: misread-alteration',
+            'm7M → iimMaj7: misread-alteration',
+            'm7b6 → iimin7b6: written-tones',
+            'm9(b5) → iih9: written-tones',
+            'm9b6 → iimin9b6: written-tones',
+            'mM11 → iimin^11: written-tones',
+            'mM13 → iimin^13: written-tones',
+            'mM9 → ii-^9: written-tones',
+            'mMaj11 → iimin^11: written-tones',
+            'mMaj13 → iimin^13: written-tones',
+            'mMaj9 → ii-^9: written-tones',
+            'm^11 → iimin^11: written-tones',
+            'm^13 → iimin^13: written-tones',
+            'm^9 → ii-^9: written-tones',
+            'ma11 → iima11: written-tones',
+            'ma13 → iima13: written-tones',
+            'ma69 → ii69: written-tones',
+            'ma7#11 → iimaj7#11: literal-minor',
+            'ma7#5 → iimaj7#5: literal-minor',
+            'ma7+ → iimaj7+: literal-minor',
+            'ma7b5 → iimaj7b5: literal-minor',
+            'ma9 → iima9: written-tones',
+            'ma9b5 → iimaj7b5: literal-minor',
+            'maj7#11b13 → iimaj7#11: literal-minor',
+            'maj7(#11) → iimaj7#11: literal-minor',
+            'maj7(#5) → iimaj7#5: literal-minor',
+            'maj7(9) → iimaj9: written-tones',
+            'maj7(b5) → iimaj7b5: literal-minor',
+            'maj9#11 → ii^9#11: written-tones',
+            'maj9(b5) → iimaj7b5: literal-minor',
+            'mi69 → ii-69: written-tones',
+            'mi9b5 → iih9: written-tones',
+            'min69 → ii-69: written-tones',
+            'min9b5 → iih9: misread-alteration',
+            'minMaj11 → iimin^11: written-tones',
+            'minMaj13 → iimin^13: written-tones',
+            'minMaj9 → ii-^9: written-tones',
+            'Δ9 → ii△9: written-tones',
+            '∆9 → ii△9: written-tones',
+        ]);
+    });
+
+    it('never drops a tone when a spelling holds the whole written chord', () => {
+        // For every `tones-dropped` result, the written chord as the dictionary reads it (where
+        // it can) has no exact spelling in the vocabulary.
+        const fuzzed = fuzzTokens();
+        const problems = [...tokens, ...fuzzed].flatMap((token) => {
+            const c = convertLegacyChordToken(token);
+            const read = readLegacyChordToken(token);
+            if (
+                c.kind !== 'chord' ||
+                c.change !== 'tones-dropped' ||
+                LOWERCASE_NUMERAL.test(read.root) ||
+                read.bass !== read.bassText
+            ) {
+                return [];
+            }
+            const written = dictionaryTones(read.written);
+            const exact =
+                written &&
+                [...SCORE_CHORD_QUALITIES].find((q) => {
+                    const facts = parseChord(`C${q}`, { tonic: 0, minor: false });
+                    return facts && toneSet(facts).join() === written.join();
+                });
+            return exact ? [`${token} → ${c.symbol}, but C${exact} holds it`] : [];
+        });
+        expect([...new Set(problems)]).toEqual([]);
+    });
+
     it('converts the issue’s own examples', () => {
         const symbols = ['Cmaj9', 'C6/9', 'CΔ', 'Cm(maj7)', 'Calt', 'C7b9#11', 'C-7(b5)'].map(
             (token) => convertLegacyChordToken(token),
@@ -419,6 +812,38 @@ describe('every quality the old parser read converts to the chord it played (#17
         ['CMaj9(#11)', 'C^9#11', 'notation'],
         ['CM', 'C', 'notation'],
         ['CMAJ7', 'Cmaj7', 'notation'],
+        // A fake book's -/+ after a digit (a leading - is still minor), the Brazilian 7M.
+        ['Cm7-5', 'Cm7b5', 'notation'],
+        ['Cm7(-5)', 'Cm7b5', 'notation'],
+        ['C-7-5', 'C-7b5', 'notation'],
+        ['C7-9', 'C7b9', 'notation'],
+        ['C7-5', 'C7b5', 'notation'],
+        ['C7b9+5', 'C7b9#5', 'notation'],
+        ['C7(+11)', 'C7#11', 'notation'],
+        ['C7+5', 'C7#5', 'notation'],
+        ['C+5', 'C+', 'notation'],
+        ['Cm+', 'Cm#5', 'notation'],
+        ['C7M', 'Cmaj7', 'notation'],
+        ['C7M(9)', 'Cmaj9', 'notation'],
+        ['C7M+5', 'Cmaj7#5', 'notation'],
+        ['Cm7M', 'CmMaj7', 'notation'],
+        // Natural tensions in parentheses over a 7th chord, and their siblings.
+        ['C7(9)', 'C9', 'notation'],
+        ['C7(9,13)', 'C13', 'notation'],
+        ['C7(9,#11)', 'C9#11', 'notation'],
+        ['C7(b9,13)', 'C13b9', 'notation'],
+        ['C7(13)', 'C7(add13)', 'notation'],
+        ['Cm7(9)', 'Cm9', 'notation'],
+        ['Cm7(9,11)', 'Cm11', 'notation'],
+        ['Cmaj7(9)', 'Cmaj9', 'notation'],
+        ['C6(9)', 'C69', 'notation'],
+        ['C11b9', 'C7b9sus', 'notation'],
+        // A 9 in parentheses straight after the root is an added tone (by intent; the old
+        // parser played C9 and Cm9).
+        ['C(9)', 'Cadd9', 'notation'],
+        ['Cm(9)', 'Cmadd9', 'notation'],
+        // m7(11) has no spelling without its 9th: the old parser's Cm7, the 11 dropped.
+        ['Cm7(11)', 'Cm7', 'tones-dropped'],
         // Unicode accidentals, read as written.
         ['D♭7', 'D♭7', 'none'],
         ['C♯m', 'C♯m', 'none'],
@@ -460,7 +885,8 @@ describe('every quality the old parser read converts to the chord it played (#17
     });
 });
 
-describe('fuzzed tokens', () => {
+/** 6,000 seeded random tokens, a root and one to four fragments. */
+function fuzzTokens(): string[] {
     const FRAGMENTS = [
         'm',
         'M',
@@ -501,13 +927,23 @@ describe('fuzzed tokens', () => {
         '/9',
         '/E',
         '/bVII',
+        '7M',
+        '-5',
+        '+5',
+        '+11',
+        '(9)',
+        ',',
     ];
     const random = makeMulberry32(1737);
     const pick = <T>(list: readonly T[]) => list[Math.floor(random() * list.length)];
-    const tokens = Array.from({ length: 6000 }, () => {
+    return Array.from({ length: 6000 }, () => {
         const parts = Array.from({ length: 1 + Math.floor(random() * 4) }, () => pick(FRAGMENTS));
         return pick(ROOTS) + parts.join('');
     }).filter((token) => !token.includes('|'));
+}
+
+describe('fuzzed tokens', () => {
+    const tokens = fuzzTokens();
 
     it.each(KEYS)(
         'convert to the old chord or a named difference, or refuse, in %s',
@@ -728,7 +1164,7 @@ describe('empty bars and sections', () => {
             v1Document({
                 sections: [
                     { label: 'A', value: 'C | G7' },
-                    { label: 'Fill', value: ' | ' },
+                    { label: 'Fill', value: ' | | | ' },
                     { label: 'B', value: 'F', repeat: 2 },
                 ],
             }),
@@ -740,9 +1176,10 @@ describe('empty bars and sections', () => {
             ['A', 1],
             ['B', 2],
         ]);
-        expect(result.notes).toContainEqual(
-            expect.objectContaining({ code: 'empty-section', section: 'Fill' }),
-        );
+        // Its one note: no "empty bar after bar 0" for each of its pieces.
+        expect(result.notes.filter((n) => n.section === 'Fill')).toEqual([
+            expect.objectContaining({ code: 'empty-section' }),
+        ]);
     });
 
     it('refuses a chart with no chords at all', () => {

@@ -93,7 +93,54 @@ const EQUIVALENT_SPELLINGS: Readonly<Record<string, string>> = Object.assign(Obj
     '7add6': '7(add13)',
     dom9: '9',
     dom13: '13',
+    // A raised 5th written with `+`: the augmented triad, a minor triad with a ♯5 (bare `m+`
+    // has no 7th to make it ambiguous), a 9th chord with a ♯5.
+    '+5': '+',
+    'm+': 'm#5',
+    'min+': 'm#5',
+    '-+': 'm#5',
+    '9+': '9#5',
+    // A dominant 11th with a ♭9: 1 5 ♭7 ♭9 11, the suspended ♭9 chord.
+    '11b9': '7b9sus',
+    // A 6th with a ♭7 over it (`C6/7`): the 7th chord with an added 13th.
+    '67': '7(add13)',
+    // Natural tensions in parentheses over a 7th chord (`C7(9)`, `C7(9,13)`, `Cm7(9)`), once
+    // the parentheses and commas are gone.
+    '79': '9',
+    '7913': '13',
+    '79#11': '9#11',
+    '79#1113': '13#11',
+    '7b913': '13b9',
+    '7#913': '13#9',
+    '913': '13',
+    '713': '7(add13)',
+    m79: 'm9',
+    '-79': '-9',
+    m7911: 'm11',
+    '-7911': '-11',
+    m7913: 'm13',
+    maj79: 'maj9',
+    maj7913: 'maj13',
+    'maj79#11': '^9#11',
+    mMaj79: '-^9',
 });
+
+/**
+ * A fake book's spellings, onto the vocabulary's: an alteration written `-`/`+` after a digit
+ * (`m7-5`, `7-9`, `7b9+5`, `7+11`; a leading `-` still means minor), and the Brazilian `7M`
+ * for a major 7th (`C7M`, `Cm7M`).
+ */
+function fakeBook(tail: string): string {
+    return tail
+        .replace(/^(m|-|min|mi)?7M/, (_, minor) => (minor ? 'mMaj7' : 'maj7'))
+        .replace(/(?<=\d)-(?=5|9|13)/g, 'b')
+        .replace(/(?<=\d)\+(?=5|9|11|13)/g, '#');
+}
+
+/** A tone in parentheses straight after the root is added, not a 7th chord's: `C(9)` is Cadd9. */
+function addedTone(written: string): string {
+    return written.replace(/^(m|-|min|mi)?\((?:9|2)\)$/, (_, minor) => (minor ? 'madd9' : 'add9'));
+}
 
 /** The alterations at the end of a suffix: `7b9#11` is `7` with `b9` and `#11`. */
 const ALTERATIONS = /^(.*?)((?:[#b+](?:13|11|9|5))*)$/;
@@ -135,8 +182,11 @@ const named = (suffix: string) => new Set(suffix.match(/\d+/g) ?? []);
  *    read as written (the old parser did not know them and played the bare letter's chord).
  * 2. **Respelled, no tone changed** (`notation`): case folded and `()`, `,`, `/` and spaces
  *    dropped the way the old parser dropped them (`CMaj7`, `C7(b9,#11)` → `C7b9#11`),
- *    alterations reordered (`C7#11b9` → `C7b9#11`), or a known equivalent spelling
- *    (`Cm6/9` → `C-69`, `CmMaj9` → `C-^9`, `CM` → `C`).
+ *    a fake book's `-`/`+` alterations and Brazilian `7M` (`Cm7-5` → `Cm7b5`, `C7M` →
+ *    `Cmaj7`), alterations reordered (`C7#11b9` → `C7b9#11`), or a known equivalent spelling
+ *    (`Cm6/9` → `C-69`, `CmMaj9` → `C-^9`, `C7(9,13)` → `C13`, `CM` → `C`). A 9 in
+ *    parentheses straight after the root is an added tone, by its intent: `C(9)` → `Cadd9`
+ *    (the old parser played C9).
  * 3. **The longest written prefix the vocabulary holds** (`tones-dropped`), never shorter than
  *    the spelling the old parser matched: `C7b9#11b13` → `C7b9#11`, where the old parser
  *    played C7b9.
@@ -182,15 +232,18 @@ export function convertLegacyChordToken(token: string): LegacyTokenConversion {
         change: lossy || bassDropped ? 'tones-dropped' : 'notation',
     });
     // The old parser kept commas; read past them (`7(b9,#11)` is 7b9#11).
-    const normalised = read.normalised.replaceAll(',', '');
-    const literal = read.written.replace(/[(),\s]/g, '');
+    const normalised = fakeBook(read.normalised.replaceAll(',', ''));
+    const literal = fakeBook(addedTone(read.written).replace(/[(),\s]/g, ''));
     const lossless = [literal, normalised].flatMap(sameChordSpellings).find(held);
     if (lossless !== undefined) {
         return chord(lossless, false);
     }
-    const kept = longestHeldPrefix(read, normalised, held);
-    const fallback = kept ?? read.suffix;
-    if (/sus|no|omit/.test(normalised) && !/sus|no|omit/.test(fallback)) {
+    const suspends = (suffix: string) => /sus|no|omit/.test(suffix);
+    const prefix = longestHeldPrefix(read, normalised, held);
+    // A kept prefix that loses a written sus gives way to the old parser's chord, if that kept it.
+    const kept =
+        prefix !== undefined && suspends(normalised) && !suspends(prefix) ? undefined : prefix;
+    if (suspends(normalised) && !suspends(kept ?? read.suffix)) {
         return {
             kind: 'refused',
             why: `No chart spelling holds “${token}”, and the old parser's ${read.root}${read.suffix} sounds the 3rd it leaves out.`,
@@ -313,7 +366,8 @@ export function proposeLegacyScoreConversion(source: string): ConversionResult {
         for (const [j, tokens] of pieces.entries()) {
             const path = `$.chart.arrangement.sections[${i}].value.bars[${j}]`;
             if (!tokens.length) {
-                if (j > first && j < last) {
+                // Only between two bars: an empty section gets its empty-section note alone.
+                if (first >= 0 && j > first && j < last) {
                     notes.push({
                         path,
                         song,
