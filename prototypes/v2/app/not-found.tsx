@@ -1,5 +1,3 @@
-import { BASE_PATH } from '../lib/base-path';
-
 /**
  * The app's not-found page: the exported `/404.html`, and what `notFound()` renders — the admin
  * page uses it for anyone the server refuses (#1717). Next's built-in one carries an inline
@@ -10,7 +8,7 @@ export default function NotFound() {
         <main className="loading">
             <h1>Page not found</h1>
             <p>
-                <a href={`${BASE_PATH}/`}>Back to the songbook</a>
+                <a href="/">Back to the songbook</a>
             </p>
         </main>
     );

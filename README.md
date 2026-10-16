@@ -29,10 +29,10 @@ The app is a Next.js static export in [`prototypes/v2/`](prototypes/v2/README.md
 ```bash
 npm ci
 npm ci --prefix prototypes/v2
-ENSEMBLE_V2_BASE=/ npm run build --prefix prototypes/v2
+npm run build --prefix prototypes/v2
 ```
 
-This writes the site to `prototypes/v2/out/`, including its service worker, the sound packs and a `build.json` naming the commit. Leave `ENSEMBLE_V2_BASE` unset to build for a `/v2/` path instead. For development, `npm run dev --prefix prototypes/v2` serves it at `http://localhost:3100/v2/`.
+This writes the site to `prototypes/v2/out/`, including its service worker, the sound packs and a `build.json` naming the commit. For development, `npm run dev --prefix prototypes/v2` serves it at `http://localhost:3100/`.
 
 Accounts need the separate API service in [`prototypes/v2-api/`](prototypes/v2-api/README.md) behind `/api/*` on the same origin; without it the app still plays and saves on the device. The production stack — container images, release by tag, cache headers — is described in [`hosting/README.md`](hosting/README.md).
 

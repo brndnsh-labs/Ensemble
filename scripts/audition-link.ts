@@ -47,13 +47,13 @@ interface CliArgs {
     retiredPart?: boolean;
 }
 
-// The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at its default `/v2` base.
+// The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at the site root.
 // Since the cutover (#1357) the v2 stand opens these links through its old-link reader
 // (`prototypes/v2/lib/v1-link.ts`, #1279), which takes the chart, key, meter, tempo, genre,
 // `int` and `bnd` (DECISION 2026-09-26, #1382) and starts playback on `autoplay=1` after the
 // first gesture. `?seed=` stays inert (v2 re-rolls it on play) — that one was never part of
 // `V2_DROPPED`, since it is a documented no-op rather than an unread field.
-const DEFAULT_BASE_URL = 'http://localhost:3100/v2/';
+const DEFAULT_BASE_URL = 'http://localhost:3100/';
 
 // Link fields the v2 stand does not read. Empty since #1382 (`int`, `bnd` and `autoplay`
 // joined the supported set); kept as a named mechanism for the next field this script grows

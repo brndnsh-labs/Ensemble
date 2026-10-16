@@ -164,7 +164,7 @@ function run(command: string, args: string[], env: Record<string, string>): Prom
 
 /** The same build `mix:report --engine=chromium` makes: the bridge in, served at `/`. */
 async function buildBridgeExport(): Promise<void> {
-    const env = { NEXT_PUBLIC_RENDER_BRIDGE: '1', ENSEMBLE_V2_BASE: '/' };
+    const env = { NEXT_PUBLIC_RENDER_BRIDGE: '1' };
     await run('npx', ['next', 'build', '--webpack'], env);
     await run('node', ['scripts/offline.mjs'], env);
 }

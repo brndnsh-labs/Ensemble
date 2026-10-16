@@ -17,8 +17,8 @@ import path from 'node:path';
  *
  * Or from one local run, with no `V2_SHARD` set so it covers every file on both projects:
  *
- *   ENSEMBLE_V2_BASE=/ npm run build
- *   ENSEMBLE_V2_BASE=/ PLAYWRIGHT_JSON_OUTPUT_NAME=report.json npx playwright test --workers=3 --reporter=json
+ *   npm run build
+ *   PLAYWRIGHT_JSON_OUTPUT_NAME=report.json npx playwright test --workers=3 --reporter=json
  *   npm run shard:weights -- report.json "<date>, main at <sha>"
  */
 const args = process.argv.slice(2);

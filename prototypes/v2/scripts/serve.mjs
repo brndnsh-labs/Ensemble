@@ -2,31 +2,21 @@ import { readFileSync } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
-import { basePathFromEnv } from './base-path.mjs';
 
 const root = path.resolve('out');
-// Serve the export where it was built to live — `/v2/` today, `/` at the cutover. The build
-// and this harness read the same variable (scripts/base-path.mjs) but in separate processes,
-// so the artifact on disk is asked too: `offline.mjs` keys every `build.json` asset under the
-// base it was built for, and serving a `/v2` export at `/` (or the reverse) is a blank app and
-// a suite of confusing timeouts rather than one clear sentence.
-const base = basePathFromEnv();
-const scope = `${base}/`;
+// The export is served from the site root, the only base there is (#1734). `build.json` keys
+// every asset under `/`, so a stale `out/` from before that fails here with one clear sentence
+// instead of a blank app and a suite of confusing timeouts.
 const built = JSON.parse(readFileSync(path.join(root, 'build.json'), 'utf8')).assets;
-// The shell's own entry is the tell: `/v2/index.html` in a `/v2` export, `/index.html` in a
-// root one. A prefix test cannot tell them apart, since every `/v2/…` key also starts with `/`.
-if (!Object.hasOwn(built, `${scope}index.html`)) {
-    throw new Error(
-        `out/ was not built for ENSEMBLE_V2_BASE=${base || '/'} — rebuild with the same value.`,
-    );
+if (!Object.hasOwn(built, '/index.html')) {
+    throw new Error('out/ was not built for the site root — rebuild it.');
 }
 // 0 = ephemeral; the Playwright fixture (checks/fixtures.ts) starts one server per worker
 // and reads the bound port back from the startup line below.
 const port = Number(process.env.V2_PREVIEW_PORT ?? 3100);
 let networkDisconnected = false;
 // Where `/api/*` goes, set per worker by the account fixture (checks/fixtures.ts). Unset, the
-// path 404s — as an out-of-scope path does at `/v2`, and as a missing file does at the site
-// root — so guest specs never depend on the API being up.
+// path 404s, as a missing file does, so guest specs never depend on the API being up.
 let apiTarget = null;
 const types = {
     '.html': 'text/html',
@@ -232,12 +222,7 @@ async function handler(request, response) {
             request.pipe(upstream);
             return;
         }
-        if (!url.pathname.startsWith(scope)) {
-            response.writeHead(404);
-            response.end();
-            return;
-        }
-        let file = path.resolve(root, decodeURIComponent(url.pathname.slice(scope.length)));
+        let file = path.resolve(root, decodeURIComponent(url.pathname.slice(1)));
         if (!file.startsWith(`${root}/`) && file !== root) {
             throw new Error('Invalid path');
         }
@@ -250,7 +235,7 @@ async function handler(request, response) {
         // A newer build of this same app, for a spec that has to prove one still waits. Only
         // the bytes and the CACHE name change — ASSETS and handlers are the shipped worker's, so
         // what is under test is the update policy and not some fabricated second worker.
-        if (workerRevision > 0 && url.pathname === `${scope}sw.js`) {
+        if (workerRevision > 0 && url.pathname === '/sw.js') {
             // A real release never reuses a shell cache name — the fingerprint in it hashes the
             // assets and the recipe — and the worker's own policy reads those names
             // (`replacingRoot`), so a staged "newer build" has to carry a newer name too.
@@ -286,5 +271,5 @@ async function handler(request, response) {
 }
 const server = http.createServer(handler);
 server.listen(port, '127.0.0.1', () => {
-    console.log(`V2 preview: http://127.0.0.1:${server.address().port}${scope}`);
+    console.log(`V2 preview: http://127.0.0.1:${server.address().port}/`);
 });

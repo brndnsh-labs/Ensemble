@@ -1,30 +1,18 @@
 import type { Metadata, Viewport } from 'next';
-import { BASE_PATH } from '../lib/base-path';
 import './style.css';
 import './motion.css';
-
-/**
- * The head is one of the few places where being the SITE and being a beta beside it genuinely
- * differ (#1355). At `/v2` this is an unlisted preview: no manifest, no installable identity,
- * and `noindex` so search engines never offer the beta as the app. At `/` it IS the app —
- * installable, indexable, and wearing v1's name, colours and icons on purpose, so a browser
- * that installed v1 updates that entry rather than growing a second one. See
- * `scripts/offline.mjs`, which emits the manifest and copies the icons for the root build only.
- */
-const AT_SITE_ROOT = BASE_PATH === '';
 
 export const metadata: Metadata = {
     title: 'Ensemble music stand',
     description: 'A chart-first music stand and local songbook for the Ensemble band.',
-    ...(AT_SITE_ROOT
-        ? {
-              manifest: '/manifest.json',
-              // Both of v1's links, not just the Apple one: v1's `public/index.html` (deleted)
-              // also carried `<link rel="icon" type="image/svg+xml" href="icon.svg">`, and a tab that lost
-              // its favicon at the cutover would be a visible regression nobody asked for.
-              icons: { icon: '/icon.svg', apple: '/icon-maskable-512.png' },
-          }
-        : { robots: { index: false, follow: false } }),
+    // The stand IS the site: installable, indexable, and wearing v1's name, colours and icons on
+    // purpose, so a browser that installed v1 updates that entry rather than growing a second
+    // one (#1355). `scripts/offline.mjs` emits the manifest and copies the icons.
+    manifest: '/manifest.json',
+    // Both of v1's links, not just the Apple one: v1's `public/index.html` (deleted) also carried
+    // `<link rel="icon" type="image/svg+xml" href="icon.svg">`, and a tab that lost its favicon
+    // at the cutover would be a visible regression nobody asked for.
+    icons: { icon: '/icon.svg', apple: '/icon-maskable-512.png' },
 };
 
 /**
@@ -36,7 +24,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
     width: 'device-width',
     initialScale: 1,
-    ...(AT_SITE_ROOT ? { themeColor: '#14110d' } : {}),
+    themeColor: '#14110d',
 };
 
 // Apply a stored Day/Stage choice before first paint so a stage-mode user never
