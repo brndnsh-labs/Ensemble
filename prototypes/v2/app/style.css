@@ -906,6 +906,19 @@ html [hidden] {
 .bar-input:focus-visible {
     outline: none;
 }
+/* On a phone the bar shows what its docked field holds (#1724), set as the field sets it. */
+.bar-draft {
+    width: 100%;
+    min-width: 0;
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: calc(var(--chord-size, 30px) * 0.8);
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
 /* Chords that don't read: the bar tinted, the reason under them. Kept as typed; Save refuses. */
 .bar.unreadable,
 .bar.selected.unreadable {
@@ -1507,7 +1520,8 @@ dialog textarea {
     .stand-stack {
         left: 16px;
         right: 16px;
-        bottom: 14px;
+        /* Above the bar dock while a bar is typed (#1724); the variable is unset otherwise. */
+        bottom: calc(14px + var(--bar-dock-space, 0px));
         transform: none;
         max-width: none;
     }
@@ -1549,6 +1563,24 @@ dialog textarea {
     }
     .edit-panel > p {
         margin-bottom: 15px;
+    }
+    /* Typing a bar on a phone (#1724): its field is docked on the keyboard (`bar-dock.css`), so
+       the transport row and the edit panel fold away while it is up and the chart keeps two or
+       three rows above it. The panel is back after Done. The chart's padding lets its last bar
+       scroll clear of the dock and keyboard (`--bar-dock-space`, set by the dock), and its
+       scroll padding keeps the bar being typed above them when it is scrolled into view. */
+    .workspace[data-bar-open] .transport-bar,
+    .workspace[data-bar-open] .edit-panel {
+        display: none;
+    }
+    .workspace[data-bar-open] .chart-scroll {
+        /* A toast rides on top of the dock, so the chart clears both (#1724 review). */
+        padding-bottom: calc(var(--bar-dock-space, 0px) + var(--stand-stack-height, 0px) + 16px);
+        scroll-padding-bottom: calc(
+            var(--bar-dock-space, 0px) +
+            var(--stand-stack-height, 0px) +
+            8px
+        );
     }
     .panel-label {
         margin-top: 10px;

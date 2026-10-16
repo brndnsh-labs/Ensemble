@@ -1,4 +1,4 @@
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, closeBarDock, expect, test } from './fixtures';
 
 /**
  * #1700 — while editing a measure chart, the chart shows which bar the editor holds, and a tap
@@ -58,9 +58,12 @@ test('the bar being edited and its editor are on screen together, wherever the b
     await expect.poll(() => onScreen(last)).toBe(true);
     await expect.poll(() => onScreen(editor)).toBe(true);
 
-    // A tap on another bar retargets the editor without closing it.
+    // A tap on another bar retargets the editor. On a phone it opens the bar dock first (#1724),
+    // which folds the editor away; after Done it is back, on that bar.
     const other = page.locator('.bar').nth(options - 3);
     await other.click({ position: { x: 6, y: 6 } });
+    await expect(other).toHaveClass(/\bselected\b/);
+    await closeBarDock(page);
     await expect(other).toHaveClass(/\bselected\b/);
     await expect.poll(() => onScreen(editor)).toBe(true);
 

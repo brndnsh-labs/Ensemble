@@ -2945,6 +2945,17 @@ export default function Ensemble() {
         }
         const score = current.chart.score;
         const drafts = barDrafts.drafts;
+        // The bar Tab/Enter (or the phone's ‹ ›) go to from `id`, passing over a bar the quick
+        // editor cannot edit; null at either end.
+        const stepFrom = (id: string, step: -1 | 1): string | null => {
+            const ids = score.sections.flatMap((section) => section.measures.map((m) => m.id));
+            const pending = barDrafts.latest();
+            let at = ids.indexOf(id) + step;
+            while (at >= 0 && at < ids.length && barField(score, pending, ids[at])?.text == null) {
+                at += step;
+            }
+            return at < 0 || at >= ids.length ? null : ids[at];
+        };
         return {
             open: openBar,
             text: (id) => chartFields.get(id)?.text ?? null,
@@ -2964,27 +2975,18 @@ export default function Ensemble() {
                     setOpenBar((open) => (open === from ? null : open));
                     return false;
                 }
-                // Tab/Enter pass over a bar the quick editor cannot edit; at either end, stay.
-                const ids = score.sections.flatMap((section) => section.measures.map((m) => m.id));
-                const pending = barDrafts.latest();
-                let at = ids.indexOf(from.id) + step;
-                while (
-                    at >= 0 &&
-                    at < ids.length &&
-                    barField(score, pending, ids[at])?.text == null
-                ) {
-                    at += step;
-                }
-                if (at < 0 || at >= ids.length) {
+                const to = stepFrom(from.id, step);
+                if (to === null) {
                     // Past either end there is no bar to go to: the field closes, and Tab carries
                     // on through the page's own focus order (review P2).
                     setOpenBar((open) => (open === from ? null : open));
                     return false;
                 }
-                setMeasureId(ids[at]);
-                setOpenBar({ id: ids[at], select: 'all' });
+                setMeasureId(to);
+                setOpenBar({ id: to, select: 'all' });
                 return true;
             },
+            canMove: (id, step) => stepFrom(id, step) !== null,
             onRevert(from) {
                 const pending = barDrafts.latest();
                 const field = barField(score, pending, from.id);
@@ -3019,7 +3021,9 @@ export default function Ensemble() {
                 showEditor();
                 // The bar that needs fixing opens on the chart, its text ready to correct
                 // (#1723). A fresh opening, so the blur of the field Save was pressed from
-                // cannot close it.
+                // cannot close it. Not for a bar refused for its repeat or ending settings: those
+                // are fixed in the panel, which on a phone the bar dock would hide (#1724), so
+                // any open field closes instead.
                 if (error instanceof BarDraftError && error.measureId) {
                     const field = barField(
                         current.chart.score,
@@ -3027,7 +3031,7 @@ export default function Ensemble() {
                         error.measureId,
                     );
                     setOpenBar(
-                        field && field.text !== null
+                        field && field.text !== null && !error.inForm
                             ? { id: error.measureId, select: 'end' }
                             : null,
                     );
@@ -6044,7 +6048,14 @@ export default function Ensemble() {
                     onOpenV1Import={openV1Import}
                 />
             ) : (
-                <main className="workspace" data-focused={focused}>
+                <main
+                    className="workspace"
+                    data-focused={focused}
+                    // A bar's field is open on the chart. At phone width that is the dock on the
+                    // keyboard (#1724), and the transport and edit panel fold away so the chart
+                    // keeps its rows above it (`style.css`).
+                    data-bar-open={openBar ? '' : undefined}
+                >
                     <SongHeader
                         current={current}
                         busy={busy}

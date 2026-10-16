@@ -87,7 +87,10 @@ test('typing in bars applies each one on leaving it, and Save keeps them (#1723)
     expect(await allSelected(field(page, 7))).toBe(true);
     await page.keyboard.type('Gm7 C7');
     await expect(field(page, 7)).toHaveValue('Gm7 C7');
-    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeVisible();
+    // (Attached, not visible: on a phone the transport row folds away while a bar is typed, #1724.)
+    await expect(
+        page.getByRole('button', { name: 'Start playback', exact: true, includeHidden: true }),
+    ).toBeAttached();
 
     // Leaving bar 6 applied it already; Enter leaves bar 7 for bar 8.
     await expect(bars.nth(5).locator('.chord')).toHaveText([/^D7(b|♭)9$/]);
@@ -97,7 +100,10 @@ test('typing in bars applies each one on leaving it, and Save keeps them (#1723)
     await expect(bars.nth(6).locator('.chord').nth(1)).toHaveText('C7');
 
     // No "Update chart" was needed: nothing is pending, and the header says it is unsaved.
-    await expect(page.getByRole('button', { name: 'Update chart', exact: true })).toBeDisabled();
+    // (The panel's, hidden on a phone while a bar is typed: #1724.)
+    await expect(
+        page.getByRole('button', { name: 'Update chart', exact: true, includeHidden: true }),
+    ).toBeDisabled();
     await expect(page.locator('.song-subtitle .unsaved')).toBeVisible();
     await expect(bars.nth(5)).toHaveClass(/\bedited\b/);
 

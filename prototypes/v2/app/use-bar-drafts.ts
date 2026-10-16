@@ -31,11 +31,13 @@ export interface BarEntry {
     effective: EffectiveContext;
 }
 
-/** A pending bar that cannot be applied: the message, and the bar to take the musician to. */
+/** A pending bar that cannot be applied: the message, and the bar to take the musician to.
+ * `inForm`: its repeat and ending settings are what is wrong, not its chords. */
 export class BarDraftError extends Error {
     constructor(
         message: string,
         readonly measureId?: string,
+        readonly inForm = false,
     ) {
         super(message);
     }
@@ -283,6 +285,7 @@ export function commitBarDrafts(
                     throw new BarDraftError(
                         `${entry.label}: ${reason instanceof Error ? reason.message : 'Check the repeat and ending settings.'}`,
                         measure.id,
+                        true,
                     );
                 }
                 delete next.key;
@@ -308,9 +311,13 @@ export function commitBarDrafts(
         const measure = section?.measures[Number(location?.[2])];
         const label =
             section && location ? `${section.label} · bar ${Number(location[2]) + 1}: ` : '';
+        // A refusal about a bar's repeat, ending or jump marks (its `start`/`end`) is for the
+        // bar's settings, not its chords: the field is not reopened over them (#1724 review).
+        const inForm = /\.(?:start|end)\b/.test(issue?.path ?? '');
         throw new BarDraftError(
             `${label}${issue?.message ?? 'Cannot apply this chart.'} Check later bars after a meter change.`,
             measure?.id,
+            inForm,
         );
     }
     return validated.value;
