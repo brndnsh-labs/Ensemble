@@ -1,0 +1,97 @@
+/* The operator page (#1717). Plain and dense: it is read, not played from. */
+.admin {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 32px 16px 48px;
+    color: var(--ink);
+}
+
+.admin h1 {
+    margin: 0 0 24px;
+    font-size: 28px;
+}
+
+.admin h2 {
+    margin: 32px 0 12px;
+    font-size: 18px;
+}
+
+.admin-note {
+    color: var(--muted);
+}
+
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+}
+
+.admin-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+}
+
+.admin-stat-label,
+.admin-stat-detail {
+    color: var(--muted);
+    font-size: 14px;
+}
+
+.admin-stat-value {
+    font-size: 28px;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-warn {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.admin-table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+    font-variant-numeric: tabular-nums;
+}
+
+.admin-table th,
+.admin-table td {
+    padding: 10px 12px;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--line);
+}
+
+.admin-table th {
+    color: var(--muted);
+    font-weight: 600;
+}
+
+.admin-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.admin-you {
+    background: var(--chip);
+}
+
+.admin-tag {
+    margin-left: 8px;
+    padding: 1px 8px;
+    border-radius: 999px;
+    background: var(--green-light);
+    color: var(--green);
+    font-size: 12px;
+}

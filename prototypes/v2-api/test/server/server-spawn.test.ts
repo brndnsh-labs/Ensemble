@@ -260,6 +260,18 @@ describe('server entrypoint spawn tests', () => {
             envOverride: { ENSEMBLE_REGISTRATION_CAP: ' 25 ' },
             expectedStderrContains: 'ENSEMBLE_REGISTRATION_CAP',
         },
+        // #1717: a malformed admin list must not start — a stray space would otherwise match
+        // nobody while looking configured.
+        {
+            name: "ENSEMBLE_ADMIN_ACCOUNT_IDS='abc, def'",
+            envOverride: { ENSEMBLE_ADMIN_ACCOUNT_IDS: 'abc, def' },
+            expectedStderrContains: 'ENSEMBLE_ADMIN_ACCOUNT_IDS',
+        },
+        {
+            name: "ENSEMBLE_ADMIN_ACCOUNT_IDS='abc,'",
+            envOverride: { ENSEMBLE_ADMIN_ACCOUNT_IDS: 'abc,' },
+            expectedStderrContains: 'ENSEMBLE_ADMIN_ACCOUNT_IDS',
+        },
     ];
 
     it.each(BAD_ENV_CASES)(

@@ -35,6 +35,7 @@ import {
 } from '../auth/index.js';
 import { isAuthDecisionCode, recordSecurityEvent } from '../auth/security-events.js';
 import type { SaveDependencies } from '../db/save.js';
+import { adminRoutes } from './admin.js';
 import { authPolicy } from './auth-policy.js';
 import { type ClientIdentityOptions, createClientIdentity } from './client-identity.js';
 import { jsonOnlyGuard, requestHasBody } from './content-type.js';
@@ -114,6 +115,11 @@ export interface CreateAppOptions {
     registrationCap?: number;
     /** #1202: revision minting override for the Save endpoint's tests. */
     saveDependencies?: SaveDependencies;
+    /**
+     * #1717: the account ids allowed to read `GET /api/admin/overview` (`ENSEMBLE_ADMIN_ACCOUNT_IDS`
+     * in `server.ts`). Empty — the default — refuses everyone.
+     */
+    adminAccountIds?: readonly string[];
 }
 
 type JsonBodyResult = { ok: true; value: unknown } | { ok: false };
@@ -138,6 +144,7 @@ export function createApp({
     registrationOpen = true,
     registrationCap = DEFAULT_REGISTRATION_CAP,
     saveDependencies,
+    adminAccountIds = [],
 }: CreateAppOptions): Hono {
     // No raw address reaches a limiter or audit row. Factory-only tests get an ephemeral secret.
     const identify = createClientIdentity(clientIdentity);
@@ -925,6 +932,12 @@ export function createApp({
         );
         return c.json({ accountId: result.accountId });
     });
+
+    // --- #1717: the operator's read-only overview (gate and budget in admin.ts) ----------------
+    app.route(
+        '/api/admin',
+        adminRoutes({ db, now, identify, requireSession, adminAccountIds, registrationCap }),
+    );
 
     // --- #1202: the Explicit Save endpoint; #1259: the library read routes --------------------
     // Session-gated through the same `requireSession` as every account route above, so a

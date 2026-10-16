@@ -185,6 +185,29 @@ function readRegistrationCap(): number {
     return cap;
 }
 const registrationCap = readRegistrationCap();
+/**
+ * #1717: who may read `/api/admin/overview` — comma-separated account ids (base64url, as
+ * `GET /api/auth/session` returns them). Unset or empty refuses everyone, which is the safe
+ * default and the state of any deployment nobody has configured. An entry that is not a
+ * base64url id refuses to start, like every other value here: a typo must not quietly lock the
+ * operator out, nor (with a stray space) look configured while matching nobody.
+ */
+function readAdminAccountIds(): string[] {
+    const raw = process.env.ENSEMBLE_ADMIN_ACCOUNT_IDS ?? '';
+    if (raw === '') {
+        return [];
+    }
+    const ids = raw.split(',');
+    for (const id of ids) {
+        if (!/^[A-Za-z0-9_-]+$/.test(id)) {
+            throw new Error(
+                `ENSEMBLE_ADMIN_ACCOUNT_IDS must be comma-separated account ids with no spaces, got ${JSON.stringify(raw)}`,
+            );
+        }
+    }
+    return ids;
+}
+const adminAccountIds = readAdminAccountIds();
 const clientIdentity: ClientIdentityOptions = {
     secret: readRequiredEnv('ENSEMBLE_AUTH_IP_SECRET'),
     header: process.env.ENSEMBLE_AUTH_IP_HEADER,
@@ -217,7 +240,14 @@ const db = openDatabase(dbPath);
 // (`%20`), which readdirSync/readFileSync would then try to open literally rather than decoding.
 runMigrations(db, fileURLToPath(new URL('../migrations', import.meta.url)));
 
-const app = createApp({ db, config, clientIdentity, registrationOpen, registrationCap });
+const app = createApp({
+    db,
+    config,
+    clientIdentity,
+    registrationOpen,
+    registrationCap,
+    adminAccountIds,
+});
 registerHealthCheck(app, db, revision);
 
 // This service's one intended startup log line. `noConsole` (biome.json) is scoped to
