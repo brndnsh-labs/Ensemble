@@ -1,22 +1,23 @@
 'use client';
 
 import { TIME_SIGNATURES } from '@engine/config';
-import { validateSemanticScore } from '@engine/songbook/score-codec';
-import { resolveScoreContext } from '@engine/songbook/score-context';
 import { durationToSteps, scoreDuration, scoreMeter } from '@engine/songbook/score-duration';
-import { parseChordBar, printChordBar } from '@engine/songbook/score-text';
-import type {
-    ScoreContext,
-    ScoreEvent,
-    ScoreMeasure,
-    SemanticScore,
-} from '@engine/songbook/score-types';
+import { parseChordBar } from '@engine/songbook/score-text';
+import type { SemanticScore } from '@engine/songbook/score-types';
 import { type Ref, useEffect, useId, useImperativeHandle, useRef, useState } from 'react';
-import { applyMeasureForm, type FormDraft, readMeasureForm } from '../lib/form-editing';
 import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
 import { FormControls } from './form-controls';
 import { GuidedForm } from './guided-form';
 import './measure-editor.css';
+import {
+    type BarDraft,
+    BarDraftError,
+    type BarDrafts,
+    barField,
+    commitBarDrafts,
+    draftChange,
+    entriesFor,
+} from './use-bar-drafts';
 
 export interface MeasureEditorHandle {
     /** Validate every pending bar. The parent must apply the result before drafts are cleared. */
@@ -27,135 +28,14 @@ export interface MeasureEditorHandle {
 
 interface MeasureEditorProps {
     score: SemanticScore;
+    /** The pending bars, owned by the shell and shared with the chart's in-bar field (#1723). */
+    barDrafts: BarDrafts;
     selectedMeasureId: string;
     onSelect: (id: string) => void;
     onApply: (score: SemanticScore) => void;
     onApplyForm: (score: SemanticScore) => void;
-    onPendingChange: (pending: boolean) => void;
     disabled?: boolean;
     ref?: Ref<MeasureEditorHandle>;
-}
-
-interface BarDraft {
-    text: string;
-    context: ScoreContext;
-    form: FormDraft | null;
-    /** Whether the bar's last chord holds (a fermata). */
-    fermata: boolean;
-}
-
-type EffectiveContext = ReturnType<typeof resolveScoreContext>;
-interface BarEntry {
-    measure: ScoreMeasure;
-    label: string;
-    inherited: EffectiveContext;
-    effective: EffectiveContext;
-}
-
-function writtenContext(measure: ScoreMeasure): ScoreContext {
-    const context: ScoreContext = {};
-    if (measure.key !== undefined) {
-        context.key = measure.key;
-    }
-    if (measure.isMinor !== undefined) {
-        context.isMinor = measure.isMinor;
-    }
-    if (measure.meter !== undefined) {
-        context.meter = measure.meter;
-    }
-    if (measure.grouping !== undefined) {
-        context.grouping = measure.grouping;
-    }
-    return context;
-}
-
-function entriesFor(score: SemanticScore, drafts: Map<string, BarDraft>): BarEntry[] {
-    return score.sections.flatMap((section) => {
-        let inherited = resolveScoreContext(score, section);
-        return section.measures.map((measure, index) => {
-            const effective = resolveScoreContext(
-                inherited,
-                drafts.get(measure.id)?.context ?? measure,
-            );
-            const entry = {
-                measure,
-                label: `${section.label} · bar ${index + 1}`,
-                inherited,
-                effective,
-            };
-            inherited = effective;
-            return entry;
-        });
-    });
-}
-
-/** Band engine only — the one placement the fermata toggle can express (see `printableEvents`). */
-function lastEventFermata(measure: ScoreMeasure): boolean {
-    return measure.content.kind === 'events'
-        ? Boolean(measure.content.events.at(-1)?.fermata)
-        : false;
-}
-
-function stripFermata(event: ScoreEvent): ScoreEvent {
-    const { fermata: _fermata, ...rest } = event;
-    return rest as ScoreEvent;
-}
-
-/**
- * `printChordBar` (score-text.ts) refuses to print any event that carries a `fermata` key at
- * all, by design: the flag is editor state, not text. Strip it from the LAST
- * event so the bar's chords stay editable text — `commit()`'s `withFermata` reapplies it once
- * the text is re-parsed, so a text edit can never silently drop it. A fermata anywhere but the
- * last event is a placement the toggle cannot represent (iReal import is the only source of
- * one), so that bar is left for `printChordBar` to refuse, same as default mode.
- */
-function printableEvents(events: readonly ScoreEvent[]): ScoreEvent[] {
-    const last = events.length - 1;
-    if (last < 0 || !events[last].fermata) {
-        return events as ScoreEvent[];
-    }
-    return [...events.slice(0, last), stripFermata(events[last])];
-}
-
-function editableText(measure: ScoreMeasure, meter: string): string | null {
-    if (measure.content.kind !== 'events') {
-        return null;
-    }
-    try {
-        const events = printableEvents(measure.content.events);
-        const printed = printChordBar(events, meter);
-        const durations = measure.content.events.map((event) => event.duration.join('/'));
-        // Most bars need no duration syntax. Unequal lengths remain visible and lossless.
-        return new Set(durations).size === 1 ? printed.replace(/:[^\s]+/g, '') : printed;
-    } catch {
-        return null;
-    }
-}
-
-/** Reapply the toggle's flag to the freshly re-parsed last event (`printableEvents` stripped it
- * for printing) — `parseChordBar` never emits `fermata` itself, so `false` needs no cleanup. */
-function withFermata(events: readonly ScoreEvent[], fermata: boolean): ScoreEvent[] {
-    const last = events.length - 1;
-    if (!fermata || last < 0) {
-        return events as ScoreEvent[];
-    }
-    return events.map((event, index) => (index === last ? { ...event, fermata: true } : event));
-}
-
-function initialDraft(entry: BarEntry): BarDraft {
-    let form: FormDraft | null = null;
-    try {
-        form = readMeasureForm(entry.measure);
-    } catch {
-        // Keep unusual but valid source boundaries intact while allowing chord edits.
-        // The compact controls cannot represent every future form without losing notation.
-    }
-    return {
-        text: editableText(entry.measure, entry.effective.meter) ?? '',
-        context: writtenContext(entry.measure),
-        form,
-        fermata: lastEventFermata(entry.measure),
-    };
 }
 
 function countText(numerator: number, denominator: number): string {
@@ -187,32 +67,29 @@ function lengthRows(text: string, meter: string): { symbol: string; counts: stri
     return rows.every((row) => row !== null) ? rows : [];
 }
 
-/** Mount with key={document.id}; keep mounted (hidden is fine) while raw drafts exist. */
+/** Mount with key={document.id}. The pending bars live in the shell's `barDrafts` (#1723), so
+ * this panel and the chart's in-bar field edit one draft per bar. */
 export function MeasureEditor({
     score,
+    barDrafts,
     selectedMeasureId,
     onSelect,
     onApply,
     onApplyForm,
-    onPendingChange,
     disabled = false,
     ref,
 }: MeasureEditorProps) {
-    const [drafts, setDrafts] = useState(new Map<string, BarDraft>());
-    const draftRef = useRef(drafts);
+    const drafts = barDrafts.drafts;
     const acceptedCandidate = useRef<string | null>(null);
     const [error, setError] = useState('');
     const [formScore, setFormScore] = useState<SemanticScore | null>(null);
     const id = useId();
     const entries = entriesFor(score, drafts);
     const selected = entries.find((entry) => entry.measure.id === selectedMeasureId) ?? entries[0];
-    const originalEntries = entriesFor(score, new Map());
-    const original = originalEntries.find((entry) => entry.measure.id === selected?.measure.id);
-    const draft = selected
-        ? (drafts.get(selected.measure.id) ?? initialDraft(original ?? selected))
-        : null;
-    const originalText = original ? editableText(original.measure, original.effective.meter) : null;
-    const readOnly = originalText === null;
+    const field = selected ? barField(score, drafts, selected.measure.id) : null;
+    const original = field?.original;
+    const draft = field?.draft ?? null;
+    const readOnly = field?.text === null;
     const meter = selected?.effective.meter ?? score.meter;
     const counts = scoreMeter(meter).counts;
     const rows = draft && !readOnly ? lengthRows(draft.text, meter) : [];
@@ -220,107 +97,39 @@ export function MeasureEditor({
     const offGrid =
         parsed?.kind === 'ok' &&
         parsed.value.some((event) => durationToSteps(event.duration) === null);
+    const { retire } = barDrafts;
 
     useEffect(() => {
         if (acceptedCandidate.current !== JSON.stringify(score)) {
             return;
         }
         acceptedCandidate.current = null;
-        draftRef.current = new Map();
-        setDrafts(draftRef.current);
-        onPendingChange(false);
-    }, [score, onPendingChange]);
+        retire();
+    }, [score, retire]);
 
     function updateDraft(next: BarDraft) {
         if (!selected || !original || disabled || readOnly) {
             return;
         }
-        const pending = new Map(draftRef.current);
-        if (JSON.stringify(next) === JSON.stringify(initialDraft(original))) {
-            pending.delete(selected.measure.id);
-        } else {
-            pending.set(selected.measure.id, next);
-        }
         acceptedCandidate.current = null;
-        draftRef.current = pending;
-        setDrafts(pending);
+        // The store notifies the shell synchronously, so a same-turn Save sees unfinished work.
+        barDrafts.put(selected.measure.id, draftChange(original, next));
         setError('');
-        // Notify synchronously so a same-turn Save/navigation sees unfinished work.
-        onPendingChange(pending.size > 0);
-    }
-
-    function fail(message: string, measureId?: string): never {
-        if (measureId) {
-            onSelect(measureId);
-        }
-        setError(message);
-        throw new Error(message);
     }
 
     function commit(): SemanticScore {
-        const pending = draftRef.current;
-        const resolved = new Map(
-            entriesFor(score, pending).map((entry) => [entry.measure.id, entry]),
-        );
-        const candidate: SemanticScore = {
-            ...score,
-            sections: score.sections.map((section) => ({
-                ...section,
-                measures: section.measures.map((measure) => {
-                    const buffer = pending.get(measure.id);
-                    if (!buffer) {
-                        return measure;
-                    }
-                    const entry = resolved.get(measure.id)!;
-                    const parsedBar = parseChordBar(buffer.text, entry.effective.meter);
-                    if (parsedBar.kind !== 'ok') {
-                        return fail(
-                            `${entry.label}: ${parsedBar.kind === 'invalid' ? parsedBar.issues[0].message : 'Cannot read this bar.'}`,
-                            measure.id,
-                        );
-                    }
-                    let next: ScoreMeasure;
-                    try {
-                        next = buffer.form
-                            ? applyMeasureForm(measure, buffer.form)
-                            : { ...measure };
-                    } catch (reason) {
-                        return fail(
-                            `${entry.label}: ${reason instanceof Error ? reason.message : 'Check the repeat and ending settings.'}`,
-                            measure.id,
-                        );
-                    }
-                    delete next.key;
-                    delete next.isMinor;
-                    delete next.meter;
-                    delete next.grouping;
-                    return {
-                        ...next,
-                        ...buffer.context,
-                        content: {
-                            kind: 'events' as const,
-                            events: withFermata(parsedBar.value, buffer.fermata),
-                        },
-                    };
-                }),
-            })),
-        };
-        const validated = validateSemanticScore(candidate);
-        if (validated.kind !== 'ok') {
-            const issue = validated.kind === 'invalid' ? validated.issues[0] : null;
-            const location = issue?.path.match(/sections\[(\d+)\]\.measures\[(\d+)\]/);
-            const section = location ? candidate.sections[Number(location[1])] : null;
-            const measure = section?.measures[Number(location?.[2])];
-            const label =
-                section && location ? `${section.label} · bar ${Number(location[2]) + 1}: ` : '';
-            return fail(
-                `${label}${issue?.message ?? 'Cannot apply this chart.'} Check later bars after a meter change.`,
-                measure?.id,
-            );
+        try {
+            const validated = commitBarDrafts(score, barDrafts.latest());
+            acceptedCandidate.current = JSON.stringify(validated);
+            setError('');
+            return validated;
+        } catch (reason) {
+            if (reason instanceof BarDraftError && reason.measureId) {
+                onSelect(reason.measureId);
+            }
+            setError(reason instanceof Error ? reason.message : String(reason));
+            throw reason;
         }
-        acceptedCandidate.current = JSON.stringify(validated.value);
-        setError('');
-        return validated.value;
     }
 
     useImperativeHandle(ref, () => ({
@@ -328,10 +137,8 @@ export function MeasureEditor({
         reset() {
             setFormScore(null);
             acceptedCandidate.current = null;
-            draftRef.current = new Map();
-            setDrafts(draftRef.current);
+            barDrafts.retire();
             setError('');
-            onPendingChange(false);
         },
     }));
 

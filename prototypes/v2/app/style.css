@@ -883,6 +883,61 @@ html [hidden] {
     background: var(--chord-hover);
     border-radius: 4px;
 }
+/* Typing on the chart (#1723). The bar being typed into reads as a page you write on: the
+   surface, ringed in the accent; its field is the chord text itself, with no box of its own. */
+.bar.selected.typing {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+.bar-input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    padding: 2px 0;
+    background: transparent;
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: calc(var(--chord-size, 30px) * 0.8);
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
+    caret-color: var(--accent);
+}
+.bar-input:focus-visible {
+    outline: none;
+}
+/* Chords that don't read: the bar tinted, the reason under them. Kept as typed; Save refuses. */
+.bar.unreadable,
+.bar.selected.unreadable {
+    background: var(--danger-bg);
+}
+.bar.selected.typing.unreadable {
+    box-shadow: inset 0 0 0 2px var(--danger);
+}
+.bar-problem {
+    flex-basis: 100%;
+    color: var(--danger);
+    font-size: 11px;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+/* The bar number is the keyboard's way to a bar while editing; it looks as it always does. */
+button.bar-number {
+    padding: 0;
+    line-height: inherit;
+}
+/* Changed since the chart was last kept: a small dot after the bar number. */
+.bar.edited .bar-number::after {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-left: 3px;
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: middle;
+}
 .chart-bottom {
     border-top: 1px solid var(--line);
     padding-top: 17px;
@@ -2022,14 +2077,6 @@ dialog textarea {
     color: var(--accent);
     margin-left: auto;
     text-decoration: underline;
-}
-.bar-edit {
-    position: absolute;
-    top: 1px;
-    right: 4px;
-    color: var(--accent);
-    padding: 2px 6px;
-    font-size: 11px;
 }
 .bar-context {
     position: absolute;
