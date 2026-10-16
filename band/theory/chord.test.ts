@@ -1,4 +1,10 @@
 import { isScoreChord, SCORE_CHORD_QUALITIES } from '../../public/songbook/score-text.js';
+import { type CompInstrument, DEFAULT_SETTINGS } from '../core/types.js';
+import { compileTimeline } from '../form/timeline.js';
+import { performPass } from '../perform.js';
+import { COMP_INSTRUMENTS } from '../players/comp/instruments.js';
+import { STYLE_IDS } from '../styles/index.js';
+import { score } from '../test/scores.js';
 import { chordPcs, KNOWN_QUALITIES, parseChord } from './chord.js';
 import { mod12, notePc } from './pitch.js';
 
@@ -152,5 +158,58 @@ describe('chord facts', () => {
         expect(facts('Dm13', C).intervals).toEqual([0, 3, 7, 10, 14, 21]);
         expect(facts('Dmin13', C).intervals).toEqual([0, 3, 7, 10, 14, 21]);
         expect(facts('Dmin^13', C).intervals).toEqual([0, 3, 7, 11, 14, 21]);
+    });
+});
+
+/**
+ * #1737: three jazz dominants a measure-less chart could hold, added so its conversion keeps
+ * them. Their tones come from their names (a ♭13 over a chord that keeps its 5th, as `7b13`
+ * does), and the band voices them in every lane's register on every style and comp instrument.
+ * The chord-symbol oracle (`tests/oracle/`) holds the comp's notes to the symbols.
+ */
+describe('the dominants added for the text-chart converter', () => {
+    it.each([
+        ['G7#9b13', [7, 11, 2, 5, 10, 3]],
+        ['G9b13', [7, 11, 2, 5, 9, 3]],
+        ['G13b9#11', [7, 11, 2, 5, 8, 1, 4]],
+    ])('%s sounds the tones its name spells', (symbol, pcs) => {
+        const chord = parseChord(symbol, C);
+        expect(chord && new Set(chordPcs(chord))).toEqual(new Set(pcs));
+    });
+
+    it('every lane keeps to its register on them, in every style and comp instrument', () => {
+        const timeline = compileTimeline(
+            score([
+                {
+                    label: 'A',
+                    bars: 'Dm9 | G7#9b13 | C^9 | A9b13 | Dm9 | G13b9#11 | C^9 | C^9',
+                },
+            ]),
+        );
+        const problems: string[] = [];
+        for (const style of STYLE_IDS) {
+            for (const comp of Object.keys(COMP_INSTRUMENTS) as CompInstrument[]) {
+                const settings = {
+                    ...DEFAULT_SETTINGS,
+                    style,
+                    comp,
+                    seed: 'widened',
+                    lanes: { drums: true, bass: true, comp: true, lead: false },
+                };
+                const { events } = performPass(timeline, settings, { pass: 0, looping: true });
+                const comps = COMP_INSTRUMENTS[comp].range;
+                for (const e of events) {
+                    if (e.lane !== 'bass' && e.lane !== 'comp') {
+                        continue;
+                    }
+                    const range = e.lane === 'bass' ? [23, 57] : comps;
+                    if (e.midi < range[0] || e.midi > range[1]) {
+                        problems.push(`${style}/${comp}: ${e.lane} ${e.midi}`);
+                    }
+                }
+                expect(events.some((e) => e.lane === 'comp')).toBe(true);
+            }
+        }
+        expect(problems).toEqual([]);
     });
 });

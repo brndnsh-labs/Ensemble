@@ -166,10 +166,15 @@ const QUALITY_TABLE: readonly (readonly [spellings: readonly string[], formula: 
     [['7b9#5'], '1 3 #5 b7 b9'],
     [['7b9#9'], '1 3 5 b7 b9 #9'],
     [['7b9b13'], '1 3 5 b7 b9 b13'],
+    // #1737: the jazz dominants a measure-less chart could hold and the vocabulary could not.
+    // Each keeps its 5th under a b13, as `7b13` and `7b9b13` do.
+    [['7#9b13'], '1 3 5 b7 #9 b13'],
+    [['9b13'], '1 3 5 b7 9 b13'],
     // Altered: no 5th; the b9/#9/b13 carry the colour.
     [['7alt', 'alt'], '1 3 b7 b9 #9 b13'],
     [['13#11'], '1 3 5 b7 9 #11 13'],
     [['13b9'], '1 3 5 b7 b9 13'],
+    [['13b9#11'], '1 3 5 b7 b9 #11 13'],
     [['13#9'], '1 3 5 b7 #9 13'],
 ];
 

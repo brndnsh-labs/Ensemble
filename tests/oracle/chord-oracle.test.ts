@@ -75,6 +75,11 @@ const DIVERGENCES: Readonly<
         referenceOnly: [],
         why: 'A ♭13 is a colour above the chord, which still has its 5th (the ♯5 chord is written 7#5). The dictionary drops the 5th.',
     },
+    '9b13': {
+        bandOnly: [7],
+        referenceOnly: [],
+        why: 'The same reading as 7b13: the ♭13 is a colour above a chord that keeps its 5th.',
+    },
     '7#9b5': {
         bandOnly: [],
         referenceOnly: [7],

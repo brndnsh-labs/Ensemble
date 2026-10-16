@@ -478,7 +478,12 @@ written token, so the two are held to each other: **the chart shows what the ban
 `vii` is a B minor triad in C, `i7b9` a Cm7b9, and `i11` a Cm11 (#1674: a dominant 11th is
 written without a third, so the numeral's case gives it a minor one; `I11` stays C11). `parseChord` reads every name the old parser writes, so a tap
 and the neck sound the chord that is shown. `prototypes/v2/lib/legacy-band-chart.test.ts` holds
-every chord such a chart can play (`LEGACY_CHORD_QUALITIES`) to it. On the
+the everyday qualities, every root spelling, to it. The band plays such a chart through
+`proposeLegacyScoreConversion` (`public/songbook/legacy-score.ts`), which converts every token
+the old parser read (#1737); `tests/unit/songbook/legacy-score.test.ts` holds the conversion to
+the old parser's own playing, and names each spelling where the band now plays the written
+chord instead (a tone the old parser dropped, two written alterations it rounded to `7alt`, a
+lowercase numeral it kept major). For those few, the sheet still shows the old parser's name. On the
 band engine the measure editor can put a fermata on (or take it off) a bar's last event: the flag is
 editor state carried across the bar's text round-trip, never encoded in chord text.
 
