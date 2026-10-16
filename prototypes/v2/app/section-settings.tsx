@@ -4,6 +4,7 @@ import type { ScoreSection, SemanticScore } from '@engine/songbook/score-types';
 import { useEffect, useState } from 'react';
 import { SECTION_NAME_MAX, type SectionChange } from '../lib/documents';
 import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
+import { afterPress } from './after-press';
 
 const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
@@ -206,7 +207,8 @@ function CommitField({
                     setText(event.target.value);
                     onPending(event.target.value === value ? null : change(event.target.value));
                 }}
-                onBlur={commit}
+                // A press that took the focus lands before the commit moves the page (#1733).
+                onBlur={() => afterPress(commit)}
                 onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                         event.preventDefault();

@@ -14,6 +14,7 @@ import { arrangementOf, type SectionChange } from '../lib/documents';
 import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
+import { afterPress } from './after-press';
 import { BarDock, usePhoneWidth } from './bar-dock';
 import { BarMenu, type BarMenuBar } from './bar-menu';
 import { SectionMenu } from './section-menu';
@@ -582,8 +583,11 @@ export function ChartSheet({
         // app, another tab) is not. A press on another bar never gets here: it keeps focus off
         // the way (`onMouseDown`) and leaves through `onOpen`. Matched on the opening, not the
         // bar, so a newer opening of the same bar (Save landing on it) is not closed by this.
+        // A press that took the focus: the bar is left once that press has landed (`afterPress`),
+        // so the page does not move out from under it before its click (#1733).
         if (document.hasFocus()) {
-            barEdit?.onLeave(from, 0);
+            const leave = barEdit?.onLeave;
+            afterPress(() => leave?.(from, 0));
         }
     }
     // At phone width the open bar is typed in a field docked on the keyboard (#1724), not in
@@ -1234,7 +1238,9 @@ export function ChartSheet({
                                 fieldNode.current?.focus({ preventScroll: true });
                             }
                         } else if (byFocus || !target?.closest('.bar')) {
-                            barEdit.onLeave(open, 0);
+                            // Once the press that closed the menu has landed (#1733).
+                            const leave = barEdit.onLeave;
+                            afterPress(() => leave(open, 0));
                         }
                     }}
                     onRepeats={() => {
