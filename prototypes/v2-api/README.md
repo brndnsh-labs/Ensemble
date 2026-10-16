@@ -57,6 +57,8 @@ route/socket identity is not built or verified. See the explicit receipt in that
 | `src/http/cookies.ts` | Ceremony/session cookie transport — names, `__Host-` prefixing, and attributes, all derived from `config.origin`. |
 | `src/http/headers.ts` | `securityHeaders()` — `Cache-Control`, CSP, `X-Content-Type-Options`, `Referrer-Policy` on every `/api/*` response, including 404/413/415/403/500. |
 | `src/http/errors.ts` | `sendError` / `ceremonyFailureResponse` / `revokePasskeyFailureResponse` / `recoveryActionFailureResponse` (#1191) — the collapsed `{ error: <code> }` taxonomy. `malformed_request` is 400; `fresh_auth_required` (add-passkey, and #1191's enroll/confirm) is 403; every other ceremony failure reason, including #1190's `session_mismatch` and #1191's `recovery_session_invalid`/`account_not_found`/`recovery_code_not_found`, is `401 authentication_failed`. `revokePasskey`'s own reasons map separately: `fresh_auth_required` 403, `not_found` 404, `last_credential` 409. `recoveryActionFailureResponse` (enroll/confirm): `fresh_auth_required` 403, `not_found` 404. `rate_limited` (#1191, the recovery-claim limiter) is 429. |
+| `src/db/admin-overview.ts` | `readAdminOverview` (#1717) — the operator's read-only counts (accounts against the cap, new and signed-in, documents and bytes, auth failures) and the newest-first account list. SELECTs only; never returns a full account id, a credential id or a document body. |
+| `src/http/admin.ts` | `adminRoutes` / `ADMIN_POLICIES` (#1717) — `GET /api/admin/overview`: the allowlist gate (every refusal is the unknown-route 404), then a no-query-string check and the route's own budget, both reached only by a listed account. |
 | `src/server.ts` | The only file that reads `process.env`. Builds config, opens the database, runs migrations, starts `@hono/node-server`, and closes the database on `SIGTERM`/`SIGINT`. |
 | `test/helpers/test-db.ts` | `createTestDatabase()` — a fresh on-disk (never `:memory:`, which can't hold WAL mode) SQLite file per test, migrated for real. |
 | `test/helpers/soft-authenticator.ts` | `createSoftAuthenticator({ rpId, origin })` — a software WebAuthn authenticator that builds real ES256 registration/assertion responses (`node:crypto` + `isoCBOR`/`isoBase64URL`) so ceremony tests exercise the actual library verify path, not a mock. Controllable origin, RP ID, UV flag, counter, `userHandle` and signing key pair. |
@@ -692,7 +694,8 @@ npm run build     # esbuild bundle -> dist/server.js (+ .map); see build.mjs —
 npm start         # node dist/server.js — needs ENSEMBLE_RP_ID, ENSEMBLE_RP_NAME, ENSEMBLE_ORIGIN,
                   # ENSEMBLE_DB_PATH (a file, never :memory:), ENSEMBLE_AUTH_IP_SECRET (>=32 bytes)
                   # optional PORT (8080), HOST (0.0.0.0), ENSEMBLE_REGISTRATION (closed),
-                  # ENSEMBLE_REGISTRATION_CAP (25); verified proxy configuration below
+                  # ENSEMBLE_REGISTRATION_CAP (25), ENSEMBLE_ADMIN_ACCOUNT_IDS (nobody);
+                  # verified proxy configuration below
 npm run dev       # tsx src/server.ts, development only
 ```
 
@@ -758,6 +761,15 @@ answers `403 registration_closed` from `register/options` and `register/verify` 
 guards and rate limits as every route) and changes nothing else — login, sessions, passkey
 management and recovery keep working for existing accounts. Both deployed stacks run closed until
 the product wires accounts in (phase 3 of the rollout); the flip is one env line plus a release.
+
+**The operator overview (#1717).** `GET /api/admin/overview` returns `readAdminOverview`'s
+counts to an account listed in `ENSEMBLE_ADMIN_ACCOUNT_IDS` (comma-separated ids, as
+`GET /api/auth/session` returns them) on a standard session. Everyone else — signed out, a
+recovery session, an account not on the list, any caller while the list is empty or unset — gets
+the same `404 not_found` an unknown route gets, so the route says nothing about itself. The list
+is deploy configuration, never a database row, so no write path in this service can grant it; an
+entry that is not a base64url id refuses to start. GET only: there is nothing to change from it.
+The app's page over it is `prototypes/v2/app/admin/`.
 
 **A service-wide registration cap backstops the per-owner storage caps (#1272 — DECISION
 2026-09-17 on #1256).** `MAX_BYTES_PER_OWNER` (`src/db/save.ts`, 256 MiB) bounds one account's

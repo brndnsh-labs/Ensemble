@@ -4,6 +4,7 @@ import { createWebAuthnConfig } from '../../src/auth/config.js';
 import { MAX_PASSKEYS } from '../../src/auth/passkeys.js';
 import { recordSecurityEvent } from '../../src/auth/security-events.js';
 import { assertAccountDeletionCoverage } from '../../src/db/account-deletion-registry.js';
+import { ADMIN_POLICIES } from '../../src/http/admin.js';
 import { createApp } from '../../src/http/app.js';
 import { AUTH_POLICIES, validAuthBody } from '../../src/http/auth-policy.js';
 import { createClientIdentity } from '../../src/http/client-identity.js';
@@ -60,7 +61,11 @@ describe('deny-by-default HTTP contracts', () => {
             .map((route) => `${route.method} ${route.path}`)
             .sort();
         expect(routes).toEqual(
-            [...Object.keys(AUTH_POLICIES), ...Object.keys(DOCUMENT_POLICIES)].sort(),
+            [
+                ...Object.keys(AUTH_POLICIES),
+                ...Object.keys(DOCUMENT_POLICIES),
+                ...Object.keys(ADMIN_POLICIES),
+            ].sort(),
         );
     });
     it.each(Object.keys(DOCUMENT_POLICIES))(

@@ -165,6 +165,13 @@ the API reads `open`/`closed` from its environment (unset means closed) and caps
 so whether a host takes sign-ups is a reviewed line in homelab-maintenance, never a value
 somebody set on the box and forgot.
 
+`ENSEMBLE_ADMIN_ACCOUNT_IDS` (#1717) is the opposite case on purpose: it names who can read
+`/admin`, which is a fact about a person's account rather than about the host, so it is NOT in
+the recipe. It lives in the stack's root-only `api.env` beside `ENSEMBLE_AUTH_IP_SECRET`, which
+the `env_file` above already loads; unset means nobody. Adding an id is one line in that file
+plus recreating the API container (`docker compose up -d --force-recreate <stack>-api`); the id
+is what `GET /api/auth/session` answers while that account is signed in.
+
 The Caddy handle for a host on the image imports **neither** `default_app_policy` nor
 `ensemble_cache_policy`: both replace upstream headers, and the image owns its cache and framing
 policy (`frame-ancestors 'none'` is stricter than the edge default; `X-Frame-Options` goes away

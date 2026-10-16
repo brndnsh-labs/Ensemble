@@ -1,0 +1,118 @@
+import type { DatabaseSync } from 'node:sqlite';
+
+/**
+ * The operator's read of the whole service (#1717): how many accounts exist against the sign-up
+ * cap, how much they store, and a list of them. Read-only by construction — this module runs
+ * SELECTs and nothing else — and scoped to nothing, which is why the route in front of it
+ * (`http/admin.ts`) is gated by a deploy-config allowlist rather than by anything in the database.
+ *
+ * It never returns a full account id, a credential id or a document body. An account appears as
+ * the first `SHORT_ID_LENGTH` characters of its id (enough to tell a handful apart, not enough to
+ * address one), and the caller's own row is marked `you` here, so the page never needs the id.
+ */
+
+const SHORT_ID_LENGTH = 8;
+/** The list is newest first and stops here; `listTruncated` says when it did. */
+export const MAX_ADMIN_ACCOUNT_ROWS = 200;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface AdminAccountRow {
+    shortId: string;
+    joinedAt: number;
+    /**
+     * The newest standard session's start: `readSession` writes nothing, so a sign-in is the last
+     * trace. Expired sessions are swept on every sign-in (`issueSession`), so `null` means "not in
+     * the last 30 days" (`SESSION_TTL_MS`), not "never" — registering always mints one.
+     */
+    lastSignInAt: number | null;
+    documents: number;
+    bytes: number;
+    passkeys: number;
+    you: boolean;
+}
+
+export interface AdminOverview {
+    accounts: {
+        total: number;
+        cap: number;
+        remaining: number;
+        newLast7Days: number;
+        newLast30Days: number;
+        signedInLast7Days: number;
+    };
+    documents: { total: number; bytes: number };
+    authFailuresLast24Hours: number;
+    list: AdminAccountRow[];
+    listTruncated: boolean;
+}
+
+function count(db: DatabaseSync, sql: string, ...params: number[]): number {
+    const row = db.prepare(sql).get(...params) as unknown as { n: number };
+    return row.n;
+}
+
+export function readAdminOverview(
+    db: DatabaseSync,
+    { cap, callerId, now }: { cap: number; callerId: string; now: number },
+): AdminOverview {
+    const total = count(db, 'SELECT COUNT(*) AS n FROM accounts');
+    const documents = db
+        .prepare(
+            'SELECT COUNT(*) AS total, COALESCE(SUM(length(CAST(body AS BLOB))), 0) AS bytes FROM documents',
+        )
+        .get() as unknown as { total: number; bytes: number };
+    // One row more than the page shows, so a full page can tell "exactly 200" from "more".
+    const rows = db
+        .prepare(
+            `SELECT a.id AS id,
+                    a.created_at AS joinedAt,
+                    (SELECT MAX(s.created_at) FROM sessions s
+                        WHERE s.account_id = a.id AND s.purpose = 'standard') AS lastSignInAt,
+                    (SELECT COUNT(*) FROM documents d WHERE d.owner_id = a.id) AS documents,
+                    (SELECT COALESCE(SUM(length(CAST(d.body AS BLOB))), 0) FROM documents d
+                        WHERE d.owner_id = a.id) AS bytes,
+                    (SELECT COUNT(*) FROM credentials c WHERE c.account_id = a.id) AS passkeys
+             FROM accounts a
+             ORDER BY a.created_at DESC, a.id
+             LIMIT ?`,
+        )
+        .all(MAX_ADMIN_ACCOUNT_ROWS + 1) as unknown as Array<
+        Omit<AdminAccountRow, 'shortId' | 'you'> & { id: string }
+    >;
+
+    return {
+        accounts: {
+            total,
+            cap,
+            remaining: Math.max(0, cap - total),
+            newLast7Days: count(
+                db,
+                'SELECT COUNT(*) AS n FROM accounts WHERE created_at >= ?',
+                now - 7 * DAY_MS,
+            ),
+            newLast30Days: count(
+                db,
+                'SELECT COUNT(*) AS n FROM accounts WHERE created_at >= ?',
+                now - 30 * DAY_MS,
+            ),
+            signedInLast7Days: count(
+                db,
+                "SELECT COUNT(DISTINCT account_id) AS n FROM sessions WHERE purpose = 'standard' AND created_at >= ?",
+                now - 7 * DAY_MS,
+            ),
+        },
+        documents: { total: documents.total, bytes: documents.bytes },
+        authFailuresLast24Hours: count(
+            db,
+            "SELECT COUNT(*) AS n FROM auth_security_events WHERE event = 'auth_failure' AND created_at >= ?",
+            now - DAY_MS,
+        ),
+        list: rows.slice(0, MAX_ADMIN_ACCOUNT_ROWS).map(({ id, ...row }) => ({
+            shortId: id.slice(0, SHORT_ID_LENGTH),
+            ...row,
+            you: id === callerId,
+        })),
+        listTruncated: rows.length > MAX_ADMIN_ACCOUNT_ROWS,
+    };
+}
