@@ -26,14 +26,18 @@ function manySongs(count: number) {
 }
 
 /**
- * Counts full reads of the guest songbook from outside the app (#1441 review P3): `repository.list`
- * is the one caller of `getAll()` on the guest `documents` store, and the home's own reads are
- * `get`, `count` and a cursor. Installed before the app's scripts run.
+ * Counts full reads of the guest songbook from outside the app (#1441 review P3): `getAll()` on the
+ * guest `documents` store is a whole-songbook read (`repository.list`, and since #1738 the
+ * "Upgrade old songs" scan's `listReadable`), and the home's own reads are `get`, `count` and a
+ * cursor. Each is also counted apart when it happens before the home's rows are on screen — the
+ * claim #1441 makes is that the home never WAITS on one; #1738's scan runs only after the home
+ * has rendered. Installed before the app's scripts run.
  */
 async function countFullReads(page: Page): Promise<void> {
     await page.addInitScript(() => {
-        const w = window as unknown as { __fullReads: number };
+        const w = window as unknown as { __fullReads: number; __readsBeforeRows: number };
         w.__fullReads = 0;
+        w.__readsBeforeRows = 0;
         const getAll = IDBObjectStore.prototype.getAll;
         IDBObjectStore.prototype.getAll = function (
             this: IDBObjectStore,
@@ -41,6 +45,9 @@ async function countFullReads(page: Page): Promise<void> {
         ) {
             if (this.name === 'documents') {
                 w.__fullReads += 1;
+                if (!document.querySelector('.home-table .song-row')) {
+                    w.__readsBeforeRows += 1;
+                }
             }
             return getAll.apply(this, args);
         };
@@ -49,6 +56,12 @@ async function countFullReads(page: Page): Promise<void> {
 
 function fullReads(page: Page): Promise<number> {
     return page.evaluate(() => (window as unknown as { __fullReads: number }).__fullReads);
+}
+
+function readsBeforeRows(page: Page): Promise<number> {
+    return page.evaluate(
+        () => (window as unknown as { __readsBeforeRows: number }).__readsBeforeRows,
+    );
 }
 
 /** What the phone and desktop must never do at the page level. */
@@ -67,8 +80,9 @@ test('the home renders its rows without a full-library read', async ({ page }) =
     await seedGuestDocuments(page, [...manySongs(12), corrupt]);
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     await expect(page.locator('.home-table .song-row')).toHaveCount(8);
-    // The seam, counted: the home rendered its rows and nothing read the whole songbook.
-    expect(await fullReads(page)).toBe(0);
+    // The seam, counted: the home rendered its rows and nothing read the whole songbook first.
+    // (These songs are in the old format, so #1738's upgrade scan reads them all — after.)
+    expect(await readsBeforeRows(page)).toBe(0);
     // The count is IndexedDB's own — the corrupt song is still one of the thirteen.
     await expect(page.getByTestId('all-songs-link')).toHaveText('All 13 songs →');
     await expect(page.getByTestId('home-unreadable')).toHaveCount(0);

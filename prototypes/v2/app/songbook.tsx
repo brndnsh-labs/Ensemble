@@ -15,6 +15,7 @@ import {
     type StandardEntry,
     type StandardShelf,
 } from '../lib/standards';
+import { UpgradeCard, type UpgradeOffer } from './upgrade-card';
 
 /** The Continue card's display facts (#1441) — always one of the musician's own songs. */
 export interface FeaturedSummary {
@@ -168,6 +169,14 @@ interface SongbookProps {
     v1Present: boolean;
     /** The song menu's permanent way back into the v1 import, from the first-visit card. */
     onOpenV1Import: () => void;
+    /**
+     * "Upgrade old songs" (#1738): null while there is nothing in the old format here and no
+     * outcome to show — the card is never on the page then.
+     */
+    upgrade: UpgradeOffer | null;
+    /** The upgrade scan has landed (#1738), published as `data-upgrade-scan` for checks. */
+    upgradeSettled: boolean;
+    upgradeActions: Omit<Parameters<typeof UpgradeCard>[0], 'offer' | 'busy'>;
     /** Per-device star set (#1440) — same source the row ⋯ menu's Star/Unstar writes through. */
     starred: ReadonlySet<string>;
     onToggleStar: (id: string) => void;
@@ -202,6 +211,7 @@ export function Songbook(props: SongbookProps) {
         featured,
         search,
         v1Import,
+        upgrade,
         busy,
         offline,
     } = props;
@@ -234,6 +244,7 @@ export function Songbook(props: SongbookProps) {
             // A positive "no more v1 offer is coming" signal (#1441 review P2): the offer's plan
             // waits on a lazy whole-songbook read, so "no card yet" alone proves nothing.
             data-v1-plan={props.v1PlanSettled ? 'settled' : 'pending'}
+            data-upgrade-scan={props.upgradeSettled ? 'settled' : 'pending'}
         >
             {firstVisitIntro ? (
                 <p className="home-library" data-testid="library-heading">
@@ -313,6 +324,7 @@ export function Songbook(props: SongbookProps) {
                     onDismiss={props.onDismissV1}
                 />
             )}
+            {upgrade && <UpgradeCard offer={upgrade} busy={busy} {...props.upgradeActions} />}
             {query ? (
                 <SearchResults
                     query={query}

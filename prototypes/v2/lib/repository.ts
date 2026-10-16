@@ -102,6 +102,38 @@ export async function list(): Promise<ChartDocument[]> {
 }
 
 /**
+ * Every song, for "Upgrade old songs" (#1738), with what does not validate left out and counted —
+ * `list()`'s read, minus its refusal of a songbook it cannot wholly read: one corrupt row must not
+ * stop the others being upgraded, and the upgrade never writes a row it could not read.
+ */
+export async function listReadable(pace?: {
+    shouldYield: () => boolean;
+    yieldNow: () => Promise<void>;
+}): Promise<{ documents: ChartDocument[]; unreadable: number }> {
+    const db = await open();
+    const rows = await new Promise<unknown[]>((resolve, reject) => {
+        const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
+        request.onerror = () => reject(new Error('Unable to read your local songbook.'));
+        request.onsuccess = () => resolve(request.result);
+    });
+    // Validated after the transaction, in slices when paced: validation is most of what a whole
+    // songbook costs to read (#1442's profile), and this read runs behind the home page.
+    const documents: ChartDocument[] = [];
+    let unreadable = 0;
+    for (const row of rows) {
+        try {
+            documents.push(validated(row));
+        } catch {
+            unreadable += 1;
+        }
+        if (pace?.shouldYield()) {
+            await pace.yieldNow();
+        }
+    }
+    return { documents, unreadable };
+}
+
+/**
  * What the songbook home shows, without reading the whole songbook (#1441): the store's `count()`,
  * the Continue document and the recently opened ones by id, and — only when fewer than
  * `request.rows` of those exist — a bounded cursor fill (`HomeRead.fill`). One read-only
@@ -422,6 +454,95 @@ export function recoveryFor(
     return record
         ? { document: record.document, conflict: record.document.revision !== document.revision }
         : null;
+}
+
+/** One recovery slot as stored, for "Upgrade old songs" (#1738). `raw` is its exact bytes. */
+export interface RecoverySlot {
+    key: string;
+    writerId: string;
+    documentId: string;
+    capturedAt: string;
+    document: ChartDocument;
+    raw: string;
+}
+
+/**
+ * Every writer's recovery slot on this device, for every song (#1738) — the upgrade has to find
+ * the old-format drafts wherever they are, not only the ones a song on the stand would offer. A
+ * slot that does not read is counted and left exactly where it is, as `recoveriesFor` leaves it.
+ */
+export function recoverySlots(): { slots: RecoverySlot[]; unreadable: number } {
+    const slots: RecoverySlot[] = [];
+    let unreadable = 0;
+    const keys: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key?.startsWith(RECOVERY)) {
+            keys.push(key);
+        }
+    }
+    for (const key of keys) {
+        const raw = localStorage.getItem(key);
+        // `${RECOVERY}${writer}:${id}`: a writer id is a UUID (or `unavailable`), never a colon.
+        const rest = key.slice(RECOVERY.length);
+        const split = rest.indexOf(':');
+        try {
+            if (!raw || raw.length > 1_100_000 || split < 1) {
+                throw new Error('unreadable');
+            }
+            const record = JSON.parse(raw);
+            const document = validated(record.document);
+            const documentId = rest.slice(split + 1);
+            if (
+                document.id !== documentId ||
+                typeof record.capturedAt !== 'string' ||
+                !Number.isFinite(Date.parse(record.capturedAt))
+            ) {
+                throw new Error('unreadable');
+            }
+            slots.push({
+                key,
+                writerId: rest.slice(0, split),
+                documentId,
+                capturedAt: record.capturedAt,
+                document,
+                raw,
+            });
+        } catch {
+            unreadable += 1;
+        }
+    }
+    return { slots, unreadable };
+}
+
+/**
+ * Rewrite one recovery slot in place (#1738) — the same key, so the same writer, and the same
+ * `capturedAt`, so it stays exactly as live or as dead as it was — or retire it (`null`). Only if
+ * the slot still holds the bytes it was read with: a tab that captured it again since wins, and
+ * nothing is written. Never a live slot: the caller's rule (`lib/upgrade.ts`) checks that against
+ * the committed song, and a draft retained after this read is new bytes, which this refuses.
+ */
+export function replaceRecoverySlot(slot: RecoverySlot, next: ChartDocument | null): boolean {
+    if (localStorage.getItem(slot.key) !== slot.raw) {
+        return false;
+    }
+    if (next === null) {
+        localStorage.removeItem(slot.key);
+        return true;
+    }
+    const document = validated(next);
+    if (document.id !== slot.documentId) {
+        throw new Error('A draft cannot move to another song.');
+    }
+    const json = JSON.stringify({ capturedAt: slot.capturedAt, document });
+    if (new TextEncoder().encode(json).byteLength > 1_048_576) {
+        throw new Error('This draft is too large for preview recovery');
+    }
+    localStorage.setItem(slot.key, json);
+    if (localStorage.getItem(slot.key) !== json) {
+        throw new Error('Unable to verify the upgraded draft. The old one may still be there.');
+    }
+    return true;
 }
 
 export function clearOwnRecovery(id: string): void {

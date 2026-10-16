@@ -2262,6 +2262,84 @@ export class AccountSongbook {
         });
     }
 
+    /**
+     * Every retained draft this owner has here, every song and every writer, live or not —
+     * what "Upgrade old songs" (#1738) has to find the old-format ones among. A row that does not
+     * read is counted and left alone rather than failing the rest, as a home read treats a song.
+     */
+    async allDrafts(scope: AccountScope): Promise<{ drafts: Draft[]; unreadable: number }> {
+        scope = copyScope(scope);
+        return this.database.run('readonly', scope, (tx) => {
+            // `clearAccount`'s owner bound: it stops at this owner's last row.
+            const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+            tx.read(tx.table('drafts').getAll(owned), (rows: Draft[]) => {
+                const drafts: Draft[] = [];
+                let unreadable = 0;
+                for (const row of rows) {
+                    try {
+                        drafts.push(savedDraft(row, scope, row?.documentId));
+                    } catch {
+                        unreadable += 1;
+                    }
+                }
+                tx.finish({ drafts, unreadable });
+            });
+        });
+    }
+
+    /**
+     * Rewrite one retained draft in place (`next`), or retire it (`null`) — #1738's draft half,
+     * and never a Save: the row keeps its writer, its `baseRevision` and its `capturedAt`, so it is
+     * exactly as live or as dead as it was, and nothing is queued or sent.
+     *
+     * ONE transaction, compare-and-swapped twice. `'changed'` when the row is gone or was captured
+     * again since the caller read it (`capturedAt` moved): that writer's newer text wins. `'live'`
+     * when the row is a live draft of a saved song (`liveDraft`'s rule): unsaved work is the
+     * musician's to Save or discard, never this method's to rewrite. A row whose song this device
+     * does not hold is not refused — nothing here can tell its live from its dead, and a rewrite
+     * that keeps the music is the safe direction for it.
+     */
+    async replaceDraft(
+        scope: AccountScope,
+        draft: { documentId: string; writerId: string; capturedAt: string },
+        next: unknown,
+    ): Promise<'replaced' | 'changed' | 'live'> {
+        scope = copyScope(scope);
+        const { documentId, writerId, capturedAt } = draft;
+        identifier(documentId);
+        identifier(writerId);
+        const document = next === null ? null : snapshot(next);
+        if (document && document.id !== documentId) {
+            throw new Error('A draft cannot move to another song.');
+        }
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.read(
+                tx.table('songs').get([scope.ownerId, documentId]),
+                (song: SavedSong | undefined) => {
+                    const saved = song ? savedSong(song, scope, documentId) : null;
+                    tx.read(
+                        tx.table('drafts').get([scope.ownerId, documentId, writerId]),
+                        (row: Draft | undefined) => {
+                            if (!row || row.capturedAt !== capturedAt) {
+                                return tx.finish('changed');
+                            }
+                            if (saved && liveDraft(row, saved)) {
+                                return tx.finish('live');
+                            }
+                            const key = [scope.ownerId, documentId, writerId];
+                            if (document === null) {
+                                tx.table('drafts').delete(key);
+                            } else {
+                                tx.table('drafts').put({ ...row, document } satisfies Draft);
+                            }
+                            tx.finish('replaced');
+                        },
+                    );
+                },
+            );
+        });
+    }
+
     async prepare(
         scope: AccountScope,
         documentId: string,

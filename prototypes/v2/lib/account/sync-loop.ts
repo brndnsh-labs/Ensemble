@@ -870,6 +870,32 @@ export interface SyncLoop {
         owner?: string | null,
     ): Promise<Map<string, ChartDocument>>;
     /**
+     * Every retained draft this account has on this device, every song and every writer, live or
+     * not (`AccountSongbook.allDrafts`) — what "Upgrade old songs" (#1738) finds old-format drafts
+     * among. Scoped like `listLibrary`.
+     */
+    listDrafts(owner?: string | null): Promise<{ drafts: Draft[]; unreadable: number }>;
+    /**
+     * Rewrite one retained draft in place, or retire it (`null`), never a live one
+     * (`AccountSongbook.replaceDraft`). #1738's draft half: purely local, nothing queued or sent.
+     * Fenced on `owner` like every write here.
+     */
+    replaceDraft(
+        draft: { documentId: string; writerId: string; capturedAt: string },
+        next: ChartDocument | null,
+        owner: string | null,
+    ): Promise<'replaced' | 'changed' | 'live'>;
+    /**
+     * The state of one song's outbox head here: nothing queued, an ordinary queue, or a head the
+     * account refused (`conflict`, `refused`) that only Keep both or a fresh Save moves. What
+     * "Upgrade old songs" (#1738) asks before it Saves, so it never queues behind — or retires —
+     * a queue the musician has to resolve. Scoped like `listLibrary`.
+     */
+    saveQueue(
+        documentId: string,
+        owner?: string | null,
+    ): Promise<'empty' | 'queued' | 'conflict' | 'refused'>;
+    /**
      * Drop this writer's retained experiment, once a Save has committed what it held.
      *
      * Takes the `owner` for the reason every write here does (#1311 patch): a delete keyed by
@@ -1903,6 +1929,16 @@ export function createSyncLoop(
                 }
             }
             return held;
+        },
+        async listDrafts(owner = null) {
+            return songbook.allDrafts(await heldScope(owner));
+        },
+        async replaceDraft(draft, next, owner) {
+            return songbook.replaceDraft(await ownedScope(owner), draft, next);
+        },
+        async saveQueue(documentId, owner = null) {
+            const head = (await songbook.pending(await heldScope(owner), documentId))[0];
+            return head ? head.status : 'empty';
         },
         async discardDraft(documentId, owner) {
             await songbook.discardDraft(await ownedScope(owner), documentId, writerId);
