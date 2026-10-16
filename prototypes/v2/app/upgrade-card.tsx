@@ -1,14 +1,11 @@
 import { useEffect, useRef } from 'react';
-import {
-    UPGRADE_SKIPS,
-    type UpgradeNote,
-    type UpgradeOutcome,
-    type UpgradeStoreKind,
-} from '../lib/upgrade';
+import type { UpgradeNote, UpgradeOutcome, UpgradePlan, UpgradeStoreKind } from '../lib/upgrade';
 
 /**
  * "Upgrade old songs" (#1738) as the songbook home shows it. Counts and copy only; the shell owns
- * the plan, the backup and the run (`app/ensemble.tsx`, `lib/upgrade.ts`).
+ * the plan, the backup and the run (`app/ensemble.tsx`, `app/use-upgrade.ts`, `lib/upgrade.ts`).
+ * It is on the page while ANYTHING old is stored on this device — upgradable or not — so its
+ * absence means there is nothing old left here.
  */
 export interface UpgradeOffer {
     /** `idle` offers the upgrade; `backup` is the step before it; `done` shows the outcome. */
@@ -17,12 +14,14 @@ export interface UpgradeOffer {
     songs: number;
     /** Old-format unsaved drafts, here. */
     drafts: number;
+    /** Old rows that will not read, by id and reason. */
+    unreadable: UpgradePlan['unreadable'];
+    /** Songbooks that could not be read at all. */
+    failures: UpgradePlan['failures'];
     /** Signed in: the account's songs upload as each is upgraded. */
     account: boolean;
-    /** How many files the backup wrote, once it has; null before. */
-    backedUp: number | null;
-    /** How many files the backup would write. */
-    backupFiles: number;
+    /** The backup file was written in this backup step. */
+    backedUp: boolean;
     progress: { done: number; total: number } | null;
     outcome: UpgradeOutcome | null;
     /** Which store "Open" can reach: the live songbook's. */
@@ -55,6 +54,19 @@ function where(note: UpgradeNote): string {
     return place || text ? `${place}${text}: ` : '';
 }
 
+function Notes({ notes }: { notes: readonly UpgradeNote[] }) {
+    return (
+        <ul>
+            {keyed(notes, noteKey).map(([key, note]) => (
+                <li key={key}>
+                    {where(note)}
+                    {note.message}
+                </li>
+            ))}
+        </ul>
+    );
+}
+
 export function UpgradeCard({
     offer,
     busy,
@@ -83,7 +95,8 @@ export function UpgradeCard({
         }
         phase.current = offer.phase;
     }, [offer.phase]);
-    const count = offer.songs + offer.drafts;
+    const upgradable = offer.songs + offer.drafts;
+    const count = upgradable + offer.unreadable.length + offer.failures.length;
     const { outcome } = offer;
     const openButton = (store: UpgradeStoreKind, id: string, label: string, section?: number) =>
         store === offer.openable ? (
@@ -98,19 +111,43 @@ export function UpgradeCard({
         ) : (
             <span className="upgrade-elsewhere">
                 {' '}
-                (in this device’s guest songbook: sign out to open it)
+                (in this device’s {store === 'guest' ? 'guest' : 'account'} songbook: switch to it
+                to open it)
             </span>
         );
     const headingText =
         offer.phase === 'done'
-            ? outcome?.upgraded.length
-                ? `Upgraded ${plural(outcome.upgraded.length, 'song')}`
-                : 'Nothing was upgraded'
+            ? count > 0
+                ? `${plural(count, 'item')} left in the old format — open each to fix`
+                : outcome?.upgraded.length
+                  ? `Upgraded ${plural(outcome.upgraded.length, 'song')}`
+                  : 'Nothing old is left here'
             : offer.phase === 'backup'
               ? 'First, a backup'
               : offer.phase === 'running'
                 ? 'Upgrading old songs…'
                 : `Upgrade old songs (${count})`;
+    const unreadableList = offer.unreadable.length > 0 && (
+        <div data-testid="upgrade-unreadable">
+            <h3>Can’t be read, so can’t be upgraded</h3>
+            <ul className="import-problems">
+                {keyed(offer.unreadable, (row) => `${row.store}:${row.kind}:${row.id}`).map(
+                    ([key, row]) => (
+                        <li key={key}>
+                            {row.kind === 'draft' ? 'Unsaved draft of ' : 'Song '}
+                            <code>{row.id}</code> ({row.store === 'account' ? 'account' : 'guest'}{' '}
+                            songbook) — {row.reason}
+                        </li>
+                    ),
+                )}
+            </ul>
+        </div>
+    );
+    const failureList = offer.failures.map((failure) => (
+        <p key={failure.store} className="library-notice">
+            {`Couldn’t read the ${failure.store === 'account' ? 'account' : 'guest'} songbook: ${failure.message}`}
+        </p>
+    ));
     return (
         <section
             className="home-card import-card upgrade-card"
@@ -124,38 +161,54 @@ export function UpgradeCard({
             </h2>
             {offer.phase === 'idle' && (
                 <>
-                    <p>
-                        {offer.songs > 0
-                            ? `${plural(offer.songs, 'song')} here ${offer.songs === 1 ? 'is' : 'are'} saved in the old format`
-                            : 'No songs here are in the old format'}
-                        {offer.drafts > 0
-                            ? `, ${offer.songs > 0 ? 'and ' : 'but '}${plural(offer.drafts, 'unsaved draft')} ${offer.drafts === 1 ? 'is' : 'are'}`
-                            : ''}
-                        .
-                    </p>
-                    <p>
-                        Upgrading rewrites each one in place as a bar-by-bar chart: the same song,
-                        saved as a new version
-                        {offer.account ? ' and uploaded to your account' : ''}. A song that can’t be
-                        converted, or has unsaved changes, is left exactly as it is and listed.
-                        You’re offered a backup first.
-                    </p>
-                    <div className="import-actions">
-                        <button className="btn primary" disabled={busy} onClick={onStart}>
-                            Upgrade old songs…
-                        </button>
-                    </div>
+                    {upgradable > 0 && (
+                        <p>
+                            {offer.songs > 0
+                                ? `${plural(offer.songs, 'song')} here ${offer.songs === 1 ? 'is' : 'are'} saved in the old format`
+                                : 'No songs here are in the old format'}
+                            {offer.drafts > 0
+                                ? `, ${offer.songs > 0 ? 'and ' : 'but '}${plural(offer.drafts, 'unsaved draft')} ${offer.drafts === 1 ? 'is' : 'are'}`
+                                : ''}
+                            .
+                        </p>
+                    )}
+                    {failureList}
+                    {unreadableList}
+                    {upgradable > 0 && (
+                        <>
+                            <p>
+                                Upgrading rewrites each one in place as a bar-by-bar chart: the same
+                                song, with the same last-edited date, saved as a new version
+                                {offer.account ? ' and uploaded to your account' : ''}. A song that
+                                can’t be converted, or has unsaved changes, is left exactly as it is
+                                and listed. No draft is ever deleted. You’re offered a backup file
+                                first.
+                            </p>
+                            <p>
+                                <strong>Close Ensemble in other tabs first.</strong>
+                            </p>
+                            <div className="import-actions">
+                                <button className="btn primary" disabled={busy} onClick={onStart}>
+                                    Upgrade old songs…
+                                </button>
+                            </div>
+                        </>
+                    )}
                 </>
             )}
             {offer.phase === 'backup' && (
                 <>
                     <p>
-                        {offer.backedUp === null
-                            ? `Download every song in ${offer.account ? 'these songbooks' : 'this songbook'}, and the old drafts, as ${plural(offer.backupFiles, 'file')} on this device, as they are now — before anything is rewritten.`
-                            : `Downloaded ${plural(offer.backedUp, 'file')}. Check they’re in your downloads, then upgrade.`}
+                        {offer.backedUp
+                            ? 'Check the backup file is in your downloads before going on: it is the only copy of these songs as they are now.'
+                            : `One file, before anything is touched: an archive of the ${plural(offer.songs, 'song')}${offer.drafts ? ` and ${plural(offer.drafts, 'unsaved draft')}` : ''} this will change, each exactly as stored now. It is readable JSON.`}
                     </p>
                     <div className="import-actions">
-                        {offer.backedUp === null ? (
+                        {offer.backedUp ? (
+                            <button className="btn primary" disabled={busy} onClick={onRun}>
+                                I have the file — upgrade now
+                            </button>
+                        ) : (
                             <>
                                 <button className="btn primary" disabled={busy} onClick={onBackup}>
                                     Download backup
@@ -164,10 +217,6 @@ export function UpgradeCard({
                                     Upgrade without a backup
                                 </button>
                             </>
-                        ) : (
-                            <button className="btn primary" disabled={busy} onClick={onRun}>
-                                Upgrade now
-                            </button>
                         )}
                         <button className="btn" disabled={busy} onClick={onCancel}>
                             Cancel
@@ -180,34 +229,30 @@ export function UpgradeCard({
                     ? `Upgraded ${offer.progress.done} of ${offer.progress.total}`
                     : ''}
             </p>
-            {offer.phase === 'done' && outcome && (
+            {offer.phase === 'done' && (
                 <>
-                    {outcome.failures.map((failure) => (
-                        <p key={failure.store} className="library-notice">
-                            {`Couldn’t read the ${failure.store === 'account' ? 'account' : 'guest'} songbook: ${failure.message}`}
-                        </p>
-                    ))}
-                    {outcome.changed.length > 0 && (
+                    {outcome && outcome.upgraded.length > 0 && count > 0 && (
+                        <p data-testid="upgrade-done-count">{`Upgraded ${plural(outcome.upgraded.length, 'song')}.`}</p>
+                    )}
+                    {failureList}
+                    {outcome && outcome.changed.length > 0 && (
                         <div data-testid="upgrade-changed">
                             <h3>Upgraded with changes</h3>
                             <ul className="import-problems">
-                                {outcome.changed.map((entry) => (
-                                    <li key={`${entry.store}:${entry.id}`}>
+                                {keyed(
+                                    outcome.changed,
+                                    (entry) => `${entry.store}:${entry.id}:${entry.draft}`,
+                                ).map(([key, entry]) => (
+                                    <li key={key}>
                                         <strong>{entry.title}</strong>
-                                        <ul>
-                                            {keyed(entry.notes, noteKey).map(([key, note]) => (
-                                                <li key={key}>
-                                                    {where(note)}
-                                                    {note.message}
-                                                </li>
-                                            ))}
-                                        </ul>
+                                        {entry.draft ? ' (unsaved draft)' : ''}
+                                        <Notes notes={entry.notes} />
                                     </li>
                                 ))}
                             </ul>
                         </div>
                     )}
-                    {outcome.refused.length > 0 && (
+                    {outcome && outcome.refused.length > 0 && (
                         <div data-testid="upgrade-refused">
                             <h3>Couldn’t be upgraded — fix the chart, then upgrade again</h3>
                             <ul className="import-problems">
@@ -222,20 +267,13 @@ export function UpgradeCard({
                                                 (reason) => reason.sectionIndex !== undefined,
                                             )?.sectionIndex,
                                         )}
-                                        <ul>
-                                            {keyed(entry.reasons, noteKey).map(([key, reason]) => (
-                                                <li key={key}>
-                                                    {where(reason)}
-                                                    {reason.message}
-                                                </li>
-                                            ))}
-                                        </ul>
+                                        <Notes notes={entry.reasons} />
                                     </li>
                                 ))}
                             </ul>
                         </div>
                     )}
-                    {outcome.skipped.length > 0 && (
+                    {outcome && outcome.skipped.length > 0 && (
                         <div data-testid="upgrade-skipped">
                             <h3>Left as they are</h3>
                             <ul className="import-problems">
@@ -248,22 +286,11 @@ export function UpgradeCard({
                             </ul>
                         </div>
                     )}
-                    {(outcome.draftsConverted > 0 ||
-                        outcome.draftsRetired > 0 ||
-                        outcome.draftsKept.length > 0) && (
+                    {outcome && (outcome.draftsConverted > 0 || outcome.draftsKept.length > 0) && (
                         <div data-testid="upgrade-drafts">
-                            <p>
-                                {[
-                                    outcome.draftsConverted
-                                        ? `${plural(outcome.draftsConverted, 'old draft')} converted`
-                                        : null,
-                                    outcome.draftsRetired
-                                        ? `${plural(outcome.draftsRetired, 'old draft')} that couldn’t be converted removed (they’re in your backup)`
-                                        : null,
-                                ]
-                                    .filter(Boolean)
-                                    .join('; ')}
-                            </p>
+                            {outcome.draftsConverted > 0 && (
+                                <p>{`${plural(outcome.draftsConverted, 'old unsaved draft')} converted in place.`}</p>
+                            )}
                             {outcome.draftsKept.length > 0 && (
                                 <ul className="import-problems">
                                     {keyed(
@@ -271,28 +298,30 @@ export function UpgradeCard({
                                         (entry) => `${entry.store}:${entry.id}:${entry.reason}`,
                                     ).map(([key, entry]) => (
                                         <li key={key}>
-                                            <strong>{entry.title}</strong> (draft) — {entry.reason}
-                                            {entry.reason === UPGRADE_SKIPS.draftLive && (
-                                                <>
-                                                    {' '}
-                                                    {openButton(entry.store, entry.id, entry.title)}
-                                                </>
-                                            )}
+                                            <strong>{entry.title}</strong> (unsaved draft) —{' '}
+                                            {entry.reason}{' '}
+                                            {entry.openable &&
+                                                openButton(entry.store, entry.id, entry.title)}
+                                            {entry.reasons && <Notes notes={entry.reasons} />}
                                         </li>
                                     ))}
                                 </ul>
                             )}
                         </div>
                     )}
-                    {count > 0 && (
-                        <p data-testid="upgrade-remaining">
-                            {`${plural(count, 'item')} still in the old format.`}
-                        </p>
-                    )}
+                    {unreadableList}
                     <div className="import-actions">
-                        <button className="btn" disabled={busy} onClick={onDone}>
-                            Done
-                        </button>
+                        {count > 0 ? (
+                            offer.songs + offer.drafts > 0 && (
+                                <button className="btn" disabled={busy} onClick={onStart}>
+                                    Upgrade again…
+                                </button>
+                            )
+                        ) : (
+                            <button className="btn" disabled={busy} onClick={onDone}>
+                                Done
+                            </button>
+                        )}
                     </div>
                 </>
             )}

@@ -569,6 +569,19 @@ export function heldByAccount(
  * (#1477). Its sentence is the one a song Save at the cap is answered with (`SYNC_MESSAGES.quota`'s
  * remedy), minus "Saved on this device" — nothing was.
  */
+/**
+ * Why an upgrade Save (`AccountSongbook.save` with `upgrade`, #1738) wrote nothing: a live draft
+ * (`unsaved`), a conflicted or refused outbox head (`refused`), an account version waiting
+ * (`waiting`) or a frozen delete (`deleting`). Decided inside the Save's own transaction.
+ */
+export class UpgradeSaveRefused extends Error {
+    readonly reason: 'unsaved' | 'refused' | 'waiting' | 'deleting';
+    constructor(reason: 'unsaved' | 'refused' | 'waiting' | 'deleting') {
+        super(`Upgrade refused: ${reason}.`);
+        this.reason = reason;
+    }
+}
+
 export class CollectionCapError extends Error {
     constructor() {
         super(
@@ -1919,11 +1932,28 @@ export class AccountSongbook {
         });
     }
 
+    /**
+     * Commit a version locally and queue it. `upgrade` (#1738, "Upgrade old songs", and nothing
+     * else) changes four things, all inside this one transaction:
+     * - the document's own `updatedAt` is kept (an upgrade is not an edit, and the songbook orders
+     *   by it); the revision still advances and the queued Save is an ordinary one;
+     * - it aborts with `UpgradeSaveRefused` when the song has a LIVE draft (`liveDraft`), an
+     *   outbox head that is not plainly queued (conflicted or refused: that is the musician's to
+     *   resolve, and an ordinary Save would retire a refused queue), an account version waiting
+     *   beside it, or a frozen delete — all read here, so nothing can slip in between a check and
+     *   the write;
+     * - no draft row is swept: the upgrade never deletes a draft.
+     */
     async save(
         scope: AccountScope,
         candidate: unknown,
         expected: number | null,
+        options: { upgrade?: boolean } = {},
     ): Promise<SavedSong> {
+        const upgrade = options.upgrade === true;
+        if (upgrade && expected === null) {
+            throw new Error('An upgrade rewrites a saved song; it never creates one.');
+        }
         scope = copyScope(scope);
         const document = snapshot(candidate);
         localRevision(expected);
@@ -1957,6 +1987,45 @@ export class AccountSongbook {
                         throw new LocalRevisionError();
                     }
                     operations(tx, scope, document.id, (queue) => {
+                        if (!upgrade) {
+                            commit(queue);
+                            return;
+                        }
+                        if (queue[0] && queue[0].status !== 'queued') {
+                            throw new UpgradeSaveRefused('refused');
+                        }
+                        const key = [scope.ownerId, document.id];
+                        tx.read(
+                            tx.table('meta').get(candidateKey(scope.ownerId, document.id)),
+                            (waiting: unknown) => {
+                                if (waiting !== undefined) {
+                                    throw new UpgradeSaveRefused('waiting');
+                                }
+                                tx.read(
+                                    tx.table('meta').get(deletionKey(scope.ownerId, document.id)),
+                                    (deleting: unknown) => {
+                                        if (deleting !== undefined) {
+                                            throw new UpgradeSaveRefused('deleting');
+                                        }
+                                        tx.read(
+                                            tx.table('drafts').index('song').getAll(key),
+                                            (rows: Draft[]) => {
+                                                if (
+                                                    rows.some((row) =>
+                                                        liveDraft(row, previous ?? null),
+                                                    )
+                                                ) {
+                                                    throw new UpgradeSaveRefused('unsaved');
+                                                }
+                                                commit(queue);
+                                            },
+                                        );
+                                    },
+                                );
+                            },
+                        );
+                    });
+                    function commit(queue: SaveOperation[]) {
                         // A refused HEAD (#1298) is a verdict on bytes a retry cannot change: the
                         // account has answered about THESE bytes and will answer the same way
                         // forever, so a fresh Save of this same document is a request it has never
@@ -1988,7 +2057,7 @@ export class AccountSongbook {
                             ...document,
                             revision: expected === null ? 0 : expected + 1,
                             createdAt: previous?.document.createdAt ?? now,
-                            updatedAt: now,
+                            updatedAt: upgrade ? document.updatedAt : now,
                         });
                         const song: SavedSong = {
                             ownerId: scope.ownerId,
@@ -2014,6 +2083,10 @@ export class AccountSongbook {
                         }
                         tx.table('songs').put(song);
                         tx.table('operations').add(operation);
+                        if (upgrade) {
+                            tx.finish(song);
+                            return;
+                        }
                         // EVERY writer's superseded rows go with the commit (#1299 patch review
                         // P1), not only the saving writer's. A row captured before the version
                         // just written is one `liveDraft` will never count or offer again, so
@@ -2043,7 +2116,7 @@ export class AccountSongbook {
                                 tx.finish(song);
                             },
                         );
-                    });
+                    }
                 },
             );
         });
@@ -2263,23 +2336,91 @@ export class AccountSongbook {
     }
 
     /**
+     * One page of this owner's songs for "Upgrade old songs" (#1738), where a row that does not
+     * read is reported (id, reason, and its raw `document` for the old-format judgement) rather
+     * than failing the page as `list` does: the upgrade must list it, and must not be stopped by
+     * it. Same owner bound and id cursor as `list`.
+     */
+    async upgradePage(
+        scope: AccountScope,
+        afterDocumentId: string | undefined,
+        limit: number,
+    ): Promise<{
+        /** Each readable song, with its stored document exactly as read (`stored`). */
+        songs: Array<{ song: SavedSong; stored: unknown }>;
+        unreadable: Array<{ documentId: string; reason: string; document: unknown }>;
+        nextAfterDocumentId: string | null;
+    }> {
+        scope = copyScope(scope);
+        if (afterDocumentId !== undefined) {
+            identifier(afterDocumentId);
+        }
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT) {
+            throw new Error(`List limit must be an integer between 1 and ${MAX_LIST_LIMIT}.`);
+        }
+        return this.database.run('readonly', scope, (tx) => {
+            const range = IDBKeyRange.bound(
+                afterDocumentId === undefined ? [scope.ownerId] : [scope.ownerId, afterDocumentId],
+                [scope.ownerId, []],
+                afterDocumentId !== undefined,
+                true,
+            );
+            tx.read(tx.table('songs').getAll(range, limit + 1), (rows: SavedSong[]) => {
+                const window = rows.slice(0, limit);
+                const songs: Array<{ song: SavedSong; stored: unknown }> = [];
+                const unreadable: Array<{ documentId: string; reason: string; document: unknown }> =
+                    [];
+                for (const row of window) {
+                    try {
+                        identifier(row?.documentId);
+                        songs.push({
+                            song: savedSong(row, scope, row.documentId),
+                            stored: row.document,
+                        });
+                    } catch (failure) {
+                        unreadable.push({
+                            documentId: String(row?.documentId),
+                            reason: failure instanceof Error ? failure.message : String(failure),
+                            document: row?.document,
+                        });
+                    }
+                }
+                tx.finish({
+                    songs,
+                    unreadable,
+                    nextAfterDocumentId:
+                        rows.length > limit ? String(window[window.length - 1].documentId) : null,
+                });
+            });
+        });
+    }
+
+    /**
      * Every retained draft this owner has here, every song and every writer, live or not —
      * what "Upgrade old songs" (#1738) has to find the old-format ones among. A row that does not
-     * read is counted and left alone rather than failing the rest, as a home read treats a song.
+     * read is reported (ids and reason) and left alone rather than failing the rest, as a home read treats a song.
      */
-    async allDrafts(scope: AccountScope): Promise<{ drafts: Draft[]; unreadable: number }> {
+    async allDrafts(scope: AccountScope): Promise<{
+        drafts: Draft[];
+        unreadable: Array<{ documentId: string; writerId: string; reason: string }>;
+    }> {
         scope = copyScope(scope);
         return this.database.run('readonly', scope, (tx) => {
             // `clearAccount`'s owner bound: it stops at this owner's last row.
             const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
             tx.read(tx.table('drafts').getAll(owned), (rows: Draft[]) => {
                 const drafts: Draft[] = [];
-                let unreadable = 0;
+                const unreadable: Array<{ documentId: string; writerId: string; reason: string }> =
+                    [];
                 for (const row of rows) {
                     try {
                         drafts.push(savedDraft(row, scope, row?.documentId));
-                    } catch {
-                        unreadable += 1;
+                    } catch (failure) {
+                        unreadable.push({
+                            documentId: String(row?.documentId),
+                            writerId: String(row?.writerId),
+                            reason: failure instanceof Error ? failure.message : String(failure),
+                        });
                     }
                 }
                 tx.finish({ drafts, unreadable });
@@ -2288,28 +2429,27 @@ export class AccountSongbook {
     }
 
     /**
-     * Rewrite one retained draft in place (`next`), or retire it (`null`) — #1738's draft half,
-     * and never a Save: the row keeps its writer, its `baseRevision` and its `capturedAt`, so it is
-     * exactly as live or as dead as it was, and nothing is queued or sent.
+     * Rewrite one retained draft in place — #1738's draft half, and never a Save: the row keeps its
+     * writer, its `baseRevision` and its `capturedAt`, so it is exactly as live or as dead as it
+     * was, and nothing is queued or sent. There is no way to delete a draft through here.
      *
-     * ONE transaction, compare-and-swapped twice. `'changed'` when the row is gone or was captured
-     * again since the caller read it (`capturedAt` moved): that writer's newer text wins. `'live'`
-     * when the row is a live draft of a saved song (`liveDraft`'s rule): unsaved work is the
-     * musician's to Save or discard, never this method's to rewrite. A row whose song this device
-     * does not hold is not refused — nothing here can tell its live from its dead, and a rewrite
-     * that keeps the music is the safe direction for it.
+     * ONE transaction, compare-and-swapped twice. `'gone'` when the row no longer exists (its
+     * writer saved or discarded it), `'changed'` when it was captured again since the caller read
+     * it (`capturedAt` moved): that writer's newer text wins. `'live'` when it is a live draft by
+     * `liveDraft`'s rule — including a row whose song this device does not hold, which that rule
+     * counts as live: unsaved work is the musician's to Save or discard, never this method's.
      */
     async replaceDraft(
         scope: AccountScope,
         draft: { documentId: string; writerId: string; capturedAt: string },
         next: unknown,
-    ): Promise<'replaced' | 'changed' | 'live'> {
+    ): Promise<'replaced' | 'changed' | 'live' | 'gone'> {
         scope = copyScope(scope);
         const { documentId, writerId, capturedAt } = draft;
         identifier(documentId);
         identifier(writerId);
-        const document = next === null ? null : snapshot(next);
-        if (document && document.id !== documentId) {
+        const document = snapshot(next);
+        if (document.id !== documentId) {
             throw new Error('A draft cannot move to another song.');
         }
         return this.database.run('readwrite', scope, (tx) => {
@@ -2320,18 +2460,16 @@ export class AccountSongbook {
                     tx.read(
                         tx.table('drafts').get([scope.ownerId, documentId, writerId]),
                         (row: Draft | undefined) => {
-                            if (!row || row.capturedAt !== capturedAt) {
+                            if (!row) {
+                                return tx.finish('gone');
+                            }
+                            if (row.capturedAt !== capturedAt) {
                                 return tx.finish('changed');
                             }
-                            if (saved && liveDraft(row, saved)) {
+                            if (liveDraft(row, saved)) {
                                 return tx.finish('live');
                             }
-                            const key = [scope.ownerId, documentId, writerId];
-                            if (document === null) {
-                                tx.table('drafts').delete(key);
-                            } else {
-                                tx.table('drafts').put({ ...row, document } satisfies Draft);
-                            }
+                            tx.table('drafts').put({ ...row, document } satisfies Draft);
                             tx.finish('replaced');
                         },
                     );

@@ -102,29 +102,36 @@ export async function list(): Promise<ChartDocument[]> {
 }
 
 /**
- * Every song, for "Upgrade old songs" (#1738), with what does not validate left out and counted —
- * `list()`'s read, minus its refusal of a songbook it cannot wholly read: one corrupt row must not
- * stop the others being upgraded, and the upgrade never writes a row it could not read.
+ * Every song, for "Upgrade old songs" (#1738): each readable one with its row exactly as stored
+ * (`stored`, for the backup), and each row that does not validate reported by id and reason —
+ * `list()`'s read without its refusal of a songbook it cannot wholly read, because one bad row
+ * must neither stop the others nor go unmentioned. Validation (most of a whole songbook's cost,
+ * #1442) runs after the transaction, in slices when paced: this read runs behind the home page.
  */
 export async function listReadable(pace?: {
     shouldYield: () => boolean;
     yieldNow: () => Promise<void>;
-}): Promise<{ documents: ChartDocument[]; unreadable: number }> {
+}): Promise<{
+    documents: Array<{ document: ChartDocument; stored: unknown }>;
+    unreadable: Array<{ id: string; reason: string; stored: unknown }>;
+}> {
     const db = await open();
     const rows = await new Promise<unknown[]>((resolve, reject) => {
         const request = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
         request.onerror = () => reject(new Error('Unable to read your local songbook.'));
         request.onsuccess = () => resolve(request.result);
     });
-    // Validated after the transaction, in slices when paced: validation is most of what a whole
-    // songbook costs to read (#1442's profile), and this read runs behind the home page.
-    const documents: ChartDocument[] = [];
-    let unreadable = 0;
+    const documents: Array<{ document: ChartDocument; stored: unknown }> = [];
+    const unreadable: Array<{ id: string; reason: string; stored: unknown }> = [];
     for (const row of rows) {
         try {
-            documents.push(validated(row));
-        } catch {
-            unreadable += 1;
+            documents.push({ document: validated(row), stored: row });
+        } catch (failure) {
+            unreadable.push({
+                id: String((row as { id?: unknown } | null)?.id ?? '(no id)'),
+                reason: failure instanceof Error ? failure.message : String(failure),
+                stored: row,
+            });
         }
         if (pace?.shouldYield()) {
             await pace.yieldNow();
@@ -226,9 +233,14 @@ export async function get(id: string): Promise<ChartDocument | null> {
     return raw === undefined ? null : validated(raw);
 }
 
+/**
+ * `keepUpdatedAt` is "Upgrade old songs"' (#1738) and nothing else's: an upgrade is not an edit,
+ * so the song keeps its own `updatedAt` (the songbook orders by it) while the revision advances.
+ */
 export async function save(
     candidate: ChartDocument,
     expected: number | null,
+    options: { keepUpdatedAt?: boolean } = {},
 ): Promise<ChartDocument> {
     const document = validated(candidate);
     const db = await open();
@@ -258,7 +270,7 @@ export async function save(
                 // (e.g. a v1 import's saved-progression timestamp, `import-v1.ts`) with
                 // this write's wall-clock time.
                 createdAt: previous?.createdAt ?? document.createdAt,
-                updatedAt: now,
+                updatedAt: options.keepUpdatedAt ? document.updatedAt : now,
             };
             store.put(committed);
         };
@@ -469,11 +481,14 @@ export interface RecoverySlot {
 /**
  * Every writer's recovery slot on this device, for every song (#1738) — the upgrade has to find
  * the old-format drafts wherever they are, not only the ones a song on the stand would offer. A
- * slot that does not read is counted and left exactly where it is, as `recoveriesFor` leaves it.
+ * slot that does not read is reported (key, id, reason) and left exactly where it is, as `recoveriesFor` leaves it.
  */
-export function recoverySlots(): { slots: RecoverySlot[]; unreadable: number } {
+export function recoverySlots(): {
+    slots: RecoverySlot[];
+    unreadable: Array<{ key: string; id: string; reason: string }>;
+} {
     const slots: RecoverySlot[] = [];
-    let unreadable = 0;
+    const unreadable: Array<{ key: string; id: string; reason: string }> = [];
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -486,19 +501,19 @@ export function recoverySlots(): { slots: RecoverySlot[]; unreadable: number } {
         // `${RECOVERY}${writer}:${id}`: a writer id is a UUID (or `unavailable`), never a colon.
         const rest = key.slice(RECOVERY.length);
         const split = rest.indexOf(':');
+        const documentId = split < 1 ? rest : rest.slice(split + 1);
         try {
             if (!raw || raw.length > 1_100_000 || split < 1) {
-                throw new Error('unreadable');
+                throw new Error('This draft could not be read.');
             }
             const record = JSON.parse(raw);
             const document = validated(record.document);
-            const documentId = rest.slice(split + 1);
             if (
                 document.id !== documentId ||
                 typeof record.capturedAt !== 'string' ||
                 !Number.isFinite(Date.parse(record.capturedAt))
             ) {
-                throw new Error('unreadable');
+                throw new Error('This draft does not match its song.');
             }
             slots.push({
                 key,
@@ -508,8 +523,12 @@ export function recoverySlots(): { slots: RecoverySlot[]; unreadable: number } {
                 document,
                 raw,
             });
-        } catch {
-            unreadable += 1;
+        } catch (failure) {
+            unreadable.push({
+                key,
+                id: documentId,
+                reason: failure instanceof Error ? failure.message : String(failure),
+            });
         }
     }
     return { slots, unreadable };
@@ -517,18 +536,21 @@ export function recoverySlots(): { slots: RecoverySlot[]; unreadable: number } {
 
 /**
  * Rewrite one recovery slot in place (#1738) — the same key, so the same writer, and the same
- * `capturedAt`, so it stays exactly as live or as dead as it was — or retire it (`null`). Only if
- * the slot still holds the bytes it was read with: a tab that captured it again since wins, and
- * nothing is written. Never a live slot: the caller's rule (`lib/upgrade.ts`) checks that against
- * the committed song, and a draft retained after this read is new bytes, which this refuses.
+ * `capturedAt`, so it stays exactly as live or as dead as it was. Only if the slot still holds
+ * the bytes it was read with (`'changed'`: a tab captured it again since, and wins; `'gone'`: it
+ * was saved or discarded). Never a deletion. Never a live slot: the caller's rule
+ * (`lib/upgrade.ts`) checks that against the committed song.
  */
-export function replaceRecoverySlot(slot: RecoverySlot, next: ChartDocument | null): boolean {
-    if (localStorage.getItem(slot.key) !== slot.raw) {
-        return false;
+export function replaceRecoverySlot(
+    slot: RecoverySlot,
+    next: ChartDocument,
+): 'replaced' | 'changed' | 'gone' {
+    const held = localStorage.getItem(slot.key);
+    if (held === null) {
+        return 'gone';
     }
-    if (next === null) {
-        localStorage.removeItem(slot.key);
-        return true;
+    if (held !== slot.raw) {
+        return 'changed';
     }
     const document = validated(next);
     if (document.id !== slot.documentId) {
@@ -542,7 +564,7 @@ export function replaceRecoverySlot(slot: RecoverySlot, next: ChartDocument | nu
     if (localStorage.getItem(slot.key) !== json) {
         throw new Error('Unable to verify the upgraded draft. The old one may still be there.');
     }
-    return true;
+    return 'replaced';
 }
 
 export function clearOwnRecovery(id: string): void {

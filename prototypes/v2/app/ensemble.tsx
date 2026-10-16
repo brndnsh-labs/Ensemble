@@ -5680,7 +5680,6 @@ export default function Ensemble() {
             volatileDrafts.current.has(id) ||
             (store === 'account' && accountDrafts.current.has(id)),
         run: (task) => run(task),
-        exportDocument,
         afterRun: async (outcome) => {
             if (outcome.upgraded.some((entry) => entry.store === 'account')) {
                 // One pass for the whole run, as the guest adoption does: every Save is already

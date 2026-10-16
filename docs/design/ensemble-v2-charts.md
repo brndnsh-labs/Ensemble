@@ -444,25 +444,34 @@ never enters analytics or error payloads.
 >
 > - **What counts.** A schema-1 chart; a chart whose stored content differs from what today's
 >   writer stores (`writtenChart` + `withFollowFeel`: the legacy fields `/admin` counts, a missing
->   groove `genre`, an old built-in sound pin); a schema-1 retained draft. Never a collection. Both
->   songbooks on the device — the guest one always, the account one once its library has
->   downloaded (`needsUpgrade`, `planUpgrade` in `prototypes/v2/lib/upgrade.ts`).
-> - **Backup first.** The card offers the app's own export (one `.ensemble` file per song, plus
->   each old draft) before anything is written; skipping it is allowed and said.
-> - **In place, through the ordinary Save.** Same id, a new revision: the guest repository's
->   `save`, or the account's Save, which queues one outbox operation compare-and-swapped on its
->   base revision, so account songs reach the server by the normal drain. A text chart goes
->   through `proposeLegacyScoreConversion` (#1737); a refusal leaves the song exactly as it was
->   and lists its section, bar and reason with a way to open it in the text editor. A lossy
->   conversion (`tones-dropped`) is listed as "upgraded with changes".
-> - **Never over unsaved work or a stuck queue.** A song with a live draft (any store, any tab)
->   or unsaved text in this tab is skipped; so is an account song whose outbox head is
->   conflicted or refused, or with an account version waiting. Each is listed, not forced.
-> - **Drafts.** A live draft is unsaved work and is never rewritten: its song is skipped until the
->   musician saves or discards it. A dead or orphaned schema-1 draft is converted in place (same
->   writer, same `capturedAt`, so exactly as live or dead as before); one the converter refuses is
->   retired only if it is in the backup just taken, otherwise kept and listed. Converting keeps the
->   music; retiring is the only loss and needs the file first.
+>   groove `genre`, an old built-in sound pin); a retained draft that is schema 1 or carries legacy
+>   fields; and an old-format row that will not read. Never a collection. Both songbooks on the
+>   device — the guest one always, the account one once its library has downloaded
+>   (`needsUpgrade`, `draftNeedsUpgrade`, `planUpgrade` in `prototypes/v2/lib/upgrade.ts`). The
+>   card stays on the home while ANY of that remains, so its absence means nothing old is stored
+>   on this device.
+> - **Backup first: one file.** A single human-readable JSON archive of exactly the songs and
+>   drafts the run may change, each as it is stored, with store, id and title
+>   (`upgradeBackup`). The run starts only after "I have the file", or an explicit "Upgrade
+>   without a backup".
+> - **In place, through the ordinary Save, same edit date.** Same id, a new revision, the song's
+>   own `updatedAt` kept (an upgrade is not an edit; the songbook's order and the server body
+>   keep it too): the guest repository's `save` and the account's Save, each with one
+>   upgrade-only option (`keepUpdatedAt`, `upgrade`). The account Save queues an ordinary outbox
+>   operation, so account songs reach the server by the normal drain. A text chart goes through
+>   `proposeLegacyScoreConversion` (#1737); a refusal leaves the song exactly as it was and lists
+>   its section, bar and reason with a way to open it in the text editor. A lossy conversion
+>   (`tones-dropped`) is listed as "upgraded with changes", for songs and drafts alike.
+> - **Never over unsaved work or a stuck queue — checked when writing.** A song with a live draft
+>   or this tab's unsaved text is skipped. The account Save re-checks inside its own transaction
+>   and refuses over a live draft, a conflicted or refused outbox head, an account version waiting
+>   or a frozen delete; the guest Save re-checks the recovery slots just before writing. Each is
+>   listed, never forced.
+> - **Drafts are never deleted.** A live draft — and an orphan, or one whose song row will not
+>   read, which `liveDraft`'s rule also counts as live — is never rewritten. A dead draft is
+>   rewritten in place (same writer, same `capturedAt`, so exactly as live or dead as before); one
+>   the converter refuses is kept and listed with Open. The upgrade Save does not sweep superseded
+>   draft rows as an ordinary Save does.
 > - **Interrupt-safe and idempotent.** Each document is one transaction, so a closed tab leaves
 >   every song wholly old or wholly new; the next run re-reads and finishes the rest. An upgraded
 >   document is checked to need no upgrade itself, so a second run is a no-op.

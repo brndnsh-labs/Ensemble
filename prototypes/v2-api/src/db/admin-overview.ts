@@ -51,7 +51,7 @@ export interface AdminChartCounts {
  * build writes — the "Legacy ... read, never written" fields of `public/songbook/types.ts`.
  * Paths are JSON paths into the stored `ChartDocument`.
  */
-const LEGACY_CHART_PATHS: readonly string[] = [
+export const LEGACY_CHART_PATHS: readonly string[] = [
     '$.chart.arrangement.lastChordPreset',
     '$.chart.performance.complexity',
     '$.chart.band.harmony',
@@ -73,7 +73,7 @@ const LEGACY_CHART_PATHS: readonly string[] = [
     '$.chart.band.groove.pattern',
 ];
 /** The new format stores the genre once, as `genre`; a groove without it is an old chart. */
-const GENRE_PATH = '$.chart.band.groove.genre';
+export const GENRE_PATH = '$.chart.band.groove.genre';
 
 // A row whose body is not JSON, or has a string `kind`, is not a chart. Path literals are
 // constants above, never input.
