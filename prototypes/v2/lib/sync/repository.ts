@@ -929,6 +929,38 @@ export class AccountSongbook {
             tx.read(songs.count(owned), (count: number) => {
                 result.count = count;
             });
+            // The songs the account has deleted while this device kept them (#1754): a `deleted`
+            // candidate over a song row. Counted apart so "All N songs" can leave them out. A
+            // candidate row this build cannot read is skipped here, never fatal — the home's
+            // posture (`settleHome`); `remoteCandidates` is where one is reported.
+            result.gone = 0;
+            const prefix = candidatePrefix(scope.ownerId);
+            tx.read(
+                tx
+                    .table('meta')
+                    .getAll(
+                        IDBKeyRange.bound(prefix, `${prefix}￿`, false, true),
+                        MAX_REMOTE_CANDIDATES,
+                    ),
+                (rows: RemoteCandidate[]) => {
+                    for (const row of rows) {
+                        let documentId: string;
+                        try {
+                            documentId = row.documentId;
+                            if (savedCandidate(row, scope, documentId).kind !== 'deleted') {
+                                continue;
+                            }
+                        } catch {
+                            continue;
+                        }
+                        tx.read(songs.getKey([scope.ownerId, documentId]), (key: unknown) => {
+                            if (key !== undefined) {
+                                result.gone = (result.gone ?? 0) + 1;
+                            }
+                        });
+                    }
+                },
+            );
             if (request.continueId !== null) {
                 tx.read(songs.get([scope.ownerId, request.continueId]), (row: SavedSong) => {
                     result.continued = row;
@@ -2206,6 +2238,109 @@ export class AccountSongbook {
                 ),
             );
             tx.finish(undefined);
+        });
+    }
+
+    /**
+     * Delete songs from THIS DEVICE ONLY, for good (#1754) — the way out for a song the account no
+     * longer holds. Each id loses, in ONE transaction for the whole list: its `songs` row, every
+     * writer's `drafts` row, its WHOLE outbox queue (never a single operation: a queued Save's
+     * `base` names the one before it, so an orphaned op would brick every pass — `keepBoth`'s
+     * precedent), and its `remote:`, `delete:`, `opened:` and `star:` meta rows. Receipts stay, as
+     * `commitDeleted` keeps them: they record Saves already acknowledged, not work.
+     *
+     * Never a cloud operation: no tombstone, no operation queued, no `delete:` freeze written, no
+     * request. So it only takes an id the account cannot hand back on the next download:
+     *
+     * - one the account tombstoned (a `deleted` candidate — "No longer in your account"), or
+     * - one the cloud never confirmed (`remoteRevision === null`, or no song row at all).
+     *
+     * Anything else — a song the account still holds, a collection — is `held` and untouched: a
+     * local delete of it would only come back, and the account's own delete is `prepareDelete`'s.
+     * A Save already in flight for a purged id may still land on the server; then the song IS in
+     * the account, and the next download brings it back as the account's — which is the truth.
+     */
+    async purgeLocal(
+        scope: AccountScope,
+        documentIds: readonly string[],
+    ): Promise<{ purged: string[]; held: string[] }> {
+        scope = copyScope(scope);
+        const ids = [...new Set(documentIds)];
+        for (const documentId of ids) {
+            identifier(documentId);
+        }
+        return this.database.run('readwrite', scope, (tx) => {
+            const result = { purged: [] as string[], held: [] as string[] };
+            tx.finish(result);
+            const step = (index: number) => {
+                const documentId = ids[index];
+                if (documentId === undefined) {
+                    return;
+                }
+                const key = [scope.ownerId, documentId];
+                const next = () => step(index + 1);
+                tx.read(tx.table('collections').getKey(key), (collection: unknown) => {
+                    if (collection !== undefined) {
+                        result.held.push(documentId);
+                        return next();
+                    }
+                    tx.read(
+                        tx.table('meta').get(candidateKey(scope.ownerId, documentId)),
+                        (row: RemoteCandidate | undefined) => {
+                            let tombstoned = false;
+                            try {
+                                tombstoned =
+                                    !!row &&
+                                    savedCandidate(row, scope, documentId).kind === 'deleted';
+                            } catch {
+                                // A candidate this build cannot read says nothing about the id.
+                            }
+                            tx.read(tx.table('songs').get(key), (song: unknown) => {
+                                // Read raw, not through `savedSong`: a row that will not validate
+                                // can still be purged when nothing in the account holds it. Only an
+                                // explicit `null` means "never confirmed".
+                                const confirmed =
+                                    song !== undefined &&
+                                    (song as { remoteRevision?: unknown })?.remoteRevision !== null;
+                                if (confirmed && !tombstoned) {
+                                    result.held.push(documentId);
+                                    return next();
+                                }
+                                tx.read(
+                                    tx.table('operations').index('song').getAllKeys(key),
+                                    (operationKeys: IDBValidKey[]) => {
+                                        for (const operationKey of operationKeys) {
+                                            tx.table('operations').delete(operationKey);
+                                        }
+                                        tx.table('songs').delete(key);
+                                        tx.table('drafts').delete(
+                                            IDBKeyRange.bound(
+                                                key,
+                                                [scope.ownerId, documentId, []],
+                                                false,
+                                                true,
+                                            ),
+                                        );
+                                        tx.table('meta').delete(
+                                            candidateKey(scope.ownerId, documentId),
+                                        );
+                                        tx.table('meta').delete(
+                                            deletionKey(scope.ownerId, documentId),
+                                        );
+                                        tx.table('meta').delete(
+                                            openedKey(scope.ownerId, documentId),
+                                        );
+                                        tx.table('meta').delete(starKey(scope.ownerId, documentId));
+                                        result.purged.push(documentId);
+                                        next();
+                                    },
+                                );
+                            });
+                        },
+                    );
+                });
+            };
+            step(0);
         });
     }
 

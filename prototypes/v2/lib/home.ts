@@ -40,6 +40,13 @@ export interface HomeRequest {
 export interface HomeRead<R> {
     /** Every song in the store, from IndexedDB `count()` — never a partial read. */
     count: number;
+    /**
+     * How many of `count` the account has deleted while this device kept them ("No longer in
+     * your account", #1754): a `deleted` candidate over a song row. Counted apart, never out of
+     * `count`, so a songbook of nothing else still reaches All songs to remove them. The guest
+     * store has none.
+     */
+    gone?: number;
     continued: R | undefined;
     /** The `recentIds` that exist, in request order. */
     recent: R[];
@@ -56,6 +63,8 @@ export interface HomeRead<R> {
 /** The validated home page. `unreadable` counts documents a by-id or fill read could not open. */
 export interface HomeSlice {
     count: number;
+    /** `HomeRead.gone`: songs the "All N songs" count leaves out (#1754). */
+    gone: number;
     continued: ChartDocument | null;
     rows: ChartDocument[];
     unreadable: number;
@@ -161,7 +170,7 @@ export function settleHome<R>(
             listed.push(document);
         }
     }
-    return { count: read.count, continued, rows: listed, unreadable };
+    return { count: read.count, gone: read.gone ?? 0, continued, rows: listed, unreadable };
 }
 
 /**

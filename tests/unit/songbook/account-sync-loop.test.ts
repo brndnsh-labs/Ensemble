@@ -810,6 +810,58 @@ describe('the sync loop runs one pass at a time', () => {
     });
 });
 
+describe('a local purge takes the loop’s turn like a pass (#1754)', () => {
+    it('never runs beside a pass: it waits out a coalesced re-run, and a pass asked for meanwhile waits for it', async () => {
+        const events: string[] = [];
+        let finishPurge = () => {};
+        const purgeHeld = new Promise<void>((resolve) => {
+            finishPurge = resolve;
+        });
+        const songbook = stubSongbook({
+            list: async () => ({
+                songs: [{ documentId: 'song-1', remoteRevision: null }],
+                nextAfterDocumentId: null,
+            }),
+            prepare: async () => {
+                events.push('prepare');
+                return 'idle';
+            },
+            purgeLocal: async () => {
+                events.push('purge-start');
+                await purgeHeld;
+                events.push('purge-end');
+                return { purged: ['song-1'], held: [] };
+            },
+        });
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+
+        // A pass, and a second request during it: `run()`'s `finally` starts that re-run the
+        // moment it clears its slot — the window a single `await` of the first pass misses.
+        void loop.run();
+        void loop.run();
+        const purging = loop.purgeLocal(['song-1'], OWNER);
+        // Wait until the purge holds the slot, then ask for a pass: it must coalesce behind it.
+        await vi.waitFor(() => expect(events).toContain('purge-start'));
+        void loop.run();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(events.at(-1)).toBe('purge-start');
+
+        finishPurge();
+        await expect(purging).resolves.toEqual({ purged: ['song-1'], held: [] });
+        await vi.waitFor(() => expect(events.at(-1)).toBe('prepare'));
+
+        const start = events.indexOf('purge-start');
+        const end = events.indexOf('purge-end');
+        // Both earlier passes reached the store before the purge began; the one asked for during
+        // it ran after it ended. Nothing in between.
+        expect(events.slice(0, start).filter((event) => event === 'prepare')).toHaveLength(2);
+        expect(end).toBe(start + 1);
+        expect(events.slice(end + 1)).toContain('prepare');
+    });
+});
+
 /**
  * Explicit cloud deletion (#1270). What is proven here is the loop's CLASSIFICATION: which server
  * answer becomes which sentence, and — the part that actually protects data — when the frozen
