@@ -490,6 +490,12 @@ never enters analytics or error payloads.
 > - **Interrupt-safe and idempotent.** Each document is one transaction, so a closed tab leaves
 >   every song wholly old or wholly new; the next run re-reads and finishes the rest. An upgraded
 >   document is checked to need no upgrade itself, so a second run is a no-op.
+>
+> **Amended 2026-10-17 (#1741).** The gate held (every device upgraded, `/admin` at 0), so the
+> legacy band/performance fields are gone from the codec: a chart carrying one is refused on the
+> client and by the API. "What counts" is now a schema-1 chart or one that differs from
+> `writtenChart` alone (`withFollowFeel` is deleted); a row still carrying a retired field no
+> longer reads, so it is listed as a leftover, removable once backed up.
 
 ## Device acceptance and next stories
 

@@ -116,12 +116,6 @@ export const SMART_GENRES: Record<string, SmartGenre> = Object.entries(GENRES).r
 }, Object.create(null));
 
 export const GENRE_NAMES: string[] = Object.keys(GENRES);
-// filter, not `as string`: a genre missing `feel` would otherwise put a literal
-// `undefined` into this array and silently poison every membership guard keyed
-// off it.
-export const GENRE_FEELS: string[] = Object.values(GENRES)
-    .map((g) => g.feel)
-    .filter((f): f is string => Boolean(f));
 
 /* ────────────────────────────────────────────────────────────────────────────
  * GENRE-NAMING AUTHORITY
@@ -130,16 +124,17 @@ export const GENRE_FEELS: string[] = Object.values(GENRES)
  * has a different owner and a different lifetime:
  *
  *   1. CANON NAME   ('Bossa', 'Ska-Punk')  — the UI keyspace. Rendered by the
- *      genre picker and Surprise Me straight off `GENRE_NAMES`, persisted as
- *      `groove.lastSmartGenre`, and pinned by `genre-canon-guard.test.ts`.
+ *      genre picker and Surprise Me straight off `GENRE_NAMES`, stored in a chart
+ *      as `band.groove.genre` (the only spelling the songbook codec accepts), held
+ *      in state as `groove.lastSmartGenre`, and pinned by `genre-canon-guard.test.ts`.
  *      Changing one is a user-visible rename.
- *   2. FEEL         ('Bossa Nova', 'Ska')  — the runtime keyspace. Lives in
- *      `groove.genreFeel` and is what the feel-keyed tables are keyed on
- *      (the synth voices' genre trims; the old
- *      engine had ~20 more). It is a *musical* label ("this genre feels like a
- *      bossa nova"), deliberately free to differ from the picker label; several
- *      genres could legitimately share a feel in future. `GENRE_FEELS` is the set
- *      the songbook codec accepts for `groove.genreFeel`.
+ *   2. FEEL         ('Bossa Nova', 'Ska')  — the runtime keyspace. Lives in the
+ *      state's `groove.genreFeel`, set from the name when a genre is applied, and
+ *      is what the feel-keyed tables are keyed on (the synth voices' genre trims;
+ *      the old engine had ~20 more). It is a *musical* label ("this genre feels
+ *      like a bossa nova"), deliberately free to differ from the picker label;
+ *      several genres could legitimately share a feel in future. No stored chart
+ *      holds a feel any more (#1741).
  *   3. (retired) GROOVE STRATEGY KEY ('latin', 'ska-punk') — the old engine's
  *      `public/engine/grooves/<key>.ts` basename for a kit, many-to-one with feels
  *      (Bossa's kit was `latin.ts`). Those modules went with the engine (#1404); the
@@ -148,73 +143,7 @@ export const GENRE_FEELS: string[] = Object.values(GENRES)
  *      was a *strategy* key, NOT a genre — the retired `Latin` GENRE was deleted in
  *      #628 and must never be resurrected as a `GENRE_OVERRIDES` key or a feel.
  *
- * The divergence is small (2 of 13 names ≠ feel) but it is real, so it is
- * reconciled HERE, once, instead of ad-hoc at every call site.
+ * The divergence is small (2 of 13 names ≠ feel) but it is real, so a genre's
+ * feel is always read off its entry (`SMART_GENRES[name].feel`), never assumed
+ * equal to its name.
  * ──────────────────────────────────────────────────────────────────────────── */
-
-/**
- * Reverse feel → canonical-genre-name lookup. Eleven genres have `name === feel`;
- * exactly two diverge — `Ska-Punk` → `Ska` and `Bossa` → `Bossa Nova` — which is why
- * anything receiving a genre string from outside (share URLs, persisted sessions)
- * must translate rather than assume the two keyspaces are the same.
- *
- * **Reduced into `Object.create(null)`, not `{}`** (#1258) — as are the four sibling
- * feel-keyed tables in this file. All of them are indexed with a genre string that can
- * arrive from outside, and on a plain object every `Object.prototype` member reads as
- * truthy. That mattered most here: `feelToCanon` is `(feel && GENRE_NAME_BY_FEEL[feel])
- * || null`, so `?genre=__proto__` made `resolveGenre` return a *hit* instead of `null`
- * and `groove.genreFeel` was set to `'__proto__'` before v1's Preact tree mounted.
- * Downstream, v1's canonical-meters lookup had the same defeated-`||` shape and returned
- * `Object.prototype` in place of an array, which crashed its initial render on every
- * reload. Every other feel-keyed table was poisoned in the same session too
- * (the old engine's `GENRE_POCKET` → NaN scheduler timing, `strategies[genreFeel]` → a
- * bogus groove strategy). Fixing the seeds is what makes the *next* feel-keyed table safe by default.
- */
-const GENRE_NAME_BY_FEEL: Record<string, string> = Object.entries(GENRES).reduce<
-    Record<string, string>
->((acc, [name, override]) => {
-    if (override.feel) {
-        acc[override.feel] = name;
-    }
-    return acc;
-}, Object.create(null));
-
-/** Canon genre NAME → runtime FEEL. `null` for anything outside the canon. */
-function canonToFeel(name: string | null | undefined): string | null {
-    return (name && GENRES[name]?.feel) || null;
-}
-
-/** Runtime FEEL → canon genre NAME. `null` for anything outside the canon. */
-function feelToCanon(feel: string | null | undefined): string | null {
-    return (feel && GENRE_NAME_BY_FEEL[feel]) || null;
-}
-
-/**
- * Normalize a genre string arriving in *either* keyspace into the canonical pair.
- *
- * The UI and `groove.lastSmartGenre` speak genre NAMES; the engine and
- * `groove.genreFeel` speak FEELS, and every feel-keyed table (the old
- * engine's `GENRE_POCKET`, groove `strategies` map and the like) misses
- * on a name. Saved charts and share URLs carry the feel (`songbook/codec.ts` writes
- * `groove.genreFeel`), but hand-written and older links carry the name — accept both,
- * and return `null` for anything in neither keyspace so callers reject it instead of
- * writing a phantom key into `genreFeel` (#1130 / #1200).
- */
-export function resolveGenre(
-    input: string | null | undefined,
-): { name: string; feel: string } | null {
-    if (!input) {
-        return null;
-    }
-    // Feel-space first: no feel collides with another genre's name, so order is
-    // only a matter of which lookup is the common case (the share writer's output).
-    const nameForFeel = feelToCanon(input);
-    if (nameForFeel) {
-        return { name: nameForFeel, feel: input };
-    }
-    const feelForName = canonToFeel(input);
-    if (feelForName) {
-        return { name: input, feel: feelForName };
-    }
-    return null;
-}

@@ -1,14 +1,8 @@
 import { KEY_ORDER, TIME_SIGNATURES } from '../config.js';
-import {
-    isKnownBassStyle,
-    isKnownChordStyle,
-    isKnownHarmonyStyle,
-    isKnownSoloistStyle,
-} from '../data/instrument-styles.js';
-import { GENRE_FEELS, GENRE_NAMES, resolveGenre, SMART_GENRES } from '../data/smart-genres.js';
+import { GENRE_NAMES } from '../data/smart-genres.js';
 import { isValidTimeSignatureGrouping } from '../meter.js';
 import { normalizeSongSeed, SONG_SEED_MAX_LENGTH, stripDangerousChars } from '../sanitize.js';
-import { type ChordDensity, isChordDensity, isSwingSub } from '../types.js';
+import { isSwingSub } from '../types.js';
 import {
     exceedsUtf8ByteLimit,
     inspectSongbookStructure,
@@ -17,17 +11,12 @@ import {
 } from './structural-limits.js';
 import {
     CHART_DOCUMENT_SCHEMA_VERSION,
-    CHART_GROOVE_PATTERN_LANE_NAMES,
     type ChartArrangement,
     type ChartBand,
-    type ChartBass,
-    type ChartChords,
     type ChartContent,
     type ChartDocument,
     type ChartEnergy,
     type ChartGroove,
-    type ChartGroovePatternLane,
-    type ChartHarmony,
     type ChartLaneMix,
     type ChartPerformance,
     type ChartSection,
@@ -37,19 +26,16 @@ import {
     type CodecIssue,
     DEFAULT_SOLOIST_TRADE_CHORUSES,
     SOLOIST_TRADE_BARS,
-    type SoloistTradeMode,
 } from './types.js';
 
 type JsonRecord = Record<string, unknown>;
 
 const NOTATIONS = new Set(['roman', 'name', 'nns']);
 const SOLOIST_MODES = new Set(['monophonic', 'guitar']);
-const SOLOIST_TRADE_MODES = new Set(['manual', 'sections', 'loops']);
 const SOLOIST_TRADE_WITH = new Set(['off', 'soloist', 'drums']);
 // `harmony` is a retired lane (#1436), kept so an old chart's section override round-trips.
 const SECTION_INSTRUMENTS = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
 const PROTOTYPE_MEMBER_NAMES = new Set(Object.getOwnPropertyNames(Object.prototype));
-const GROOVE_PATTERN_LANE_NAMES = new Set<string>(CHART_GROOVE_PATTERN_LANE_NAMES);
 const PACK_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 class ValidationContext {
@@ -98,21 +84,6 @@ function pathFor(path: string, key: string): string {
 
 function hasField(record: JsonRecord, key: string): boolean {
     return Object.hasOwn(record, key);
-}
-
-/**
- * A legacy field (see `public/songbook/types.ts`): validated exactly as it always was when a
- * chart carries it, and reproduced in its old position, so a stored chart decodes to the same
- * bytes it was saved as. That identity is load-bearing: the account API refuses a Save whose
- * bytes are not the codec's canonical serialization (`decodeSaveRequest`), and a Save an older
- * build queued still carries these fields. Absent, it stays absent — capture never writes one.
- */
-function legacy<K extends string, V>(
-    record: JsonRecord,
-    key: K,
-    read: () => V,
-): Partial<Record<K, V>> {
-    return hasField(record, key) ? ({ [key]: read() } as Record<K, V>) : {};
 }
 
 function stringField(
@@ -334,12 +305,14 @@ function validateArrangement(
     candidate: unknown,
     path: string,
 ): ChartArrangement {
-    const record = ctx.object(
-        candidate,
-        path,
-        ['sections', 'key', 'timeSignature', 'grouping', 'isMinor', 'notation'],
-        ['lastChordPreset'],
-    );
+    const record = ctx.object(candidate, path, [
+        'sections',
+        'key',
+        'timeSignature',
+        'grouping',
+        'isMinor',
+        'notation',
+    ]);
     const rawSections = record.sections;
     let sections: ChartSection[] = [];
     if (!Array.isArray(rawSections)) {
@@ -403,14 +376,6 @@ function validateArrangement(
             allowed: NOTATIONS,
             message: 'Unknown notation',
         }) as ChartArrangement['notation'],
-        ...legacy(record, 'lastChordPreset', () =>
-            stringField(ctx, record, 'lastChordPreset', path, {
-                min: 1,
-                max: 100,
-                predicate: validateSafeDisplayString,
-                message: 'Preset name contains unsafe characters',
-            }),
-        ),
     };
 }
 
@@ -419,12 +384,7 @@ function validatePerformance(
     candidate: unknown,
     path: string,
 ): ChartPerformance {
-    const record = ctx.object(
-        candidate,
-        path,
-        ['bpm', 'seed', 'randomizeSeed'],
-        ['energy', 'complexity'],
-    );
+    const record = ctx.object(candidate, path, ['bpm', 'seed', 'randomizeSeed'], ['energy']);
     const seed = stringField(ctx, record, 'seed', path, {
         max: SONG_SEED_MAX_LENGTH,
         predicate: (value) => normalizeSongSeed(value) === value,
@@ -432,7 +392,6 @@ function validatePerformance(
     });
     return {
         bpm: numberField(ctx, record, 'bpm', path, 40, 240, true),
-        ...legacy(record, 'complexity', () => numberField(ctx, record, 'complexity', path, 0, 1)),
         seed,
         randomizeSeed: booleanField(ctx, record, 'randomizeSeed', path),
         ...(hasField(record, 'energy') ? { energy: energyField(ctx, record, path) } : {}),
@@ -452,11 +411,7 @@ function energyField(ctx: ValidationContext, record: JsonRecord, path: string): 
     return value;
 }
 
-function validateLaneMix(
-    ctx: ValidationContext,
-    record: JsonRecord,
-    path: string,
-): Pick<ChartChords, 'enabled' | 'voice' | 'autoSound' | 'volume' | 'reverb'> {
+function validateLaneMix(ctx: ValidationContext, record: JsonRecord, path: string): ChartLaneMix {
     return {
         enabled: booleanField(ctx, record, 'enabled', path),
         voice: stringField(ctx, record, 'voice', path, {
@@ -464,7 +419,7 @@ function validateLaneMix(
             max: 128,
             predicate: validateVoice,
             message: 'Unknown instrument voice',
-        }) as ChartChords['voice'],
+        }) as ChartLaneMix['voice'],
         autoSound: booleanField(ctx, record, 'autoSound', path),
         volume: numberField(ctx, record, 'volume', path, 0, 1),
         reverb: numberField(ctx, record, 'reverb', path, 0, 1),
@@ -473,60 +428,19 @@ function validateLaneMix(
 
 const LANE_MIX_FIELDS = ['enabled', 'voice', 'autoSound', 'volume', 'reverb'] as const;
 
-function validateChords(ctx: ValidationContext, candidate: unknown, path: string): ChartChords {
-    const record = ctx.object(candidate, path, LANE_MIX_FIELDS, [
-        'style',
-        'instrument',
-        'octave',
-        'density',
-    ]);
+function validateBand(ctx: ValidationContext, candidate: unknown, path: string): ChartBand {
+    const record = ctx.object(candidate, path, ['chords', 'bass', 'soloist', 'groove']);
     return {
-        ...validateLaneMix(ctx, record, path),
-        ...legacy(record, 'style', () =>
-            stringField(ctx, record, 'style', path, {
-                min: 1,
-                max: 64,
-                predicate: isKnownChordStyle,
-                message: 'Unknown chord style',
-            }),
-        ),
-        ...legacy(record, 'instrument', () =>
-            stringField(ctx, record, 'instrument', path, {
-                min: 1,
-                max: 100,
-                predicate: validateSafeDisplayString,
-                message: 'Instrument name contains unsafe characters',
-            }),
-        ),
-        ...legacy(record, 'octave', () => numberField(ctx, record, 'octave', path, 0, 127, true)),
-        ...legacy(
-            record,
-            'density',
-            () =>
-                stringField(ctx, record, 'density', path, {
-                    min: 1,
-                    max: 16,
-                    predicate: isChordDensity,
-                    message: 'Unknown chord density',
-                }) as ChordDensity,
-        ),
+        chords: validateMixLane(ctx, record.chords, `${path}.chords`),
+        bass: validateMixLane(ctx, record.bass, `${path}.bass`),
+        soloist: validateSoloist(ctx, record.soloist, `${path}.soloist`),
+        groove: validateGroove(ctx, record.groove, `${path}.groove`),
     };
 }
 
-function validateBass(ctx: ValidationContext, candidate: unknown, path: string): ChartBass {
-    const record = ctx.object(candidate, path, LANE_MIX_FIELDS, ['style', 'octave']);
-    return {
-        ...validateLaneMix(ctx, record, path),
-        ...legacy(record, 'style', () =>
-            stringField(ctx, record, 'style', path, {
-                min: 1,
-                max: 64,
-                predicate: isKnownBassStyle,
-                message: 'Unknown bass style',
-            }),
-        ),
-        ...legacy(record, 'octave', () => numberField(ctx, record, 'octave', path, 0, 127, true)),
-    };
+/** A lane that holds only its mix: the chords and the bass. */
+function validateMixLane(ctx: ValidationContext, candidate: unknown, path: string): ChartLaneMix {
+    return validateLaneMix(ctx, ctx.object(candidate, path, LANE_MIX_FIELDS), path);
 }
 
 function validateSoloist(ctx: ValidationContext, candidate: unknown, path: string): ChartSoloist {
@@ -534,16 +448,7 @@ function validateSoloist(ctx: ValidationContext, candidate: unknown, path: strin
         candidate,
         path,
         [...LANE_MIX_FIELDS, 'mode', 'autoMode'],
-        [
-            'tradeWith',
-            'tradeBars',
-            'tradeChoruses',
-            'style',
-            'preset',
-            'octave',
-            'phrasingIntensity',
-            'tradeMode',
-        ],
+        ['tradeWith', 'tradeBars', 'tradeChoruses'],
     );
     const tradeWith = optionalStringField(ctx, record, 'tradeWith', path, {
         min: 1,
@@ -557,30 +462,8 @@ function validateSoloist(ctx: ValidationContext, candidate: unknown, path: strin
     }
     // 0-4: 0 keeps trading forever, 1-4 is how many traded choruses before the head returns.
     const tradeChoruses = optionalNumberField(ctx, record, 'tradeChoruses', path, 0, 4, true);
-    // Legacy fields sit where they always did, between the kept ones, so an old chart's
-    // fields come back in their stored order (see `legacy`).
     return {
         ...validateLaneMix(ctx, record, path),
-        ...legacy(record, 'style', () =>
-            stringField(ctx, record, 'style', path, {
-                min: 1,
-                max: 64,
-                predicate: isKnownSoloistStyle,
-                message: 'Unknown soloist style',
-            }),
-        ),
-        ...legacy(
-            record,
-            'preset',
-            () =>
-                stringField(ctx, record, 'preset', path, {
-                    min: 1,
-                    max: 16,
-                    allowed: new Set(['trumpet']),
-                    message: 'Unknown soloist preset',
-                }) as 'trumpet',
-        ),
-        ...legacy(record, 'octave', () => numberField(ctx, record, 'octave', path, 0, 127, true)),
         mode: stringField(ctx, record, 'mode', path, {
             min: 1,
             max: 16,
@@ -588,20 +471,6 @@ function validateSoloist(ctx: ValidationContext, candidate: unknown, path: strin
             message: 'Unknown soloist mode',
         }) as ChartSoloist['mode'],
         autoMode: booleanField(ctx, record, 'autoMode', path),
-        ...legacy(record, 'phrasingIntensity', () =>
-            numberField(ctx, record, 'phrasingIntensity', path, 0, 1),
-        ),
-        ...legacy(
-            record,
-            'tradeMode',
-            () =>
-                stringField(ctx, record, 'tradeMode', path, {
-                    min: 1,
-                    max: 16,
-                    allowed: SOLOIST_TRADE_MODES,
-                    message: 'Unknown soloist trade mode',
-                }) as SoloistTradeMode,
-        ),
         ...(tradeWith === undefined ? {} : { tradeWith }),
         ...(tradeBars === undefined ? {} : { tradeBars: tradeBars as ChartSoloist['tradeBars'] }),
         ...(tradeChoruses === undefined
@@ -610,139 +479,16 @@ function validateSoloist(ctx: ValidationContext, candidate: unknown, path: strin
     };
 }
 
-function validateHarmony(ctx: ValidationContext, candidate: unknown, path: string): ChartHarmony {
+function validateGroove(ctx: ValidationContext, candidate: unknown, path: string): ChartGroove {
     const record = ctx.object(candidate, path, [
-        'enabled',
-        'voice',
-        'autoSound',
-        'style',
-        'octave',
-        'volume',
-        'reverb',
-        'complexity',
+        ...LANE_MIX_FIELDS,
+        'swing',
+        'swingSub',
+        'humanize',
+        'genre',
     ]);
     return {
         ...validateLaneMix(ctx, record, path),
-        style: stringField(ctx, record, 'style', path, {
-            min: 1,
-            max: 64,
-            predicate: isKnownHarmonyStyle,
-            message: 'Unknown harmony style',
-        }),
-        octave: numberField(ctx, record, 'octave', path, 0, 127, true),
-        complexity: numberField(ctx, record, 'complexity', path, 0, 1),
-    };
-}
-
-function validatePatternLane(
-    ctx: ValidationContext,
-    candidate: unknown,
-    path: string,
-): ChartGroovePatternLane {
-    const record = ctx.object(candidate, path, ['name', 'steps']);
-    const name = stringField(ctx, record, 'name', path, {
-        min: 1,
-        max: 100,
-        allowed: GROOVE_PATTERN_LANE_NAMES,
-        message: 'Unknown groove pattern lane',
-    }) as ChartGroovePatternLane['name'];
-    let steps: number[] = [];
-    if (!Array.isArray(record.steps)) {
-        ctx.issue(`${path}.steps`, 'invalid-type', 'Expected an array of pattern steps');
-    } else if (record.steps.length > 128) {
-        ctx.issue(`${path}.steps`, 'invalid-value', 'Pattern lane exceeds 128 steps');
-    } else {
-        steps = record.steps.map((step, index) => {
-            if (typeof step !== 'number' || !Number.isInteger(step) || step < 0 || step > 2) {
-                ctx.issue(
-                    `${path}.steps.${index}`,
-                    'invalid-value',
-                    'Pattern steps must be 0, 1, or 2',
-                );
-                return 0;
-            }
-            return step;
-        });
-    }
-    return { name, steps };
-}
-
-function validatePattern(
-    ctx: ValidationContext,
-    record: JsonRecord,
-    path: string,
-): ChartGroovePatternLane[] {
-    let pattern: ChartGroovePatternLane[] = [];
-    if (!Array.isArray(record.pattern)) {
-        ctx.issue(`${path}.pattern`, 'invalid-type', 'Expected an array of groove lanes');
-    } else if (record.pattern.length > 64) {
-        ctx.issue(`${path}.pattern`, 'invalid-value', 'Groove pattern exceeds 64 lanes');
-    } else {
-        pattern = record.pattern.map((lane, index) =>
-            validatePatternLane(ctx, lane, `${path}.pattern.${index}`),
-        );
-        const names = new Set<string>();
-        for (let index = 0; index < pattern.length; index++) {
-            const name = pattern[index].name;
-            if (names.has(name)) {
-                ctx.issue(
-                    `${path}.pattern.${index}.name`,
-                    'invalid-value',
-                    'Duplicate pattern lane',
-                );
-            }
-            names.add(name);
-        }
-    }
-    return pattern;
-}
-
-function validateGroove(ctx: ValidationContext, candidate: unknown, path: string): ChartGroove {
-    const record = ctx.object(
-        candidate,
-        path,
-        [...LANE_MIX_FIELDS, 'swing', 'swingSub', 'humanize'],
-        ['genre', 'measures', 'lastDrumPreset', 'genreFeel', 'lastSmartGenre', 'pattern'],
-    );
-
-    const genre = optionalStringField(ctx, record, 'genre', path, {
-        min: 1,
-        max: 64,
-        predicate: (value) => GENRE_NAMES.includes(value),
-        message: 'Unknown genre',
-    });
-    // The legacy pair, stored by every chart saved before `genre` existed. Checked exactly as
-    // before when present, including that the two agree.
-    const genreFeel = optionalStringField(ctx, record, 'genreFeel', path, {
-        min: 1,
-        max: 64,
-        predicate: (value) => GENRE_FEELS.includes(value),
-        message: 'Unknown genre feel',
-    });
-    const lastSmartGenre = optionalStringField(ctx, record, 'lastSmartGenre', path, {
-        min: 1,
-        max: 64,
-        predicate: (value) => Object.hasOwn(SMART_GENRES, value),
-        message: 'Unknown smart genre',
-    });
-    if (
-        genreFeel !== undefined &&
-        lastSmartGenre !== undefined &&
-        resolveGenre(lastSmartGenre)?.feel !== genreFeel
-    ) {
-        ctx.issue(
-            `${path}.lastSmartGenre`,
-            'invalid-value',
-            'Smart genre name and engine feel must describe the same genre',
-        );
-    }
-    if (genre === undefined && genreFeel === undefined && lastSmartGenre === undefined) {
-        ctx.issue(`${path}.genre`, 'missing-field', 'Missing required field genre');
-    }
-
-    return {
-        ...validateLaneMix(ctx, record, path),
-        ...legacy(record, 'measures', () => numberField(ctx, record, 'measures', path, 1, 8, true)),
         swing: numberField(ctx, record, 'swing', path, 0, 100),
         swingSub: stringField(ctx, record, 'swingSub', path, {
             min: 1,
@@ -751,49 +497,13 @@ function validateGroove(ctx: ValidationContext, candidate: unknown, path: string
             message: 'Unknown swing subdivision',
         }) as ChartGroove['swingSub'],
         humanize: numberField(ctx, record, 'humanize', path, 0, 100),
-        ...legacy(record, 'lastDrumPreset', () =>
-            stringField(ctx, record, 'lastDrumPreset', path, {
-                min: 1,
-                max: 100,
-                predicate: validateSafeDisplayString,
-                message: 'Drum preset name contains unsafe characters',
-            }),
-        ),
-        ...(genreFeel === undefined ? {} : { genreFeel }),
-        ...(lastSmartGenre === undefined ? {} : { lastSmartGenre }),
-        ...legacy(record, 'pattern', () => validatePattern(ctx, record, path)),
-        ...(genre === undefined ? {} : { genre }),
+        genre: stringField(ctx, record, 'genre', path, {
+            min: 1,
+            max: 64,
+            predicate: (value) => GENRE_NAMES.includes(value),
+            message: 'Unknown genre',
+        }),
     };
-}
-
-function validateBand(ctx: ValidationContext, candidate: unknown, path: string): ChartBand {
-    const record = ctx.object(
-        candidate,
-        path,
-        ['chords', 'bass', 'soloist', 'groove'],
-        ['harmony'],
-    );
-    return {
-        chords: validateChords(ctx, record.chords, `${path}.chords`),
-        bass: validateBass(ctx, record.bass, `${path}.bass`),
-        soloist: validateSoloist(ctx, record.soloist, `${path}.soloist`),
-        ...legacy(record, 'harmony', () => validateHarmony(ctx, record.harmony, `${path}.harmony`)),
-        groove: validateGroove(ctx, record.groove, `${path}.groove`),
-    };
-}
-
-/**
- * The chart's genre as a canonical name: `genre`, or — for a chart saved before it was stored
- * once — the legacy name/feel pair, which either spelling resolves (`resolveGenre`). Falls back
- * to Rock, the default band, only for a groove no validated chart can hold.
- */
-export function chartGenre(groove: ChartGroove): string {
-    return (
-        resolveGenre(groove.genre)?.name ??
-        resolveGenre(groove.lastSmartGenre)?.name ??
-        resolveGenre(groove.genreFeel)?.name ??
-        'Rock'
-    );
 }
 
 function writtenMix(lane: ChartLaneMix): ChartLaneMix {
@@ -802,10 +512,11 @@ function writtenMix(lane: ChartLaneMix): ChartLaneMix {
 }
 
 /**
- * A chart's performance and band as a chart is written today: the same fields the app's
- * `captureContent` writes, with an old chart's legacy fields left out and its genre stored once.
- * For building a NEW chart from an existing one's setup (a blank song, an import, a v1
- * conversion), so a new chart never starts life carrying the old engine's fields.
+ * A chart's performance and band exactly as the app's `captureContent` writes them: energy
+ * always stored, and the trade settings only while trading, with the defaults an absent one
+ * reads as. Built field by field, so nothing the writer does not write rides along. For building
+ * a NEW chart from an existing one's setup (a blank song, an import), and, through
+ * {@link writtenChart}, for comparing what two charts hold.
  */
 export function writtenSettings(content: Pick<ChartContent, 'performance' | 'band'>): {
     performance: ChartPerformance;
@@ -843,36 +554,20 @@ export function writtenSettings(content: Pick<ChartContent, 'performance' | 'ban
                 swing: groove.swing,
                 swingSub: groove.swingSub,
                 humanize: groove.humanize,
-                genre: chartGenre(groove),
+                genre: groove.genre,
             },
         },
     };
 }
 
 /**
- * A chart's arrangement as a chart is written today: v1's `lastChordPreset` left out (#1424).
- * The arrangement's counterpart of {@link writtenSettings}, for comparing an old chart, whose
- * stored copy keeps the field until its next save, with what the app captures now.
- */
-export function writtenArrangement(arrangement: ChartArrangement): ChartArrangement {
-    const { lastChordPreset: _legacy, ...written } = arrangement;
-    return written;
-}
-
-/**
- * A whole chart as it would be written today — {@link writtenSettings} and, for a chart with
- * one, {@link writtenArrangement} — for asking whether two charts hold the same music. An old
- * chart keeps its legacy fields until its next save, so comparing the raw stored copies would
- * call a chart changed when only a field today's app no longer writes differs.
+ * A whole chart with its settings as {@link writtenSettings} writes them, for asking whether two
+ * charts hold the same music: a chart stored before energy was saved with it, or with trade
+ * settings left over from a trade since switched off, reads the same as the one the app would
+ * write today.
  */
 export function writtenChart<C extends Pick<ChartContent, 'performance' | 'band'>>(chart: C): C {
-    return {
-        ...chart,
-        ...writtenSettings(chart),
-        ...('arrangement' in chart
-            ? { arrangement: writtenArrangement(chart.arrangement as ChartArrangement) }
-            : {}),
-    };
+    return { ...chart, ...writtenSettings(chart) };
 }
 
 function validateChartContent(

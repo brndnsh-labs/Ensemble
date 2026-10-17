@@ -25,7 +25,7 @@
 import { writtenChart } from '@engine/songbook/codec';
 import { type ConversionNote, proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { CodecIssue } from '@engine/songbook/types';
-import { type ChartDocument, validateDocument, withFollowFeel } from './documents';
+import { type ChartDocument, validateDocument } from './documents';
 
 /** One reason or change, about one bar where the converter could say which. */
 export interface UpgradeNote {
@@ -64,10 +64,9 @@ function canonical(value: unknown): string {
     });
 }
 
-/** A document as the current writer would store it: Follow feel applied, legacy fields gone. */
-function asWrittenToday<T extends ChartDocument>(document: T, writtenAt?: string): T {
-    const followed = withFollowFeel(document, writtenAt ?? document.updatedAt);
-    return { ...followed, chart: writtenChart(followed.chart) };
+/** A document as the current writer would store it (`writtenChart`). */
+function asWrittenToday<T extends ChartDocument>(document: T): T {
+    return { ...document, chart: writtenChart(document.chart) };
 }
 
 function isCollection(document: unknown): boolean {
@@ -80,10 +79,12 @@ function isCollection(document: unknown): boolean {
 
 /**
  * Does this stored document need upgrading? A schema-1 (text) chart always does. A schema-2 one
- * does when its stored content differs from what today's writer would store: a legacy
- * band/performance field (`LEGACY_CHART_PATHS` in `prototypes/v2-api/src/db/admin-overview.ts`),
- * a groove with no `genre`, or an old built-in sound pin `withFollowFeel` would move. A collection
- * (`kind` set) never does.
+ * does when its stored content differs from what today's writer would store (`writtenChart`):
+ * no stored energy, say. A collection (`kind` set) never does.
+ *
+ * Asked of a raw row that will not read too (`unreadableLooksOld`): one that still carries a
+ * band or performance field the codec no longer accepts (#1741) differs from `writtenChart`'s
+ * field-by-field copy, so it is listed as an old leftover rather than ignored.
  */
 export function needsUpgrade(document: ChartDocument): boolean {
     if (isCollection(document)) {
@@ -109,10 +110,6 @@ function noteOf(issue: CodecIssue | ConversionNote): UpgradeNote {
 
 /**
  * The upgraded document must itself be current, or a second run would rewrite it again. Checked
- * as it will be stored — restamped now, past `FOLLOW_FEEL_SINCE` — and through the full validator.
- */
-/**
- * The upgraded document must itself be current, or a second run would rewrite it again. Checked
  * as it will be stored — with its own `updatedAt`, which the upgrade keeps — through the full
  * validator.
  */
@@ -136,8 +133,7 @@ function lossy(notes: readonly ConversionNote[]): UpgradeNote[] {
 /**
  * What one stored song becomes. A text chart goes through `proposeLegacyScoreConversion` (#1737),
  * which converts what v1 played or refuses with a reason per bar; every upgraded document is then
- * written as today's writer writes it (`writtenChart`, `withFollowFeel` against the song's own
- * `updatedAt`). `changes` are the converter's `tones-dropped` notes: upgraded, but not tone for
+ * written as today's writer writes it (`writtenChart`). `changes` are the converter's `tones-dropped` notes: upgraded, but not tone for
  * tone. Same id and the same `updatedAt` — an upgrade is not an edit (DECISION 2026-10-16); the
  * revision is the Save's to advance.
  */
@@ -160,10 +156,7 @@ export function upgradeDocument(document: ChartDocument): DocumentUpgrade {
                 : [{ message: 'The chart could not be converted.' }],
         };
     }
-    const next = {
-        ...asWrittenToday(proposal.value, document.updatedAt),
-        updatedAt: document.updatedAt,
-    };
+    const next = { ...asWrittenToday(proposal.value), updatedAt: document.updatedAt };
     if (next.id !== document.id || !settles(next, document.updatedAt)) {
         return { kind: 'refused', reasons: [UNSETTLED] };
     }
@@ -179,9 +172,8 @@ export function draftNeedsUpgrade(document: ChartDocument): boolean {
 }
 
 /**
- * What one retained DRAFT becomes, rewritten in place: a text chart converted, and either kind's
- * legacy fields left out (`writtenChart`). Not `withFollowFeel`: a draft's readers apply that
- * against its own `capturedAt`, which the rewrite keeps.
+ * What one retained DRAFT becomes, rewritten in place: a text chart converted, and either kind
+ * written as today's writer writes it (`writtenChart`).
  */
 export function upgradeDraftDocument(document: ChartDocument): DocumentUpgrade {
     if (!draftNeedsUpgrade(document)) {

@@ -31,8 +31,6 @@ export interface AdminOverview {
         total: number;
         /** Chart count per `schemaVersion` as text; `unknown` is none or non-integer. */
         bySchemaVersion: Record<string, number>;
-        /** Charts carrying any legacy band/performance field, or lacking a groove `genre`. */
-        withLegacyFields: number;
     };
     authFailuresLast24Hours: number;
     list: AdminAccountRow[];
@@ -64,12 +62,9 @@ export function hasValidChartCounts(value: unknown): boolean {
     if (!isRecord(value) || !isRecord(value.charts)) {
         return false;
     }
-    const { total, bySchemaVersion, withLegacyFields } = value.charts;
+    const { total, bySchemaVersion } = value.charts;
     return (
-        isCount(total) &&
-        isCount(withLegacyFields) &&
-        isRecord(bySchemaVersion) &&
-        Object.values(bySchemaVersion).every(isCount)
+        isCount(total) && isRecord(bySchemaVersion) && Object.values(bySchemaVersion).every(isCount)
     );
 }
 

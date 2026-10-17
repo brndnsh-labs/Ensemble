@@ -31,7 +31,6 @@ import {
 import { warmDrumBuffers } from '@engine/engine/synth-drums';
 import { transposeChordText } from '@engine/engine/transpose';
 import { unlockAudio } from '@engine/platform';
-import { chartGenre } from '@engine/songbook/codec';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { SemanticScore } from '@engine/songbook/score-types';
 import {
@@ -457,8 +456,7 @@ function mix(lane: ChartLaneMix): ChartLaneMix {
 
 /**
  * Explicit semantic projection, never a clone of the live/audio state tree. It writes the music
- * and the settings the band honours, nothing else (DECISION 2026-09-26): the old engine's fields
- * are still read from an old chart, but never written, so a chart sheds them on its next save.
+ * and the settings the band honours, nothing else (DECISION 2026-09-26).
  */
 export function captureContent(): ChartContent {
     const { arranger: a, playback: p, chords: c, bass: b, soloist: s, groove: g } = getState();
@@ -974,8 +972,7 @@ function apply(content: DocumentContent, compiled?: Timeline): void {
     const energy = performance.energy ?? 'auto';
     param('playback', 'autoIntensity', energy === 'auto');
     param('playback', 'bandIntensity', energy === 'auto' ? DEFAULT_ENERGY : energy);
-    // Only the fields a chart writes are applied, by name: an old chart's legacy fields (see
-    // `ChartBand`) are read by nothing, so they never reach the engine.
+    // Each lane's mix, by name.
     for (const module of ['chords', 'bass', 'soloist', 'groove'] as const) {
         const lane = band[module];
         for (const key of ['enabled', 'voice', 'autoSound', 'volume', 'reverb'] as const) {
@@ -991,7 +988,7 @@ function apply(content: DocumentContent, compiled?: Timeline): void {
     param('groove', 'swing', band.groove.swing);
     param('groove', 'swingSub', band.groove.swingSub);
     param('groove', 'humanize', band.groove.humanize);
-    applyGenre(chartGenre(band.groove));
+    applyGenre(band.groove.genre);
     dispatch(ACTIONS.SET_START_STEP, 0);
 }
 

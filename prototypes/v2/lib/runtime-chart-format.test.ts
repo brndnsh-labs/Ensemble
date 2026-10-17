@@ -3,16 +3,15 @@
  */
 /**
  * The chart format (DECISION 2026-09-26, #1404): a chart holds the music plus the settings the
- * band honours. An old chart still opens — its legacy fields are read by nothing — and the
- * next capture writes none of them, so it sheds them on its next save. Genre is stored once, by
- * name; energy rides the chart.
+ * band honours. The old engine's band and performance fields are refused outright (#1741).
+ * Genre is stored once, by name; energy rides the chart.
  */
-import { validateChartDocument, writtenArrangement, writtenSettings } from '@engine/songbook/codec';
+import { validateChartDocument, writtenChart } from '@engine/songbook/codec';
 import type { ChartContent, ChartDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { captureContent, captureDocument, load, state } from './runtime';
 
-/** A chart saved before 2026-09-26: every field the old engine wrote, genre stored twice. */
+/** A chart as the app writes it, with every setting off its default. */
 function oldChart(): ChartDocument {
     return {
         schemaVersion: 1,
@@ -29,9 +28,8 @@ function oldChart(): ChartDocument {
                 grouping: null,
                 isMinor: false,
                 notation: 'name',
-                lastChordPreset: 'Songbook',
             },
-            performance: { bpm: 132, complexity: 0.8, seed: 'A1B2C3', randomizeSeed: false },
+            performance: { bpm: 132, seed: 'A1B2C3', randomizeSeed: false },
             band: {
                 chords: {
                     enabled: true,
@@ -39,10 +37,6 @@ function oldChart(): ChartDocument {
                     autoSound: false,
                     volume: 0.7,
                     reverb: 0.25,
-                    style: 'funk',
-                    instrument: 'Warm',
-                    octave: 55,
-                    density: 'rich',
                 },
                 bass: {
                     enabled: false,
@@ -50,8 +44,6 @@ function oldChart(): ChartDocument {
                     autoSound: false,
                     volume: 0.6,
                     reverb: 0.1,
-                    style: 'hiphop',
-                    octave: 30,
                 },
                 soloist: {
                     enabled: true,
@@ -59,23 +51,8 @@ function oldChart(): ChartDocument {
                     autoSound: false,
                     volume: 0.8,
                     reverb: 0.5,
-                    style: 'bird',
-                    preset: 'trumpet',
-                    octave: 80,
                     mode: 'guitar',
                     autoMode: false,
-                    phrasingIntensity: 0.9,
-                    tradeMode: 'sections',
-                },
-                harmony: {
-                    enabled: true,
-                    voice: 'synth',
-                    autoSound: false,
-                    volume: 0.4,
-                    reverb: 0.4,
-                    style: 'horns',
-                    octave: 62,
-                    complexity: 0.9,
                 },
                 groove: {
                     enabled: true,
@@ -83,85 +60,29 @@ function oldChart(): ChartDocument {
                     autoSound: false,
                     volume: 0.9,
                     reverb: 0.15,
-                    measures: 2,
                     swing: 40,
                     swingSub: '16th',
                     humanize: 12,
-                    lastDrumPreset: 'Funk',
-                    genreFeel: 'Bossa Nova',
-                    lastSmartGenre: 'Bossa',
-                    pattern: [{ name: 'Kick', steps: [1, 0, 0, 0] }],
+                    genre: 'Bossa',
                 },
             },
         },
     };
 }
 
-const LEGACY = {
-    performance: ['complexity'],
-    chords: ['style', 'instrument', 'octave', 'density'],
-    bass: ['style', 'octave'],
-    soloist: ['style', 'preset', 'octave', 'phrasingIntensity', 'tradeMode'],
-    groove: ['measures', 'lastDrumPreset', 'genreFeel', 'lastSmartGenre', 'pattern'],
-} as const;
-
-describe('opening an old chart and capturing it again', () => {
-    it('opens a chart carrying every dropped field, and the next capture writes none of them', () => {
-        const stored = oldChart();
-        expect(validateChartDocument(stored).kind).toBe('ok');
-        load(stored);
-        const content = captureContent();
-        expect(content.performance).not.toHaveProperty('complexity');
-        // v1's preset name went the same lazy way (#1424).
-        expect(content.arrangement).not.toHaveProperty('lastChordPreset');
-        expect(content.band).not.toHaveProperty('harmony');
-        for (const lane of ['chords', 'bass', 'soloist', 'groove'] as const) {
-            for (const field of LEGACY[lane]) {
-                expect(content.band[lane], `${lane}.${field}`).not.toHaveProperty(field);
-            }
-        }
-        // The capture is a valid chart in its own right, and the stored copy is untouched.
-        expect(validateChartDocument(captureDocument(stored)).kind).toBe('ok');
-        expect(stored).toEqual(oldChart());
-    });
-
+describe('opening a chart and capturing it again', () => {
     it('keeps every field the band honours, exactly', () => {
         load(oldChart());
         const { arrangement, performance, band } = captureContent();
-        const { lastChordPreset: _dropped, ...music } = oldChart().chart.arrangement;
-        expect(arrangement).toEqual(music);
+        expect(arrangement).toEqual(oldChart().chart.arrangement);
         expect(performance).toEqual({
             bpm: 132,
             seed: 'A1B2C3',
             randomizeSeed: false,
-            // An old chart carried no energy: the band shapes it.
+            // A chart stored with no energy: the band shapes it.
             energy: 'auto',
         });
-        expect(band).toEqual({
-            chords: { enabled: true, voice: 'synth', autoSound: false, volume: 0.7, reverb: 0.25 },
-            bass: { enabled: false, voice: 'synth', autoSound: false, volume: 0.6, reverb: 0.1 },
-            soloist: {
-                enabled: true,
-                voice: 'synth',
-                autoSound: false,
-                volume: 0.8,
-                reverb: 0.5,
-                mode: 'guitar',
-                autoMode: false,
-            },
-            groove: {
-                enabled: true,
-                voice: 'synth',
-                autoSound: false,
-                volume: 0.9,
-                reverb: 0.15,
-                swing: 40,
-                swingSub: '16th',
-                humanize: 12,
-                // Stored twice before (`Bossa`/`Bossa Nova`), once now, by name.
-                genre: 'Bossa',
-            },
-        });
+        expect(band).toEqual(oldChart().chart.band);
     });
 
     it('round-trips a chart as it is written today without losing anything', () => {
@@ -171,24 +92,14 @@ describe('opening an old chart and capturing it again', () => {
         expect(captureDocument(written)).toEqual(written);
     });
 
-    it('reads as the same chart once written today, so an old chart undone by hand is not an edit', () => {
-        // The stand's dirty check compares charts as written today (`written` in ensemble.tsx):
-        // the stored copy keeps its legacy fields until the next Save, a capture never has them.
-        const asWritten = (chart: Pick<ChartContent, 'performance' | 'band'>) =>
-            JSON.stringify({
-                ...chart,
-                ...writtenSettings(chart),
-                ...('arrangement' in chart
-                    ? {
-                          arrangement: writtenArrangement(
-                              chart.arrangement as ChartContent['arrangement'],
-                          ),
-                      }
-                    : {}),
-            });
+    it('reads as the same chart once written today, so a chart undone by hand is not an edit', () => {
+        // The stand's dirty check compares charts as written today (`same` in ensemble.tsx).
+        const asWritten = (document: { chart: Pick<ChartContent, 'performance' | 'band'> }) =>
+            JSON.stringify(writtenChart(document.chart));
         const stored = oldChart();
         load(stored);
-        expect(asWritten(captureDocument(stored).chart)).toBe(asWritten(stored.chart));
+        expect(asWritten(captureDocument(stored))).toBe(asWritten(stored));
+        // The capture stores the energy the chart left out.
         expect(JSON.stringify(captureDocument(stored).chart)).not.toBe(
             JSON.stringify(stored.chart),
         );
@@ -198,12 +109,14 @@ describe('opening an old chart and capturing it again', () => {
         const trading = oldChart();
         Object.assign(trading.chart.band.soloist, { tradeWith: 'drums', tradeBars: 4 });
         load(trading);
-        expect(asWritten(captureDocument(trading).chart)).toBe(asWritten(trading.chart));
+        expect(asWritten(captureDocument(trading))).toBe(asWritten(trading));
     });
 
-    it('derives the lane styles from the genre, not from the chart or the one open before', () => {
+    it('derives the lane styles from the genre, not from the chart open before', () => {
+        const funk = oldChart();
+        funk.chart.band.groove.genre = 'Funk';
+        load(funk);
         load(oldChart());
-        // The old chart's own styles (funk/hiphop/bird/horns) are legacy; Bossa routes its own.
         const { chords, bass, groove } = state();
         expect(groove.lastSmartGenre).toBe('Bossa');
         expect(groove.genreFeel).toBe('Bossa Nova');
@@ -212,29 +125,48 @@ describe('opening an old chart and capturing it again', () => {
     });
 });
 
-describe('genre, stored once', () => {
-    const withGroove = (groove: Record<string, unknown>) => {
-        const document = oldChart();
-        const { genreFeel: _feel, lastSmartGenre: _name, ...rest } = document.chart.band.groove;
-        document.chart.band.groove = { ...rest, ...groove } as typeof rest;
-        return document;
-    };
+/** A sample of the old engine's band and performance fields, one per place they sat (#1741). */
+const RETIRED: ReadonlyArray<[path: string, extra: (document: ChartDocument) => object]> = [
+    ['$.chart.arrangement.lastChordPreset', () => ({ lastChordPreset: 'Songbook' })],
+    ['$.chart.performance.complexity', () => ({ complexity: 0.8 })],
+    ['$.chart.band.harmony', (document) => ({ harmony: document.chart.band.chords })],
+    ['$.chart.band.chords.style', () => ({ style: 'funk' })],
+    ['$.chart.band.soloist.tradeMode', () => ({ tradeMode: 'sections' })],
+    ['$.chart.band.groove.genreFeel', () => ({ genreFeel: 'Bossa Nova' })],
+    ['$.chart.band.groove.lastSmartGenre', () => ({ lastSmartGenre: 'Bossa' })],
+];
 
-    it.each([
-        ['the name', { lastSmartGenre: 'Ska-Punk' }, 'Ska-Punk'],
-        ['the feel', { genreFeel: 'Ska' }, 'Ska-Punk'],
-        ['both, agreeing', { lastSmartGenre: 'Jazz', genreFeel: 'Jazz' }, 'Jazz'],
-        [
-            '`genre` over the legacy pair',
-            { genre: 'Funk', lastSmartGenre: 'Jazz', genreFeel: 'Jazz' },
-            'Funk',
-        ],
-    ])('reads it from %s', (_, groove, expected) => {
-        const document = withGroove(groove);
-        expect(validateChartDocument(document).kind).toBe('ok');
-        load(document);
-        expect(state().groove.lastSmartGenre).toBe(expected);
-        expect(captureContent().band.groove.genre).toBe(expected);
+/** The object a retired field's path names, inside `document`. */
+function holder(document: ChartDocument, path: string): object {
+    const keys = path.split('.').slice(1, -1);
+    return keys.reduce<Record<string, unknown>>(
+        (node, key) => node[key] as Record<string, unknown>,
+        document as unknown as Record<string, unknown>,
+    );
+}
+
+describe("the old engine's fields", () => {
+    it.each(RETIRED)(
+        'refuses a chart carrying %s, and the stand will not open it',
+        (path, extra) => {
+            const document = oldChart();
+            Object.assign(holder(document, path), extra(document));
+            const verdict = validateChartDocument(document);
+            expect(verdict.kind === 'invalid' && verdict.issues).toContainEqual(
+                expect.objectContaining({ path, code: 'unknown-field' }),
+            );
+            expect(() => load(document)).toThrow();
+        },
+    );
+
+    it('refuses a groove with no genre', () => {
+        const document = oldChart();
+        const { genre: _genre, ...groove } = document.chart.band.groove;
+        document.chart.band.groove = groove as typeof document.chart.band.groove;
+        const verdict = validateChartDocument(document);
+        expect(verdict.kind === 'invalid' && verdict.issues).toContainEqual(
+            expect.objectContaining({ path: '$.chart.band.groove.genre', code: 'missing-field' }),
+        );
     });
 });
 

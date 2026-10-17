@@ -48,26 +48,6 @@ export function isSwingSub(value: unknown): value is SwingSub {
 }
 
 /**
- * Chord voicing density, as a saved chart's legacy `density` field spells it (the songbook
- * codec validates it). A keyspace, not a scale; the old voicing stack that branched on
- * `'rich'` / `'thin'` is gone, and nothing in the band reads it.
- *
- * Union rather than `string` for the same reason as `SwingSub` (#1264): the share
- * reader ran this through a numeric `clamp`, which did `parseFloat('rich') → NaN`
- * and substituted `0.5`, silently collapsing every shared rich/thin voicing to
- * standard. Typing the field makes that class of mismatch a compile error.
- */
-export type ChordDensity = 'thin' | 'standard' | 'rich';
-
-/** Runtime keyspace for {@link ChordDensity}. See {@link SWING_SUBS} on why it is local. */
-const CHORD_DENSITIES: readonly ChordDensity[] = ['thin', 'standard', 'rich'];
-
-/** Narrows an untrusted value to {@link ChordDensity}. See {@link isSwingSub}. */
-export function isChordDensity(value: unknown): value is ChordDensity {
-    return typeof value === 'string' && (CHORD_DENSITIES as readonly string[]).includes(value);
-}
-
-/**
  * One component of a chord display string (root + suffix, with optional slash bass).
  */
 export interface ChordNamePart {

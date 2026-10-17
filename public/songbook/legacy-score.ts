@@ -27,8 +27,7 @@ export interface ConversionNote {
         | 'empty-bar'
         | 'empty-section'
         | 'respelled'
-        | 'tones-dropped'
-        | 'preset-detached';
+        | 'tones-dropped';
     message: string;
     song?: string;
     section?: string;
@@ -497,14 +496,6 @@ export function proposeLegacyScoreConversion(source: string): ConversionResult {
             source,
             issues: checked.kind === 'invalid' ? checked.issues : [],
         };
-    }
-    if (arrangement.lastChordPreset) {
-        notes.push({
-            path: '$.chart.arrangement.lastChordPreset',
-            code: 'preset-detached',
-            message:
-                'The saved preset association remains in the original document; the new score owns its written music.',
-        });
     }
     return { kind: 'candidate', source, value: checked.value, notes };
 }

@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import {
-    chartGenre,
     decodeChartDocument,
     encodeChartDocument,
     validateChartDocument,
     writtenSettings,
 } from '../../../public/songbook/codec.js';
+import { validateChartDocumentV2 } from '../../../public/songbook/document-v2.js';
+import type { ChartDocumentV2 } from '../../../public/songbook/score-types.js';
 import { SONGBOOK_MAX_SECTIONS } from '../../../public/songbook/structural-limits.js';
 import type { ChartDocument } from '../../../public/songbook/types.js';
 
-/**
- * A chart saved before the chart-format decision (2026-09-26): it carries every field the old
- * engine wrote, and its genre twice. Every test that reads it is a backward-compatible READ.
- */
+/** A chart as the app stored one, every optional field it can hold but trading and energy. */
 function makeChartDocument(): ChartDocument {
     return {
         schemaVersion: 1,
@@ -48,11 +46,9 @@ function makeChartDocument(): ChartDocument {
                 grouping: [2, 3],
                 isMinor: false,
                 notation: 'roman',
-                lastChordPreset: 'User Study',
             },
             performance: {
                 bpm: 117,
-                complexity: 0.67,
                 seed: 'A1B2C3',
                 randomizeSeed: false,
             },
@@ -61,10 +57,6 @@ function makeChartDocument(): ChartDocument {
                     enabled: true,
                     voice: 'pack:grand',
                     autoSound: false,
-                    style: 'smart',
-                    instrument: 'Piano',
-                    octave: 48,
-                    density: 'rich',
                     volume: 0.82,
                     reverb: 0.24,
                 },
@@ -72,8 +64,6 @@ function makeChartDocument(): ChartDocument {
                     enabled: true,
                     voice: 'synth',
                     autoSound: true,
-                    style: 'smart',
-                    octave: 38,
                     volume: 0.9,
                     reverb: 0.12,
                 },
@@ -81,25 +71,10 @@ function makeChartDocument(): ChartDocument {
                     enabled: true,
                     voice: 'synth',
                     autoSound: true,
-                    style: 'smart',
-                    preset: 'trumpet',
-                    octave: 72,
                     volume: 0.88,
                     reverb: 0.3,
                     mode: 'monophonic',
                     autoMode: false,
-                    phrasingIntensity: 0.74,
-                    tradeMode: 'sections',
-                },
-                harmony: {
-                    enabled: true,
-                    voice: 'synth',
-                    autoSound: true,
-                    style: 'smart',
-                    octave: 60,
-                    volume: 0.7,
-                    reverb: 0.4,
-                    complexity: 0.58,
                 },
                 groove: {
                     enabled: true,
@@ -107,17 +82,10 @@ function makeChartDocument(): ChartDocument {
                     autoSound: false,
                     volume: 0.95,
                     reverb: 0.18,
-                    measures: 2,
                     swing: 56,
                     swingSub: '16th',
                     humanize: 23,
-                    lastDrumPreset: 'Basic Rock',
-                    genreFeel: 'Jazz',
-                    lastSmartGenre: 'Jazz',
-                    pattern: [
-                        { name: 'Kick', steps: [1, 0, 0, 0, 2, 0, 0, 0] },
-                        { name: 'Snare', steps: [0, 0, 1, 0, 0, 0, 1, 0] },
-                    ],
+                    genre: 'Jazz',
                 },
             },
         },
@@ -155,8 +123,8 @@ describe('Songbook codecs (#1044)', () => {
     it('rejects the complete current candidate instead of returning a partial document', () => {
         const candidate = makeChartDocument() as any;
         candidate.chart.band.bass.volume = 9;
-        candidate.chart.band.groove.pattern[0].steps[0] = 'hit';
-        candidate.chart.band.harmony.buffer = [];
+        candidate.chart.band.groove.swing = 'hit';
+        candidate.chart.band.chords.buffer = [];
 
         const result = validateChartDocument(candidate);
         expect(result.kind).toBe('invalid');
@@ -167,8 +135,8 @@ describe('Songbook codecs (#1044)', () => {
         expect(result.issues.map((issue) => issue.path)).toEqual(
             expect.arrayContaining([
                 '$.chart.band.bass.volume',
-                '$.chart.band.groove.pattern.0.steps.0',
-                '$.chart.band.harmony.buffer',
+                '$.chart.band.groove.swing',
+                '$.chart.band.chords.buffer',
             ]),
         );
     });
@@ -226,24 +194,6 @@ describe('Songbook codecs (#1044)', () => {
                 '$.chart.arrangement.sections.1.id',
                 '$.chart.performance.transportStep',
             ]),
-        );
-    });
-
-    it('rejects a genre name and engine feel that describe different genres', () => {
-        const candidate = makeChartDocument();
-        candidate.chart.band.groove.genreFeel = 'Rock';
-        candidate.chart.band.groove.lastSmartGenre = 'Jazz';
-
-        const result = validateChartDocument(candidate);
-        expect(result.kind).toBe('invalid');
-        if (result.kind !== 'invalid') {
-            return;
-        }
-        expect(result.issues).toContainEqual(
-            expect.objectContaining({
-                path: '$.chart.band.groove.lastSmartGenre',
-                code: 'invalid-value',
-            }),
         );
     });
 
@@ -327,9 +277,8 @@ describe('Songbook codecs (#1044)', () => {
         }
     });
 
-    it('rejects unknown groove lanes and path-unsafe pack ids', () => {
+    it('rejects path-unsafe pack ids', () => {
         const candidate = makeChartDocument() as any;
-        candidate.chart.band.groove.pattern[0].name = 'Cowbell';
         candidate.chart.band.chords.voice = 'pack:../../api/logout?x=';
 
         const result = validateChartDocument(candidate);
@@ -337,12 +286,7 @@ describe('Songbook codecs (#1044)', () => {
         if (result.kind !== 'invalid') {
             return;
         }
-        expect(result.issues.map((issue) => issue.path)).toEqual(
-            expect.arrayContaining([
-                '$.chart.band.groove.pattern.0.name',
-                '$.chart.band.chords.voice',
-            ]),
-        );
+        expect(result.issues.map((issue) => issue.path)).toEqual(['$.chart.band.chords.voice']);
     });
 
     it('rejects accessor-bearing candidates without invoking their getters', () => {
@@ -412,13 +356,152 @@ describe('Songbook codecs (#1044)', () => {
 
 /**
  * The chart format (DECISION 2026-09-26, #1404): the music plus the settings the band honours.
- * The old engine's fields are still read (lazily dropped on the next save, never by migration),
- * the genre is stored once, and the band's energy rides the chart.
+ * The genre is stored once, the band's energy rides the chart, and the old engine's band and
+ * performance fields are refused (#1741).
  */
-/** A chart as the codec before 2026-09-26 serialized it (see the test that reads it). */
+/** A chart as the codec before 2026-09-26 serialized it, every old-engine field included. */
 // biome-ignore format: exact bytes
 const OLDER_BUILD_BYTES =
     '{"schemaVersion":1,"id":"chart-ada-001","title":"Odd-Meter Study","createdAt":"2026-08-28T12:00:00.000Z","updatedAt":"2026-08-28T12:30:00.000Z","revision":3,"chart":{"arrangement":{"sections":[{"id":"section-a","label":"A","value":"Imaj7 | IVmaj7","repeat":2,"key":"Gb","isMinor":false,"timeSignature":"5/4","seamless":true,"targetIntensity":0.62,"instruments":{"groove":true,"bass":true,"chords":false,"harmony":true,"soloist":false}}],"key":"Gb","timeSignature":"5/4","grouping":[2,3],"isMinor":false,"notation":"roman","lastChordPreset":"User Study"},"performance":{"bpm":117,"complexity":0.67,"seed":"A1B2C3","randomizeSeed":false},"band":{"chords":{"enabled":true,"voice":"pack:grand","autoSound":false,"volume":0.82,"reverb":0.24,"style":"smart","instrument":"Piano","octave":48,"density":"rich"},"bass":{"enabled":true,"voice":"synth","autoSound":true,"volume":0.9,"reverb":0.12,"style":"smart","octave":38},"soloist":{"enabled":true,"voice":"synth","autoSound":true,"volume":0.88,"reverb":0.3,"style":"smart","preset":"trumpet","octave":72,"mode":"monophonic","autoMode":false,"phrasingIntensity":0.74,"tradeMode":"sections","tradeWith":"drums","tradeBars":8,"tradeChoruses":3},"harmony":{"enabled":true,"voice":"synth","autoSound":true,"volume":0.7,"reverb":0.4,"style":"smart","octave":60,"complexity":0.58},"groove":{"enabled":true,"voice":"pack:studio-kit","autoSound":false,"volume":0.95,"reverb":0.18,"measures":2,"swing":56,"swingSub":"16th","humanize":23,"lastDrumPreset":"Basic Rock","genreFeel":"Jazz","lastSmartGenre":"Jazz","pattern":[{"name":"Kick","steps":[1,0,0,0,2,0,0,0]},{"name":"Snare","steps":[0,0,1,0,0,0,1,0]}]}}}}';
+
+/**
+ * Every band and performance field the old engine wrote, by its path in a stored chart, with a
+ * value it once accepted. None of them is accepted any more (#1741).
+ */
+const RETIRED_FIELDS: ReadonlyArray<[path: string, value: unknown]> = [
+    ['$.chart.arrangement.lastChordPreset', 'User Study'],
+    ['$.chart.performance.complexity', 0.67],
+    [
+        '$.chart.band.harmony',
+        {
+            enabled: true,
+            voice: 'synth',
+            autoSound: true,
+            volume: 0.7,
+            reverb: 0.4,
+            style: 'smart',
+            octave: 60,
+            complexity: 0.58,
+        },
+    ],
+    ['$.chart.band.chords.style', 'smart'],
+    ['$.chart.band.chords.instrument', 'Piano'],
+    ['$.chart.band.chords.octave', 48],
+    ['$.chart.band.chords.density', 'rich'],
+    ['$.chart.band.bass.style', 'smart'],
+    ['$.chart.band.bass.octave', 38],
+    ['$.chart.band.soloist.style', 'smart'],
+    ['$.chart.band.soloist.preset', 'trumpet'],
+    ['$.chart.band.soloist.octave', 72],
+    ['$.chart.band.soloist.phrasingIntensity', 0.74],
+    ['$.chart.band.soloist.tradeMode', 'sections'],
+    ['$.chart.band.groove.measures', 2],
+    ['$.chart.band.groove.lastDrumPreset', 'Basic Rock'],
+    ['$.chart.band.groove.genreFeel', 'Jazz'],
+    ['$.chart.band.groove.lastSmartGenre', 'Jazz'],
+    ['$.chart.band.groove.pattern', [{ name: 'Kick', steps: [1, 0, 0, 0] }]],
+];
+
+/** `document` with `value` set at `path` (`$.a.b.c`). */
+function withField(document: object, path: string, value: unknown): object {
+    const copy = structuredClone(document) as Record<string, unknown>;
+    const keys = path.split('.').slice(1);
+    const last = keys.pop() as string;
+    const holder = keys.reduce<Record<string, unknown>>(
+        (node, key) => node[key] as Record<string, unknown>,
+        copy,
+    );
+    holder[last] = value;
+    return copy;
+}
+
+/** The same chart as a measure chart (schema 2), whose band the same validator checks. */
+function makeMeasureChart(): ChartDocumentV2 {
+    const { chart, ...envelope } = makeChartDocument();
+    return {
+        ...envelope,
+        schemaVersion: 2,
+        chart: {
+            performance: chart.performance,
+            band: chart.band,
+            score: {
+                key: 'C',
+                isMinor: false,
+                notation: 'name',
+                meter: '4/4',
+                grouping: null,
+                sections: [
+                    {
+                        id: 'a',
+                        label: 'A',
+                        repeat: 1,
+                        measures: [
+                            {
+                                id: 'm1',
+                                content: {
+                                    kind: 'events',
+                                    events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
+                                },
+                            },
+                        ],
+                    },
+                ],
+            },
+        },
+    };
+}
+
+describe("the old engine's fields, refused (#1741)", () => {
+    it('refuses the bytes an older build wrote, naming every field it no longer accepts', () => {
+        const result = decodeChartDocument(OLDER_BUILD_BYTES);
+        expect(result.kind).toBe('invalid');
+        if (result.kind !== 'invalid') {
+            return;
+        }
+        const unknown = result.issues
+            .filter((issue) => issue.code === 'unknown-field')
+            .map((issue) => issue.path);
+        expect(unknown.sort()).toEqual(RETIRED_FIELDS.map(([path]) => path).sort());
+        // …and the genre it stored only the old way is missing.
+        expect(result.issues).toContainEqual(
+            expect.objectContaining({ path: '$.chart.band.groove.genre', code: 'missing-field' }),
+        );
+    });
+
+    it.each(RETIRED_FIELDS)('refuses a chart carrying %s, in either schema', (path, value) => {
+        for (const [document, validate] of [
+            [makeChartDocument(), validateChartDocument],
+            [makeMeasureChart(), validateChartDocumentV2],
+        ] as const) {
+            if (path.startsWith('$.chart.arrangement.') && document.schemaVersion === 2) {
+                continue; // A measure chart has no arrangement: its score has no such field.
+            }
+            expect(validate(document).kind).toBe('ok');
+            const result = validate(withField(document, path, value));
+            expect(result.kind).toBe('invalid');
+            expect(result.kind === 'invalid' && result.issues).toContainEqual(
+                expect.objectContaining({ path, code: 'unknown-field' }),
+            );
+        }
+    });
+
+    it('requires the genre, in either schema', () => {
+        for (const [document, validate] of [
+            [makeChartDocument(), validateChartDocument],
+            [makeMeasureChart(), validateChartDocumentV2],
+        ] as const) {
+            const candidate = structuredClone(document) as any;
+            delete candidate.chart.band.groove.genre;
+            const result = validate(candidate);
+            expect(result.kind === 'invalid' && result.issues).toEqual([
+                expect.objectContaining({
+                    path: '$.chart.band.groove.genre',
+                    code: 'missing-field',
+                }),
+            ]);
+        }
+    });
+});
 
 describe('chart format: the settings the band honours', () => {
     /** The same chart as a chart is written today. */
@@ -429,38 +512,6 @@ describe('chart format: the settings the band honours', () => {
             chart: { arrangement: old.chart.arrangement, ...writtenSettings(old.chart) },
         };
     }
-
-    it('reproduces the bytes an older build wrote, legacy fields and all', () => {
-        // The account API refuses a Save whose bytes are not the codec's canonical form
-        // (`decodeSaveRequest`), and a Save an older build queued carries these fields in
-        // that build's order. These are the exact bytes the codec before 2026-09-26 emitted
-        // for this chart (trading included), recorded from it when the format changed.
-        const result = decodeChartDocument(OLDER_BUILD_BYTES);
-        expect(result.kind).toBe('ok');
-        if (result.kind !== 'ok') {
-            return;
-        }
-        expect(JSON.stringify(result.value)).toBe(OLDER_BUILD_BYTES);
-    });
-
-    it('still checks a legacy field when a chart carries one', () => {
-        const candidate = makeChartDocument() as any;
-        candidate.chart.band.chords.style = 'retired-style';
-        candidate.chart.band.soloist.tradeMode = 'forever';
-        candidate.chart.performance.complexity = 2;
-        const result = validateChartDocument(candidate);
-        expect(result.kind).toBe('invalid');
-        if (result.kind !== 'invalid') {
-            return;
-        }
-        expect(result.issues.map((issue) => issue.path)).toEqual(
-            expect.arrayContaining([
-                '$.chart.band.chords.style',
-                '$.chart.band.soloist.tradeMode',
-                '$.chart.performance.complexity',
-            ]),
-        );
-    });
 
     it('round-trips a chart as written today losslessly, holding only the kept fields', () => {
         const written = makeWrittenChart();
@@ -502,36 +553,18 @@ describe('chart format: the settings the band honours', () => {
     });
 
     describe('genre, stored once', () => {
-        function withGenre(groove: Record<string, unknown>): ChartDocument {
-            const candidate = makeWrittenChart() as any;
-            delete candidate.chart.band.groove.genre;
-            Object.assign(candidate.chart.band.groove, groove);
+        function withGenre(genre: string): ChartDocument {
+            const candidate = makeWrittenChart();
+            candidate.chart.band.groove.genre = genre;
             return candidate;
         }
 
-        it.each([
-            ['genre alone', { genre: 'Bossa' }, 'Bossa'],
-            ['the legacy name alone', { lastSmartGenre: 'Bossa' }, 'Bossa'],
-            ['the legacy feel alone, in the feel spelling', { genreFeel: 'Bossa Nova' }, 'Bossa'],
-            ['the legacy feel for Ska-Punk', { genreFeel: 'Ska' }, 'Ska-Punk'],
-            ['the legacy pair', { lastSmartGenre: 'Ska-Punk', genreFeel: 'Ska' }, 'Ska-Punk'],
-            [
-                'genre, over a legacy pair that disagrees with it',
-                { genre: 'Funk', lastSmartGenre: 'Jazz', genreFeel: 'Jazz' },
-                'Funk',
-            ],
-        ])('reads %s', (_, groove, expected) => {
-            const result = validateChartDocument(withGenre(groove));
-            expect(result.kind).toBe('ok');
-            if (result.kind !== 'ok') {
-                return;
+        it('reads a canonical genre name and writes it back as it is', () => {
+            const result = validateChartDocument(withGenre('Ska-Punk'));
+            expect(result.kind === 'ok' && result.value.chart.band.groove.genre).toBe('Ska-Punk');
+            if (result.kind === 'ok') {
+                expect(writtenSettings(result.value.chart).band.groove.genre).toBe('Ska-Punk');
             }
-            expect(chartGenre(result.value.chart.band.groove)).toBe(expected);
-            // …and writes it back once, by name.
-            const { groove: written } = writtenSettings(result.value.chart).band;
-            expect(written.genre).toBe(expected);
-            expect(written).not.toHaveProperty('genreFeel');
-            expect(written).not.toHaveProperty('lastSmartGenre');
         });
 
         it.each([
@@ -540,26 +573,13 @@ describe('chart format: the settings the band honours', () => {
             ['a prototype key', 'constructor'],
             ['an empty string', ''],
         ])('stores only a canonical genre name, not %s', (_, genre) => {
-            const result = validateChartDocument(withGenre({ genre }));
+            const result = validateChartDocument(withGenre(genre));
             expect(result.kind).toBe('invalid');
             if (result.kind === 'invalid') {
                 expect(result.issues.map((issue) => issue.path)).toContain(
                     '$.chart.band.groove.genre',
                 );
             }
-        });
-
-        it('requires a genre in one form or the other', () => {
-            const result = validateChartDocument(withGenre({}));
-            expect(result).toEqual({
-                kind: 'invalid',
-                issues: [
-                    expect.objectContaining({
-                        path: '$.chart.band.groove.genre',
-                        code: 'missing-field',
-                    }),
-                ],
-            });
         });
     });
 

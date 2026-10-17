@@ -33,8 +33,7 @@ export function importedDocument(
     }
     checkPlayable(song.score);
     const now = new Date().toISOString();
-    // The band's setup as a chart is written today, so the import doesn't inherit the old
-    // engine's fields from an old base chart.
+    // The band's setup as a chart is written today (`writtenSettings`).
     const setup = writtenSettings(base.chart);
     return validateDocument({
         schemaVersion: 2,

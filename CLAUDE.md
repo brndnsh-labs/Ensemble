@@ -174,7 +174,6 @@ The music stand: songbook home, chart sheet (edited in place: bars typed on the 
 
 ### Data / Config split
 
-- Per-lane style keyspaces (what a saved chart's legacy `style` fields may hold, validated by the songbook codec): `public/data/instrument-styles.ts`
 - Musical behavior: the band engine's styles, `band/styles/` (one file per genre)
 - Styles live beside the components in `prototypes/v2/app/` (`style.css` plus per-surface `.css` files). `public/` holds no CSS.
 

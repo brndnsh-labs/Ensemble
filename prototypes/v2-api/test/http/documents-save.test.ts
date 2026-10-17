@@ -152,7 +152,7 @@ describe('POST /api/documents/save (#1202)', () => {
         expect(JSON.parse(row?.body ?? '{}')).toEqual(snapshot(makeChartDocument('doc-1')));
     });
 
-    it('commits a chart as the app writes it today: no legacy fields, genre once, energy (#1404)', async () => {
+    it('commits a chart as the app writes it today: genre once, energy (#1404)', async () => {
         ctx = await setUp();
         const old = makeChartDocument('doc-lean');
         const written = {
@@ -175,6 +175,105 @@ describe('POST /api/documents/save (#1202)', () => {
         expect(stored.chart.band.groove.genre).toBe('Jazz');
         expect(stored.chart.band).not.toHaveProperty('harmony');
         expect(stored.chart.performance.energy).toBe('auto');
+    });
+
+    it("refuses a chart still carrying one of the old engine's fields, and writes nothing (#1741)", async () => {
+        ctx = await setUp();
+        const accountId = ctx.accountId;
+        const textChart = makeChartDocument('doc-old');
+        // The same chart as a measure chart (schema 2), which shares the band validator. Its bytes
+        // are stored as sent, so a field added anywhere is still the codec's canonical form: only
+        // the field itself can be what is refused, and the clean copy below commits.
+        const { chart: content, ...envelope } = makeChartDocument('doc-old');
+        const measureChart = {
+            ...envelope,
+            schemaVersion: 2,
+            chart: {
+                performance: content.performance,
+                band: content.band,
+                score: {
+                    key: 'C',
+                    isMinor: false,
+                    notation: 'name',
+                    meter: '4/4',
+                    grouping: null,
+                    sections: [
+                        {
+                            id: 'a',
+                            label: 'A',
+                            repeat: 1,
+                            measures: [
+                                {
+                                    id: 'm1',
+                                    content: {
+                                        kind: 'events',
+                                        events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+        };
+        // One per place the old engine's fields sat. `lastChordPreset` lived on a text chart's
+        // arrangement, last, where the codec used to write it.
+        const retired: Array<[string, unknown, (document: any) => void]> = [
+            [
+                'arrangement.lastChordPreset',
+                textChart,
+                (d) => (d.chart.arrangement.lastChordPreset = 'User Study'),
+            ],
+            [
+                'performance.complexity',
+                measureChart,
+                (d) => (d.chart.performance.complexity = 0.67),
+            ],
+            [
+                'band.harmony',
+                measureChart,
+                (d) => (d.chart.band.harmony = { ...d.chart.band.chords }),
+            ],
+            ['chords.style', measureChart, (d) => (d.chart.band.chords.style = 'smart')],
+            [
+                'soloist.tradeMode',
+                measureChart,
+                (d) => (d.chart.band.soloist.tradeMode = 'sections'),
+            ],
+            ['groove.pattern', measureChart, (d) => (d.chart.band.groove.pattern = [])],
+            ['groove.genreFeel', measureChart, (d) => (d.chart.band.groove.genreFeel = 'Jazz')],
+            [
+                'groove.lastSmartGenre instead of genre',
+                measureChart,
+                (d) => {
+                    delete d.chart.band.groove.genre;
+                    d.chart.band.groove.lastSmartGenre = 'Jazz';
+                },
+            ],
+        ];
+        const body = (document: unknown, operationId: string) =>
+            JSON.stringify({
+                protocolVersion: 1,
+                ownerId: accountId,
+                documentId: 'doc-old',
+                operationId,
+                expectedRevision: null,
+                document,
+            });
+        for (const [index, [label, chart, retire]] of retired.entries()) {
+            const document: any = structuredClone(chart);
+            retire(document);
+            const { status, json } = await save(ctx, body(document, `op-old-${index}`));
+            expect(status, label).toBe(400);
+            expect(json, label).toEqual({ error: 'malformed_request' });
+        }
+        expect(readDocument(ctx.testDb.db, accountId, 'doc-old')).toBeUndefined();
+        expect(counter).toBe(0);
+        // Without the field, each chart commits as sent.
+        expect((await save(ctx, body(measureChart, 'op-measures'))).status).toBe(200);
+        expect(JSON.parse(readDocument(ctx.testDb.db, accountId, 'doc-old')?.body ?? '{}')).toEqual(
+            measureChart,
+        );
     });
 
     it('replaying the same operation id and bytes returns the original result without a second write', async () => {
