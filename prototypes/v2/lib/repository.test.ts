@@ -375,11 +375,16 @@ describe('removing an "Upgrade old songs" leftover, guest songbook (#1738)', () 
         localStore.set(SLOT, slot(song.updatedAt));
         expect(await removeRecoverySlot(SLOT, slot(song.updatedAt))).toBe('live');
         expect(localStore.get(SLOT)).toBe(slot(song.updatedAt));
-        // No capture time to tell by, on a song that reads: live too.
-        const bare = JSON.stringify({ document: song });
-        localStore.set(SLOT, bare);
-        expect(await removeRecoverySlot(SLOT, bare)).toBe('live');
-        expect(localStore.get(SLOT)).toBe(bare);
+    });
+
+    it('removes a slot recoveryFor would never offer, even on a song that reads', async () => {
+        fake.rows.set(song.id, song);
+        // No capture time, and bytes that do not parse: neither can come back as a draft.
+        for (const raw of [JSON.stringify({ document: song }), '{not json']) {
+            localStore.set(SLOT, raw);
+            expect(await removeRecoverySlot(SLOT, raw)).toBe('removed');
+            expect(localStore.has(SLOT)).toBe(false);
+        }
     });
 
     it('removes an orphan slot: no song here for it to be live on', async () => {

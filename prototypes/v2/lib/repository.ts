@@ -457,6 +457,28 @@ export function recoveriesFor(
     return records;
 }
 
+/**
+ * Whether `recoveryFor` would offer this slot's bytes on `song`: a record that reads, for this
+ * song, captured (a real time) at or after its version. A slot that fails any of that is never
+ * offered, so it is not unsaved work anyone can get back here — only its backup holds it.
+ */
+function offeredAsRecovery(raw: string, song: ChartDocument): boolean {
+    if (raw.length > 1_100_000) {
+        return false;
+    }
+    try {
+        const record = JSON.parse(raw);
+        return (
+            validated(record.document).id === song.id &&
+            typeof record.capturedAt === 'string' &&
+            Number.isFinite(Date.parse(record.capturedAt)) &&
+            record.capturedAt >= song.updatedAt
+        );
+    } catch {
+        return false;
+    }
+}
+
 export function recoveryFor(
     document: ChartDocument,
 ): { document: ChartDocument; conflict: boolean } | null {
@@ -591,9 +613,10 @@ export function replaceRecoverySlot(
  * Remove ONE recovery slot the musician chose to remove from "Upgrade old songs"' leftovers
  * (#1738), only if it still holds exactly the bytes the backup file holds (`raw`). A slot
  * captured again since (`'changed'`) or already gone (`'gone'`) is left alone, and so is a LIVE
- * one (`'live'`): a slot of a song this device reads, captured at or after that song's version
- * (`recoveryFor`'s rule) — or with no capture time to tell — is unsaved work, which has its own way
- * back. The account's `AccountSongbook.removeDraftRow`, with the same answers.
+ * one (`'live'`): a slot `recoveryFor` would offer on a song this device reads
+ * (`offeredAsRecovery`) is unsaved work, which has its own way back. A slot it would never offer
+ * (no capture time, bytes that do not read) is not, or it could never be cleared. The account's
+ * `AccountSongbook.removeDraftRow`, with the same answers.
  */
 export async function removeRecoverySlot(
     key: string,
@@ -619,16 +642,8 @@ export async function removeRecoverySlot(
     if (held !== raw) {
         return 'changed';
     }
-    if (song) {
-        let capturedAt: unknown;
-        try {
-            capturedAt = (JSON.parse(held) as { capturedAt?: unknown } | null)?.capturedAt;
-        } catch {
-            capturedAt = undefined;
-        }
-        if (typeof capturedAt !== 'string' || capturedAt >= song.updatedAt) {
-            return 'live';
-        }
+    if (song && offeredAsRecovery(held, song)) {
+        return 'live';
     }
     localStorage.removeItem(key);
     return 'removed';
