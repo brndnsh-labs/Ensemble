@@ -119,3 +119,24 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
+/* The way to the opening bar's own markers (#1758): quiet, under the guide, for the forms it
+   leaves alone. */
+.guided-markers {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    margin: 16px 0 0;
+    font-size: 13px;
+}
+.guided-markers span {
+    color: var(--muted);
+}
+/* The per-bar markers view: its checkboxes are not the dialog's 44px-tall fields (out-specifies
+   `.guided-form input` above, whatever the import order). */
+.guided-form .form-controls-toggle input {
+    min-height: 0;
+}
+.guided-form .form-controls {
+    margin: 12px 0;
+}

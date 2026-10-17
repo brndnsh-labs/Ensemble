@@ -173,8 +173,11 @@ Ctrl/⌘+.) holds **Key or meter from here**, which applies from that bar throug
 does not transpose chord names; where the bar's meter has more than one idiomatic split (5, 7, 8,
 9, 10, 11 or 12 counts — `lib/grouping.ts`), its beat grouping picks one, such as 2+3 in 5/4, and
 the section's settings offer the same at section scope (#1376). Any meter change resets it. The
-menu also holds **Repeat or ending…**, **Advanced · per-bar repeat and ending markers**, **Hold
-last chord**, **Insert bar after** and **Delete bar**.
+menu also holds **Repeat or ending…** (the one repeat path), **Hold last chord**, **Insert bar
+after** and, last after a divider, **Delete bar**. Only the beat ruler is open as the menu opens;
+Key or meter from here is folded (#1758). On a phone the bar and section menus slide up from the
+foot of the screen over a light backdrop that a press goes through, so pressing another bar
+still opens it.
 The song's title is typed in the header while editing. The transport's **Key** button opens one
 small popover (#1757) holding the song's Key, Mode, Meter and Chord notation, each changed as it is
 picked. Key transposes the entire score. **Mode** sets the song's own major/minor
@@ -184,6 +187,10 @@ section or bar with its own meter keeps it, and a bar whose written lengths cann
 the change and is selected for you — nothing is rounded. A text chart's popover holds Key and
 Chord notation only. How many times the form plays (or Repeats
 continuously) is the chart footer's form-length menu.
+Delete bar and Delete section take effect at once; a toast then offers **Undo** for a few
+seconds (#1758), which puts back the chart exactly as it was before the delete — the deleted bar's
+unapplied typing included, its bar open again. It is one snapshot, not a history: any later edit,
+or Save, retires it, and it touches nothing saved.
 Delete bar removes the bar (a key/meter change it wrote passes to the next bar, so the rest of the
 section sounds the same; a section's only bar takes the section with it) and the section letter's
 **Delete section** removes the whole section (#1373). Both refuse, changing nothing, when it would
@@ -192,7 +199,7 @@ bar carrying repeat/navigation marks — remove the marks or the whole section i
 section letter in Edit opens that section's menu (#1374, #1726): it names the section (1–24
 characters), sets how many times it plays (1–64), gives it its own key, mode or meter or returns
 each to the song's, and adds a section after it (one bar in the song's key and meter) or deletes
-it. A section meter change re-fits that section's bars by the song meter's rule and resets its beat
+it. Its name and plays, and its key, mode or meter, are two folded groups. A section meter change re-fits that section's bars by the song meter's rule and resets its beat
 grouping; a bar with its own override keeps it. Save includes pending bars even with the editor
 hidden.
 
@@ -204,8 +211,9 @@ edit its range/count or remove only its form markers. Cancel keeps unrelated pen
 text. Apply adopts the complete validated draft; explicit Save updates the songbook.
 The [guided interaction note](../../docs/design/ensemble-v2-guided-form.md) describes the boundaries.
 
-**Advanced · per-bar repeat and ending markers** (in the bar menu) keeps the low-level fields for
-nested and nonstandard forms. Set each affected bar in turn: a bar whose markers make no form yet
+**Per-bar markers for …** (inside the Repeats and endings dialog since #1758, in the bar menu
+before) keeps the bar's low-level fields for nested and nonstandard forms; where the pending
+bars' markers make no form yet, the dialog opens straight on them. Set each affected bar in turn: a bar whose markers make no form yet
 stays pending (lightly tinted, no error), and the form applies as soon as the bars together make
 one; Save says what is still missing. Complex sections are preserved by the guide and remain
 editable here.

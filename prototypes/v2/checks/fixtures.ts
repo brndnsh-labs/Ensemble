@@ -379,9 +379,17 @@ export async function openSectionMenu(page: Page, label: string): Promise<Locato
     return menu;
 }
 
-/** The section menu's "Key, mode or meter" group, unfolded. */
+/** The section menu's "Key, mode or meter" group, unfolded (folded as the menu opens, #1758). */
 export async function openSectionContext(menu: Locator): Promise<void> {
-    const details = menu.locator('details');
+    await unfold(menu.locator('details.section-menu-context'));
+}
+
+/** The section menu's "Name and plays" group, unfolded (folded as the menu opens, #1758). */
+export async function openSectionNames(menu: Locator): Promise<void> {
+    await unfold(menu.locator('details.section-menu-names'));
+}
+
+async function unfold(details: Locator): Promise<void> {
     if (!(await details.evaluate((node: HTMLDetailsElement) => node.open))) {
         await details.locator('summary').click();
     }

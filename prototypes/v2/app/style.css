@@ -1024,6 +1024,28 @@ button.bar-number {
     max-width: 100%;
     pointer-events: auto;
 }
+/* A toast's one action (a delete's Undo, #1758): a text button in the toast's own colours, 44px
+   tall like its close button. */
+.toast-action {
+    flex-shrink: 0;
+    min-height: 44px;
+    margin-block: -8px;
+    margin-right: -6px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.toast-action:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: -3px;
+}
 .toast-close {
     flex-shrink: 0;
     min-width: 44px;

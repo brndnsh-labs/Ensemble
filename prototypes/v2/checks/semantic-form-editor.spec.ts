@@ -66,9 +66,10 @@ async function newSong(page: Page, title: string) {
 }
 
 /**
- * Bar `bar`'s menu (#1725), opened on its "Advanced · per-bar repeat and ending markers" (#1726:
- * the edit panel's form controls moved here). The markers are a draft change like the bar's
- * chords: applied on leaving the bar, kept by Save.
+ * Bar `bar`'s own repeat and ending markers: the per-bar view of the Repeats and endings dialog,
+ * from the bar menu's "Repeat or ending…" (#1758; in the bar menu itself before). The markers are
+ * a draft change like the bar's chords: applied on leaving the bar, kept by Save. Where the
+ * pending bars' markers make no form yet, the dialog opens on them; otherwise on the guide.
  */
 async function barForm(page: Page, bar: number): Promise<Locator> {
     await openBar(page, bar);
@@ -76,19 +77,22 @@ async function barForm(page: Page, bar: number): Promise<Locator> {
     if (!(await menu.isVisible())) {
         await page.getByRole('button', { name: 'Bar menu', exact: true }).click();
     }
-    await expect(menu).toBeVisible();
-    const details = menu.locator('details.form-controls');
-    if (!(await details.evaluate((node: HTMLDetailsElement) => node.open))) {
-        await expect(menu.getByLabel('Start repeat here', { exact: true })).not.toBeVisible();
-        await details.locator('summary').click();
+    await menu.getByRole('button', { name: /^Repeat or ending/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
+    await expect(dialog).toBeVisible();
+    const perBar = dialog.getByRole('button', { name: /^Per-bar markers for / });
+    if (await perBar.isVisible()) {
+        await expect(dialog.getByLabel('Start repeat here', { exact: true })).toHaveCount(0);
+        await perBar.click();
     }
-    await expect(menu.getByLabel('Start repeat here', { exact: true })).toBeVisible();
-    return menu;
+    await expect(dialog.getByLabel('Start repeat here', { exact: true })).toBeVisible();
+    return dialog;
 }
 
-/** Closes the open bar menu back to typing (Esc); the bar's field stays open. */
+/** Closes the markers (Esc) back to typing; the bar's field stays open, its draft kept. */
 async function closeBarMenu(page: Page) {
     await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Repeats and endings' })).toHaveCount(0);
     await expect(page.getByRole('dialog', { name: /^Bar \d+ menu$/ })).toHaveCount(0);
 }
 

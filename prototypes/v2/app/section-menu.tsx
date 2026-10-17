@@ -4,6 +4,8 @@ import type { ScoreSection, SemanticScore } from '@engine/songbook/score-types';
 import { type RefObject, useEffect, useRef } from 'react';
 import type { SectionChange } from '../lib/documents';
 import './bar-menu.css';
+// The phone sheet's slide and backdrop are `<Menu>`'s (#1755), the one copy of that motion.
+import './menu.css';
 import { type SectionField, SectionNameFields, SectionSelects } from './section-settings';
 import { useAnchoredPlacement } from './use-anchored-placement';
 
@@ -37,6 +39,10 @@ interface SectionMenuProps {
  * never lost — and only then closes. An action in the menu takes a field's uncommitted typing
  * with it, as one change: on WebKit a press does not take focus, so the field is still focused
  * when the action runs, and its own commit then would turn the action away (#1726 review).
+ *
+ * Calm by default (#1758): Start here and the section actions are single rows, the settings are
+ * two folded groups (name and plays; key, mode or meter), and Delete section is last, after a
+ * divider. On a phone it slides up over a light backdrop, its Close in the heading row.
  */
 export function SectionMenu({
     score,
@@ -108,7 +114,7 @@ export function SectionMenu({
 
     useEffect(() => {
         node.current
-            ?.querySelector<HTMLElement>('button, input, select, summary')
+            ?.querySelector<HTMLElement>('button:not(.bar-menu-back), input, select, summary')
             ?.focus({ preventScroll: true });
         function outside(event: PointerEvent) {
             const target = event.target instanceof Element ? event.target : null;
@@ -133,140 +139,148 @@ export function SectionMenu({
     });
 
     return (
-        <div
-            ref={node}
-            className={`bar-menu section-edit-menu${sheet ? ' bar-menu-sheet' : ' popover'}`}
-            role="dialog"
-            aria-label={`Section ${section.label} menu`}
-            tabIndex={-1}
-            onFocus={(event) => {
-                lastFocus.current = event.target;
-            }}
-            onKeyDown={(event) => {
-                // The chart's keys (Space playing, an arrow browsing) are not the menu's.
-                event.stopPropagation();
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    close(true);
-                }
-            }}
-            onBlur={(event) => {
-                // Tabbing out of the menu leaves it; focus going nowhere (a control disabled
-                // while the change is made, the window losing focus) does not.
-                // Focus moving to this menu's own letter is its press, which toggles the menu
-                // shut itself (the letter's click).
-                const to = event.relatedTarget;
-                if (
-                    to instanceof Element &&
-                    !event.currentTarget.contains(to) &&
-                    !latest.current.anchor()?.contains(to)
-                ) {
-                    close(false);
-                }
-            }}
-        >
-            <p className="bar-menu-heading">Section {section.label}</p>
-            <button
-                type="button"
-                className="bar-menu-item"
-                aria-disabled={busy || undefined}
-                onClick={() => {
-                    if (!busy) {
-                        const changes = take();
+        <>
+            {/* The light backdrop of `<Menu>`'s sheet, drawn only: a press goes through it, so a
+                press on another letter opens that section's menu (the outside press above). */}
+            {sheet && <div className="menu-backdrop bar-menu-backdrop" aria-hidden="true" />}
+            <div
+                ref={node}
+                className={`bar-menu section-edit-menu${sheet ? ' bar-menu-sheet' : ' popover'}`}
+                role="dialog"
+                aria-label={`Section ${section.label} menu`}
+                tabIndex={-1}
+                onFocus={(event) => {
+                    lastFocus.current = event.target;
+                }}
+                onKeyDown={(event) => {
+                    // The chart's keys (Space playing, an arrow browsing) are not the menu's.
+                    event.stopPropagation();
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
                         close(true);
-                        onStartHere(changes);
                     }
                 }}
-            >
-                Start here
-            </button>
-            <hr />
-            <div className="bar-menu-fields">
-                <SectionNameFields
-                    score={score}
-                    section={section}
-                    disabled={busy}
-                    onChange={(change) => {
-                        if (!taken.current) {
-                            onChange([change]);
-                        }
-                    }}
-                    onPending={(field, change) => {
-                        if (change) {
-                            pending.current.set(field, change);
-                        } else {
-                            pending.current.delete(field);
-                        }
-                    }}
-                />
-            </div>
-            <details className="bar-menu-details">
-                <summary className="bar-menu-item">
-                    Key, mode or meter
-                    <span>
-                        {section.key === undefined &&
-                        section.isMinor === undefined &&
-                        section.meter === undefined &&
-                        section.grouping === undefined
-                            ? 'Song’s'
-                            : 'Its own'}
-                    </span>
-                </summary>
-                <div className="bar-menu-fields">
-                    <SectionSelects
-                        score={score}
-                        section={section}
-                        disabled={busy}
-                        onChange={(change) => onChange([change])}
-                    />
-                </div>
-                <p className="bar-menu-caption">
-                    A bar with its own key or meter keeps it. Changing the section's meter re-fits
-                    bars of equal lengths and resets its beat grouping; chord names are not
-                    transposed.
-                </p>
-            </details>
-            <hr />
-            <button
-                type="button"
-                className="bar-menu-item"
-                aria-disabled={busy || undefined}
-                onClick={() => {
-                    if (!busy) {
-                        const changes = take();
+                onBlur={(event) => {
+                    // Tabbing out of the menu leaves it; focus going nowhere (a control disabled
+                    // while the change is made, the window losing focus) does not.
+                    // Focus moving to this menu's own letter is its press, which toggles the menu
+                    // shut itself (the letter's click).
+                    const to = event.relatedTarget;
+                    if (
+                        to instanceof Element &&
+                        !event.currentTarget.contains(to) &&
+                        !latest.current.anchor()?.contains(to)
+                    ) {
                         close(false);
-                        onAddAfter(changes);
                     }
                 }}
             >
-                Add section after
-            </button>
-            <button
-                type="button"
-                className="bar-menu-item bar-menu-danger"
-                aria-disabled={busy || undefined}
-                onClick={() => {
-                    if (!busy) {
-                        const changes = take();
-                        close(true);
-                        onDelete(changes);
-                    }
-                }}
-            >
-                Delete section
-            </button>
-            {sheet && (
-                <>
-                    <hr />
-                    <button
-                        type="button"
-                        className="bar-menu-item bar-menu-back"
-                        onClick={() => close(true)}
-                    >
-                        Close
-                    </button>
-                </>
-            )}
-        </div>
+                <div className="bar-menu-top">
+                    <p className="bar-menu-heading">Section {section.label}</p>
+                    {sheet && (
+                        <button type="button" className="bar-menu-back" onClick={() => close(true)}>
+                            Close
+                        </button>
+                    )}
+                </div>
+                <button
+                    type="button"
+                    className="bar-menu-item"
+                    aria-disabled={busy || undefined}
+                    onClick={() => {
+                        if (!busy) {
+                            const changes = take();
+                            close(true);
+                            onStartHere(changes);
+                        }
+                    }}
+                >
+                    Start here
+                </button>
+                <hr />
+                <details className="bar-menu-details section-menu-names">
+                    <summary className="bar-menu-item">
+                        Name and plays
+                        <span>
+                            {section.repeat === 1 ? 'Plays once' : `Plays ${section.repeat}×`}
+                        </span>
+                    </summary>
+                    <div className="bar-menu-fields">
+                        <SectionNameFields
+                            score={score}
+                            section={section}
+                            disabled={busy}
+                            onChange={(change) => {
+                                if (!taken.current) {
+                                    onChange([change]);
+                                }
+                            }}
+                            onPending={(field, change) => {
+                                if (change) {
+                                    pending.current.set(field, change);
+                                } else {
+                                    pending.current.delete(field);
+                                }
+                            }}
+                        />
+                    </div>
+                </details>
+                <details className="bar-menu-details section-menu-context">
+                    <summary className="bar-menu-item">
+                        Key, mode or meter
+                        <span>
+                            {section.key === undefined &&
+                            section.isMinor === undefined &&
+                            section.meter === undefined &&
+                            section.grouping === undefined
+                                ? 'Song’s'
+                                : 'Its own'}
+                        </span>
+                    </summary>
+                    <div className="bar-menu-fields">
+                        <SectionSelects
+                            score={score}
+                            section={section}
+                            disabled={busy}
+                            onChange={(change) => onChange([change])}
+                        />
+                    </div>
+                    <p className="bar-menu-caption">
+                        A bar with its own key or meter keeps it. Changing the section's meter
+                        re-fits bars of equal lengths and resets its beat grouping; chord names are
+                        not transposed.
+                    </p>
+                </details>
+                <button
+                    type="button"
+                    className="bar-menu-item"
+                    aria-disabled={busy || undefined}
+                    onClick={() => {
+                        if (!busy) {
+                            const changes = take();
+                            close(false);
+                            onAddAfter(changes);
+                        }
+                    }}
+                >
+                    Add section after
+                </button>
+                <hr />
+                <button
+                    type="button"
+                    className="bar-menu-item bar-menu-danger"
+                    aria-disabled={busy || undefined}
+                    onClick={() => {
+                        if (!busy) {
+                            const changes = take();
+                            close(true);
+                            onDelete(changes);
+                        }
+                    }}
+                >
+                    Delete section
+                </button>
+            </div>
+        </>
     );
 }
