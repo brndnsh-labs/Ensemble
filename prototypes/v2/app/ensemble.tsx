@@ -253,8 +253,9 @@ function libraryDocuments(library: SavedSong[]): ChartDocument[] {
  *
  * Since #1299 an account chart's unsaved text IS in the account database, so `signOutPreflight`'s
  * own `drafts` count is the real number and this adds what no store holds: a `volatileDrafts` entry
- * — the tab's in-memory copy of an experiment whose storage write was refused — and any guest
- * recovery slot left under an account id by a build from before #1299. Left uncounted, the step
+ * — the tab's in-memory copy of an experiment whose storage write was refused. (Guest recovery
+ * slots are never counted here: no build since #1299 writes one under an account id, and #1743
+ * retired reading them.) Left uncounted, the step
  * would print "Everything on this device has reached your account", hide Export, label the button a
  * plain "Sign out", and then delete the edit it had just said nothing about.
  *
@@ -268,15 +269,8 @@ function withLocalDrafts(
     let held = 0;
     const exposed = new Set(plan.atRisk);
     for (const id of plan.documentIds) {
-        let slots = 0;
-        try {
-            slots = repository.recoverySlotCount(id);
-        } catch {
-            /* Unreadable storage is not evidence of nothing; the in-tab map still answers. */
-        }
-        const local = slots + (volatile.has(id) ? 1 : 0);
-        if (local > 0) {
-            held += local;
+        if (volatile.has(id)) {
+            held += 1;
             exposed.add(id);
         }
     }
@@ -2666,9 +2660,8 @@ export default function Ensemble() {
      * this writer's would leave that row to be recovered again on the next open — the musician
      * reverts, reloads, and the edit they threw away is back on the stand.
      *
-     * A concurrent tab's live experiment goes with it. That is the same trade `clearRecovery`
-     * makes at sign-out, and the tab in question still holds its text and retains it again on its
-     * next keystroke.
+     * A concurrent tab's live experiment goes with it, and the tab in question still holds its text
+     * and retains it again on its next keystroke.
      *
      * A chart whose account is not the attached one clears only what THIS TAB holds (#1311). The
      * account half would be a delete against B's `drafts` store keyed by A's document id: a no-op
@@ -3392,13 +3385,10 @@ export default function Ensemble() {
     }
     /**
      * The retained experiment to offer for a chart being opened, from the songbook it came from
-     * (#1299) — the account's `drafts` store signed in, guest `localStorage` otherwise.
-     *
-     * Signed in, the guest namespace is still consulted as a FALLBACK, and only as one: a device
-     * that ran a build from before #1299 can hold a slot under an account id, and that slot is the
-     * musician's own work. Offering it once through the same menu is how it comes back; the next
-     * successful Save of that song is what finally clears it. Nothing ever writes there for an
-     * account chart again.
+     * (#1299) — the account's `drafts` store signed in, guest `localStorage` otherwise. Every
+     * caller reads the live songbook, so signed in the chart is an account chart, and only the
+     * account store is asked: the guest fallback for a slot a build from before #1299 left under an
+     * account id was retired in #1743.
      *
      * `unreadable` keeps "this song has no retained draft" apart from "this device could not ask"
      * (#1299 patch review P2). Collapsing the two opened the committed copy as if it were the
@@ -3411,21 +3401,18 @@ export default function Ensemble() {
         recovery: { document: ChartDocument; conflict: boolean } | null;
         unreadable: boolean;
     }> {
-        let unreadable = false;
-        if (signedIn) {
-            try {
-                const held = await accountSync.retainedDraft(document.id);
-                if (held) {
-                    return {
-                        recovery: { document: held.document, conflict: held.conflict },
-                        unreadable: false,
-                    };
-                }
-            } catch {
-                unreadable = true;
-            }
+        if (!signedIn) {
+            return { recovery: repository.recoveryFor(document), unreadable: false };
         }
-        return { recovery: repository.recoveryFor(document), unreadable };
+        try {
+            const held = await accountSync.retainedDraft(document.id);
+            return {
+                recovery: held ? { document: held.document, conflict: held.conflict } : null,
+                unreadable: false,
+            };
+        } catch {
+            return { recovery: null, unreadable: true };
+        }
     }
     /**
      * Every preserved draft the song menu can offer for the chart on the stand (#1299 patch
@@ -4809,14 +4796,6 @@ export default function Ensemble() {
             }
             volatileDrafts.current.delete(original.id);
             accountDrafts.current.delete(original.id);
-            try {
-                // Belt and braces: an account chart's experiment is in the account store now, so
-                // this only ever reaches a slot left by a build from before #1299 — and the old id
-                // holds the ACCOUNT's version from here on, which that text is not a draft of.
-                repository.clearRecovery(original.id);
-            } catch {
-                /* Recovery is a convenience; a stale slot must not fail the resolution. */
-            }
             await refreshSongs();
             setMessage(
                 resolution.conflict === 'version'
@@ -4917,15 +4896,9 @@ export default function Ensemble() {
             }
             setAdoptRemoteOffer(null);
             // The experiment this device was holding is gone from the account store, so nothing
-            // may go on claiming it here either. The guest slot is belt and braces since #1299:
-            // only a build from before it could have left one under an account id.
+            // may go on claiming it here either.
             volatileDrafts.current.delete(update.documentId);
             accountDrafts.current.delete(update.documentId);
-            try {
-                repository.clearRecovery(update.documentId);
-            } catch {
-                /* Recovery is a convenience; a stale slot must not fail the resolution. */
-            }
             // The STAND moves first, and the list after (patch R3). The transaction has committed
             // either way, so the one thing still at stake is what is on screen: if the library
             // re-read throws first, `open()` never runs and the stand goes on showing the
@@ -5057,8 +5030,8 @@ export default function Ensemble() {
     }
     /**
      * The newest local version of one account song (#1269's export precedence, extracted for
-     * #1271): this tab's retained draft first, then the account's own retained draft, then a guest
-     * slot from before #1299, then the committed library copy. The work an export exists to rescue
+     * #1271): this tab's retained draft first, then the account's own retained draft, then the
+     * committed library copy. The work an export exists to rescue
      * is exactly the part that is NOT in the library copy, so writing that copy alone would hand
      * back a file missing the very edit the warning was about.
      *
@@ -5066,16 +5039,7 @@ export default function Ensemble() {
      * than awaited between two downloads.
      */
     function latestLocalVersion(song: ChartDocument): ChartDocument {
-        const retained = volatileDrafts.current.get(song.id) ?? accountDrafts.current.get(song.id);
-        if (retained) {
-            return retained;
-        }
-        try {
-            return repository.recoveryFor(song)?.document ?? song;
-        } catch {
-            /* Unreadable slot; the committed copy is still worth a file. */
-            return song;
-        }
+        return volatileDrafts.current.get(song.id) ?? accountDrafts.current.get(song.id) ?? song;
     }
     /**
      * Delete the account (#1271) — what this device does once the server says the account is gone.
@@ -5244,22 +5208,6 @@ export default function Ensemble() {
             accountSync.discardDraft(current.id, standOwner()).catch(() => {
                 /* The committed Save is authoritative; a retained row is harmless. */
             });
-            try {
-                // Every writer's guest slot, and only for an ACCOUNT chart: nothing writes there
-                // for one any more, so whatever is left is a slot from before #1299 — account
-                // content in the guest namespace, which is the thing this story removes. It was
-                // offered once by `retainedDraftFor`, and the commit it was offered against has
-                // now happened.
-                //
-                // Load-bearing invariant, and the reason this is safe to do by id alone: the two
-                // id spaces never overlap. A guest document id is minted by `crypto.randomUUID`
-                // in this app and an account one by the same call inside the account database —
-                // so a slot found under an account chart's id can only ever be that same chart's,
-                // written by a build that routed account recovery through the guest namespace.
-                repository.clearRecovery(current.id);
-            } catch {
-                /* Recovery is a convenience; a stale slot must not fail the Save. */
-            }
         } else {
             try {
                 repository.clearOwnRecovery(current.id);
@@ -5531,7 +5479,8 @@ export default function Ensemble() {
             return null;
         }
         // `accountDrafts` is what makes the card preview an ACCOUNT chart's unsaved edit (#1299):
-        // the guest slot below no longer holds one, and a store read cannot happen in a memo. It
+        // the guest slot below is read for a guest chart only, and a store read cannot happen in
+        // a memo. It
         // only answers for a song this TAB has opened or prefetched, though — on a cold load the
         // map is empty and the card previews the committed copy, which is the honest answer here
         // rather than a claim about a draft nobody has read (#1299 patch review P3).
@@ -5543,7 +5492,9 @@ export default function Ensemble() {
             resolved =
                 current?.id === featuredSave.id
                     ? current
-                    : held || repository.recoveryFor(featuredSave)?.document || featuredSave;
+                    : held ||
+                      (signedIn ? null : repository.recoveryFor(featuredSave)?.document) ||
+                      featuredSave;
         } catch {
             resolved = current?.id === featuredSave.id ? current : held || featuredSave;
         }
@@ -5562,7 +5513,7 @@ export default function Ensemble() {
             isMinor: resolved.chart.score.isMinor,
             bars,
         };
-    }, [featuredSave, current]);
+    }, [featuredSave, current, signedIn]);
     /**
      * `offline.sounds` for the status chip. `soundsAvailableOffline` answers one yes/no about the
      * whole set the open chart needs, so the honest count is that single requirement — verified

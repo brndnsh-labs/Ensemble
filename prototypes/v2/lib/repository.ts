@@ -432,13 +432,13 @@ export function clearOwnRecovery(id: string): void {
 }
 
 /**
- * Remove EVERY writer's recovery slot for one document (#1269), not just this page load's.
+ * Remove EVERY writer's recovery slot for one guest document, not just this page load's.
  *
  * `clearOwnRecovery` is the right tool after a Save: another tab editing the same song is holding
- * its own live experiment, and this writer has no business discarding it. Signing out is the
- * opposite case — the account's local data is being removed from a possibly shared device, a slot
- * an earlier page load left behind holds that chart's text in plaintext, and a tab still open on
- * the same account is losing its session too. So the whole id goes.
+ * its own live experiment, and this writer has no business discarding it. A delete (`remove`)
+ * and a chart back at its committed version are the opposite case: the song, or the edit, is
+ * gone, so a slot an earlier page load left behind must not bring it back. So the whole id goes.
+ * (Sign-out swept these by account id until #1743; no build since #1299 writes one there.)
  */
 export function clearRecovery(id: string): void {
     for (const key of recoveryKeysFor(id)) {

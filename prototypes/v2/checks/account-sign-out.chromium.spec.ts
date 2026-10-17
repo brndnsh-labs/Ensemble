@@ -178,10 +178,7 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     // Web-first, so it retries while the guest library re-renders after sign-out (#1330).
     await expect(songTitles(page)).toHaveText(guestSongs);
-    // Still nothing in the guest namespace — it never held this account's text (#1299), and the
-    // clear that runs over `documentIds` anyway is belt and braces for a slot an older build could
-    // have left. (One page load can only produce its own slot, so the across-writers half of that
-    // clear is proven in `tests/unit/songbook/repository-recovery.test.ts`.)
+    // Still nothing in the guest namespace — it never held this account's text (#1299).
     expect(await recoverySlots(page)).toBe(0);
 
     // A second account on the SAME browser profile — which is what switching accounts is
