@@ -1,4 +1,4 @@
-import { expect, openBand, seedStarters, songLink, test } from './fixtures';
+import { expect, openBand, seedStarters, songLink, songMenuAction, test } from './fixtures';
 
 // #1276 — the Band sheet's Groove and Practice tabs: swing/swing grid/humanize/chord notation and the
 // chart's energy — auto intensity/band intensity, saved with the chart since the
@@ -78,8 +78,7 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
 
     // Revert to saved restores the pre-edit values while still unsaved.
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await expect(page.locator('.chord-button').first()).toHaveText('C7');
     await openBand(page, 'Groove');
     await expect(swing).toHaveValue('100');
@@ -179,8 +178,7 @@ test("energy (auto intensity, band intensity) is the chart's own: it dirties the
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
 
     // Revert to saved puts the band back on auto.
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await openBand(page, 'Groove');
     await expect(autoIntensity).toBeChecked();
     await expect(bandIntensity).toHaveValue('35');

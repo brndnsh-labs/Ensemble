@@ -1,5 +1,5 @@
 import { encodeChartLink } from '../../../public/songbook/chart-link';
-import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, songMenu, songMenuAction, test } from './fixtures';
 import { importTemplate } from './large-library';
 
 // Deterministic across both projects (Desktop Chrome and the WebKit-based
@@ -22,8 +22,7 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
     await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await songMenuAction(page, 'Copy link');
     const linkInput = page.getByTestId('share-link-fallback');
     await expect(linkInput).toBeVisible();
     const link = await linkInput.inputValue();
@@ -66,8 +65,7 @@ test('editing an opened share link before Keep a copy writes nothing to recovery
     await withoutClipboard(page);
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await songMenuAction(page, 'Copy link');
     const link = await page.getByTestId('share-link-fallback').inputValue();
     await page.getByRole('button', { name: 'Close', exact: true }).click();
 
@@ -91,7 +89,8 @@ test('editing an opened share link before Keep a copy writes nothing to recovery
         )
         .toBe(0);
 
-    await fresh.getByRole('button', { name: 'Song actions' }).click();
+    await songMenuAction(fresh, 'More');
+    await expect(songMenu(fresh, 'more')).toBeVisible();
     await expect(fresh.getByText(/Preserved drafts \(/)).toHaveCount(0);
 });
 
@@ -186,8 +185,7 @@ test('a `#chart=` link consumes `?accounts=` without applying it', async ({ page
     await withoutClipboard(page);
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await songMenuAction(page, 'Copy link');
     const hash = new URL(await page.getByTestId('share-link-fallback').inputValue()).hash;
     await page.getByRole('button', { name: 'Close', exact: true }).click();
 

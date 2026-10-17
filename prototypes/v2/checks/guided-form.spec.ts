@@ -6,9 +6,11 @@ import {
     barField,
     editorRevealed,
     expect,
+    exportAs,
     leaveBar,
     openBar,
     songLink,
+    songMenuAction,
     test,
     typeBar,
 } from './fixtures';
@@ -31,11 +33,9 @@ async function openGuide(page: Page, bar = 1) {
     return page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
 }
 async function exported(page: Page): Promise<ChartDocument> {
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const result = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     return result;
 }
 async function createEndings(page: Page) {
@@ -170,16 +170,14 @@ test('guided endings survive save, copy, export, transpose, Revert and offline r
     expect(bars).toHaveLength(4);
     expect(bars[2].start).toEqual([{ kind: 'ending-start', passes: [1] }]);
     expect(bars[3].end).toEqual([{ kind: 'ending-end' }]);
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
+    await songMenuAction(page, 'Duplicate');
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
     const copy = await exported(page);
     expect(copy.id).not.toBe(source.id);
     expect(copy.chart).toEqual(source.chart);
     await page.getByLabel('Key', { exact: true }).selectOption('D');
     await expect(page.locator('.bar .chord')).toHaveText(['D', 'A', 'Bm', 'G']);
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved', exact: true }).click();
+    await songMenuAction(page, 'Revert to saved');
     await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
     await page.getByLabel('Key', { exact: true }).selectOption('D');
     await page.getByRole('button', { name: 'Save', exact: true }).click();

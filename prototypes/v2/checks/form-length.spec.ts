@@ -1,10 +1,10 @@
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, closeSongMenu, editorRevealed, expect, openWholeSong, test } from './fixtures';
+import { appUrl, editorRevealed, expect, formLength, test } from './fixtures';
 
 /**
- * #1511: the chart footer's "N bars · repeats continuously" is the form-length control. It
- * sets the same `score.choruses` the Song menu's Choruses select does (#1475, #1726), and on a text
+ * #1511: the chart footer's "N bars · repeats continuously" is the form-length control, and
+ * since #1756 the only one: it sets `score.choruses` (#1475), and on a text
  * (schema 1) chart a pick first makes the measure copy "Try the bar editor · keep original"
  * makes. Passes are counted from the chart's own pointer, as `choruses.spec.ts` does.
  */
@@ -72,16 +72,6 @@ async function pick(page: Page, choice: string) {
     await expect(formMenu(page)).toBeVisible();
     await formMenu(page).getByRole('menuitemradio', { name: choice, exact: true }).click();
     await expect(formMenu(page)).toHaveCount(0);
-}
-
-/** The Song menu's Choruses select, read in Edit with the menu open, then closed again. */
-async function songMenuChoruses(page: Page): Promise<string> {
-    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await openWholeSong(page);
-    const value = await page.getByLabel('Choruses', { exact: true }).inputValue();
-    await closeSongMenu(page);
-    await page.getByRole('button', { name: 'Chart', exact: true }).click();
-    return value;
 }
 
 test('the footer sets how many times a measure chart plays, and the band stops after them', async ({
@@ -172,9 +162,9 @@ test('the footer sets how many times a measure chart plays, and the band stops a
         menu.getByRole('menuitemradio', { name: 'Plays 2 times', exact: true }),
     ).toHaveAttribute('aria-checked', 'true');
     await page.keyboard.press('Escape');
-    expect(await songMenuChoruses(page)).toBe('2');
+    expect(await formLength(page)).toBe('Plays 2 times');
 
-    // One unsaved edit, which Save keeps like the Song menu's.
+    // One unsaved edit, which Save keeps like any other.
     const save = page.getByRole('button', { name: 'Save', exact: true });
     await expect(save).toBeEnabled();
     await save.click();
@@ -202,10 +192,10 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     expect(heard.at(-1)).toBe('F');
     await expect(footer).toHaveText('4 bars · plays 2 times, then ends');
 
-    // "Repeats continuously" clears the count, in the document and the Song menu.
+    // "Repeats continuously" clears the count, in the document and the footer's menu.
     await pick(page, 'Repeats continuously');
     await expect(footer).toHaveText('4 bars · repeats continuously');
-    expect(await songMenuChoruses(page)).toBe('loop');
+    expect(await formLength(page)).toBe('Repeats continuously');
     await save.click();
     await expect(save).toBeDisabled();
     const cleared = (await documents(page)).find((d) => d.title === 'Footer choruses');

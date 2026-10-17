@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { createAccountThroughDialog, openWithAccounts } from './account-helpers';
-import { expect, accountTest as test } from './fixtures';
+import { expect, openSongMenu, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -115,7 +115,7 @@ test('a device whose songs are already in the account is offered its collections
     // The songs really reached the account before the second device looks.
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await page.locator('.song-link', { hasText: 'Blue pocket' }).first().click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
+    await openSongMenu(page);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
 
     const [passkey] = await authenticator.credentials();

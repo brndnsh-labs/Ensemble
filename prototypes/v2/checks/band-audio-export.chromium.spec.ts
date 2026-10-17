@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { appUrl, editorRevealed, expect, test, typeBar } from './fixtures';
+import { appUrl, editorRevealed, expect, exportAs, test, typeBar } from './fixtures';
 
 /**
  * Chromium-only, same reasoning as `audio-export.chromium.spec.ts`: this exercises a real
@@ -58,20 +58,18 @@ async function newBandChart(page: Page, title: string): Promise<void> {
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
 }
 
-test('Export audio (mix) works on the band engine and downloads a valid WAV', async ({
+test('Export → Audio (mix) works on the band engine and downloads a valid WAV', async ({
     page,
 }, testInfo) => {
     test.setTimeout(60_000);
     await newBandChart(page, 'Band export study');
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download', { timeout: 45_000 });
-    await page.getByRole('button', { name: 'Export audio (mix)' }).click();
+    await exportAs(page, 'Audio (mix)');
     const downloadEvent = await download;
     expect(downloadEvent.suggestedFilename()).toBe('Band export study.wav');
     const dest = testInfo.outputPath('band-mix.wav');
     await downloadEvent.saveAs(dest);
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     const wav = parseWav(await readFile(dest));
     expect(wav.numChannels).toBe(2);
@@ -85,21 +83,20 @@ test('Export audio (mix) works on the band engine and downloads a valid WAV', as
     await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
-test('Export audio (stems) renders drums/bass/chords/soloist, never harmony', async ({
+test('Export → Audio (separate tracks) renders drums/bass/chords/soloist, never harmony', async ({
     page,
 }, testInfo) => {
     // Four full offline renders (`renderBandStemsToWav`), one per lane the band engine has.
     test.setTimeout(120_000);
     await newBandChart(page, 'Band stems study');
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
     // One stem per band lane (`STEM_INSTRUMENTS` in band-export.ts), so exactly 4 downloads land;
     // the soloist stem is the lead, forced on like every stem even though it is off live.
     // Matches `audio-export.chromium.spec.ts`'s accumulation pattern for
     // `downloadExportResult`'s tight synchronous loop.
     const downloads: import('@playwright/test').Download[] = [];
     page.on('download', (event) => downloads.push(event));
-    await page.getByRole('button', { name: 'Export audio (stems)' }).click();
+    await exportAs(page, 'Audio (separate tracks)');
     await expect.poll(() => downloads.length, { timeout: 110_000 }).toBe(4);
     const names = downloads.map((event) => event.suggestedFilename()).sort();
     expect(names).toEqual(

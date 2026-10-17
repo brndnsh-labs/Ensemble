@@ -75,9 +75,10 @@ test('the bar being edited and its editor are on screen together, wherever the b
     await leaveBar(page);
     await expect(other).toHaveClass(/\bselected\b/);
 
-    // The whole-song settings live in the Song menu, one tap from open.
+    // The whole-song settings are the Song menu's More › Song settings… (#1756).
     await expect(page.getByLabel('Song meter')).toBeHidden();
     await openWholeSong(page);
     await expect(page.getByLabel('Song meter')).toBeVisible();
     await closeSongMenu(page);
+    await expect(page.getByLabel('Song meter')).toBeHidden();
 });

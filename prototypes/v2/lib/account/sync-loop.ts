@@ -747,7 +747,7 @@ export interface SignOutPreflight {
 /**
  * One account chart's retained unsaved experiment (#1299), in the shape the shell already renders a
  * guest recovery in (`recoveryFor` in `lib/repository.ts`) — the offer is the SAME offer, so it
- * reuses the same menu, the same message and the same "save a copy to keep both" advice.
+ * reuses the same menu, the same message and the same "duplicate it to keep both" advice.
  */
 export interface RetainedDraft {
     document: ChartDocument;
@@ -809,7 +809,7 @@ export interface SyncLoop {
      * match the attached scope is refused with `AccountMismatchError` BEFORE the songbook is
      * touched, so a refused Save writes no record, no outbox operation and no draft. The case:
      * the session expires under account A's chart, "Sign in again" is answered with B's passkey,
-     * and a plain Save — or `Save a copy`, which passes `expected: null` and would therefore
+     * and a plain Save — or Duplicate, which passes `expected: null` and would therefore
      * succeed — files A's chart content inside B's account.
      */
     save(

@@ -1725,29 +1725,12 @@ dialog textarea {
 .sheet {
     min-width: 0;
 }
+/* Preserved drafts (#1756), a dialog off the Song menu's More. */
 .recovery-list {
-    margin-top: 20px;
-    max-height: 35dvh;
+    display: grid;
+    gap: 8px;
+    max-height: 45dvh;
     overflow: auto;
-}
-/* #1460 — the three sync facts, moved into Song actions from the stand's now-removed footer. */
-.song-menu-status {
-    margin-top: 20px;
-    padding-top: 16px;
-    border-top: 1px solid var(--line);
-}
-.song-menu-status-label {
-    margin: 0 0 8px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-    color: var(--muted);
-}
-.recovery-list summary {
-    cursor: pointer;
-    font-size: 13px;
-    margin-bottom: 12px;
 }
 /* #1268's offer preview: every title that is about to be copied, scrollable rather than
    pushing the Add/Not now buttons off a phone screen on a generous guest songbook. */
@@ -1892,27 +1875,10 @@ dialog textarea {
     width: min(480px, calc(100vw - 32px));
     box-shadow: var(--shadow);
 }
-/* Song actions (#1700): one labelled group per purpose, the labels in the transport's small-caps
-   voice so they read as signposts rather than headings competing with the title. */
-.song-menu-group {
-    margin-top: 22px;
-}
-.song-menu-group h3 {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-    font-weight: 650;
-    margin: 0;
-}
-.modal-box .song-menu-group .dialog-actions {
-    margin-top: 8px;
-}
-/* The whole song's meter, mode and choruses (#1726). */
+/* Song settings (#1756): Song meter and Song mode, until the transport's Key popover (#1757). */
 .song-menu-fields {
     display: grid;
     gap: 4px;
-    margin-top: 8px;
 }
 .song-menu-fields label {
     font-size: 12px;
@@ -1930,10 +1896,27 @@ dialog textarea {
     /* 16px or more, or iOS zooms the page in on focus. */
     font-size: 16px;
 }
-.song-menu-close {
-    justify-content: flex-end;
-    border-top: 1px solid var(--line);
-    padding-top: 16px;
+/* Export… (#1756): one row per format, its file type muted at the end. */
+.export-formats {
+    display: grid;
+    gap: 8px;
+}
+.export-format {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px;
+    text-align: left;
+}
+.export-file {
+    color: var(--muted);
+    font-size: 12px;
+}
+.modal-box .export-progress {
+    margin: 14px 0 0;
+    padding: 0;
 }
 .modal-box h2 {
     font-family: Georgia, serif;

@@ -1,15 +1,13 @@
 import { readFile } from 'node:fs/promises';
-import { expect, seedStarters, songLink, test } from './fixtures';
+import { expect, exportAs, seedStarters, songLink, test } from './fixtures';
 
 // Trading with the band (docs/design/band-engine.md, "Trading with the player"): the Trade
 // button by the Soloist chip opens a sheet; the choice is saved with the chart.
 
 async function exportedSoloist(page: import('@playwright/test').Page) {
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const saved = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     return saved.chart.band.soloist;
 }
 

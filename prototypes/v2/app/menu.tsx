@@ -43,6 +43,11 @@ interface MenuProps {
     items: readonly MenuItem[];
     /** One quiet line above the items, read as the menu's description. */
     note?: ReactNode;
+    /**
+     * A block of facts above the items that is not a line of text (the Song menu's sync status,
+     * #1756). Shown, never read as the menu's name or description, and never focused.
+     */
+    header?: ReactNode;
     className?: string;
     /** Esc, a press outside, Tab, or the trigger scrolling away: the menu should close. */
     onClose: () => void;
@@ -84,6 +89,7 @@ export function Menu({
     align = 'start',
     items,
     note,
+    header,
     className,
     onClose,
 }: MenuProps) {
@@ -239,6 +245,7 @@ export function Menu({
                         {title}
                     </p>
                 )}
+                {header && <div className="menu-header">{header}</div>}
                 {note && (
                     <p className="menu-note" id={noteId}>
                         {note}

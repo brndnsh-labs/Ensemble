@@ -96,6 +96,14 @@
     font-size: 11px;
     line-height: 1.5;
 }
+/* Facts above the rows (the Song menu's sync status, #1756), set apart from them by a rule. */
+.menu-header {
+    flex: none;
+    margin: 0 0 4px;
+    padding: 6px 9px 9px;
+    border-bottom: 1px solid var(--line);
+    font-size: 12px;
+}
 .menu-item {
     display: flex;
     flex: none;

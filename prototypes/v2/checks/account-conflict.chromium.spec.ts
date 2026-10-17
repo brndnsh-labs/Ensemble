@@ -14,7 +14,14 @@ import {
     songTitles,
     uploadOf,
 } from './account-helpers';
-import { expect, leaveBar, openBar, accountTest as test, typeBar } from './fixtures';
+import {
+    expect,
+    leaveBar,
+    openBar,
+    songMenuAction,
+    accountTest as test,
+    typeBar,
+} from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -133,8 +140,7 @@ function expectFreshIdentity(sent: Array<{ documentId: string; operationId: stri
 }
 
 async function openDeleteConfirm(page: Page): Promise<void> {
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByTestId('delete-from-account').click();
+    await songMenuAction(page, 'Delete…');
     await expect(page.getByTestId('delete-song-confirm')).toBeVisible();
 }
 

@@ -8,6 +8,7 @@ import {
     closeSongMenu,
     editorRevealed,
     expect,
+    exportAs,
     leaveBar,
     openBar,
     openSectionContext,
@@ -15,6 +16,7 @@ import {
     openWholeSong,
     seedStarters,
     songLink,
+    songMenuAction,
     typeBar,
 } from './fixtures';
 
@@ -87,12 +89,10 @@ async function closeBarMenu(page: Page) {
 }
 
 async function exportCurrent(page: Page): Promise<ChartDocument> {
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const downloaded = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const path = await (await downloaded).path();
     const document = JSON.parse(await readFile(path!, 'utf8'));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     return document;
 }
 
@@ -228,8 +228,7 @@ test('unfinished bars survive selection, errors and hidden editor; Save commits 
     );
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await typeBar(page, 1, 'unwanted');
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await expect(page.locator('.bar.unreadable')).toHaveCount(0);
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C', 'Dm', 'G7']);
     await expect(await openBar(page, 1)).toHaveValue('C:2 Dm:1 G7:1');
@@ -334,8 +333,7 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     await expect(await openBar(second, 1)).toHaveValue('F:3 G7:1');
     await leaveBar(second);
     expect((await documents(page)).find((document) => document.id === original.id)).toEqual(newer);
-    await second.getByRole('button', { name: 'Song actions' }).click();
-    await second.getByRole('button', { name: 'Save a copy', exact: true }).click();
+    await songMenuAction(second, 'Duplicate');
     const copy = await exportCurrent(second);
     expect(copy.id).not.toBe(original.id);
     if (copy.schemaVersion !== 2) {

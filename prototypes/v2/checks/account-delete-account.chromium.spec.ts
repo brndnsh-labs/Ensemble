@@ -16,7 +16,7 @@ import {
     signUp,
     songTitles,
 } from './account-helpers';
-import { expect, accountTest as test } from './fixtures';
+import { expect, exportAs, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -219,9 +219,8 @@ test('a second device is refused after the deletion, and keeps its own work expo
         await expect(
             second.getByRole('heading', { name: 'Road take two', exact: true }),
         ).toBeVisible();
-        await second.getByRole('button', { name: 'Song actions' }).click();
         const download = second.waitForEvent('download');
-        await second.getByRole('button', { name: 'Export file' }).click();
+        await exportAs(second, 'Song file');
         expect((await download).suggestedFilename()).toBe('Road take two.ensemble');
     } finally {
         await fresh.close();

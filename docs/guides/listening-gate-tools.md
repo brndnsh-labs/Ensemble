@@ -858,10 +858,10 @@ harness. `tmp/` is gitignored, which is what lets the rendered output survive th
 checkout. The tool refuses a dirty tree, never stashes, and restores the original ref
 in a `finally`.
 
-## Song menu → Export audio
+## Song menu → Export… → Audio
 
-In addition to the CLI tools above, the song menu's **Export audio (mix)** and **Export
-audio (stems)** render the current chart through `renderBandPasses` — the same offline
+In addition to the CLI tools above, the Song menu's **Export…** dialog's **Audio (mix)** and
+**Audio (separate tracks)** render the current chart through `renderBandPasses` — the same offline
 render `mix:report` measures — and download WAVs. A stem renders its lane even when that
 lane is off live (the lead is off by default): the render opens the bus of every lane that
 has events in it.

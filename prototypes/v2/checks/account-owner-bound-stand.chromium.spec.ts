@@ -14,7 +14,7 @@ import {
     signUp,
     songTitles,
 } from './account-helpers';
-import { expect, accountTest as test } from './fixtures';
+import { expect, exportAs, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -30,7 +30,7 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
  * authenticate with THEIR passkey without the song ever leaving the stand.
  *
  * Before #1311 the shell recorded only that the chart came from "the account store". `storeSave`
- * therefore filed it under whoever was attached at the time it was pressed — and `Save a copy`,
+ * therefore filed it under whoever was attached at the time it was pressed — and Duplicate,
  * which passes `expected: null`, could not even report a conflict about it: it simply created A's
  * music inside B's library.
  *
@@ -238,12 +238,11 @@ test('a chart from another account is exportable but can never be saved into the
     // Export is the way out the sentence names, and it writes the version that was refused —
     // 'Set list two' is the EDITED title, so this is the in-tab draft and not a committed copy.
     // A refusal that stranded the work would be a worse outcome than the leak it prevented.
-    // Song actions is already open from the sync check above.
+    await closeSongActions(page);
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const exported = await download;
     expect(exported.suggestedFilename()).toBe('Set list two.ensemble');
-    await page.keyboard.press('Escape');
 
     // Nothing of A's reached B's storage — read out of IndexedDB directly rather than inferred
     // from a list, because the claim covers the committed record, the outbox, the drafts and the

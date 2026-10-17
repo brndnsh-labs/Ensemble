@@ -6,9 +6,11 @@ import {
     test as base,
     editorRevealed,
     expect,
+    exportAs,
     leaveBar,
     openBar,
     songLink,
+    songMenuAction,
 } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
@@ -101,12 +103,10 @@ async function addEndings(page: Page) {
 }
 
 async function exportCurrent(page: Page): Promise<ChartDocument> {
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const downloaded = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const path = await (await downloaded).path();
     const document = JSON.parse(await readFile(path!, 'utf8'));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     return document;
 }
 
@@ -290,8 +290,7 @@ test('invalid raw form edits survive failed Save until Revert, and malformed for
     expect(await savedDocuments(page)).toEqual(before);
     await expectWrittenStand(page, ['C', 'G', 'Am', 'F']);
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const third = await barForm(page, 3);
     await expect(third.getByLabel('Total repeat passes', { exact: true })).toHaveValue('2');

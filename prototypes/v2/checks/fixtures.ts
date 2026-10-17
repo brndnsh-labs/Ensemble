@@ -560,28 +560,107 @@ export async function seedGuestDocuments(page: Page, docs: unknown[], path = '')
     await page.goto(appUrl(path));
 }
 
-/**
- * Opens the Song menu (•••) on its whole-song settings (#1726): Song meter, Song mode and
- * Choruses, which the edit panel's "Whole song" group held. Returns the menu; `closeSongMenu`
- * closes it again (it is modal: nothing behind it takes a click while it is open).
- */
-export async function openWholeSong(page: Page): Promise<Locator> {
-    const menu = page.getByTestId('song-menu');
-    if (!(await menu.isVisible())) {
-        await page.getByRole('button', { name: 'Song actions', exact: true }).click();
-    }
-    await expect(menu.getByRole('heading', { name: 'Chart', exact: true })).toBeVisible();
-    await expect(menu.getByLabel('Song meter')).toBeEnabled();
+/** The Song menu's top-level rows (#1756); every other row is under More. */
+const SONG_MENU_TOP = ['Copy link', 'Duplicate', 'Export…', 'More', 'Delete…'];
+
+/** The Song menu's list (•••, #1756): its five actions, or `more` for the More list. */
+export function songMenu(page: Page, list: 'actions' | 'more' = 'actions'): Locator {
+    return page.getByRole('menu', {
+        name: list === 'more' ? 'More song actions' : 'Song actions',
+        exact: true,
+    });
+}
+
+/** Opens the Song menu (•••, #1756) and returns its list of five actions. */
+export async function openSongMenu(page: Page): Promise<Locator> {
+    const menu = songMenu(page);
+    await page.getByRole('button', { name: 'Song actions', exact: true }).click();
+    await expect(menu).toBeVisible();
     return menu;
 }
 
-/** Closes the Song menu if it is open. */
-export async function closeSongMenu(page: Page): Promise<void> {
-    const menu = page.getByTestId('song-menu');
-    if (await menu.isVisible()) {
-        await menu.getByRole('button', { name: 'Close', exact: true }).click();
-        await expect(menu).toBeHidden();
+/**
+ * Chooses one row of the Song menu (#1756), opening it first: a top-level action (Copy link,
+ * Duplicate, Export…, Delete…) or one under More (Revert to saved, Preserved drafts (N)…, Song
+ * settings…). A row that is `aria-disabled` is waited on, as a disabled button is.
+ */
+export async function songMenuAction(page: Page, name: string | RegExp): Promise<void> {
+    const menu = await openSongMenu(page);
+    if (typeof name === 'string' && SONG_MENU_TOP.includes(name)) {
+        await menu.getByRole('menuitem', { name, exact: true }).click();
+        return;
     }
+    await menu.getByRole('menuitem', { name: 'More', exact: true }).click();
+    const more = songMenu(page, 'more');
+    await expect(more).toBeVisible();
+    await more
+        .getByRole('menuitem', typeof name === 'string' ? { name, exact: true } : { name })
+        .click();
+}
+
+/** Export… (#1756), the Song menu's dialog of formats. */
+export const exportDialog = (page: Page) => page.getByTestId('export-dialog');
+
+/**
+ * Song menu → Export… → one format (#1756). The caller waits on the download itself (set up
+ * before this call). A song file, MIDI or original source closes the dialog once written; audio
+ * holds it open with its progress until the render settles.
+ */
+export async function exportAs(
+    page: Page,
+    format: 'Song file' | 'MIDI' | 'Audio (mix)' | 'Audio (separate tracks)' | 'Original source',
+): Promise<Locator> {
+    await songMenuAction(page, 'Export…');
+    const dialog = exportDialog(page);
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: format, exact: true }).click();
+    return dialog;
+}
+
+/**
+ * Opens the whole song's settings (#1756: Song menu → More → Song settings…), the Song meter and
+ * Song mode the transport's Key popover (#1757) will take. Returns the dialog; `closeSongMenu`
+ * closes it again (it is modal: nothing behind it takes a click while it is open).
+ */
+export async function openWholeSong(page: Page): Promise<Locator> {
+    const settings = page.getByTestId('song-settings');
+    if (!(await settings.isVisible())) {
+        await songMenuAction(page, 'Song settings…');
+    }
+    await expect(settings.getByLabel('Song meter')).toBeEnabled();
+    return settings;
+}
+
+/** Closes the Song settings dialog if it is open. */
+export async function closeSongMenu(page: Page): Promise<void> {
+    const settings = page.getByTestId('song-settings');
+    if (await settings.isVisible()) {
+        await settings.getByRole('button', { name: 'Close', exact: true }).click();
+        await expect(settings).toBeHidden();
+    }
+}
+
+/** Picks how many times the form plays from the chart footer's form-length menu (#1511). */
+export async function pickFormLength(page: Page, choice: string): Promise<void> {
+    const menu = page.getByRole('menu', { name: 'How many times the form plays' });
+    await page.locator('.chart-bottom').getByRole('button').click();
+    await menu.getByRole('menuitemradio', { name: choice, exact: true }).click();
+    await expect(menu).toHaveCount(0);
+}
+
+/**
+ * The chart footer's form-length menu's current choice (#1511): "Repeats continuously" or a
+ * count, read with the menu open, then closed again. Choruses has had no other home since #1756.
+ */
+export async function formLength(page: Page): Promise<string> {
+    const menu = page.getByRole('menu', { name: 'How many times the form plays' });
+    await page.locator('.chart-bottom').getByRole('button').click();
+    await expect(menu).toBeVisible();
+    const checked = menu.getByRole('menuitemradio', { checked: true });
+    const label = (await checked.innerText()).trim();
+    await page.keyboard.press('Escape');
+    await expect(menu).toHaveCount(0);
+    return label;
 }
 
 /**
