@@ -1,5 +1,5 @@
 import type { SectionInstrumentKey } from '../types.js';
-import type { ChartBand, ChartDocument, ChartNotation, ChartPerformance } from './types.js';
+import type { ChartBand, ChartNotation, ChartPerformance } from './types.js';
 
 /** Reduced rational quarter-note units. Never seconds, pixels, or generated engine steps. */
 export type ScoreDuration = [numerator: number, denominator: number];
@@ -108,9 +108,17 @@ export interface SemanticScore {
     choruses?: number;
 }
 
-/** Semantic document; the isolated preview reads both versions. V1 sources are never rewritten. */
-export interface ChartDocumentV2 extends Omit<ChartDocument, 'schemaVersion' | 'chart'> {
+/**
+ * A chart document: the one schema (2) the songbook stores, syncs and opens. Schema 1, the text
+ * chart, was retired in #1740; a document carrying it is refused.
+ */
+export interface ChartDocumentV2 {
     schemaVersion: 2;
+    id: string;
+    title: string;
+    createdAt: string;
+    updatedAt: string;
+    revision: number;
     chart: {
         score: SemanticScore;
         performance: ChartPerformance;

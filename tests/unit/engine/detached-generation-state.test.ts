@@ -17,8 +17,7 @@ describe('detached generation state', () => {
             },
             arranger: {
                 ...live.arranger,
-                progression: [{ absName: 'C', beats: 4 }],
-                stepMap: [{ start: 0, end: 16, chord: { absName: 'C' } }],
+                key: 'D',
             },
             groove: {
                 ...live.groove,
@@ -42,7 +41,6 @@ describe('detached generation state', () => {
         expect(detached.groove.lastHatGain).toBeNull();
         expect(detached.groove.lastSampledHatVoice).toBeNull();
         expect(detached.bass.lastBassGain).toBeNull();
-        expect(detached.arranger.progression).toEqual(input.arranger.progression);
-        expect(detached.arranger.progression).not.toBe(input.arranger.progression);
+        expect(detached.arranger.key).toBe('D');
     });
 });

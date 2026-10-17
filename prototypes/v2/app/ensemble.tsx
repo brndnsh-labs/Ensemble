@@ -1,6 +1,6 @@
 'use client';
 
-import { decodeChartLink, encodeChartLink } from '@engine/songbook/chart-link';
+import { decodeChartLink, encodeChartLink, RETIRED_CHART_LINK } from '@engine/songbook/chart-link';
 import { writtenChart } from '@engine/songbook/codec';
 import { compileScoreForm } from '@engine/songbook/score-form';
 import type { SemanticScore } from '@engine/songbook/score-types';
@@ -30,12 +30,9 @@ import {
 import { songsOnlyIn } from '../lib/collections';
 import {
     blankSong,
-    currentFormat,
     genreOf,
-    isCurrentFormat,
     OLD_FORMAT_REFUSAL,
     type SectionChange,
-    type StoredDocument,
     withBarAfter,
     withoutMeasure,
     withoutSection,
@@ -69,8 +66,6 @@ import type { SavedSong } from '../lib/sync/protocol';
 import type { KeepBothResolution } from '../lib/sync/repository';
 import type { Progress } from '../lib/sync/status';
 import { initializeTelemetry, track } from '../lib/telemetry';
-import type { UpgradePace } from '../lib/upgrade';
-import { accountUpgradeStore, guestUpgradeStore } from '../lib/upgrade-stores';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
 import { AdoptGuestDialog } from './account/adopt-guest';
@@ -131,7 +126,6 @@ import { useCollections } from './use-collections';
 import { useNeckVoicing } from './use-neck-view';
 import { useOfflineInstall } from './use-offline-install';
 import { useStageTheme } from './use-stage-theme';
-import { useUpgrade } from './use-upgrade';
 
 /**
  * Deep equality over plain JSON data that ignores the order of object keys: a chart read back
@@ -249,22 +243,10 @@ type StandStore = { store: 'account'; ownerId: string } | { store: 'guest' };
  * in document-ID order instead — the right choice for a resumable cursor, and an arbitrary one to
  * a musician — so the ordering a person sees is the shell's to apply, not storage's to change.
  */
-function libraryDocuments(library: SavedSong[]): StoredDocument[] {
+function libraryDocuments(library: SavedSong[]): ChartDocument[] {
     return library
         .map((song) => song.document)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-}
-
-/**
- * The entries whose document the app opens. A text chart (schemaVersion 1) is left out of every
- * list and offer (#1739), never out of a backup: it stays stored for "Upgrade old songs".
- */
-function openable<T extends { document: StoredDocument }>(
-    entries: readonly T[],
-): Array<T & { document: ChartDocument }> {
-    return entries.filter((entry): entry is T & { document: ChartDocument } =>
-        isCurrentFormat(entry.document),
-    );
 }
 
 /**
@@ -329,8 +311,8 @@ async function readSignOutPlan(
     owner: string | null,
 ): Promise<{
     plan: SignOutPreflight;
-    drafts: Map<string, StoredDocument>;
-    songs: StoredDocument[];
+    drafts: Map<string, ChartDocument>;
+    songs: ChartDocument[];
 }> {
     const plan = await accountSync.signOutPreflight(owner);
     return {
@@ -552,7 +534,7 @@ export default function Ensemble() {
      * export is prepared, replaced by what `open()` reads back, and dropped the moment the account
      * leaves this device.
      */
-    const accountDrafts = useRef(new Map<string, StoredDocument>());
+    const accountDrafts = useRef(new Map<string, ChartDocument>());
     /**
      * The last account this loop actually attached to, null only before the first one. Deliberately
      * NOT cleared on detach: an expiry publishes `owner: null` on its way past, so a ref that
@@ -933,7 +915,7 @@ export default function Ensemble() {
      * off with this too, since it is read at the moment the step opens rather than whenever the
      * library list last happened to refresh.
      */
-    const [signOutSongs, setSignOutSongs] = useState<StoredDocument[] | null>(null);
+    const [signOutSongs, setSignOutSongs] = useState<ChartDocument[] | null>(null);
     /**
      * The sentence the OPEN step produced, rendered inside its own dialog (#1351 patch R3/R12).
      *
@@ -1502,7 +1484,7 @@ export default function Ensemble() {
             if (!alive) {
                 return;
             }
-            if (document && !isCurrentFormat(document)) {
+            if (document === RETIRED_CHART_LINK) {
                 setError(OLD_FORMAT_REFUSAL);
             } else if (document) {
                 openSharedDraft(document, 'Opened from a shared link · not saved yet');
@@ -3437,8 +3419,7 @@ export default function Ensemble() {
         if (signedIn) {
             try {
                 const held = await accountSync.retainedDraft(document.id);
-                // A text chart's draft is not offered: the app does not open one (#1739).
-                if (held && isCurrentFormat(held.document)) {
+                if (held) {
                     return {
                         recovery: { document: held.document, conflict: held.conflict },
                         unreadable: false,
@@ -3465,7 +3446,7 @@ export default function Ensemble() {
      * an offer, and a missing offer is not a claim about anything.
      */
     async function recoveryOptionsFor(document: ChartDocument) {
-        const slots = openable(repository.recoveriesFor(document));
+        const slots = repository.recoveriesFor(document);
         // A chart whose account is not the attached one has no rows to read here either (#1311):
         // `preservedDrafts` would query B's store for A's document id, which is at best nothing.
         if (currentStore.current?.store !== 'account' || standBelongsElsewhere()) {
@@ -3473,7 +3454,7 @@ export default function Ensemble() {
         }
         let held: Array<{ document: ChartDocument; capturedAt: string }> = [];
         try {
-            held = openable(await accountSync.preservedDrafts(document.id));
+            held = await accountSync.preservedDrafts(document.id);
         } catch {
             /* Unreadable account store; the legacy slots below are still worth offering. */
         }
@@ -3734,7 +3715,7 @@ export default function Ensemble() {
             const documents = libraryDocuments(await accountSync.listLibrary(owner));
             if (read === accountLibraryRead.current) {
                 accountSongsOwner.current = owner;
-                setAccountSongs(documents.filter(isCurrentFormat));
+                setAccountSongs(documents);
                 setAccountLibraryFailure(null);
             }
         } catch (failure) {
@@ -3753,8 +3734,7 @@ export default function Ensemble() {
      */
     async function readLiveSong(id: string): Promise<ChartDocument | null> {
         if (signedIn) {
-            const song = await accountSync.readSong(id, sessionOwner);
-            return song && currentFormat(song);
+            return accountSync.readSong(id, sessionOwner);
         }
         return repository.get(id);
     }
@@ -4499,7 +4479,7 @@ export default function Ensemble() {
             // Save is one of the four things that runs a pass. Not awaited: the commit is
             // already durable, and the upload is the loop's problem from here.
             void accountSync.run();
-            return currentFormat(song.document);
+            return song.document;
         } catch (failure) {
             // A mismatch is not a failed Save (#1311 patch review R5): nothing on this device
             // went wrong, and "Save failed on this device" would blame the one store that is
@@ -4810,7 +4790,7 @@ export default function Ensemble() {
             setCurrent(moved);
             // As resolved on this device, like `current` (#1405), or the chip reports a sound
             // resolved on open as an unsaved change.
-            setSaved(runtime.withLoadedSounds(currentFormat(resolution.document)));
+            setSaved(runtime.withLoadedSounds(resolution.document));
             // The account the transaction actually SETTLED TO, reported back by the loop rather
             // than read from this render's snapshot (#1311 patch review R1).
             bindStand({ store: 'account', ownerId: resolution.ownerId });
@@ -4876,13 +4856,6 @@ export default function Ensemble() {
         // The frozen offer names a document as well as a revision, and the step's title comes
         // from `current`: an offer for any other song is not the one this step described.
         if (!current || update === null || update.documentId !== current.id) {
-            return;
-        }
-        if (update.oldFormat) {
-            // The account's version is a text chart, which the app no longer opens (#1739).
-            // Refused BEFORE the transaction: adopting it would discard this device's experiment
-            // and drafts for a version the stand could not then open. Nothing changes.
-            setAdoptRemoteFailure(OLD_FORMAT_REFUSAL);
             return;
         }
         // Captured before the awaits, like `owner`: whether anything was at stake is what the
@@ -4959,7 +4932,7 @@ export default function Ensemble() {
             // re-read throws first, `open()` never runs and the stand goes on showing the
             // discarded document as clean — and the next keystroke retains it back into the store
             // as a draft of a song that no longer holds that music.
-            await open(currentFormat(resolution.document));
+            await open(resolution.document);
             // The account the transaction actually SETTLED TO, reported back by the loop rather
             // than read from this render's snapshot (#1311 patch review R1). `open()` binds the
             // stand from the session a moment earlier; this is the same rule `keepBothVersions`
@@ -5102,13 +5075,13 @@ export default function Ensemble() {
      * Synchronous by design — see `readSignOutPlan` for why the account half is prefetched rather
      * than awaited between two downloads.
      */
-    function latestLocalVersion(song: StoredDocument): StoredDocument {
+    function latestLocalVersion(song: ChartDocument): ChartDocument {
         const retained = volatileDrafts.current.get(song.id) ?? accountDrafts.current.get(song.id);
         if (retained) {
             return retained;
         }
         try {
-            return (isCurrentFormat(song) && repository.recoveryFor(song)?.document) || song;
+            return repository.recoveryFor(song)?.document ?? song;
         } catch {
             /* Unreadable slot; the committed copy is still worth a file. */
             return song;
@@ -5498,15 +5471,25 @@ export default function Ensemble() {
      * cap. There is no E2E coverage for either engine here — WebKit/Firefox-specific handling
      * (batching into one archive, or a click-through per file) is unverified and out of scope.
      */
-    function exportDocument(candidate: StoredDocument) {
-        const url = URL.createObjectURL(
-            new Blob([JSON.stringify(repository.storedValidated(candidate), null, 2)], {
-                type: 'application/json',
-            }),
+    function exportDocument(candidate: ChartDocument) {
+        downloadFile(
+            JSON.stringify(repository.validated(candidate), null, 2),
+            `${candidate.title.replace(/[^\p{L}\p{N} -]/gu, '').slice(0, 80) || 'chart'}.ensemble`,
         );
+    }
+    /**
+     * A song row this build cannot read (a text chart, retired in #1740, or a corrupt row), written
+     * out as it is stored before a sign-out or account deletion removes it: no build will open the
+     * file, but the bytes are the musician's and nothing else here keeps them.
+     */
+    function exportUnreadable(row: { documentId: string; raw: string }) {
+        downloadFile(row.raw, `${row.documentId.slice(0, 80)} (unreadable).json`);
+    }
+    function downloadFile(contents: string, name: string) {
+        const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
         const anchor = document.createElement('a');
         anchor.href = url;
-        anchor.download = `${candidate.title.replace(/[^\p{L}\p{N} -]/gu, '').slice(0, 80) || 'chart'}.ensemble`;
+        anchor.download = name;
         anchor.click();
         window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
@@ -5554,61 +5537,6 @@ export default function Ensemble() {
             setExportOpen(false);
         }
     }
-    // "Upgrade old songs" (#1738). The account songbook joins once its library has downloaded
-    // here — before that, an upgrade of an older local copy would only be refused by the server's
-    // compare-and-swap. The guest songbook is always in: signed in, its old songs could still be
-    // added to the account by #1268's offer.
-    const upgradeAccountOwner =
-        signedIn &&
-        sessionOwner !== null &&
-        sync.owner === sessionOwner &&
-        libraryDownloaded(sync.documents)
-            ? sessionOwner
-            : null;
-    function upgradeStores(pace?: UpgradePace) {
-        return upgradeAccountOwner === null
-            ? [guestUpgradeStore(pace)]
-            : [accountUpgradeStore(upgradeAccountOwner, pace), guestUpgradeStore(pace)];
-    }
-    const upgrade = useUpgrade({
-        active: ready && !current && !songbookLoading,
-        signedIn,
-        stores: upgradeStores,
-        scanKey: `${upgradeAccountOwner}:${liveHome?.count}:${guestHome?.count}`,
-        // A song this tab holds unsaved text for that no store has yet (`volatileDrafts`), or an
-        // account draft this tab knows of; a stored live draft is the run's own check.
-        unsavedHere: (store, id) =>
-            volatileDrafts.current.has(id) ||
-            (store === 'account' && accountDrafts.current.has(id)),
-        run: (task) => run(task),
-        afterRun: async (outcome) => {
-            if (outcome.upgraded.some((entry) => entry.store === 'account')) {
-                // One pass for the whole run, as the guest adoption does: every Save is already
-                // committed and queued, and the outbox owns sending it from here.
-                void accountSync.run();
-            }
-            await refreshSongs();
-            if (signedIn && outcome.upgraded.some((entry) => entry.store === 'guest')) {
-                await refreshGuest();
-            }
-        },
-        open: (id, sectionIndex) =>
-            void run(async () => {
-                const document = await readLiveSong(id);
-                if (!document) {
-                    throw new Error('Song no longer exists.');
-                }
-                const opened = await open(document);
-                setAllSongsOpen(false);
-                // Into its editor, on the section named. (A text chart is refused before here,
-                // by `readLiveSong`, with `OLD_FORMAT_REFUSAL`: the app no longer opens one.)
-                selectSection(
-                    opened.current,
-                    opened.current.chart.score.sections[sectionIndex ?? 0]?.id,
-                );
-                editChart();
-            }),
-    });
     // The Continue card (#1441): the live songbook's own "last opened" song, read by id with the
     // home slice, else its most recently opened row. A device with no songs has no card at all —
     // it gets the first-visit layout, where the standards are the page.
@@ -5623,10 +5551,9 @@ export default function Ensemble() {
         // only answers for a song this TAB has opened or prefetched, though — on a cold load the
         // map is empty and the card previews the committed copy, which is the honest answer here
         // rather than a claim about a draft nobody has read (#1299 patch review P3).
-        const accountHeld = accountDrafts.current.get(featuredSave.id);
         const held =
             volatileDrafts.current.get(featuredSave.id) ??
-            (accountHeld && isCurrentFormat(accountHeld) ? accountHeld : undefined);
+            accountDrafts.current.get(featuredSave.id);
         let resolved: ChartDocument;
         try {
             resolved =
@@ -6338,9 +6265,6 @@ export default function Ensemble() {
                     onNewSong={newSong}
                     onOpenSong={openSong}
                     lastRemovedId={deletedRowId}
-                    upgrade={upgrade.offer}
-                    upgradeSettled={upgrade.settled}
-                    upgradeActions={upgrade.actions}
                 />
             ) : (
                 <main
@@ -6871,8 +6795,14 @@ export default function Ensemble() {
                             )) {
                                 accountDrafts.current.set(id, held);
                             }
+                            // And the rows this build cannot read, as they are stored, read before
+                            // the first file for the same reason.
+                            const unreadable = await accountSync.unreadableSongs(sessionOwner);
                             for (const song of library) {
                                 exportDocument(latestLocalVersion(song));
+                            }
+                            for (const row of unreadable) {
+                                exportUnreadable(row);
                             }
                         })
                     }
@@ -6951,6 +6881,13 @@ export default function Ensemble() {
                             for (const id of signOutPlan?.atRisk ?? []) {
                                 const song = signOutSongs?.find((held) => held.id === id);
                                 if (!song) {
+                                    // A row this build cannot read: its stored bytes, as they are.
+                                    const row = signOutPlan?.unreadable.find(
+                                        (held) => held.documentId === id,
+                                    );
+                                    if (row) {
+                                        exportUnreadable(row);
+                                    }
                                     continue;
                                 }
                                 // The EDITED bytes, not the committed ones — same precedence as

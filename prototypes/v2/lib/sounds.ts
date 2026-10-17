@@ -6,7 +6,7 @@ import {
 } from '@engine/engine/instrument-registry';
 import { ensurePackLoaded } from '@engine/engine/pack-runtime';
 import { type PackManifest, setPackAssetFetcher, withRevToken } from '@engine/engine/sample-loader';
-import type { ChartContent } from '@engine/songbook/types';
+import type { ChartSettings } from '@engine/songbook/types';
 import type { InstrumentModule, InstrumentVoice } from '@engine/types';
 
 export { packsForInstrument };
@@ -326,7 +326,7 @@ export async function prepareSound(
 }
 
 export async function prepareSounds(
-    chart: Pick<ChartContent, 'band'>,
+    chart: Pick<ChartSettings, 'band'>,
     progress: (text: string) => void,
 ): Promise<void> {
     const ids = new Set(
@@ -362,7 +362,7 @@ export async function allSoundsAvailableOffline(): Promise<boolean> {
     }
 }
 
-export async function soundsAvailableOffline(chart: Pick<ChartContent, 'band'>): Promise<boolean> {
+export async function soundsAvailableOffline(chart: Pick<ChartSettings, 'band'>): Promise<boolean> {
     try {
         for (const lane of Object.values(chart.band)) {
             const id = packIdFromVoice(lane.voice);

@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
-import { decodeChartDocument } from '../../../public/songbook/codec.js';
 import {
     decodeChartDocumentV2,
     encodeChartDocumentV2,
     validateChartDocumentV2,
 } from '../../../public/songbook/document-v2.js';
-import { proposeLegacyScoreConversion } from '../../../public/songbook/legacy-score.js';
 import { validateSemanticScore } from '../../../public/songbook/score-codec.js';
 import { resolveScoreContext } from '../../../public/songbook/score-context.js';
 import type { ChartDocumentV2, SemanticScore } from '../../../public/songbook/score-types.js';
-import type { ChartDocument, ChartLaneMix } from '../../../public/songbook/types.js';
+import type { ChartBand, ChartLaneMix } from '../../../public/songbook/types.js';
 
 function scoreFixture(): SemanticScore {
     return {
@@ -47,7 +45,7 @@ function scoreFixture(): SemanticScore {
     };
 }
 
-function legacyFixture(value = 'C G7 | Dm7 G7'): ChartDocument {
+function bandFixture(): ChartBand {
     const mix: ChartLaneMix = {
         enabled: true,
         voice: 'synth',
@@ -56,66 +54,26 @@ function legacyFixture(value = 'C G7 | Dm7 G7'): ChartDocument {
         reverb: 0.2,
     };
     return {
-        schemaVersion: 1,
+        chords: { ...mix },
+        bass: { ...mix },
+        soloist: { ...mix, mode: 'monophonic', autoMode: false },
+        groove: { ...mix, swing: 50, swingSub: '8th', humanize: 0, genre: 'Jazz' },
+    };
+}
+
+function documentFixture(): ChartDocumentV2 {
+    return {
+        schemaVersion: 2,
         id: 'study',
         title: 'Study',
         revision: 3,
         createdAt: '2026-09-08T12:00:00.000Z',
         updatedAt: '2026-09-08T12:30:00.000Z',
-        chart: {
-            arrangement: {
-                key: 'C',
-                isMinor: false,
-                timeSignature: '4/4',
-                grouping: null,
-                notation: 'name',
-                sections: [
-                    {
-                        id: 'a',
-                        label: 'A',
-                        value,
-                        repeat: 2,
-                        key: 'D',
-                        isMinor: true,
-                        seamless: true,
-                        targetIntensity: 0.5,
-                        instruments: { soloist: false },
-                    },
-                ],
-            },
-            performance: { bpm: 120, seed: 'ABC123', randomizeSeed: false },
-            band: {
-                chords: {
-                    ...mix,
-                },
-                bass: { ...mix },
-                soloist: {
-                    ...mix,
-                    mode: 'monophonic',
-                    autoMode: false,
-                },
-                groove: {
-                    ...mix,
-                    swing: 50,
-                    swingSub: '8th',
-                    humanize: 0,
-                    genre: 'Jazz',
-                },
-            },
-        },
-    };
-}
-
-function documentFixture(): ChartDocumentV2 {
-    const legacy = legacyFixture();
-    return {
-        ...legacy,
-        schemaVersion: 2,
         metadata: { composer: 'Test author', style: 'Swing' },
         chart: {
             score: scoreFixture(),
-            performance: legacy.chart.performance,
-            band: legacy.chart.band,
+            performance: { bpm: 120, seed: 'ABC123', randomizeSeed: false },
+            band: bandFixture(),
         },
     };
 }
@@ -456,118 +414,23 @@ describe('semantic authored-score validation', () => {
         expect(validateChartDocumentV2(candidate).kind).toBe('invalid');
     });
 
-    it('does not teach v1 readers to accept v2 or convert v1 implicitly', () => {
-        const current = JSON.stringify(documentFixture());
-        expect(decodeChartDocument(current)).toEqual({
-            kind: 'future-version',
-            schemaVersion: 2,
-            source: current,
+    it('refuses a text chart (schema 1) and keeps a future version verbatim', () => {
+        const textChart = JSON.stringify({
+            ...documentFixture(),
+            schemaVersion: 1,
+            chart: {
+                arrangement: { sections: [{ id: 'a', label: 'A', value: 'C G7 | Dm7 G7' }] },
+                performance: documentFixture().chart.performance,
+                band: documentFixture().chart.band,
+            },
         });
-        const legacy = JSON.stringify(legacyFixture());
-        expect(decodeChartDocument(legacy).kind).toBe('ok');
-        expect(decodeChartDocumentV2(legacy).kind).toBe('invalid');
+        expect(decodeChartDocumentV2(textChart).kind).toBe('invalid');
         const future = ' { "schemaVersion": 3, "newMeaning": "retain me" } ';
         expect(decodeChartDocumentV2(future)).toEqual({
             kind: 'future-version',
             schemaVersion: 3,
             source: future,
         });
-    });
-});
-
-describe('pure legacy conversion proposals', () => {
-    it('preserves legacy empty-string section inheritance as absent overrides', () => {
-        const legacy = legacyFixture();
-        legacy.chart.arrangement.sections[0].key = '';
-        legacy.chart.arrangement.sections[0].timeSignature = '';
-        const converted = proposeLegacyScoreConversion(JSON.stringify(legacy));
-        expect(converted.kind).toBe('candidate');
-        if (converted.kind !== 'candidate') {
-            throw new Error('Expected candidate');
-        }
-        expect(converted.value.chart.score.sections[0]).not.toHaveProperty('key');
-        expect(converted.value.chart.score.sections[0]).not.toHaveProperty('meter');
-        expect(converted.source).toBe(JSON.stringify(legacy));
-    });
-    it('preserves original bytes, settings, identity and exact timing in a deterministic candidate', () => {
-        const legacy = legacyFixture();
-        const source = JSON.stringify(legacy, null, 2);
-        const converted = proposeLegacyScoreConversion(source);
-        expect(converted.kind).toBe('candidate');
-        if (converted.kind !== 'candidate') {
-            throw new Error(JSON.stringify(converted.issues));
-        }
-        expect(converted.source).toBe(source);
-        expect(converted.value.id).toBe(legacy.id);
-        expect(converted.value.revision).toBe(legacy.revision);
-        expect(converted.value.chart.band).toEqual(legacy.chart.band);
-        expect(converted.value.chart.performance).toEqual(legacy.chart.performance);
-        expect(converted.value.chart.score.sections[0]).toMatchObject({
-            id: 'a',
-            label: 'A',
-            repeat: 2,
-            key: 'D',
-            isMinor: true,
-            seamless: true,
-            targetIntensity: 0.5,
-            instruments: { soloist: false },
-            measures: [
-                {
-                    id: 'measure-1',
-                    content: {
-                        kind: 'events',
-                        events: [
-                            { kind: 'chord', symbol: 'C', duration: [2, 1] },
-                            { kind: 'chord', symbol: 'G7', duration: [2, 1] },
-                        ],
-                    },
-                },
-                { id: 'measure-2' },
-            ],
-        });
-        expect(proposeLegacyScoreConversion(source)).toEqual(converted);
-        expect(decodeChartDocument(source)).toEqual({ kind: 'ok', value: legacy });
-    });
-
-    it('converts compound-meter counts to quarters without doubling the bar', () => {
-        const legacy = legacyFixture('Am Dm');
-        legacy.chart.arrangement.sections[0].timeSignature = '6/8';
-        const converted = proposeLegacyScoreConversion(JSON.stringify(legacy));
-        expect(converted.kind).toBe('candidate');
-        if (converted.kind !== 'candidate') {
-            throw new Error('Expected candidate');
-        }
-        expect(converted.value.chart.score.sections[0]).toMatchObject({
-            meter: '6/8',
-            measures: [
-                {
-                    content: { events: [{ duration: [3, 2] }, { duration: [3, 2] }] },
-                },
-            ],
-        });
-    });
-
-    it.each([
-        // What the old parser guessed at rather than read (#1737): `tests/unit/songbook/
-        // legacy-score.test.ts` holds what does convert to the old parser's own playing.
-        ['C '.repeat(17), 'off-grid'],
-        ['Cnope', 'legacy-syntax'],
-        ['C:2 G7:2', 'legacy-syntax'],
-        ['Xm7', 'legacy-syntax'],
-        ['Cmaj7sus4', 'legacy-syntax'],
-    ])('keeps all original data and offers no partial conversion for %s', (bar, code) => {
-        const source = JSON.stringify(legacyFixture(bar));
-        const result = proposeLegacyScoreConversion(source);
-        expect(result).toMatchObject({
-            kind: 'blocked',
-            source,
-            issues: [expect.objectContaining({ code })],
-        });
-        expect(result).not.toHaveProperty('value');
-    });
-
-    it.each(['{', '{"schemaVersion":99}', '{}'])('preserves invalid/future input %s', (source) => {
-        expect(proposeLegacyScoreConversion(source)).toMatchObject({ kind: 'blocked', source });
     });
 });
 

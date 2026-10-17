@@ -27,11 +27,10 @@ function manySongs(count: number) {
 
 /**
  * Counts full reads of the guest songbook from outside the app (#1441 review P3): `getAll()` on the
- * guest `documents` store is a whole-songbook read (`repository.list`, and since #1738 the
- * "Upgrade old songs" scan's `listReadable`), and the home's own reads are `get`, `count` and a
- * cursor. Each is also counted apart when it happens before the home's rows are on screen — the
- * claim #1441 makes is that the home never WAITS on one; #1738's scan runs only after the home
- * has rendered. Installed before the app's scripts run.
+ * guest `documents` store is a whole-songbook read (`repository.list`), and the home's own reads
+ * are `get`, `count` and a cursor. Each is also counted apart when it happens before the home's
+ * rows are on screen — the claim #1441 makes is that the home never WAITS on one. Installed
+ * before the app's scripts run.
  */
 async function countFullReads(page: Page): Promise<void> {
     await page.addInitScript(() => {
@@ -81,7 +80,6 @@ test('the home renders its rows without a full-library read', async ({ page }) =
     await expect(page.getByTestId('library-heading')).toHaveText('Your songbook');
     await expect(page.locator('.home-table .song-row')).toHaveCount(8);
     // The seam, counted: the home rendered its rows and nothing read the whole songbook first.
-    // (These songs are in the old format, so #1738's upgrade scan reads them all — after.)
     expect(await readsBeforeRows(page)).toBe(0);
     // The count is IndexedDB's own — the corrupt song is still one of the thirteen.
     await expect(page.getByTestId('all-songs-link')).toHaveText('All 13 songs →');

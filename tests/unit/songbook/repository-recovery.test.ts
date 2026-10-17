@@ -6,7 +6,7 @@ import {
     recoveriesFor,
     recoverySlotCount,
 } from '../../../prototypes/v2/lib/repository.js';
-import { accountScoreChart as accountChart } from '../../utils/account-songbook-fixture.js';
+import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 /**
  * Guest recovery slots across WRITERS (#1269).

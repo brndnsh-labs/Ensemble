@@ -13,17 +13,7 @@ import type { ChartDocumentV2 } from '@engine/songbook/score-types';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type FakeIndexedDB, installFakeIndexedDB } from '../../../tests/utils/fake-indexeddb';
 import { homeRequest } from './home';
-import {
-    get,
-    home,
-    list,
-    recoverySlotCount,
-    remove,
-    removeRecoverySlot,
-    removeUnreadableSong,
-    rename,
-    save,
-} from './repository';
+import { get, home, list, recoverySlotCount, remove, rename, save } from './repository';
 import { buildStandardDocument, standardFor } from './standards';
 
 const localStore = new Map<string, string>();
@@ -267,92 +257,44 @@ describe('repository.home — the songbook home reads only what it shows (#1441)
     });
 });
 
-describe('removing an "Upgrade old songs" leftover, guest songbook (#1738)', () => {
-    const SLOT = 'ensemble-v2-preview:recovery:writer-a:leftover-song';
-    const song = {
-        schemaVersion: 2,
-        id: 'leftover-song',
-        title: 'Saved',
+describe('a text chart left in the guest songbook (schema 1, retired in #1740)', () => {
+    const textChart = {
+        schemaVersion: 1,
+        id: 'old',
+        title: 'Old',
         createdAt: '2026-01-01T00:00:00.000Z',
-        updatedAt: '2026-01-05T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
         revision: 0,
-        chart: chart(),
+        chart: { arrangement: {}, performance: {}, band: {} },
     };
-    const slot = (capturedAt: string) => JSON.stringify({ capturedAt, document: song });
-    const OLD = '2026-01-02T00:00:00.000Z';
     beforeEach(() => {
         fake.reset();
     });
 
-    it('removes a dead slot holding exactly the backed-up bytes', async () => {
-        fake.rows.set(song.id, song);
-        localStore.set(SLOT, slot(OLD));
-        expect(await removeRecoverySlot(SLOT, slot(OLD))).toBe('removed');
-        expect(localStore.has(SLOT)).toBe(false);
-        expect(await removeRecoverySlot(SLOT, slot(OLD))).toBe('gone');
+    it('is left out of the whole-songbook read, not a reason to refuse the rest', async () => {
+        const now = new Date().toISOString();
+        fake.rows.set('old', textChart);
+        fake.rows.set('new', {
+            schemaVersion: 2,
+            id: 'new',
+            title: 'New',
+            createdAt: now,
+            updatedAt: now,
+            revision: 0,
+            chart: chart(),
+        });
+        expect((await list()).map((song) => song.id)).toEqual(['new']);
+        // Left exactly as it was stored.
+        expect(fake.rows.get('old')).toEqual(textChart);
     });
 
-    it('keeps a slot whose bytes changed since the backup', async () => {
-        localStore.set(SLOT, slot(OLD));
-        expect(await removeRecoverySlot(SLOT, `${slot(OLD)} `)).toBe('changed');
-        expect(localStore.get(SLOT)).toBe(slot(OLD));
-    });
-
-    it('keeps a LIVE slot — captured at or after the readable song it sits on', async () => {
-        fake.rows.set(song.id, song);
-        localStore.set(SLOT, slot(song.updatedAt));
-        expect(await removeRecoverySlot(SLOT, slot(song.updatedAt))).toBe('live');
-        expect(localStore.get(SLOT)).toBe(slot(song.updatedAt));
-    });
-
-    it('removes a slot recoveryFor would never offer, even on a song that reads', async () => {
-        fake.rows.set(song.id, song);
-        // No capture time, and bytes that do not parse: neither can come back as a draft.
-        for (const raw of [JSON.stringify({ document: song }), '{not json']) {
-            localStore.set(SLOT, raw);
-            expect(await removeRecoverySlot(SLOT, raw)).toBe('removed');
-            expect(localStore.has(SLOT)).toBe(false);
-        }
-    });
-
-    it('removes an orphan slot: no song here for it to be live on', async () => {
-        localStore.set(SLOT, slot(song.updatedAt));
-        expect(await removeRecoverySlot(SLOT, slot(song.updatedAt))).toBe('removed');
-    });
-
-    it('refuses a removal with no bytes to compare', async () => {
-        localStore.set(SLOT, 'undefined');
-        const none = undefined as unknown as string;
-        await expect(removeRecoverySlot(SLOT, none)).rejects.toThrow();
-        expect(localStore.get(SLOT)).toBe('undefined');
-    });
-
-    it('removes an unreadable song row holding exactly the backed-up bytes', async () => {
-        const broken = { schemaVersion: 1, id: 'broken', title: 42 };
-        fake.rows.set('broken', broken);
-        expect(await removeUnreadableSong('broken', JSON.stringify(broken))).toBe('removed');
-        expect(fake.rows.has('broken')).toBe(false);
-        expect(await removeUnreadableSong('broken', JSON.stringify(broken))).toBe('gone');
-    });
-
-    it('keeps an unreadable song row whose bytes changed since the backup', async () => {
-        const broken = { schemaVersion: 1, id: 'broken', title: 42 };
-        fake.rows.set('broken', broken);
-        expect(await removeUnreadableSong('broken', `${JSON.stringify(broken)} `)).toBe('changed');
-        expect(fake.rows.get('broken')).toEqual(broken);
-    });
-
-    it('keeps a row that reads now, even with the backed-up bytes', async () => {
-        fake.rows.set(song.id, song);
-        expect(await removeUnreadableSong(song.id, JSON.stringify(song))).toBe('changed');
-        expect(fake.rows.get(song.id)).toEqual(song);
-    });
-
-    it('refuses a song removal with no bytes to compare', async () => {
-        fake.rows.set('broken', { id: 'broken' });
-        await expect(
-            removeUnreadableSong('broken', undefined as unknown as string),
-        ).rejects.toThrow();
-        expect(fake.rows.has('broken')).toBe(true);
+    it('is refused in plain words when asked for by id, and counted, not shown, by the home', async () => {
+        fake.rows.set('old', textChart);
+        await expect(get('old')).rejects.toThrow('old text-chart format');
+        const slice = await home(homeRequest(new Map(), 'old'));
+        expect(slice.rows).toEqual([]);
+        expect(slice.continued).toBeNull();
+        expect(slice.count).toBe(1);
+        expect(slice.unreadable).toBeGreaterThan(0);
     });
 });

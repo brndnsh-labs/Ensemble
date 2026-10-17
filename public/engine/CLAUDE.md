@@ -2,9 +2,8 @@
 
 The sounds the band engine plays through: the synth voices (`synth-*.ts`), the sample-pack
 voices (`sample-voice.ts`, `pack-runtime.ts`, `instrument-registry.ts`), the bus graph and reverb
-(`engine.ts` `initAudio()`, `reverb.ts`), and the old chord parser (`chords-engine.ts`), which
-nothing in the app reads since the text-chart UI went (#1739): only the "Upgrade old songs"
-converter (`songbook/legacy-score.ts`) still uses it, until #1740 deletes both. The old worker-based generators that used to live here were deleted with the
+(`engine.ts` `initAudio()`, `reverb.ts`). The old chord parser (`chords-engine.ts`) is gone with
+the v1 text-chart format (#1740). The old worker-based generators that used to live here were deleted with the
 old engine (#1404); the band's musical rules are in `band/CLAUDE.md` and
 `docs/design/band-engine.md`. The rule numbers below are kept from the old file, so a reference to
 one elsewhere still points at the same rule.

@@ -1,30 +1,30 @@
-import type { ChartDocument } from '../../../../public/songbook/types.js';
+import type { ChartDocumentV2 } from '../../../../public/songbook/score-types.js';
 
 /**
- * One valid schema-1 chart for the Save tests — the same shape the root
- * `tests/unit/songbook/codec.test.ts` fixture uses, so it passes the shared codec the endpoint
- * decodes with. `id` is overridable because the sync identifier grammar is stricter than the
- * codec's and a test wants several documents per owner.
+ * One valid chart for the Save tests — schema 2, the only one the shared codec the endpoint
+ * decodes with accepts since #1740. `id` is overridable because the sync identifier grammar is
+ * stricter than the codec's and a test wants several documents per owner.
  */
-export function makeChartDocument(id = 'chart-ada-001'): ChartDocument {
+export function makeChartDocument(id = 'chart-ada-001'): ChartDocumentV2 {
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         id,
         title: 'Odd-Meter Study',
         createdAt: '2026-08-28T12:00:00.000Z',
         updatedAt: '2026-08-28T12:30:00.000Z',
         revision: 3,
         chart: {
-            arrangement: {
+            score: {
+                key: 'Gb',
+                isMinor: false,
+                notation: 'roman',
+                meter: '5/4',
+                grouping: [2, 3],
                 sections: [
                     {
                         id: 'section-a',
                         label: 'A',
-                        value: 'Imaj7 | IVmaj7',
                         repeat: 2,
-                        key: 'Gb',
-                        isMinor: false,
-                        timeSignature: '5/4',
                         seamless: true,
                         targetIntensity: 0.62,
                         instruments: {
@@ -34,13 +34,17 @@ export function makeChartDocument(id = 'chart-ada-001'): ChartDocument {
                             harmony: true,
                             soloist: false,
                         },
+                        measures: [
+                            {
+                                id: 'm1',
+                                content: {
+                                    kind: 'events',
+                                    events: [{ kind: 'chord', symbol: 'Gb^7', duration: [5, 1] }],
+                                },
+                            },
+                        ],
                     },
                 ],
-                key: 'Gb',
-                timeSignature: '5/4',
-                grouping: [2, 3],
-                isMinor: false,
-                notation: 'roman',
             },
             performance: {
                 bpm: 117,
@@ -83,6 +87,30 @@ export function makeChartDocument(id = 'chart-ada-001'): ChartDocument {
                     genre: 'Jazz',
                 },
             },
+        },
+    };
+}
+
+/**
+ * The same chart as a text chart (schema 1), the format retired in #1740: exactly what an older
+ * build's outbox would still send. Not a valid document any more, so it is a plain object.
+ */
+export function makeTextChart(id = 'chart-ada-001'): Record<string, unknown> {
+    const { chart, ...envelope } = makeChartDocument(id);
+    return {
+        ...envelope,
+        schemaVersion: 1,
+        chart: {
+            arrangement: {
+                sections: [{ id: 'section-a', label: 'A', value: 'Imaj7 | IVmaj7', repeat: 2 }],
+                key: 'Gb',
+                timeSignature: '5/4',
+                grouping: [2, 3],
+                isMinor: false,
+                notation: 'roman',
+            },
+            performance: chart.performance,
+            band: chart.band,
         },
     };
 }

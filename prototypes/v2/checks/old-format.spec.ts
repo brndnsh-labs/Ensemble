@@ -1,17 +1,26 @@
 import type { Page } from '@playwright/test';
 import { encodeChartLink } from '../../../public/songbook/chart-link';
-import type { ChartDocument as LegacyDocument } from '../../../public/songbook/types';
+import type { ChartDocumentV2 } from '../../../public/songbook/score-types';
 import { OLD_FORMAT_REFUSAL } from '../lib/documents';
 import { bandForGenre } from '../lib/standards';
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import {
+    appUrl,
+    expect,
+    seedGuestDocuments,
+    seedStarters,
+    songLink,
+    starterDocuments,
+    test,
+} from './fixtures';
 
 /**
- * The app opens measure charts only (#1739): a text chart (schemaVersion 1) arriving anyway — an
- * old file, an old link — is refused in plain words, and nothing is written.
+ * The text chart (schemaVersion 1) is retired (#1739, #1740): no reader for it is left. One
+ * arriving anyway — an old file, an old link — is refused in plain words, and nothing is written;
+ * one still sitting in a songbook is left out, never a crash.
  */
 
 /** A text chart as v1 wrote one. */
-function textChart(): LegacyDocument {
+function textChart() {
     const stamp = '2026-09-01T12:00:00.000Z';
     return {
         schemaVersion: 1,
@@ -32,7 +41,7 @@ function textChart(): LegacyDocument {
             performance: { bpm: 120, seed: '', randomizeSeed: false },
             band: bandForGenre('Blues'),
         },
-    } as LegacyDocument;
+    };
 }
 
 /** Every row in the guest songbook, as stored. */
@@ -74,9 +83,27 @@ test('an old text-chart file is refused in plain words, and nothing is imported'
 test('an old text-chart link is refused in plain words, not opened', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(appUrl(await encodeChartLink(textChart())));
+    await page.goto(appUrl(await encodeChartLink(textChart() as unknown as ChartDocumentV2)));
     await expect(page.locator('.error-banner[role="alert"]')).toContainText(OLD_FORMAT_REFUSAL);
     await expect(page.locator('main.home')).toBeVisible();
     expect(await stored(page)).toEqual([]);
+    expect(errors).toEqual([]);
+});
+
+test('a text chart left in the songbook is left out of it, and the rest still opens', async ({
+    page,
+}) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await seedGuestDocuments(page, [...starterDocuments(), textChart()]);
+    await expect(page.locator('.home-table .song-row')).toHaveCount(3);
+    // The one read of everything lists the rest rather than refusing the songbook over it.
+    await page.getByTestId('all-songs-link').click();
+    await expect(page.locator('.all-songs-table .song-row')).toHaveCount(3);
+    await expect(page.getByTestId('library-failure')).toHaveCount(0);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
+    // Left exactly where it is.
+    expect(await stored(page)).toContainEqual(textChart());
     expect(errors).toEqual([]);
 });

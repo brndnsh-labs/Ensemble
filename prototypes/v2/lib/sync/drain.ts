@@ -80,15 +80,17 @@ async function outboxPage(
             collection: true,
         })),
     ].sort((a, b) => (a.documentId < b.documentId ? -1 : a.documentId > b.documentId ? 1 : 0));
-    const documents = merged.slice(0, OUTBOX_PAGE_LIMIT);
-    const more =
-        merged.length > OUTBOX_PAGE_LIMIT ||
-        songs.nextAfterDocumentId !== null ||
-        collections.nextAfterDocumentId !== null;
-    return {
-        documents,
-        nextAfterDocumentId: more && documents.length > 0 ? documents.at(-1)!.documentId : null,
-    };
+    // Each page read up to its own cursor and no further. A songs page can hand back fewer songs
+    // than it read — `list` steps over a retired text chart (#1740) without listing it — so the
+    // union is exact only up to the nearer of the two cursors: nothing past it is visited here.
+    const bound = [songs.nextAfterDocumentId, collections.nextAfterDocumentId]
+        .filter((cursor) => cursor !== null)
+        .sort()[0];
+    const within = merged.filter((document) => bound === undefined || document.documentId <= bound);
+    const documents = within.slice(0, OUTBOX_PAGE_LIMIT);
+    const nextAfterDocumentId =
+        within.length > OUTBOX_PAGE_LIMIT ? documents.at(-1)!.documentId : (bound ?? null);
+    return { documents, nextAfterDocumentId };
 }
 
 /**

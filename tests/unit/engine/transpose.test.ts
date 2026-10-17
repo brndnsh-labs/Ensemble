@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { transposeChordText } from '../../../public/engine/transpose.js';
 
-// #777: the single shared progression-text transposer. Covers the slash-bass bug, the two-mode
-// behavior split (absolute transpose vs relative-key switch), two-path parity, and round-trip
-// pitch stability. Pure function — no mocks needed (real config + real normalizeKey).
+// #777: the single shared chord-text transposer. Covers the slash-bass bug and round-trip
+// pitch stability (the relative-key rewrite went with the text chart, #1740).
+// Pure function — no mocks needed (real config + real normalizeKey).
 
-describe('transposeChordText — absolute transpose (rewriteRelative: false)', () => {
+describe('transposeChordText — transpose', () => {
     it('transposes note-name roots by +delta', () => {
         expect(transposeChordText('C F G', 2)).toBe('D G A');
     });
@@ -40,33 +40,7 @@ describe('transposeChordText — absolute transpose (rewriteRelative: false)', (
     });
 });
 
-describe('transposeChordText — relative-key switch (rewriteRelative: true)', () => {
-    it('rewrites Roman numerals against the new key (by -shift)', () => {
-        expect(transposeChordText('I | V', -3, { rewriteRelative: true })).toBe('bIII | bVII');
-    });
-
-    it('rewrites Nashville numbers against the new key (by -shift)', () => {
-        // Exercises the NNS relative path used by switchToRelativeKey on Nashville charts.
-        expect(transposeChordText('1 4 5', 3, { rewriteRelative: true })).toBe('6 2 3');
-    });
-
-    it('still moves note-name roots and slash basses by +shift', () => {
-        expect(transposeChordText('C/E | G/B', 2, { rewriteRelative: true })).toBe('D/Gb | A/Db');
-    });
-});
-
-describe('transposeChordText — two-path parity & round-trip', () => {
-    it('both modes agree on note-name-only content (the shared note/slash path)', () => {
-        // No Roman/NNS tokens, so the only difference between the modes is irrelevant here —
-        // proves the absolute path and the relative path share one note/slash tokenizer.
-        const fixture = 'Ab/Gb | Bbm7 | C/E';
-        for (const shift of [1, 2, 5, 7, -4]) {
-            expect(transposeChordText(fixture, shift)).toBe(
-                transposeChordText(fixture, shift, { rewriteRelative: true }),
-            );
-        }
-    });
-
+describe('transposeChordText — round-trip', () => {
     it('round-trips +n then -n back to the original (flat-canonical input)', () => {
         const fixture = 'C/E F | Am7/G | Dmaj7';
         expect(transposeChordText(transposeChordText(fixture, 5), -5)).toBe(fixture);

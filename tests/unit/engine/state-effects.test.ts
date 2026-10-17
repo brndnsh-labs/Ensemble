@@ -5,9 +5,6 @@ import { handleEffects } from '../../../public/state/state-effects.js';
 import { ACTIONS } from '../../../public/types.js';
 
 // Mock all the imported functions
-vi.mock('../../../public/engine/chords-engine.js', () => ({
-    validateProgression: vi.fn(),
-}));
 vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
     syncBusReverbSend: vi.fn(),

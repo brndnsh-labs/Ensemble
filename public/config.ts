@@ -14,8 +14,6 @@ export const ENHARMONIC_MAP = {
     'E#': 'F',
     Fb: 'E',
 };
-export const ROMAN_VALS = { I: 0, II: 2, III: 4, IV: 5, V: 7, VI: 9, VII: 11 };
-export const NNS_OFFSETS = [0, 2, 4, 5, 7, 9, 11];
 export const INTERVAL_TO_NNS = {
     0: '1',
     1: 'b2',

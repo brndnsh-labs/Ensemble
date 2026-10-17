@@ -1,7 +1,6 @@
 import { stripDangerousChars } from '../../../public/sanitize.js';
-import { validateAnyChartDocument } from '../../../public/songbook/document-v2.js';
+import { validateChartDocumentV2 } from '../../../public/songbook/document-v2.js';
 import type { ChartDocumentV2 } from '../../../public/songbook/score-types.js';
-import type { ChartDocument as LegacyDocument } from '../../../public/songbook/types.js';
 
 /**
  * A collection (#1474, decided on #1443): a named, ORDERED list of song ids that is its own
@@ -55,9 +54,8 @@ export interface CollectionDocument {
     builtIn?: BuiltInCollection;
 }
 
-export type ChartDocument = LegacyDocument | ChartDocumentV2;
 /** Every synced document kind. A chart carries no `kind`; a collection carries `'collection'`. */
-export type AnyDocument = ChartDocument | CollectionDocument;
+export type AnyDocument = ChartDocumentV2 | CollectionDocument;
 
 /** The key set this build writes, in the order it writes them. Anything else is refused. */
 const KEYS = [
@@ -214,7 +212,7 @@ export function validateAnyDocument(candidate: unknown): AnyDocument {
     if (isCollectionCandidate(candidate)) {
         return validateCollection(candidate);
     }
-    const result = validateAnyChartDocument(candidate);
+    const result = validateChartDocumentV2(candidate);
     if (result.kind !== 'ok') {
         throw new Error('Cannot open this document. The source has not been changed.');
     }

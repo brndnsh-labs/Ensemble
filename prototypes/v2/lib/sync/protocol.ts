@@ -1,9 +1,9 @@
-import { validateAnyChartDocument } from '../../../../public/songbook/document-v2.js';
+import { validateChartDocumentV2 } from '../../../../public/songbook/document-v2.js';
 import type { ChartDocumentV2 } from '../../../../public/songbook/score-types.js';
-import type { ChartDocument as LegacyDocument } from '../../../../public/songbook/types.js';
 import { type CollectionDocument, decodeCollection, isCollectionCandidate } from '../collections';
 
-export type ChartDocument = LegacyDocument | ChartDocumentV2;
+/** A chart the account syncs: schema 2, the only one since #1740 (a text chart is refused). */
+export type ChartDocument = ChartDocumentV2;
 /**
  * Every document kind the account syncs (#1474): a chart, or a collection (`lib/collections.ts`).
  * A chart carries no `kind`, so every chart path below is unchanged; only the paths that move
@@ -387,7 +387,7 @@ export function remoteRevision(value: unknown): asserts value is string {
 }
 
 export function snapshot(candidate: unknown): ChartDocument {
-    const decoded = validateAnyChartDocument(candidate);
+    const decoded = validateChartDocumentV2(candidate);
     if (decoded.kind !== 'ok') {
         throw new Error('Cannot sync this chart version or content. The source is unchanged.');
     }

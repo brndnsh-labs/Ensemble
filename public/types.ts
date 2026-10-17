@@ -57,42 +57,12 @@ export interface ChordNamePart {
 }
 
 /**
- * Pre-formatted chord names in all three notation styles. Built by chords-engine.
+ * Pre-formatted chord names in all three notation styles. Built by `prototypes/v2/lib/band-chart.ts`.
  */
 export interface FormattedChordNames {
     name: ChordNamePart;
     nns: ChordNamePart;
     roman: ChordNamePart;
-}
-
-/**
- * Canonical parsed-chord type produced by `chords-engine.validateProgression()`: the names and
- * the timing a measure-less chart was drawn from (the app draws none since #1739). It holds no
- * pitches. Section-context fields (sectionId, sectionLabel,
- * localIndex, keyIsMinor, repeatIndex) are tagged on by validateProgression after
- * parsing — they're absent on a freshly parsed chord and present once it's been
- * placed in the arrangement.
- */
-export interface Chord {
-    /** Written measure identity, present for semantic-score playback. */
-    measureId?: string;
-    // --- Display ---
-    absName: string;
-    display: FormattedChordNames;
-
-    // --- Temporal / structural ---
-    beats: number;
-    timeSignature: string;
-
-    // --- Tonal context ---
-    key: string;
-
-    // --- Section context (added by validateProgression) ---
-    sectionId?: string;
-    sectionLabel?: string;
-    keyIsMinor?: boolean;
-    localIndex?: number;
-    repeatIndex?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,8 +76,6 @@ export interface Section {
     id: string;
     /** Display name (e.g., "Verse", "Chorus"). */
     label: string;
-    /** The chord progression string (e.g., "I | IV"). */
-    value: string;
     /** Number of times to repeat this section (default 1). */
     repeat?: number;
     /** Local key for this section (e.g., "G"). */
@@ -138,8 +106,6 @@ export type SectionInstrumentKey = 'groove' | 'bass' | 'chords' | 'harmony' | 's
 export interface ArrangerState {
     /** List of song sections. */
     readonly sections: Section[];
-    /** Flattened list of parsed chord objects. */
-    readonly progression: Chord[];
     /** The global musical key (e.g., "C", "F#"). */
     readonly key: string;
     /** The global time signature (e.g., "4/4", "3/4"). */
@@ -148,12 +114,6 @@ export interface ArrangerState {
     readonly isMinor: boolean;
     /** Notation style ('roman', 'nns', 'name'). */
     readonly notation: string;
-    /** Total number of 16th note steps in the song. */
-    readonly totalSteps: number;
-    /** Map of steps to chord objects. */
-    readonly stepMap: Array<{ start: number; end: number; chord: Chord }>;
-    /** Map of sections to step ranges. */
-    readonly sectionMap: Array<{ id: string; start: number; end: number }>;
     /** Custom rhythmic grouping array (e.g. [3, 2]). */
     readonly grouping: number[] | null;
     /** 6-char hex PRNG seed driving soloist + drum generation for this song. */
@@ -493,7 +453,6 @@ export interface ActionPayloadMap {
     SET_NOTATION: string;
     /** Section-practice: seed the step the next play begins from (#1016). */
     SET_START_STEP: number;
-    PROG_VALIDATED?: undefined;
 }
 
 /**
@@ -543,5 +502,4 @@ export const ACTIONS = {
     SET_START_STEP: 'SET_START_STEP',
 
     // --- Signal-only / Lifecycle (payload-less notifications) ---
-    PROG_VALIDATED: 'PROG_VALIDATED',
 } as const satisfies { readonly [K in keyof ActionPayloadMap]-?: K };

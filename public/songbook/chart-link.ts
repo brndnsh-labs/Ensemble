@@ -1,18 +1,18 @@
 /**
  * chart-link.ts — v2 shareable-link codec.
  *
- * Encodes/decodes a v2 ChartDocument (schema version 1 or 2 — whatever the stand
- * currently has open) as a URL hash fragment: `#chart=<base64url(deflate(JSON))>`.
+ * Encodes/decodes a chart document (schema 2, the only one since #1740) as a URL hash
+ * fragment: `#chart=<base64url(deflate(JSON))>`. A link that carries a schema-1 text chart
+ * decodes to `RETIRED_CHART_LINK`, so the app can say plainly why it does not open.
  * Old v1 `?s=` links are not opened at all (#1735; see
  * `docs/design/ensemble-v2-rollout.md`'s 2026-09-15 decision: v2-only links, no
  * v1 dual-open).
  *
  * Trust boundary: a link carries portable musical intent only — no account,
  * session or retry metadata. That isn't a promise kept by this file's code; it's
- * enforced structurally by `validateAnyChartDocument` (dispatching to
- * `validateChartDocument`/`validateChartDocumentV2`), which reject any envelope key outside
- * their fixed schema (`schemaVersion`/`id`/`title`/`createdAt`/`updatedAt`/`revision`/`chart`,
- * plus `metadata`/`importSource` on v2) before a decoded payload is trusted. Decoding
+ * enforced structurally by `validateChartDocumentV2`, which rejects any envelope key outside
+ * its fixed schema (`schemaVersion`/`id`/`title`/`createdAt`/`updatedAt`/`revision`/`chart`,
+ * `metadata`/`importSource`) before a decoded payload is trusted. Decoding
  * never throws into the UI: any malformed, oversized or schema-invalid payload
  * resolves to `undefined` — fail closed.
  *
@@ -22,12 +22,12 @@
  * async.
  */
 
-import { validateAnyChartDocument } from './document-v2.js';
+import { isRetiredSchema, validateChartDocumentV2 } from './document-v2.js';
 import type { ChartDocumentV2 } from './score-types.js';
 import { SONGBOOK_MAX_INPUT_BYTES } from './structural-limits.js';
-import type { ChartDocument } from './types.js';
 
-export type ChartLinkDocument = ChartDocument | ChartDocumentV2;
+/** What {@link decodeChartLink} answers for a link to a schema-1 text chart (#1740). */
+export const RETIRED_CHART_LINK = 'retired-schema';
 
 /** The URL hash key: `#chart=<payload>`. */
 const CHART_LINK_KEY = 'chart';
@@ -116,14 +116,19 @@ async function inflate(bytes: Uint8Array): Promise<Uint8Array | undefined> {
     return out;
 }
 
-/** Routes to the matching validator; fails closed rather than trusting the fragment. */
-function validateChartLinkDocument(candidate: unknown): ChartLinkDocument | undefined {
-    const result = validateAnyChartDocument(candidate);
+/** Fails closed rather than trusting the fragment. */
+function validateChartLinkDocument(
+    candidate: unknown,
+): ChartDocumentV2 | typeof RETIRED_CHART_LINK | undefined {
+    if (isRetiredSchema(candidate)) {
+        return RETIRED_CHART_LINK;
+    }
+    const result = validateChartDocumentV2(candidate);
     return result.kind === 'ok' ? result.value : undefined;
 }
 
 /** Encodes a chart as a shareable `#chart=` URL hash fragment. */
-export async function encodeChartLink(document: ChartLinkDocument): Promise<string> {
+export async function encodeChartLink(document: ChartDocumentV2): Promise<string> {
     const json = JSON.stringify(document);
     const compressed = await deflate(new TextEncoder().encode(json));
     return `#${CHART_LINK_KEY}=${toBase64Url(compressed)}`;
@@ -131,11 +136,13 @@ export async function encodeChartLink(document: ChartLinkDocument): Promise<stri
 
 /**
  * Decodes a `#chart=` URL hash fragment (with or without the leading `#`) back
- * into a validated ChartDocument. Never throws; any malformed, oversized or
- * schema-invalid payload resolves to `undefined` so a corrupt link degrades to
- * "nothing loaded," not a crash.
+ * into a validated chart document, or `RETIRED_CHART_LINK` for a schema-1 text chart.
+ * Never throws; any other malformed, oversized or schema-invalid payload resolves to
+ * `undefined` so a corrupt link degrades to "nothing loaded," not a crash.
  */
-export async function decodeChartLink(fragment: string): Promise<ChartLinkDocument | undefined> {
+export async function decodeChartLink(
+    fragment: string,
+): Promise<ChartDocumentV2 | typeof RETIRED_CHART_LINK | undefined> {
     if (!fragment) {
         return undefined;
     }

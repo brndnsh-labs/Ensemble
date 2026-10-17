@@ -44,7 +44,7 @@ describe('live:capture', () => {
         const scene = DEFAULT_MIX_REPORT_SCENES.find((s) => s.id === 'funk-pocket')!;
         const url = new URL(await sceneUrl('http://127.0.0.1:4321', scene, ['chords']));
         const doc = await decodeChartLink(url.hash);
-        if (doc?.schemaVersion !== 2) {
+        if (typeof doc !== 'object') {
             throw new Error('expected a schema-2 chart link');
         }
         expect(doc.chart.band.groove.genre).toBe('Funk');

@@ -3,7 +3,6 @@ import type { CodecIssue } from './types.js';
 export const SONGBOOK_MAX_INPUT_BYTES = 1024 * 1024;
 export const SONGBOOK_MAX_DEPTH = 32;
 export const SONGBOOK_MAX_VISITED_NODES = 100_000;
-export const SONGBOOK_MAX_SECTIONS = 500;
 
 export interface StructureInspection {
     nodes: number;

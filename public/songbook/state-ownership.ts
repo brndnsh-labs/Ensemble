@@ -17,14 +17,10 @@ type StateOwnershipManifest = {
 export const STATE_OWNERSHIP_MANIFEST = {
     arranger: {
         sections: 'document',
-        progression: 'runtime-derived',
         key: 'document',
         timeSignature: 'document',
         isMinor: 'document',
         notation: 'document',
-        totalSteps: 'runtime-derived',
-        stepMap: 'runtime-derived',
-        sectionMap: 'runtime-derived',
         grouping: 'document',
         seed: 'document',
         randomizeSeed: 'document',

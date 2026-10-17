@@ -1,10 +1,14 @@
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import fixtures from '../../../docs/design/fixtures/ensemble-v2-charts.json';
-import { decodeChartLink, encodeChartLink } from '../../../public/songbook/chart-link.js';
+import {
+    decodeChartLink,
+    encodeChartLink,
+    RETIRED_CHART_LINK,
+} from '../../../public/songbook/chart-link.js';
 import { parseIRealImport } from '../../../public/songbook/ireal-import.js';
 import type { ChartDocumentV2, SemanticScore } from '../../../public/songbook/score-types.js';
-import type { ChartDocument, ChartLaneMix } from '../../../public/songbook/types.js';
+import type { ChartBand, ChartLaneMix } from '../../../public/songbook/types.js';
 
 function mix(overrides: Partial<ChartLaneMix> = {}): ChartLaneMix {
     return {
@@ -17,7 +21,7 @@ function mix(overrides: Partial<ChartLaneMix> = {}): ChartLaneMix {
     };
 }
 
-function bandFixture(): ChartDocument['chart']['band'] {
+function bandFixture(): ChartBand {
     return {
         chords: mix(),
         bass: mix(),
@@ -36,7 +40,11 @@ function bandFixture(): ChartDocument['chart']['band'] {
     };
 }
 
-function legacyFixture(value = 'C G7 | Dm7 G7'): ChartDocument {
+/**
+ * A text chart (schemaVersion 1) as an older build wrote one: the format was retired in #1740,
+ * and a link carrying one decodes to `RETIRED_CHART_LINK` so the app can say so plainly.
+ */
+function retiredTextChart() {
     return {
         schemaVersion: 1,
         id: 'study',
@@ -51,19 +59,7 @@ function legacyFixture(value = 'C G7 | Dm7 G7'): ChartDocument {
                 timeSignature: '4/4',
                 grouping: null,
                 notation: 'name',
-                sections: [
-                    {
-                        id: 'a',
-                        label: 'A',
-                        value,
-                        repeat: 2,
-                        key: 'D',
-                        isMinor: true,
-                        seamless: true,
-                        targetIntensity: 0.5,
-                        instruments: { soloist: false },
-                    },
-                ],
+                sections: [{ id: 'a', label: 'A', value: 'C G7 | Dm7 G7', repeat: 2 }],
             },
             performance: { bpm: 120, seed: 'ABC123', randomizeSeed: false },
             band: bandFixture(),
@@ -72,12 +68,19 @@ function legacyFixture(value = 'C G7 | Dm7 G7'): ChartDocument {
 }
 
 function documentFixtureV2(score: SemanticScore): ChartDocumentV2 {
-    const legacy = legacyFixture();
     return {
-        ...legacy,
         schemaVersion: 2,
+        id: 'study',
+        title: 'Study',
+        revision: 3,
+        createdAt: '2026-09-08T12:00:00.000Z',
+        updatedAt: '2026-09-08T12:30:00.000Z',
         metadata: { composer: 'Test author', style: 'Swing' },
-        chart: { score, performance: legacy.chart.performance, band: legacy.chart.band },
+        chart: {
+            score,
+            performance: { bpm: 120, seed: 'ABC123', randomizeSeed: false },
+            band: bandFixture(),
+        },
     };
 }
 
@@ -145,21 +148,20 @@ function thirtyTwoBarScoreFixture(): SemanticScore {
 }
 
 describe('v2 shareable chart links', () => {
-    it('round-trips a v1 legacy document', async () => {
-        const document = legacyFixture();
+    it('round-trips a chart document', async () => {
+        const document = documentFixtureV2(scoreFixture());
         const link = await encodeChartLink(document);
         expect(link.startsWith('#chart=')).toBe(true);
         await expect(decodeChartLink(link)).resolves.toEqual(document);
     });
 
-    it('round-trips a v2 semantic document', async () => {
-        const document = documentFixtureV2(scoreFixture());
-        const link = await encodeChartLink(document);
-        await expect(decodeChartLink(link)).resolves.toEqual(document);
+    it('names a link to a retired text chart (schema 1) apart from a broken one', async () => {
+        const link = await encodeChartLink(retiredTextChart() as unknown as ChartDocumentV2);
+        await expect(decodeChartLink(link)).resolves.toBe(RETIRED_CHART_LINK);
     });
 
     it('accepts the fragment with or without a leading #', async () => {
-        const document = legacyFixture();
+        const document = documentFixtureV2(scoreFixture());
         const link = await encodeChartLink(document);
         await expect(decodeChartLink(link.slice(1))).resolves.toEqual(document);
     });
@@ -239,17 +241,17 @@ describe('v2 shareable chart links', () => {
     });
 
     it('rejects a payload with an envelope field outside the fixed document schema', async () => {
-        const document = legacyFixture();
+        const document = documentFixtureV2(scoreFixture());
         const withAccountField = {
             ...document,
             accountId: 'evil-actor',
-        } as unknown as ChartDocument;
+        } as unknown as ChartDocumentV2;
         const link = await encodeChartLink(withAccountField);
         await expect(decodeChartLink(link)).resolves.toBeUndefined();
     });
 
-    it('rejects a v1-shaped document with an out-of-range field', async () => {
-        const document = legacyFixture();
+    it('rejects a document with an out-of-range field', async () => {
+        const document = documentFixtureV2(scoreFixture());
         const tampered = {
             ...document,
             chart: { ...document.chart, performance: { ...document.chart.performance, bpm: -5 } },

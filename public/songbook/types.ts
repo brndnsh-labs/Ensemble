@@ -1,8 +1,5 @@
-import type { InstrumentVoice, SectionInstrumentKey, SwingSub } from '../types.js';
+import type { InstrumentVoice, SwingSub } from '../types.js';
 
-export const CHART_DOCUMENT_SCHEMA_VERSION = 1 as const;
-
-export type ChartDocumentSchemaVersion = typeof CHART_DOCUMENT_SCHEMA_VERSION;
 export type ChartNotation = 'roman' | 'name' | 'nns';
 export type SoloistMode = 'monophonic' | 'guitar';
 /**
@@ -19,28 +16,6 @@ export const SOLOIST_TRADE_BARS: readonly SoloistTradeBars[] = [2, 4, 8];
  */
 export type SoloistTradeChoruses = 0 | 1 | 2 | 3 | 4;
 export const DEFAULT_SOLOIST_TRADE_CHORUSES: SoloistTradeChoruses = 2;
-
-export interface ChartSection {
-    id: string;
-    label: string;
-    value: string;
-    repeat?: number;
-    key?: string;
-    isMinor?: boolean;
-    timeSignature?: string;
-    seamless?: boolean;
-    targetIntensity?: number;
-    instruments?: Partial<Record<SectionInstrumentKey, boolean>>;
-}
-
-export interface ChartArrangement {
-    sections: ChartSection[];
-    key: string;
-    timeSignature: string;
-    grouping: number[] | null;
-    isMinor: boolean;
-    notation: ChartNotation;
-}
 
 /**
  * The band's energy for this chart: a fixed level (0-1, the band engine's
@@ -101,24 +76,12 @@ export interface ChartBand {
 }
 
 /**
- * Portable authored content. This shape is intentionally semantic rather than a
- * projection of the live state slices: repositories can persist it without
- * importing or reading those slices.
+ * The settings a chart holds beside its music (DECISION 2026-09-26, #1404): what the band
+ * honours. The music itself is the chart's `score` (`ChartDocumentV2` in `score-types.ts`).
  */
-export interface ChartContent {
-    arrangement: ChartArrangement;
+export interface ChartSettings {
     performance: ChartPerformance;
     band: ChartBand;
-}
-
-export interface ChartDocument {
-    schemaVersion: ChartDocumentSchemaVersion;
-    id: string;
-    title: string;
-    createdAt: string;
-    updatedAt: string;
-    revision: number;
-    chart: ChartContent;
 }
 
 export interface CodecIssue {
@@ -132,8 +95,7 @@ export interface CodecIssue {
         | 'invalid-type'
         | 'invalid-value'
         | 'missing-field'
-        | 'unknown-field'
-        | 'too-many-sections';
+        | 'unknown-field';
     message: string;
 }
 

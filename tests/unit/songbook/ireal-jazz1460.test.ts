@@ -16,31 +16,22 @@ import {
 import { parseIRealImport } from '../../../public/songbook/ireal-import.js';
 import { compileScoreForm } from '../../../public/songbook/score-form.js';
 import type { ChartDocumentV2 } from '../../../public/songbook/score-types.js';
-import type { ChartDocument } from '../../../public/songbook/types.js';
-import { accountScoreChart } from '../../utils/account-songbook-fixture.js';
+import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 /**
  * A donor chart for the band/performance settings `importedDocument` carries forward — its own
- * music is discarded. Shape copied from `codec.test.ts`'s `makeChartDocument` fixture, which is
- * already a known-valid schemaVersion 1 document.
+ * music (`accountChart`'s two bars) is discarded.
  */
-function baseChart(): ChartDocument {
+function baseScoreChart(): ChartDocumentV2 {
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         id: 'chart-base-001',
         title: 'Base study',
         createdAt: '2026-08-28T12:00:00.000Z',
         updatedAt: '2026-08-28T12:30:00.000Z',
         revision: 1,
         chart: {
-            arrangement: {
-                sections: [{ id: 'section-a', label: 'A', value: 'Imaj7', repeat: 1 }],
-                key: 'C',
-                timeSignature: '4/4',
-                grouping: null,
-                isMinor: false,
-                notation: 'name',
-            },
+            score: accountChart().chart.score,
             performance: { bpm: 120, seed: 'A1B2C3', randomizeSeed: false },
             band: {
                 chords: {
@@ -87,16 +78,6 @@ function fixture(slug: string): string {
         new URL(`../../fixtures/ireal/${slug}.txt`, import.meta.url),
         'utf8',
     ).trim();
-}
-
-/** `baseChart`'s settings on a measure chart, the only kind the app opens (#1739). */
-function baseScoreChart(): ChartDocumentV2 {
-    const { arrangement: _arrangement, ...settings } = baseChart().chart;
-    return {
-        ...baseChart(),
-        schemaVersion: 2,
-        chart: { ...settings, score: accountScoreChart().chart.score },
-    } as ChartDocumentV2;
 }
 
 /** Imports the fixture's sole song through the app's own path and returns the new document. */
