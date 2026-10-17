@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import { GENRE_PATH, LEGACY_CHART_PATHS } from '../../v2-api/src/db/admin-overview';
-import { createAccountThroughDialog, openWithAccounts } from './account-helpers';
-import { expect, accountTest as test } from './fixtures';
+import { createAccountThroughDialog } from './account-helpers';
+import { expect, seedGuestDocuments, starterTextCharts, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -84,7 +84,8 @@ test('account songs are upgraded in place through the outbox, and the server hol
     await addVirtualAuthenticator(page);
     const saves = acceptedSaves(page);
     // Three old-format (schema-1) songs in this device's guest songbook…
-    await openWithAccounts(page);
+    await seedGuestDocuments(page, starterTextCharts());
+    await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await createAccountThroughDialog(page);
     await page.getByTestId('recovery-not-now').click();

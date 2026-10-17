@@ -22,8 +22,6 @@ Network egress from the stand is same-origin only for everything but analytics: 
 | Account API — library, Save, delete, account deletion | `src/http/app.ts` and the library/save/delete modules (README §§ #1202, #1259, #1260, #1271) | **Reviewed** per story. Owner-scoped queries, idempotent owner-bound receipts, body limits on every mutation (64 KB; Save and delete carry their own bounds), JSON-only mutation routes, fresh-auth gate on account deletion. |
 | Account API — abuse and capacity | `src/http/rate-limit-guard.ts`, `src/auth/rate-limit.ts`, `DEFAULT_REGISTRATION_CAP` (`src/auth/registration.ts`) | **Partly open.** Transport rate limit (300/min) and ceremony limits are in place; registration is capped at 25 accounts (#1272). The on-host disk alert that was the other half of #1272 is not built yet (plan on #1272). |
 | `#chart=` share links | `public/songbook/chart-link.ts` (`decodeChartLink`), the shared-link effect in `prototypes/v2/app/ensemble.tsx` | **Defended.** Size-bounded decode (200,000 encoded characters), then the canonical document validators (`validateChartDocument`/`validateChartDocumentV2`); a bad payload is an error message, never a throw into the UI. Opens as an unsaved draft; nothing is written. |
-| Old v1 `?s=` share links | `prototypes/v2/lib/v1-link.ts`, `public/state/share-codec.ts` (decode only) | **Defended, one open hardening item:** #1132 (`normalizeKey` prototype lookup, and `section.key` skipping the key-membership check on this path). Harmless at today's call sites. |
-| v1 browser-data import | `prototypes/v2/lib/import-v1.ts` | **Defended.** Read-only `getItem` view of `ensemble_*`; v1's own normalizers, then the canonical codec; never writes back to a v1 key. **Not separately security-reviewed.** |
 | iReal Pro and chart-file import | `prototypes/v2/lib/import-document.ts`, `app/import-dialog.tsx`, `public/songbook/` parsers | Parsed into the semantic score and validated before use; the original text is kept verbatim as data (`importSource`), never interpreted as markup. **Not separately security-reviewed.** |
 | HTML sinks in the stand | React's default escaping; the one `dangerouslySetInnerHTML` is `app/layout.tsx`'s constant theme script | **Clean.** No user-derived value reaches an HTML sink. |
 | Response headers | `hosting/web/nginx.conf` (`nosniff`, `Referrer-Policy`, `frame-ancestors 'none'`), `prototypes/v2/scripts/offline.mjs` (the `<meta>` CSP), edge Caddy (HSTS), API `src/http/headers.ts` | **Closed (#1395, F8).** `offline.mjs` computes each exported HTML file's inline-script sha256 hashes and injects a `<meta http-equiv="Content-Security-Policy">` as the first thing in `<head>`; nginx still carries `frame-ancestors` (a `<meta>` CSP cannot). |
@@ -41,7 +39,6 @@ Network egress from the stand is same-origin only for everything but analytics: 
 **Open:**
 
 - **F7 (Optional) — GitHub Actions pinned to major-version tags.** Unchanged: SHA-pinning third-party actions (`docker/*`, `tailscale/github-action`) is the supply-chain ideal; lower priority for first-party `actions/*`.
-- **#1132** — the v1-link key hardening above.
 - **#1272** — the disk alert above.
 
 ## Standing rules for future changes (check on every diff)

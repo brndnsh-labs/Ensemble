@@ -81,15 +81,11 @@ describe('accountsFlagRequest', () => {
         expect(accountsFlagRequest('?accounts=off', '#abc123')).toBeNull();
     });
 
-    it('ignores it for an OLD v1 share link too, which has no hash at all (#1279)', () => {
-        // The hash test above cannot see a v1 link: `/v2/?s=<chart>&accounts=on` is a share
-        // link entirely in the query string, and it must not flip the flag either.
-        expect(accountsFlagRequest('?s=abc&accounts=on', '')).toBeNull();
-        expect(accountsFlagRequest('?accounts=on&s=abc', '')).toBeNull();
-        expect(accountsFlagRequest('?prog=I%20%7C%20IV&accounts=on', '')).toBeNull();
-        expect(accountsFlagRequest('?s=abc&accounts=off', '')).toBeNull();
-        // A URL that merely carries v1's descriptive parameters is not a share link, so an
-        // ordinary opt-in is still honoured.
+    it('does not treat an old v1 `?s=`/`?prog=` link as a share link (#1735)', () => {
+        // Those links are no longer read, so the query-string payload carries no side-effect
+        // protection to give: an ordinary opt-in beside it is honoured like any other.
+        expect(accountsFlagRequest('?s=abc&accounts=on', '')).toBe('on');
+        expect(accountsFlagRequest('?prog=I%20%7C%20IV&accounts=off', '')).toBe('off');
         expect(accountsFlagRequest('?key=C&bpm=120&accounts=on', '')).toBe('on');
     });
 });

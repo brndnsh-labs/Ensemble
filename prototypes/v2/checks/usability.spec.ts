@@ -1,6 +1,22 @@
 import { readFile } from 'node:fs/promises';
+import type { ChartDocumentV2 } from '@engine/songbook/score-types';
 import type { Page } from '@playwright/test';
-import { expect, seedStarters, settled, songLink, test } from './fixtures';
+import {
+    closeBarDock,
+    expect,
+    leaveBar,
+    openBar,
+    openSectionMenu,
+    phoneWidth,
+    seedStarters,
+    settled,
+    songLink,
+    test,
+    typeBar,
+} from './fixtures';
+
+// The text chart's editor (Chord text, Section, ＋ Section, Update chart, Edit section) has its
+// own spec, `text-chart.spec.ts` (#1733); the starters here are measure charts.
 
 async function openEditor(page: Page) {
     await seedStarters(page);
@@ -15,15 +31,7 @@ async function savedBlue(page: Page) {
             request.onerror = () => reject(request.error);
         });
         try {
-            return await new Promise<{
-                title: string;
-                revision: number;
-                updatedAt: string;
-                chart: {
-                    arrangement: { key: string; sections: { value: string }[] };
-                    performance: { bpm: number };
-                };
-            }>((resolve, reject) => {
+            return await new Promise<ChartDocumentV2>((resolve, reject) => {
                 const read = db
                     .transaction('documents')
                     .objectStore('documents')
@@ -36,6 +44,14 @@ async function savedBlue(page: Page) {
         }
     });
 }
+/** The chord symbols of bar `bar` (from 1) of section `section` (from 0). */
+function symbols(document: ChartDocumentV2, bar: number, section = 0): string[] {
+    const content = document.chart.score.sections[section].measures[bar - 1].content;
+    if (content.kind !== 'events') {
+        throw new Error('expected chord events');
+    }
+    return content.events.map((event) => (event.kind === 'chord' ? event.symbol : '?'));
+}
 async function exportCurrent(page: Page) {
     await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
@@ -46,31 +62,31 @@ async function exportCurrent(page: Page) {
     return document;
 }
 
-test('typed chords are unsaved work: Save includes every edited section without Update', async ({
+test('typed chords are unsaved work: Save includes every edited section without leaving the bar', async ({
     page,
 }) => {
     await openEditor(page);
-    await page.getByRole('button', { name: '＋ Section', exact: true }).click();
-    const second = await page.getByLabel('Section', { exact: true }).inputValue();
-    await page.getByLabel('Section', { exact: true }).selectOption('a');
-    await page.getByLabel('Chord text').fill('Dm7 G7 | Cmaj7 | A7');
-    await page.getByLabel('Section', { exact: true }).selectOption(second);
-    await page.getByLabel('Chord text').fill('Fmaj7 | E7 | Am7 | G7');
-    await page.getByLabel('Section', { exact: true }).selectOption('a');
-    await expect(page.getByLabel('Chord text')).toHaveValue('Dm7 G7 | Cmaj7 | A7');
-    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    // A second section after A (#1726): its one bar is bar 13.
+    await (await openSectionMenu(page, 'A'))
+        .getByRole('button', { name: 'Add section after', exact: true })
+        .click();
+    await leaveBar(page);
+    await expect(page.locator('.bar')).toHaveCount(13);
+    await typeBar(page, 1, 'Dm7 G7');
+    await typeBar(page, 13, 'Fmaj7 E7');
+    // Section A kept its bar while section B was typed.
+    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['Dm7', 'G7']);
     await expect(page.locator('.song-subtitle')).toContainText('Unsaved chord text');
+    // Save straight from the open bar: it keeps every section's bars.
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    expect((await savedBlue(page)).chart.arrangement.sections.map((s) => s.value)).toEqual([
-        'Dm7 G7 | Cmaj7 | A7',
-        'Fmaj7 | E7 | Am7 | G7',
-    ]);
-    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await page.getByLabel('Chord text').fill('Am7 | D7');
+    const saved = await savedBlue(page);
+    expect(symbols(saved, 1, 0)).toEqual(['Dm7', 'G7']);
+    expect(symbols(saved, 1, 1)).toEqual(['Fmaj7', 'E7']);
+    await typeBar(page, 1, 'Am7 D7');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    expect((await savedBlue(page)).chart.arrangement.sections[0].value).toBe('Am7 | D7');
+    expect(symbols(await savedBlue(page), 1)).toEqual(['Am7', 'D7']);
 });
 
 test('a practice nudge is said apart from a chart change, and both wait for Save (#1706)', async ({
@@ -101,41 +117,33 @@ test('a practice nudge is said apart from a chart change, and both wait for Save
 
     // Nothing was written until Save, which keeps both.
     const stored = await savedBlue(page);
-    expect(stored.chart.arrangement.key).not.toBe(before === 'D' ? 'E' : 'D');
+    expect(stored.chart.score.key).not.toBe(before === 'D' ? 'E' : 'D');
     await save.click();
     await expect(save).toBeDisabled();
     await expect(status).toHaveText('Saved on this device');
     const kept = await savedBlue(page);
     expect(kept.chart.performance.bpm).toBe(stored.chart.performance.bpm + 5);
-    expect(kept.chart.arrangement.key).toBe(before === 'D' ? 'E' : 'D');
+    expect(kept.chart.score.key).toBe(before === 'D' ? 'E' : 'D');
 });
 
-test('export and Save a copy include typed text but do not overwrite the original save', async ({
+test('export and Save a copy include a typed bar but do not overwrite the original save', async ({
     page,
 }) => {
     await openEditor(page);
     const original = await savedBlue(page);
-    await page.getByLabel('Chord text').fill('Dm7 | G7 | Cmaj7');
-    expect((await exportCurrent(page)).chart.arrangement.sections[0].value).toBe(
-        'Dm7 | G7 | Cmaj7',
-    );
+    await typeBar(page, 1, 'Dm7 G7');
+    expect(symbols(await exportCurrent(page), 1)).toEqual(['Dm7', 'G7']);
     expect(await savedBlue(page)).toEqual(original);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
-    await page.getByLabel('Chord text').fill('Am7 | D7 | Gmaj7');
+    await typeBar(page, 1, 'Am7 D7');
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
     // While editing, the title is the header's input (#1726).
     await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket — copy');
-    expect((await exportCurrent(page)).chart.arrangement.sections[0].value).toBe(
-        'Am7 | D7 | Gmaj7',
-    );
+    expect(symbols(await exportCurrent(page), 1)).toEqual(['Am7', 'D7']);
     expect(await savedBlue(page)).toEqual(original);
 });
 
-// #1331 — the guard's job is "new editor text must never silently become another chord", and
-// it did that by comparing the parser's canonical spelling back to the typed text. Once the
-// parser learned to normalise case, parentheses, Δ and the in-quality slash (#1320-#1324),
-// that string comparison rejected exactly the spellings it had just learned to read.
 test('a queued close event cannot shut a dialog that has already been reopened (#1402)', async ({
     page,
 }) => {
@@ -153,146 +161,6 @@ test('a queued close event cannot shut a dialog that has already been reopened (
     // A real close still reports.
     await page.keyboard.press('Escape');
     await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeHidden();
-});
-
-test('the editor accepts every spelling the playback parser understands', async ({ page }) => {
-    await openEditor(page);
-    const supported = [
-        'CMaj7 | CM7 | CΔ7', // capitalised / Greek-delta major 7ths
-        'Cm7(b5) | G7(b9) | C13(#11b9)', // parenthesised alterations
-        'CmMaj7 | Cm/maj7 | Cmadd9', // minor-major and minor added tone
-        'Gsus | G7sus | G9sus4 | G13sus', // suspension shorthand
-        'C6/9 | Cm6/9 | C69 | Cmaj7b5', // in-quality slash, and the exact maj7b5
-        'Cm7#5 | C-7#5 | Cm(b6) | C-b6', // #1340 — written altered 5ths and the added b6
-        'Cmaj7/G | Am7/E', // real slash basses still split
-    ].join(' | ');
-    await page.getByLabel('Chord text').fill(supported);
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.locator('.error-banner')).toHaveCount(0);
-    expect((await savedBlue(page)).chart.arrangement.sections[0].value).toBe(supported);
-});
-
-test('the editor still rejects a partly-understood spelling', async ({ page }) => {
-    await openEditor(page);
-    // `m7#11` consumes `m7` and drops the `#11`: the chord would silently lose its alteration,
-    // which is the case this guard exists for. A leading slash is unfinished text.
-    // (#1340 swapped the example from `Cm7#5`, which is now a real quality — see the accepted
-    // list above. The guard is about partial matches, so it needs a spelling that still is one.)
-    for (const token of ['Cm7#11', 'C/9', 'Cm7add11']) {
-        await page.getByLabel('Chord text').fill(`Dm7 | ${token}`);
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-        await expect(page.locator('.error-banner')).toContainText(
-            `unsupported chord spelling “${token}”`,
-        );
-    }
-});
-
-test('unsupported text blocks save, export, navigation and transforms without losing any buffer', async ({
-    page,
-}) => {
-    await openEditor(page);
-    await page.getByRole('button', { name: '＋ Section', exact: true }).click();
-    const second = await page.getByLabel('Section', { exact: true }).inputValue();
-    await page.getByLabel('Chord text').fill('C | potato | G');
-    await page.getByLabel('Section', { exact: true }).selectOption('a');
-    await page.getByLabel('Chord text').fill('Dm7 | G7');
-    const original = await savedBlue(page);
-    for (const action of ['Save', 'Update chart', 'Back to songbook', 'Start playback']) {
-        await page.getByRole('button', { name: action, exact: true }).click();
-        await expect(page.locator('.error-banner')).toContainText(
-            'Section B: unsupported chord spelling “potato”',
-        );
-        await expect(page.getByLabel('Chord text')).toHaveValue('C | potato | G');
-        await expect(page.getByLabel('Section', { exact: true })).toHaveValue(second);
-        expect(await savedBlue(page)).toEqual(original);
-    }
-    for (const action of ['Save a copy', 'Export file']) {
-        await page.getByRole('button', { name: 'Song actions' }).click();
-        await page.getByRole('button', { name: action, exact: true }).click();
-        await expect(page.locator('.error-banner')).toContainText('unsupported chord spelling');
-        await expect(page.getByLabel('Chord text')).toHaveValue('C | potato | G');
-    }
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('C');
-    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
-    await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Blues');
-    await page.getByLabel('Section', { exact: true }).selectOption('a');
-    await expect(page.getByLabel('Chord text')).toHaveValue('Dm7 | G7');
-    // Invalid text remains tab-only, and the browser receives an unload guard.
-    expect(
-        await page.evaluate(() => {
-            const event = new Event('beforeunload', { cancelable: true });
-            window.dispatchEvent(event);
-            return event.defaultPrevented;
-        }),
-    ).toBe(true);
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
-    await expect(page.getByLabel('Chord text')).toHaveValue(
-        original.chart.arrangement.sections[0].value,
-    );
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-});
-
-test('editor validation consumes complete supported spellings and preserves rejected input', async ({
-    page,
-}) => {
-    await openEditor(page);
-    const original = await savedBlue(page);
-    for (const text of [
-        '',
-        'C || G',
-        'Cmaj7junk',
-        'C/Egarbage',
-        'C/',
-        'C/E/G',
-        '%',
-        'N.C.',
-        'C7 x2',
-        'B♭7', // the unicode flat is deliberately not in the vocabulary
-        'C '.repeat(501),
-    ]) {
-        await page.getByLabel('Chord text').fill(text);
-        await page.getByRole('button', { name: 'Save', exact: true }).click();
-        await expect(page.locator('.error-banner')).toBeVisible();
-        await expect(page.getByLabel('Chord text')).toHaveValue(text);
-        expect(await savedBlue(page)).toEqual(original);
-    }
-    // `C13(#11b9)` moved here from the reject list above (#1331): the parser reads
-    // parenthesised alterations now, and #1329 maps this one to 7b9 instead of a 13 whose
-    // natural 9 contradicts the written b9. The editor rejected it for the old reason — the
-    // canonical spelling no longer equals the typed text.
-    const supported =
-        '| Dm7 G7 | Cmaj7 | #ivm7b5 VII7alt | 1 4 57 | C6/9 | G7/B IVmaj9/5 | B#maj7 Cbmaj7 | C13(#11b9) |';
-    await page.getByLabel('Chord text').fill(supported);
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    expect((await savedBlue(page)).chart.arrangement.sections[0].value).toBe(supported);
-});
-
-test('transposition follows pending text and cannot be undone by stale editor text', async ({
-    page,
-}) => {
-    await openEditor(page);
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
-    await expect(page.getByLabel('Chord text')).toHaveValue(/^D7 \| G7/);
-    await page.getByRole('button', { name: 'Update chart', exact: true }).click();
-    await expect(page.locator('.chord-button').first()).toHaveText('D7');
-    await page.getByLabel('Chord text').fill('Dm7 | G7');
-    await page.getByLabel('Key', { exact: true }).selectOption('E');
-    await expect(page.getByLabel('Chord text')).toHaveValue('Em7 | A7');
-    await page.getByRole('button', { name: '＋ Section', exact: true }).click();
-    await page.getByLabel('Section', { exact: true }).selectOption('a');
-    await expect(page.getByLabel('Chord text')).toHaveValue('Em7 | A7');
-    await page.getByLabel('Chord text').fill('F#m7 | B7');
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await page.getByRole('button', { name: 'Open chart', exact: true }).click();
-    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await expect(page.getByLabel('Chord text')).toHaveValue('F#m7 | B7');
-    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
-    await page.getByRole('button', { name: 'Stop playback' }).click();
-    await expect(page.locator('.chord-button').first()).toHaveText('F#m7');
 });
 
 test('tempo allows sequential typing, Enter, blur, Escape and single step commits', async ({
@@ -410,9 +278,12 @@ test('last-opened preference failure does not prevent playback or saving', async
         }
     });
     await openEditor(page);
-    await page.getByLabel('Chord text').fill('Dm7 | G7');
+    await typeBar(page, 1, 'Dm7 G7');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    expect(symbols(await savedBlue(page), 1)).toEqual(['Dm7', 'G7']);
+    // On a phone the transport is back once the bar dock is done (#1724).
+    await leaveBar(page);
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await expect(page.locator('.error-banner')).toHaveCount(0);
@@ -437,18 +308,21 @@ test('a failed Save retains typed chords through recovery, navigation and retry'
             return request;
         };
     });
-    await page.getByLabel('Chord text').fill('Fmaj7 | E7 | Am7');
+    await typeBar(page, 1, 'Fmaj7 E7');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.locator('.error-banner')).toContainText('Your chart is still open');
     expect(await savedBlue(page)).toEqual(original);
+    await leaveBar(page);
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await page.reload();
     await page.getByRole('button', { name: 'Open chart', exact: true }).click();
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await expect(page.getByLabel('Chord text')).toHaveValue('Fmaj7 | E7 | Am7');
+    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['Fmaj7', 'E7']);
+    await expect(await openBar(page, 1)).toHaveValue('Fmaj7 E7');
+    await leaveBar(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    expect((await savedBlue(page)).chart.arrangement.sections[0].value).toBe('Fmaj7 | E7 | Am7');
+    expect(symbols(await savedBlue(page), 1)).toEqual(['Fmaj7', 'E7']);
 });
 
 test('a revision conflict retains typed chords and allows an independent copy', async ({
@@ -458,24 +332,25 @@ test('a revision conflict retains typed chords and allows an independent copy', 
     await openEditor(page);
     const second = await context.newPage();
     await openEditor(second);
-    await second.getByLabel('Chord text').fill('Am7 | D7');
+    await typeBar(second, 1, 'Am7 D7');
     await second.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(second.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const newer = await savedBlue(page);
-    await page.getByLabel('Chord text').fill('Dm7 | G7');
+    await typeBar(page, 1, 'Dm7 G7');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.locator('.error-banner')).toContainText('saved in another tab');
-    await expect(page.getByLabel('Chord text')).toHaveValue('Dm7 | G7');
+    await expect(await openBar(page, 1)).toHaveValue('Dm7 G7');
     expect(await savedBlue(page)).toEqual(newer);
+    await leaveBar(page);
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
     // While editing, the title is the header's input (#1726).
     await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket — copy');
-    expect((await exportCurrent(page)).chart.arrangement.sections[0].value).toBe('Dm7 | G7');
+    expect(symbols(await exportCurrent(page), 1)).toEqual(['Dm7', 'G7']);
     expect(await savedBlue(page)).toEqual(newer);
 });
 
-test('Edit chart and Edit section reveal the input across laptop, phone and tablet layouts', async ({
+test('Edit chart, a bar and the section menu are in reach across laptop, phone and tablet layouts', async ({
     page,
 }, info) => {
     await openEditor(page);
@@ -486,35 +361,35 @@ test('Edit chart and Edit section reveal the input across laptop, phone and tabl
         { width: 820, height: 1180 },
     ]) {
         await page.setViewportSize(viewport);
+        await leaveBar(page);
         await page.getByRole('button', { name: 'Chart', exact: true }).click();
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-        // The panel slides in (#1700); its boxes are measured once it has arrived.
-        await settled(page.locator('.edit-panel'));
-        await expect(page.getByLabel('Chord text')).toBeInViewport();
-        await expect(page.getByLabel('Chord text')).toBeFocused();
+        const field = await openBar(page, 1);
+        await expect(field).toBeInViewport();
         expect((await page.getByLabel('Song title').boundingBox())!.height).toBeLessThan(65);
         expect(
-            (await page.getByLabel('Section', { exact: true }).boundingBox())!.height,
-        ).toBeGreaterThanOrEqual(44);
-        expect(
-            await page
-                .getByLabel('Chord text')
-                .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize)),
+            await field.evaluate((element) =>
+                Number.parseFloat(getComputedStyle(element).fontSize),
+            ),
         ).toBeGreaterThanOrEqual(16);
-        if (viewport.width === 402) {
-            // A phone docks the editor below the chart (#1705): both are on screen, the panel
-            // scrolled to its input rather than to its heading.
-            await expect(page.locator('.edit-panel')).toBeInViewport();
+        if (phoneWidth(page)) {
+            // A phone types the bar in the dock over the keyboard (#1724), with the chart on
+            // screen above it.
+            await expect(page.locator('.bar-dock')).toBeInViewport();
             await expect(page.locator('.chart-scroll')).toBeInViewport();
         }
-        await page.getByRole('button', { name: 'Edit section', exact: true }).first().click();
-        await expect(page.getByLabel('Chord text')).toBeInViewport();
+        await closeBarDock(page);
+        await leaveBar(page);
+        const menu = await openSectionMenu(page, 'A');
+        await expect(menu).toBeInViewport();
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
             true,
         );
         await page.screenshot({
             path: info.outputPath(`editor-${viewport.width}x${viewport.height}.png`),
         });
+        await menu.press('Escape');
+        await expect(menu).toBeHidden();
     }
 });
 

@@ -267,7 +267,7 @@ export async function save(
                 // An update keeps the row's ORIGINAL createdAt. A brand-new row (no
                 // `previous`) instead honours the candidate's own `createdAt` — always
                 // present on `ChartDocument` — rather than overwriting real provenance
-                // (e.g. a v1 import's saved-progression timestamp, `import-v1.ts`) with
+                // (e.g. an imported chart's original timestamp) with
                 // this write's wall-clock time.
                 createdAt: previous?.createdAt ?? document.createdAt,
                 updatedAt: options.keepUpdatedAt ? document.updatedAt : now,

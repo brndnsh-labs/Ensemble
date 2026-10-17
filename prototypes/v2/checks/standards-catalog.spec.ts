@@ -114,8 +114,7 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
 });
 
 /**
- * A shared draft — a standard here, a `#chart=`/v1 link in `share-link.spec.ts` /
- * `v1-share-link.spec.ts` — belongs to no songbook yet (`landDraftOnStand`'s own doc comment:
+ * A shared draft — a standard here, a `#chart=` link in `share-link.spec.ts` — belongs to no songbook yet (`landDraftOnStand`'s own doc comment:
  * "no recovery-storage write"). `draft()` used to write one anyway on every edit, keyed under
  * the standard's own catalog id (`ensemble-v2-preview:recovery:<writer>:standard-…`) — a slot
  * nothing but a Save, which this never is, ever clears, so "Preserved drafts (N)" grew by one per

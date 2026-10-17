@@ -3,9 +3,7 @@
  *
  * Encodes/decodes a v2 ChartDocument (schema version 1 or 2 — whatever the stand
  * currently has open) as a URL hash fragment: `#chart=<base64url(deflate(JSON))>`.
- * This is deliberately separate from `state/share-codec.ts`, which encodes v1's
- * *sections array only* (not a whole document) for the `?s=` query-param link —
- * different envelope, different host, different trust boundary (see
+ * Old v1 `?s=` links are not opened at all (#1735; see
  * `docs/design/ensemble-v2-rollout.md`'s 2026-09-15 decision: v2-only links, no
  * v1 dual-open).
  *
@@ -16,8 +14,7 @@
  * their fixed schema (`schemaVersion`/`id`/`title`/`createdAt`/`updatedAt`/`revision`/`chart`,
  * plus `metadata`/`importSource` on v2) before a decoded payload is trusted. Decoding
  * never throws into the UI: any malformed, oversized or schema-invalid payload
- * resolves to `undefined` — the same fail-closed contract as
- * `tryDecompressSections` in `state/share-codec.ts`.
+ * resolves to `undefined` — fail closed.
  *
  * Compression uses the native Compression Streams API (`CompressionStream`/
  * `DecompressionStream`, 'deflate' — supported in Node 18+, Chromium, Firefox and

@@ -40,9 +40,6 @@
             "foundation.spec.ts": 33.2,
             "guided-form.spec.ts": 13.7,
             "home-density.spec.ts": 2.1,
-            "import-v1-account.chromium.spec.ts": 3.7,
-            "import-v1-adopt.chromium.spec.ts": 26.5,
-            "import-v1.spec.ts": 14.6,
             "instrument-settings.spec.ts": 7.8,
             "ireal-import.spec.ts": 27.7,
             "large-library.perf.spec.ts": 0,
@@ -62,8 +59,7 @@
             "standards-catalog.spec.ts": 7,
             "telemetry.spec.ts": 1.7,
             "trade.spec.ts": 4.3,
-            "usability.spec.ts": 45.3,
-            "v1-share-link.spec.ts": 11.8
+            "usability.spec.ts": 45.3
         },
         "webkit-phone": {
             "account-entry.spec.ts": 30.8,
@@ -84,7 +80,6 @@
             "foundation.spec.ts": 99,
             "guided-form.spec.ts": 51.3,
             "home-density.spec.ts": 4.6,
-            "import-v1.spec.ts": 31.5,
             "instrument-settings.spec.ts": 23.9,
             "ireal-import.spec.ts": 45.2,
             "large-library.perf.spec.ts": 0,
@@ -103,8 +98,7 @@
             "standards-catalog.spec.ts": 12.8,
             "telemetry.spec.ts": 4.2,
             "trade.spec.ts": 15.8,
-            "usability.spec.ts": 109.5,
-            "v1-share-link.spec.ts": 26.8
+            "usability.spec.ts": 109.5
         }
     }
 }

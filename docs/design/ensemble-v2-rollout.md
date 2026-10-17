@@ -32,7 +32,7 @@ a further product decision.
    (service worker + manifest at root scope). Visualizer, MIDI in/out and the manual ship after
    cutover as v2 features. **Amended 2026-09-15 (Brandon: "don't over-engineer the cutover, we
    don't have a significant userbase"):** opening v1 `?s=` links on the stand is best-effort,
-   not a fixture-backed gate.
+   not a fixture-backed gate. **Retired 2026-10-16 (#1735):** `?s=`/`?prog=` links are no longer read; the page opens as the songbook.
 4. **v1 retirement: hard cut.** The day v2 takes `/`, v1 is gone. No `/v1/` grace path. The
    v1 local-data import stays fixture-backed and cutover-blocking; old share links are
    best-effort per decision 3.

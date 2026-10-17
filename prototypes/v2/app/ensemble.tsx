@@ -45,18 +45,6 @@ import { validateEditorText } from '../lib/editor';
 import { checkPlayable } from '../lib/engine-mode';
 import { firstBars } from '../lib/first-bars';
 import type { HomeSlice } from '../lib/home';
-import {
-    describeV1Outcome,
-    findV1Data,
-    hasV1Data,
-    importV1,
-    planV1Import,
-    V1_SESSION_ID,
-    type V1Finding,
-    type V1ImportPlan,
-    v1ImportContext,
-    v1ImportOffer,
-} from '../lib/import-v1';
 import { isNavEntry, type NavEntry, type NavView, navKey, stepTo } from '../lib/navigation';
 import { collectionWrite, framePace, type PlaylistImport } from '../lib/playlist-import';
 import * as repository from '../lib/repository';
@@ -66,18 +54,12 @@ import {
     allSongsSortPreference,
     forgetOpened as forgetOpenedGuest,
     openedAtMap as guestOpenedAtMap,
-    hasDeclinedV1Import,
     recordOpened as recordOpenedGuest,
     rememberAllSongsSort,
     rememberSong,
     rememberStandMode,
-    rememberV1Import,
-    rememberV1ImportDecline,
-    rememberV1SessionMark,
     type StandMode,
     standMode,
-    v1ImportLedger,
-    v1SessionMark,
 } from '../lib/session';
 import { withSongMeter } from '../lib/song-meter';
 import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
@@ -89,7 +71,6 @@ import type { Progress } from '../lib/sync/status';
 import { initializeTelemetry, track } from '../lib/telemetry';
 import type { UpgradePace } from '../lib/upgrade';
 import { accountUpgradeStore, guestUpgradeStore } from '../lib/upgrade-stores';
-import { hasV1SharePayload, openV1ShareLink, stripV1ShareParams } from '../lib/v1-link';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
 import { AdoptGuestDialog } from './account/adopt-guest';
@@ -451,7 +432,7 @@ export default function Ensemble() {
     // Each songbook is read two ways (#1441). The HOME slice is what the songbook home shows —
     // the Continue song, the recently opened ones by id and a count — and it is all the home page
     // ever reads, so a 2,000-song library opens as fast as a 20-song one. The FULL library is read
-    // lazily, the first time a surface needs every song (All songs, search, the v1 import plan,
+    // lazily, the first time a surface needs every song (All songs, search,
     // the account page's export and count), and then kept for the page session. `null` is "not
     // read (yet)" for both, never "empty": only a home slice's `count` — IndexedDB's own
     // `count()`, not a partial read — may say a songbook has no songs.
@@ -877,16 +858,6 @@ export default function Ensemble() {
     // manually from the account page's "Add this device's songs" button at any later time.
     const [adoptOpen, setAdoptOpen] = useState(false);
     /**
-     * Which guest songs the OPEN offer is about (#1359), or null for the whole guest songbook.
-     *
-     * Only the post-import path sets it: a signed-in import writes the guest songbook, and the
-     * offer that follows is the second half of that one gesture, so it asks about the songs that
-     * just landed rather than about every guest song this device happens to hold. State rather
-     * than a ref because the dialog recomputes its offer from it, and cleared by whichever control
-     * opens or closes an offer so a scope can never outlive the import it came from.
-     */
-    const [adoptScope, setAdoptScope] = useState<readonly string[] | null>(null);
-    /**
      * The owner this device has already been OFFERED the copy for during this attach (#1268 patch
      * review P3-6a). `hasDecidedAdoption` only remembers an ANSWER, so an escaped prompt — Escape
      * or the backdrop, deliberately not a decision — was re-opened by the very next `accountDialog`
@@ -1135,52 +1106,6 @@ export default function Ensemble() {
     // One document is all this needs, so it comes from the home slices (#1441), never a full read.
     const template =
         liveHome?.rows[0] ?? liveHome?.continued ?? guestHome?.rows[0] ?? defaultTemplate;
-    // #1274 — the v1 import offer: what this browser's old-Ensemble profile holds
-    // (`finding`), what is still on offer after the ledger (`offer`), and the result
-    // line of a run that just happened. Read once, after the songbook is ready.
-    // `asked` is how this offer got here: the musician chose it from the song menu, rather
-    // than the app opening it on its own. It decides whether the card may show over an
-    // ACCOUNT songbook (patch R2) — an unasked one may not, because the songs land in the
-    // guest songbook and nobody asked about that library.
-    const [v1Data, setV1Data] = useState<{
-        finding: V1Finding;
-        offer: V1Finding;
-        asked: boolean;
-    } | null>(null);
-    const [v1Result, setV1Result] = useState<string | null>(null);
-    // Does this origin hold an old-Ensemble profile at all? Separate from `v1Data`, which is
-    // only ever the CURRENT offer: the song menu's way back is shown for as long as there is
-    // v1 data on this device, including after everything has been imported or declined.
-    const [v1Present, setV1Present] = useState(false);
-    const v1Checked = useRef(false);
-    /**
-     * What pressing Import would actually do, decided by the SAME verdict the run uses
-     * (#1274 patch N2) against the songbook as it is right now.
-     *
-     * In state rather than derived at render: reaching the verdict converts the v1 session
-     * (and any progression not yet here) through the canonical codec, and it reads the
-     * session mark out of `localStorage` — neither belongs in a render body (patch N6). The
-     * effect below recomputes it whenever the offer or the songbook moves.
-     *
-     * Null while it cannot be decided yet (#1441): the verdict is a diff against the WHOLE guest
-     * songbook, which the home page no longer reads, so an offer waits for that lazy read rather
-     * than rendering "nothing to bring over" from a songbook nobody has looked at.
-     */
-    const [v1Plan, setV1Plan] = useState<V1ImportPlan | null>(null);
-    /**
-     * Why no plan can be made, when none can (#1441 review P2) — the whole guest songbook would
-     * not read (one corrupt song is enough: `repository.list` refuses a songbook it cannot wholly
-     * read), or the plan itself threw. Said on the card, never a card that silently never
-     * appears: an offer the musician ASKED for must always answer.
-     */
-    const [v1PlanFailure, setV1PlanFailure] = useState<string | null>(null);
-    /**
-     * Has this page load looked for the old Ensemble's data yet (#1441 review P2)? With the plan
-     * now waiting on a lazy read, "no card" is only a fact once this is true and any offer's plan
-     * has settled — the songbook publishes that as `data-v1-plan`, so a check that no offer
-     * appears has something positive to wait for.
-     */
-    const [v1Looked, setV1Looked] = useState(false);
     const dialog = useRef<HTMLDialogElement>(null);
     const accountDialogRef = useRef<HTMLDialogElement>(null);
     const accountPageDialogRef = useRef<HTMLDialogElement>(null);
@@ -1394,8 +1319,8 @@ export default function Ensemble() {
     }, []);
     /**
      * Lands `document` on the stand as an unsaved draft — belonging to no songbook until "Keep a
-     * copy"/Save decides one. Shared by every entry that opens a chart this way: a `#chart=` or
-     * v1 share link (below), and opening a standard from the catalog (`openStandard`, #1439).
+     * copy"/Save decides one. Shared by every entry that opens a chart this way: a `#chart=`
+     * share link (below), and opening a standard from the catalog (`openStandard`, #1439).
      * Deliberately not `open()`: no `saved` baseline (so it can't masquerade as already
      * committed), no recovery-storage write (the id may be untrusted, or a catalog id that is
      * never meant to collide with a recovery key), and `lastOpened`/`rememberSong` are left alone
@@ -1443,32 +1368,21 @@ export default function Ensemble() {
         // every run: a same-document fragment navigation (pasting a `#chart=` URL into the
         // tab the musician is already working in — the browser does nothing) followed by any
         // re-run would then open the stranger's chart over the stand and discard unsaved
-        // chord text. `template` is in the dependency array for `useExhaustiveDependencies`
-        // and is harmless with the latch in front of it; it is already resolved on the first
-        // `ready` render, since `start()`'s `.then` batches `setGuestSongs` with `setReady`.
+        // chord text.
         sharedLinkHandled.current = true;
         const hash = window.location.hash;
         const search = window.location.search;
-        // Which entry, if either, owns this page load (#1279 patch R5) — in order:
-        //   1. a `#chart=` fragment, so the modern link always wins where both are present;
-        //   2. otherwise a v1 `?s=`/`?prog=` payload, INCLUDING under an unrelated fragment
-        //      (a `#:~:text=` scroll anchor, a chat client's `#`) that is nobody's share link;
-        //   3. otherwise any other non-empty hash, which stays on the v2 path so a corrupt
-        //      `#chart=…` still says so.
-        // The `chart` key is `public/songbook/chart-link.ts`'s `CHART_LINK_KEY`, which is not
-        // exported; read here rather than exported because `public/` is live production code.
-        const chartFragment = new URLSearchParams(hash.replace(/^#/, '')).has('chart');
-        const entry = chartFragment ? 'v2' : hasV1SharePayload(search) ? 'v1' : hash ? 'v2' : null;
-        if (!entry) {
+        // A `#chart=` fragment is the only share link. Any other non-empty hash stays on this
+        // path too, so a corrupt `#chart=…` still says so. An old v1 `?s=`/`?prog=` link has no
+        // fragment and is ignored (#1735): the page opens as the songbook, URL untouched.
+        if (!hash) {
             return;
         }
         let alive = true;
-        // `landDraftOnStand` handles both entries so they open the SAME draft rather than two
-        // drifting copies of it. `track` stays here rather than inside that shared helper: this
-        // is the one call site that knows `legacy`, and `openStandard` (#1439) tracks its own
-        // `chart_opened` event instead of `share_opened`.
-        const openSharedDraft = (link: ChartDocument, note: string, legacy: boolean) => {
-            track('share_opened', { legacy });
+        // `track` stays here rather than inside `landDraftOnStand`: `openStandard` (#1439)
+        // tracks its own `chart_opened` event instead of `share_opened`.
+        const openSharedDraft = (link: ChartDocument, note: string) => {
+            track('share_opened');
             // A link that decodes can still be one the band refuses (`checkPlayable`: too long
             // to play, #1632). This runs outside `run()`, so say why here instead of leaving
             // an unhandled rejection and a silent page.
@@ -1480,49 +1394,19 @@ export default function Ensemble() {
         };
         // Consumed on load either way: a corrupt/foreign payload must not resurrect on
         // reload, and a successfully opened draft must not resurrect after "Keep a copy"
-        // replaces it with a saved document. The hash goes, the v1 parameters go (#1279),
-        // and so does the account flag — a share link must never carry a feature-flag side
-        // effect (`accountsFlagRequest` refuses to APPLY one; leaving it in the tidied URL
-        // would just let the next reload apply it instead). Everything else survives.
+        // replaces it with a saved document. The hash goes, and so does the account flag — a
+        // share link must never carry a feature-flag side effect (`accountsFlagRequest` refuses
+        // to APPLY one; leaving it in the tidied URL would just let the next reload apply it
+        // instead). Everything else survives.
         const consumeLink = () =>
             window.history.replaceState(
                 // Keeps the shell's history entry (#1700); only the URL is tidied.
                 window.history.state,
                 '',
-                window.location.pathname +
-                    stripV1ShareParams(stripAccountsParam(window.location.search)),
+                window.location.pathname + stripAccountsParam(window.location.search),
             );
-        if (entry === 'v1') {
-            // The band and tempo defaults for the two fields v1 never persisted; see
-            // `linkSession` for how little else of this actually reaches the chart. A
-            // songbook with nothing in it yet falls back to the live engine's defaults.
-            const older = openV1ShareLink(
-                search,
-                template
-                    ? { performance: template.chart.performance, band: template.chart.band }
-                    : runtime.captureContent(),
-            );
-            consumeLink();
-            if (older.kind === 'ok') {
-                // #1460 review P2 #3 — "tap anywhere to play" is no longer baked into this note:
-                // it is derived reactively from `pendingAutoplay` (`pendingAutoplayHint`) so it
-                // stays lit for exactly as long as autoplay is armed, not just the ~4s an `info`
-                // message gets.
-                openSharedDraft(
-                    older.document,
-                    'Opened from an older shared link · not saved yet',
-                    true,
-                );
-                if (older.autoplay) {
-                    setPendingAutoplay(true);
-                }
-            } else {
-                setError("This older link couldn't be opened");
-            }
-            return;
-        }
-        // `?autoplay=1` on a `#chart=` link (#1732) arms playback exactly as it does on an old
-        // link; read before `consumeLink` strips it.
+        // `?autoplay=1` on a `#chart=` link (#1732) arms playback; read before `consumeLink`
+        // strips it.
         const wantsAutoplay = new URLSearchParams(search).get('autoplay') === '1';
         void decodeChartLink(hash).then((document) => {
             consumeLink();
@@ -1530,7 +1414,7 @@ export default function Ensemble() {
                 return;
             }
             if (document) {
-                openSharedDraft(document, 'Opened from a shared link · not saved yet', false);
+                openSharedDraft(document, 'Opened from a shared link · not saved yet');
                 if (wantsAutoplay) {
                     setPendingAutoplay(true);
                 }
@@ -1543,7 +1427,7 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [ready, template]);
+    }, [ready]);
 
     // Where the musician is, as a history entry names it (#1700).
     const navView: NavView = current
@@ -1766,97 +1650,6 @@ export default function Ensemble() {
             setPendingAutoplay(false);
         }
     }, [playing]);
-    useEffect(() => {
-        // #1274 — look for v1 data only once the songbook is ready: guest startup owns
-        // the critical path, and nothing here may delay or block it. A profile whose v1
-        // data is corrupt still reaches this (findV1Data reports it as a problem), and a
-        // storage read that throws outright leaves the stand exactly as it was.
-        if (!ready) {
-            return;
-        }
-        setV1Looked(true);
-        try {
-            // Two `getItem`s (patch R3). Whether this origin has an old-Ensemble profile AT
-            // ALL is what decides the song menu's permanent way back (DECISION 2026-09-19) —
-            // it has to stay there after everything has been imported or declined — and it
-            // must not cost a decode of up to 500 saved progressions on every single load.
-            if (!hasV1Data(window.localStorage)) {
-                return;
-            }
-            setV1Present(true);
-            // Signed in, the songbook on screen is the ACCOUNT library and this import writes
-            // the guest one, so nothing is opened unasked: the menu entry — which `v1Present`
-            // keeps visible — is the way in, and says where the songs land (patch R2). The
-            // one-shot latch is deliberately NOT set on this path, so signing out later still
-            // gets the offer.
-            if (signedIn || hasDeclinedV1Import() || v1Checked.current) {
-                return;
-            }
-            v1Checked.current = true;
-            const finding = findV1Data(window.localStorage);
-            const offer = v1ImportOffer(finding, v1ImportLedger());
-            if (offer.sources.length || offer.problems.length) {
-                setV1Data({ finding, offer, asked: false });
-            }
-        } catch {
-            // The old app's data is a bonus, never a prerequisite for playing here.
-        }
-    }, [ready, signedIn]);
-    // `draftsHeldFor` and `wantLibrary` are stable component-scope helpers, not values this effect
-    // should re-run for; its real inputs are the three states in the array below.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see above.
-    useEffect(() => {
-        // #1274 patch N2 — what the card may promise, from the run's own verdicts. Off the
-        // render path (it converts through the codec and reads the mark), and re-derived
-        // whenever the offer or the songbook moves, which includes right after a run.
-        if (!v1Data) {
-            setV1Plan(null);
-            setV1PlanFailure(null);
-            return;
-        }
-        if (guestSongs === null) {
-            setV1Plan(null);
-            if (guestLibraryFailure !== null) {
-                // The read that the plan is a diff against failed. Said, with its reason —
-                // a guess in either direction ("nothing new" or "import all") would be wrong.
-                setV1PlanFailure(
-                    `Some songs on this device couldn’t be read, so the old Ensemble’s songs can’t be compared with them yet. ${guestLibraryFailure}`,
-                );
-                return;
-            }
-            // A whole-library pass (#1441): ask for the guest songbook and wait for it.
-            setV1PlanFailure(null);
-            wantLibrary('guest');
-            return;
-        }
-        const base = current ?? guestSongs[0] ?? defaultTemplate;
-        try {
-            setV1Plan(
-                planV1Import(
-                    v1Data.offer,
-                    v1ImportContext(v1Data.finding, {
-                        performance: base.chart.performance,
-                        band: base.chart.band,
-                    }),
-                    new Map(
-                        guestSongs.map((song) => [
-                            song.id,
-                            { document: song, drafts: draftsHeldFor(song.id) },
-                        ]),
-                    ),
-                    v1SessionMark(),
-                ),
-            );
-            setV1PlanFailure(null);
-        } catch (failure) {
-            // A plan must never take the songbook down — and it must not make the card vanish
-            // either, taking the unreadable-v1 problems it lists with it. Said instead.
-            setV1Plan(null);
-            setV1PlanFailure(
-                `The old Ensemble’s songs couldn’t be compared with this songbook. ${failure instanceof Error ? failure.message : String(failure)}`,
-            );
-        }
-    }, [v1Data, guestSongs, guestLibraryFailure, current]);
     // Into the editor, the input it is for takes focus (#1235): the title for a row-menu Rename
     // (#1440), a text chart's chord text. A measure chart takes none (#1726): its bars are typed
     // where they are read, opened by a press on one, and every bar stays on the page as written.
@@ -2220,30 +2013,6 @@ export default function Ensemble() {
         }
     }, [adoptOpen]);
     /**
-     * What the post-import offer is decided against, as of the LATEST render (#1359 patch P1-2).
-     *
-     * `importV1Songs` awaits a whole import run before it decides whether to open the offer, and
-     * `signedIn`/`sync` inside it are the snapshots of whichever render defined that handler — the
-     * moment the button was pressed. Two things really go wrong when the run is the slow one: a
-     * session that expires mid-run still passes a stale `signedIn` and sets `adoptOpen` true while
-     * the dialog is no longer rendered (the flag sticks, and the account page's button is then a
-     * no-op for the rest of the page load, since `adoptOpen` never transitions), and a library
-     * that finishes downloading mid-run is still read as not downloaded and says nothing at all.
-     *
-     * So the three facts are re-read from here after the awaits. A ref updated on every commit,
-     * not state: nothing renders from it, and it must not re-run anything.
-     */
-    const adoptGate = useRef({
-        signedIn,
-        owner: sync.owner,
-        documents: sync.documents,
-    });
-    // No dependency array on purpose: this is a mirror of the current render, not a reaction to
-    // one particular field changing.
-    useEffect(() => {
-        adoptGate.current = { signedIn, owner: sync.owner, documents: sync.documents };
-    });
-    /**
      * An offer cannot outlive the session it is about (#1359 patch P1-2).
      *
      * The dialog only renders while signed in, so a sign-out (or an expiry) with one on screen
@@ -2255,7 +2024,6 @@ export default function Ensemble() {
     useEffect(() => {
         if (!signedIn) {
             setAdoptOpen(false);
-            setAdoptScope(null);
         }
     }, [signedIn]);
     // #1310 — `offered` is a dependency, not just a guard, for the reason the cloud-delete step's
@@ -2341,10 +2109,8 @@ export default function Ensemble() {
             accountDialog !== null ||
             onStand ||
             // A question already on screen is never re-asked underneath its own musician (#1359
-            // patch P2-2): this effect re-runs whenever the library's counts change, and an
-            // import's scoped offer carries no `adoptOffered` mark of its own until it opens, so
-            // without this a download landing mid-answer would turn "Add the song you just
-            // brought over?" into the whole-songbook question with the buttons in the same place.
+            // patch P2-2): this effect re-runs whenever the library's counts change, and the
+            // account page's own offer carries no `adoptOffered` mark until it opens.
             adoptOnScreen.current ||
             adoptOffered.current === owner ||
             hasDecidedAdoption(owner) ||
@@ -2375,9 +2141,6 @@ export default function Ensemble() {
                 }
                 if (alive && (offer.candidates.length > 0 || collections > 0)) {
                     adoptOffered.current = owner;
-                    // The sign-in offer is about the whole guest songbook; only an import scopes
-                    // one (#1359), and a scope left over from an earlier offer must not narrow it.
-                    setAdoptScope(null);
                     setAdoptOpen(true);
                 }
             })
@@ -3734,8 +3497,8 @@ export default function Ensemble() {
     }
     /**
      * The guest songbook's home slice, and its full library when a surface has asked for it — for
-     * the paths that write the GUEST songbook whatever the session says (the v1 import, and the
-     * guest songbook becoming live again after a sign-out or an account deletion).
+     * the paths that write the GUEST songbook whatever the session says (the guest songbook
+     * becoming live again after a sign-out or an account deletion).
      */
     async function refreshGuest(): Promise<void> {
         setGuestHome(await readGuestHome());
@@ -3744,8 +3507,8 @@ export default function Ensemble() {
         }
     }
     /**
-     * Ask for a songbook's WHOLE library (#1441) — All songs, a search, the v1 import plan and the
-     * account page are the surfaces that need every song. Idempotent; a failed read is retried by
+     * Ask for a songbook's WHOLE library (#1441) — All songs, a search and the account page are
+     * the surfaces that need every song. Idempotent; a failed read is retried by
      * the next ask.
      */
     function wantLibrary(which: 'guest' | 'account') {
@@ -4219,7 +3982,7 @@ export default function Ensemble() {
             }
             // `createdAt`/`updatedAt` reset to now, as `keepSharedCopy` does (review #1440 P3):
             // the guest `repository.save` honours a brand-new row's OWN `createdAt` (deliberately,
-            // for v1-import provenance), so leaving the original's here would make a fresh copy
+            // to keep an imported chart's original timestamp), so leaving the original's here would make a fresh copy
             // sort as if it were made back when the original was.
             const now = new Date().toISOString();
             const copyDocument = {
@@ -5235,210 +4998,6 @@ export default function Ensemble() {
         return created;
     }
     /**
-     * Copy the offered v1 songs into the GUEST songbook (#1274).
-     *
-     * Straight through `repository`, never `storeSave`: these are v1's songs arriving on
-     * this device, they make no owner claim, and they must not land in an account library
-     * or re-point the stand's binding (#1311). #1268's "Add this device's songs" is the
-     * bridge from here into an account — and signed in, this run now opens that same offer
-     * itself (#1359), scoped to what it just brought over, rather than leaving one intent
-     * split across two gestures. What the import WRITES is unchanged: the guest songbook,
-     * and only on the musician's explicit Add does anything reach the account.
-     *
-     * Item-atomic and resumable: each song that lands is saved and remembered on its
-     * own, so a failure partway through keeps everything before it and a rerun picks up
-     * only what is still missing. The v1 keys are never written — `findV1Data` was only
-     * ever handed a read-only storage view.
-     */
-    function importV1Songs() {
-        if (!v1Data) {
-            return;
-        }
-        void run(async () => {
-            const library = await repository.list();
-            const base = current ?? library[0] ?? defaultTemplate;
-            // One ledger write per batch, not per song (patch R6): `rememberV1Import` reads,
-            // merges and re-serialises the whole ledger, so calling it 500 times is O(n²) and
-            // 500 synchronous `setItem`s. A run interrupted between flushes loses at most the
-            // last few digests, which costs nothing — the deterministic document ids make a
-            // re-offered item land as `alreadyPresent` rather than as a duplicate.
-            const pending: string[] = [];
-            const flush = () => {
-                if (pending.length) {
-                    rememberV1Import(pending.splice(0), 'imported');
-                }
-            };
-            const outcome = await importV1({
-                offer: v1Data.offer,
-                // The whole finding, not the offer: a progression imported now still
-                // wants the key and meter of the v1 session, even if that session was
-                // already brought over on an earlier run.
-                context: v1ImportContext(v1Data.finding, {
-                    performance: base.chart.performance,
-                    band: base.chart.band,
-                }),
-                existing: new Map(
-                    library.map((song) => [
-                        song.id,
-                        { document: song, drafts: draftsHeldFor(song.id) },
-                    ]),
-                ),
-                sessionMark: v1SessionMark(),
-                save: (document, expected) => repository.save(document, expected),
-                remember: (digest) => {
-                    pending.push(digest);
-                    if (pending.length >= 50) {
-                        flush();
-                    }
-                },
-                markSession: rememberV1SessionMark,
-            });
-            flush();
-            // Everything this run SHOWED and will do nothing more about (patch R1): the
-            // automatic offer stops re-opening for those exact bytes, while the menu entry
-            // still lists them, and v1 data that changes is a new digest and offered again.
-            rememberV1Import(outcome.acknowledged, 'shown');
-            // The guest songbook, home and whole — awaited here, unlike `refreshGuest`'s background
-            // read, because the offer's next plan is a diff against exactly what just landed.
-            setGuestHome(await readGuestHome());
-            await reloadGuestLibrary();
-            setV1Data({
-                finding: v1Data.finding,
-                offer: v1ImportOffer(v1Data.finding, v1ImportLedger()),
-                asked: v1Data.asked,
-            });
-            setV1Result(describeV1Outcome(outcome));
-            /**
-             * Signed in, the second half of the same gesture (#1359): the songs are in the guest
-             * songbook, and the offer to copy them into the account opens by itself instead of
-             * pointing at a button on the account page.
-             *
-             * OPENING it consults nothing — the same `setAdoptOpen(true)` the account page's "Add
-             * this device's songs" button runs, and deliberately not `hasDecidedAdoption`: this is
-             * the musician asking, so a standing "Not now" from a sign-in does not silence it.
-             * ANSWERING it (Add or Not now) records the same per-device answer any answer has
-             * always recorded (`rememberAdoptionDecision`, in the dialog), which also retires the
-             * whole-songbook sign-in offer for this owner. That is deliberate: re-asking about the
-             * same songs on the next sign-in, right after a "Not now" here, is exactly the nag the
-             * latch exists to prevent, and the account page's button remains the way back.
-             * `forgetAdoptionDecision` is account-deletion-only (#1351) and is not called here.
-             *
-             * Four conditions. `landed` is this run's own work: something actually reached the
-             * guest songbook (a run that found everything already here, was blocked, or failed
-             * asks nothing new). The other three come from `adoptGate`, which is the latest
-             * COMMITTED render rather than the one that defined this handler — an import run is
-             * slow enough to outlive the facts it started with (patch P1-2). This device must
-             * still be SIGNED IN, which by `signedIn`'s own definition excludes an expired
-             * session and a device holding an account without one; the loop must have published
-             * an owner; and the account library must have been downloaded, since the offer is a
-             * diff against it and a library not yet downloaded re-offers songs the account
-             * already has (#1268's P0). Without that download this says nothing — the card's
-             * pointer to the account page is still on screen and is the way through.
-             */
-            const landed = [...outcome.imported, ...outcome.updated].map((song) => song.id);
-            if (landed.length > 0) {
-                track('chart_imported', { format: 'v1' });
-            }
-            const gate = adoptGate.current;
-            if (
-                landed.length > 0 &&
-                gate.signedIn &&
-                gate.owner !== null &&
-                libraryDownloaded(gate.documents)
-            ) {
-                // This attach has now made its offer (#1359 patch P2-2). The sign-in effect's own
-                // escape guard, set for the same reason it sets it: an offer the musician escapes
-                // without answering must not be reopened — as the whole-songbook question, no
-                // less — by the next download or dialog transition.
-                adoptOffered.current = gate.owner;
-                setAdoptScope(landed);
-                setAdoptOpen(true);
-            }
-        });
-    }
-    /**
-     * Unsaved edits this device is holding for one song — the half of "has this been edited
-     * here?" that a document's own revision cannot see (#1274). Never fatal: storage that
-     * refuses to be read is not evidence of no draft, so it counts as one.
-     */
-    function draftsHeldFor(id: string): number {
-        // Only the session's verdict (`sessionUpdate`) reads a draft count, and each count is a
-        // full scan of `localStorage` — so a 500-song songbook must not pay for 500 of them.
-        if (id !== V1_SESSION_ID) {
-            return 0;
-        }
-        try {
-            return repository.recoverySlotCount(id);
-        } catch {
-            return 1;
-        }
-    }
-    /**
-     * The song menu's permanent way back into the import (DECISION 2026-09-19).
-     *
-     * Re-reads v1 storage rather than reusing the startup finding — the old app may have
-     * been used in another tab since — and offers the WHOLE finding, ledger and decline
-     * ignored: this is the musician asking, so everything v1 holds is on the table. Items
-     * already in the songbook report as "already here" rather than landing twice.
-     */
-    function openV1Import() {
-        setMenu(false);
-        void run(async () => {
-            if (current) {
-                // Committed FIRST (patch R13): `updateChart()` throws on invalid chart text,
-                // and arming the offer before it would leave the card set but never shown —
-                // the musician back on a stand with an editor error and an invisible import
-                // waiting behind it. Same path the header's Home button takes.
-                const candidate = updateChart();
-                if (newSongNow.current && !untouchedNewSong(candidate)) {
-                    // A new song with bars in it is kept, as leaving it any other way keeps it.
-                    await keepNewSong(candidate, false);
-                }
-                runtime.stop();
-                setCurrent(null);
-                bindStand(null);
-            }
-            const finding = findV1Data(window.localStorage);
-            setV1Present(finding.sources.length > 0 || finding.problems.length > 0);
-            setV1Result(null);
-            setV1Data({ finding, offer: finding, asked: true });
-        });
-    }
-    /**
-     * The card's one dismiss gesture. `declined` is the CARD's answer, because the card is
-     * what the musician read: only the button that actually says "Not now" declines, and an
-     * offer they asked for from the menu never does (patch N1). Deriving it here from
-     * `v1Result` was the bug — a card whose button says "Done" was recording a permanent
-     * device-wide decline.
-     *
-     * A decline is per-DEVICE (DECISION 2026-09-19): the automatic offer never opens again,
-     * whatever v1 data appears later.
-     *
-     * Dismissing without a run still acknowledges the PROBLEMS the card displayed (patch
-     * N1c). Those are unreadable v1 data — they will read the same way on every load, and
-     * with no Import button in that shape nothing else would ever record them, so the
-     * automatic offer would re-open forever. Never the sources: an importable song stays on
-     * offer until it is imported or the whole offer is declined.
-     */
-    function dismissV1(declined: boolean) {
-        if (declined) {
-            rememberV1ImportDecline();
-        }
-        if (v1Data && !v1Result) {
-            // Everything the card DISPLAYED with a reason: unreadable data, and the items the run
-            // would refuse (`V1ImportPlan.blocked`). Never an importable source.
-            rememberV1Import(
-                [
-                    ...v1Data.offer.problems.map((problem) => problem.digest),
-                    ...(v1Plan?.blocked ?? []).map((item) => item.digest),
-                ],
-                'shown',
-            );
-        }
-        setV1Data(null);
-        setV1Result(null);
-    }
-    /**
      * "Try the bar editor · keep original": saves a measure copy of the text chart on the stand
      * and opens it, leaving the original as it was. Null when the stand holds no text chart.
      * Throws, before anything is created, when the chart cannot be converted or played.
@@ -6376,52 +5935,6 @@ export default function Ensemble() {
                     onNewSong={newSong}
                     onOpenSong={openSong}
                     lastRemovedId={deletedRowId}
-                    v1Import={
-                        // An offer the app opened by itself is for the GUEST songbook and is
-                        // not shown over an account library (patch R2); one the musician
-                        // asked for from the song menu always is, and says where the songs
-                        // land through `accountPointer` below.
-                        // The plan is a diff against the whole guest songbook, read lazily
-                        // (#1441): the offer waits for it rather than guessing, while a finished
-                        // run's result needs no plan to be said.
-                        v1Data &&
-                        (v1Data.asked || !signedIn) &&
-                        (v1Plan || v1PlanFailure !== null || v1Result !== null)
-                            ? {
-                                  // What Import would actually do, not what v1 holds (patch
-                                  // R12/N2): the menu path offers everything, ledger
-                                  // included, so most of an offer is routinely already here.
-                                  songs: v1Plan?.fresh ?? 0,
-                                  alreadyHere: v1Plan?.alreadyHere ?? 0,
-                                  // v1 data that could not be read, plus anything the run
-                                  // would refuse — said before the button, not only after.
-                                  problems: [
-                                      ...v1Data.offer.problems.map((problem) => ({
-                                          label: problem.label,
-                                          reason: problem.reason,
-                                      })),
-                                      ...(v1Plan?.blocked ?? []),
-                                  ],
-                                  result: v1Result,
-                                  unavailable: v1Plan ? null : v1PlanFailure,
-                                  // An offer the musician asked for never records a decline,
-                                  // whatever shape it is in (patch N1b).
-                                  asked: v1Data.asked,
-                                  // Guest-songbook work (#1274): signed in, the songs land in
-                                  // this device's songbook and #1268's account-page button is
-                                  // how they reach the account (patch R2).
-                                  accountPointer: signedIn,
-                              }
-                            : null
-                    }
-                    onImportV1={importV1Songs}
-                    onDismissV1={dismissV1}
-                    v1Present={v1Present}
-                    v1PlanSettled={
-                        v1Looked &&
-                        (!v1Data || v1Plan !== null || v1PlanFailure !== null || v1Result !== null)
-                    }
-                    onOpenV1Import={openV1Import}
                     upgrade={upgrade.offer}
                     upgradeSettled={upgrade.settled}
                     upgradeActions={upgrade.actions}
@@ -6878,8 +6391,6 @@ export default function Ensemble() {
                 onSongMeter={changeSongMeter}
                 onSongMode={(isMinor) => change(() => runtime.setMode(isMinor), true)}
                 onChoruses={changeChoruses}
-                v1Available={v1Present}
-                onBringOverV1={openV1Import}
                 onRevert={() =>
                     void run(() => {
                         if (!saved) {
@@ -6989,8 +6500,6 @@ export default function Ensemble() {
                     }}
                     onOpenAdopt={() => {
                         setAccountPageOpen(false);
-                        // The standing invitation is about every guest song (#1359).
-                        setAdoptScope(null);
                         setAdoptOpen(true);
                     }}
                     // Same P0 gate as the auto-prompt above: until this device has downloaded the
@@ -7004,10 +6513,8 @@ export default function Ensemble() {
                     open={adoptOpen}
                     ownerId={sync.owner}
                     online={account.online}
-                    scopeGuestIds={adoptScope}
                     onClose={() => {
                         setAdoptOpen(false);
-                        setAdoptScope(null);
                     }}
                 />
             )}

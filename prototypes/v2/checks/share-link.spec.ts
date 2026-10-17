@@ -156,3 +156,50 @@ test('a malformed share link fails closed with a visible error, not a crash', as
     await page.reload();
     await expect(page.locator('.error-banner[role="alert"]')).toHaveCount(0);
 });
+
+// Old v1 `?s=`/`?prog=` links are retired (#1735). The URL is LEFT ALONE, not cleaned: nothing
+// reads those parameters any more, so stripping them would be code kept alive for a link
+// nobody opens, and a reload of an untouched URL is the same harmless songbook.
+test('an old v1 `?s=` or `?prog=` link opens the songbook and is ignored, URL untouched', async ({
+    page,
+}) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    for (const search of [
+        '?s=not-a-real-payload&key=C&bpm=120',
+        `?prog=${encodeURIComponent('C7 | F7 | C7 | G7')}&genre=Blues&autoplay=1`,
+    ]) {
+        await seedStarters(page, search);
+        await expect(page.locator('main.home')).toBeVisible();
+        await expect(page.locator('main.workspace')).toHaveCount(0);
+        await expect(page.locator('.error-banner[role="alert"]')).toHaveCount(0);
+        await expect(page.getByRole('heading', { name: 'Shared song' })).toHaveCount(0);
+        expect(new URL(page.url()).search).toBe(search);
+        // The songbook underneath is the starters, working as usual.
+        await songLink(page, 'Blue pocket', 'Blues').click();
+        await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
+    }
+    expect(errors).toEqual([]);
+});
+
+test('a `#chart=` link consumes `?accounts=` without applying it', async ({ page, context }) => {
+    await withoutClipboard(page);
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    const hash = new URL(await page.getByTestId('share-link-fallback').inputValue()).hash;
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+
+    const fresh = await context.newPage();
+    await withoutClipboard(fresh);
+    await fresh.goto(appUrl(`?accounts=off&utm_source=email${hash}`));
+    await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
+    await expect(fresh.locator('.song-subtitle')).toContainText('Opened from a shared link');
+    // The account flag is neither applied nor left in the tidied URL; the rest survives.
+    expect(new URL(fresh.url()).search).toBe('?utm_source=email');
+    expect(new URL(fresh.url()).hash).toBe('');
+    expect(
+        await fresh.evaluate(() => localStorage.getItem('ensemble-v2-preview:accounts')),
+    ).toBeNull();
+});

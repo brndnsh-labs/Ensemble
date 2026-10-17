@@ -3,7 +3,7 @@
  *
  * A leaf on purpose. `sync-loop.ts` writes this beside every move of the `meta.active` fence, and
  * the sync layer must not reach the document codec to do it — `feature.ts`, where this first
- * lived, imports `v1-link`, which imports `documents.ts` and the whole `@engine` songbook with it.
+ * lived, once imported the document codec and the whole `@engine` songbook with it.
  * Nothing here may import more than the protocol constants.
  */
 

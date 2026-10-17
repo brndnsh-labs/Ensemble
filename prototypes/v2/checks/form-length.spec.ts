@@ -1,17 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import {
-    appUrl,
-    closeSongMenu,
-    editorRevealed,
-    expect,
-    leaveBar,
-    openBar,
-    openWholeSong,
-    seedStarters,
-    songLink,
-    test,
-} from './fixtures';
+import { appUrl, closeSongMenu, editorRevealed, expect, openWholeSong, test } from './fixtures';
 
 /**
  * #1511: the chart footer's "N bars · repeats continuously" is the form-length control. It
@@ -215,91 +204,4 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     const cleared = (await documents(page)).find((d) => d.title === 'Footer choruses');
     expect(cleared?.schemaVersion === 2 && 'choruses' in cleared.chart.score).toBe(false);
     expect(pageErrors).toEqual([]);
-});
-
-test('on a shared text chart, a count makes the measure copy and counts it (#1511)', async ({
-    page,
-}) => {
-    const pageErrors: string[] = [];
-    page.on('pageerror', (error) => pageErrors.push(error.message));
-    // v1's plain-text `?prog=` link, which opens as an unsaved schema-1 shared draft.
-    await page.goto(appUrl(`?prog=${encodeURIComponent('C7 | F7 | C7 | G7')}&key=C&bpm=120`));
-    await expect(page.getByRole('heading', { name: 'Shared song' })).toBeVisible();
-    const footer = footerButton(page);
-    await expect(footer).toHaveText('4 bars · repeats continuously');
-
-    await footer.click();
-    const menu = formMenu(page);
-    await expect(page.locator('.form-length-note')).toHaveText(
-        'Counting choruses turns this chart into bars; the original is kept.',
-    );
-    await expect(menu).toHaveAttribute('aria-describedby', 'form-length-note');
-    await expect(
-        menu.getByRole('menuitemradio', { name: 'Repeats continuously', exact: true }),
-    ).toHaveAttribute('aria-checked', 'true');
-    await menu.getByRole('menuitemradio', { name: 'Plays 2 times', exact: true }).click();
-
-    await expect(page.getByTestId('stand-toast')).toContainText('Editable copy created');
-    await expect(footer).toHaveText('4 bars · plays 2 times, then ends');
-    await expect(page.locator('.chart-bottom')).not.toContainText('repeats continuously');
-    // The copy is a measure chart: Edit opens its bars, not the text panel, and the Song menu
-    // agrees on the count.
-    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await expect(page.locator('.edit-panel')).toHaveCount(0);
-    await expect(await openBar(page, 1)).toBeVisible();
-    await leaveBar(page);
-    await openWholeSong(page);
-    await expect(page.getByLabel('Choruses', { exact: true })).toHaveValue('2');
-    await closeSongMenu(page);
-    await page.getByRole('button', { name: 'Chart', exact: true }).click();
-
-    // What the conversion stored is the button's copy, with the count as one unsaved edit on
-    // top; the link itself was never stored, so nothing but the copy is in the songbook.
-    let stored = await documents(page);
-    expect(stored.map((d) => [d.schemaVersion, d.title])).toEqual([
-        [2, 'Shared song — editable copy'],
-    ]);
-    expect(stored[0].schemaVersion === 2 && 'choruses' in stored[0].chart.score).toBe(false);
-    // That unsaved count is retained like any edit to a library song: one recovery slot, the
-    // copy's, so closing the tab before Save does not lose it.
-    const copyId = stored[0].id;
-    const recoveryKeys = () =>
-        page.evaluate(() =>
-            Object.keys(localStorage).filter((key) =>
-                key.startsWith('ensemble-v2-preview:recovery:'),
-            ),
-        );
-    await expect.poll(recoveryKeys).toHaveLength(1);
-    expect((await recoveryKeys())[0].endsWith(`:${copyId}`)).toBe(true);
-    await page.reload();
-    await songLink(page, 'Shared song — editable copy').first().click();
-    await expect(footer).toHaveText('4 bars · plays 2 times, then ends');
-    const save = page.getByRole('button', { name: 'Save', exact: true });
-    await save.click();
-    await expect(save).toBeDisabled();
-    stored = await documents(page);
-    expect(stored).toHaveLength(1);
-    expect(stored[0].schemaVersion === 2 && stored[0].chart.score.choruses).toBe(2);
-    expect(pageErrors).toEqual([]);
-});
-
-test('on a saved text chart, a count converts a copy and leaves the original untouched', async ({
-    page,
-}) => {
-    await seedStarters(page);
-    const original = (await documents(page)).find((d) => d.id === 'starter-blues');
-    expect(original?.schemaVersion).toBe(1);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    const footer = footerButton(page);
-    await expect(footer).toHaveText('12 bars · repeats continuously');
-
-    await pick(page, 'Plays 3 times');
-    await expect(footer).toHaveText('12 bars · plays 3 times, then ends');
-    expect(await songMenuChoruses(page)).toBe('3');
-    const stored = await documents(page);
-    // The original is exactly as it was; the copy is a new measure chart beside it.
-    expect(stored.find((d) => d.id === 'starter-blues')).toEqual(original);
-    expect(stored.filter((d) => d.schemaVersion === 2).map((d) => d.title)).toEqual([
-        'Blue pocket — editable copy',
-    ]);
 });
