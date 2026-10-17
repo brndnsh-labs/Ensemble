@@ -9,7 +9,7 @@
 import { writtenChart } from '@engine/songbook/codec';
 import { validateChartDocumentV2 as validateChartDocument } from '@engine/songbook/document-v2';
 import type { ChartDocumentV2 as ChartDocument } from '@engine/songbook/score-types';
-import type { ChartContent } from '@engine/songbook/types';
+import type { ChartSettings } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { captureContent, captureDocument, load, state } from './runtime';
 
@@ -109,7 +109,7 @@ describe('opening a chart and capturing it again', () => {
 
     it('reads as the same chart once written today, so a chart undone by hand is not an edit', () => {
         // The stand's dirty check compares charts as written today (`same` in ensemble.tsx).
-        const asWritten = (document: { chart: Pick<ChartContent, 'performance' | 'band'> }) =>
+        const asWritten = (document: { chart: ChartSettings }) =>
             JSON.stringify(writtenChart(document.chart));
         const stored = oldChart();
         load(stored);

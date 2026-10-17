@@ -8,7 +8,7 @@ import { readDocument, readReceipt } from '../../src/db/documents.js';
 import { MAX_DOCUMENTS_PER_OWNER } from '../../src/db/save.js';
 import { createApp } from '../../src/http/app.js';
 import { DOCUMENT_POLICIES } from '../../src/http/documents.js';
-import { makeChartDocument } from '../fixtures/chart-document.js';
+import { makeChartDocument, makeTextChart } from '../fixtures/chart-document.js';
 import { createCookieJar } from '../helpers/cookie-jar.js';
 import { createSoftAuthenticator } from '../helpers/soft-authenticator.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/test-db.js';
@@ -157,7 +157,7 @@ describe('POST /api/documents/save (#1202)', () => {
         const old = makeChartDocument('doc-lean');
         const written = {
             ...old,
-            chart: { arrangement: old.chart.arrangement, ...writtenSettings(old.chart) },
+            chart: { score: old.chart.score, ...writtenSettings(old.chart) },
         };
         const body = freeze({
             ownerId: ctx.accountId,
@@ -180,50 +180,11 @@ describe('POST /api/documents/save (#1202)', () => {
     it("refuses a chart still carrying one of the old engine's fields, and writes nothing (#1741)", async () => {
         ctx = await setUp();
         const accountId = ctx.accountId;
-        const textChart = makeChartDocument('doc-old');
-        // The same chart as a measure chart (schema 2), which shares the band validator. Its bytes
-        // are stored as sent, so a field added anywhere is still the codec's canonical form: only
-        // the field itself can be what is refused, and the clean copy below commits.
-        const { chart: content, ...envelope } = makeChartDocument('doc-old');
-        const measureChart = {
-            ...envelope,
-            schemaVersion: 2,
-            chart: {
-                performance: content.performance,
-                band: content.band,
-                score: {
-                    key: 'C',
-                    isMinor: false,
-                    notation: 'name',
-                    meter: '4/4',
-                    grouping: null,
-                    sections: [
-                        {
-                            id: 'a',
-                            label: 'A',
-                            repeat: 1,
-                            measures: [
-                                {
-                                    id: 'm1',
-                                    content: {
-                                        kind: 'events',
-                                        events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
-                                    },
-                                },
-                            ],
-                        },
-                    ],
-                },
-            },
-        };
-        // One per place the old engine's fields sat. `lastChordPreset` lived on a text chart's
-        // arrangement, last, where the codec used to write it.
+        // Its bytes are stored as sent, so a field added anywhere is still the codec's canonical
+        // form: only the field itself can be what is refused, and the clean copy below commits.
+        const measureChart = makeChartDocument('doc-old');
+        // One per place the old engine's fields sat.
         const retired: Array<[string, unknown, (document: any) => void]> = [
-            [
-                'arrangement.lastChordPreset',
-                textChart,
-                (d) => (d.chart.arrangement.lastChordPreset = 'User Study'),
-            ],
             [
                 'performance.complexity',
                 measureChart,
@@ -274,6 +235,35 @@ describe('POST /api/documents/save (#1202)', () => {
         expect(JSON.parse(readDocument(ctx.testDb.db, accountId, 'doc-old')?.body ?? '{}')).toEqual(
             measureChart,
         );
+    });
+
+    it('refuses a text chart (schema 1) Save body, and writes nothing (#1740)', async () => {
+        ctx = await setUp();
+        // What an older build's outbox could still hold: the same chart in the retired format,
+        // frozen exactly as its `prepare()` froze one. One chart schema is left, so the shared
+        // decoder refuses it before anything reaches the database.
+        const body = JSON.stringify({
+            protocolVersion: 1,
+            ownerId: ctx.accountId,
+            documentId: 'doc-text',
+            operationId: 'op-text',
+            expectedRevision: null,
+            document: makeTextChart('doc-text'),
+        });
+        const { status, json } = await save(ctx, body);
+        expect(status).toBe(400);
+        expect(json).toEqual({ error: 'malformed_request' });
+        expect(readDocument(ctx.testDb.db, ctx.accountId, 'doc-text')).toBeUndefined();
+        expect(readReceipt(ctx.testDb.db, ctx.accountId, 'op-text')).toBeUndefined();
+        expect(counter).toBe(0);
+        // The same chart as schema 2 commits: the version, not the content, is what is refused.
+        const current = freeze({
+            ownerId: ctx.accountId,
+            documentId: 'doc-text',
+            operationId: 'op-current',
+            expectedRevision: null,
+        });
+        expect((await save(ctx, current)).status).toBe(200);
     });
 
     it('replaying the same operation id and bytes returns the original result without a second write', async () => {

@@ -56,6 +56,8 @@ function stubSongbook(overrides: Record<string, unknown> = {}): AccountSongbook 
         // The conflict merge each sweep asks for, and the collection outbox count (#1477).
         mergeCollectionConflicts: async () => 0,
         collectionOutbox: async () => ({ unsent: 0, refused: 0 }),
+        // Song rows this build cannot read (#1740): none unless a test says so.
+        unreadableSongs: async () => [],
         remoteCandidates: async () => [],
         reconcile: async () => 'unchanged',
         prepare: async () => 'idle',
@@ -1498,6 +1500,7 @@ describe('signing out moves the fence before it asks the server for anything', (
             // superseded row reaches neither this list nor the count below, or the step would
             // warn about an experiment no export could write and no musician could point at.
             atRisk: ['song-1', 'song-2'],
+            unreadable: [],
             unsentSaves: 2,
             refusedSaves: 0,
             // No collection Saves in this store (#1477): counted apart from songs, and zero here.
@@ -1535,6 +1538,35 @@ describe('signing out moves the fence before it asks the server for anything', (
             // song-1's two, never song-2's: an ordinary queue behind an ordinary head still syncs.
             refusedSaves: 2,
         });
+    });
+
+    it('puts a song row this build cannot read at risk, with its bytes for the export (#1740)', async () => {
+        // A text chart left on this device (schema 1, retired in #1740) is stepped over by the
+        // library read, so nothing else here would mention it — and signing out deletes it.
+        const raw = JSON.stringify({ schemaVersion: 1, id: 'song-old' });
+        const { api } = fakeApi({ ok: true, value: {}, status: 204 });
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({
+                list: async () => ({
+                    songs: [{ documentId: 'song-1' }],
+                    nextAfterDocumentId: null,
+                }),
+                drafts: async () => [],
+                unreadableSongs: async () => [{ documentId: 'song-old', raw }],
+            }),
+        );
+        await loop.attach(OWNER);
+
+        expect(await loop.signOutPreflight()).toMatchObject({
+            documentIds: ['song-1', 'song-old'],
+            atRisk: ['song-old'],
+            unreadable: [{ documentId: 'song-old', raw }],
+            unsentSaves: 0,
+            drafts: 0,
+        });
+        expect(await loop.unreadableSongs()).toEqual([{ documentId: 'song-old', raw }]);
     });
 });
 
@@ -2129,6 +2161,7 @@ describe('an expired session signs out on this device without a round trip (#135
         expect(await loop.signOutPreflight(OWNER)).toEqual({
             documentIds: ['song-1', 'song-2'],
             atRisk: ['song-1', 'song-2'],
+            unreadable: [],
             unsentSaves: 1,
             refusedSaves: 0,
             unsentCollections: 0,
@@ -2415,27 +2448,6 @@ describe('the sync loop publishes the remote updates it preserved', () => {
             { documentId: 'song-gone', revision: 'cloud-2', kind: 'deleted' },
             { documentId: 'song-future', revision: 'cloud-3', kind: 'unsupported' },
             { documentId: 'song-1', revision: 'cloud-9', kind: 'version' },
-        ]);
-    });
-
-    it('marks a version whose body is a text chart, so the stand refuses it before adopting (#1739)', async () => {
-        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
-        const loop = createSyncLoop(
-            api,
-            createAccountSession(api),
-            stubSongbook({
-                remoteCandidates: async () => [
-                    { ...version('song-old', 'cloud-4'), document: { schemaVersion: 1 } },
-                    { ...version('song-new', 'cloud-5'), document: { schemaVersion: 2 } },
-                ],
-            }),
-        );
-
-        await loop.attach(OWNER);
-
-        expect(loop.getSnapshot().candidates).toEqual([
-            { documentId: 'song-old', revision: 'cloud-4', kind: 'version', oldFormat: true },
-            { documentId: 'song-new', revision: 'cloud-5', kind: 'version' },
         ]);
     });
 

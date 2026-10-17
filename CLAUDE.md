@@ -121,7 +121,7 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 
 ### State (`public/state.ts`, `public/state/`)
 
-- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — each a `deepSignal`. A field nothing reads gets removed, not kept as a leftover: the old engine's `conductor` and `vizState` slices, its toast/flash state and its scheduler scratch fields went that way on 2026-10-11. The soloist's per-phrase `session` went the same way. So did the fields live code read but nothing ever set to a new value, together with the branches that waited on them: `playback.step`, `sustainActive`, `heldNotes`, `debugSoloist`, `nextNoteTime` and `unswungNextNoteTime`, the lane `buffer` Maps, and `lastFreq`/`lastPlayedFreq` on bass and soloist. The tree holds no field that nothing sets. Don't assume a field is live because it is declared: check for a writer.
+- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — each a `deepSignal`. A field nothing reads gets removed, not kept as a leftover: the old engine's `conductor` and `vizState` slices, its toast/flash state and its scheduler scratch fields went that way on 2026-10-11. The soloist's per-phrase `session` went the same way. So did the fields live code read but nothing ever set to a new value, together with the branches that waited on them: `playback.step`, `sustainActive`, `heldNotes`, `debugSoloist`, `nextNoteTime` and `unswungNextNoteTime`, the lane `buffer` Maps, and `lastFreq`/`lastPlayedFreq` on bass and soloist. So did the arranger's step maps (`progression`, `totalSteps`, `stepMap`, `sectionMap`) and `ACTIONS.PROG_VALIDATED`, with the old chord parser that wrote them (#1740); `arranger.sections` stays, because the runtime mirrors the score's sections into it for `isInstrumentEverActive`. The tree holds no field that nothing sets. Don't assume a field is live because it is declared: check for a writer.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - Hosts read with `getState()` and listen with `subscribe()` (`public/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
 - `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
@@ -132,7 +132,7 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 
 - **Sanctioned (real-time hot paths):** the `synth-*.ts` family — direct audio param writes for synthesis. No site outside the engine dir is sanctioned today: the BPM reschedule in `app-controller.ts` and `flushBuffer()`'s voice-continuity writes were deleted with the state they wrote.
 - **Sanctioned exception (init-only):** `public/engine/engine.ts` `initAudio()`, `public/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
-- **Sanctioned exception (detached render clone):** the clone `prototypes/v2/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` still carries a marker for the same reason (it writes `arranger.progression` on its passed-in `state`), though nothing but its tests calls it since #1739; #1740 deletes it.
+- **Sanctioned exception (detached render clone):** the clone `prototypes/v2/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export.
 - **Everything else routes through reducers.** Any site not in the three categories above must dispatch.
 
 Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches the bare, cast (`(slice as Mutable<…>).f =`), and aliased-handle assignment idioms, treating a `@direct-mutation` marker anywhere in the statement as the exemption. The skip list is **content-based, not path-based**: a file is exempt only if it *declares* a slice (contains `deepSignal<`), plus `*reducer*` by name. That deliberately keeps the non-slice plumbing that lives alongside the slices (`state/state-effects.ts`) inside the guard — a blanket `state/` path skip would exempt them the moment they moved into that directory. Two known limits: **`scripts/` is not in scope** (it has its own unmigrated sites), and **array-method mutation is invisible** to an assignment-based guard (`arr.push/shift/pop` on a slice field is unmarked and unenforced; `state/history.ts`, the one known site, was deleted).
@@ -145,8 +145,8 @@ Every page plays the ground-up band engine: `band/` is a pure, deterministic `pe
 score's timeline, driven live by `prototypes/v2/lib/band-host.ts` and exported through the same
 event stream (`.mid`, WAV). Read `band/CLAUDE.md` and `docs/design/band-engine.md` before touching
 it. The old worker-based generator is gone (#1404): `public/engine` now holds the voices, sample
-packs and audio graph the band plays through, plus the old chord parser (`chords-engine.ts`),
-which the app no longer reads (#1739): only "Upgrade old songs" and tests use it, until #1740.
+packs and audio graph the band plays through. The old chord parser went with the v1 text-chart
+format (#1740): a chart is one schema, 2 (`public/songbook/document-v2.ts`), its music a score.
 
 The listening-gate tools (`npm run mix:report` and `mix:ab`/`mix:verify`/`mix:spectro`/`mix:plant`
 built on it) render the band engine: `scripts/band-scene.ts` composes each scene in node
@@ -170,7 +170,7 @@ There is no visualizer, and no state for one.
 
 ### UI (`prototypes/v2/app/`)
 
-The music stand: songbook home, chart sheet (edited in place: bars typed on the chart with their bar menu, a section from its letter, the whole song from the Song menu — #1726; only an old text chart keeps a small editor beside it), transport and sounds panel. Ownership and boundaries per surface are in `prototypes/v2/CLAUDE.md`'s navigation table — read it before a UI story.
+The music stand: songbook home, chart sheet (edited in place: bars typed on the chart with their bar menu, a section from its letter, the whole song from the Song menu — #1726), transport and sounds panel. Ownership and boundaries per surface are in `prototypes/v2/CLAUDE.md`'s navigation table — read it before a UI story.
 
 ### Data / Config split
 

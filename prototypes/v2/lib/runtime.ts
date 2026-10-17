@@ -897,7 +897,6 @@ function apply(content: Session, compiled?: Timeline): void {
         const sections = score.sections.map(
             ({ measures: _measures, meter, grouping: _grouping, ...section }) => ({
                 ...section,
-                value: '',
                 ...(meter ? { timeSignature: meter } : {}),
             }),
         );

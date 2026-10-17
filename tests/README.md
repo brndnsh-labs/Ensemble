@@ -5,7 +5,7 @@ This directory contains the automated tests for the Ensemble application, powere
 ## Structure
 
 *   **`unit/`**: Tests for individual modules, functions, and logic.
-    *   *Examples:* Chord parsing in `public/engine/chords-engine.ts`, synthesis logic in `public/engine/synth-*.ts`, or isolated component logic.
+    *   *Examples:* Chord parsing in `band/theory/chord.ts`, synthesis logic in `public/engine/synth-*.ts`, or isolated component logic.
     *   *Environment:* `happy-dom` (simulates browser APIs like `window` and `document`).
 *   **`integration/`**: Tests that verify the interaction between multiple modules.
 *   **`standards/`**: Genre and routing guards (the 13-genre canon), plus the

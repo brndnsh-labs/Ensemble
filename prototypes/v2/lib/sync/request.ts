@@ -211,22 +211,19 @@ export async function decodeSaveRequest(
     // rewritten body can never be committed under an existing operation ID.
     //
     // KNOWN ASYMMETRY, and the reason this comment is longer than the code. How tightly the
-    // DOCUMENT is pinned depends on its schema version, because `snapshot()` behaves
-    // differently for each:
-    //   v1 — `validateChartDocument` REBUILDS the document in its own field order, so this
-    //        comparison pins one byte sequence per logical chart. Key-shuffled v1 bodies are
-    //        rejected.
-    //   v2 — `validateChartDocumentV2` returns the detached parsed candidate with the
+    // DOCUMENT is pinned depends on its kind, because the decoders behave differently:
+    //   chart — `validateChartDocumentV2` returns the detached parsed candidate with the
     //        caller's key order intact, so the reconstruction echoes whatever order arrived.
-    //        A key-shuffled v2 body is ACCEPTED, and hashes to a different digest.
-    //   collection (#1474) — `decodeCollection` REBUILDS in its own field order, like v1, so a
-    //        key-shuffled collection body is rejected.
+    //        A key-shuffled chart body is ACCEPTED, and hashes to a different digest. (A
+    //        schema-1 text chart is refused outright since #1740.)
+    //   collection (#1474) — `decodeCollection` REBUILDS in its own field order, so this
+    //        comparison pins one byte sequence per collection; a key-shuffled one is rejected.
     // That is not an integrity hole: every schema object is allowlisted, so no extra content
-    // can ride along in either version, and the outbox only ever sends bytes it froze once.
+    // can ride along in either kind, and the outbox only ever sends bytes it froze once.
     // But a receipt service keyed on (operationId, digest) must treat the digest as "the bytes
     // this attempt sent", not "the identity of this document" — which is exactly how the sync
     // contract already specifies it (same bytes replay, different bytes under one ID reject).
-    // Normalising v2 ordering would have to happen in the portable codec, not here; changing
+    // Normalising chart ordering would have to happen in the portable codec, not here; changing
     // the chart schema or the wire format is explicitly out of scope for this decoder.
     const canonical = JSON.stringify({
         protocolVersion: SAVE_REQUEST_PROTOCOL_VERSION,

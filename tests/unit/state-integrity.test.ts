@@ -80,13 +80,11 @@ describe('State Integrity Audit', () => {
             // which is exactly how `ACTIONS.INIT_AUDIO` read as "dispatched" for years
             // after #1358 deleted its only real caller — nothing but its own handler case
             // ever mentioned it again. `\s*` spans a wrapped multi-line call
-            // (`dispatch(\n    ACTIONS.SET_SONG_SEED,` — see runtime.ts). `(?:\?\.)?` covers
-            // an optional-chained caller (`dispatch?.(ACTIONS.PROG_VALIDATED)` in
-            // chords-engine.ts, where `dispatch` is an optional callback param). A listener
+            // (`dispatch(\n    ACTIONS.SET_SONG_SEED,` — see runtime.ts). A listener
             // file (state-effects.ts) is NOT excluded here: it has genuine
             // `dispatch(ACTIONS.…)` call sites of its own (e.g. `SET_SOLOIST_MODE`, which
             // has no other caller), and this pattern already can't match its `case` arms.
-            const dispatchRegex = new RegExp(`dispatch(?:\\?\\.)?\\(\\s*ACTIONS\\.${key}\\b`);
+            const dispatchRegex = new RegExp(`dispatch\\(\\s*ACTIONS\\.${key}\\b`);
             const isDispatched = fileContents.some((f) => {
                 if (isSlice(f) || f.path === TYPES_FILE) {
                     return false;
@@ -118,12 +116,7 @@ describe('State Integrity Audit', () => {
             // too. REL_KEY_TOGGLE and TRANSPOSE were on this list too, but had no reducer arm
             // AND no listener — genuinely inert. Removed in #1166; don't re-add an exception
             // without pointing at the consumer that justifies it.
-            const exceptions = [
-                // Dispatched from `chords-engine.ts`'s `validateProgression` purely so the
-                // v2 runtime's single generic `subscribe()` listener re-renders — genuinely
-                // no reducer `case` anywhere, by design, not an unwired signal.
-                'PROG_VALIDATED',
-            ];
+            const exceptions: string[] = [];
 
             if (!isDispatched && !exceptions.includes(key)) {
                 unusedInDispatch.push(key);

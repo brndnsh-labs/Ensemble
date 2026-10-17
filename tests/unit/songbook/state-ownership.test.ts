@@ -16,9 +16,7 @@ describe('Songbook state ownership manifest (#1044)', () => {
         expect(STATE_OWNERSHIP_MANIFEST.playback.autoIntensity).toBe('document');
     });
 
-    it('keeps derived maps, transport and audio handles runtime-owned', () => {
-        expect(STATE_OWNERSHIP_MANIFEST.arranger.progression).toBe('runtime-derived');
-        expect(STATE_OWNERSHIP_MANIFEST.arranger.stepMap).toBe('runtime-derived');
+    it('keeps transport and audio handles runtime-owned', () => {
         expect(STATE_OWNERSHIP_MANIFEST.playback.audioGraph).toBe('runtime-derived');
         expect(STATE_OWNERSHIP_MANIFEST.soloist.audio).toBe('runtime-derived');
     });

@@ -15,7 +15,7 @@ You do not edit code. You read, grep, reason, and report.
 2. **`@direct-mutation` is a narrow exception, not an escape hatch.** The marker trails the statement (`// @direct-mutation`). It is sanctioned in exactly the three categories of `CLAUDE.md` § `@direct-mutation` policy — that section is the authority, and every marker site in `public/` today fits one of them:
    - **Real-time hot paths.** The `synth-*.ts` voices' audio-param writes, where dispatch overhead would cause an audible glitch. (The old `app-controller.ts` BPM reschedule and `flushBuffer()` voice-continuity writes were the same class; both are gone.)
    - **Init-only.** `engine.ts` `initAudio()` and `engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
-   - **Detached render clone.** `prototypes/v2/lib/band-export.ts`'s render clone and `chords-engine.ts`'s `validateProgression` on its passed-in `state` — dispatching there would write the live slices mid-export.
+   - **Detached render clone.** `prototypes/v2/lib/band-export.ts`'s render clone — dispatching there would write the live slices mid-export.
 
    **`@worker-mutation`** — the old engine's marker for writes to its worker's copy of the tree. The worker is gone (#1404), so a new one is always wrong.
 

@@ -56,15 +56,11 @@ describe('Arranger Reducer', () => {
         it('should update all supported parameters', () => {
             const params: { [K in keyof ArrangerState]?: unknown } = {
                 sections: [],
-                progression: [{ c: 1 }],
                 key: 'F#',
                 timeSignature: '3/4',
                 grouping: [3, 2],
                 isMinor: true,
                 notation: 'name',
-                totalSteps: 128,
-                stepMap: [{ s: 1 }],
-                sectionMap: [{ id: '1' }],
             };
 
             for (const [param, value] of Object.entries(params) as Array<

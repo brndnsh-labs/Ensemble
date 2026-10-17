@@ -1,4 +1,4 @@
-import { validateChartDocument } from '../../../../public/songbook/codec.js';
+import { validateChartDocumentV2 } from '../../../../public/songbook/document-v2.js';
 import { decodeCollection } from '../collections';
 import {
     AccountChangedError,
@@ -410,9 +410,8 @@ function decodeBody(value: unknown, documentId: string): ChartDocument | null {
 /**
  * Classify a body this build could not use, without re-implementing any validation: the
  * canonical decoder's own verdict decides. A `schemaVersion` with no decoder here is a
- * "needs app update"; anything else is corrupt. Version 2 is excluded because
- * `validateChartDocument` reports every v2 document as a future version and `snapshot()` then
- * decodes it — so a v2 body that failed is invalid content, not a newer format.
+ * "needs app update"; anything else is corrupt — a text chart (schema 1, retired in #1740)
+ * included: this build has no reader for it, and nothing could ever be.
  *
  * The two verdicts get opposite treatments, and that difference is the point. A newer format is
  * a fact about THIS BUILD, not about the data: the bytes are presumed good, so they are
@@ -421,8 +420,7 @@ function decodeBody(value: unknown, documentId: string): ChartDocument | null {
  * run cannot claim a complete library over a document it refused.
  */
 function unsupportedReason(document: unknown): UnsupportedReason {
-    const verdict = validateChartDocument(document);
-    return verdict.kind === 'future-version' && verdict.schemaVersion !== 2
+    return validateChartDocumentV2(document).kind === 'future-version'
         ? 'needs-app-update'
         : 'invalid';
 }

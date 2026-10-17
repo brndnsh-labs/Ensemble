@@ -156,12 +156,6 @@ export interface RemoteUpdate {
     documentId: string;
     revision: string;
     kind: RemoteCandidateKind;
-    /**
-     * Set on a `version` whose body is a text chart (schemaVersion 1), which the app no longer
-     * opens (#1739): the stand refuses to adopt it BEFORE the transaction that would discard the
-     * local experiment. Revision-bound like the rest of the offer, so it cannot go stale.
-     */
-    oldFormat?: true;
 }
 
 const NO_UPDATES: readonly RemoteUpdate[] = [];
@@ -714,6 +708,12 @@ export interface SignOutPreflight {
      * rest of the library is already safe in the cloud and comes back on the next sign-in.
      */
     atRisk: string[];
+    /**
+     * Song rows this device holds that this build cannot read (a text chart, retired in #1740, or
+     * a corrupt row), with their stored bytes. Signing out removes them, and nothing can read them
+     * back, so each is also in `documentIds` and `atRisk`, and the export writes `raw` as it is.
+     */
+    unreadable: Array<{ documentId: string; raw: string }>;
     /** Committed versions still in the outbox, across the whole library. */
     unsentSaves: number;
     /**
@@ -795,6 +795,12 @@ export interface SyncLoop {
      */
     listLibrary(owner?: string | null): Promise<SavedSong[]>;
     /**
+     * The song rows `listLibrary` cannot hand back — a text chart (#1740) or a corrupt row — with
+     * their stored bytes (`AccountSongbook.unreadableSongs`), for an export that must not leave
+     * them out. Scoped like `listLibrary`.
+     */
+    unreadableSongs(owner?: string | null): Promise<Array<{ documentId: string; raw: string }>>;
+    /**
      * What the songbook home shows (#1441): the Continue song, the most recently opened ones by
      * id and the library's count — never the whole library. The account's own opened-at map and
      * last-opened pointer decide which ids; see `AccountSongbook.home`. Scoped exactly like
@@ -822,26 +828,7 @@ export interface SyncLoop {
         document: ChartDocument,
         expected: number | null,
         owner: string | null,
-        /** #1738's upgrade Save only — see `AccountSongbook.save`. */
-        options?: { upgrade?: boolean },
     ): Promise<SavedSong>;
-    /**
-     * Every song this account holds here for "Upgrade old songs" (#1738): paged, the event loop
-     * handed back between pages (`pace`), and a row that does not read reported rather than
-     * failing the read (`AccountSongbook.upgradePage`). Scoped like `listLibrary`.
-     */
-    upgradeLibrary(
-        owner: string | null,
-        pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> },
-    ): Promise<{
-        songs: Array<{ song: SavedSong; stored: unknown }>;
-        unreadable: Array<{
-            documentId: string;
-            reason: string;
-            document: unknown;
-            serverHeld: boolean;
-        }>;
-    }>;
     /**
      * Retain this writer's unsaved experiment on an account chart (#1299) — the account half of
      * `lib/repository.ts`'s guest `recover`, and emphatically NOT an upload: it writes one row to
@@ -894,47 +881,6 @@ export interface SyncLoop {
         documentIds: string[],
         owner?: string | null,
     ): Promise<Map<string, ChartDocument>>;
-    /**
-     * Every retained draft this account has on this device, every song and every writer, live or
-     * not (`AccountSongbook.allDrafts`) — what "Upgrade old songs" (#1738) finds old-format drafts
-     * among. Scoped like `listLibrary`.
-     */
-    listDrafts(owner?: string | null): Promise<{
-        drafts: Array<{ draft: Draft; stored: unknown }>;
-        unreadable: Array<{
-            documentId: string;
-            writerId: string;
-            capturedAt: unknown;
-            reason: string;
-            stored: unknown;
-        }>;
-    }>;
-    /**
-     * Remove one retained draft row, or one song row that will not read, that the musician chose
-     * from "Upgrade old songs"' leftovers (#1738) — guarded on the backed-up bytes, local only,
-     * never a cloud delete (`AccountSongbook.removeDraftRow`/`removeUnreadableSong`). Fenced on
-     * `owner` like every write here.
-     */
-    removeDraftRow(
-        draft: { documentId: string; writerId: string },
-        raw: string,
-        owner: string | null,
-    ): Promise<'removed' | 'changed' | 'gone' | 'live'>;
-    removeUnreadableSong(
-        documentId: string,
-        raw: string,
-        owner: string | null,
-    ): Promise<'removed' | 'changed' | 'gone' | 'held'>;
-    /**
-     * Rewrite one retained draft in place, never a live one and never a deletion
-     * (`AccountSongbook.replaceDraft`). #1738's draft half: purely local, nothing queued or sent.
-     * Fenced on `owner` like every write here.
-     */
-    replaceDraft(
-        draft: { documentId: string; writerId: string; capturedAt: string; raw: string },
-        next: ChartDocument,
-        owner: string | null,
-    ): Promise<'replaced' | 'changed' | 'live' | 'gone'>;
     /**
      * Drop this writer's retained experiment, once a Save has committed what it held.
      *
@@ -1417,9 +1363,6 @@ export function createSyncLoop(
                 documentId: row.documentId,
                 revision: row.revision,
                 kind: row.kind,
-                ...(row.kind === 'version' && row.document.schemaVersion === 1
-                    ? { oldFormat: true as const }
-                    : {}),
             }));
         } catch {
             // Unreadable is not "none": leaving the last published list alone is the conservative
@@ -1947,6 +1890,9 @@ export function createSyncLoop(
             }
             throw new Error('Account library paging did not terminate.');
         },
+        async unreadableSongs(owner = null) {
+            return songbook.unreadableSongs(await heldScope(owner));
+        },
         async homeLibrary(owner = null) {
             const current = await heldScope(owner);
             const [openedAt, continueId] = await Promise.all([
@@ -1959,36 +1905,11 @@ export function createSyncLoop(
             const current = await heldScope(owner);
             return (await songbook.read(current, documentId))?.document ?? null;
         },
-        async upgradeLibrary(owner, pace) {
-            const current = await heldScope(owner);
-            const songs: Array<{ song: SavedSong; stored: unknown }> = [];
-            const unreadable: Array<{
-                documentId: string;
-                reason: string;
-                document: unknown;
-                serverHeld: boolean;
-            }> = [];
-            let cursor: string | undefined;
-            // A small page, so each transaction's validation is a short slice of main thread.
-            for (let page = 0; page <= MAX_REMOTE_CANDIDATES / 10; page += 1) {
-                const listing = await songbook.upgradePage(current, cursor, 10);
-                songs.push(...listing.songs);
-                unreadable.push(...listing.unreadable);
-                if (listing.nextAfterDocumentId === null) {
-                    return { songs, unreadable };
-                }
-                cursor = listing.nextAfterDocumentId;
-                if (pace?.shouldYield()) {
-                    await pace.yieldNow();
-                }
-            }
-            throw new Error('Account library paging did not terminate.');
-        },
-        async save(document, expected, owner, options) {
+        async save(document, expected, owner) {
             // #1311: before `songbook.save`, deliberately. A Save refused here has written
             // nothing at all — no record, no queued operation, no bump of this owner's library.
             const current = await ownedScope(owner);
-            const song = await songbook.save(current, document, expected, options);
+            const song = await songbook.save(current, document, expected);
             publish({ libraryVersion: state.libraryVersion + 1 });
             await observe();
             return song;
@@ -2016,18 +1937,6 @@ export function createSyncLoop(
                 }
             }
             return held;
-        },
-        async listDrafts(owner = null) {
-            return songbook.allDrafts(await heldScope(owner));
-        },
-        async removeDraftRow(draft, raw, owner) {
-            return songbook.removeDraftRow(await ownedScope(owner), draft, raw);
-        },
-        async removeUnreadableSong(documentId, raw, owner) {
-            return songbook.removeUnreadableSong(await ownedScope(owner), documentId, raw);
-        },
-        async replaceDraft(draft, next, owner) {
-            return songbook.replaceDraft(await ownedScope(owner), draft, next);
         },
         async discardDraft(documentId, owner) {
             await songbook.discardDraft(await ownedScope(owner), documentId, writerId);
@@ -2375,12 +2284,18 @@ export function createSyncLoop(
                     atRisk.push(song.documentId);
                 }
             }
+            const unreadable = await songbook.unreadableSongs(current);
+            for (const { documentId } of unreadable) {
+                documentIds.push(documentId);
+                atRisk.push(documentId);
+            }
             // Collections too (#1477): a queued star or set-list change is committed work the
             // account has not got, and a sign-out that said nothing about it would drop it.
             const collections = await songbook.collectionOutbox(current);
             return {
                 documentIds,
                 atRisk,
+                unreadable,
                 unsentSaves,
                 refusedSaves,
                 unsentCollections: collections.unsent,

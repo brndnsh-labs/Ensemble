@@ -7,16 +7,12 @@ import { writeDeclaredParam } from './set-param.js';
 export type { ArrangerState };
 
 export const arranger = deepSignal<ArrangerState>({
-    sections: [{ id: 's1', label: 'Intro', value: 'I | V | vi | IV', repeat: 1 }],
-    progression: [],
+    sections: [{ id: 's1', label: 'Intro', repeat: 1 }],
     key: 'C',
     timeSignature: '4/4',
     grouping: null,
     isMinor: false,
     notation: 'roman',
-    totalSteps: 0,
-    stepMap: [],
-    sectionMap: [],
     seed: '',
     randomizeSeed: true,
 });

@@ -23,7 +23,7 @@ const base = (over: Record<string, unknown> = {}) => ({
 
 async function chartOf(url: string): Promise<ChartDocumentV2> {
     const doc = await decodeChartLink(new URL(url).hash);
-    if (doc?.schemaVersion !== 2) {
+    if (typeof doc !== 'object') {
         throw new Error('the link did not decode to a schema-2 chart');
     }
     return doc;

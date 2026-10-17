@@ -1,16 +1,15 @@
 /**
- * `validateDocument`'s single-prepare dispatch (#1445). Before this, a v2 document ran the
- * codec's structural walk (`inspectSongbookStructure`) roughly six times: once trying the v1
- * codec, once more for the v2 attempt, and once again for the nested score subtree — three
- * full `prepareCandidate` calls where one detached copy would do. This file proves the
- * consolidated dispatch: it opens v1, v2 and future-version candidates identically to before,
- * still fails closed on an accessor trap or a depth bomb before either codec's field validators
- * run, and — the acceptance test — walks a valid v2 document's structure exactly once.
+ * `validateDocument`'s single prepare (#1445). A document once ran the codec's structural walk
+ * (`inspectSongbookStructure`) roughly six times — a v1 attempt, a v2 attempt and the nested
+ * score — where one detached copy would do. This file proves it: a chart opens, a future version
+ * and a text chart (schema 1, retired in #1740) are refused in plain words, an accessor trap or
+ * a depth bomb fails closed before any field validator runs, and — the acceptance test — a valid
+ * document's structure is walked exactly once.
  */
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';
-import type { ChartLaneMix, ChartDocument as LegacyDocument } from '@engine/songbook/types';
+import type { ChartLaneMix } from '@engine/songbook/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { OLD_FORMAT_REFUSAL, validateDocument, validateStoredDocument } from './documents';
+import { OLD_FORMAT_REFUSAL, validateDocument } from './documents';
 
 // Vitest hoists `vi.mock` above these imports, so every importer of this module in the test's
 // module graph — including `codec.ts`'s internal `import { inspectSongbookStructure } from
@@ -33,7 +32,11 @@ const mix = (): ChartLaneMix => ({
     reverb: 0.2,
 });
 
-function legacyDocument(): LegacyDocument {
+/** A text chart as v1 wrote one: no reader is left for it (#1740). */
+function legacyDocument(): Omit<ChartDocumentV2, 'schemaVersion' | 'chart'> & {
+    schemaVersion: 1;
+    chart: Omit<ChartDocumentV2['chart'], 'score'> & { arrangement: object };
+} {
     return {
         schemaVersion: 1,
         id: 'study',
@@ -105,16 +108,16 @@ describe('validateDocument', () => {
         vi.mocked(inspectSongbookStructure).mockClear();
     });
 
-    it('refuses a text chart (schemaVersion 1) in plain words; only a store reads one (#1739)', () => {
+    it('refuses a text chart (schemaVersion 1) in plain words, without walking it (#1740)', () => {
         expect(() => validateDocument(legacyDocument())).toThrow(OLD_FORMAT_REFUSAL);
-        expect(validateStoredDocument(legacyDocument())).toEqual(legacyDocument());
+        expect(inspectSongbookStructure).not.toHaveBeenCalled();
     });
 
     it('opens a v2 document', () => {
         expect(validateDocument(v2Document())).toEqual(v2Document());
     });
 
-    it('refuses a schema version newer than either codec knows', () => {
+    it('refuses a schema version newer than the codec knows', () => {
         expect(() => validateDocument({ schemaVersion: 99, opaque: true })).toThrow(
             /newer document version/,
         );
@@ -133,25 +136,20 @@ describe('validateDocument', () => {
         expect(read).toBe(false);
     });
 
-    it('rejects a depth bomb before either codec walks the candidate', () => {
+    it('rejects a depth bomb before the codec validates a field', () => {
         let deep: unknown = true;
         for (let depth = 0; depth < 40; depth++) {
             deep = { child: deep };
         }
-        expect(() => validateDocument({ schemaVersion: 1, deep })).toThrow(/exceeds depth/);
+        expect(() => validateDocument({ schemaVersion: 2, deep })).toThrow(/exceeds depth/);
     });
 
     it('prepares a valid v2 document exactly once, with no separate walk of the nested score', () => {
         validateDocument(v2Document());
         // `prepareCandidate` walks the structure twice per preparation (once raw, once on the
-        // JSON-round-tripped copy). Exactly one preparation for the whole document — the v1
-        // attempt and the v2 dispatch share it, and the nested score reuses the same detached
-        // subtree — means exactly 2 calls, not the ~6 a naive v1-then-v2-then-score chain made.
-        expect(inspectSongbookStructure).toHaveBeenCalledTimes(2);
-    });
-
-    it('prepares a stored v1 document exactly once', () => {
-        validateStoredDocument(legacyDocument());
+        // JSON-round-tripped copy). Exactly one preparation for the whole document — the nested
+        // score reuses the same detached subtree — means exactly 2 calls, not the ~6 a naive
+        // v1-then-v2-then-score chain once made.
         expect(inspectSongbookStructure).toHaveBeenCalledTimes(2);
     });
 });

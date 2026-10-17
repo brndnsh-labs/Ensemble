@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeChartDocument } from '../../../public/songbook/codec.js';
+import { decodeChartDocumentV2 as decodeChartDocument } from '../../../public/songbook/document-v2.js';
 import {
     inspectSongbookStructure,
     SONGBOOK_MAX_DEPTH,

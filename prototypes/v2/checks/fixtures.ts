@@ -5,11 +5,10 @@ import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { writtenSettings } from '@engine/songbook/codec';
-import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
+import { parseChordBar } from '@engine/songbook/score-text';
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';
-import type { ChartDocument as LegacyDocument } from '@engine/songbook/types';
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
-import { validateDocument, validateStoredDocument } from '../lib/documents';
+import { validateDocument } from '../lib/documents';
 import { bandForGenre } from '../lib/standards';
 
 export { expect } from '@playwright/test';
@@ -422,59 +421,52 @@ const STARTER_SAMPLES: readonly SampleSong[] = [
 /** One song as `STARTER_SAMPLES` lists it: id, title, genre, key, the bars' chord text, bpm. */
 export type SampleSong = readonly [string, string, string, string, string, number];
 
-/** One sample song as a text chart (schemaVersion 1), the shape `lib/starters.ts` wrote. */
-function textChart([id, title, genre, key, value, bpm]: SampleSong, stamp: string): LegacyDocument {
-    const document = validateStoredDocument({
-        schemaVersion: 1,
+/**
+ * One sample song as a measure chart: one section of 4/4 bars, each bar's chord text read by the
+ * bar editor's own parser (`parseChordBar`), so a bar holds exactly what its text says, and the
+ * codec, not this file, decides what a valid chart is. Written as a chart is today
+ * (`writtenSettings`). An A-key sample is A minor, as the starters were.
+ */
+export function measureSong(
+    [id, title, genre, key, value, bpm]: SampleSong,
+    stamp = new Date().toISOString(),
+): ChartDocumentV2 {
+    const measures = value.split('|').map((text, index) => {
+        const events = parseChordBar(text, '4/4');
+        if (events.kind !== 'ok') {
+            throw new Error(`Sample "${title}" bar ${index + 1} did not read: ${text}`);
+        }
+        return {
+            id: `measure-${index + 1}`,
+            content: { kind: 'events' as const, events: events.value },
+        };
+    });
+    return validateDocument({
+        schemaVersion: 2,
         id,
         title,
         createdAt: stamp,
         updatedAt: stamp,
         revision: 0,
         chart: {
-            arrangement: {
+            score: {
                 key,
                 isMinor: key === 'A',
-                timeSignature: '4/4',
-                grouping: null,
                 notation: 'name',
-                sections: [{ id: 'a', label: 'A', value, repeat: 1 }],
+                meter: '4/4',
+                grouping: null,
+                sections: [{ id: 'a', label: 'A', repeat: 1, measures }],
             },
             // `randomizeSeed: false` here is a deliberate TEST-fixture divergence from what
             // `lib/starters.ts` used to write (`randomizeSeed: true`, the engine's own
             // default) — this fixture's job is reproducible clickable data across runs, not
             // modelling real seed-randomization behavior, and several specs assert exact
             // durations/output against these songs.
-            performance: { bpm, seed: '', randomizeSeed: false },
-            band: bandForGenre(genre),
+            ...writtenSettings({
+                performance: { bpm, seed: '', randomizeSeed: false },
+                band: bandForGenre(genre),
+            }),
         },
-    });
-    if (document.schemaVersion !== 1) {
-        throw new Error('A text-chart sample must stay schema 1.');
-    }
-    return document;
-}
-
-/**
- * One sample song as a measure chart (schemaVersion 2, #1733): its text chart through the app's
- * own converter (`proposeLegacyScoreConversion`), so the bars are exactly what the text said,
- * under the same id, title and timestamps, and the codec, not this file, decides what a valid
- * measure chart is. Written as a chart is today (`writtenSettings`).
- */
-export function measureSong(sample: SampleSong, stamp = new Date().toISOString()): ChartDocumentV2 {
-    const legacy = textChart(sample, stamp);
-    const proposal = proposeLegacyScoreConversion(JSON.stringify(legacy));
-    if (proposal.kind !== 'candidate') {
-        throw new Error(`Sample "${legacy.title}" did not convert to a measure chart.`);
-    }
-    return validateDocument({
-        ...proposal.value,
-        id: legacy.id,
-        title: legacy.title,
-        createdAt: legacy.createdAt,
-        updatedAt: legacy.updatedAt,
-        revision: 0,
-        chart: { ...proposal.value.chart, ...writtenSettings(proposal.value.chart) },
     });
 }
 

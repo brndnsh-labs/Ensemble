@@ -33,10 +33,7 @@ function chart(document: SyncDocument): ChartDocument {
 
 /**
  * Mirrors `AccountSongbook.prepare`'s serialization exactly — including the `snapshot()` call
- * around the document. That call is not incidental: for a v1 chart the portable validator
- * REBUILDS the document in its own field order (…updatedAt, revision, chart), so the bytes on
- * the wire are the normalised form, not whatever order the caller happened to author. A test
- * that embedded a raw fixture here would be testing a request no client can produce.
+ * around the document, so a test here sends only a request a client can produce.
  */
 function wire(
     document: ChartDocument,
@@ -117,7 +114,7 @@ async function sha256(value: string): Promise<string> {
 }
 
 describe('accepts exactly what prepare() produces', () => {
-    it('round-trips a v1 request, returning the envelope and a detached document', async () => {
+    it('round-trips a request, returning the envelope and a detached document', async () => {
         const document = accountChart('A', 'study');
         const body = wire(document);
         const decoded = await decodeSaveRequest(body, OWNER);
@@ -175,24 +172,33 @@ describe('accepts exactly what prepare() produces', () => {
         await expect(decodeSaveRequest(body, OWNER)).resolves.toBeDefined();
     });
 
-    it('pins v1 document field order, which the portable validator rebuilds', async () => {
-        const document = accountChart('A', 'study');
-        // Author the same chart with its top-level keys reversed. `validateChartDocument`
-        // REBUILDS a v1 document in its own field order, so the canonical reconstruction
-        // normalises this — and a body carrying the author's order is refused.
-        const reversed = Object.fromEntries(
-            Object.entries(document).reverse(),
-        ) as unknown as ChartDocument;
-        const shuffled = JSON.stringify({
+    it('refuses a text chart (schema 1): the format was retired in #1740', async () => {
+        const { chart: settings, ...envelope } = accountChart('A', 'study');
+        const textChart = {
+            ...envelope,
+            schemaVersion: 1,
+            chart: {
+                arrangement: {
+                    sections: [{ id: 'a', label: 'A', value: 'C7 | F7', repeat: 1 }],
+                    key: 'C',
+                    timeSignature: '4/4',
+                    grouping: null,
+                    isMinor: false,
+                    notation: 'name',
+                },
+                performance: settings.performance,
+                band: settings.band,
+            },
+        };
+        const body = JSON.stringify({
             protocolVersion: 1,
             ownerId: OWNER,
             documentId: 'study',
             operationId: 'op-1',
             expectedRevision: null,
-            document: reversed,
+            document: textChart,
         });
-        expect(shuffled).not.toBe(wire(document));
-        await expect(decodeSaveRequest(shuffled, OWNER)).rejects.toThrow('canonical serialization');
+        await expect(decodeSaveRequest(body, OWNER)).rejects.toThrow(SaveRequestError);
     });
 
     it('does NOT pin v2 document field order — a deliberate, documented asymmetry', async () => {
@@ -202,7 +208,7 @@ describe('accepts exactly what prepare() produces', () => {
         // key-shuffled v2 body is accepted — with a DIFFERENT digest for the same logical
         // chart. This is not an integrity hole (every schema object is allowlisted, so no
         // extra content rides along) and the outbox only ever sends bytes it froze once. It
-        // is pinned here so the difference from v1 above is a decision on record rather than
+        // is pinned here so the difference from a collection is a decision on record rather than
         // something a future reader discovers while debugging a receipt mismatch.
         const reversed = Object.fromEntries(
             Object.entries(document).reverse(),

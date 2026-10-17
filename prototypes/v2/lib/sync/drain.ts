@@ -43,11 +43,13 @@ export interface OutboxPassResult {
  * across kinds. So the cursor stays one document id, and a caller resuming a sweep — `drain` in
  * `lib/account/sync-loop.ts` — needs to know nothing about collections.
  *
- * Each store is paged to the same limit after the same cursor; the first `limit` ids of the union
- * are necessarily among those two pages, so the merge is exact. The songs page is still the full
- * validated `list` read it always was, so a song record that does not validate still fails the
- * pass rather than being stepped over. Two transactions rather than one: pages were never a
- * snapshot of the library (`list`), and the cursor is an id, not an offset.
+ * Each store is paged to the same limit after the same cursor, and each page reports how far it
+ * READ (its own cursor). The merge keeps only ids up to the nearer of the two cursors, which both
+ * pages have read in full, so it is exact even when a songs page hands back fewer songs than it
+ * read: `list` steps over a retired text chart (#1740), listing nothing for it, while its cursor
+ * still moves past. Any other song record that does not validate still fails the pass rather than
+ * being stepped over (#1769). Two transactions rather than one: pages were never a snapshot of the
+ * library (`list`), and the cursor is an id, not an offset.
  */
 async function outboxPage(
     songbook: AccountSongbook,
@@ -80,15 +82,17 @@ async function outboxPage(
             collection: true,
         })),
     ].sort((a, b) => (a.documentId < b.documentId ? -1 : a.documentId > b.documentId ? 1 : 0));
-    const documents = merged.slice(0, OUTBOX_PAGE_LIMIT);
-    const more =
-        merged.length > OUTBOX_PAGE_LIMIT ||
-        songs.nextAfterDocumentId !== null ||
-        collections.nextAfterDocumentId !== null;
-    return {
-        documents,
-        nextAfterDocumentId: more && documents.length > 0 ? documents.at(-1)!.documentId : null,
-    };
+    // Each page read up to its own cursor and no further. A songs page can hand back fewer songs
+    // than it read — `list` steps over a retired text chart (#1740) without listing it — so the
+    // union is exact only up to the nearer of the two cursors: nothing past it is visited here.
+    const bound = [songs.nextAfterDocumentId, collections.nextAfterDocumentId]
+        .filter((cursor) => cursor !== null)
+        .sort()[0];
+    const within = merged.filter((document) => bound === undefined || document.documentId <= bound);
+    const documents = within.slice(0, OUTBOX_PAGE_LIMIT);
+    const nextAfterDocumentId =
+        within.length > OUTBOX_PAGE_LIMIT ? documents.at(-1)!.documentId : (bound ?? null);
+    return { documents, nextAfterDocumentId };
 }
 
 /**

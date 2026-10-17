@@ -1,35 +1,43 @@
 import { describe, expect, it } from 'vitest';
+import { writtenSettings } from '../../../public/songbook/codec.js';
 import {
-    decodeChartDocument,
-    encodeChartDocument,
-    validateChartDocument,
-    writtenSettings,
-} from '../../../public/songbook/codec.js';
-import { validateChartDocumentV2 } from '../../../public/songbook/document-v2.js';
-import type { ChartDocumentV2 } from '../../../public/songbook/score-types.js';
-import { SONGBOOK_MAX_SECTIONS } from '../../../public/songbook/structural-limits.js';
-import type { ChartDocument } from '../../../public/songbook/types.js';
+    decodeChartDocumentV2 as decodeChartDocument,
+    encodeChartDocumentV2 as encodeChartDocument,
+    isRetiredSchema,
+    validateChartDocumentV2 as validateChartDocument,
+} from '../../../public/songbook/document-v2.js';
+import type { ChartDocumentV2 as ChartDocument } from '../../../public/songbook/score-types.js';
 
-/** A chart as the app stored one, every optional field it can hold but trading and energy. */
+/**
+ * The chart document's own validator (#1740): one schema (2), its envelope, performance and band
+ * checked by `document-v2.ts` itself — no longer through a synthetic schema-1 envelope — and its
+ * score by `score-codec.ts` (`score-codec.test.ts`). These are the cases the schema-1 codec's
+ * tests held for the envelope, performance and band, ported onto the one validator left.
+ */
+
+/** A chart as the app stores one, every optional field it can hold but trading and energy. */
 function makeChartDocument(): ChartDocument {
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         id: 'chart-ada-001',
         title: 'Odd-Meter Study',
         createdAt: '2026-08-28T12:00:00.000Z',
         updatedAt: '2026-08-28T12:30:00.000Z',
         revision: 3,
         chart: {
-            arrangement: {
+            score: {
+                key: 'Gb',
+                isMinor: false,
+                notation: 'roman',
+                meter: '5/4',
+                grouping: [2, 3],
                 sections: [
                     {
                         id: 'section-a',
                         label: 'A',
-                        value: 'Imaj7 | IVmaj7',
                         repeat: 2,
                         key: 'Gb',
                         isMinor: false,
-                        timeSignature: '5/4',
                         seamless: true,
                         targetIntensity: 0.62,
                         instruments: {
@@ -39,13 +47,17 @@ function makeChartDocument(): ChartDocument {
                             harmony: true,
                             soloist: false,
                         },
+                        measures: [
+                            {
+                                id: 'm1',
+                                content: {
+                                    kind: 'events',
+                                    events: [{ kind: 'chord', symbol: 'Gb^7', duration: [5, 1] }],
+                                },
+                            },
+                        ],
                     },
                 ],
-                key: 'Gb',
-                timeSignature: '5/4',
-                grouping: [2, 3],
-                isMinor: false,
-                notation: 'roman',
             },
             performance: {
                 bpm: 117,
@@ -92,6 +104,27 @@ function makeChartDocument(): ChartDocument {
     };
 }
 
+/** The same chart as a text chart (schemaVersion 1), the format retired in #1740. */
+function makeTextChart(): Record<string, unknown> {
+    const { chart, ...envelope } = makeChartDocument();
+    return {
+        ...envelope,
+        schemaVersion: 1,
+        chart: {
+            arrangement: {
+                sections: [{ id: 'section-a', label: 'A', value: 'Imaj7 | IVmaj7', repeat: 2 }],
+                key: 'Gb',
+                timeSignature: '5/4',
+                grouping: [2, 3],
+                isMinor: false,
+                notation: 'roman',
+            },
+            performance: chart.performance,
+            band: chart.band,
+        },
+    };
+}
+
 describe('Songbook codecs (#1044)', () => {
     it('round-trips every nested ChartDocument field through JSON unchanged', () => {
         const document = makeChartDocument();
@@ -116,8 +149,10 @@ describe('Songbook codecs (#1044)', () => {
             return;
         }
 
-        documentResult.value.chart.arrangement.sections[0].label = 'Changed result';
-        expect(document.chart.arrangement.sections[0].label).toBe('A');
+        documentResult.value.chart.score.sections[0].label = 'Changed result';
+        documentResult.value.chart.band.chords.volume = 0;
+        expect(document.chart.score.sections[0].label).toBe('A');
+        expect(document.chart.band.chords.volume).toBe(0.82);
     });
 
     it('rejects the complete current candidate instead of returning a partial document', () => {
@@ -153,48 +188,110 @@ describe('Songbook codecs (#1044)', () => {
         });
     });
 
-    it('accepts exactly 500 sections and rejects section 501', () => {
-        const atLimit = makeChartDocument();
-        atLimit.chart.arrangement.sections = Array.from(
-            { length: SONGBOOK_MAX_SECTIONS },
-            (_, index) => ({ id: `section-${index}`, label: `S${index}`, value: 'I' }),
-        );
-        expect(validateChartDocument(atLimit).kind).toBe('ok');
+    it('refuses a text chart (schemaVersion 1) as a historical version, and says which it is', () => {
+        const textChart = makeTextChart();
+        expect(validateChartDocument(textChart)).toEqual({
+            kind: 'invalid',
+            issues: [
+                expect.objectContaining({
+                    path: '$.schemaVersion',
+                    message: 'Unsupported historical schema version 1',
+                }),
+            ],
+        });
+        expect(decodeChartDocument(JSON.stringify(textChart)).kind).toBe('invalid');
+        expect(encodeChartDocument(textChart as unknown as ChartDocument).kind).toBe('invalid');
+        // What the app asks to tell an old file or link apart from a broken one.
+        expect(isRetiredSchema(textChart)).toBe(true);
+        expect(isRetiredSchema(makeChartDocument())).toBe(false);
+        expect(isRetiredSchema({ schemaVersion: '1' })).toBe(false);
+        expect(isRetiredSchema(null)).toBe(false);
+        expect(isRetiredSchema([1])).toBe(false);
+    });
 
-        const overLimit = structuredClone(atLimit);
-        overLimit.chart.arrangement.sections.push({ id: 'section-500', label: 'S500', value: 'I' });
-        const result = validateChartDocument(overLimit);
-        expect(result.kind).toBe('invalid');
-        if (result.kind !== 'invalid') {
-            return;
-        }
-        expect(result.issues).toContainEqual(
-            expect.objectContaining({
-                path: '$.chart.arrangement.sections',
-                code: 'too-many-sections',
-            }),
-        );
+    it('reads the retired version stamp without invoking an accessor', () => {
+        let getterRead = false;
+        const candidate = Object.defineProperty({}, 'schemaVersion', {
+            enumerable: true,
+            get() {
+                getterRead = true;
+                return 1;
+            },
+        });
+        expect(isRetiredSchema(candidate)).toBe(false);
+        expect(getterRead).toBe(false);
     });
 
     it('rejects duplicate section identities and unknown current-schema fields', () => {
-        const candidate = makeChartDocument() as any;
-        candidate.chart.arrangement.sections.push({
-            ...candidate.chart.arrangement.sections[0],
+        const duplicate = makeChartDocument();
+        duplicate.chart.score.sections.push({
+            ...structuredClone(duplicate.chart.score.sections[0]),
             label: 'Duplicate identity',
+            measures: [{ ...duplicate.chart.score.sections[0].measures[0], id: 'm2' }],
         });
-        candidate.chart.performance.transportStep = 64;
+        const duplicated = validateChartDocument(duplicate);
+        expect(duplicated.kind === 'invalid' && duplicated.issues).toEqual([
+            expect.objectContaining({ path: '$.chart.score.sections[1].id' }),
+        ]);
 
+        for (const [path, apply] of [
+            [
+                '$.chart.performance.transportStep',
+                (d: any) => (d.chart.performance.transportStep = 64),
+            ],
+            ['$.revisionNote', (d: any) => (d.revisionNote = 'x')],
+            ['$.chart.arrangement', (d: any) => (d.chart.arrangement = {})],
+            ['$.metadata.tempo', (d: any) => (d.metadata = { tempo: 'fast' })],
+            [
+                '$.importSource.url',
+                (d: any) => (d.importSource = { format: 'irealb', text: 'x', url: 'y' }),
+            ],
+        ] as const) {
+            const candidate = makeChartDocument() as any;
+            apply(candidate);
+            const result = validateChartDocument(candidate);
+            expect(result.kind, path).toBe('invalid');
+            expect(result.kind === 'invalid' && result.issues, path).toContainEqual(
+                expect.objectContaining({ path, code: 'unknown-field' }),
+            );
+        }
+    });
+
+    it.each([
+        ['id', '', '$.id'],
+        ['id', '<script>', '$.id'],
+        ['title', '', '$.title'],
+        ['title', 'x'.repeat(201), '$.title'],
+        ['createdAt', 'yesterday', '$.createdAt'],
+        ['updatedAt', 42, '$.updatedAt'],
+        ['revision', -1, '$.revision'],
+        ['revision', 1.5, '$.revision'],
+    ])('checks the envelope: %s = %j is refused', (key, value, path) => {
+        const candidate = { ...makeChartDocument(), [key]: value };
         const result = validateChartDocument(candidate);
         expect(result.kind).toBe('invalid');
-        if (result.kind !== 'invalid') {
-            return;
-        }
-        expect(result.issues.map((issue) => issue.path)).toEqual(
-            expect.arrayContaining([
-                '$.chart.arrangement.sections.1.id',
-                '$.chart.performance.transportStep',
-            ]),
+        expect(result.kind === 'invalid' && result.issues.map((issue) => issue.path)).toContain(
+            path,
         );
+    });
+
+    it('requires every envelope field', () => {
+        for (const key of ['id', 'title', 'createdAt', 'updatedAt', 'revision', 'chart']) {
+            const candidate = makeChartDocument() as any;
+            delete candidate[key];
+            const result = validateChartDocument(candidate);
+            expect(result.kind === 'invalid' && result.issues, key).toContainEqual(
+                expect.objectContaining({ path: `$.${key}`, code: 'missing-field' }),
+            );
+        }
+        for (const key of ['score', 'performance', 'band']) {
+            const candidate = makeChartDocument() as any;
+            delete candidate.chart[key];
+            const result = validateChartDocument(candidate);
+            expect(result.kind === 'invalid' && result.issues, key).toContainEqual(
+                expect.objectContaining({ path: `$.chart.${key}`, code: 'missing-field' }),
+            );
+        }
     });
 
     it('reads trading as optional: absent is off, and only real partners and lengths pass', () => {
@@ -359,17 +456,12 @@ describe('Songbook codecs (#1044)', () => {
  * The genre is stored once, the band's energy rides the chart, and the old engine's band and
  * performance fields are refused (#1741).
  */
-/** A chart as the codec before 2026-09-26 serialized it, every old-engine field included. */
-// biome-ignore format: exact bytes
-const OLDER_BUILD_BYTES =
-    '{"schemaVersion":1,"id":"chart-ada-001","title":"Odd-Meter Study","createdAt":"2026-08-28T12:00:00.000Z","updatedAt":"2026-08-28T12:30:00.000Z","revision":3,"chart":{"arrangement":{"sections":[{"id":"section-a","label":"A","value":"Imaj7 | IVmaj7","repeat":2,"key":"Gb","isMinor":false,"timeSignature":"5/4","seamless":true,"targetIntensity":0.62,"instruments":{"groove":true,"bass":true,"chords":false,"harmony":true,"soloist":false}}],"key":"Gb","timeSignature":"5/4","grouping":[2,3],"isMinor":false,"notation":"roman","lastChordPreset":"User Study"},"performance":{"bpm":117,"complexity":0.67,"seed":"A1B2C3","randomizeSeed":false},"band":{"chords":{"enabled":true,"voice":"pack:grand","autoSound":false,"volume":0.82,"reverb":0.24,"style":"smart","instrument":"Piano","octave":48,"density":"rich"},"bass":{"enabled":true,"voice":"synth","autoSound":true,"volume":0.9,"reverb":0.12,"style":"smart","octave":38},"soloist":{"enabled":true,"voice":"synth","autoSound":true,"volume":0.88,"reverb":0.3,"style":"smart","preset":"trumpet","octave":72,"mode":"monophonic","autoMode":false,"phrasingIntensity":0.74,"tradeMode":"sections","tradeWith":"drums","tradeBars":8,"tradeChoruses":3},"harmony":{"enabled":true,"voice":"synth","autoSound":true,"volume":0.7,"reverb":0.4,"style":"smart","octave":60,"complexity":0.58},"groove":{"enabled":true,"voice":"pack:studio-kit","autoSound":false,"volume":0.95,"reverb":0.18,"measures":2,"swing":56,"swingSub":"16th","humanize":23,"lastDrumPreset":"Basic Rock","genreFeel":"Jazz","lastSmartGenre":"Jazz","pattern":[{"name":"Kick","steps":[1,0,0,0,2,0,0,0]},{"name":"Snare","steps":[0,0,1,0,0,0,1,0]}]}}}}';
 
 /**
  * Every band and performance field the old engine wrote, by its path in a stored chart, with a
  * value it once accepted. None of them is accepted any more (#1741).
  */
 const RETIRED_FIELDS: ReadonlyArray<[path: string, value: unknown]> = [
-    ['$.chart.arrangement.lastChordPreset', 'User Study'],
     ['$.chart.performance.complexity', 0.67],
     [
         '$.chart.band.harmony',
@@ -415,45 +507,15 @@ function withField(document: object, path: string, value: unknown): object {
     return copy;
 }
 
-/** The same chart as a measure chart (schema 2), whose band the same validator checks. */
-function makeMeasureChart(): ChartDocumentV2 {
-    const { chart, ...envelope } = makeChartDocument();
-    return {
-        ...envelope,
-        schemaVersion: 2,
-        chart: {
-            performance: chart.performance,
-            band: chart.band,
-            score: {
-                key: 'C',
-                isMinor: false,
-                notation: 'name',
-                meter: '4/4',
-                grouping: null,
-                sections: [
-                    {
-                        id: 'a',
-                        label: 'A',
-                        repeat: 1,
-                        measures: [
-                            {
-                                id: 'm1',
-                                content: {
-                                    kind: 'events',
-                                    events: [{ kind: 'chord', symbol: 'C', duration: [4, 1] }],
-                                },
-                            },
-                        ],
-                    },
-                ],
-            },
-        },
-    };
-}
-
 describe("the old engine's fields, refused (#1741)", () => {
-    it('refuses the bytes an older build wrote, naming every field it no longer accepts', () => {
-        const result = decodeChartDocument(OLDER_BUILD_BYTES);
+    it('refuses a chart carrying all of them, naming every field it no longer accepts', () => {
+        let older: object = makeChartDocument();
+        for (const [path, value] of RETIRED_FIELDS) {
+            older = withField(older, path, value);
+        }
+        // …and the genre it stored only the old way (`genreFeel`) is missing.
+        delete (older as any).chart.band.groove.genre;
+        const result = decodeChartDocument(JSON.stringify(older));
         expect(result.kind).toBe('invalid');
         if (result.kind !== 'invalid') {
             return;
@@ -462,44 +524,31 @@ describe("the old engine's fields, refused (#1741)", () => {
             .filter((issue) => issue.code === 'unknown-field')
             .map((issue) => issue.path);
         expect(unknown.sort()).toEqual(RETIRED_FIELDS.map(([path]) => path).sort());
-        // …and the genre it stored only the old way is missing.
         expect(result.issues).toContainEqual(
             expect.objectContaining({ path: '$.chart.band.groove.genre', code: 'missing-field' }),
         );
     });
 
-    it.each(RETIRED_FIELDS)('refuses a chart carrying %s, in either schema', (path, value) => {
-        for (const [document, validate] of [
-            [makeChartDocument(), validateChartDocument],
-            [makeMeasureChart(), validateChartDocumentV2],
-        ] as const) {
-            if (path.startsWith('$.chart.arrangement.') && document.schemaVersion === 2) {
-                continue; // A measure chart has no arrangement: its score has no such field.
-            }
-            expect(validate(document).kind).toBe('ok');
-            const result = validate(withField(document, path, value));
-            expect(result.kind).toBe('invalid');
-            expect(result.kind === 'invalid' && result.issues).toContainEqual(
-                expect.objectContaining({ path, code: 'unknown-field' }),
-            );
-        }
+    it.each(RETIRED_FIELDS)('refuses a chart carrying %s', (path, value) => {
+        const document = makeChartDocument();
+        expect(validateChartDocument(document).kind).toBe('ok');
+        const result = validateChartDocument(withField(document, path, value));
+        expect(result.kind).toBe('invalid');
+        expect(result.kind === 'invalid' && result.issues).toContainEqual(
+            expect.objectContaining({ path, code: 'unknown-field' }),
+        );
     });
 
-    it('requires the genre, in either schema', () => {
-        for (const [document, validate] of [
-            [makeChartDocument(), validateChartDocument],
-            [makeMeasureChart(), validateChartDocumentV2],
-        ] as const) {
-            const candidate = structuredClone(document) as any;
-            delete candidate.chart.band.groove.genre;
-            const result = validate(candidate);
-            expect(result.kind === 'invalid' && result.issues).toEqual([
-                expect.objectContaining({
-                    path: '$.chart.band.groove.genre',
-                    code: 'missing-field',
-                }),
-            ]);
-        }
+    it('requires the genre', () => {
+        const candidate = structuredClone(makeChartDocument()) as any;
+        delete candidate.chart.band.groove.genre;
+        const result = validateChartDocument(candidate);
+        expect(result.kind === 'invalid' && result.issues).toEqual([
+            expect.objectContaining({
+                path: '$.chart.band.groove.genre',
+                code: 'missing-field',
+            }),
+        ]);
     });
 });
 
@@ -509,7 +558,7 @@ describe('chart format: the settings the band honours', () => {
         const old = makeChartDocument();
         return {
             ...old,
-            chart: { arrangement: old.chart.arrangement, ...writtenSettings(old.chart) },
+            chart: { score: old.chart.score, ...writtenSettings(old.chart) },
         };
     }
 

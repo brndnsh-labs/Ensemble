@@ -41,10 +41,6 @@ vi.mock('../../../public/state.js', () => {
         },
         arranger: {
             timeSignature: '4/4',
-            progression: [],
-            stepMap: [],
-            sectionMap: [],
-            totalSteps: 128,
             key: 'C',
             isMinor: false,
         },
