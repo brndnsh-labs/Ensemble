@@ -332,6 +332,8 @@ export interface BarDrafts {
     put(measureId: string, draft: BarDraft | null): void;
     /** Retire what an adoption folded in: every pending bar, or only the ones named. */
     retire(measureIds?: readonly string[]): void;
+    /** Put back a set of pending bars taken earlier with `latest()` (a delete's Undo, #1758). */
+    restore(drafts: ReadonlyMap<string, BarDraft>): void;
 }
 
 /**
@@ -389,6 +391,9 @@ export function useBarDrafts(
                 next.delete(measureId);
             }
             write(next);
+        },
+        restore(drafts) {
+            write(drafts.size > 0 ? drafts : NO_DRAFTS);
         },
     };
 }

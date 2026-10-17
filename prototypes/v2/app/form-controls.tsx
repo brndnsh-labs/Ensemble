@@ -12,14 +12,14 @@ interface FormControlsProps {
 
 /**
  * A bar's own repeat and ending markers, field by field, for the nested and nonstandard forms
- * the guide (`GuidedForm`) leaves alone. In the bar menu since #1726. No shadow drafts: the
- * bar's draft (`useBarDrafts`) owns the raw values through leaving the bar, Save and recovery.
+ * the guide (`GuidedForm`) leaves alone. Inside the guide's dialog since #1758 (its "per-bar
+ * markers" view), so the bar menu offers one repeat path. No shadow drafts: the bar's draft
+ * (`useBarDrafts`) owns the raw values through leaving the bar, Save and recovery.
  */
 export function FormControls({ value, onChange, disabled = false }: FormControlsProps) {
     const id = useId();
     return (
-        <details className="form-controls">
-            <summary>Advanced · per-bar repeat and ending markers</summary>
+        <div className="form-controls">
             <fieldset disabled={disabled} aria-describedby={`${id}-help`}>
                 <legend className="sr">Repeats and endings for this bar</legend>
                 <label className="form-controls-toggle">
@@ -85,6 +85,6 @@ export function FormControls({ value, onChange, disabled = false }: FormControls
                     explicitly. Set every affected bar before leaving the last of them.
                 </p>
             </fieldset>
-        </details>
+        </div>
     );
 }

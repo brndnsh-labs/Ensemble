@@ -230,13 +230,16 @@ test('opening the guide preserves complex forms and failed validation retains pe
     const dialog = await openGuide(page);
     await expect(dialog.getByRole('alert')).toContainText('nested or nonstandard');
     await expect(dialog.getByRole('button', { name: 'Apply', exact: true })).toBeDisabled();
+    // The per-bar markers are inside the guide's dialog (#1758), for exactly this form: bar 1
+    // opens the nested repeat. The menu itself has no second repeat path.
+    await dialog
+        .getByRole('button', { name: 'Per-bar markers for A · bar 1…', exact: true })
+        .click();
+    await expect(dialog.getByLabel('Start repeat here', { exact: true })).toBeChecked();
+    await dialog.getByRole('button', { name: 'Back to the guide', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toContainText('nested or nonstandard');
     await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
-    // The advanced markers sit in a bar's menu (#1726): bar 1 opens the nested repeat.
-    await openBar(page, 1);
-    await page.getByRole('button', { name: 'Bar menu', exact: true }).click();
-    await page.getByText('Advanced · per-bar repeat and ending markers', { exact: true }).click();
-    await expect(page.getByLabel('Start repeat here', { exact: true })).toBeChecked();
-    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
     await leaveBar(page);
     expect((await exported(page)).chart).toEqual(source.chart);
     await start(page, 'Pending validation');

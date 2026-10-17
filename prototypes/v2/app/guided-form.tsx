@@ -3,6 +3,7 @@
 import type { SemanticScore } from '@engine/songbook/score-types';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { checkPlayable } from '../lib/engine-mode';
+import type { FormDraft } from '../lib/form-editing';
 import {
     type BarRange,
     changeGuidedForm,
@@ -11,19 +12,48 @@ import {
     guidedGroups,
     guidedRoute,
 } from '../lib/guided-form';
+import { FormControls } from './form-controls';
 import './guided-form.css';
 
 type RangeName = 'body' | 'first' | 'second';
 const RANGE_LABELS = { body: 'Repeated body', first: 'First ending', second: 'Second ending' };
 
+/**
+ * The bar the guide opened from, as its own repeat and ending markers (#1758): the low-level
+ * route for nested and nonstandard forms the guide cannot edit. Its changes are the bar's draft,
+ * as typing is, written as they are made.
+ */
+export interface BarMarkers {
+    /** "A · bar 3": the bar the markers belong to. */
+    label: string;
+    /** Null where the bar has repeat boundaries the per-bar controls cannot express. */
+    value: FormDraft | null;
+    disabled: boolean;
+    onChange: (value: FormDraft) => void;
+}
+
+/**
+ * The Repeats and endings dialog, from the bar menu's "Repeat or ending…" (#1725) — the menu's
+ * one repeat path since #1758. The guide (choose bars, check how they play, Apply) is its main
+ * view; the opening bar's own markers (`markers`) are a second view inside it, for the forms the
+ * guide leaves alone. `blocked` says why the pending bars make no form yet (a repeat half-built
+ * with the per-bar markers): the guide waits, and the dialog opens on the markers instead.
+ * `onGuide` asks the shell to read the pending bars again on the way back to the guide.
+ */
 export function GuidedForm({
     score,
     selectedMeasureId,
+    markers,
+    blocked,
+    onGuide,
     onApply,
     onClose,
 }: {
     score: SemanticScore;
     selectedMeasureId: string;
+    markers?: BarMarkers | null;
+    blocked?: string;
+    onGuide?: () => void;
     onApply: (candidate: SemanticScore) => void;
     onClose: () => void;
 }) {
@@ -47,6 +77,7 @@ export function GuidedForm({
     const [anchor, setAnchor] = useState<number | null>(null);
     const [remove, setRemove] = useState(false);
     const [error, setError] = useState('');
+    const [view, setView] = useState<'guide' | 'markers'>(blocked && markers ? 'markers' : 'guide');
     const dialog = useRef<HTMLDialogElement>(null);
     const id = useId();
 
@@ -129,273 +160,341 @@ export function GuidedForm({
             }}
         >
             <h2 id={`${id}-title`}>Repeats and endings</h2>
-            <p>
-                Choose existing bars, check how they play, then Apply. Save keeps the result in your
-                songbook.
-            </p>
-            <label className="guided-field">
-                Section
-                <select
-                    value={sectionId}
-                    onChange={(event) => {
-                        setSectionId(event.target.value);
-                        edit();
-                    }}
-                >
-                    {score.sections.map((entry) => (
-                        <option key={entry.id} value={entry.id}>
-                            {entry.label}
-                        </option>
-                    ))}
-                </select>
-            </label>
-            {groups?.length ? (
-                <div className="guided-groups" aria-label="Existing repeat groups">
-                    {groups.map((existing) => (
-                        <button
-                            type="button"
-                            className="btn"
-                            key={existing.body.start}
-                            onClick={() => edit(existing)}
-                        >
-                            Edit {existing.first ? 'endings' : 'repeat'} · bars{' '}
-                            {existing.body.start + 1}–{groupEnd(existing) + 1}
-                        </button>
-                    ))}
-                    <button type="button" className="btn" onClick={() => edit()}>
-                        New repeat group
-                    </button>
-                </div>
-            ) : null}
-            {!groups ? (
-                <p role="alert">
-                    This section has a nested or nonstandard form. Its notation is preserved. Close
-                    this guide and use Advanced for per-bar controls.
-                </p>
-            ) : (
+            {view === 'markers' && markers ? (
                 <>
-                    <div className="guided-actions">
-                        <button
-                            type="button"
-                            className="btn"
-                            aria-pressed={!group.first}
-                            onClick={() => {
-                                setGroup({ body: group.body, times: group.times });
-                                setActive('body');
-                                setAnchor(null);
-                                setRemove(false);
-                            }}
-                        >
-                            Repeat these bars
-                        </button>
-                        <button
-                            type="button"
-                            className="btn"
-                            aria-pressed={!!group.first}
-                            disabled={section.measures.length < 3}
-                            onClick={endings}
-                        >
-                            Add first and second endings
-                        </button>
-                    </div>
-                    {section.measures.length < 3 && (
+                    <p>
+                        {markers.label}’s own repeat and ending markers, for a nested or nonstandard
+                        form the guide leaves alone. A change here is the bar’s, like its chords:
+                        applied when you leave the bar, kept by Save.
+                    </p>
+                    {blocked && <p role="alert">{blocked}</p>}
+                    {markers.value ? (
+                        <FormControls
+                            value={markers.value}
+                            disabled={markers.disabled}
+                            onChange={markers.onChange}
+                        />
+                    ) : (
                         <p>
-                            First and second endings need at least three existing bars: a body and
-                            two endings.
+                            This bar has repeat boundaries these controls cannot edit. Its notation
+                            is preserved.
                         </p>
                     )}
-                    <label className="guided-field">
-                        Play times total
-                        <input
-                            type="number"
-                            min="1"
-                            max="64"
-                            step="1"
-                            value={Number.isNaN(group.times) ? '' : group.times}
-                            disabled={!!group.first}
-                            onChange={(event) => {
-                                setGroup({ ...group, times: event.target.valueAsNumber });
-                                setRemove(false);
+                    <div className="dialog-actions">
+                        <button
+                            type="button"
+                            className="btn"
+                            onClick={() => {
+                                onGuide?.();
+                                setView('guide');
                             }}
-                        />
-                        <span>
-                            {group.first
-                                ? 'First ending on pass 1; second ending on pass 2.'
-                                : '2 means play twice, including the first time.'}
-                        </span>
+                        >
+                            Back to the guide
+                        </button>
+                        <button type="button" className="btn primary" onClick={onClose}>
+                            Done
+                        </button>
+                    </div>
+                </>
+            ) : (
+                <>
+                    <p>
+                        Choose existing bars, check how they play, then Apply. Save keeps the result
+                        in your songbook.
+                    </p>
+                    <label className="guided-field">
+                        Section
+                        <select
+                            value={sectionId}
+                            onChange={(event) => {
+                                setSectionId(event.target.value);
+                                edit();
+                            }}
+                        >
+                            {score.sections.map((entry) => (
+                                <option key={entry.id} value={entry.id}>
+                                    {entry.label}
+                                </option>
+                            ))}
+                        </select>
                     </label>
-                    <div className="guided-ranges">
-                        {(['body', 'first', 'second'] as const).map((name) => {
-                            const range = group[name];
-                            if (!range) {
-                                return null;
-                            }
-                            return (
-                                <fieldset key={name}>
-                                    <legend>{RANGE_LABELS[name]}</legend>
+                    {!blocked && groups?.length ? (
+                        <div className="guided-groups" aria-label="Existing repeat groups">
+                            {groups.map((existing) => (
+                                <button
+                                    type="button"
+                                    className="btn"
+                                    key={existing.body.start}
+                                    onClick={() => edit(existing)}
+                                >
+                                    Edit {existing.first ? 'endings' : 'repeat'} · bars{' '}
+                                    {existing.body.start + 1}–{groupEnd(existing) + 1}
+                                </button>
+                            ))}
+                            <button type="button" className="btn" onClick={() => edit()}>
+                                New repeat group
+                            </button>
+                        </div>
+                    ) : null}
+                    {blocked ? (
+                        <p role="alert">
+                            {blocked}
+                            {markers &&
+                                ' Finish them with the per-bar markers below, then the guide can read this form.'}
+                        </p>
+                    ) : !groups ? (
+                        <p role="alert">
+                            This section has a nested or nonstandard form. Its notation is
+                            preserved.
+                            {markers && ' Use the per-bar markers below for it.'}
+                        </p>
+                    ) : (
+                        <>
+                            <div className="guided-actions">
+                                <button
+                                    type="button"
+                                    className="btn"
+                                    aria-pressed={!group.first}
+                                    onClick={() => {
+                                        setGroup({ body: group.body, times: group.times });
+                                        setActive('body');
+                                        setAnchor(null);
+                                        setRemove(false);
+                                    }}
+                                >
+                                    Repeat these bars
+                                </button>
+                                <button
+                                    type="button"
+                                    className="btn"
+                                    aria-pressed={!!group.first}
+                                    disabled={section.measures.length < 3}
+                                    onClick={endings}
+                                >
+                                    Add first and second endings
+                                </button>
+                            </div>
+                            {section.measures.length < 3 && (
+                                <p>
+                                    First and second endings need at least three existing bars: a
+                                    body and two endings.
+                                </p>
+                            )}
+                            <label className="guided-field">
+                                Play times total
+                                <input
+                                    type="number"
+                                    min="1"
+                                    max="64"
+                                    step="1"
+                                    value={Number.isNaN(group.times) ? '' : group.times}
+                                    disabled={!!group.first}
+                                    onChange={(event) => {
+                                        setGroup({ ...group, times: event.target.valueAsNumber });
+                                        setRemove(false);
+                                    }}
+                                />
+                                <span>
+                                    {group.first
+                                        ? 'First ending on pass 1; second ending on pass 2.'
+                                        : '2 means play twice, including the first time.'}
+                                </span>
+                            </label>
+                            <div className="guided-ranges">
+                                {(['body', 'first', 'second'] as const).map((name) => {
+                                    const range = group[name];
+                                    if (!range) {
+                                        return null;
+                                    }
+                                    return (
+                                        <fieldset key={name}>
+                                            <legend>{RANGE_LABELS[name]}</legend>
+                                            <button
+                                                type="button"
+                                                className="btn"
+                                                aria-pressed={active === name}
+                                                onClick={() => {
+                                                    setActive(name);
+                                                    setAnchor(null);
+                                                }}
+                                            >
+                                                Select {RANGE_LABELS[name].toLowerCase()} bars
+                                            </button>
+                                            <div className="guided-range-fields">
+                                                {(['start', 'end'] as const).map((edge) => (
+                                                    <label key={edge}>
+                                                        {edge === 'start'
+                                                            ? 'From bar'
+                                                            : 'Through bar'}
+                                                        <select
+                                                            aria-label={`${RANGE_LABELS[name]} ${edge} bar`}
+                                                            value={range[edge]}
+                                                            onChange={(event) => {
+                                                                updateRange(name, {
+                                                                    ...range,
+                                                                    [edge]: Number(
+                                                                        event.target.value,
+                                                                    ),
+                                                                });
+                                                                setAnchor(null);
+                                                            }}
+                                                        >
+                                                            {section.measures.map((bar, index) => (
+                                                                <option key={bar.id} value={index}>
+                                                                    {index + 1}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </fieldset>
+                                    );
+                                })}
+                            </div>
+                            <p id={`${id}-selection`} aria-live="polite">
+                                Selecting {RANGE_LABELS[active].toLowerCase()}: bars{' '}
+                                {activeRange.start + 1}–{activeRange.end + 1}.{' '}
+                                {anchor === null
+                                    ? 'Choose a first bar, then a last bar.'
+                                    : `First bar ${anchor + 1} chosen. Choose the last bar.`}{' '}
+                                Tap or use Tab and Enter. The From/Through fields also work with the
+                                keyboard.
+                            </p>
+                            <div
+                                className="guided-bars"
+                                role="group"
+                                aria-label="Choose bar range"
+                                aria-describedby={`${id}-selection`}
+                            >
+                                {section.measures.map((bar, index) => (
                                     <button
                                         type="button"
-                                        className="btn"
-                                        aria-pressed={active === name}
-                                        onClick={() => {
-                                            setActive(name);
-                                            setAnchor(null);
-                                        }}
+                                        className="guided-bar"
+                                        key={bar.id}
+                                        aria-label={`Select bar ${index + 1}`}
+                                        aria-pressed={
+                                            index >= activeRange.start && index <= activeRange.end
+                                        }
+                                        onClick={() => chooseBar(index)}
                                     >
-                                        Select {RANGE_LABELS[name].toLowerCase()} bars
+                                        <span>Bar {index + 1}</span>
+                                        <strong>
+                                            {bar.content.kind === 'events'
+                                                ? bar.content.events
+                                                      .map((event) =>
+                                                          event.kind === 'chord'
+                                                              ? event.symbol
+                                                              : event.kind,
+                                                      )
+                                                      .join(' ')
+                                                : 'Measure repeat'}
+                                        </strong>
                                     </button>
-                                    <div className="guided-range-fields">
-                                        {(['start', 'end'] as const).map((edge) => (
-                                            <label key={edge}>
-                                                {edge === 'start' ? 'From bar' : 'Through bar'}
-                                                <select
-                                                    aria-label={`${RANGE_LABELS[name]} ${edge} bar`}
-                                                    value={range[edge]}
-                                                    onChange={(event) => {
-                                                        updateRange(name, {
-                                                            ...range,
-                                                            [edge]: Number(event.target.value),
-                                                        });
-                                                        setAnchor(null);
-                                                    }}
-                                                >
-                                                    {section.measures.map((bar, index) => (
-                                                        <option key={bar.id} value={index}>
-                                                            {index + 1}
-                                                        </option>
-                                                    ))}
-                                                </select>
-                                            </label>
-                                        ))}
-                                    </div>
-                                </fieldset>
-                            );
-                        })}
-                    </div>
-                    <p id={`${id}-selection`} aria-live="polite">
-                        Selecting {RANGE_LABELS[active].toLowerCase()}: bars {activeRange.start + 1}
-                        –{activeRange.end + 1}.{' '}
-                        {anchor === null
-                            ? 'Choose a first bar, then a last bar.'
-                            : `First bar ${anchor + 1} chosen. Choose the last bar.`}{' '}
-                        Tap or use Tab and Enter. The From/Through fields also work with the
-                        keyboard.
-                    </p>
-                    <div
-                        className="guided-bars"
-                        role="group"
-                        aria-label="Choose bar range"
-                        aria-describedby={`${id}-selection`}
-                    >
-                        {section.measures.map((bar, index) => (
-                            <button
-                                type="button"
-                                className="guided-bar"
-                                key={bar.id}
-                                aria-label={`Select bar ${index + 1}`}
-                                aria-pressed={
-                                    index >= activeRange.start && index <= activeRange.end
-                                }
-                                onClick={() => chooseBar(index)}
+                                ))}
+                            </div>
+                            <section
+                                className="guided-preview"
+                                aria-label="Form preview"
+                                aria-live="polite"
                             >
-                                <span>Bar {index + 1}</span>
-                                <strong>
-                                    {bar.content.kind === 'events'
-                                        ? bar.content.events
-                                              .map((event) =>
-                                                  event.kind === 'chord'
-                                                      ? event.symbol
-                                                      : event.kind,
-                                              )
-                                              .join(' ')
-                                        : 'Measure repeat'}
-                                </strong>
-                            </button>
-                        ))}
-                    </div>
-                    <section
-                        className="guided-preview"
-                        aria-label="Form preview"
-                        aria-live="polite"
-                    >
-                        <h3>{remove ? 'After removing this group' : 'Written brackets'}</h3>
-                        {remove ? (
-                            <p>
-                                Remove only this group’s repeat and ending markers. All chords and
-                                bars stay.
-                            </p>
-                        ) : (
-                            <div className="guided-brackets">
-                                <span>
-                                    𝄆 Bars {group.body.start + 1}–
-                                    {group.first ? group.first.end + 1 : group.body.end + 1} 𝄇 ·{' '}
-                                    {group.times || '?'} total plays
-                                </span>
-                                {group.first && group.second && (
+                                <h3>{remove ? 'After removing this group' : 'Written brackets'}</h3>
+                                {remove ? (
+                                    <p>
+                                        Remove only this group’s repeat and ending markers. All
+                                        chords and bars stay.
+                                    </p>
+                                ) : (
+                                    <div className="guided-brackets">
+                                        <span>
+                                            𝄆 Bars {group.body.start + 1}–
+                                            {group.first ? group.first.end + 1 : group.body.end + 1}{' '}
+                                            𝄇 · {group.times || '?'} total plays
+                                        </span>
+                                        {group.first && group.second && (
+                                            <>
+                                                <span className="guided-ending">
+                                                    1. Bars {group.first.start + 1}–
+                                                    {group.first.end + 1}
+                                                </span>
+                                                <span className="guided-ending">
+                                                    2. Bars {group.second.start + 1}–
+                                                    {group.second.end + 1}
+                                                </span>
+                                            </>
+                                        )}
+                                    </div>
+                                )}
+                                {preview.error ? (
+                                    <p role="alert">{preview.error}</p>
+                                ) : (
                                     <>
-                                        <span className="guided-ending">
-                                            1. Bars {group.first.start + 1}–{group.first.end + 1}
-                                        </span>
-                                        <span className="guided-ending">
-                                            2. Bars {group.second.start + 1}–{group.second.end + 1}
-                                        </span>
+                                        <h3>Playback route · whole chart</h3>
+                                        <p
+                                            className="guided-route"
+                                            data-testid="guided-playback-route"
+                                        >
+                                            {preview.route}
+                                        </p>
                                     </>
                                 )}
-                            </div>
+                            </section>
+                        </>
+                    )}
+                    {error && <p role="alert">{error}</p>}
+                    {markers && (
+                        <p className="guided-markers">
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={() => setView('markers')}
+                            >
+                                Per-bar markers for {markers.label}…
+                            </button>
+                            <span>For nested and nonstandard forms.</span>
+                        </p>
+                    )}
+                    <div className="dialog-actions">
+                        <button type="button" className="btn" onClick={onClose}>
+                            Cancel
+                        </button>
+                        {previous && (
+                            <button
+                                type="button"
+                                className="btn"
+                                onClick={() => {
+                                    setRemove(true);
+                                    setError('');
+                                }}
+                            >
+                                Remove form markers
+                            </button>
                         )}
-                        {preview.error ? (
-                            <p role="alert">{preview.error}</p>
-                        ) : (
-                            <>
-                                <h3>Playback route · whole chart</h3>
-                                <p className="guided-route" data-testid="guided-playback-route">
-                                    {preview.route}
-                                </p>
-                            </>
-                        )}
-                    </section>
+                        <button
+                            type="button"
+                            className="btn primary"
+                            disabled={!groups || !preview.candidate || Boolean(blocked)}
+                            onClick={() => {
+                                if (!preview.candidate) {
+                                    return;
+                                }
+                                try {
+                                    onApply(preview.candidate);
+                                    onClose();
+                                } catch (reason) {
+                                    setError(
+                                        reason instanceof Error
+                                            ? reason.message
+                                            : 'Could not apply. Your chart and typing are still here.',
+                                    );
+                                }
+                            }}
+                        >
+                            Apply
+                        </button>
+                    </div>
                 </>
             )}
-            {error && <p role="alert">{error}</p>}
-            <div className="dialog-actions">
-                <button type="button" className="btn" onClick={onClose}>
-                    Cancel
-                </button>
-                {previous && (
-                    <button
-                        type="button"
-                        className="btn"
-                        onClick={() => {
-                            setRemove(true);
-                            setError('');
-                        }}
-                    >
-                        Remove form markers
-                    </button>
-                )}
-                <button
-                    type="button"
-                    className="btn primary"
-                    disabled={!groups || !preview.candidate}
-                    onClick={() => {
-                        if (!preview.candidate) {
-                            return;
-                        }
-                        try {
-                            onApply(preview.candidate);
-                            onClose();
-                        } catch (reason) {
-                            setError(
-                                reason instanceof Error
-                                    ? reason.message
-                                    : 'Could not apply. Your chart and typing are still here.',
-                            );
-                        }
-                    }}
-                >
-                    Apply
-                </button>
-            </div>
         </dialog>
     );
 }

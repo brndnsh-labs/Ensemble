@@ -1,12 +1,3 @@
-.form-controls {
-    border-top: 1px solid var(--line);
-}
-.form-controls summary {
-    min-height: 44px;
-    padding: 12px 0;
-    font-size: 13px;
-    cursor: pointer;
-}
 .form-controls fieldset {
     display: grid;
     gap: 8px;
@@ -54,7 +45,7 @@
     margin: 0;
     accent-color: var(--green);
 }
-.form-controls :is(input, summary):focus-visible {
+.form-controls input:focus-visible {
     outline: 3px solid var(--focus-ring);
     outline-offset: 3px;
 }

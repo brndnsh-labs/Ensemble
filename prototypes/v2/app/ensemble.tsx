@@ -103,7 +103,7 @@ import {
 import { DeleteGuestSongDialog } from './delete-guest-song';
 import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
-import { GuidedForm } from './guided-form';
+import { type BarMarkers, GuidedForm } from './guided-form';
 import { downloadImportSource, ImportDialog } from './import-dialog';
 import { NeckView } from './neck-view';
 import { SongHeader } from './song-header';
@@ -170,6 +170,38 @@ function sameData(a: unknown, b: unknown): boolean {
  * chart) to its click.
  */
 const NEW_SONG_KEEP_DELAY_MS = 500;
+
+/** How long a delete's Undo is offered (#1758), unless the toast has the pointer or focus. */
+const DELETE_UNDO_MS = 6000;
+
+/**
+ * What a delete's Undo puts back (#1758): the chart and its pending bars just before the delete,
+ * and where the musician was. Good only while the chart is still `after`, what the delete left.
+ */
+interface DeleteUndo {
+    /** What the toast says: "Bar 5 deleted". */
+    text: string;
+    before: ChartDocument;
+    drafts: ReadonlyMap<string, BarDraft>;
+    measureId: string;
+    sectionId: string;
+    /** The bar whose field was open when it was deleted, opened again. */
+    reopen: string | null;
+    after: ChartDocument;
+    /** One per delete: the offer's few seconds are counted from it, not from a carry-forward. */
+    token: number;
+}
+
+/**
+ * Whether `next` is `after` as a new song's first-change keep left it (#1707): the same chart,
+ * only stored — a new revision and `updatedAt`, nothing the musician changed.
+ */
+function keptAs(after: ChartDocument, next: ChartDocument): boolean {
+    return (
+        next.id === after.id &&
+        sameData({ ...after, revision: 0, updatedAt: '' }, { ...next, revision: 0, updatedAt: '' })
+    );
+}
 
 /**
  * Compared as written today (`writtenChart`), not as stored: a change undone by hand on an old
@@ -622,10 +654,31 @@ export default function Ensemble() {
     // The bar whose field is open on the chart (#1723), or null.
     const [openBar, setOpenBar] = useState<OpenBar | null>(null);
     // The bar menu's "Repeat or ending…" (#1725): the Repeats and endings dialog over the chart,
-    // reviewing every pending bar, on the bar it was opened from.
-    const [barForm, setBarForm] = useState<{ score: SemanticScore; measureId: string } | null>(
-        null,
-    );
+    // reviewing every pending bar, on the bar it was opened from. `blocked`: the pending bars'
+    // repeat markers make no form yet, so the dialog opens on the bar's own markers (#1758).
+    const [barForm, setBarForm] = useState<{
+        score: SemanticScore;
+        measureId: string;
+        blocked?: string;
+    } | null>(null);
+    // A delete's Undo (#1758): the chart and its pending bars as they were just before the
+    // delete, offered for a few seconds. One snapshot, in memory, not a history: it is good only
+    // while the chart is still exactly what the delete left (`after`, no bar pending since), so
+    // any later edit — or Save, which writes a new revision — retires it.
+    const [deleteUndo, setDeleteUndo] = useState<DeleteUndo | null>(null);
+    // The offer as of now, for an Undo that waited its turn behind another action (`run`).
+    const deleteUndoNow = useRef(deleteUndo);
+    deleteUndoNow.current = deleteUndo;
+    const undoToken = useRef(0);
+    const [undoHeld, setUndoHeld] = useState(false);
+    // Where focus goes once an Undo has landed (#1758 review): the restored section's letter,
+    // or the restored bar's number where its field does not open, never the page.
+    const undoFocus = useRef<{ sectionId: string } | { measureId: string } | null>(null);
+    // The selected bar as of now, for a delete that waited its turn (`run`).
+    const measureIdNow = useRef(measureId);
+    measureIdNow.current = measureId;
+    // An Undo pressed while another action ran, to run once it is done.
+    const undoAfterWork = useRef(false);
     const [editorRequest, setEditorRequest] = useState(0);
     const revealedEditorRequest = useRef(0);
     // #1440 — set just before an `editorRequest` bump that should focus the title field (in the
@@ -3052,12 +3105,49 @@ export default function Ensemble() {
             setError('');
             return true;
         } catch (reason) {
+            // Repeat markers half-built bar by bar: the dialog opens on this bar's own markers,
+            // which is where they are finished (#1758), the guide waiting until they make a form.
+            // On the bar whose markers are at fault, which is where they are fixed.
+            if (reason instanceof BarDraftError && reason.inForm) {
+                setBarForm({
+                    score: current.chart.score,
+                    measureId: reason.measureId ?? measureId,
+                    blocked: reason.message,
+                });
+                setError('');
+                return true;
+            }
             setError(reason instanceof Error ? reason.message : String(reason));
             if (reason instanceof BarDraftError && reason.measureId && !reason.inForm) {
                 openBarField(reason.measureId);
             }
             return false;
         }
+    }
+    /** The opening bar's own repeat and ending markers, for the Repeats and endings dialog's
+     * per-bar view (#1758): a draft change, as the bar menu's Advanced markers were. */
+    function barMarkers(measureId: string): BarMarkers | null {
+        if (current?.schemaVersion !== 2) {
+            return null;
+        }
+        const field = barField(current.chart.score, barDrafts.drafts, measureId);
+        if (!field || field.text === null) {
+            return null;
+        }
+        return {
+            label: field.entry.label,
+            value: field.draft.form,
+            disabled: busy,
+            onChange(form) {
+                const latest = barField(current.chart.score, barDrafts.latest(), measureId);
+                if (latest && latest.text !== null && !busy) {
+                    barDrafts.put(
+                        measureId,
+                        draftChange(latest.original, { ...latest.draft, form }),
+                    );
+                }
+            },
+        };
     }
     /** The Repeats and endings dialog's Apply (the bar menu's "Repeat or ending…"). */
     function applyForm(score: SemanticScore) {
@@ -3094,6 +3184,9 @@ export default function Ensemble() {
      */
     function deleteBar(measureId: string) {
         void run(() => {
+            // Taken before the pending bars commit, so Undo puts them back pending (#1758).
+            const before = currentNow.current;
+            const drafts = barDrafts.latest();
             const next = updateChart();
             if (next.schemaVersion !== 2) {
                 return;
@@ -3115,6 +3208,85 @@ export default function Ensemble() {
                 setOpenBar({ id: nearest, select: 'end' });
             } else {
                 setOpenBar(null);
+            }
+            if (before?.schemaVersion === 2) {
+                const bars = before.chart.score.sections;
+                const holding = bars.find((s) => s.measures.some((m) => m.id === measureId));
+                const number = bars.flatMap((s) => s.measures).findIndex((m) => m.id === measureId);
+                offerUndo({
+                    text:
+                        holding && result.score.sections.every((s) => s.id !== holding.id)
+                            ? `Section ${holding.label} deleted`
+                            : `Bar ${number + 1} deleted`,
+                    before,
+                    drafts,
+                    measureId,
+                    sectionId: holding?.id ?? sectionId,
+                    reopen: measureId,
+                });
+            }
+        });
+    }
+    /** Offer Undo for the delete just made (#1758): the chart as it now stands is `after`. */
+    function offerUndo(undo: Omit<DeleteUndo, 'after' | 'token'>) {
+        const after = currentNow.current;
+        if (after) {
+            undoToken.current += 1;
+            setDeleteUndo({ ...undo, after, token: undoToken.current });
+            setUndoHeld(false);
+        }
+    }
+    /**
+     * The delete toast's Undo (#1758): the chart and its pending bars exactly as they were before
+     * the delete, the bar that was open opened again. Unsaved, like the delete it undoes. Refused
+     * if anything has changed since (the toast is gone by then anyway).
+     *
+     * Pressed while another action runs (Play still loading its sounds), it waits for that action
+     * rather than being turned away (`run` turns a second action away): the offer stays up, its
+     * clock held, and Undo runs as soon as the shell is free (`undoAfterWork`, #1758 review).
+     */
+    function undoDelete() {
+        if (!deleteUndoNow.current) {
+            return;
+        }
+        if (working.current && !waiting.current && !background.current) {
+            undoAfterWork.current = true;
+            setUndoHeld(true);
+            return;
+        }
+        void run(() => {
+            // The offer as it stands when this turn comes, carried past a new song's keep.
+            const undo = deleteUndoNow.current;
+            const now = currentNow.current;
+            setDeleteUndo(null);
+            if (!undo) {
+                return;
+            }
+            if (
+                !now ||
+                (now !== undo.after && !keptAs(undo.after, now)) ||
+                barDrafts.latest().size > 0
+            ) {
+                throw new Error('The chart has changed since the delete, so it can’t be undone.');
+            }
+            // Kept since the snapshot (a new song's first change): the chart goes back, at the
+            // revision the songbook now holds.
+            const restored =
+                now === undo.after
+                    ? undo.before
+                    : { ...undo.before, revision: now.revision, updatedAt: now.updatedAt };
+            runtime.load(restored);
+            draft(restored);
+            barDrafts.restore(undo.drafts);
+            setMeasureId(undo.measureId);
+            setSectionId(undo.sectionId);
+            if (undo.reopen && typeOnChart) {
+                // Its field takes focus as it opens.
+                setOpenBar({ id: undo.reopen, select: 'end' });
+            } else {
+                undoFocus.current = undo.reopen
+                    ? { measureId: undo.reopen }
+                    : { sectionId: undo.sectionId };
             }
         });
     }
@@ -5373,6 +5545,11 @@ export default function Ensemble() {
     /** The section letter's "Delete section" (#1726), by `withoutSection`'s rules. */
     function deleteSection(sectionId: string, pending: readonly SectionChange[]) {
         void run(() => {
+            // Taken before the pending bars commit, so Undo puts them back pending (#1758). A
+            // name still in the menu's field was never the chart's, and Undo does not bring it.
+            const before = currentNow.current;
+            const drafts = barDrafts.latest();
+            const selected = measureIdNow.current;
             const next = updateChart();
             if (next.schemaVersion !== 2) {
                 return;
@@ -5389,6 +5566,18 @@ export default function Ensemble() {
             applyScore(result.score);
             setMeasureId(result.measureId);
             setSectionId(result.sectionId);
+            const deleted = before?.schemaVersion === 2 ? before : null;
+            const section = deleted?.chart.score.sections.find((s) => s.id === sectionId);
+            if (deleted && section) {
+                offerUndo({
+                    text: `Section ${section.label} deleted`,
+                    before: deleted,
+                    drafts,
+                    measureId: selected,
+                    sectionId,
+                    reopen: null,
+                });
+            }
         });
     }
     /** `changes` to section `id`, one after another; a refusal throws and selects its bar. */
@@ -5746,6 +5935,77 @@ export default function Ensemble() {
             setToastHeld(false);
         }
     }, [toastText]);
+    // A delete's Undo (#1758) holds while the chart is still what the delete left: any later
+    // edit, a bar typed in, Save or another song retires it, and so do a few seconds untouched.
+    // A new song's first-change keep (#1707) is not an edit: it stores the same chart at a new
+    // revision, and the offer is carried forward onto it (#1758 review).
+    const undoKept =
+        deleteUndo !== null &&
+        current !== null &&
+        current !== deleteUndo.after &&
+        keptAs(deleteUndo.after, current);
+    const undoLive =
+        deleteUndo !== null &&
+        (current === deleteUndo.after || undoKept) &&
+        barDrafts.drafts.size === 0;
+    useEffect(() => {
+        if (!deleteUndo) {
+            return;
+        }
+        if (!undoLive) {
+            setDeleteUndo(null);
+        } else if (undoKept && current) {
+            setDeleteUndo({
+                ...deleteUndo,
+                before: {
+                    ...deleteUndo.before,
+                    revision: current.revision,
+                    updatedAt: current.updatedAt,
+                },
+                after: current,
+            });
+        }
+    }, [deleteUndo, undoLive, undoKept, current]);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: counted per delete (`token`), not per carry-forward.
+    useEffect(() => {
+        if (!undoLive || undoHeld) {
+            return;
+        }
+        const timer = window.setTimeout(() => setDeleteUndo(null), DELETE_UNDO_MS);
+        return () => window.clearTimeout(timer);
+    }, [deleteUndo?.token, undoLive, undoHeld]);
+    // An Undo that waited for the action before it (`undoDelete`).
+    // biome-ignore lint/correctness/useExhaustiveDependencies: the shell coming free is the trigger.
+    useEffect(() => {
+        if (!busy && undoAfterWork.current) {
+            undoAfterWork.current = false;
+            undoDelete();
+        }
+    }, [busy]);
+    // Focus after an Undo whose bar does not open (a section's, or a bar's outside Edit): on
+    // what came back, not the page (#1758 review).
+    // biome-ignore lint/correctness/useExhaustiveDependencies: the restored chart is the trigger.
+    useEffect(() => {
+        const target = undoFocus.current;
+        if (!target) {
+            return;
+        }
+        undoFocus.current = null;
+        const node =
+            'sectionId' in target
+                ? document.querySelector<HTMLElement>(
+                      `.section-letter[data-section-id="${CSS.escape(target.sectionId)}"]`,
+                  )
+                : document.querySelector<HTMLElement>(
+                      `[data-measure-id="${CSS.escape(target.measureId)}"] .bar-number`,
+                  );
+        node?.focus({ preventScroll: true });
+    }, [current]);
+    useEffect(() => {
+        if (!undoLive) {
+            setUndoHeld(false);
+        }
+    }, [undoLive]);
 
     // Keys on the stand (UI audit): Space plays and stops, and PageDown/PageUp step through the
     // chart a section at a time — what a page-turn pedal sends. Only on the stand's chart, with no
@@ -6502,6 +6762,14 @@ export default function Ensemble() {
                             <GuidedForm
                                 score={barForm.score}
                                 selectedMeasureId={barForm.measureId}
+                                markers={barMarkers(barForm.measureId)}
+                                blocked={barForm.blocked}
+                                onGuide={() => {
+                                    // The pending bars read again, markers and all.
+                                    if (!openBarForm(barForm.measureId)) {
+                                        setBarForm(null);
+                                    }
+                                }}
                                 onClose={() => setBarForm(null)}
                                 onApply={applyForm}
                             />
@@ -6609,6 +6877,43 @@ export default function Ensemble() {
                                 >
                                     ×
                                 </button>
+                            )}
+                        </div>
+                        {/*
+                         * A delete's Undo (#1758): the toast's look, its own element so no other
+                         * message (a draft kept, a sound loading) can push it out while it holds.
+                         * Always mounted, as the toast is, so its text change is announced. Undo
+                         * keeps focus where it was on the way down: a bar's field stays open, and
+                         * on a phone its dock stays up rather than fold away under the tap.
+                         */}
+                        <div
+                            className="stand-toast stand-undo"
+                            role="status"
+                            data-testid="stand-undo"
+                            data-empty={!undoLive}
+                            // A real mouse only: an iOS tap on the text sends pointer events
+                            // too, and must not hold the offer open for good.
+                            onPointerEnter={(event) =>
+                                event.pointerType === 'mouse' && setUndoHeld(true)
+                            }
+                            onPointerLeave={(event) =>
+                                event.pointerType === 'mouse' && setUndoHeld(false)
+                            }
+                            onFocus={() => setUndoHeld(true)}
+                            onBlur={() => setUndoHeld(false)}
+                        >
+                            {undoLive && deleteUndo && (
+                                <>
+                                    <span>{deleteUndo.text}</span>
+                                    <button
+                                        type="button"
+                                        className="toast-action"
+                                        onMouseDown={(event) => event.preventDefault()}
+                                        onClick={undoDelete}
+                                    >
+                                        Undo
+                                    </button>
+                                </>
                             )}
                         </div>
                         {/*

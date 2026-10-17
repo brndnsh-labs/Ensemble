@@ -6,6 +6,7 @@ import {
     leaveBar,
     openSectionContext,
     openSectionMenu,
+    openSectionNames,
     phoneWidth,
     test,
     typeBar,
@@ -35,6 +36,7 @@ test('a new section can be named, repeated and put in 6/8, and it plays', async 
     await leaveBar(page);
 
     let menu = await openSectionMenu(page, 'B');
+    await openSectionNames(menu);
     await menu.getByLabel('Section name').fill('Bridge');
     await menu.getByLabel('Section name').press('Enter');
     menu = page.getByRole('dialog', { name: 'Section Bridge menu', exact: true });
@@ -65,7 +67,7 @@ test('a new section can be named, repeated and put in 6/8, and it plays', async 
 test('an empty section name is refused and the old name comes back', async ({ page }) => {
     await newSong(page);
     const menu = await openSectionMenu(page, 'A');
-
+    await openSectionNames(menu);
     await menu.getByLabel('Section name').fill('   ');
     await menu.getByLabel('Section name').press('Enter');
 
@@ -78,6 +80,7 @@ test('a section name typed and left by a press elsewhere is kept, not lost (#172
 }) => {
     await newSong(page);
     const menu = await openSectionMenu(page, 'A');
+    await openSectionNames(menu);
     await menu.getByLabel('Section name').fill('Verse');
     // A press outside closes the menu; the field's typing commits on the way out.
     await page.locator('.song-subtitle').click();
@@ -120,6 +123,7 @@ test('a name still being typed goes in with the menu action pressed next (#1726 
 }) => {
     await newSong(page);
     let menu = await openSectionMenu(page, 'A');
+    await openSectionNames(menu);
     await menu.getByLabel('Section name').fill('Verse');
     // On WebKit the press takes no focus, so the field is still focused when the action runs.
     await press(page, menu.getByRole('button', { name: 'Add section after', exact: true }));
@@ -130,6 +134,7 @@ test('a name still being typed goes in with the menu action pressed next (#1726 
 
     // The new section takes the first letter no section has: A, now that A is the Verse.
     menu = await openSectionMenu(page, 'A');
+    await openSectionNames(menu);
     await menu.getByLabel('Section name').fill('Bridge');
     await press(page, menu.getByRole('button', { name: 'Delete section', exact: true }));
     await expect(page.locator('.bar')).toHaveCount(4);
@@ -144,6 +149,7 @@ test('the letter that closes its menu keeps a name still being typed (#1726 revi
 }) => {
     await newSong(page);
     const menu = await openSectionMenu(page, 'A');
+    await openSectionNames(menu);
     await menu.getByLabel('Section name').fill('Intro');
     await press(page, page.getByRole('button', { name: 'Section A', exact: true }));
     await expect(menu).toBeHidden();
@@ -155,7 +161,7 @@ test('Enter commits a name and keeps focus in the menu, so Esc still closes it (
     page,
 }) => {
     await newSong(page);
-    await openSectionMenu(page, 'A');
+    await openSectionNames(await openSectionMenu(page, 'A'));
     await page.getByLabel('Section name').fill('Verse');
     await page.getByLabel('Section name').press('Enter');
     const menu = page.getByRole('dialog', { name: 'Section Verse menu', exact: true });

@@ -13,6 +13,8 @@ import {
 } from 'react';
 import { BarContextFields } from './bar-context-fields';
 import './bar-menu.css';
+// The phone sheet's slide and backdrop are `<Menu>`'s (#1755), the one copy of that motion.
+import './menu.css';
 import {
     countsLabel,
     movedSplit,
@@ -24,7 +26,6 @@ import {
     splitRange,
     stepSplit,
 } from './bar-ruler';
-import { FormControls } from './form-controls';
 import { useAnchoredPlacement } from './use-anchored-placement';
 import type { BarDraft } from './use-bar-drafts';
 
@@ -212,11 +213,16 @@ function BarRuler({
 
 /**
  * The bar menu (#1725): a bar's structure, on the bar being typed rather than in a panel — chord
- * lengths, key or meter from here, repeats and endings (the guide, and the per-bar markers under
- * Advanced), the fermata, and adding or removing a bar. Everything in it edits the bar's draft as
- * typing does (unsaved; applied on leaving the bar, kept by Save), except the bar actions, which
- * commit pending bars first as every chart edit does. A popover beside the bar on a laptop, a sheet
- * on a phone.
+ * lengths, key or meter from here, repeats and endings (one path, the guide's dialog, which holds
+ * the per-bar markers too since #1758), the fermata, and adding or removing a bar. Everything in
+ * it edits the bar's draft as typing does (unsaved; applied on leaving the bar, kept by Save),
+ * except the bar actions, which commit pending bars first as every chart edit does. A popover
+ * beside the bar on a laptop, a sheet on a phone that slides up over a light backdrop.
+ *
+ * Calm by default (#1758): the ruler is the one open group — it is what the menu is for, and
+ * folding it would put the menu's most-used control behind a second tap — and everything else
+ * starts folded or is a single row. Delete is last, after a divider, as in `<Menu>`; the phone's
+ * "Back to typing" sits in the heading row, so it never comes between Delete and the end.
  */
 export function BarMenu({
     bar,
@@ -239,8 +245,11 @@ export function BarMenu({
 
     // Focus into the menu once per opening, so the keyboard reaches its controls and Esc is ours.
     useEffect(() => {
+        // The phone's "Back to typing" heads the sheet, but is not where focus starts.
         node.current
-            ?.querySelector<HTMLElement>('[role="slider"], button, select, input, summary')
+            ?.querySelector<HTMLElement>(
+                '[role="slider"], button:not(.bar-menu-back), select, input, summary',
+            )
             ?.focus({ preventScroll: true });
     }, []);
 
@@ -286,127 +295,118 @@ export function BarMenu({
     }
     const meter = effective.meter;
     return (
-        <div
-            ref={setRefs}
-            className={`bar-menu${sheet ? ' bar-menu-sheet' : ' popover'}`}
-            role="dialog"
-            aria-label={`Bar ${bar} menu`}
-            data-bar-menu=""
-            onKeyDown={(event) => {
-                // The chart's keys (an arrow browsing away from Following, Space playing) are
-                // not the menu's controls'.
-                event.stopPropagation();
-                if (event.key === 'Escape') {
-                    event.preventDefault();
-                    onClose();
-                }
-            }}
-            onBlur={(event) => {
-                // Tabbing out of the menu leaves it; focus going nowhere (the window losing it,
-                // a control unmounting) does not.
-                const to = event.relatedTarget;
-                if (to instanceof Element && !event.currentTarget.contains(to)) {
-                    dismiss(to, true);
-                }
-            }}
-            // A swipe on the ruler is the ruler's, not the chart's (`.chart-scroll` takes a touch
-            // move as browsing away from Following).
-            onTouchMove={(event) => event.stopPropagation()}
-        >
-            <p className="bar-menu-heading">Bar {bar}</p>
-            <section className="bar-menu-group" aria-labelledby={`${id}-lengths`}>
-                <p className="bar-menu-heading" id={`${id}-lengths`}>
-                    Chord lengths
-                </p>
-                <BarRuler
-                    text={draft.text}
-                    fermata={draft.fermata}
-                    meter={meter}
-                    busy={busy}
-                    onText={(text) => onDraft({ ...draft, text })}
-                />
-            </section>
-            <hr />
-            <details className="bar-menu-details">
-                <summary className="bar-menu-item">
-                    Key or meter from here
-                    <span>
-                        {effective.key}
-                        {effective.isMinor ? 'm' : ''} · {meter}
-                    </span>
-                </summary>
-                <BarContextFields
-                    className="bar-menu-fields"
-                    context={draft.context}
-                    inherited={inherited}
-                    meter={meter}
-                    disabled={busy}
-                    onChange={(context) => onDraft({ ...draft, context })}
-                />
-                <p className="bar-menu-caption">
-                    From this bar to the end of its section. Chord names are not transposed.
-                </p>
-            </details>
-            <button
-                type="button"
-                className="bar-menu-item"
-                aria-disabled={busy || undefined}
-                onClick={() => !busy && onRepeats()}
+        <>
+            {/* The light backdrop of `<Menu>`'s sheet, but drawn only: a press goes through it,
+                so a press on another bar still opens that bar, and on the dock is typing again
+                (the outside press above reads what is under it). */}
+            {sheet && <div className="menu-backdrop bar-menu-backdrop" aria-hidden="true" />}
+            <div
+                ref={setRefs}
+                className={`bar-menu${sheet ? ' bar-menu-sheet' : ' popover'}`}
+                role="dialog"
+                aria-label={`Bar ${bar} menu`}
+                data-bar-menu=""
+                onKeyDown={(event) => {
+                    // The chart's keys (an arrow browsing away from Following, Space playing) are
+                    // not the menu's controls'.
+                    event.stopPropagation();
+                    if (event.key === 'Escape') {
+                        event.preventDefault();
+                        onClose();
+                    }
+                }}
+                onBlur={(event) => {
+                    // Tabbing out of the menu leaves it; focus going nowhere (the window losing
+                    // it, a control unmounting) does not.
+                    const to = event.relatedTarget;
+                    if (to instanceof Element && !event.currentTarget.contains(to)) {
+                        dismiss(to, true);
+                    }
+                }}
+                // A swipe on the ruler is the ruler's, not the chart's (`.chart-scroll` takes a
+                // touch move as browsing away from Following).
+                onTouchMove={(event) => event.stopPropagation()}
             >
-                Repeat or ending… <span aria-hidden="true">›</span>
-            </button>
-            {/* The low-level markers for a form the guide cannot edit (#1726, from the old edit
-                panel): a draft change like the rest of the menu. */}
-            <div className="bar-menu-advanced">
-                {draft.form ? (
-                    <FormControls
-                        value={draft.form}
-                        disabled={busy}
-                        onChange={(form) => onDraft({ ...draft, form })}
-                    />
-                ) : (
-                    <p className="bar-menu-caption">
-                        This bar has repeat boundaries these controls cannot edit. Its notation is
-                        preserved.
+                <div className="bar-menu-top">
+                    <p className="bar-menu-heading">Bar {bar}</p>
+                    {sheet && (
+                        <button type="button" className="bar-menu-back" onClick={onClose}>
+                            Back to typing
+                        </button>
+                    )}
+                </div>
+                <section className="bar-menu-group" aria-labelledby={`${id}-lengths`}>
+                    <p className="bar-menu-heading" id={`${id}-lengths`}>
+                        Chord lengths
                     </p>
-                )}
+                    <BarRuler
+                        text={draft.text}
+                        fermata={draft.fermata}
+                        meter={meter}
+                        busy={busy}
+                        onText={(text) => onDraft({ ...draft, text })}
+                    />
+                </section>
+                <hr />
+                <details className="bar-menu-details">
+                    <summary className="bar-menu-item">
+                        Key or meter from here
+                        <span>
+                            {effective.key}
+                            {effective.isMinor ? 'm' : ''} · {meter}
+                        </span>
+                    </summary>
+                    <BarContextFields
+                        className="bar-menu-fields"
+                        context={draft.context}
+                        inherited={inherited}
+                        meter={meter}
+                        disabled={busy}
+                        onChange={(context) => onDraft({ ...draft, context })}
+                    />
+                    <p className="bar-menu-caption">
+                        From this bar to the end of its section. Chord names are not transposed.
+                    </p>
+                </details>
+                {/* The one repeat path (#1758): the guide, whose dialog also holds this bar's
+                    own markers for nested and nonstandard forms. */}
+                <button
+                    type="button"
+                    className="bar-menu-item"
+                    aria-disabled={busy || undefined}
+                    onClick={() => !busy && onRepeats()}
+                >
+                    Repeat or ending… <span aria-hidden="true">›</span>
+                </button>
+                {/* The band holds a fermata's chord through a stretched span with the drums
+                    crashing (docs/design/band-engine.md). */}
+                <label className="bar-menu-item bar-menu-toggle">
+                    Hold last chord
+                    <input
+                        type="checkbox"
+                        checked={draft.fermata}
+                        disabled={busy}
+                        onChange={(event) => onDraft({ ...draft, fermata: event.target.checked })}
+                    />
+                </label>
+                <button
+                    type="button"
+                    className="bar-menu-item"
+                    aria-disabled={busy || undefined}
+                    onClick={() => !busy && onInsertAfter()}
+                >
+                    Insert bar after
+                </button>
+                <hr />
+                <button
+                    type="button"
+                    className="bar-menu-item bar-menu-danger"
+                    aria-disabled={busy || undefined}
+                    onClick={() => !busy && onDelete()}
+                >
+                    {view.wholeSection ? 'Delete section' : 'Delete bar'}
+                </button>
             </div>
-            {/* The band holds a fermata's chord through a stretched span with the drums
-                crashing (docs/design/band-engine.md). */}
-            <label className="bar-menu-item bar-menu-toggle">
-                Hold last chord
-                <input
-                    type="checkbox"
-                    checked={draft.fermata}
-                    disabled={busy}
-                    onChange={(event) => onDraft({ ...draft, fermata: event.target.checked })}
-                />
-            </label>
-            <hr />
-            <button
-                type="button"
-                className="bar-menu-item"
-                aria-disabled={busy || undefined}
-                onClick={() => !busy && onInsertAfter()}
-            >
-                Insert bar after
-            </button>
-            <button
-                type="button"
-                className="bar-menu-item bar-menu-danger"
-                aria-disabled={busy || undefined}
-                onClick={() => !busy && onDelete()}
-            >
-                {view.wholeSection ? 'Delete section' : 'Delete bar'}
-            </button>
-            {sheet && (
-                <>
-                    <hr />
-                    <button type="button" className="bar-menu-item bar-menu-back" onClick={onClose}>
-                        Back to typing
-                    </button>
-                </>
-            )}
-        </div>
+        </>
     );
 }

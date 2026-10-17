@@ -14,7 +14,8 @@ From/Through selectors offer the same operation through standard keyboard contro
 **Add first and second endings** identifies a repeated body and two contiguous ending ranges
 over existing bars. The ranges must follow in written order without gaps or overlap. No
 chords or bars are invented. First/second endings always use two total plays; more elaborate
-pass assignments remain under **Advanced · per-bar repeat and ending markers**.
+pass assignments remain under the dialog's **Per-bar markers** view (#1758; the bar menu's
+Advanced group before), the opening bar's own repeat and ending fields.
 
 Before Apply, the guide labels the written repeat boundaries and ending brackets and displays
 the whole-chart itinerary from `compileScoreForm`. A four-bar study reads
@@ -25,7 +26,9 @@ and reference semantics before Apply becomes available. Errors stay beside the s
 Each recognized group offers Edit to change its ranges/count or preview removing its form
 markers. Removal keeps all written content, identities, contexts, annotations and unrelated
 navigation. A section containing nested, implicit or nonstandard marker arrangements remains
-available through Advanced; opening the guide preserves it and explains this limitation.
+available through the per-bar markers; opening the guide preserves it and explains this
+limitation. Where pending per-bar markers make no form yet, the guide waits and the dialog opens
+on the markers instead (#1758).
 The guide recognizes exact common-case notation patterns, never rewrites a complex form
 into a simpler interpretation. Disjoint simple groups can be edited independently.
 
@@ -51,7 +54,7 @@ transport renders cannot reset an in-progress selection.
   invalid ranges/counts, group overlap, complex notation preservation and global navigation.
 - `prototypes/v2/checks/guided-form.spec.ts`: keyboard/tap interaction, draft cancellation,
   create/edit/remove, preview failures, layouts and saved/offline round trips.
-- Existing `semantic-form-editor.spec.ts` continues to exercise Advanced pending forms,
+- Existing `semantic-form-editor.spec.ts` continues to exercise per-bar marker pending forms,
   saved documents, import rejection, transpose and offline reopening.
 
 These checks do not establish listening acceptance, physical-device usability or a public

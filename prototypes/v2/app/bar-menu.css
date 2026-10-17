@@ -1,6 +1,7 @@
 /* The bar menu (#1725), and the section letter's menu built the same way (#1726). On a laptop a
-   `.popover` beside the bar (placed by `bar-menu.tsx`); on a phone a sheet from the screen's foot,
-   over the bar dock (`bar-dock.css`, z-index 50). */
+   `.popover` beside the bar (placed by `useAnchoredPlacement`); on a phone a sheet from the
+   screen's foot, over the bar dock (`bar-dock.css`, z-index 50), that slides up over `<Menu>`'s
+   light backdrop (#1758, `menu.css`'s `menu-slide-up` and `.menu-backdrop`). */
 .bar-menu.popover {
     width: 290px;
     padding: 8px;
@@ -24,6 +25,45 @@
     padding: 10px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
         max(10px, env(safe-area-inset-left));
     font-size: 15px;
+    animation: menu-slide-up var(--motion-base) var(--ease-out);
+}
+/* A grab handle, as `<Menu>`'s sheet has, so it reads as one at a glance. Decorative. */
+.bar-menu-sheet::before {
+    content: "";
+    display: block;
+    width: 36px;
+    height: 4px;
+    margin: 0 auto 6px;
+    border-radius: 2px;
+    background: var(--line);
+}
+/* Drawn, never pressed: a press goes through to the bar, letter or dock beneath, which the
+   menus' own outside press reads (a press on another bar opens it). */
+.bar-menu-backdrop {
+    pointer-events: none;
+}
+/* The menu's heading, with the phone's way back (Back to typing, Close) at its end — out of the
+   list, so Delete stays last. */
+.bar-menu-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+.bar-menu-back {
+    min-height: 44px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+}
+.bar-menu-back:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: -1px;
 }
 .bar-menu hr {
     border: 0;
@@ -79,10 +119,6 @@
 .bar-menu-danger {
     color: var(--danger);
 }
-.bar-menu-back {
-    justify-content: center;
-    font-weight: 600;
-}
 .bar-menu-toggle input {
     width: 18px;
     height: 18px;
@@ -94,6 +130,21 @@
 }
 .bar-menu-details summary::-webkit-details-marker {
     display: none;
+}
+/* A folded group says so (#1758): a chevron at the row's end that turns as it opens. */
+.bar-menu-details > summary > span {
+    margin-left: auto;
+}
+.bar-menu-details > summary::after {
+    /* A browser without the alt-text form keeps the plain one. */
+    content: "›";
+    /* biome-ignore lint/suspicious/noDuplicateProperties: the alt-text form, after its fallback. */
+    content: "›" / "";
+    color: var(--muted);
+    transition: transform var(--motion-fast) var(--ease-out);
+}
+.bar-menu-details[open] > summary::after {
+    transform: rotate(90deg);
 }
 .bar-menu-fields {
     display: grid;
@@ -249,20 +300,4 @@
 .bar-menu-button:focus-visible {
     outline: 3px solid var(--focus-ring);
     outline-offset: 1px;
-}
-
-/* Advanced · per-bar repeat and ending markers (`form-controls.tsx`), in the menu since #1726. */
-.bar-menu-advanced {
-    padding: 0 8px;
-}
-.bar-menu-advanced .form-controls {
-    border-top: 0;
-}
-.bar-menu-advanced .form-controls summary {
-    min-height: 36px;
-    padding: 8px 0;
-}
-.bar-menu-sheet .bar-menu-advanced input {
-    /* 16px or more, or iOS zooms the page in on focus. */
-    font-size: 16px;
 }

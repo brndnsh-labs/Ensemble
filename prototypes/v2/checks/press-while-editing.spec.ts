@@ -1,5 +1,13 @@
 import type { Page } from '@playwright/test';
-import { expect, openSectionMenu, seedStarters, songLink, test, typeBar } from './fixtures';
+import {
+    expect,
+    openSectionMenu,
+    openSectionNames,
+    seedStarters,
+    songLink,
+    test,
+    typeBar,
+} from './fixtures';
 
 /**
  * #1733 — a press that leaves an open bar (or commits a typed field) lands where it was pressed.
@@ -119,6 +127,7 @@ test('Play pressed with a section name typed renames it and plays (#1733)', asyn
     await page.setViewportSize({ width: 820, height: 1180 });
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     const menu = await openSectionMenu(page, 'A');
+    await openSectionNames(menu);
     await menu.getByLabel('Section name', { exact: true }).fill('Head');
     await shiftOnChange(page);
     await press(page, 'Start playback');

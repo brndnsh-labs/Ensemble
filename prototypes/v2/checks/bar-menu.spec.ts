@@ -343,7 +343,9 @@ test('on a phone: ⋯ in the dock opens the sheet and keeps the draft (#1725)', 
     await page.locator('.bar-dock').getByRole('button', { name: 'Bar menu', exact: true }).tap();
     const sheet = menu(page, 7);
     await expect(sheet).toBeVisible();
-    // A sheet from the screen's foot, the bar still open beneath with its draft.
+    // A sheet from the screen's foot (once its slide up has settled, #1758), the bar still open
+    // beneath with its draft.
+    await sheet.evaluate((box) => Promise.all(box.getAnimations().map((a) => a.finished)));
     const viewport = page.viewportSize();
     const box = await sheet.boundingBox();
     if (viewport && box) {
