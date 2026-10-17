@@ -9,11 +9,13 @@ import { expect, test } from './fixtures';
  * real offline transition, and WebKit's emulation of the last of those is already known-broken
  * in `foundation-helpers.ts`.
  *
- * Some names here are FROZEN, and these tests pin them so a change has to be deliberate: the
- * manifest `id: '/'` (a different `id` is a second app on the home screen), the shell cache
- * prefix `ensemble-v2-root-` (a worker only retires old shells under its own prefix) and the
- * sound cache `ensemble-v2-sounds-v1` (a rename orphans every downloaded pack). Installed
- * browsers already hold all three.
+ * Three names are FROZEN, because installed browsers already hold them: the manifest `id: '/'`
+ * (a different `id` is a second app on the home screen), the shell cache prefix
+ * `ensemble-v2-root-` (a worker only retires old shells under its own prefix) and the sound cache
+ * `ensemble-v2-sounds-v1` (a rename orphans every downloaded pack). This spec pins the first two;
+ * the sound cache's name is pinned by `foundation-sounds.spec.ts`, which evicts a file the app
+ * downloaded from that cache by name and expects the app to notice. Here it is only the cache the
+ * activate sweep must leave alone.
  */
 function controller(page: Page) {
     return page
@@ -177,4 +179,62 @@ test('a newer build of the stand waits behind the running one', async ({ page, r
             };
         }),
     ).resolves.toEqual({ waiting: 'installed', controllerUnchanged: true, activeUnchanged: true });
+});
+
+test('the update, once it activates, retires the old shell and keeps the downloaded sounds', async ({
+    context,
+    page,
+    request,
+}) => {
+    test.setTimeout(90_000);
+    await page.goto('/');
+    await expect.poll(() => controller(page)).toContain('/sw.js');
+    const before = await page.evaluate(async () => {
+        const sounds = await caches.open('ensemble-v2-sounds-v1');
+        await sounds.put('/packs/rhodes/manifest.json?asset=x', new Response('pack bytes'));
+        return (await caches.keys()).filter((name) => name.startsWith('ensemble-v2-root-'));
+    });
+    expect(before).toHaveLength(1);
+
+    // Stage a newer build and let it install; it waits while this tab holds the old one.
+    await request.post('/__test/sw-revision');
+    await page.evaluate(async () => {
+        await (await navigator.serviceWorker.getRegistration('/'))?.update();
+    });
+    await expect
+        .poll(
+            () =>
+                page
+                    .evaluate(
+                        async () =>
+                            (await navigator.serviceWorker.getRegistration('/'))?.waiting?.state ??
+                            'none',
+                    )
+                    .catch(() => null),
+            { timeout: 30_000 },
+        )
+        .toBe('installed');
+
+    // Close every tab: the waiting worker activates on the next visit.
+    await page.close();
+    const next = await context.newPage();
+    await next.goto('/');
+    await expect
+        .poll(
+            () =>
+                next
+                    .evaluate(async () => {
+                        const names = await caches.keys();
+                        const sounds = await caches.open('ensemble-v2-sounds-v1');
+                        return {
+                            root: names.filter((name) => name.startsWith('ensemble-v2-root-')),
+                            sound: await (
+                                await sounds.match('/packs/rhodes/manifest.json?asset=x')
+                            )?.text(),
+                        };
+                    })
+                    .catch(() => null),
+            { timeout: 30_000 },
+        )
+        .toEqual({ root: [`${before[0]}-r1`], sound: 'pack bytes' });
 });
