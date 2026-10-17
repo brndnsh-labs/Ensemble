@@ -1,5 +1,14 @@
 import { encodeChartLink } from '../../../public/songbook/chart-link';
-import { appUrl, expect, seedStarters, songLink, songMenu, songMenuAction, test } from './fixtures';
+import {
+    appUrl,
+    expect,
+    pickSongKey,
+    seedStarters,
+    songLink,
+    songMenu,
+    songMenuAction,
+    test,
+} from './fixtures';
 import { importTemplate } from './large-library';
 
 // Deterministic across both projects (Desktop Chrome and the WebKit-based
@@ -74,7 +83,7 @@ test('editing an opened share link before Keep a copy writes nothing to recovery
     await fresh.goto(link);
     await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
-    await fresh.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(fresh, 'D');
     await fresh.getByLabel('Tempo', { exact: true }).fill('140');
     await fresh.getByLabel('Tempo', { exact: true }).press('Enter');
 

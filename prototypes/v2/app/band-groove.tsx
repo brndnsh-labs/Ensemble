@@ -1,4 +1,3 @@
-import type { ChartNotation } from '@engine/songbook/types';
 import type { SwingSub } from '@engine/types';
 import { useEffect, useState } from 'react';
 import { arrangementOf } from '../lib/documents';
@@ -10,12 +9,6 @@ import { useRangeCommit } from './use-range-commit';
  * would double it — mirrors v1's `InstrumentRail.tsx` `SWING_DISABLED_METERS` (deleted).
  */
 const SWING_DISABLED_METERS = new Set(['6/8', '12/8']);
-
-const NOTATION_OPTIONS: { value: ChartNotation; label: string }[] = [
-    { value: 'roman', label: 'Roman Numerals (I, vi, IV)' },
-    { value: 'name', label: 'Chord Names (C, Am, F)' },
-    { value: 'nns', label: 'Nashville Numbers (1, 6-, 4)' },
-];
 
 /**
  * The live values the sheet shows that are NOT read off `ChartDocument['chart']`
@@ -193,29 +186,25 @@ export function GrooveTab({
 }
 
 interface PracticeTabProps {
-    current: ChartDocument;
     busy: boolean;
     feel: FeelSnapshot;
     onMetronome: (enabled: boolean) => void;
     onMasterVolume: (value: number) => void;
     onCountIn: (enabled: boolean) => void;
-    onNotation: (notation: ChartNotation) => void;
 }
 
 /**
  * The Band sheet's Practice tab (#1703): what helps the musician practise — the click, the
- * count-in, the overall level and how the chart spells its chords.
+ * count-in and the overall level. How the chart spells its chords is the transport's Key
+ * popover's (#1757).
  */
 export function PracticeTab({
-    current,
     busy,
     feel,
     onMetronome,
     onMasterVolume,
     onCountIn,
-    onNotation,
 }: PracticeTabProps) {
-    const arrangement = arrangementOf(current);
     return (
         <div className="feel-groups">
             <div className="feel-group">
@@ -250,27 +239,9 @@ export function PracticeTab({
                     onCommit={onMasterVolume}
                 />
             </div>
-            <div className="feel-group">
-                <h3>Chart</h3>
-                <label>
-                    Chord notation
-                    <select
-                        aria-label="Chord notation"
-                        value={arrangement.notation}
-                        disabled={busy}
-                        onChange={(event) => onNotation(event.target.value as ChartNotation)}
-                    >
-                        {NOTATION_OPTIONS.map((entry) => (
-                            <option key={entry.value} value={entry.value}>
-                                {entry.label}
-                            </option>
-                        ))}
-                    </select>
-                </label>
-            </div>
             <p className="band-note">
                 The metronome lasts this session and master volume belongs to this device — neither
-                saves with the chart. Chord notation does.
+                saves with the chart.
             </p>
         </div>
     );

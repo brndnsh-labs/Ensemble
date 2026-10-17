@@ -4,9 +4,11 @@ import {
     editorRevealed,
     expect,
     exportAs,
+    keyButton,
     leaveBar,
     measureSong,
     openBar,
+    pickSongKey,
     seedGuestDocuments,
     seedStarters,
     songLink,
@@ -133,9 +135,10 @@ for (const [width, height] of [
         await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
         await expect(page.getByRole('button', { name: 'Edit chart', exact: true })).toBeHidden();
         await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeHidden();
-        for (const label of ['Tempo', 'Key', 'Style']) {
+        for (const label of ['Tempo', 'Style']) {
             await expect(page.getByLabel(label, { exact: true })).toBeVisible();
         }
+        await expect(keyButton(page)).toBeVisible();
         await expect(page.getByRole('button', { name: 'Bass', exact: true })).toBeVisible();
         const focusedChart = await page.locator('.chart-scroll').boundingBox();
         expect(focusedChart!.height).toBeGreaterThan(height * 0.5);
@@ -319,13 +322,13 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
         await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
         await expect(page.locator('.error-banner[role="alert"]')).toHaveCount(0);
     }
-    await page.getByLabel('Key', { exact: true }).selectOption('Eb');
+    await pickSongKey(page, 'Eb');
     await page.getByRole('button', { name: 'Bass', exact: true }).click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.reload();
     await songLink(page, 'Blue pocket').click();
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('Eb');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: E♭');
     await expect(page.getByRole('button', { name: 'Bass', exact: true })).toHaveAttribute(
         'aria-pressed',
         'false',

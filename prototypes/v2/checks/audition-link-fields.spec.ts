@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process';
 import path from 'node:path';
 import { promisify } from 'node:util';
-import { appUrl, expect, openBand, openWholeSong, test } from './fixtures';
+import { appUrl, expect, keyButton, openBand, openKeyPopover, test } from './fixtures';
 
 /**
  * `npm run audition-link` writes a schema-2 `#chart=` link (#1732), the envelope the stand's
@@ -71,10 +71,10 @@ test('an audition link opens as an unsaved draft with its genre, key, meter and 
     await expect(page.locator('.song-subtitle')).toContainText('Opened from a shared link');
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['Cm7']);
     await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Jazz');
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('Eb');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: E♭');
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('92');
-    const menu = await openWholeSong(page);
-    await expect(menu.getByLabel('Song meter')).toHaveValue('3/4');
+    const menu = await openKeyPopover(page);
+    await expect(menu.getByLabel('Meter', { exact: true })).toHaveValue('3/4');
     // Consumed on load: a reload lands on the songbook, not the draft again.
     expect(new URL(page.url()).hash).toBe('');
     expect(errors).toEqual([]);

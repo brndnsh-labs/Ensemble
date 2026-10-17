@@ -1,4 +1,13 @@
-import { appUrl, editorRevealed, expect, seedStarters, songLink, test, typeBar } from './fixtures';
+import {
+    appUrl,
+    editorRevealed,
+    expect,
+    pickSongKey,
+    seedStarters,
+    songLink,
+    test,
+    typeBar,
+} from './fixtures';
 
 declare global {
     interface Window {
@@ -132,7 +141,7 @@ test('changing the key of a measure-less chart while it plays restarts the band 
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect.poll(activeBar, { timeout: 20_000, intervals: [50] }).toBeGreaterThanOrEqual(3);
 
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await expect(page.locator('.sheet .bar').first().locator('.chord')).toHaveText(['D7']);
     // Back to the top: the first bar lit after the change is bar 1, not the next bar on.
     await expect.poll(activeBar, { timeout: 5_000, intervals: [25] }).toBe(0);

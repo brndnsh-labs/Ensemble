@@ -3,12 +3,16 @@ import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import {
     appUrl,
+    closeKeyPopover,
     editorRevealed,
     expect,
     exportAs,
     formLength,
+    keyButton,
     leaveBar,
     openBar,
+    openKeyPopover,
+    pickSongKey,
     seedGuestDocuments,
     settled,
     songLink,
@@ -231,8 +235,8 @@ test('unsupported text blocks save, export, navigation and transforms without lo
         // The refusal closes Export… onto the editor it names.
         await expect(page.getByTestId('export-dialog')).toBeHidden();
     }
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('C');
+    await pickSongKey(page, 'D');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: C');
     await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
     await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Blues');
     await page.getByLabel('Section', { exact: true }).selectOption('a');
@@ -288,16 +292,30 @@ test('editor validation consumes complete supported spellings and preserves reje
     expect((await savedBlue(page)).chart.arrangement.sections[0].value).toBe(supported);
 });
 
+test('a text chart’s Key popover holds Key and Chord notation, not Mode or Meter (#1757)', async ({
+    page,
+}) => {
+    await seedTextCharts(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    const popover = await openKeyPopover(page);
+    await expect(popover.getByLabel('Key', { exact: true })).toBeVisible();
+    await expect(popover.getByLabel('Chord notation', { exact: true })).toBeVisible();
+    // A text chart has no song meter or mode of its own to set.
+    await expect(popover.getByLabel('Mode', { exact: true })).toHaveCount(0);
+    await expect(popover.getByLabel('Meter', { exact: true })).toHaveCount(0);
+    await closeKeyPopover(page);
+});
+
 test('transposition follows pending text and cannot be undone by stale editor text', async ({
     page,
 }) => {
     await openEditor(page);
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await expect(page.getByLabel('Chord text')).toHaveValue(/^D7 \| G7/);
     await page.getByRole('button', { name: 'Update chart', exact: true }).click();
     await expect(page.locator('.chord-button').first()).toHaveText('D7');
     await page.getByLabel('Chord text').fill('Dm7 | G7');
-    await page.getByLabel('Key', { exact: true }).selectOption('E');
+    await pickSongKey(page, 'E');
     await expect(page.getByLabel('Chord text')).toHaveValue('Em7 | A7');
     await page.getByRole('button', { name: '＋ Section', exact: true }).click();
     await page.getByLabel('Section', { exact: true }).selectOption('a');
@@ -505,13 +523,13 @@ test('all existing feels and key/mutes survive a save; long charts scroll legibl
         await expect(page.getByLabel('Style', { exact: true })).toBeEnabled();
         await expect(page.locator('.error-banner[role="alert"]')).toHaveCount(0);
     }
-    await page.getByLabel('Key', { exact: true }).selectOption('Eb');
+    await pickSongKey(page, 'Eb');
     await page.getByRole('button', { name: 'Bass', exact: true }).click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.reload();
     await songLink(page, 'Blue pocket').click();
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('Eb');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: E♭');
     await expect(page.getByRole('button', { name: 'Bass', exact: true })).toHaveAttribute(
         'aria-pressed',
         'false',
@@ -598,7 +616,7 @@ test('2+1+1 editor saves a source-preserving copy, transposes and reopens offlin
     await typeBar(page, 1, 'C:2 Dm:1 G7:1');
     // Leaving the bar applies it; the transpose then carries it (and retires the old buffers).
     await leaveBar(page);
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await expect(await openBar(page, 1)).toHaveValue('D:2 Em:1 A7:1');
     await leaveBar(page);
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['D', 'Em', 'A7']);
@@ -646,7 +664,7 @@ test('2+1+1 editor saves a source-preserving copy, transposes and reopens offlin
     await disconnect();
     await page.reload();
     await songLink(page, 'Uneven blues', 'Blues').click();
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: D');
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect.poll(() => page.locator('.chord[aria-current="true"]').count()).toBe(1);
     await page.getByRole('button', { name: 'Stop playback' }).click();

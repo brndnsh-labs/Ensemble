@@ -5,15 +5,17 @@ import {
     appUrl,
     barField,
     test as base,
-    closeSongMenu,
+    closeKeyPopover,
     editorRevealed,
     expect,
     exportAs,
+    keyButton,
     leaveBar,
     openBar,
+    openKeyPopover,
     openSectionContext,
     openSectionMenu,
-    openWholeSong,
+    pickSongKey,
     seedStarters,
     songLink,
     songMenuAction,
@@ -107,7 +109,7 @@ test('2+1+1 editor saves the song, transposes and reopens offline', async ({
     await typeBar(page, 1, 'C:2 Dm:1 G7:1');
     // Leaving the bar applies it; the transpose then carries it (and retires the old buffers).
     await leaveBar(page);
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await expect(await openBar(page, 1)).toHaveValue('D:2 Em:1 A7:1');
     await leaveBar(page);
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['D', 'Em', 'A7']);
@@ -158,7 +160,7 @@ test('2+1+1 editor saves the song, transposes and reopens offline', async ({
     await disconnect();
     await page.reload();
     await songLink(page, 'Uneven blues', 'Blues').click();
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: D');
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect.poll(() => page.locator('.chord[aria-current="true"]').count()).toBe(1);
     await page.getByRole('button', { name: 'Stop playback' }).click();
@@ -372,17 +374,15 @@ test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({ 
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
-    const menu = await openWholeSong(page);
-    const mode = menu.getByLabel('Song mode');
+    const menu = await openKeyPopover(page);
+    const mode = menu.getByLabel('Mode', { exact: true });
 
     await mode.selectOption('minor');
 
-    await closeSongMenu(page);
+    await closeKeyPopover(page);
     await expect(page.locator('.bar-context').first()).toHaveText('Cm · 4/4');
-    // The transport's Key select already names a minor key with its "m".
-    await expect(page.getByLabel('Key', { exact: true }).locator('option:checked')).toHaveText(
-        'Cm',
-    );
+    // The transport's Key button names a minor key with its "m".
+    await expect(keyButton(page)).toHaveAccessibleName('Key: Cm');
     // Chord names are not rewritten, and the key stays C — no relative-key swap.
     await expect(page.locator('.chord')).toHaveText(['C', 'G', 'Am', 'F']);
 
@@ -393,10 +393,10 @@ test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({ 
     await expect(page.locator('.bar-context').first()).toHaveText('C · 4/4');
     await section.press('Escape');
     await expect(section).toBeHidden();
-    await openWholeSong(page);
+    await openKeyPopover(page);
     await mode.selectOption('major');
     await mode.selectOption('minor');
-    await closeSongMenu(page);
+    await closeKeyPopover(page);
     const again = await openSectionMenu(page, 'A');
     await openSectionContext(again);
     await expect(again.getByLabel('Section mode')).toHaveValue('major');
@@ -428,9 +428,9 @@ test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears i
     await closeBarMenu(page);
     await leaveBar(page);
 
-    const menu = await openWholeSong(page);
-    await menu.getByLabel('Song meter').selectOption('5/4');
-    await closeSongMenu(page);
+    const menu = await openKeyPopover(page);
+    await menu.getByLabel('Meter', { exact: true }).selectOption('5/4');
+    await closeKeyPopover(page);
     await openBar(page, 1);
     await openBarMenu(page, 1);
     await openKeyOrMeter(page);
@@ -448,9 +448,9 @@ test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears i
     expect(saved.chart.score.sections[0].measures[0].grouping).toEqual([2, 3]);
 
     // The existing rule: a meter change resets a grouping written for the old meter.
-    const again = await openWholeSong(page);
-    await again.getByLabel('Song meter').selectOption('4/4');
-    await closeSongMenu(page);
+    const again = await openKeyPopover(page);
+    await again.getByLabel('Meter', { exact: true }).selectOption('4/4');
+    await closeKeyPopover(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const resaved = (await documents(page)).find((document) => document.id === saved.id);

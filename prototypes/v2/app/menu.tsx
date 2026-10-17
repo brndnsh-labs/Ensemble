@@ -8,9 +8,9 @@ import {
     useRef,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { afterPress } from './after-press';
 import { usePhoneWidth } from './bar-dock';
 import './menu.css';
+import { focusAnchor, useAnchoredDismiss } from './use-anchored-dismiss';
 import { useAnchoredPlacement } from './use-anchored-placement';
 
 /** One row of a `<Menu>` (#1755). */
@@ -53,13 +53,6 @@ interface MenuProps {
     onClose: () => void;
 }
 
-function focusAnchor(anchor: () => Element | null): void {
-    const target = anchor();
-    if (target instanceof HTMLElement && target.isConnected) {
-        target.focus({ preventScroll: true });
-    }
-}
-
 /**
  * The anchored menu (#1755): a short list of actions at the button that opened it, instead of
  * a modal. On a laptop a compact list under (or over) the trigger, placed by
@@ -98,7 +91,7 @@ export function Menu({
     const backdrop = useRef<HTMLDivElement | null>(null);
     const noteId = useId();
     const closed = useRef(false);
-    // Read through a ref, so the document listeners are added once per opening.
+    // Read through a ref, so a close reached from a listener calls this render's `onClose`.
     const latest = useRef({ anchor, onClose });
     latest.current = { anchor, onClose };
 
@@ -121,6 +114,9 @@ export function Menu({
         onGone: () => closeRef.current(false),
     });
 
+    // Its trigger's `aria-expanded`, a press outside and Esc anywhere: shared with the Key popover.
+    useAnchoredDismiss([node, backdrop], anchor, (refocus) => closeRef.current(refocus));
+
     useEffect(() => {
         const rows = Array.from(
             node.current?.querySelectorAll<HTMLElement>('[role^="menuitem"]') ?? [],
@@ -128,46 +124,6 @@ export function Menu({
         (rows.find((row) => row.getAttribute('aria-checked') === 'true') ?? rows[0])?.focus({
             preventScroll: true,
         });
-        // The trigger says the menu is open for as long as it is.
-        const trigger = latest.current.anchor();
-        trigger?.setAttribute('aria-expanded', 'true');
-        function outside(event: PointerEvent) {
-            const target = event.target instanceof Node ? event.target : null;
-            // The trigger's own press toggles the menu (its click); the backdrop's tap is its own.
-            if (
-                node.current?.contains(target) ||
-                backdrop.current?.contains(target) ||
-                latest.current.anchor()?.contains(target)
-            ) {
-                return;
-            }
-            // Focus goes back to the trigger once the press has landed — unless the press gave it
-            // to something else (a field, another button), as it would have anyway.
-            const anchor = latest.current.anchor;
-            closeRef.current(false);
-            afterPress(() => {
-                const active = document.activeElement;
-                if (!active || active === document.body) {
-                    focusAnchor(anchor);
-                }
-            });
-        }
-        // Esc with focus somewhere outside the list (inside it, `onKeyDown` answers first).
-        function escape(event: KeyboardEvent) {
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                closeRef.current(true);
-            }
-        }
-        document.addEventListener('pointerdown', outside, true);
-        document.addEventListener('keydown', escape);
-        return () => {
-            document.removeEventListener('pointerdown', outside, true);
-            document.removeEventListener('keydown', escape);
-            if (trigger?.isConnected) {
-                trigger.setAttribute('aria-expanded', 'false');
-            }
-        };
     }, []);
 
     function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {

@@ -1229,7 +1229,7 @@ export function transpose(delta: number): void {
  * The song's own major/minor (#1375) — `score.isMinor` only, never a section or bar override.
  * Chord names are not rewritten, and the key stays where it is: unlike v1's relative-key toggle,
  * v2's key is the score's own, so a musician who wants A minor picks A, then Minor. Measure-based
- * charts only, like the Song menu's Song meter that sits beside it.
+ * charts only, like the song's meter beside it in the transport's Key popover (#1757).
  */
 export function setMode(isMinor: boolean): void {
     if (!currentScore) {
@@ -1246,9 +1246,9 @@ export function setMode(isMinor: boolean): void {
 }
 /**
  * How many choruses the song plays before the band stops (#1475): `score.choruses`, 1–16 from the
- * Song menu. `undefined` is Loop ("Repeats continuously"), the default — the field is removed, so
- * the band loops the form forever as every chart did before. Measure-based charts only, like Song
- * mode beside it; a playing band restarts from the top, as a mode change does.
+ * chart footer's form-length menu. `undefined` is Loop ("Repeats continuously"), the default — the field is removed, so
+ * the band loops the form forever as every chart did before. Measure-based charts only, like the
+ * song's mode; a playing band restarts from the top, as a mode change does.
  */
 export function setChoruses(choruses: number | undefined): void {
     if (!currentScore) {

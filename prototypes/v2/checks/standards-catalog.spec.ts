@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, expect, songMenu, songMenuAction, test } from './fixtures';
+import { appUrl, expect, pickSongKey, songMenu, songMenuAction, test } from './fixtures';
 
 /**
  * The read-only standards catalog (#1439): a fresh device's guest songbook is genuinely empty
@@ -84,7 +84,7 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
     expect(await documents(page)).toEqual([]);
 
     // Key and feel change like any chart, on the unsaved draft.
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['D7']);
     await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
     await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Jazz');
@@ -128,7 +128,7 @@ test('editing an open standard writes nothing to recovery storage', async ({ pag
     await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
 
     // Every one of these routes through `draft()`.
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await page.getByLabel('Tempo', { exact: true }).fill('140');
     await page.getByLabel('Tempo', { exact: true }).press('Enter');
     await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
