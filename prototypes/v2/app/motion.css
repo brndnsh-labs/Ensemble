@@ -31,7 +31,7 @@
         opacity var(--motion-fast) var(--ease-out),
         transform var(--motion-fast) var(--ease-out);
 }
-:where(button):not(:disabled, .bars *, [aria-haspopup]):active {
+:where(button):not(:disabled, [aria-disabled="true"], .bars *, [aria-haspopup]):active {
     transform: scale(0.97);
 }
 
@@ -130,9 +130,10 @@ dialog[open]::backdrop {
     }
 }
 
-/* Popovers (the chart's section and form-length menus) mount when opened, so a keyframe gives
-   them their entry. They open up OR down depending on room, so they grow from their own centre
-   rather than slide from a side that might be wrong. */
+/* Popovers (the bar menu and the section letter's menu in Edit) mount when opened, so a keyframe
+   gives them their entry. They open up OR down depending on room, so they grow from their own
+   centre rather than slide from a side that might be wrong. The anchored `<Menu>` (#1755) has the
+   same pop, and its phone sheet a slide up, in `menu.css` on these tokens. */
 @keyframes motion-pop {
     from {
         opacity: 0;
@@ -199,7 +200,7 @@ dialog[open]::backdrop {
         --motion-slow: 0ms;
         --motion-rise: 0px;
     }
-    :where(button):not(:disabled, .bars *, [aria-haspopup]):active {
+    :where(button):not(:disabled, [aria-disabled="true"], .bars *, [aria-haspopup]):active {
         transform: none;
     }
 }

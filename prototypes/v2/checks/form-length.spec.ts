@@ -86,7 +86,7 @@ async function songMenuChoruses(page: Page): Promise<string> {
 
 test('the footer sets how many times a measure chart plays, and the band stops after them', async ({
     page,
-}) => {
+}, testInfo) => {
     test.setTimeout(90_000);
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
@@ -126,7 +126,7 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     await expect(loop).toHaveAttribute('aria-checked', 'true');
     await expect(loop).toBeFocused();
     // A measure chart has nothing to convert, so the menu says nothing about it.
-    await expect(page.locator('.form-length-note')).toHaveCount(0);
+    await expect(page.locator('.menu-note')).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(footer).toBeFocused();
@@ -144,7 +144,8 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
     await expect(footer).toBeFocused();
-    // The popover stays inside the viewport and the page never scrolls sideways.
+    // The menu (a popover on a laptop, a sheet on a phone) stays inside the viewport and the page
+    // never scrolls sideways.
     await footer.click();
     const box = await page.locator('.form-length-menu').boundingBox();
     const viewport = page.viewportSize();
@@ -152,7 +153,13 @@ test('the footer sets how many times a measure chart plays, and the band stops a
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
         true,
     );
-    await footer.click();
+    // The footer toggles it shut on a laptop; on a phone the sheet's backdrop covers the footer,
+    // and a tap there closes it.
+    if (testInfo.project.name === 'webkit-phone') {
+        await page.mouse.click(5, 5);
+    } else {
+        await footer.click();
+    }
     await expect(menu).toHaveCount(0);
 
     await pick(page, 'Plays once');

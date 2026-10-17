@@ -17,6 +17,7 @@ import { directionLabel } from '../lib/score-labels';
 import { afterPress } from './after-press';
 import { BarDock, usePhoneWidth } from './bar-dock';
 import { BarMenu, type BarMenuBar } from './bar-menu';
+import { Menu } from './menu';
 import { SectionMenu } from './section-menu';
 import type { BarDraft } from './use-bar-drafts';
 
@@ -28,10 +29,6 @@ type WrittenBar = WrittenSection['measures'][number];
  * 1–16 (`CHORUS_COUNTS` in `song-menu.tsx`), plus the chart's own count when it is not listed.
  */
 const STAND_CHORUS_COUNTS = [1, 2, 3, 4, 6, 8, 12, 16];
-/** The popover's width (`.popover` in `style.css`), for placing it inside the viewport. */
-const POPOVER_WIDTH = 260;
-/** Room kept between the popover and the viewport's edges. */
-const VIEWPORT_MARGIN = 8;
 
 /** What the footer says the band does with the form: the count, or the loop when there is none. */
 function formLengthText(choruses: number | undefined): string {
@@ -227,15 +224,10 @@ export function ChartSheet({
     onAudition,
     onChoruses,
 }: ChartSheetProps) {
-    // A tap on a section letter opens this small menu (#1422). One menu for the whole
-    // sheet, not one per section: cheaper, and only one can be open at a time anyway.
-    const [sectionMenu, setSectionMenu] = useState<{
-        id: string;
-        label: string;
-        top: number;
-        left: number;
-    } | null>(null);
-    const sectionMenuRef = useRef<HTMLDivElement>(null);
+    // A tap on a section letter opens its menu (#1422): outside Edit a `<Menu>` holding Start
+    // here (#1755), in Edit the section's own menu (#1726). One menu for the whole sheet, not
+    // one per section: cheaper, and only one can be open at a time anyway.
+    const [sectionMenu, setSectionMenu] = useState<{ id: string; label: string } | null>(null);
     const sectionMenuTrigger = useRef<HTMLButtonElement | null>(null);
     // The open section menu's own close (#1726), which commits a field still being typed in
     // before it goes: the letter's toggle closes through it, as a press elsewhere does.
@@ -261,219 +253,47 @@ export function ChartSheet({
             ?.focus();
     }, [blocks]);
 
-    // While editing a measure chart the letter opens the section's own menu instead (#1726),
-    // which arms its own listeners; leaving Edit closes it.
+    // Entering or leaving Edit swaps which menu the letter opens, so whichever is open closes.
     const editingSections = sectionEdit !== null;
+    // biome-ignore lint/correctness/useExhaustiveDependencies: a change of mode is the trigger.
     useEffect(() => {
-        if (!editingSections) {
-            setSectionMenu(null);
-        }
+        setSectionMenu(null);
     }, [editingSections]);
-    // Keyed on WHICH menu is open, not its object: the effect focuses the item and arms the
-    // listeners once per opening.
-    const sectionMenuId = sectionMenu?.id ?? null;
-    useEffect(() => {
-        if (sectionMenuId === null || editingSections) {
-            return;
-        }
-        const first = sectionMenuRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
-        first?.focus();
-        function closeOnOutsideClick(event: PointerEvent) {
-            if (!sectionMenuRef.current?.contains(event.target as Node)) {
-                setSectionMenu(null);
-            }
-        }
-        function closeOnEscape(event: KeyboardEvent) {
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                setSectionMenu(null);
-                sectionMenuTrigger.current?.focus();
-            }
-        }
-        // The menu is fixed at the letter's position when it opened; a scroll — the musician's,
-        // or Following's own while the band plays — moves the letter, so the menu follows it
-        // rather than floating over some other bar (#1700). Written straight to the menu's own
-        // style, not to state: Following scrolls on the paint path, and a state write would
-        // re-render the whole sheet every frame of it. Once the letter has left the screen the
-        // menu closes rather than follow it off.
-        function followTrigger() {
-            const rect = sectionMenuTrigger.current?.getBoundingClientRect();
-            const menu = sectionMenuRef.current;
-            if (!rect || !menu) {
-                return;
-            }
-            if (rect.bottom < 0 || rect.top > window.innerHeight) {
-                setSectionMenu(null);
-                return;
-            }
-            menu.style.top = `${rect.bottom + 6}px`;
-            menu.style.left = `${rect.left}px`;
-        }
-        document.addEventListener('pointerdown', closeOnOutsideClick);
-        document.addEventListener('keydown', closeOnEscape);
-        document.addEventListener('scroll', followTrigger, true);
-        window.addEventListener('resize', followTrigger);
-        return () => {
-            document.removeEventListener('pointerdown', closeOnOutsideClick);
-            document.removeEventListener('keydown', closeOnEscape);
-            document.removeEventListener('scroll', followTrigger, true);
-            window.removeEventListener('resize', followTrigger);
-        };
-    }, [sectionMenuId, editingSections]);
 
     function openSectionMenu(event: ReactMouseEvent<HTMLButtonElement>, block: ChartBlock) {
         if (!block.id) {
             return;
         }
-        // The letter toggles the section's menu; its own press is not outside it (#1726). It
-        // closes through the menu, so a name still being typed is committed, not dropped.
-        if (editingSections && sectionMenu?.id === block.id) {
-            if (sectionMenuCloser.current) {
+        // The letter toggles its menu; its own press is not outside it. In Edit it closes
+        // through the menu (#1726), so a name still being typed is committed, not dropped.
+        if (sectionMenu?.id === block.id) {
+            if (editingSections && sectionMenuCloser.current) {
                 sectionMenuCloser.current(true);
             } else {
-                closeSectionMenu();
+                setSectionMenu(null);
             }
             return;
         }
-        const rect = event.currentTarget.getBoundingClientRect();
         sectionMenuTrigger.current = event.currentTarget;
-        setSectionMenu({
-            id: block.id,
-            label: block.label || 'A',
-            top: rect.bottom + 6,
-            left: rect.left,
-        });
+        setSectionMenu({ id: block.id, label: block.label || 'A' });
     }
-    function closeSectionMenu() {
-        setSectionMenu(null);
-        sectionMenuTrigger.current?.focus();
-    }
+    const sectionAnchor = () =>
+        sectionMenuTrigger.current?.isConnected ? sectionMenuTrigger.current : null;
 
-    // The footer's form-length menu (#1511): how many times the band plays the form. Opened
-    // above or below the footer button, whichever has more room, and never wider than the
-    // viewport; only that computed placement is inline, as the section menu's is.
+    // The footer's form-length menu (#1511): how many times the band plays the form, a `<Menu>`
+    // at the footer button (#1755).
     const choruses = current.schemaVersion === 2 ? current.chart.score.choruses : undefined;
-    const [formMenu, setFormMenu] = useState<{
-        top?: number;
-        bottom?: number;
-        left: number;
-        maxHeight: number;
-    } | null>(null);
-    const formMenuRef = useRef<HTMLDivElement>(null);
+    const [formMenu, setFormMenu] = useState(false);
     const formMenuTrigger = useRef<HTMLButtonElement>(null);
     // The menu closes with the footer: playback hides it, and so does a busy shell.
-    const formMenuOpen = formMenu !== null && !playbackActive && !busy;
+    const formMenuOpen = formMenu && !playbackActive && !busy;
     useEffect(() => {
         if (playbackActive || busy) {
-            setFormMenu(null);
+            setFormMenu(false);
         }
     }, [playbackActive, busy]);
-
-    useEffect(() => {
-        if (!formMenuOpen) {
-            return;
-        }
-        const items = () =>
-            Array.from(
-                formMenuRef.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? [],
-            );
-        (
-            items().find((item) => item.getAttribute('aria-checked') === 'true') ?? items()[0]
-        )?.focus();
-        function closeOnOutsidePress(event: PointerEvent) {
-            const target = event.target as Node;
-            // The button's own click toggles the menu; closing here first would reopen it.
-            if (
-                !formMenuRef.current?.contains(target) &&
-                !formMenuTrigger.current?.contains(target)
-            ) {
-                setFormMenu(null);
-            }
-        }
-        // Escape with focus somewhere outside the menu; inside it, `onFormMenuKey` answers and
-        // stops the event before it reaches the document.
-        function closeOnEscape(event: KeyboardEvent) {
-            if (event.key === 'Escape') {
-                event.preventDefault();
-                setFormMenu(null);
-                formMenuTrigger.current?.focus();
-            }
-        }
-        // Placed against the footer button when it opened; a scroll of the chart (or a resize)
-        // moves the button out from under it, so the menu closes rather than floating (#1700).
-        // It only opens while stopped, so nothing scrolls the chart but the musician. Its own
-        // list scrolls too, when it is taller than the room — that one is the menu, not the page.
-        function closeOnScroll(event: Event) {
-            if (!formMenuRef.current?.contains(event.target as Node)) {
-                setFormMenu(null);
-            }
-        }
-        function closeOnResize() {
-            setFormMenu(null);
-        }
-        document.addEventListener('pointerdown', closeOnOutsidePress);
-        document.addEventListener('keydown', closeOnEscape);
-        document.addEventListener('scroll', closeOnScroll, true);
-        window.addEventListener('resize', closeOnResize);
-        return () => {
-            document.removeEventListener('pointerdown', closeOnOutsidePress);
-            document.removeEventListener('keydown', closeOnEscape);
-            document.removeEventListener('scroll', closeOnScroll, true);
-            window.removeEventListener('resize', closeOnResize);
-        };
-    }, [formMenuOpen]);
-
-    /**
-     * The menu's own keys. They stop here, because the chart around the sheet reads an arrow
-     * as browsing away from Following.
-     */
-    function onFormMenuKey(event: ReactKeyboardEvent<HTMLDivElement>) {
-        const all = Array.from(
-            event.currentTarget.querySelectorAll<HTMLElement>('[role="menuitemradio"]'),
-        );
-        const at = all.indexOf(document.activeElement as HTMLElement);
-        const moves: Record<string, number> = {
-            ArrowDown: at + 1,
-            ArrowUp: at - 1,
-            Home: 0,
-            End: all.length - 1,
-        };
-        if (event.key === 'Escape') {
-            event.preventDefault();
-            event.stopPropagation();
-            setFormMenu(null);
-            formMenuTrigger.current?.focus();
-        } else if (Object.hasOwn(moves, event.key)) {
-            event.preventDefault();
-            event.stopPropagation();
-            all[(moves[event.key] + all.length) % all.length]?.focus();
-        }
-    }
-
-    function toggleFormMenu(event: ReactMouseEvent<HTMLButtonElement>) {
-        if (formMenu) {
-            setFormMenu(null);
-            return;
-        }
-        const rect = event.currentTarget.getBoundingClientRect();
-        const left = Math.max(
-            VIEWPORT_MARGIN,
-            Math.min(
-                rect.right - POPOVER_WIDTH,
-                window.innerWidth - POPOVER_WIDTH - VIEWPORT_MARGIN,
-            ),
-        );
-        const below = window.innerHeight - rect.bottom - 6 - VIEWPORT_MARGIN;
-        const above = rect.top - 6 - VIEWPORT_MARGIN;
-        setFormMenu(
-            below >= above
-                ? { top: rect.bottom + 6, left, maxHeight: below }
-                : { bottom: window.innerHeight - rect.top + 6, left, maxHeight: above },
-        );
-    }
     function pickChoruses(next: number | undefined) {
-        setFormMenu(null);
-        formMenuTrigger.current?.focus();
+        setFormMenu(false);
         if (next !== choruses) {
             onChoruses(next);
         }
@@ -1078,50 +898,34 @@ export function ChartSheet({
                     className="form-length"
                     aria-haspopup="menu"
                     aria-expanded={formMenuOpen}
-                    disabled={busy}
-                    onClick={toggleFormMenu}
+                    // Not `disabled`: the menu hands focus back here as a pick starts the
+                    // busy moment it makes, and a disabled button would drop it.
+                    aria-disabled={busy || undefined}
+                    onClick={() => !busy && setFormMenu((was) => !was)}
                 >
                     {totalBars} bars · {formLengthText(choruses)}
                 </button>
             </div>
             {formMenuOpen && (
-                <div
-                    ref={formMenuRef}
-                    className="popover form-length-menu"
-                    style={{
-                        top: formMenu.top,
-                        bottom: formMenu.bottom,
-                        left: formMenu.left,
-                        maxHeight: formMenu.maxHeight,
-                    }}
-                >
-                    {current.schemaVersion === 1 && (
-                        <p className="form-length-note" id="form-length-note">
-                            Counting choruses turns this chart into bars; the original is kept.
-                        </p>
-                    )}
-                    <div
-                        role="menu"
-                        aria-label="How many times the form plays"
-                        onKeyDown={onFormMenuKey}
-                        aria-describedby={
-                            current.schemaVersion === 1 ? 'form-length-note' : undefined
-                        }
-                    >
-                        {chorusChoices.map((count) => (
-                            <button
-                                key={count ?? 'loop'}
-                                type="button"
-                                role="menuitemradio"
-                                aria-checked={count === choruses}
-                                className={`option${count === choruses ? ' active' : ''}`}
-                                onClick={() => pickChoruses(count)}
-                            >
-                                {chorusChoice(count)}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                <Menu
+                    label="How many times the form plays"
+                    title="How many times the form plays"
+                    className="form-length-menu"
+                    anchor={() => formMenuTrigger.current}
+                    align="end"
+                    note={
+                        current.schemaVersion === 1
+                            ? 'Counting choruses turns this chart into bars; the original is kept.'
+                            : undefined
+                    }
+                    onClose={() => setFormMenu(false)}
+                    items={chorusChoices.map((count) => ({
+                        id: String(count ?? 'loop'),
+                        label: chorusChoice(count),
+                        checked: count === choruses,
+                        onSelect: () => pickChoruses(count),
+                    }))}
+                />
             )}
             {sectionMenu &&
                 sectionEdit &&
@@ -1136,11 +940,7 @@ export function ChartSheet({
                             section={written}
                             busy={busy}
                             sheet={phone}
-                            anchor={() =>
-                                sectionMenuTrigger.current?.isConnected
-                                    ? sectionMenuTrigger.current
-                                    : null
-                            }
+                            anchor={sectionAnchor}
                             closer={sectionMenuCloser}
                             onStartHere={(pending) => sectionEdit.onStartHere(written.id, pending)}
                             onChange={(changes) => sectionEdit.onChange(written.id, changes)}
@@ -1165,25 +965,23 @@ export function ChartSheet({
                     ) : null;
                 })()}
             {sectionMenu && !sectionEdit && (
-                <div
-                    ref={sectionMenuRef}
-                    role="menu"
-                    aria-label={`Section ${sectionMenu.label}`}
-                    className="popover section-menu"
-                    style={{ position: 'fixed', top: sectionMenu.top, left: sectionMenu.left }}
-                >
-                    <button
-                        type="button"
-                        role="menuitem"
-                        className="option"
-                        onClick={() => {
-                            onStartHere(sectionMenu.id);
-                            closeSectionMenu();
-                        }}
-                    >
-                        Start here
-                    </button>
-                </div>
+                <Menu
+                    key={sectionMenu.id}
+                    label={`Section ${sectionMenu.label}`}
+                    title={`Section ${sectionMenu.label}`}
+                    anchor={sectionAnchor}
+                    onClose={() => setSectionMenu(null)}
+                    items={[
+                        {
+                            id: 'start-here',
+                            label: 'Start here',
+                            onSelect: () => {
+                                setSectionMenu(null);
+                                onStartHere(sectionMenu.id);
+                            },
+                        },
+                    ]}
+                />
             )}
             {openNumber > 0 && open && barEdit && (
                 <BarDock

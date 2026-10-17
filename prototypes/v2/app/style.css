@@ -82,7 +82,10 @@ button {
     cursor: pointer;
     color: inherit;
 }
-button:disabled {
+/* `aria-disabled` reads the same as `disabled`: it is the disabled state of a button that must
+   keep focus (a menu's trigger, #1755; the bar dock's keys), which `disabled` would drop. */
+button:disabled,
+button[aria-disabled="true"] {
     cursor: default;
     opacity: 0.45;
 }
@@ -939,18 +942,8 @@ button.bar-number {
     content: "▾";
     color: var(--muted);
 }
-.chart-bottom .form-length:hover:not(:disabled) {
+.chart-bottom .form-length:hover:not([aria-disabled="true"]) {
     border-color: var(--muted);
-}
-.form-length-menu {
-    overflow: auto;
-    padding: 9px;
-}
-.form-length-note {
-    font-size: 11px;
-    line-height: 1.5;
-    color: var(--muted);
-    padding: 6px 9px 8px;
 }
 .chart-bottom em {
     font-family: Georgia, serif;
@@ -1100,45 +1093,6 @@ button.bar-number {
     box-shadow: var(--shadow);
     padding: 17px;
     width: 260px;
-}
-.popover h3 {
-    font-size: 14px;
-    margin-bottom: 13px;
-}
-.popover .option {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 9px;
-    text-align: left;
-    width: 100%;
-    border-radius: 7px;
-    font-size: 12px;
-}
-/* The section menu holds one action; a 260px card with 17px of padding around it read as an
-   empty panel (#1700). It sizes to its item. */
-.popover.section-menu {
-    width: auto;
-    min-width: 168px;
-    padding: 6px;
-}
-.section-menu .option {
-    font-size: 13px;
-    font-weight: 600;
-}
-.popover .option:hover {
-    background: var(--paper);
-}
-.popover .option.active {
-    color: var(--green);
-    background: var(--green-light);
-}
-.popover small {
-    font-size: 11px;
-    line-height: 1.6;
-    display: block;
-    color: var(--muted);
-    margin-top: 8px;
 }
 dialog {
     border: 1px solid var(--line);
@@ -1544,10 +1498,6 @@ dialog textarea {
     }
     .editing .bars {
         row-gap: 9px;
-    }
-    .popover {
-        max-height: 65dvh;
-        overflow: auto;
     }
     .song-header .song-actions {
         flex-basis: 100%;
@@ -3073,19 +3023,13 @@ html[data-theme="stage"] {
     background: var(--hover);
     color: var(--ink);
 }
-/* The shared row ⋯ menu (#1440), a compact action list rather than the full song menu's grid. */
-.row-menu-actions {
+/* The row ⋯ menu's "Add to collection…" dialog (#1477): the collections as a list to pick from. */
+.row-menu-collections {
     flex-direction: column;
     align-items: stretch;
 }
-.row-menu-actions .btn {
+.row-menu-collections .btn {
     justify-content: flex-start;
-}
-.row-menu-divider {
-    border: 0;
-    border-top: 1px solid var(--line);
-    margin: 4px 0;
-    width: 100%;
 }
 @media (max-width: 760px) {
     .all-songs-layout {

@@ -9,7 +9,6 @@ import {
     type Ref,
     useEffect,
     useId,
-    useLayoutEffect,
     useRef,
 } from 'react';
 import { BarContextFields } from './bar-context-fields';
@@ -26,6 +25,7 @@ import {
     stepSplit,
 } from './bar-ruler';
 import { FormControls } from './form-controls';
+import { useAnchoredPlacement } from './use-anchored-placement';
 import type { BarDraft } from './use-bar-drafts';
 
 type EffectiveContext = ReturnType<typeof resolveScoreContext>;
@@ -246,8 +246,8 @@ export function BarMenu({
 
     // Read through refs, so the listeners below are added once per opening, not on every render
     // (a drag renders on each step).
-    const latest = useRef({ onDismiss, anchor });
-    latest.current = { onDismiss, anchor };
+    const latest = useRef({ onDismiss });
+    latest.current = { onDismiss };
 
     // A press anywhere outside closes it — the trigger's own press excepted, which toggles it.
     useEffect(() => {
@@ -265,44 +265,10 @@ export function BarMenu({
         return () => document.removeEventListener('pointerdown', outside, true);
     }, []);
 
-    // Beside the bar on a laptop: under it and aligned to its right edge (where ⋯ sits), above
-    // it where there is no room below, and never off the screen. Followed through a scroll, as
-    // the section menu is — written to the menu's own style, not to state.
-    useLayoutEffect(() => {
-        if (sheet) {
-            return;
-        }
-        function place() {
-            const menu = node.current;
-            const rect = latest.current.anchor()?.getBoundingClientRect();
-            if (!menu || !rect) {
-                return;
-            }
-            const width = menu.offsetWidth;
-            const height = menu.offsetHeight;
-            const left = Math.min(Math.max(8, rect.right - width), window.innerWidth - width - 8);
-            const below = rect.bottom + 6;
-            const top =
-                below + height > window.innerHeight - 8 && rect.top - 6 - height >= 8
-                    ? rect.top - 6 - height
-                    : Math.max(8, Math.min(below, window.innerHeight - height - 8));
-            menu.style.left = `${Math.max(8, left)}px`;
-            menu.style.top = `${top}px`;
-        }
-        place();
-        // Opening "Key or meter from here" grows the menu without a render: placed again.
-        const grown = new ResizeObserver(place);
-        if (node.current) {
-            grown.observe(node.current);
-        }
-        document.addEventListener('scroll', place, true);
-        window.addEventListener('resize', place);
-        return () => {
-            grown.disconnect();
-            document.removeEventListener('scroll', place, true);
-            window.removeEventListener('resize', place);
-        };
-    }, [sheet]);
+    // Beside the bar on a laptop: under it and aligned to its right edge (where ⋯ sits), the
+    // shared anchored placement (#1755) — followed through a scroll, and placed again as
+    // "Key or meter from here" grows it.
+    useAnchoredPlacement(node, anchor, { enabled: !sheet, align: 'end' });
 
     function dismiss(target: Element | null, byFocus: boolean) {
         if (!dismissed.current) {

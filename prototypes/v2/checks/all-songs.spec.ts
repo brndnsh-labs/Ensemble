@@ -244,15 +244,13 @@ test('the row ⋯ menu: Star/Unstar, Rename, Duplicate, Export file, Delete…',
     await row.getByRole('button', { name: 'More actions for Blue pocket' }).click();
     await expect(page.getByTestId('row-menu-star')).toHaveText('★ Star');
 
-    // Star from the menu is the same fact the row's own toggle reads. Starring does not close
-    // the menu (matching the existing song menu's own "actions don't auto-close" convention);
-    // close it explicitly before the next row click.
+    // Star from the menu is the same fact the row's own toggle reads. Like every choice in an
+    // anchored menu (#1755), it closes the menu.
     await page.getByTestId('row-menu-star').click();
     await expect(page.getByRole('button', { name: 'Unstar Blue pocket' })).toBeVisible();
-    await page.keyboard.press('Escape');
     await expect(page.getByTestId('row-menu-star')).toBeHidden();
 
-    // Rename, in place.
+    // Rename, in its own small dialog.
     await row.getByRole('button', { name: 'More actions for Blue pocket' }).click();
     await page.getByTestId('row-menu-rename').click();
     await page.getByTestId('row-menu-rename-input').fill('Blue pocket renamed');
@@ -283,8 +281,6 @@ test('the row ⋯ menu: Star/Unstar, Rename, Duplicate, Export file, Delete…',
     const download = page.waitForEvent('download');
     await page.getByTestId('row-menu-export').click();
     expect((await download).suggestedFilename()).toBe('Blue pocket renamed copy.ensemble');
-    // Export does not close the menu either; close it before the next row click.
-    await page.keyboard.press('Escape');
     await expect(page.getByTestId('row-menu-export')).toBeHidden();
 
     // Delete asks first and offers export first.
