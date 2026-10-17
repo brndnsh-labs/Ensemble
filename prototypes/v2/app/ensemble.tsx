@@ -16,7 +16,7 @@ import {
     pendingGuestCollections,
 } from '../lib/account/adopt-guest';
 import { stripAccountsParam } from '../lib/account/feature';
-import { heldAccountBanner } from '../lib/account/messages';
+import { heldAccountBanner, PURGE_MESSAGES } from '../lib/account/messages';
 import {
     AccountMismatchError,
     accountSync,
@@ -83,6 +83,7 @@ import {
     syncFailureNotice,
     useAccountLibrary,
 } from './account/library';
+import { PurgeSongsDialog } from './account/purge-songs';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { SignOutDialog, type SignOutMode } from './account/sign-out';
 import { useAccountSession, useAccountsSwitch } from './account/use-account-session';
@@ -776,6 +777,12 @@ export default function Ensemble() {
     );
     const [rowDeleteFailure, setRowDeleteFailure] = useState<string | null>(null);
     const rowDeleteDialogRef = useRef<HTMLDialogElement>(null);
+    // Delete from this device for good (#1754): one song the account no longer holds or never
+    // received (`title` set), or every "No longer in your account" row at once (`title` null).
+    const [purgeTarget, setPurgeTarget] = useState<{ ids: string[]; title: string | null } | null>(
+        null,
+    );
+    const purgeDialogRef = useRef<HTMLDialogElement>(null);
     // The songbook's own status line (#1440 review P2) — set only by row actions (renamed,
     // duplicated, deleted, "hasn't reached your account yet"), NEVER the stand's `message`
     // (`open()` always sets one, and reusing it here showed a stale stand status on every visit
@@ -1854,6 +1861,13 @@ export default function Ensemble() {
             guestDeleteDialogRef.current?.close();
         }
     }, [guestDeleteTarget]);
+    useEffect(() => {
+        if (purgeTarget) {
+            purgeDialogRef.current?.showModal();
+        } else {
+            purgeDialogRef.current?.close();
+        }
+    }, [purgeTarget]);
     // Closes itself if `rowInAccount` goes false while open (the same posture the stand's own
     // `deleteOpen` effect takes) — a queued Save landing mid-confirm, or the account detaching,
     // must not leave a confirm button pointed at a state that no longer supports it. Releases the
@@ -4045,10 +4059,11 @@ export default function Ensemble() {
      * `watch` gets the same `sync.observation` the confirm step needs without any of that; it is
      * released again in `closeRowDeleteConfirm` below.
      *
-     * A song the cloud has never acknowledged (`remoteRevision` still null — a queued-but-unsent
-     * Save, most commonly) has nothing to delete there yet. The stand's own song menu handles this
-     * by simply not rendering its Delete button (`inAccount`'s doc comment); this can't know that
-     * before asking, so it asks, then explains rather than opening a dialog with a dead confirm.
+     * Two account songs have nothing in the account to delete, and both go straight to the
+     * delete-from-this-device step instead (#1754): one marked "No longer in your account" (the
+     * account tombstoned it while this device kept it — a cloud delete would only answer
+     * `retained` again), and one the cloud never acknowledged (`remoteRevision` still null — a
+     * Save never sent, or one still queued). That used to be a "nothing to delete" dead end.
      */
     function requestDeleteRow() {
         const target = rowMenuFor;
@@ -4057,14 +4072,20 @@ export default function Ensemble() {
         }
         closeRowMenu();
         if (signedIn) {
+            if (
+                sync.candidates.some(
+                    (row) => row.documentId === target.id && row.kind === 'deleted',
+                )
+            ) {
+                setPurgeTarget({ ids: [target.id], title: target.title });
+                return;
+            }
             void run(async () => {
                 accountSync.setActiveDocument(target.id);
                 await accountSync.watch(target.id);
                 if (accountSync.getSnapshot().observation?.remoteRevision == null) {
                     releaseRowDeleteClaim();
-                    setHomeNoticeState(
-                        'This song hasn’t finished syncing to your account yet — there’s nothing there to delete.',
-                    );
+                    setPurgeTarget({ ids: [target.id], title: target.title });
                     return;
                 }
                 setRowDeleteFailure(null);
@@ -4134,10 +4155,76 @@ export default function Ensemble() {
             if (result === null) {
                 return;
             }
-            setDeletedRowId(target.id);
             closeRowDeleteConfirm();
+            if (result.kind === 'deleted' && result.retained) {
+                // Gone from the account, but this device kept its copy (a draft, a queued Save):
+                // one press of Delete means the song is gone, so the delete-from-this-device step
+                // follows straight on (#1754). Cancelled, the row stays, marked.
+                await refreshSongs();
+                setHomeNoticeState(result.message);
+                setPurgeTarget({ ids: [target.id], title: target.title });
+                return;
+            }
+            setDeletedRowId(target.id);
             await refreshSongs();
             setHomeNoticeState(result.message);
+        });
+    }
+    /**
+     * "Remove N songs no longer in your account" on All songs (#1754): every listed song the
+     * account tombstoned while this device kept it, behind one confirm.
+     */
+    function requestPurgeGone(ids: string[]) {
+        if (ids.length > 0) {
+            setPurgeTarget({ ids, title: null });
+        }
+    }
+    /**
+     * Delete songs from this device for good (#1754) — `accountSync.purgeLocal`, one transaction,
+     * nothing queued or sent. What this tab holds for them goes too: its in-memory drafts, its
+     * opened-at entries, and the guest-namespace recovery slot an older build may have left under
+     * the id (`clearOwnRecovery`, as a clean cloud delete prunes it).
+     */
+    function purgeConfirmed() {
+        const target = purgeTarget;
+        if (!target) {
+            return;
+        }
+        const owner = sync.owner;
+        void run(async () => {
+            const result = await accountSync.purgeLocal(target.ids, owner);
+            const purged = new Set(result.purged);
+            for (const id of purged) {
+                volatileDrafts.current.delete(id);
+                accountDrafts.current.delete(id);
+                try {
+                    repository.clearOwnRecovery(id);
+                } catch {
+                    /* Recovery is a convenience; a stale slot is not worth failing the delete. */
+                }
+            }
+            setOpenedAtState((previous) => {
+                if (![...purged].some((id) => previous.has(id))) {
+                    return previous;
+                }
+                const updated = new Map(previous);
+                for (const id of purged) {
+                    updated.delete(id);
+                }
+                return updated;
+            });
+            if (target.title !== null && purged.size === 1) {
+                setDeletedRowId(target.ids[0]);
+            }
+            setPurgeTarget(null);
+            await refreshSongs();
+            setHomeNoticeState(
+                result.held.length > 0 && target.title !== null
+                    ? PURGE_MESSAGES.held
+                    : target.title !== null
+                      ? PURGE_MESSAGES.deleted
+                      : PURGE_MESSAGES.removed(purged.size),
+            );
         });
     }
     /**
@@ -4317,6 +4404,7 @@ export default function Ensemble() {
             return;
         }
         const documentId = current.id;
+        const title = current.title;
         const owner = standOwner();
         void run(async () => {
             if (standBelongsElsewhere()) {
@@ -4352,6 +4440,10 @@ export default function Ensemble() {
             // just closed the chart and landed back on the songbook, and `message` has no
             // audience there — see `homeNotice`'s own doc comment.
             setHomeNoticeState(result.message);
+            if (result.kind === 'deleted' && result.retained) {
+                // The copy this device kept goes too, once asked (#1754): one Delete, song gone.
+                setPurgeTarget({ ids: [documentId], title });
+            }
         });
     }
     /**
@@ -5891,6 +5983,7 @@ export default function Ensemble() {
                     }
                     onDeleteCollection={requestDeleteCollection}
                     removedCollectionId={deletedCollectionId}
+                    onRemoveGone={requestPurgeGone}
                 />
             ) : !current ? (
                 <Songbook
@@ -6669,6 +6762,16 @@ export default function Ensemble() {
                     onExport={exportGuestDeleteTarget}
                     onConfirm={deleteGuestSong}
                     onClose={() => setGuestDeleteTarget(null)}
+                />
+            )}
+            {purgeTarget && (
+                <PurgeSongsDialog
+                    dialogRef={purgeDialogRef}
+                    title={purgeTarget.title}
+                    count={purgeTarget.ids.length}
+                    busy={busy}
+                    onConfirm={purgeConfirmed}
+                    onClose={() => setPurgeTarget(null)}
                 />
             )}
             {rowDeleteTarget && rowInAccount && (

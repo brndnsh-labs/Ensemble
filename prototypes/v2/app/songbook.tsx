@@ -287,6 +287,15 @@ export function Songbook(props: SongbookProps) {
     );
 }
 
+/**
+ * The All songs link (#1440). Its count leaves out the songs the account no longer holds (#1754,
+ * `HomeSlice.gone`); a songbook of nothing else still links there, without a number, since that
+ * page is where they are removed.
+ */
+function allSongsLabel(count: number): string {
+    return count > 0 ? `All ${count} ${count === 1 ? 'song' : 'songs'} →` : 'All songs →';
+}
+
 /** A key the way the chart header writes it: `C`, `Am`. */
 function keyOf(document: ChartDocument): string {
     const { key, isMinor } = arrangementOf(document);
@@ -451,7 +460,7 @@ function RecentSongs({
                         data-testid="all-songs-link"
                         onClick={onOpenAllSongs}
                     >
-                        All {home.count} {home.count === 1 ? 'song' : 'songs'} →
+                        {allSongsLabel(home.count - home.gone)}
                     </button>
                 )}
             </div>

@@ -149,6 +149,25 @@ export const REMOTE_UPDATE_MESSAGES = {
 } as const;
 
 /**
+ * Deleting songs from this device for good (#1754) — the way out for a song a cloud delete cannot
+ * remove: one the account no longer holds (`REMOTE_UPDATE_MESSAGES.deletedMarker`) or never
+ * received. Nothing is sent, so nothing here says "account" except to say where the song is NOT.
+ */
+export const PURGE_MESSAGES = {
+    question: 'Delete from this device too?',
+    detail: 'Unsaved changes to it will be lost.',
+    bulkDetail:
+        'They’re deleted from this device too. Unsaved changes to them will be lost. This can’t be undone.',
+    bulk: (count: number) =>
+        count === 1
+            ? 'Remove 1 song no longer in your account'
+            : `Remove ${count} songs no longer in your account`,
+    deleted: 'Deleted from this device',
+    removed: (count: number) => (count === 1 ? 'Removed 1 song' : `Removed ${count} songs`),
+    held: 'That song is in your account now, so it was kept. Delete it again to remove it there.',
+} as const;
+
+/**
  * The two things the SONGBOOK has to say about the account switch itself (#1357), as opposed to
  * about an account. Here with the rest of the copy for the same reason every sentence in this
  * file is: a musician reads them, so they are not spelled inline in a component.

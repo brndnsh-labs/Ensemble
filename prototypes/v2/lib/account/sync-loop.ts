@@ -1036,6 +1036,25 @@ export interface SyncLoop {
      */
     deleteFromCloud(documentId: string, owner: string | null): Promise<CloudDeleteResult>;
     /**
+     * Delete songs from THIS DEVICE for good (#1754): the songs the account no longer holds ("No
+     * longer in your account") or never received (`remoteRevision === null`), which a cloud delete
+     * cannot remove — it can only answer `retained` again. ONE transaction over every id
+     * (`AccountSongbook.purgeLocal`): each id's song row, every writer's draft, its whole outbox
+     * queue and its meta rows. Nothing is queued, frozen or sent. An id the account still holds is
+     * returned in `held`, untouched. It holds the loop's serialization slot like a pass: it waits
+     * until no pass of THIS tab is running, and a pass asked for meanwhile runs after it, so this
+     * tab never sends a Save for an id it is deleting. Another TAB's pass is outside that slot:
+     * if one sent such a Save mid-purge, its acknowledgement finds no operation and that pass
+     * reports a server failure once, and the song can come back on the next download (the
+     * account then really holds it). Nothing is lost, and the next pass is clean. Fenced on
+     * `owner` like every write; publishes the library and the collections (whose resolved songs
+     * shrink) and re-reads the observation, so the candidates and counts follow.
+     */
+    purgeLocal(
+        documentIds: readonly string[],
+        owner: string | null,
+    ): Promise<{ purged: string[]; held: string[] }>;
+    /**
      * Resolve this document's refused Save by keeping both (#1267) — the one way out of a
      * conflicted outbox head, which is otherwise terminal and parks every later Save of that song
      * behind it.
@@ -2201,6 +2220,47 @@ export function createSyncLoop(
                 retained,
                 message: retained ? DELETE_MESSAGES.retained : DELETE_MESSAGES.deleted,
             };
+        },
+        async purgeLocal(documentIds, owner) {
+            // The purge takes the loop's ONE serialization slot, as a pass does. Waiting for a
+            // pass once is not enough: `run()`'s `finally` starts a coalesced re-run the moment it
+            // clears `inFlight`, and any trigger (online, a Save) could start one while the scope
+            // below resolves. A pass sending a frozen Save of an id deleted under it would meet a
+            // missing operation at `acknowledge` (a storage error for the whole drain) and the
+            // song would come back on the download. So: wait until no pass holds the slot, take
+            // it synchronously, and let every `run()` meanwhile coalesce behind the purge.
+            while (inFlight) {
+                await inFlight.catch(() => {});
+            }
+            let release = () => {};
+            const slot = new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            inFlight = slot;
+            try {
+                const current = await ownedScope(owner);
+                const mine = epoch;
+                const result = await songbook.purgeLocal(current, documentIds);
+                if (mine === epoch && result.purged.length > 0) {
+                    publish({
+                        libraryVersion: state.libraryVersion + 1,
+                        collectionsVersion: state.collectionsVersion + 1,
+                    });
+                    await observe();
+                }
+                return result;
+            } finally {
+                if (inFlight === slot) {
+                    inFlight = null;
+                }
+                release();
+                if (rerun) {
+                    // A pass asked for while the purge held the slot, dispatched the way
+                    // `run()` dispatches its own coalesced re-run.
+                    rerun = false;
+                    void loop.run().catch(() => {});
+                }
+            }
         },
         async keepBoth(documentId, owner) {
             // #1311: before the transaction opens. Keeping both CREATES a local line for the

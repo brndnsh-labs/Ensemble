@@ -257,7 +257,7 @@ describe('repository.home — the songbook home reads only what it shows (#1441)
 
     it('skips opened ids whose song is gone, and says an empty songbook is empty', async () => {
         const slice = await home(homeRequest(new Map([['gone', at(1)]]), 'gone'));
-        expect(slice).toEqual({ count: 0, continued: null, rows: [], unreadable: 0 });
+        expect(slice).toEqual({ count: 0, gone: 0, continued: null, rows: [], unreadable: 0 });
     });
 
     it('get reads one song by id, null when it is gone', async () => {
