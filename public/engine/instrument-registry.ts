@@ -166,21 +166,3 @@ export function __resetPackCacheForTest(): void {
     packCache.clear();
     installedPacks.clear();
 }
-
-/**
- * Normalize a persisted/hydrated voice value to a valid `InstrumentVoice`.
- * Preserves a `pack:<id>` selection across reloads; everything else — including
- * the retired `current`/`new` A/B voices (#649) and any garbage — collapses to
- * `synth`. So a saved session that still holds `current`/`new` keeps working and
- * just sounds like the (only) reworked synth voice.
- */
-export function hydrateVoice(saved: unknown): InstrumentVoice {
-    if (
-        typeof saved === 'string' &&
-        saved.startsWith(PACK_PREFIX) &&
-        saved.length > PACK_PREFIX.length
-    ) {
-        return saved as InstrumentVoice;
-    }
-    return 'synth';
-}

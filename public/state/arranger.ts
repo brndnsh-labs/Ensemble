@@ -1,10 +1,10 @@
 import { deepSignal } from 'deepsignal/core';
 import { normalizeSongSeed } from '../sanitize.js';
-import type { Action, ArrangerState, Mutable, Section } from '../types.js';
+import type { Action, ArrangerState, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { writeDeclaredParam } from './set-param.js';
 
-export type { ArrangerState, Section };
+export type { ArrangerState };
 
 export const arranger = deepSignal<ArrangerState>({
     sections: [{ id: 's1', label: 'Intro', value: 'I | V | vi | IV', repeat: 1 }],

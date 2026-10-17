@@ -45,7 +45,7 @@ export interface HomeRead<R> {
     recent: R[];
     /**
      * Songs read to fill the list when fewer than `rows` of the opened ones exist: a device that
-     * has saved or imported songs it never opened (a v1 import, a library downloaded onto a second
+     * has saved or imported songs it never opened (a library downloaded onto a second
      * device, #1442's seeded library). Read by a bounded cursor in key order — never more than the
      * rows still empty — so for a small songbook this is simply the rest of it, and for a large
      * one it is a stable, arbitrary handful rather than a scan for the newest.

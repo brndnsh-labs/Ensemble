@@ -26,15 +26,6 @@ interface SongMenuProps {
      * draft. Deleting from the cloud is only offered for a song that is actually in the cloud.
      */
     inAccount: boolean;
-    /**
-     * Does this device hold an old-Ensemble (v1) profile (#1274)? The entry below is the
-     * permanent way back into the import (DECISION 2026-09-19): it is shown for as long as
-     * there is v1 data on this origin, including after a "Not now" and after everything has
-     * already been brought over — which is the point, since the automatic offer never
-     * returns once declined.
-     */
-    v1Available: boolean;
-    onBringOverV1: () => void;
     onClose: () => void;
     onShare: () => void;
     onSaveCopy: () => void;
@@ -75,8 +66,6 @@ export function SongMenu({
     shareLinkFallback,
     recoveryOptions,
     inAccount,
-    v1Available,
-    onBringOverV1,
     onClose,
     onShare,
     onSaveCopy,
@@ -253,23 +242,6 @@ export function SongMenu({
                             that many times, then stops: an Intro at the start plays the first time
                             only, and an Outro at the end or a last-chorus coda the last time only.
                         </p>
-                    </div>
-                </section>
-            )}
-            {/* Importing a chart starts from the songbook home; from here the menu only offers
-                the old app's songs, which are about this device rather than this song. */}
-            {v1Available && (
-                <section className="song-menu-group" aria-labelledby="song-menu-bring">
-                    <h3 id="song-menu-bring">Bring in songs</h3>
-                    <div className="dialog-actions">
-                        <button
-                            className="btn"
-                            data-testid="bring-over-v1"
-                            disabled={busy}
-                            onClick={onBringOverV1}
-                        >
-                            Bring over old Ensemble songs
-                        </button>
                     </div>
                 </section>
             )}

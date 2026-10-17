@@ -31,7 +31,7 @@ interface TelemetryEventData {
     part_toggled: { part: 'drums' | 'bass' | 'chords' | 'soloist' };
     chart_opened: { source: 'songbook' | 'import' | 'standard' };
     chart_created: undefined;
-    chart_imported: { format: 'ireal' | 'v1' | 'file' };
+    chart_imported: { format: 'ireal' | 'file' };
     share_created: undefined;
     share_opened: undefined;
     account_signed_in: undefined;

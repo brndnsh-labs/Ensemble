@@ -15,8 +15,6 @@ export type { BassState, ChordState, SoloistState };
 import { groove, isGrooveModule } from './groove.js';
 import { writeDeclaredParam } from './set-param.js';
 
-export const MIXER_SETTINGS_VERSION = 2;
-
 export const INSTRUMENT_REVERB_DEFAULTS = Object.freeze({
     chords: 0.3,
     bass: 0.05,

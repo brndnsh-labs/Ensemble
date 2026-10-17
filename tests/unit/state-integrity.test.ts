@@ -45,8 +45,8 @@ const fileContents: SourceFile[] = allFiles.map((f) => ({
 }));
 
 // "Is this a state slice?" is a CONTENT question, not a directory one: `public/state/`
-// also holds non-slice plumbing (`state-effects`, `state-hydration`, `history`,
-// `share-codec`) that dispatches like any other consumer. Keying on the
+// also holds non-slice plumbing (`state-effects`, `history`)
+// that dispatches like any other consumer. Keying on the
 // `deepSignal<` declaration keeps the dispatch/handler split honest as files move in and
 // out of that directory. Same discriminator as `scripts/check-mutations.ts`.
 const isSlice = (f: SourceFile) => /deepSignal</.test(f.content);
