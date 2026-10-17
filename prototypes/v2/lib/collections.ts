@@ -92,11 +92,6 @@ function timestamp(value: unknown): value is string {
     );
 }
 
-/** Can a collection hold this as a song id? The decoder's own rule, for a caller filtering input. */
-export function isCollectionSongId(value: unknown): value is string {
-    return safeString(value, MAX_ID_LENGTH);
-}
-
 /** Does this candidate claim to be a collection at all? A chart carries no `kind`. */
 export function isCollectionCandidate(candidate: unknown): boolean {
     return (

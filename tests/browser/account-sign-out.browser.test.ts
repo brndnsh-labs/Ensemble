@@ -9,6 +9,8 @@ import {
     type ChartDocument,
     candidateKey,
     deletionKey,
+    retiredStarPrefix,
+    retiredStarsMarkerKey,
 } from '../../prototypes/v2/lib/sync/protocol.js';
 import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
@@ -66,6 +68,32 @@ function metaKeys(): Promise<string[]> {
             keys.onerror = () => {
                 db.close();
                 reject(keys.error);
+            };
+        };
+    });
+}
+
+/**
+ * Writes raw `meta` rows the way a build before #1743 left them: nothing in the repository API
+ * writes the retired star rows any more.
+ */
+function putMeta(rows: Array<Record<string, unknown>>): Promise<void> {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(name);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+            const db = request.result;
+            const tx = db.transaction('meta', 'readwrite');
+            for (const row of rows) {
+                tx.objectStore('meta').put(row);
+            }
+            tx.oncomplete = () => {
+                db.close();
+                resolve();
+            };
+            tx.onerror = () => {
+                db.close();
+                reject(tx.error);
             };
         };
     });
@@ -151,6 +179,31 @@ describe('signing out removes every trace of that account from this device', () 
         // Only the active pointer is left. Nothing else belonged to anyone else, either.
         expect(await metaKeys()).toEqual(['active']);
         expect(await metaKeys()).not.toContain(deletionKey(A, 'study'));
+    });
+
+    it('wipes the retired star rows and their migration marker, and only that owner’s', async () => {
+        // #1440's `star:` rows and #1477's `stars-migrated:` marker are inert since #1743, but they
+        // are still this account's data on this device, so sign-out takes them with the rest.
+        const starA = `${retiredStarPrefix(A)}song-1`;
+        const starB = `${retiredStarPrefix(B)}song-2`;
+        await putMeta([
+            { key: starA, ownerId: A, documentId: 'song-1' },
+            { key: retiredStarsMarkerKey(A), ownerId: A, migratedAt: '2026-09-01T00:00:00.000Z' },
+            { key: starB, ownerId: B, documentId: 'song-2' },
+            { key: retiredStarsMarkerKey(B), ownerId: B, migratedAt: '2026-09-01T00:00:00.000Z' },
+        ]);
+        expect(await metaKeys()).toEqual(
+            expect.arrayContaining([starA, retiredStarsMarkerKey(A), starB]),
+        );
+
+        await book.switchAccount(null);
+        await book.clearAccount(A);
+
+        const left = await metaKeys();
+        expect(left.some((key) => key.startsWith(retiredStarPrefix(A)))).toBe(false);
+        expect(left).not.toContain(retiredStarsMarkerKey(A));
+        // B's rows are B's: `clearAccount(A)` is bounded by owner.
+        expect(left).toEqual(expect.arrayContaining([starB, retiredStarsMarkerKey(B)]));
     });
 
     it('leaves another account on the same profile completely untouched', async () => {

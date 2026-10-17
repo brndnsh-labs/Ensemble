@@ -8,7 +8,6 @@ import {
     deletionKey,
     openedKey,
     type PreparedSave,
-    starKey,
 } from '../../prototypes/v2/lib/sync/protocol.js';
 import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
 import { sendNext } from '../../prototypes/v2/lib/sync/send.js';
@@ -84,14 +83,13 @@ async function confirmed(id: string, revision: string) {
 
 /**
  * The shape behind "No longer in your account": a confirmed song this device still holds work for
- * — a queued Save, two writers' drafts, a frozen delete, opened-at and star rows — when the
+ * — a queued Save, two writers' drafts, a frozen delete, an opened-at row — when the
  * account's tombstone arrives, so `commitDeleted` keeps it all and writes a `deleted` candidate.
  */
 async function tombstonedWithEverything(id: string) {
     await confirmed(id, `${id}-1`);
     expect(typeof (await book.prepareDelete(scope, id))).toBe('object');
     await book.recordOpened(scope, id);
-    await book.setStarred(scope, id, true);
     await book.save(scope, chart('Queued', id, 1), 0);
     await book.save(scope, chart('Queued again', id, 2), 1);
     // After the Saves, which retire every writer's superseded draft.
@@ -140,7 +138,6 @@ describe('purgeLocal deletes a song from this device for good (#1754)', () => {
         // The neighbour holds the same kinds of rows, so a range one id too wide shows up here.
         await confirmed(KEPT, 'kept-1');
         await book.recordOpened(scope, KEPT);
-        await book.setStarred(scope, KEPT, true);
         await book.save(scope, chart('Kept queued', KEPT, 1), 0);
         await book.recover(scope, 'writer-1', chart('Kept draft', KEPT, 1), 1);
 
@@ -149,12 +146,7 @@ describe('purgeLocal deletes a song from this device for good (#1754)', () => {
         expect(before.drafts).toBe(2);
         expect(before.operations).toBe(2);
         expect(before.meta.sort()).toEqual(
-            [
-                candidateKey(OWNER, GONE),
-                deletionKey(OWNER, GONE),
-                openedKey(OWNER, GONE),
-                starKey(OWNER, GONE),
-            ].sort(),
+            [candidateKey(OWNER, GONE), deletionKey(OWNER, GONE), openedKey(OWNER, GONE)].sort(),
         );
         const kept = await rowsFor(KEPT);
         const receipts = await rows('receipts');
@@ -264,7 +256,7 @@ describe('purgeLocal deletes a song from this device for good (#1754)', () => {
         const neighbour = await rowsFor(GONE);
         expect(neighbour.drafts).toBe(2);
         expect(neighbour.operations).toBe(2);
-        expect(neighbour.meta).toHaveLength(4);
+        expect(neighbour.meta).toHaveLength(3);
 
         expect(await book.purgeLocal(scope, ['gone'])).toEqual({ purged: ['gone'], held: [] });
         expect(await rowsFor('gone')).toEqual({ songs: 0, drafts: 0, operations: 0, meta: [] });

@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { appUrl, expect, seedStarters, test } from './fixtures';
+import { expect, seedStarters, test } from './fixtures';
 
 /**
  * Collections on the All songs page, and Starred as a built-in collection (#1477) — the guest
@@ -198,66 +198,6 @@ test('New collection, then Rename, from the All songs page', async ({ page }) =>
     );
     await expect(page.getByTestId('collection-filter')).toHaveText(['Sunday practice 0']);
     await noSidewaysScroll(page);
-});
-
-test('a guest’s device-local stars move into Starred on upgrade, and the old key stays', async ({
-    page,
-}) => {
-    // Two stars written by #1440's build, before this one ever ran.
-    const legacy = JSON.stringify(['starter-blues', 'starter-bossa']);
-    await page.goto(appUrl('build.json'));
-    await page.evaluate(
-        (value) => localStorage.setItem('ensemble-v2-preview:starred', value),
-        legacy,
-    );
-    await seedStarters(page);
-    await page.getByTestId('all-songs-link').click();
-
-    await expect(page.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 2');
-    await page.getByRole('button', { name: /^Starred/ }).click();
-    await expect(rows(page)).toHaveText(['Blue pocket', 'After hours']);
-    // A copy: the old key is exactly as it was.
-    expect(await page.evaluate(() => localStorage.getItem('ensemble-v2-preview:starred'))).toBe(
-        legacy,
-    );
-
-    // Once: a song unstarred after the copy is not starred again by the next load.
-    await page.getByRole('button', { name: 'Unstar Blue pocket' }).click();
-    await expect(page.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
-    // The star on screen is optimistic; reloading before its write commits would abort the write
-    // and test nothing about the migration. Wait for the STORED Starred to hold one song.
-    await expect
-        .poll(() =>
-            page.evaluate(
-                () =>
-                    new Promise<number>((resolve, reject) => {
-                        const request = indexedDB.open('ensemble-v2-preview-collections', 1);
-                        request.onerror = () => reject(request.error);
-                        request.onsuccess = () => {
-                            const db = request.result;
-                            const read = db
-                                .transaction('collections')
-                                .objectStore('collections')
-                                .get('collection-starred');
-                            read.onsuccess = () => {
-                                db.close();
-                                resolve(
-                                    (read.result as { songIds?: string[] } | undefined)?.songIds
-                                        ?.length ?? -1,
-                                );
-                            };
-                            read.onerror = () => reject(read.error);
-                        };
-                    }),
-            ),
-        )
-        .toBe(1);
-    await page.reload();
-    await page.getByTestId('all-songs-link').click();
-    await expect(page.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
-    expect(await page.evaluate(() => localStorage.getItem('ensemble-v2-preview:starred'))).toBe(
-        legacy,
-    );
 });
 
 /**

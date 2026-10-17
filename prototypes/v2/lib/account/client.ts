@@ -6,9 +6,9 @@
  * per-render `createAccountSession()` would not provide.
  *
  * Constructing these is inert — no request, no storage access, no timer — so importing this
- * module cannot change guest startup. The per-device flag (`feature.ts`) gates every CALL:
- * a device that opted out with `?accounts=off` never reaches `refresh()` or any ceremony, and
- * therefore never issues an `/api/*` request at all.
+ * module cannot change guest startup. A device that has never held an account never reaches
+ * `refresh()` on its own (`deviceMayHoldAccount` in `held-account.ts`), so it issues no
+ * `/api/*` request until the musician asks for one.
  */
 
 import { createAccountApi } from './api';

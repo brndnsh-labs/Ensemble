@@ -15,7 +15,7 @@ export { expect } from '@playwright/test';
 
 /**
  * One app URL, from the site root (#1734). `appUrl()` is the songbook itself; the argument is
- * everything after the slash — `appUrl('sw.js')`, `appUrl('?accounts=on')`, `appUrl('#chart=')`.
+ * everything after the slash — `appUrl('sw.js')`, `appUrl('?autoplay=1')`, `appUrl('#chart=')`.
  */
 export function appUrl(suffix = ''): string {
     return `/${suffix}`;

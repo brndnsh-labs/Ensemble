@@ -17,10 +17,8 @@ import {
     type SavedSong,
     type SaveOperation,
     type SaveRefusalReason,
-    type Star,
     type SyncDocument,
     snapshot,
-    starKey,
     type UnsupportedReason,
 } from './protocol';
 
@@ -191,15 +189,6 @@ export function savedOpenedAt(value: OpenedAt, scope: AccountScope, id: string):
         throw new Error('Invalid opened-at timestamp.');
     }
     return { key: value.key, ownerId: scope.ownerId, documentId: id, openedAt: value.openedAt };
-}
-
-/** Re-prove a stored star (#1440) the same way — presence is the whole fact. */
-export function savedStar(value: Star, scope: AccountScope, id: string): Star {
-    owned(value, scope, id);
-    if (value.key !== starKey(scope.ownerId, id)) {
-        throw new Error('Stored star does not match its key.');
-    }
-    return { key: value.key, ownerId: scope.ownerId, documentId: id };
 }
 
 /**

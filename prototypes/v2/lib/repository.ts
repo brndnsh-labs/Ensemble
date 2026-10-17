@@ -4,11 +4,7 @@ import {
     assertBuiltInKept,
     BuiltInCollectionError,
     type CollectionDocument,
-    isCollectionSongId,
-    MAX_COLLECTION_SONGS,
-    newStarred,
     resolvedSongIds,
-    STARRED_COLLECTION_ID,
     validateCollection,
 } from './collections';
 import { type ChartDocument, validateDocument } from './documents';
@@ -436,13 +432,13 @@ export function clearOwnRecovery(id: string): void {
 }
 
 /**
- * Remove EVERY writer's recovery slot for one document (#1269), not just this page load's.
+ * Remove EVERY writer's recovery slot for one guest document, not just this page load's.
  *
  * `clearOwnRecovery` is the right tool after a Save: another tab editing the same song is holding
- * its own live experiment, and this writer has no business discarding it. Signing out is the
- * opposite case — the account's local data is being removed from a possibly shared device, a slot
- * an earlier page load left behind holds that chart's text in plaintext, and a tab still open on
- * the same account is losing its session too. So the whole id goes.
+ * its own live experiment, and this writer has no business discarding it. A delete (`remove`)
+ * and a chart back at its committed version are the opposite case: the song, or the edit, is
+ * gone, so a slot an earlier page load left behind must not bring it back. So the whole id goes.
+ * (Sign-out swept these by account id until #1743; no build since #1299 writes one there.)
  */
 export function clearRecovery(id: string): void {
     for (const key of recoveryKeysFor(id)) {
@@ -649,34 +645,6 @@ export async function editCollection(
             reject(failure || new Error('Saving the collection failed. Storage may be full.'));
         tx.onabort = () => reject(failure || new Error('Saving the collection was interrupted.'));
     });
-}
-
-/**
- * Copy the device-local stars (#1440's `ensemble-v2-preview:starred`, read by `lib/session.ts`'s
- * `legacyStarredIds`) into the built-in Starred collection, once (#1477).
- *
- * A COPY: the old key is never written or removed here, so the migration is reversible — an older
- * build still finds every star it had. Idempotent by construction, because it runs only while this
- * songbook has no Starred at all: once one exists (made here or by a later star), the old key is
- * inert, and a song unstarred since is not starred again on the next load. No stars, no Starred —
- * it is never created empty. One transaction, so two tabs migrating at once write it once.
- *
- * `true` when this call created it.
- */
-export async function migrateGuestStars(legacy: ReadonlySet<string>): Promise<boolean> {
-    if (![...legacy].some(isCollectionSongId)) {
-        return false;
-    }
-    // A guest's Starred only ever lives at its fixed id: nothing re-creates it elsewhere, since a
-    // guest collection has no outbox and so no `'gone'` conflict to resolve.
-    const created = await editCollection(STARRED_COLLECTION_ID, (current) =>
-        current === null
-            ? // Only ids a collection can hold (#1477 review): one id the old key accepted but the
-              // decoder would refuse must not fail the whole copy on every load.
-              newStarred([...legacy].filter(isCollectionSongId).slice(0, MAX_COLLECTION_SONGS))
-            : null,
-    );
-    return created !== null;
 }
 
 /**

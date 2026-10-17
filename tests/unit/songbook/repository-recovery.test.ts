@@ -28,7 +28,7 @@ import { accountChart } from '../../utils/account-songbook-fixture.js';
 const RECOVERY = 'ensemble-v2-preview:recovery:';
 
 /**
- * Node/happy-dom has no `localStorage` here (see `account-feature.test.ts`), so the scan has to be
+ * Node/happy-dom has no `localStorage` here (see `held-account.test.ts`), so the scan has to be
  * given a real one. Map-backed on purpose: insertion order and, crucially, RENUMBERING on delete
  * are the Storage behaviors the index-walking scans in the module under test depend on.
  */

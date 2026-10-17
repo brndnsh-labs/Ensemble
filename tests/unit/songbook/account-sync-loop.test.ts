@@ -1451,8 +1451,7 @@ describe('signing out moves the fence before it asks the server for anything', (
     /**
      * The `drafts` half of this plan is the ACCOUNT DATABASE's, which since #1299 is where an
      * account chart's unsaved text actually sits. What it cannot see is a draft whose storage
-     * write was refused and a guest slot left under an account id by an older build; the SHELL
-     * adds those (`withLocalDrafts` in `app/ensemble.tsx`), and that composition is proven end to
+     * write was refused; the SHELL adds that (`withLocalDrafts` in `app/ensemble.tsx`), and that composition is proven end to
      * end in `prototypes/v2/checks/account-sign-out.chromium.spec.ts`.
      */
     it('counts unsent Saves and unsaved drafts as two separate facts', async () => {

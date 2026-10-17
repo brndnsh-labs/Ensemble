@@ -971,11 +971,6 @@ export interface SyncLoop {
      */
     collectionDeleteRefusal(documentId: string, owner: string | null): Promise<string | null>;
     /**
-     * Copy this device's #1440 `star:` rows into Starred, once (`AccountSongbook.migrateStars`).
-     * Runs a pass when it queued a Save. Fenced on `owner` like every write.
-     */
-    migrateStars(owner: string | null): Promise<void>;
-    /**
      * Delete one document from the cloud (#1270): an explicit ONLINE operation with a frozen,
      * retry-safe operation id, never a side effect of removing a local copy. Sends immediately
      * rather than joining the outbox — a delete is a deliberate human act that must report its own
@@ -2032,14 +2027,6 @@ export function createSyncLoop(
                 return local === 'queued' ? COLLECTION_MESSAGES.uploading : null;
             } catch (error) {
                 return error instanceof Error ? error.message : String(error);
-            }
-        },
-        async migrateStars(owner) {
-            const outcome = await songbook.migrateStars(await ownedScope(owner));
-            if (outcome === 'migrated') {
-                publish({ collectionsVersion: state.collectionsVersion + 1 });
-                await observe();
-                void loop.run().catch(() => {});
             }
         },
         async deleteFromCloud(documentId, owner) {

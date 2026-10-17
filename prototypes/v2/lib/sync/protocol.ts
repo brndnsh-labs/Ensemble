@@ -183,38 +183,23 @@ export interface OpenedAt {
 }
 
 /**
- * Starred songs (#1440), one row per starred document — presence is the whole fact, so there is
- * no value beyond the identity fields. LEGACY since #1477: stars are the synced built-in Starred
- * collection now, nothing writes these rows any more, and `AccountSongbook.migrateStars` copies
- * them in once per device and leaves them (reversible). A per-device, per-owner row in the same
- * `meta` store as the rest of this file's namespaces. `'star:'` sorts strictly between `'remote:'` and the end of the
- * key space, so it cannot collide with any prefix range above.
+ * The retired per-device stars (#1440): one `star:` row per starred song, copied into the built-in
+ * Starred collection by a one-time migration (#1477) that #1743 retired. Nothing reads or writes
+ * these rows any more. They are still this account's data on this device, so `clearAccount`
+ * removes them with the rest; that is the only thing that names them. `'star:'` sorts after every
+ * other prefix here, so no other range can reach it.
  */
-export function starPrefix(ownerId: string): string {
+export function retiredStarPrefix(ownerId: string): string {
     identifier(ownerId);
     return `star:${ownerId}:`;
 }
 
-export function starKey(ownerId: string, documentId: string): string {
-    identifier(documentId);
-    return `${starPrefix(ownerId)}${documentId}`;
-}
-
-export interface Star {
-    key: string;
-    ownerId: string;
-    documentId: string;
-}
-
 /**
- * This device has copied its `star:` rows into the account's built-in Starred collection (#1477),
- * one row per owner. The marker is what makes that copy run ONCE per device: the `star:` rows are
- * deliberately left in place (the migration is reversible), so without it a song unstarred after
- * the copy would be starred again by the next one. `'stars-migrated:'` sorts after every `'star:'`
- * key (`':'` < `'s'`), so the star range above can never reach it. Removed by `clearAccount` with
- * the rows it describes.
+ * The marker #1477's star migration wrote, one per owner (retired in #1743). `'stars-migrated:'`
+ * sorts after every `'star:'` key (`':'` < `'s'`), so the star range above never reaches it: it is
+ * removed on its own, by `clearAccount`.
  */
-export function starsMigratedKey(ownerId: string): string {
+export function retiredStarsMarkerKey(ownerId: string): string {
     identifier(ownerId);
     return `stars-migrated:${ownerId}`;
 }

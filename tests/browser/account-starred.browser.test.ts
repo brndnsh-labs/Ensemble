@@ -15,7 +15,6 @@ import {
     ACCOUNT_DATABASE,
     type AccountScope,
     digest,
-    starsMigratedKey,
 } from '../../prototypes/v2/lib/sync/protocol.js';
 import {
     AccountSongbook,
@@ -30,7 +29,6 @@ import { accountChart } from '../utils/account-songbook-fixture.js';
  * against real IndexedDB in both engines:
  *
  * - a collection edit is ONE read-modify-write transaction, refused locally at the document cap;
- * - the one-time copy of the device-local `star:` rows into Starred (the account migration);
  * - a conflicted collection Save resolves by MERGE, without asking — and two devices that star
  *   different songs offline both end with the union, nothing queued, nothing conflicted;
  * - the sign-out preflight and the sync chip count collection Saves;
@@ -79,26 +77,6 @@ afterEach(async () => {
         });
     }
 });
-
-/** Reads one raw `meta` key: nothing in the repository API exposes the marker itself. */
-function metaKey(name: string, key: string): Promise<unknown> {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open(name);
-        request.onerror = () => reject(request.error);
-        request.onsuccess = () => {
-            const db = request.result;
-            const read = db.transaction('meta', 'readonly').objectStore('meta').get(key);
-            read.onsuccess = () => {
-                db.close();
-                resolve(read.result);
-            };
-            read.onerror = () => {
-                db.close();
-                reject(read.error);
-            };
-        };
-    });
-}
 
 /** A transport that commits every Save, as an account with nothing else in it would. */
 function committing(): SaveTransport {
@@ -214,71 +192,6 @@ async function fill(target: AccountSongbook, count: number): Promise<void> {
         };
     });
 }
-
-describe('the device-local stars are copied into Starred once (#1477)', () => {
-    it('copies every star row into a new Starred and leaves the rows in place', async () => {
-        await book.setStarred(scope, 'song-2', true);
-        await book.setStarred(scope, 'song-1', true);
-
-        expect(await book.migrateStars(scope)).toBe('migrated');
-
-        const [starred] = await book.listCollections(scope);
-        expect(starred.documentId).toBe(STARRED_COLLECTION_ID);
-        expect(new Set(starred.document.songIds)).toEqual(new Set(['song-1', 'song-2']));
-        // A copy: the #1440 rows are exactly as they were, so the migration is reversible.
-        expect(await book.starredIds(scope)).toEqual(new Set(['song-1', 'song-2']));
-        // And it queued ONE Save, for the outbox to send.
-        expect(await book.pendingCollection(scope, STARRED_COLLECTION_ID)).toHaveLength(1);
-    });
-
-    it('runs once: a song unstarred after the copy is not starred again', async () => {
-        await book.setStarred(scope, 'song-1', true);
-        expect(await book.migrateStars(scope)).toBe('migrated');
-        await book.editCollection(scope, STARRED_COLLECTION_ID, (current) =>
-            current ? withSong(current, 'song-1', false) : null,
-        );
-
-        expect(await book.migrateStars(scope)).toBe('done');
-        const [starred] = await book.listCollections(scope);
-        expect(starred.document.songIds).toEqual([]);
-    });
-
-    it('creates no Starred when this device has no stars', async () => {
-        expect(await book.migrateStars(scope)).toBe('nothing');
-        expect(await book.listCollections(scope)).toEqual([]);
-        expect(await book.migrateStars(scope)).toBe('done');
-    });
-
-    it('adds this device’s stars after whatever Starred already holds', async () => {
-        await book.editCollection(scope, STARRED_COLLECTION_ID, () => newStarred(['theirs']));
-        await book.setStarred(scope, 'mine', true);
-        await book.setStarred(scope, 'theirs', true);
-
-        expect(await book.migrateStars(scope)).toBe('migrated');
-        const [starred] = await book.listCollections(scope);
-        expect(starred.document.songIds).toEqual(['theirs', 'mine']);
-    });
-
-    it('at the cap it writes nothing — not even its marker — so it is tried again later', async () => {
-        await book.setStarred(scope, 'song-1', true);
-        await fill(book, MAX_REMOTE_CANDIDATES);
-
-        expect(await book.migrateStars(scope)).toBe('full');
-        expect(await book.listCollections(scope)).toEqual([]);
-        const name = databaseOf.get(book)!;
-        expect(await metaKey(name, starsMigratedKey(OWNER))).toBeUndefined();
-    });
-
-    it('sign-out removes the marker with the rows it describes', async () => {
-        await book.setStarred(scope, 'song-1', true);
-        await book.migrateStars(scope);
-        const name = databaseOf.get(book)!;
-        expect(await metaKey(name, starsMigratedKey(OWNER))).toBeDefined();
-        await book.switchAccount(null);
-        await book.clearAccount(OWNER);
-        expect(await metaKey(name, starsMigratedKey(OWNER))).toBeUndefined();
-    });
-});
 
 describe('a conflicted collection Save resolves by merge, without asking (#1477)', () => {
     function conflicting(remote: { revision: string; document: unknown } | null): SaveTransport {

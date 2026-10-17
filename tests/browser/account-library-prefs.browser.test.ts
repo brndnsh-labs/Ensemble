@@ -5,16 +5,17 @@ import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**
- * Per-song opened-at and starred preferences (#1440) against real IndexedDB in both engines.
+ * The per-song opened-at preference (#1440) against real IndexedDB in both engines. (#1440's
+ * per-device stars are the built-in Starred collection since #1477; their old rows are inert.)
  *
  * Three claims a fake store cannot prove:
  *
  * 1. **Recording an open never touches the `songs`/`operations` stores.** A preference read has to
  *    prove it did not accidentally commit a document edit or queue a Save — the acceptance
  *    criterion this suite exists to pin.
- * 2. **Both preferences are scoped per owner**, the way `lastOpenedKey`/candidates/deletions
- *    already are: account A's stars and opens are invisible to account B on the same device.
- * 3. **`clearAccount` removes both**, alongside everything else a sign-out clears.
+ * 2. **The preference is scoped per owner**, the way `lastOpenedKey`/candidates/deletions
+ *    already are: account A's opens are invisible to account B on the same device.
+ * 3. **`clearAccount` removes it**, alongside everything else a sign-out clears.
  */
 
 const A = 'owner-a';
@@ -130,35 +131,5 @@ describe('opened-at (#1440)', () => {
         const mapB = await book.openedAtMap(scopeB2);
         expect(mapB.size).toBe(1);
         expect(mapB.has('song-3')).toBe(true);
-    });
-});
-
-describe('starred songs (#1440)', () => {
-    it('stars and unstars a song', async () => {
-        await book.setStarred(scopeA, 'song-1', true);
-        expect(await book.starredIds(scopeA)).toEqual(new Set(['song-1']));
-        await book.setStarred(scopeA, 'song-1', false);
-        expect(await book.starredIds(scopeA)).toEqual(new Set());
-    });
-
-    it('scopes stars per owner — B never sees A’s stars', async () => {
-        await book.setStarred(scopeA, 'song-1', true);
-        const scopeB = (await book.switchAccount(B))!;
-        expect(await book.starredIds(scopeB)).toEqual(new Set());
-    });
-
-    it('clearAccount removes every star for that owner, and only that owner', async () => {
-        await book.setStarred(scopeA, 'song-1', true);
-        await book.setStarred(scopeA, 'song-2', true);
-        const scopeB = (await book.switchAccount(B))!;
-        await book.setStarred(scopeB, 'song-3', true);
-
-        await book.clearAccount(A);
-
-        const scopeA2 = (await book.switchAccount(A))!;
-        expect(await book.starredIds(scopeA2)).toEqual(new Set());
-        // B's own star is untouched (#1440 review P5) — same fence as opened-at above.
-        const scopeB2 = (await book.switchAccount(B))!;
-        expect(await book.starredIds(scopeB2)).toEqual(new Set(['song-3']));
     });
 });

@@ -255,7 +255,7 @@ describe('adoptGuestSongs', () => {
 });
 
 /**
- * Node/happy-dom has no `localStorage` at all, same fact `account-feature.test.ts` documents —
+ * Node/happy-dom has no `localStorage` at all, same fact `held-account.test.ts` documents —
  * which is exactly why both accessors here are wrapped in try/catch, proven the same way.
  */
 function withStorage(store: Map<string, string>, options: { throws?: boolean } = {}) {
