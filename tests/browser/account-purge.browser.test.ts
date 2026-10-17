@@ -206,6 +206,71 @@ describe('purgeLocal deletes a song from this device for good (#1754)', () => {
         expect(await rowsFor(KEPT)).toEqual(before);
     });
 
+    it('holds a confirmed song whose candidate is a newer version or an unreadable body', async () => {
+        // Only a `deleted` candidate means the account let go of the id. A `version` or an
+        // `unsupported` one is the account HOLDING it, so a local delete would only come back.
+        await confirmed(KEPT, 'kept-1');
+        await book.recover(scope, 'writer-1', chart('Held by a draft', KEPT, 0), 0);
+        expect(
+            await book.reconcile(
+                scope,
+                {
+                    kind: 'version',
+                    documentId: KEPT,
+                    revision: 'kept-2',
+                    document: chart('Their take', KEPT, 3),
+                },
+                { expectedRemoteRevision: 'kept-1' },
+            ),
+        ).toBe('candidate');
+        expect((await book.remoteCandidate(scope, KEPT))?.kind).toBe('version');
+        let before = await rowsFor(KEPT);
+        expect(await book.purgeLocal(scope, [KEPT])).toEqual({ purged: [], held: [KEPT] });
+        expect(await rowsFor(KEPT)).toEqual(before);
+
+        expect(
+            await book.reconcile(scope, {
+                kind: 'unsupported',
+                documentId: KEPT,
+                revision: 'kept-3',
+                body: { schemaVersion: 99, id: KEPT },
+                reason: 'needs-app-update',
+            }),
+        ).toBe('unsupported');
+        expect((await book.remoteCandidate(scope, KEPT))?.kind).toBe('unsupported');
+        before = await rowsFor(KEPT);
+        expect(await book.purgeLocal(scope, [KEPT])).toEqual({ purged: [], held: [KEPT] });
+        expect(await rowsFor(KEPT)).toEqual(before);
+    });
+
+    it('purges what it may and holds the rest, in the same call', async () => {
+        await tombstonedWithEverything(GONE);
+        await confirmed(KEPT, 'kept-1');
+        const kept = await rowsFor(KEPT);
+
+        expect(await book.purgeLocal(scope, [KEPT, GONE])).toEqual({
+            purged: [GONE],
+            held: [KEPT],
+        });
+        expect(await rowsFor(GONE)).toEqual({ songs: 0, drafts: 0, operations: 0, meta: [] });
+        expect(await rowsFor(KEPT)).toEqual(kept);
+    });
+
+    it('never reaches an id that merely starts with the purged one', async () => {
+        // `gone` is a key prefix of `gone-song` in every store: a range bound one character too
+        // loose would take the longer id's rows with it.
+        await tombstonedWithEverything('gone');
+        await tombstonedWithEverything(GONE);
+        const neighbour = await rowsFor(GONE);
+        expect(neighbour.drafts).toBe(2);
+        expect(neighbour.operations).toBe(2);
+        expect(neighbour.meta).toHaveLength(4);
+
+        expect(await book.purgeLocal(scope, ['gone'])).toEqual({ purged: ['gone'], held: [] });
+        expect(await rowsFor('gone')).toEqual({ songs: 0, drafts: 0, operations: 0, meta: [] });
+        expect(await rowsFor(GONE)).toEqual(neighbour);
+    });
+
     it('holds a collection id rather than deleting through it', async () => {
         const set = newCollection('Set');
         expect(await book.editCollection(scope, set.id, () => set)).not.toBeNull();
