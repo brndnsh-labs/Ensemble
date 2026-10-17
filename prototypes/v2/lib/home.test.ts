@@ -50,7 +50,7 @@ describe('settleHome (#1441)', () => {
             pass,
             8,
         );
-        expect(slice).toEqual({ count: 2, continued: null, rows: [], unreadable: 2 });
+        expect(slice).toEqual({ count: 2, gone: 0, continued: null, rows: [], unreadable: 2 });
     });
 });
 

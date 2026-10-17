@@ -1036,6 +1036,21 @@ export interface SyncLoop {
      */
     deleteFromCloud(documentId: string, owner: string | null): Promise<CloudDeleteResult>;
     /**
+     * Delete songs from THIS DEVICE for good (#1754): the songs the account no longer holds ("No
+     * longer in your account") or never received (`remoteRevision === null`), which a cloud delete
+     * cannot remove — it can only answer `retained` again. ONE transaction over every id
+     * (`AccountSongbook.purgeLocal`): each id's song row, every writer's draft, its whole outbox
+     * queue and its meta rows. Nothing is queued, frozen or sent. An id the account still holds is
+     * returned in `held`, untouched. Waits out a pass already running, so a Save this tab has in
+     * flight for one of these ids is answered before its queue goes. Fenced on `owner` like every
+     * write; publishes the library and the collections (whose resolved songs shrink) and re-reads
+     * the observation, so the candidates and counts follow.
+     */
+    purgeLocal(
+        documentIds: readonly string[],
+        owner: string | null,
+    ): Promise<{ purged: string[]; held: string[] }>;
+    /**
      * Resolve this document's refused Save by keeping both (#1267) — the one way out of a
      * conflicted outbox head, which is otherwise terminal and parks every later Save of that song
      * behind it.
@@ -2201,6 +2216,22 @@ export function createSyncLoop(
                 retained,
                 message: retained ? DELETE_MESSAGES.retained : DELETE_MESSAGES.deleted,
             };
+        },
+        async purgeLocal(documentIds, owner) {
+            if (inFlight) {
+                await inFlight.catch(() => {});
+            }
+            const current = await ownedScope(owner);
+            const mine = epoch;
+            const result = await songbook.purgeLocal(current, documentIds);
+            if (mine === epoch && result.purged.length > 0) {
+                publish({
+                    libraryVersion: state.libraryVersion + 1,
+                    collectionsVersion: state.collectionsVersion + 1,
+                });
+                await observe();
+            }
+            return result;
         },
         async keepBoth(documentId, owner) {
             // #1311: before the transaction opens. Keeping both CREATES a local line for the

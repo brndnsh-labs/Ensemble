@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
+import { PURGE_MESSAGES, REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
 import { starredOf } from '../lib/collections';
 import { arrangementOf, composerOf, genreOf } from '../lib/documents';
@@ -92,6 +92,11 @@ interface AllSongsProps {
      * to match this specific id before it moves focus at all.
      */
     lastRemovedId: string | null;
+    /**
+     * Remove every listed song the account no longer holds (#1754), behind the shell's one
+     * confirm — the ids of the rows marked "No longer in your account". Account songbook only.
+     */
+    onRemoveGone?: (ids: string[]) => void;
 }
 
 /**
@@ -133,6 +138,7 @@ export function AllSongs({
     onRenameCollection,
     onDeleteCollection,
     removedCollectionId,
+    onRemoveGone,
 }: AllSongsProps) {
     const [view, setViewState] = useState<LibraryView>(
         initialCollectionId === null ? 'all' : `collection:${initialCollectionId}`,
@@ -212,6 +218,17 @@ export function AllSongs({
         () => new Map(remoteCandidates.map((row) => [row.id, row.kind])),
         [remoteCandidates],
     );
+
+    // The songs the account has deleted while this device kept them (#1754): listed and marked,
+    // so they can be removed, but no longer counted as the musician's songs.
+    const goneIds = useMemo(
+        () =>
+            songs
+                .filter((song) => remoteCandidateKinds.get(song.id) === 'deleted')
+                .map((song) => song.id),
+        [songs, remoteCandidateKinds],
+    );
+    const songCount = songs.length - goneIds.length;
 
     const genres = useMemo(() => {
         const present = new Set(songs.map((song) => genreOf(song)));
@@ -378,8 +395,7 @@ export function AllSongs({
                         ← Songbook
                     </button>
                     <h1 ref={heading} tabIndex={-1}>
-                        All songs{' '}
-                        {loaded && <span className="all-songs-count">· {songs.length}</span>}
+                        All songs {loaded && <span className="all-songs-count">· {songCount}</span>}
                     </h1>
                 </div>
             </div>
@@ -428,8 +444,7 @@ export function AllSongs({
                         aria-pressed={view === 'all'}
                         onClick={() => setView('all')}
                     >
-                        All songs{' '}
-                        <span className="filter-count">{loaded ? songs.length : '…'}</span>
+                        All songs <span className="filter-count">{loaded ? songCount : '…'}</span>
                     </button>
                     <button
                         className="filter-item"
@@ -505,6 +520,18 @@ export function AllSongs({
                                 Delete…
                             </button>
                         </div>
+                    )}
+                    {loaded && accountLibrary && onRemoveGone && goneIds.length > 0 && (
+                        <p className="library-notice" data-testid="remove-gone">
+                            <button
+                                className="btn"
+                                data-testid="remove-gone-button"
+                                disabled={busy}
+                                onClick={() => onRemoveGone(goneIds)}
+                            >
+                                {PURGE_MESSAGES.bulk(goneIds.length)}
+                            </button>
+                        </p>
                     )}
                     {!loaded ? (
                         failure ? (
