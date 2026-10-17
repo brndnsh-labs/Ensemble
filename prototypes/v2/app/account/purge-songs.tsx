@@ -19,7 +19,15 @@ export interface PurgeSongsDialogProps {
     /** One song's title, or null for the bulk removal of `count` songs. */
     title: string | null;
     count: number;
+    /**
+     * The one song was never confirmed by the cloud (#1756), so no cloud delete came before this
+     * step and the copy here is the only one. Otherwise a cloud delete came first, or the account
+     * no longer holds the song ("No longer in your account").
+     */
+    unconfirmed: boolean;
     busy: boolean;
+    /** Writes the one song to a file first; the bulk removal has none. */
+    onExport: (() => void) | null;
     onConfirm: () => void;
     onClose: () => void;
 }
@@ -28,7 +36,9 @@ export function PurgeSongsDialog({
     dialogRef,
     title,
     count,
+    unconfirmed,
     busy,
+    onExport,
     onConfirm,
     onClose,
 }: PurgeSongsDialogProps) {
@@ -54,13 +64,26 @@ export function PurgeSongsDialog({
                 </>
             ) : (
                 <>
-                    <h2 id="purge-songs-title">{PURGE_MESSAGES.question}</h2>
+                    <h2 id="purge-songs-title">
+                        {unconfirmed ? PURGE_MESSAGES.unconfirmedQuestion : PURGE_MESSAGES.question}
+                    </h2>
                     <p>
-                        <strong>{title}</strong> — {PURGE_MESSAGES.detail}
+                        <strong>{title}</strong> —{' '}
+                        {unconfirmed ? PURGE_MESSAGES.unconfirmedDetail : PURGE_MESSAGES.detail}
                     </p>
                 </>
             )}
             <div className="dialog-actions">
+                {onExport && (
+                    <button
+                        className="btn"
+                        data-testid="purge-songs-export"
+                        disabled={busy}
+                        onClick={onExport}
+                    >
+                        Export file
+                    </button>
+                )}
                 <button
                     className="btn danger"
                     data-testid="purge-songs-confirm"

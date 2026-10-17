@@ -787,9 +787,15 @@ export default function Ensemble() {
     const rowDeleteDialogRef = useRef<HTMLDialogElement>(null);
     // Delete from this device for good (#1754): one song the account no longer holds or never
     // received (`title` set), or every "No longer in your account" row at once (`title` null).
-    const [purgeTarget, setPurgeTarget] = useState<{ ids: string[]; title: string | null } | null>(
-        null,
-    );
+    // `unconfirmed`: the cloud never confirmed the one song, so no cloud delete came first and
+    // this copy is the only one; `onStand`: asked from the Song menu, about the chart on the stand
+    // (#1756).
+    const [purgeTarget, setPurgeTarget] = useState<{
+        ids: string[];
+        title: string | null;
+        unconfirmed?: boolean;
+        onStand?: boolean;
+    } | null>(null);
     const purgeDialogRef = useRef<HTMLDialogElement>(null);
     // The songbook's own status line (#1440 review P2) — set only by row actions (renamed,
     // duplicated, deleted, "hasn't reached your account yet"), NEVER the stand's `message`
@@ -4121,7 +4127,7 @@ export default function Ensemble() {
                 await accountSync.watch(target.id);
                 if (accountSync.getSnapshot().observation?.remoteRevision == null) {
                     releaseRowDeleteClaim();
-                    setPurgeTarget({ ids: [target.id], title: target.title });
+                    setPurgeTarget({ ids: [target.id], title: target.title, unconfirmed: true });
                     return;
                 }
                 setRowDeleteFailure(null);
@@ -4147,6 +4153,26 @@ export default function Ensemble() {
         }
         void run(async () => {
             const document = await exportableRowDocument(target.id);
+            if (document) {
+                exportDocument(document);
+            }
+        });
+    }
+    /**
+     * The delete-from-this-device step's Export (#1756): for a song the cloud never confirmed it
+     * is the only way to keep a copy. The stand's chart as it stands, or the row's newest version.
+     */
+    function exportPurgeTarget() {
+        const target = purgeTarget;
+        if (!target || target.title === null) {
+            return;
+        }
+        if (target.onStand) {
+            void run(exportSong);
+            return;
+        }
+        void run(async () => {
+            const document = await exportableRowDocument(target.ids[0]);
             if (document) {
                 exportDocument(document);
             }
@@ -4261,6 +4287,12 @@ export default function Ensemble() {
             const onStand = currentNow.current;
             if (onStand && purged.has(onStand.id)) {
                 leaveDeletedSong();
+            } else if (target.onStand && result.held.length > 0) {
+                // The account holds it after all (a Save landed meanwhile): it stays on the stand,
+                // and the reason is said there, not on a songbook nobody is looking at.
+                setPurgeTarget(null);
+                setError(PURGE_MESSAGES.held);
+                return;
             }
             setPurgeTarget(null);
             await refreshSongs();
@@ -4466,14 +4498,18 @@ export default function Ensemble() {
             return;
         }
         void run(async () => {
-            if (format === 'song') {
-                exportSong();
-            } else if (format === 'midi') {
-                await exportMidiFile();
-            } else if (current?.schemaVersion === 2 && current.importSource) {
-                downloadImportSource(current.importSource.text);
+            try {
+                if (format === 'song') {
+                    exportSong();
+                } else if (format === 'midi') {
+                    await exportMidiFile();
+                } else if (current?.schemaVersion === 2 && current.importSource) {
+                    downloadImportSource(current.importSource.text);
+                }
+            } finally {
+                // Written or refused, it closes: a refusal is in the error line behind it.
+                setExportOpen(false);
             }
-            setExportOpen(false);
         });
     }
     /**
@@ -4489,12 +4525,34 @@ export default function Ensemble() {
             return;
         }
         if (standStore?.store === 'account') {
-            if (inAccount && standCandidate?.kind !== 'deleted') {
+            const target = { id: current.id, title: current.title };
+            // Asked of the candidates directly, as `requestDeleteRow` does: `standCandidate` is
+            // null while a Save is queued, and a song the account deleted under a queued Save
+            // must still go to this device's delete, not a cloud delete that only answers
+            // `retained`.
+            if (
+                sync.candidates.some(
+                    (row) => row.documentId === target.id && row.kind === 'deleted',
+                )
+            ) {
+                setPurgeTarget({ ids: [target.id], title: target.title, onStand: true });
+                return;
+            }
+            void run(async () => {
+                // This song's own observation, read now, not whatever the watch last held.
+                await accountSync.watch(target.id);
+                if (accountSync.getSnapshot().observation?.remoteRevision == null) {
+                    setPurgeTarget({
+                        ids: [target.id],
+                        title: target.title,
+                        unconfirmed: true,
+                        onStand: true,
+                    });
+                    return;
+                }
                 setDeleteFailure(null);
                 setDeleteOpen(true);
-            } else {
-                setPurgeTarget({ ids: [current.id], title: current.title });
-            }
+            });
             return;
         }
         setGuestDeleteTarget({
@@ -6894,7 +6952,9 @@ export default function Ensemble() {
                     dialogRef={purgeDialogRef}
                     title={purgeTarget.title}
                     count={purgeTarget.ids.length}
+                    unconfirmed={!!purgeTarget.unconfirmed}
                     busy={busy}
+                    onExport={purgeTarget.title === null ? null : exportPurgeTarget}
                     onConfirm={purgeConfirmed}
                     onClose={() => setPurgeTarget(null)}
                 />

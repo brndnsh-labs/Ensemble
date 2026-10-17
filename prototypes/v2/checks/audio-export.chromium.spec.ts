@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises';
+import type { Page } from '@playwright/test';
 import { appUrl, expect, exportAs, openBand, seedStarters, songLink, test } from './fixtures';
 
 // Same starter facts `checks/midi-export.spec.ts` hardcodes, for the same reason: an
@@ -110,7 +111,11 @@ test('Export → Audio during playback does not stop or glitch the band', async 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 
-test('Cancel stops an in-flight export before any download', async ({ page }) => {
+/**
+ * Blue pocket on the stand with the grand piano chosen but evicted, and its manifest fetch held
+ * back 4s once armed: an export's own `prepareSounds` then has slow work to do.
+ */
+async function slowGrandExport(page: Page) {
     // Delay (never fail) only the pack's OWN manifest fetch once armed — not
     // every sample file, which would stack a serial multi-second delay onto
     // each of `grand`'s 21 samples (`prepareSound` fetches at concurrency 1) —
@@ -156,7 +161,10 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
         }
         Object.assign(window, { __delayPack: true });
     });
+}
 
+test('Cancel stops an in-flight export before any download', async ({ page }) => {
+    await slowGrandExport(page);
     const download = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);
     await exportAs(page, 'Audio (mix)');
     await expect(page.getByText(/Preparing Acoustic Grand Piano/)).toBeVisible();
@@ -173,6 +181,26 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
     await expect(page.locator('.error-banner')).toHaveCount(0);
     await expect(page.getByTestId('export-dialog')).toBeHidden();
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
+});
+
+test('Esc never closes Export… while audio renders: Cancel stays in reach (#1756)', async ({
+    page,
+}) => {
+    await slowGrandExport(page);
+    await exportAs(page, 'Audio (mix)');
+    const dialog = page.getByTestId('export-dialog');
+    await expect(page.getByText(/Preparing Acoustic Grand Piano/)).toBeVisible();
+    // A browser honours a refused `cancel` only with fresh user activation, so the third Esc
+    // closes a modal dialog anyway; the dialog opens itself again while the render runs.
+    for (let press = 0; press < 3; press += 1) {
+        await page.keyboard.press('Escape');
+    }
+    await expect(dialog).toBeVisible();
+    await expect(page.getByText(/Preparing Acoustic Grand Piano/)).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
+    await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
 test('A pack that fails to install surfaces an error, never a silent synth fallback', async ({

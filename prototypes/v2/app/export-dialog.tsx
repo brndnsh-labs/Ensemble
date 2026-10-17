@@ -1,5 +1,4 @@
 import type { RefObject } from 'react';
-import { whenClosed } from './dialog-close';
 
 export type ExportFormat = 'song' | 'midi' | 'mix' | 'stems' | 'source';
 
@@ -33,8 +32,10 @@ const FORMATS: readonly { format: ExportFormat; label: string; file: string }[] 
  * Export… (#1756): the one place a song leaves the app as a file, opened from the Song menu. The
  * formats are a short list of plain names; the original import text is offered too when the song
  * has one. An audio render keeps the dialog open with its progress and Cancel, and nothing but
- * Cancel dismisses it meanwhile (Esc and the backdrop are refused), so the render is never left
- * running out of sight. Every other format writes its file at once and the dialog closes.
+ * Cancel dismisses it meanwhile, so the render is never left running out of sight. Esc's `cancel`
+ * is refused, but a browser honours that refusal only while the page has fresh user activation:
+ * a third Esc, or Android's Back gesture, closes the dialog anyway. So a close that lands while
+ * the render runs re-opens it at once. Every other format writes its file and the dialog closes.
  */
 export function ExportDialog({
     dialogRef,
@@ -63,7 +64,18 @@ export function ExportDialog({
                 }
                 onClose();
             }}
-            onClose={whenClosed(onClose)}
+            onClose={(event) => {
+                const dialog = event.currentTarget;
+                // A queued close reaching a dialog already open again is stale (`whenClosed`).
+                if (dialog.open) {
+                    return;
+                }
+                if (exportingAudio) {
+                    dialog.showModal();
+                    return;
+                }
+                onClose();
+            }}
         >
             <h2 id="export-dialog-title">Export “{title}”</h2>
             <div className="export-formats" role="group" aria-label="Format">

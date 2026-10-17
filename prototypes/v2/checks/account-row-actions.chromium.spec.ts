@@ -207,7 +207,9 @@ test('Delete… on a song the cloud has never acknowledged deletes it from this 
     // Nothing has reached the cloud, so there is no cloud delete to confirm — and no dead end
     // either (#1754): the delete-from-this-device step, which takes the queued Save with it.
     await expect(page.getByTestId('delete-song-confirm')).toHaveCount(0);
-    await expect(page.getByTestId('purge-songs')).toContainText('Delete from this device too?');
+    await expect(page.getByTestId('purge-songs')).toContainText(
+        'Delete this song from this device?',
+    );
     await page.getByTestId('purge-songs-confirm').click();
     await expect(page.getByTestId('shell-message')).toContainText('Deleted from this device');
     await expect(page.locator('.song-table .song-row')).toHaveCount(0);
