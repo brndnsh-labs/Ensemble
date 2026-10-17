@@ -2,6 +2,7 @@ import {
     CODE_SHAPE,
     createAccountThroughDialog,
     dismissAdoptGuestPrompt,
+    openSignOut,
     openWithAccounts,
     persistedState,
 } from './account-helpers';
@@ -58,7 +59,7 @@ test('recovering with the code replaces the passkey, and an interrupted enrolmen
     // lost rather than merely joined by a second one.
     const [lost] = await authenticator.credentials();
 
-    await page.getByTestId('account-sign-out').click();
+    await openSignOut(page);
     await page.getByTestId('sign-out-confirm').click();
     // A deliberate sign-out reads as `guest`, not `expired` (#1269) — "Sign in again" belongs to
     // a session that went away underneath somebody, which is not what just happened.

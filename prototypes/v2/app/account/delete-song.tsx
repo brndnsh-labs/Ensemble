@@ -1,7 +1,7 @@
 'use client';
 
 import type { RefObject } from 'react';
-import { whenClosed } from '../dialog-close';
+import { dialogRule } from '../dialog-close';
 
 /**
  * The confirm step for deleting one song from the cloud (#1270).
@@ -14,18 +14,18 @@ import { whenClosed } from '../dialog-close';
  *
  * 1. **The export preflight is offered, not implied.** `docs/design/ensemble-v2-sync.md`:
  *    "Cloud document deletion is an explicit online operation with a tombstone and
- *    recovery/export preflight". Export is a real button here, right beside the destructive one,
- *    because a file on the musician's disk is the only thing that survives this either way.
+ *    recovery/export preflight". Export is a real button here, first in the row (then Cancel, then
+ *    the red Delete, #1760), because a file on the musician's disk is the only thing that survives
+ *    this either way.
  * 2. **Offline, the destructive button is DISABLED with a reason** (rollout decision 9 S2's posture
  *    for sign-out, applied for the same reason): deleting is a server operation, and a button that
  *    looks live and then fails teaches nothing. Export stays available offline — it never leaves
  *    the device.
  * 3. **Local work is named before it is risked, not after.** Unsaved edits and Saves still waiting
  *    to upload are two different facts with two different consequences, so they are two sentences.
- * 4. **Nothing dismisses this step while the request is in flight** — not Cancel, not Escape. The
- *    answer to a destructive request is written here, and a step that vanished mid-flight would
- *    take that answer with it. The Escape default is the one browser behaviour above that is
- *    overridden, and only while `busy`.
+ * 4. **Nothing dismisses this step while the request is in flight** — not Cancel, not Escape, not
+ *    a backdrop tap (`dialogRule`). The answer to a destructive request is written here, and a step
+ *    that vanished mid-flight would take that answer with it.
  */
 
 export interface DeleteSongDialogProps {
@@ -62,17 +62,10 @@ export function DeleteSongDialog({
             ref={dialogRef}
             className="modal-box"
             aria-labelledby="delete-song-title"
-            onCancel={(event) => {
-                // Escape while the request is in flight would close the step its own answer is
-                // written to. The shell has a fallback for a refusal that arrives at a closed
-                // dialog, but the musician would still have lost the place they were standing.
-                if (busy) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
-            onClose={whenClosed(onClose)}
+            // Escape or a backdrop tap while the request is in flight would close the step its own
+            // answer is written to. The shell has a fallback for a refusal that arrives at a closed
+            // dialog, but the musician would still have lost the place they were standing.
+            {...dialogRule({ onClose, busy })}
         >
             <h2 id="delete-song-title">Delete “{title}” from your account?</h2>
             <p>
@@ -118,19 +111,19 @@ export function DeleteSongDialog({
                 </button>
                 <button
                     className="btn"
-                    data-testid="delete-song-confirm"
-                    disabled={busy || !online}
-                    onClick={onConfirm}
-                >
-                    Delete from my account
-                </button>
-                <button
-                    className="btn"
                     data-testid="delete-song-cancel"
                     disabled={busy}
                     onClick={onClose}
                 >
                     Cancel
+                </button>
+                <button
+                    className="btn danger"
+                    data-testid="delete-song-confirm"
+                    disabled={busy || !online}
+                    onClick={onConfirm}
+                >
+                    Delete from my account
                 </button>
             </div>
         </dialog>

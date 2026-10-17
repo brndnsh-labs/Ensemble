@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import {
+    accountChip,
     backToSongbook,
     closeSongActions,
     dismissAdoptGuestPrompt,
@@ -84,7 +85,7 @@ async function signInOnSecondDevice(page: Page): Promise<void> {
     await openWithAccounts(page);
     await page.getByTestId('account-sign-in').click();
     await page.getByTestId('account-do-sign-in').click();
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(accountChip(page)).toBeVisible();
     // A fresh profile: its own seeded guest songs (`openWithAccounts`, #1439), none of them in the account, so #1268's prompt
     // opens here too once the download lands.
     await dismissAdoptGuestPrompt(page);

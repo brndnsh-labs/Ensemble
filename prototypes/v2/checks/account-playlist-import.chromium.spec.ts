@@ -60,7 +60,7 @@ test('a playlist imports into the account as a collection, states the cap first,
     expect(await serverDocuments(page)).toBe(0);
 
     await page.getByRole('button', { name: 'Import chart', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Review import' });
+    const dialog = page.getByRole('dialog', { name: /^(Import a chart|Review import)$/ });
     await dialog.getByText('Or paste an iReal link', { exact: true }).click();
     await dialog.getByLabel('iReal link', { exact: true }).fill(SET);
     await dialog.getByRole('button', { name: 'Review link', exact: true }).click();

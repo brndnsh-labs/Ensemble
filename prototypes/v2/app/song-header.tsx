@@ -146,15 +146,16 @@ export function SongHeader({
                         {focused ? 'Show controls' : 'Focus chart'}
                     </button>
                 )}
-                <div className="mode-switch">
-                    <button className={!editing && !neck ? 'active' : ''} onClick={onShowChart}>
+                {/* The current mode is said with `aria-pressed`, not colour alone (#1760). */}
+                <div className="mode-switch" role="group" aria-label="Stand mode">
+                    <button aria-pressed={!editing && !neck} onClick={onShowChart}>
                         Chart
                     </button>
-                    <button className={neck && !editing ? 'active' : ''} onClick={onShowNeck}>
+                    <button aria-pressed={neck && !editing} onClick={onShowNeck}>
                         Neck
                     </button>
                     <button
-                        className={editing ? 'active' : ''}
+                        aria-pressed={editing}
                         disabled={busy}
                         // The phone shows "Edit" (three modes share its header row); the name stays whole.
                         aria-label="Edit chart"

@@ -29,12 +29,12 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
     // select, not the option.)
     await expect(sheet.locator('option[value="drums"]')).toHaveAttribute('disabled', '');
     await expect(sheet.getByLabel('Turns', { exact: true })).toBeDisabled();
-    // "Head returns" defaults to 2 choruses, same as an untraded chart's implicit default.
-    await expect(sheet.getByLabel('Head returns')).toBeDisabled();
-    await expect(sheet.getByLabel('Head returns')).toHaveValue('2');
+    // "Melody comes back" defaults to 2 choruses, same as an untraded chart's implicit default.
+    await expect(sheet.getByLabel('Melody comes back')).toBeDisabled();
+    await expect(sheet.getByLabel('Melody comes back')).toHaveValue('2');
     await sheet.getByLabel('Trade with').selectOption('soloist');
     await sheet.getByLabel('Turns', { exact: true }).selectOption('2');
-    await sheet.getByLabel('Head returns').selectOption('3');
+    await sheet.getByLabel('Melody comes back').selectOption('3');
     await sheet.getByRole('button', { name: 'Close band' }).click();
 
     // Trading with the soloist turns it on; the button shows the turns.

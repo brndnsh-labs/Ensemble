@@ -1,9 +1,11 @@
 import type { Page } from '@playwright/test';
 import { ACCOUNT_DATABASE } from '../lib/sync/protocol';
 import {
+    accountChip,
     backToSongbook,
     closeSongActions,
     dismissAdoptGuestPrompt,
+    draftKept,
     newSongOnTheStand,
     openSong,
     openSongActions,
@@ -206,7 +208,7 @@ test('a tombstoned song held by an unsaved draft is marked and offered a new ide
         await openWithAccounts(second);
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
-        await expect(second.getByRole('button', { name: 'Sign out' })).toBeVisible();
+        await expect(accountChip(second)).toBeVisible();
         await dismissAdoptGuestPrompt(second);
 
         // Device one leaves an unsaved draft on the song and closes it — the record is held by
@@ -214,7 +216,7 @@ test('a tombstoned song held by an unsaved draft is marked and offered a new ide
         await openSong(page, 'Set list');
         await page.getByRole('button', { name: 'Edit chart' }).click();
         await page.getByLabel('Song title').fill('Set list — my words');
-        await expect(page.getByText('Draft recovered on this device')).toBeVisible();
+        await draftKept(page, 'Set list — my words');
         await backToSongbook(page);
 
         // Device two deletes the song from the account.

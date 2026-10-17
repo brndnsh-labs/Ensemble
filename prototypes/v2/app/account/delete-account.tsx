@@ -145,6 +145,16 @@ export function DeleteAccountStep({
                     </button>
                 )}
                 <button
+                    className="btn"
+                    data-testid="delete-account-cancel"
+                    // Nothing dismisses this step while the request is in flight — the answer to a
+                    // destructive request is written here, not walked away from.
+                    disabled={busy}
+                    onClick={onCancel}
+                >
+                    Cancel
+                </button>
+                <button
                     className="btn danger"
                     data-testid="delete-account-confirm"
                     // Never while the library is unread: deleting before `songCount` resolves
@@ -155,16 +165,6 @@ export function DeleteAccountStep({
                     onClick={onConfirm}
                 >
                     Delete my account
-                </button>
-                <button
-                    className="btn"
-                    data-testid="delete-account-cancel"
-                    // Nothing dismisses this step while the request is in flight — the answer to a
-                    // destructive request is written here, not walked away from.
-                    disabled={busy}
-                    onClick={onCancel}
-                >
-                    Cancel
                 </button>
             </div>
         </>

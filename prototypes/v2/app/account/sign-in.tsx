@@ -11,7 +11,7 @@ import {
     signIn,
 } from '../../lib/account/passkeys';
 import { track } from '../../lib/telemetry';
-import { whenClosed } from '../dialog-close';
+import { dialogRule } from '../dialog-close';
 import { AccountFailureNotice } from './account-failure';
 import { RecoverFlow } from './recover';
 import { RecoveryCodeStep } from './recovery-code-step';
@@ -214,8 +214,10 @@ export function SignInDialog({
             ref={dialogRef}
             className="modal-box account-dialog"
             aria-labelledby="account-dialog-title"
-            onCancel={onClose}
-            onClose={whenClosed(onClose)}
+            // Esc always closes it: every await here re-checks `openRef`. A backdrop tap does not
+            // while a ceremony runs, a recovery code is on screen (shown once) or one is being
+            // typed (#1760).
+            {...dialogRule({ onClose, keep: busy || code !== '' || stage === 'recover' })}
         >
             {!supported ? (
                 <>

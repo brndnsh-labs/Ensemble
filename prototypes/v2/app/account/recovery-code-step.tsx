@@ -123,20 +123,20 @@ export function RecoveryCodeStep({
             </label>
             <div className="dialog-actions">
                 <button
-                    className="btn primary"
-                    data-testid="recovery-finish"
-                    disabled={!savedCode || busy}
-                    onClick={onFinish}
-                >
-                    Finish
-                </button>
-                <button
                     className="btn"
                     data-testid="recovery-not-now"
                     disabled={busy}
                     onClick={onClose}
                 >
                     Not now
+                </button>
+                <button
+                    className="btn primary"
+                    data-testid="recovery-finish"
+                    disabled={!savedCode || busy}
+                    onClick={onFinish}
+                >
+                    Finish
                 </button>
             </div>
             <p className="status-detail">

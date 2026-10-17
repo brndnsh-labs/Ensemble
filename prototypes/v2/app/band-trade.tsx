@@ -36,8 +36,9 @@ interface TradeTabProps {
 /**
  * The Band sheet's Trade tab (#1703): trading with the band (the band engine's
  * `BandSettings.trade`, docs/design/band-engine.md):
- * after the head, the band plays a phrase and leaves the player room to answer, turn about.
- * Saved with the chart, like the rest of the band's settings.
+ * after the melody (the head), the band plays a phrase and leaves the player room to answer, turn
+ * about. Saved with the chart, like the rest of the band's settings. Its labels are plain words
+ * (#1760): "Melody comes back", never the jargon "Head returns".
  */
 export function TradeTab({ current, busy, partners, blocked, onChange }: TradeTabProps) {
     const soloist = current.chart.band.soloist;
@@ -47,7 +48,8 @@ export function TradeTab({ current, busy, partners, blocked, onChange }: TradeTa
     return (
         <>
             <p className="band-lede">
-                After the head, the band plays a phrase and leaves you room to answer, taking turns.
+                After the melody, the band plays a phrase and leaves you room to answer, taking
+                turns.
             </p>
             <div className="feel-groups">
                 <div className="feel-group">
@@ -109,9 +111,9 @@ export function TradeTab({ current, busy, partners, blocked, onChange }: TradeTa
                 </div>
                 <div className="feel-group">
                     <label>
-                        Head returns
+                        Melody comes back
                         <select
-                            aria-label="Head returns"
+                            aria-label="Melody comes back"
                             disabled={busy || tradeWith === 'off'}
                             value={choruses}
                             onChange={(event) =>

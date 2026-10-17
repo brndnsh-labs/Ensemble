@@ -28,6 +28,8 @@ interface TransportBarProps {
     onGenre: (genre: string) => void;
     /** Opens the Band sheet (#1703) on the tab the musician was last on. */
     onBand: () => void;
+    /** Whether the Band sheet is open: its triggers' `aria-expanded` (#1760). */
+    bandOpen: boolean;
     onToggleLane: (lane: Lane) => void;
     /** Opens the Band sheet on its Trade tab: trading turns with the band. */
     onTrade: () => void;
@@ -51,6 +53,7 @@ export function TransportBar({
     onNotation,
     onGenre,
     onBand,
+    bandOpen,
     onToggleLane,
     onTrade,
     tradeBlocked,
@@ -151,6 +154,7 @@ export function TransportBar({
                     className="band-button"
                     disabled={busy}
                     aria-haspopup="dialog"
+                    aria-expanded={bandOpen}
                     onClick={onBand}
                 >
                     Band…
@@ -176,6 +180,7 @@ export function TransportBar({
                                 className={`band-toggle trade-toggle ${trading ? 'on' : 'off'}`}
                                 disabled={busy}
                                 aria-haspopup="dialog"
+                                aria-expanded={bandOpen}
                                 aria-label={
                                     trade === 'off'
                                         ? 'Trade'

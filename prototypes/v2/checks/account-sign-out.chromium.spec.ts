@@ -1,8 +1,11 @@
 import type { Page } from '@playwright/test';
 import {
+    accountChip,
     backToSongbook,
     closeSongActions,
     newSongOnTheStand,
+    openAccountPage,
+    openSignOut,
     openSong,
     openSongActions,
     openWithAccounts,
@@ -82,7 +85,7 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     // recovery-slot count is what makes that a measurement rather than a hope.
     await backToSongbook(page);
     expect(await recoverySlots(page)).toBe(0);
-    await page.getByTestId('account-sign-out').click();
+    await openSignOut(page);
     await expect(page.getByTestId('sign-out-clear')).toBeVisible();
     await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out');
     await expect(page.getByTestId('sign-out-export')).toHaveCount(0);
@@ -99,15 +102,18 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
     await closeSongActions(page);
 
-    // Offline the header refuses sign-out outright, with the reason visible (decision 9 S2).
+    // Offline the account page refuses sign-out outright, with the reason visible (decision 9 S2).
     // There is no persisted logout barrier, so a device that cannot reach the server cannot
     // honestly claim the session was revoked.
     await backToSongbook(page);
+    const accountPage = await openAccountPage(page);
     await page.context().setOffline(true);
-    await expect(page.getByTestId('account-sign-out')).toBeDisabled();
-    await expect(page.getByTestId('account-offline-note')).toBeVisible();
+    await expect(accountPage.getByTestId('account-sign-out')).toBeDisabled();
+    await expect(accountPage.getByTestId('account-offline-note')).toBeVisible();
     await page.context().setOffline(false);
-    await expect(page.getByTestId('account-sign-out')).toBeEnabled();
+    await expect(accountPage.getByTestId('account-sign-out')).toBeEnabled();
+    await page.keyboard.press('Escape');
+    await expect(accountPage).toBeHidden();
 
     // Editing the chart retains the experiment — in the ACCOUNT's own database (#1299), which is
     // what the zero below measures: not one byte of this account's chart text is in the guest
@@ -120,7 +126,7 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     expect(await recoverySlots(page)).toBe(0);
     await backToSongbook(page);
 
-    await page.getByTestId('account-sign-out').click();
+    await openSignOut(page);
     await expect(page.getByTestId('sign-out-unsent')).toContainText(
         'hasn’t reached your account yet',
     );
@@ -244,7 +250,7 @@ test('an expired session pauses the outbox, says so everywhere, and loses no que
     // lost and it was never rewritten.
     await page.getByTestId('account-sign-in').click();
     await page.getByTestId('account-do-sign-in').click();
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(accountChip(page)).toBeVisible();
     await expect(page.getByTestId('account-expired-banner')).toHaveCount(0);
     await expect(songTitles(page)).toHaveText(['Road take two']);
     await openSong(page, 'Road take two');

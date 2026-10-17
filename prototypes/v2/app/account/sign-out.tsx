@@ -2,7 +2,7 @@
 
 import type { RefObject } from 'react';
 import type { SignOutPreflight } from '../../lib/account/sync-loop';
-import { whenClosed } from '../dialog-close';
+import { dialogRule } from '../dialog-close';
 
 /**
  * The sign-out preflight (#1269) — the step that names what leaving costs before it costs it.
@@ -19,7 +19,7 @@ import { whenClosed } from '../dialog-close';
  *    the musician committed and the account has not taken yet; a draft is an experiment they never
  *    committed at all. Both are about to be removed from this device, and they are protected
  *    differently — one can still be sent, the other can only be exported.
- * 2. **Export and Sync now are real buttons, beside the destructive one.** Export is the only thing
+ * 2. **Export and Sync now are real buttons, ahead of Cancel and the destructive one (last, #1760).** Export is the only thing
  *    that survives this whatever the network does, because it never leaves the device; Sync now is
  *    the one move that can make the queue empty before it is discarded — **unless every unsent
  *    Save has been permanently refused** (#1298), in which case Sync now is a button that provably
@@ -27,10 +27,10 @@ import { whenClosed } from '../dialog-close';
  *    is not offered at all and the sentence names Export as the step that works.
  * 3. **Offline, the destructive button is DISABLED with a reason** (rollout decision 9 S2:
  *    sign-out needs a connection — there is no persisted logout barrier, so a device that cannot
- *    reach the server cannot honestly claim the session was revoked). The header's Sign out button
+ *    reach the server cannot honestly claim the session was revoked). The account page's Sign out
  *    is already disabled offline; this covers the network dropping while the step is open.
- * 4. **Nothing dismisses this step while the request is in flight** — not Cancel, not Escape. The
- *    answer to a destructive request is written here.
+ * 4. **Nothing dismisses this step while the request is in flight** — not Cancel, not Escape, not a
+ *    backdrop tap. The answer to a destructive request is written here.
  *
  * `mode` is the one thing that varies (#1351), and every difference follows from a single fact:
  * whether there is still a session to revoke.
@@ -113,14 +113,7 @@ export function SignOutDialog({
             ref={dialogRef}
             className="modal-box"
             aria-labelledby="sign-out-title"
-            onCancel={(event) => {
-                if (busy) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
-            onClose={whenClosed(onClose)}
+            {...dialogRule({ onClose, busy })}
         >
             <h2 id="sign-out-title">
                 {device ? 'Sign out on this device?' : 'Sign out of your account?'}
@@ -224,6 +217,14 @@ export function SignOutDialog({
                 )}
                 <button
                     className="btn"
+                    data-testid="sign-out-cancel"
+                    disabled={busy}
+                    onClick={onClose}
+                >
+                    Cancel
+                </button>
+                <button
+                    className="btn"
                     data-testid="sign-out-confirm"
                     // Never while the preflight is unread: "Sign out" with nothing said about
                     // what is at stake is the preflight not having happened.
@@ -232,14 +233,6 @@ export function SignOutDialog({
                     onClick={onConfirm}
                 >
                     {atRisk ? 'Sign out anyway' : device ? 'Sign out on this device' : 'Sign out'}
-                </button>
-                <button
-                    className="btn"
-                    data-testid="sign-out-cancel"
-                    disabled={busy}
-                    onClick={onClose}
-                >
-                    Cancel
                 </button>
             </div>
         </dialog>

@@ -1,5 +1,6 @@
 import { ACCOUNT_MESSAGES } from '../lib/account/messages';
 import {
+    accountChip,
     CODE_SHAPE,
     countStepUps,
     createAccountThroughDialog,
@@ -240,7 +241,7 @@ test('passkeys can be added and revoked (each stepping up when stale), the last 
         await openWithAccounts(second);
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
-        await expect(second.getByTestId('account-sign-out')).toBeVisible();
+        await expect(accountChip(second)).toBeVisible();
         // This fresh profile has its own seeded guest songbook (`openWithAccounts`, #1439) and its
         // own `localStorage`, so signing the same owner in here surfaces #1268's prompt again — and
         // declining it is also what proves this context never queues a second adoption of songs

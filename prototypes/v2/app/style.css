@@ -535,7 +535,7 @@ html [hidden] {
     font-size: 12px;
     color: var(--muted);
 }
-.mode-switch button.active {
+.mode-switch button[aria-pressed="true"] {
     background: var(--surface);
     box-shadow: 0 1px 3px #0001;
     color: var(--ink);
@@ -1747,7 +1747,7 @@ dialog textarea {
 .sheet {
     min-width: 0;
 }
-/* Preserved drafts (#1756), a dialog off the Song menu's More. */
+/* Older drafts (#1756, named so since #1760), a dialog off the Song menu's More. */
 .recovery-list {
     display: grid;
     gap: 8px;

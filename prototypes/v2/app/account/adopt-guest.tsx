@@ -11,7 +11,7 @@ import {
     rememberAdoptionDecision,
 } from '../../lib/account/adopt-guest';
 import { AccountMismatchError } from '../../lib/account/sync-loop';
-import { whenClosed } from '../dialog-close';
+import { dialogRule } from '../dialog-close';
 
 /**
  * "Add your N songs on this device to your account?" (#1268) — a `<dialog>` in the same pattern
@@ -251,15 +251,8 @@ export function AdoptGuestDialog({
             ref={dialogRef}
             className="modal-box"
             aria-labelledby="adopt-guest-title"
-            onCancel={(event) => {
-                // A copy in flight must not be abandoned mid-write from underneath itself.
-                if (busy) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
-            onClose={whenClosed(onClose)}
+            // A copy in flight must not be abandoned mid-write from underneath itself.
+            {...dialogRule({ onClose, busy })}
         >
             {phase.kind === 'loading' && (
                 <h2 id="adopt-guest-title">Checking this device’s songs…</h2>

@@ -51,7 +51,10 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
 
     // Neck replaces the chart sheet; stopped, it shows the first grip and points at the second.
     await page.getByRole('button', { name: 'Neck', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveClass(/active/);
+    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
     await expect(page.getByRole('button', { name: 'Chart', exact: true })).not.toHaveClass(
         /active/,
     );
@@ -143,13 +146,19 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     // Neck mode is remembered on this device.
     await page.reload();
     await songLink(page, 'Neck study').first().click();
-    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveClass(/active/);
+    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
     await expect(page.getByRole('region', { name: 'Neck' }).locator('.neck-dot')).toHaveCount(3);
     // The editor overlays the neck without forgetting it: leaving the editor by Play (no mode
     // button pressed) lands back on Neck, the mode a reload would bring back too.
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await editorRevealed(page);
-    await expect(page.getByRole('button', { name: 'Neck', exact: true })).not.toHaveClass(/active/);
+    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+    );
     await expect(page.getByRole('region', { name: 'Neck' })).toHaveCount(0);
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
@@ -157,7 +166,10 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
     // The mode buttons hide while the band plays; stopped, Neck is the active one.
-    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveClass(/active/);
+    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
     // Chart brings the sheet back.
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     await expect(page.locator('.chord')).toHaveText(['Dm7', 'G7', 'Cmaj7', 'Cmaj7']);

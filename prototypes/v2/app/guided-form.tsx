@@ -12,6 +12,7 @@ import {
     guidedGroups,
     guidedRoute,
 } from '../lib/guided-form';
+import { dialogRule } from './dialog-close';
 import { FormControls } from './form-controls';
 import './guided-form.css';
 
@@ -68,10 +69,11 @@ export function GuidedForm({
         0,
         initialSection.measures.findIndex((bar) => bar.id === selectedMeasureId),
     );
-    const [group, setGroup] = useState<GuidedGroup>({
+    const [opening] = useState<GuidedGroup>(() => ({
         body: { start: initialBar, end: initialBar },
         times: 2,
-    });
+    }));
+    const [group, setGroup] = useState<GuidedGroup>(opening);
     const [previous, setPrevious] = useState<GuidedGroup>();
     const [active, setActive] = useState<RangeName>('body');
     const [anchor, setAnchor] = useState<number | null>(null);
@@ -148,12 +150,21 @@ export function GuidedForm({
         setRemove(false);
     }
     const activeRange = group[active] ?? group.body;
+    // A choice in the guide not yet applied holds against a backdrop tap (#1760). The per-bar
+    // markers are written as they change, so they have nothing to lose.
+    const unapplied =
+        remove ||
+        previous !== undefined ||
+        sectionId !== initialSection.id ||
+        JSON.stringify(group) !== JSON.stringify(opening);
 
     return (
         <dialog
             ref={dialog}
             className="guided-form"
             aria-labelledby={`${id}-title`}
+            {...dialogRule({ onClose, keep: unapplied })}
+            // Esc closes it from here: the editor unmounts it, which closes it.
             onCancel={(event) => {
                 event.preventDefault();
                 onClose();

@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import { dialogRule } from './dialog-close';
 
 export type ExportFormat = 'song' | 'midi' | 'mix' | 'stems' | 'source';
 
@@ -57,13 +58,8 @@ export function ExportDialog({
             className="modal-box export-dialog"
             aria-labelledby="export-dialog-title"
             data-testid="export-dialog"
-            onCancel={(event) => {
-                if (exportingAudio) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
+            // A render running holds it open against Esc and the backdrop alike (#1760).
+            {...dialogRule({ onClose, busy: exportingAudio })}
             onClose={(event) => {
                 const dialog = event.currentTarget;
                 // A queued close reaching a dialog already open again is stale (`whenClosed`).

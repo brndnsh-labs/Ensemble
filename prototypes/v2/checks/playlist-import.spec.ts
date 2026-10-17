@@ -67,7 +67,7 @@ function guestSongCount(page: Page): Promise<number> {
 
 async function reviewLink(page: Page, source: string) {
     await page.getByRole('button', { name: 'Import chart', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Review import' });
+    const dialog = page.getByRole('dialog', { name: /^(Import a chart|Review import)$/ });
     await dialog.getByText('Or paste an iReal link', { exact: true }).click();
     await dialog.getByLabel('iReal link', { exact: true }).fill(source);
     await dialog.getByRole('button', { name: 'Review link', exact: true }).click();

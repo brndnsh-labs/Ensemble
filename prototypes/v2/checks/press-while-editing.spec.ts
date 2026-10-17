@@ -82,7 +82,10 @@ test('Neck pressed with a bar open applies the bar and shows the neck (#1733)', 
     await editBluePocket(page);
     await shiftOnChange(page);
     await press(page, 'Neck');
-    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveClass(/active/);
+    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+    );
     await expect(page.locator('.song-subtitle')).toContainText('Unsaved changes');
 });
 

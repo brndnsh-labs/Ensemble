@@ -1,13 +1,13 @@
 import type { RefObject } from 'react';
-import { whenClosed } from './dialog-close';
+import { dialogRule } from './dialog-close';
 
 /**
  * The confirm step for a GUEST-songbook delete (#1440) — the local-only counterpart to
  * `account/delete-song.tsx`'s cloud tombstone, which this must never stand in for: an account
  * song deletes through that route alone.
  *
- * Same posture as the account dialog it sits beside: export offered first, right next to the
- * destructive button, and nothing dismisses this step while the request is in flight.
+ * Same posture as the account dialog it sits beside: export offered first, Cancel next and the red
+ * Delete last (#1760), and nothing dismisses this step while the request is in flight.
  */
 export interface DeleteGuestSongDialogProps {
     dialogRef: RefObject<HTMLDialogElement | null>;
@@ -34,14 +34,7 @@ export function DeleteGuestSongDialog({
             ref={dialogRef}
             className="modal-box"
             aria-labelledby="delete-guest-song-title"
-            onCancel={(event) => {
-                if (busy) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
-            onClose={whenClosed(onClose)}
+            {...dialogRule({ onClose, busy })}
         >
             <h2 id="delete-guest-song-title">Delete “{title}”?</h2>
             <p>
@@ -64,20 +57,20 @@ export function DeleteGuestSongDialog({
                     Export file
                 </button>
                 <button
-                    className="btn danger"
-                    data-testid="delete-guest-song-confirm"
-                    disabled={busy}
-                    onClick={onConfirm}
-                >
-                    Delete
-                </button>
-                <button
                     className="btn"
                     data-testid="delete-guest-song-cancel"
                     disabled={busy}
                     onClick={onClose}
                 >
                     Cancel
+                </button>
+                <button
+                    className="btn danger"
+                    data-testid="delete-guest-song-confirm"
+                    disabled={busy}
+                    onClick={onConfirm}
+                >
+                    Delete
                 </button>
             </div>
         </dialog>
