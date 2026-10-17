@@ -10,9 +10,9 @@ are separate from the implementation described here.
 
 ## Current playable checkpoint
 
-- New songs use semantic documents. Existing songs and starter presets retain their v1
-  reader/editor. **Try the bar editor · keep original** explicitly creates a new-ID copy;
-  it never rewrites the original record, and incompatible legacy bars block conversion.
+- Every chart the app opens is a semantic document. A v1 text chart is refused with a plain
+  message (#1739); "Upgrade old songs" (#1738) converts one in place, and refuses a bar it
+  cannot convert.
 - The measure editor accepts chord text and optional length pickers. Save, export, key/feel
   transforms, playback and Home check every pending bar first. Failed validation retains raw
   buffers; successful adoption retires them before a subsequent transpose. Revert clears them

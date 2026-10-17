@@ -6,7 +6,13 @@
  */
 import { writtenChart } from '@engine/songbook/codec';
 import { describe, expect, it } from 'vitest';
-import { blankSong, type ChartDocument, validateDocument } from './documents';
+
+// Stored documents: this suite feeds the upgrade text charts, which the app no longer opens (#1739).
+import {
+    blankSong,
+    type StoredDocument as ChartDocument,
+    validateStoredDocument as validateDocument,
+} from './documents';
 import { bandForGenre } from './standards';
 import {
     draftNeedsUpgrade,

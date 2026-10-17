@@ -1,10 +1,10 @@
 import { type ReactNode, useEffect, useRef } from 'react';
-import type * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
 import { closeDialog, dialogRule } from './dialog-close';
 import { Menu, type MenuItem } from './menu';
 
-type Recovery = ReturnType<typeof repository.recoveriesFor>[number];
+/** One preserved draft the menu can offer: a chart the app opens, with when it was captured. */
+type Recovery = { document: ChartDocument; capturedAt: string };
 
 /**
  * Which part of the Song menu is showing (#1756): its five actions, the More list, or one of the

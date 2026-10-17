@@ -159,25 +159,9 @@ dialog[open]::backdrop {
     animation: motion-rise var(--motion-base) var(--ease-out);
 }
 
-/* The editor arrives from the side it lives on (the right, beside the chart); on a phone it sits
-   under the transport instead, so it rises. */
-@keyframes motion-from-right {
-    from {
-        opacity: 0;
-        transform: translateX(16px);
-    }
-}
-.edit-panel {
-    animation: motion-from-right var(--motion-slow) var(--ease-out);
-}
-/* …without the page growing a horizontal scrollbar for the frames it starts past the edge. */
+/* Nothing that moves in the workspace grows the page a horizontal scrollbar. */
 .workspace {
     overflow-x: clip;
-}
-@media (max-width: 760px) {
-    .edit-panel {
-        animation-name: motion-rise;
-    }
 }
 
 /* Opening a song, or going back to the songbook: the new page fades in rather than replacing the

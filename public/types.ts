@@ -67,8 +67,8 @@ export interface FormattedChordNames {
 
 /**
  * Canonical parsed-chord type produced by `chords-engine.validateProgression()`: the names and
- * the timing a measure-less chart is drawn from. It holds no pitches; the band reads the chord
- * back from its name (`prototypes/v2/lib/legacy-band-chart.ts`'s `legacyChordFacts`). Section-context fields (sectionId, sectionLabel,
+ * the timing a measure-less chart was drawn from (the app draws none since #1739). It holds no
+ * pitches. Section-context fields (sectionId, sectionLabel,
  * localIndex, keyIsMinor, repeatIndex) are tagged on by validateProgression after
  * parsing — they're absent on a freshly parsed chord and present once it's been
  * placed in the arrangement.

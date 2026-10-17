@@ -1,4 +1,41 @@
+import type { ChartDocumentV2 } from '../../public/songbook/score-types.js';
 import type { ChartDocument } from '../../public/songbook/types.js';
+
+/**
+ * `accountChart` as a measure chart (schemaVersion 2): what the app opens since #1739. Its band
+ * and performance are `accountChart`'s, its music the same two bars.
+ */
+export function accountScoreChart(title = 'A', id = 'study'): ChartDocumentV2 {
+    const { arrangement: _arrangement, ...settings } = accountChart(title, id).chart;
+    return {
+        ...accountChart(title, id),
+        schemaVersion: 2,
+        chart: {
+            ...settings,
+            score: {
+                key: 'C',
+                isMinor: false,
+                notation: 'name',
+                meter: '4/4',
+                grouping: null,
+                sections: [
+                    {
+                        id: 'a',
+                        label: 'A',
+                        repeat: 1,
+                        measures: ['C7', 'F7'].map((symbol, index) => ({
+                            id: `a-${index}`,
+                            content: {
+                                kind: 'events' as const,
+                                events: [{ kind: 'chord' as const, symbol, duration: [4, 1] }],
+                            },
+                        })),
+                    },
+                ],
+            },
+        },
+    } as ChartDocumentV2;
+}
 
 /** Original synthetic chart; no user library or imported repertoire in sync fixtures. */
 export function accountChart(title = 'A', id = 'study'): ChartDocument {

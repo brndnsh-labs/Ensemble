@@ -17,6 +17,7 @@ import { parseIRealImport } from '../../../public/songbook/ireal-import.js';
 import { compileScoreForm } from '../../../public/songbook/score-form.js';
 import type { ChartDocumentV2 } from '../../../public/songbook/score-types.js';
 import type { ChartDocument } from '../../../public/songbook/types.js';
+import { accountScoreChart } from '../../utils/account-songbook-fixture.js';
 
 /**
  * A donor chart for the band/performance settings `importedDocument` carries forward — its own
@@ -88,6 +89,16 @@ function fixture(slug: string): string {
     ).trim();
 }
 
+/** `baseChart`'s settings on a measure chart, the only kind the app opens (#1739). */
+function baseScoreChart(): ChartDocumentV2 {
+    const { arrangement: _arrangement, ...settings } = baseChart().chart;
+    return {
+        ...baseChart(),
+        schemaVersion: 2,
+        chart: { ...settings, score: accountScoreChart().chart.score },
+    } as ChartDocumentV2;
+}
+
 /** Imports the fixture's sole song through the app's own path and returns the new document. */
 function importFixture(slug: string) {
     const source = fixture(slug);
@@ -97,7 +108,7 @@ function importFixture(slug: string) {
     expect(
         [...result.diagnostics, ...song.diagnostics].filter((entry) => entry.severity === 'error'),
     ).toEqual([]);
-    const document = importedDocument(result, 0, baseChart(), 120);
+    const document = importedDocument(result, 0, baseScoreChart(), 120);
     return { document, song };
 }
 

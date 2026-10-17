@@ -1,6 +1,5 @@
 import { writtenSettings } from '@engine/songbook/codec';
 import { validateAnyChartDocument } from '@engine/songbook/document-v2';
-import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import { validateSemanticScore } from '@engine/songbook/score-codec';
 import { resolveScoreContext } from '@engine/songbook/score-context';
 import { scoreMeter } from '@engine/songbook/score-duration';
@@ -10,28 +9,38 @@ import type {
     ScoreSection,
     SemanticScore,
 } from '@engine/songbook/score-types';
-import type { ChartContent, ChartDocument as LegacyDocument } from '@engine/songbook/types';
+import type { ChartDocument as LegacyDocument } from '@engine/songbook/types';
 import { withSectionMeter } from './song-meter';
 
-export type ChartDocument = LegacyDocument | ChartDocumentV2;
+/**
+ * A chart document a songbook may still hold: a text chart (schemaVersion 1) included, until
+ * #1740 retires schema 1 from the stores. Only storage and "Upgrade old songs" read one as such;
+ * the app never opens it (#1739).
+ */
+export type StoredDocument = LegacyDocument | ChartDocumentV2;
+/** The chart the app opens, plays and edits: a measure chart (schemaVersion 2), the only kind. */
+export type ChartDocument = ChartDocumentV2;
 export type DocumentContent = ChartDocument['chart'];
 
 /** The chart's genre, by name (`GENRE_NAMES`). */
-export function genreOf(document: ChartDocument): string {
+export function genreOf(document: StoredDocument): string {
     return document.chart.band.groove.genre;
 }
 
-/**
- * The chart's composer, when known (#1440) — carried by a v2 iReal import's own metadata
- * (`ChartDocumentV2.metadata.composer`). A v1-schema document has nowhere to store one; `''`
- * there and for a v2 document with none, so a caller can treat "no composer" as one shape rather
- * than branching on `schemaVersion` itself.
- */
+/** The chart's composer, when known (#1440): an iReal import's own metadata; `''` when none. */
 export function composerOf(document: ChartDocument): string {
-    return document.schemaVersion === 2 ? (document.metadata?.composer ?? '') : '';
+    return document.metadata?.composer ?? '';
 }
 
-export function validateDocument(candidate: unknown): ChartDocument {
+/** What the app says about a text chart (schemaVersion 1) it is asked to open (#1739). */
+export const OLD_FORMAT_REFUSAL =
+    'This song is in the old text-chart format, which this app no longer opens. Nothing was changed.';
+
+/**
+ * A stored document of either schema, for the stores and "Upgrade old songs" alone: what this
+ * returns reaches the stand only through `currentFormat`.
+ */
+export function validateStoredDocument(candidate: unknown): StoredDocument {
     const result = validateAnyChartDocument(candidate);
     if (result.kind !== 'ok') {
         const reason =
@@ -43,63 +52,36 @@ export function validateDocument(candidate: unknown): ChartDocument {
     return result.value;
 }
 
-/** Read-only display projection; never save or parse it as v1 music. */
-export function arrangementOf(document: ChartDocument): ChartContent['arrangement'] {
-    if (document.schemaVersion === 1) {
-        return document.chart.arrangement;
-    }
-    return scoreArrangementView(document.chart.score);
+/** Is this stored document one the app opens? */
+export function isCurrentFormat(document: StoredDocument): document is ChartDocument {
+    return document.schemaVersion === 2;
 }
 
-/**
- * A score's arrangement settings with no v1 chord text. The band engine installs this in the
- * runtime too: it plays and draws the score itself, so the old engine is given nothing to parse.
- */
-export function scoreArrangementView(score: SemanticScore): ChartContent['arrangement'] {
-    return {
-        key: score.key,
-        isMinor: score.isMinor,
-        notation: score.notation,
-        timeSignature: score.meter,
-        grouping: score.grouping,
-        sections: score.sections.map(
-            ({ measures: _measures, meter, grouping: _grouping, ...section }) => ({
-                ...section,
-                value: '',
-                ...(meter ? { timeSignature: meter } : {}),
-            }),
-        ),
-    };
+/** `document`, or the plain refusal (`OLD_FORMAT_REFUSAL`) when it is a text chart. */
+export function currentFormat(document: StoredDocument): ChartDocument {
+    if (!isCurrentFormat(document)) {
+        throw new Error(OLD_FORMAT_REFUSAL);
+    }
+    return document;
 }
 
-/** Explicit copy, not an in-place migration: the source keeps its ID and revision. */
-export function convertedCopy(document: LegacyDocument): ChartDocumentV2 {
-    const proposal = proposeLegacyScoreConversion(JSON.stringify(document));
-    if (proposal.kind !== 'candidate') {
-        throw new Error(proposal.issues.map((issue) => issue.message).join(' '));
-    }
-    return {
-        ...proposal.value,
-        id: crypto.randomUUID(),
-        revision: 0,
-        title: `${document.title.slice(0, 140)} — editable copy`,
-        // A new chart, so written as a chart is today (`writtenSettings`).
-        chart: { ...proposal.value.chart, ...writtenSettings(proposal.value.chart) },
-    };
+/** A chart the app can open, or a sentence saying why not; a text chart is refused (#1739). */
+export function validateDocument(candidate: unknown): ChartDocument {
+    return currentFormat(validateStoredDocument(candidate));
 }
 
 /**
  * `band` with every lane on Follow feel (#1405): a new song plays whatever this device has
  * installed, never a sound the song it borrowed its setup from happened to pin.
  */
-export function followingFeel<T extends ChartDocument['chart']['band']>(band: T): T {
+export function followingFeel<T extends StoredDocument['chart']['band']>(band: T): T {
     return Object.fromEntries(
         Object.entries(band).map(([lane, mix]) => [lane, { ...mix, autoSound: true }]),
     ) as T;
 }
 
 /** A fresh four-bar measure chart that borrows `base`'s band and performance setup. Not yet validated. */
-export function blankSong(base: ChartDocument) {
+export function blankSong(base: { chart: Pick<StoredDocument['chart'], 'performance' | 'band'> }) {
     // As a chart is written today (`writtenSettings`): energy stored, trade settings only while trading.
     const setup = writtenSettings(base.chart);
     return {

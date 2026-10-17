@@ -9,7 +9,7 @@ import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';
 import type { ChartDocument as LegacyDocument } from '@engine/songbook/types';
 import { test as base, expect, type Locator, type Page } from '@playwright/test';
-import { validateDocument } from '../lib/documents';
+import { validateDocument, validateStoredDocument } from '../lib/documents';
 import { bandForGenre } from '../lib/standards';
 
 export { expect } from '@playwright/test';
@@ -290,24 +290,12 @@ export async function settled(locator: Locator): Promise<void> {
 }
 
 /**
- * Wait for the editor's reveal-focus to land before typing into any OTHER field (#1235).
- *
- * `revealEditor` in app/ensemble.tsx bumps `editorRequest`, and an effect gated on `!busy`
- * then focuses a text chart's chord text. That effect can fire in the middle of a `fill()` on a
- * different control: Playwright focuses its target and inserts the text as a separate step, so a
- * focus steal in between sends the keystrokes to the textarea instead — observed on
- * `webkit-phone` under three workers as the chords holding "Guided offlineC" while `Song title`
- * stayed "Untitled song". Asserting the steal has already happened is both the barrier and a real
- * assertion about the reveal contract. A measure chart focuses nothing on the way in (#1726: a
- * bar opens when pressed), so there the barrier is the header's title field, enabled once the
+ * Wait for the editor to be up before typing into it (#1235). Nothing takes focus on the way in
+ * (#1726: a bar opens when pressed), so the barrier is the header's title field, enabled once the
  * editor is no longer busy.
  */
 export async function editorRevealed(page: Page): Promise<void> {
     await expect(page.locator('#title')).toBeEnabled();
-    const text = page.locator('.edit-panel textarea');
-    if ((await text.count()) > 0) {
-        await expect(text.first()).toBeFocused();
-    }
 }
 
 /** Whether the page is at the app's phone width (`bar-dock.tsx`'s 760px), where a bar is typed
@@ -436,7 +424,7 @@ export type SampleSong = readonly [string, string, string, string, string, numbe
 
 /** One sample song as a text chart (schemaVersion 1), the shape `lib/starters.ts` wrote. */
 function textChart([id, title, genre, key, value, bpm]: SampleSong, stamp: string): LegacyDocument {
-    const document = validateDocument({
+    const document = validateStoredDocument({
         schemaVersion: 1,
         id,
         title,
@@ -479,7 +467,7 @@ export function measureSong(sample: SampleSong, stamp = new Date().toISOString()
     if (proposal.kind !== 'candidate') {
         throw new Error(`Sample "${legacy.title}" did not convert to a measure chart.`);
     }
-    const document = validateDocument({
+    return validateDocument({
         ...proposal.value,
         id: legacy.id,
         title: legacy.title,
@@ -488,10 +476,6 @@ export function measureSong(sample: SampleSong, stamp = new Date().toISOString()
         revision: 0,
         chart: { ...proposal.value.chart, ...writtenSettings(proposal.value.chart) },
     });
-    if (document.schemaVersion !== 2) {
-        throw new Error('A sample song must be a measure chart.');
-    }
-    return document;
 }
 
 /**
@@ -505,19 +489,10 @@ function starterStamps(): string[] {
     return STARTER_SAMPLES.map((_, index) => new Date(base - index * 1000).toISOString());
 }
 
-/** The three starter songs as measure charts — what every spec but the text chart's seeds. */
+/** The three starter songs as measure charts — what the specs seed. */
 export function starterDocuments(): ChartDocumentV2[] {
     const stamps = starterStamps();
     return STARTER_SAMPLES.map((sample, index) => measureSong(sample, stamps[index]));
-}
-
-/**
- * The same three songs as text charts (schemaVersion 1). Only `checks/text-chart.spec.ts` seeds
- * these: the text-chart UI's own spec, deleted with it (#1739).
- */
-export function starterTextCharts(): LegacyDocument[] {
-    const stamps = starterStamps();
-    return STARTER_SAMPLES.map((sample, index) => textChart(sample, stamps[index]));
 }
 
 /**

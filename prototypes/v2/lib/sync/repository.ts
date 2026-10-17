@@ -9,6 +9,7 @@ import {
     STARRED_COLLECTION_ID,
     starredOf,
 } from '../collections';
+import { currentFormat } from '../documents';
 import {
     HOME_FILL_SPARE,
     type HomeRead,
@@ -915,7 +916,8 @@ export class AccountSongbook {
         const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
         const validate = rememberingValidator((row: SavedSong) => {
             identifier(row?.documentId);
-            return savedSong(row, scope, row.documentId).document;
+            // A text chart is left out and counted, as the guest home does (#1739).
+            return currentFormat(savedSong(row, scope, row.documentId).document);
         });
         const read = await this.database.run<HomeRead<SavedSong>>('readonly', scope, (tx) => {
             const songs = tx.table('songs');

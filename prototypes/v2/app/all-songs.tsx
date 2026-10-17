@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { PURGE_MESSAGES, REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
 import { starredOf } from '../lib/collections';
-import { arrangementOf, composerOf, genreOf } from '../lib/documents';
+import { composerOf, genreOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import type { AllSongsSort } from '../lib/session';
 import { Menu } from './menu';
@@ -702,8 +702,8 @@ export function AllSongs({
                                                 {composerOf(song) || '—'}
                                             </td>
                                             <td className="song-key">
-                                                {arrangementOf(song).key}
-                                                {arrangementOf(song).isMinor ? 'm' : ''}
+                                                {song.chart.score.key}
+                                                {song.chart.score.isMinor ? 'm' : ''}
                                             </td>
                                             <td className="hide-mobile">
                                                 {song.chart.performance.bpm}

@@ -61,8 +61,7 @@ async function documents(page: Page): Promise<ChartDocument[]> {
     });
 }
 
-/** Blue pocket, a measure chart (#1733), open in Edit chart. Converting a text chart with "Try
- * the bar editor · keep original" is `text-chart.spec.ts`'s. */
+/** Blue pocket, a measure chart (#1733), open in Edit chart. */
 async function editBlue(page: Page) {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();

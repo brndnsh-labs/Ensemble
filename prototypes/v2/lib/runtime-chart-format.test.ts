@@ -6,28 +6,43 @@
  * band honours. The old engine's band and performance fields are refused outright (#1741).
  * Genre is stored once, by name; energy rides the chart.
  */
-import { validateChartDocument, writtenChart } from '@engine/songbook/codec';
-import type { ChartContent, ChartDocument } from '@engine/songbook/types';
+import { writtenChart } from '@engine/songbook/codec';
+import { validateChartDocumentV2 as validateChartDocument } from '@engine/songbook/document-v2';
+import type { ChartDocumentV2 as ChartDocument } from '@engine/songbook/score-types';
+import type { ChartContent } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import { captureContent, captureDocument, load, state } from './runtime';
 
 /** A chart as the app writes it, with every setting off its default. */
 function oldChart(): ChartDocument {
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         id: 'old-chart',
         title: 'Old chart',
         createdAt: '2026-09-01T12:00:00.000Z',
         updatedAt: '2026-09-01T12:00:00.000Z',
         revision: 4,
         chart: {
-            arrangement: {
-                sections: [{ id: 'a', label: 'A', value: 'Dm7 | G7 | Cmaj7 | Cmaj7' }],
+            score: {
                 key: 'C',
-                timeSignature: '4/4',
-                grouping: null,
                 isMinor: false,
                 notation: 'name',
+                meter: '4/4',
+                grouping: null,
+                sections: [
+                    {
+                        id: 'a',
+                        label: 'A',
+                        repeat: 1,
+                        measures: ['Dm7', 'G7', 'Cmaj7', 'Cmaj7'].map((symbol, index) => ({
+                            id: `a-${index}`,
+                            content: {
+                                kind: 'events',
+                                events: [{ kind: 'chord', symbol, duration: [4, 1] }],
+                            },
+                        })),
+                    },
+                ],
             },
             performance: { bpm: 132, seed: 'A1B2C3', randomizeSeed: false },
             band: {
@@ -73,8 +88,8 @@ function oldChart(): ChartDocument {
 describe('opening a chart and capturing it again', () => {
     it('keeps every field the band honours, exactly', () => {
         load(oldChart());
-        const { arrangement, performance, band } = captureContent();
-        expect(arrangement).toEqual(oldChart().chart.arrangement);
+        const { performance, band } = captureContent();
+        expect(captureDocument(oldChart()).chart.score).toEqual(oldChart().chart.score);
         expect(performance).toEqual({
             bpm: 132,
             seed: 'A1B2C3',
@@ -127,7 +142,6 @@ describe('opening a chart and capturing it again', () => {
 
 /** A sample of the old engine's band and performance fields, one per place they sat (#1741). */
 const RETIRED: ReadonlyArray<[path: string, extra: (document: ChartDocument) => object]> = [
-    ['$.chart.arrangement.lastChordPreset', () => ({ lastChordPreset: 'Songbook' })],
     ['$.chart.performance.complexity', () => ({ complexity: 0.8 })],
     ['$.chart.band.harmony', (document) => ({ harmony: document.chart.band.chords })],
     ['$.chart.band.chords.style', () => ({ style: 'funk' })],

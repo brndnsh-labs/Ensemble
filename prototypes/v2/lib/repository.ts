@@ -10,7 +10,13 @@ import {
     STARRED_COLLECTION_ID,
     validateCollection,
 } from './collections';
-import { type ChartDocument, validateDocument } from './documents';
+import {
+    type ChartDocument,
+    currentFormat,
+    isCurrentFormat,
+    type StoredDocument,
+    validateStoredDocument,
+} from './documents';
 import {
     HOME_FILL_SPARE,
     type HomeRead,
@@ -37,12 +43,22 @@ export class ConflictError extends Error {
     }
 }
 
-export function validated(candidate: unknown): ChartDocument {
-    const document = validateDocument(candidate);
+/**
+ * A stored row of either schema, for "Upgrade old songs" (#1738) and an exported file alone: a
+ * text chart reads here so it can be converted or backed up, and nowhere else (`validated`
+ * refuses it, #1739).
+ */
+export function storedValidated(candidate: unknown): StoredDocument {
+    const document = validateStoredDocument(candidate);
     for (const [module, lane] of Object.entries(document.chart.band)) {
         validateVoice(module as InstrumentModule, lane.voice);
     }
     return document;
+}
+
+/** A chart the app can open; a text chart is refused with `OLD_FORMAT_REFUSAL`. */
+export function validated(candidate: unknown): ChartDocument {
+    return currentFormat(storedValidated(candidate));
 }
 
 function open(): Promise<IDBDatabase> {
@@ -91,7 +107,10 @@ export async function list(): Promise<ChartDocument[]> {
             try {
                 resolve(
                     request.result
-                        .map(validated)
+                        .map(storedValidated)
+                        // A text chart is not unreadable, only not opened (#1739): it stays
+                        // stored for "Upgrade old songs", out of the songbook's lists.
+                        .filter(isCurrentFormat)
                         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
                 );
             } catch (error) {
@@ -112,7 +131,7 @@ export async function listReadable(pace?: {
     shouldYield: () => boolean;
     yieldNow: () => Promise<void>;
 }): Promise<{
-    documents: Array<{ document: ChartDocument; stored: unknown }>;
+    documents: Array<{ document: StoredDocument; stored: unknown }>;
     unreadable: Array<{ id: string; reason: string; stored: unknown }>;
 }> {
     const db = await open();
@@ -121,11 +140,11 @@ export async function listReadable(pace?: {
         request.onerror = () => reject(new Error('Unable to read your local songbook.'));
         request.onsuccess = () => resolve(request.result);
     });
-    const documents: Array<{ document: ChartDocument; stored: unknown }> = [];
+    const documents: Array<{ document: StoredDocument; stored: unknown }> = [];
     const unreadable: Array<{ id: string; reason: string; stored: unknown }> = [];
     for (const row of rows) {
         try {
-            documents.push({ document: validated(row), stored: row });
+            documents.push({ document: storedValidated(row), stored: row });
         } catch (failure) {
             unreadable.push({
                 id: String((row as { id?: unknown } | null)?.id ?? '(no id)'),
@@ -224,13 +243,19 @@ export async function home(request: HomeRequest): Promise<HomeSlice> {
  * honest answer for a song the musician just asked to open.
  */
 export async function get(id: string): Promise<ChartDocument | null> {
+    const stored = await getStored(id);
+    return stored && currentFormat(stored);
+}
+
+/** `get`, a text chart included: for "Upgrade old songs"' own checks alone. */
+async function getStored(id: string): Promise<StoredDocument | null> {
     const db = await open();
     const raw = await new Promise<unknown>((resolve, reject) => {
         const request = db.transaction(STORE, 'readonly').objectStore(STORE).get(id);
         request.onerror = () => reject(new Error('Unable to read your local songbook.'));
         request.onsuccess = () => resolve(request.result);
     });
-    return raw === undefined ? null : validated(raw);
+    return raw === undefined ? null : storedValidated(raw);
 }
 
 /**
@@ -430,10 +455,14 @@ export function recoverySlotCount(id: string): number {
     return recoveryKeysFor(id).length;
 }
 
+/**
+ * Every readable recovery slot for `document`'s id, newest first, a text chart's included: the
+ * upgrade counts them all (`lib/upgrade-stores.ts`); `recoveryFor` offers only a chart that opens.
+ */
 export function recoveriesFor(
-    document: ChartDocument,
-): Array<{ document: ChartDocument; capturedAt: string }> {
-    const records: Array<{ document: ChartDocument; capturedAt: string }> = [];
+    document: StoredDocument,
+): Array<{ document: StoredDocument; capturedAt: string }> {
+    const records: Array<{ document: StoredDocument; capturedAt: string }> = [];
     for (const key of recoveryKeysFor(document.id)) {
         const raw = localStorage.getItem(key);
         if (!raw || raw.length > 1_100_000) {
@@ -441,7 +470,7 @@ export function recoveriesFor(
         }
         try {
             const record = JSON.parse(raw);
-            const candidate = validated(record.document);
+            const candidate = storedValidated(record.document);
             if (
                 candidate.id === document.id &&
                 typeof record.capturedAt === 'string' &&
@@ -462,14 +491,14 @@ export function recoveriesFor(
  * song, captured (a real time) at or after its version. A slot that fails any of that is never
  * offered, so it is not unsaved work anyone can get back here — only its backup holds it.
  */
-function offeredAsRecovery(raw: string, song: ChartDocument): boolean {
+function offeredAsRecovery(raw: string, song: StoredDocument): boolean {
     if (raw.length > 1_100_000) {
         return false;
     }
     try {
         const record = JSON.parse(raw);
         return (
-            validated(record.document).id === song.id &&
+            storedValidated(record.document).id === song.id &&
             typeof record.capturedAt === 'string' &&
             Number.isFinite(Date.parse(record.capturedAt)) &&
             record.capturedAt >= song.updatedAt
@@ -482,10 +511,11 @@ function offeredAsRecovery(raw: string, song: ChartDocument): boolean {
 export function recoveryFor(
     document: ChartDocument,
 ): { document: ChartDocument; conflict: boolean } | null {
+    // A text chart's draft is never offered: the app does not open one (#1739).
     const record = recoveriesFor(document).find(
         (record) => record.capturedAt >= document.updatedAt,
     );
-    return record
+    return record && isCurrentFormat(record.document)
         ? { document: record.document, conflict: record.document.revision !== document.revision }
         : null;
 }
@@ -509,7 +539,7 @@ export interface RecoverySlot {
     writerId: string;
     documentId: string;
     capturedAt: string;
-    document: ChartDocument;
+    document: StoredDocument;
     raw: string;
 }
 
@@ -547,7 +577,7 @@ export function recoverySlots(): {
                 throw new Error('This draft could not be read.');
             }
             const record = JSON.parse(raw);
-            const document = validated(record.document);
+            const document = storedValidated(record.document);
             if (
                 document.id !== documentId ||
                 typeof record.capturedAt !== 'string' ||
@@ -629,9 +659,9 @@ export async function removeRecoverySlot(
         throw new Error('Nothing to compare this draft with, so it was not removed.');
     }
     // The song first: the slot's checks and its removal then run with no await between them.
-    let song: ChartDocument | null = null;
+    let song: StoredDocument | null = null;
     try {
-        song = await get(recoveryKeyParts(key).documentId);
+        song = await getStored(recoveryKeyParts(key).documentId);
     } catch {
         // A song row that does not read: nothing can say this draft is live on it.
     }
@@ -676,7 +706,7 @@ export async function removeUnreadableSong(
             }
             let readable = true;
             try {
-                validated(row);
+                storedValidated(row);
             } catch {
                 readable = false;
             }

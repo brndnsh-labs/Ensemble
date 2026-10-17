@@ -159,10 +159,9 @@ local browser projects and never deploys.
 
 ## Measure-based charts (#1171)
 
-New song uses document v2: sections, stable measure identities and exact chord durations.
-Existing songs/starters keep their legacy editor. In Edit chart, **Try the bar editor · keep
-original** creates a separate editable copy; it never replaces the old record. Charts whose
-legacy meaning/timing cannot be converted exactly stay in the original editor with an explanation.
+Every chart is document v2: sections, stable measure identities and exact chord durations. A
+text chart (document v1) is no longer opened (#1739): from a store, a file or a link the app says
+so in plain words and changes nothing. "Upgrade old songs" on the songbook converts one in place.
 
 In Edit chart a measure chart has no side panel (#1726): there is the chart. Press a bar and
 type its chords into it (on a phone, into the field docked on the keyboard); Tab or Enter moves on,
@@ -183,8 +182,7 @@ picked. Key transposes the entire score. **Mode** sets the song's own major/mino
 (#1375) without rewriting chord names or moving the key: A minor is A, then Minor, not a
 relative-key swap to C. **Meter** sets the song's own meter: equal-length bars re-divide, a
 section or bar with its own meter keeps it, and a bar whose written lengths cannot follow blocks
-the change and is selected for you — nothing is rounded. A text chart's popover holds Key and
-Chord notation only. How many times the form plays (or Repeats
+the change and is selected for you — nothing is rounded. How many times the form plays (or Repeats
 continuously) is the chart footer's form-length menu.
 Delete bar and Delete section take effect at once; a toast then offers **Undo** for a few
 seconds (#1758), which puts back the chart exactly as it was before the delete — the deleted bar's
@@ -269,23 +267,16 @@ Do not downgrade this browser's mixed-version songbook to an older preview: thos
 v2 documents and may fail to list the library. Original v1 data is retained, but old-client
 coexistence/production migration has not shipped. Prefer a corrective release and export first.
 
-## Legacy editing and returning to practice (#1175)
+## Editing and returning to practice (#1175)
 
-- Save, Duplicate and Export… include all currently typed section text. Update chart is an
-  optional playable preview, not a prerequisite for saving. Raw buffers survive section/view
-  changes and enable Save. Playback, key/feel changes, adding a section and returning to the
-  songbook validate/apply the buffers first; unsupported text keeps the editor open for correction.
-  Revert to saved explicitly discards both the setup experiment and pending text.
-- Only changed text receives strict full-token checking; existing untouched chart text keeps its
-  compatibility. The supported spelling follows the existing parser's absolute, Roman and
-  Nashville roots, recognized qualities, slash bass and 6/9 handling. Use ASCII #/b accidentals.
-  Empty bars, partial spellings and unimplemented directives such as N.C. or repeats are rejected
-  with a section-specific explanation. This is not richer chart semantics or iReal support.
-- Unchecked text is explicitly tab-only and requests an unload warning. Validated changes enter
-  the existing recovery path before attempting Save, so a conflict or failed write retains the
-  work. Browser unload warnings are not reliable on all mobile lifecycle paths; explicitly Save
-  or export before leaving important writing.
-- Edit chart/Edit section reveal the intended input on compact screens; Chart is a view switch,
+- Save, Duplicate and Export… include every bar still typed but not applied (#1723); a bar whose
+  chords do not read is selected and its field opened, with the reason, and nothing is saved.
+  Revert to saved explicitly discards both the setup experiment and the pending bars.
+- Pending bars are tab-only and request an unload warning. Applied changes enter the existing
+  recovery path before attempting Save, so a conflict or failed write retains the work. Browser
+  unload warnings are not reliable on all mobile lifecycle paths; explicitly Save or export
+  before leaving important writing.
+- Edit chart opens the editor over the chart; Chart is a view switch,
   not the playback button. Tempo keeps intermediate keystrokes local until Enter/blur; Escape
   cancels, and steppers commit once. Its 40–240 bounds match the existing engine and codec.
 - Continue uses a best-effort device-local last-opened preference, including recovered setup

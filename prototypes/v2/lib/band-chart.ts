@@ -1,10 +1,8 @@
 /**
  * The chart sheet's view of a score on the band engine.
  *
- * The old engine's display is its playback plan (`arranger.progression`/`stepMap`), so a chart
- * it cannot plan cannot even be drawn. Here the display is read from the two things the band
- * engine already trusts: the score for what is written, and the band timeline for where each
- * performed bar starts. So every chart the timeline compiles can be drawn, holds, N.C.,
+ * The display is read from the two things the band engine already trusts: the score for what is
+ * written, and the band timeline for where each performed bar starts. So every chart the timeline compiles can be drawn, holds, N.C.,
  * fermatas and off-grid lengths included.
  *
  * Nothing here decides which chord sounds; the timeline's chord spans are the only authority
@@ -195,8 +193,7 @@ export function slotAt(chart: BandChart, tick: number): number {
 }
 
 /**
- * A section's whole span in steps, every visit collapsed into one window — the same rule as
- * `getSectionStepBounds`, which reads the old engine's section map instead. A counted chart
+ * A section's whole span in steps, every visit collapsed into one window. A counted chart
  * (#1475) performs its form once per chorus, so only the visits of the FIRST chorus that plays
  * the section count: "Start here" begins at its first performed bar there, never at a window
  * stretched from chorus 1 to chorus N. That first chorus is chorus 0

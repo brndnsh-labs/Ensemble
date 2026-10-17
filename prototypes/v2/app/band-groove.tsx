@@ -1,6 +1,5 @@
 import type { SwingSub } from '@engine/types';
 import { useEffect, useState } from 'react';
-import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import { useRangeCommit } from './use-range-commit';
 
@@ -113,12 +112,11 @@ export function GrooveTab({
     onBandIntensity,
     onAutoIntensity,
 }: GrooveTabProps) {
-    const arrangement = arrangementOf(current);
     const groove = current.chart.band.groove;
     // The chart's energy (a chart saved before it carried one plays on auto).
     const energy = current.chart.performance.energy ?? 'auto';
     const autoEnergy = energy === 'auto';
-    const swingDisabled = busy || SWING_DISABLED_METERS.has(arrangement.timeSignature);
+    const swingDisabled = busy || SWING_DISABLED_METERS.has(current.chart.score.meter);
     return (
         <div className="feel-groups">
             <div className="feel-group">
@@ -145,9 +143,9 @@ export function GrooveTab({
                         </select>
                     </label>
                 </div>
-                {SWING_DISABLED_METERS.has(arrangement.timeSignature) && (
+                {SWING_DISABLED_METERS.has(current.chart.score.meter) && (
                     <p className="feel-hint">
-                        {arrangement.timeSignature} already notates the shuffle feel, so Swing is
+                        {current.chart.score.meter} already notates the shuffle feel, so Swing is
                         disabled here.
                     </p>
                 )}

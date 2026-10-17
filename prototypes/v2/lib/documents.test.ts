@@ -5,7 +5,6 @@
  */
 import { validateSemanticScore } from '@engine/songbook/score-codec';
 import type { ChartDocumentV2, ScoreMeasure, SemanticScore } from '@engine/songbook/score-types';
-import type { ChartDocument as LegacyDocument } from '@engine/songbook/types';
 import { describe, expect, it } from 'vitest';
 import {
     composerOf,
@@ -486,11 +485,6 @@ describe('composerOf (#1440)', () => {
 
     it('is empty for a v2 document with no composer recorded', () => {
         const document = { schemaVersion: 2 } as ChartDocumentV2;
-        expect(composerOf(document)).toBe('');
-    });
-
-    it('is always empty for a v1 document, which has nowhere to store one', () => {
-        const document = { schemaVersion: 1 } as LegacyDocument;
         expect(composerOf(document)).toBe('');
     });
 });

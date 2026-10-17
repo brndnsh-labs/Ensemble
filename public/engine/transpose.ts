@@ -10,12 +10,12 @@ import { normalizeKey } from '../utils.js';
 /**
  * The single source of truth for transposing a chord-progression string.
  *
- * `transposeKey` (absolute +/- transpose, and the key dropdown) calls with the default
+ * `runtime.transpose` (the Key popover, every chord of the score) calls with the default
  * `rewriteRelative: false`; `rewriteRelative: true` is the relative major/minor switch.
  *
  * There used to be two divergent implementations whose split regexes disagreed about the
  * slash (`/`): the relative path tokenized on it and transposed the bass, the absolute path did
- * not — so `transposeKey` left slash-bass notes stranded (`C/E` +2 → `D/E` instead of `D/Gb`).
+ * not — so an absolute transpose left slash-bass notes stranded (`C/E` +2 → `D/E` instead of `D/Gb`).
  * Unifying on one tokenizer fixes that and removes the drift.
  */
 

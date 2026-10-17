@@ -10,7 +10,7 @@
 import type { ChartDocumentV2 } from '@engine/songbook/score-types';
 import type { ChartLaneMix, ChartDocument as LegacyDocument } from '@engine/songbook/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { validateDocument } from './documents';
+import { OLD_FORMAT_REFUSAL, validateDocument, validateStoredDocument } from './documents';
 
 // Vitest hoists `vi.mock` above these imports, so every importer of this module in the test's
 // module graph — including `codec.ts`'s internal `import { inspectSongbookStructure } from
@@ -105,8 +105,9 @@ describe('validateDocument', () => {
         vi.mocked(inspectSongbookStructure).mockClear();
     });
 
-    it('opens a v1 document', () => {
-        expect(validateDocument(legacyDocument())).toEqual(legacyDocument());
+    it('refuses a text chart (schemaVersion 1) in plain words; only a store reads one (#1739)', () => {
+        expect(() => validateDocument(legacyDocument())).toThrow(OLD_FORMAT_REFUSAL);
+        expect(validateStoredDocument(legacyDocument())).toEqual(legacyDocument());
     });
 
     it('opens a v2 document', () => {
@@ -149,8 +150,8 @@ describe('validateDocument', () => {
         expect(inspectSongbookStructure).toHaveBeenCalledTimes(2);
     });
 
-    it('prepares a valid v1 document exactly once', () => {
-        validateDocument(legacyDocument());
+    it('prepares a stored v1 document exactly once', () => {
+        validateStoredDocument(legacyDocument());
         expect(inspectSongbookStructure).toHaveBeenCalledTimes(2);
     });
 });

@@ -5,7 +5,6 @@ import type { ChartNotation } from '@engine/songbook/types';
 import { normalizeKey } from '@engine/utils';
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import { usePhoneWidth } from './bar-dock';
 import './menu.css';
@@ -25,8 +24,8 @@ function keyLabel(key: string): string {
 
 /** The song's key as the transport shows it: B♭, or B♭m in a minor song. */
 export function songKeyLabel(current: ChartDocument): string {
-    const arrangement = arrangementOf(current);
-    return `${keyLabel(normalizeKey(arrangement.key))}${arrangement.isMinor ? 'm' : ''}`;
+    const { key, isMinor } = current.chart.score;
+    return `${keyLabel(normalizeKey(key))}${isMinor ? 'm' : ''}`;
 }
 
 /** Frames to wait for the selected bar's number to be enabled again once the change settles. */
@@ -87,9 +86,6 @@ interface KeyPopoverProps {
  * Each select changes the song live, as the transport's Key select did, committing pending bars
  * first (the shell's `change(…, true)`, `changeSongMeter`). A meter that a bar cannot follow is
  * refused, and the shell closes this onto that bar.
- *
- * A text chart (schemaVersion 1) offers Key and Chord notation only: its mode is the key's and
- * it has no song meter to set.
  */
 export function KeyPopover({
     current,
@@ -181,8 +177,7 @@ export function KeyPopover({
         }
     }
 
-    const score = current.schemaVersion === 2 ? current.chart.score : null;
-    const arrangement = arrangementOf(current);
+    const score = current.chart.score;
     return createPortal(
         <>
             {sheet && (
@@ -229,7 +224,7 @@ export function KeyPopover({
                     <select
                         id="song-key"
                         disabled={busy}
-                        value={normalizeKey(arrangement.key)}
+                        value={normalizeKey(score.key)}
                         onChange={(event) => onKey(event.target.value)}
                     >
                         {KEY_ORDER.map((key) => (
@@ -238,38 +233,34 @@ export function KeyPopover({
                             </option>
                         ))}
                     </select>
-                    {score && (
-                        <>
-                            <label htmlFor="song-mode">Mode</label>
-                            <select
-                                id="song-mode"
-                                disabled={busy}
-                                value={score.isMinor ? 'minor' : 'major'}
-                                onChange={(event) => onMode(event.target.value === 'minor')}
-                            >
-                                <option value="major">Major</option>
-                                <option value="minor">Minor</option>
-                            </select>
-                            <label htmlFor="song-meter">Meter</label>
-                            <select
-                                id="song-meter"
-                                disabled={busy}
-                                value={score.meter}
-                                onChange={(event) => onMeter(event.target.value)}
-                            >
-                                {[...new Set([...Object.keys(TIME_SIGNATURES), score.meter])].map(
-                                    (meter) => (
-                                        <option key={meter}>{meter}</option>
-                                    ),
-                                )}
-                            </select>
-                        </>
-                    )}
+                    <label htmlFor="song-mode">Mode</label>
+                    <select
+                        id="song-mode"
+                        disabled={busy}
+                        value={score.isMinor ? 'minor' : 'major'}
+                        onChange={(event) => onMode(event.target.value === 'minor')}
+                    >
+                        <option value="major">Major</option>
+                        <option value="minor">Minor</option>
+                    </select>
+                    <label htmlFor="song-meter">Meter</label>
+                    <select
+                        id="song-meter"
+                        disabled={busy}
+                        value={score.meter}
+                        onChange={(event) => onMeter(event.target.value)}
+                    >
+                        {[...new Set([...Object.keys(TIME_SIGNATURES), score.meter])].map(
+                            (meter) => (
+                                <option key={meter}>{meter}</option>
+                            ),
+                        )}
+                    </select>
                     <label htmlFor="song-notation">Chord notation</label>
                     <select
                         id="song-notation"
                         disabled={busy}
-                        value={arrangement.notation}
+                        value={score.notation}
                         onChange={(event) => onNotation(event.target.value as ChartNotation)}
                     >
                         {NOTATION_OPTIONS.map((entry) => (
@@ -279,11 +270,7 @@ export function KeyPopover({
                         ))}
                     </select>
                 </div>
-                {score && (
-                    <p className="menu-note">
-                        A section or bar with its own mode or meter keeps it.
-                    </p>
-                )}
+                <p className="menu-note">A section or bar with its own mode or meter keeps it.</p>
                 {sheet && (
                     <button type="button" className="menu-item" onClick={() => close(true)}>
                         Done

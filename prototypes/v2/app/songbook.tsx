@@ -1,7 +1,7 @@
 import { type RefObject, useEffect, useMemo, useRef } from 'react';
 import { ACCOUNT_SWITCH_MESSAGES, REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
-import { arrangementOf, composerOf, genreOf } from '../lib/documents';
+import { composerOf, genreOf } from '../lib/documents';
 import { type HomeSlice, openedAgo } from '../lib/home';
 import type { ChartDocument } from '../lib/runtime';
 import {
@@ -298,7 +298,7 @@ function allSongsLabel(count: number): string {
 
 /** A key the way the chart header writes it: `C`, `Am`. */
 function keyOf(document: ChartDocument): string {
-    const { key, isMinor } = arrangementOf(document);
+    const { key, isMinor } = document.chart.score;
     return `${key}${isMinor ? 'm' : ''}`;
 }
 
