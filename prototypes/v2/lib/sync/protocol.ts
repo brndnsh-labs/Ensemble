@@ -182,6 +182,28 @@ export interface OpenedAt {
     openedAt: string;
 }
 
+/**
+ * The retired per-device stars (#1440): one `star:` row per starred song, copied into the built-in
+ * Starred collection by a one-time migration (#1477) that #1743 retired. Nothing reads or writes
+ * these rows any more. They are still this account's data on this device, so `clearAccount`
+ * removes them with the rest; that is the only thing that names them. `'star:'` sorts after every
+ * other prefix here, so no other range can reach it.
+ */
+export function retiredStarPrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `star:${ownerId}:`;
+}
+
+/**
+ * The marker #1477's star migration wrote, one per owner (retired in #1743). `'stars-migrated:'`
+ * sorts after every `'star:'` key (`':'` < `'s'`), so the star range above never reaches it: it is
+ * removed on its own, by `clearAccount`.
+ */
+export function retiredStarsMarkerKey(ownerId: string): string {
+    identifier(ownerId);
+    return `stars-migrated:${ownerId}`;
+}
+
 /** The stored frozen delete. Four scalars: everything the canonical request bytes are made of. */
 export interface PendingDeletion {
     key: string;

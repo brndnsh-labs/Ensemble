@@ -46,6 +46,8 @@ import {
     type RemoteOutcome,
     remoteRevision,
     reply,
+    retiredStarPrefix,
+    retiredStarsMarkerKey,
     type SavedCollection,
     type SavedSong,
     type SaveOperation,
@@ -794,8 +796,9 @@ export class AccountSongbook {
      * is instead the explicit bound on every range below, so this can only ever reach the account
      * it was named with. The opened-at preferences (#1440) go with the rest: they are per-owner
      * device data exactly like the last-opened pointer, and a device that has forgotten an account
-     * must not keep naming that account's songs as recently opened. (#1440's `star:` rows and
-     * #1477's `stars-migrated:` markers are inert since #1743 and nothing touches them.)
+     * must not keep naming that account's songs as recently opened. #1440's retired `star:` rows
+     * and #1477's `stars-migrated:` marker go too: nothing reads them since #1743, but they are
+     * still this account's data on this device.
      *
      * One transaction: a sign-out that removed the songs and left the outbox behind would leave
      * queued Saves for an account this device no longer holds, and the next sign-in as that same
@@ -821,6 +824,7 @@ export class AccountSongbook {
                 candidatePrefix(ownerId),
                 deletionPrefix(ownerId),
                 openedPrefix(ownerId),
+                retiredStarPrefix(ownerId),
             ]) {
                 tx.table('meta').delete(IDBKeyRange.bound(prefix, `${prefix}￿`, false, true));
             }
@@ -828,6 +832,9 @@ export class AccountSongbook {
             // that is being removed in this same transaction, so leaving it would point the next
             // sign-in at a chart this device no longer holds.
             tx.table('meta').delete(lastOpenedKey(ownerId));
+            // The retired star rows' migration marker (#1477, retired in #1743): one key per owner,
+            // outside the star range above, and this account's like the rows it described.
+            tx.table('meta').delete(retiredStarsMarkerKey(ownerId));
             tx.finish(undefined);
         });
     }
