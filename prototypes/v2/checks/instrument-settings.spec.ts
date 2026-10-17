@@ -1,5 +1,14 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, openBand, seedStarters, songLink, test } from './fixtures';
+import {
+    appUrl,
+    expect,
+    exportAs,
+    openBand,
+    seedStarters,
+    songLink,
+    songMenuAction,
+    test,
+} from './fixtures';
 
 // #1275 — per-instrument volume/reverb controls (and, on the old engine, style) in
 // the Band sheet's Players tab. Mirrors `foundation-helpers.ts`'s Sounds helpers and
@@ -95,8 +104,7 @@ test('bass volume persists through save, reload, revert and a share link', async
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
 
     // Revert to saved restores the pre-edit values while still unsaved.
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await openSounds(page);
     await openMix(page, 'Bass');
     await expect(bassVolume).toHaveValue('100');
@@ -120,11 +128,9 @@ test('bass volume persists through save, reload, revert and a share link', async
 
     // A Save writes the music and the settings the band honours, nothing of the old engine's
     // (chart-format decision, 2026-09-26): its style, density and complexity are gone.
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const saved = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     expect(saved.chart.band.bass.volume).toBe(0.4);
     expect(saved.chart.band.bass).not.toHaveProperty('style');
     expect(saved.chart.band.chords).not.toHaveProperty('density');
@@ -134,8 +140,7 @@ test('bass volume persists through save, reload, revert and a share link', async
     expect(saved.chart.band.groove.genre).toBe('Blues');
 
     // Share link round-trip: opens as an unsaved draft carrying the same values.
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await songMenuAction(page, 'Copy link');
     const linkInput = page.getByTestId('share-link-fallback');
     await expect(linkInput).toBeVisible();
     const link = await linkInput.inputValue();

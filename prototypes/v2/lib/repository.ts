@@ -32,7 +32,7 @@ let database: Promise<IDBDatabase> | undefined;
 export class ConflictError extends Error {
     constructor() {
         super(
-            'This song was saved in another tab. Your changes are safe; save a copy or reopen the newer version.',
+            'This song was saved in another tab. Your changes are safe; duplicate it or reopen the newer version.',
         );
     }
 }

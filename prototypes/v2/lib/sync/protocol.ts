@@ -364,7 +364,7 @@ export class AccountChangedError extends Error {
 
 export class LocalRevisionError extends Error {
     constructor() {
-        super('This song was saved elsewhere. Your draft is preserved; reopen or save a copy.');
+        super('This song was saved elsewhere. Your draft is preserved; reopen it or duplicate it.');
     }
 }
 

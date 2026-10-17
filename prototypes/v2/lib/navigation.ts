@@ -64,7 +64,7 @@ export function depthFor(view: NavView, from: NavEntry | null): number {
         return 1;
     }
     if (from && from.view.kind === 'song') {
-        // A song replacing a song (Save a copy, Keep a copy, a recovered draft) stays level.
+        // A song replacing a song (Duplicate, Keep a copy, a recovered draft) stays level.
         return from.depth;
     }
     return (from?.depth ?? 0) + 1;

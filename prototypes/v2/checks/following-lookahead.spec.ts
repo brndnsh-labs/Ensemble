@@ -10,6 +10,7 @@ import {
     barField,
     editorRevealed,
     expect,
+    exportAs,
     leaveBar,
     openSectionMenu,
     seedGuestDocuments,
@@ -27,13 +28,11 @@ import {
  */
 
 async function exportCurrent(page: Page): Promise<ChartDocumentV2> {
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const downloaded = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const path = await (await downloaded).path();
     const { readFile } = await import('node:fs/promises');
     const document = JSON.parse(await readFile(path!, 'utf8'));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     return document;
 }
 

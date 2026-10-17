@@ -4,6 +4,7 @@ import type { Page } from '@playwright/test';
 import {
     closeBarDock,
     expect,
+    exportAs,
     leaveBar,
     openBar,
     openSectionMenu,
@@ -11,6 +12,7 @@ import {
     seedStarters,
     settled,
     songLink,
+    songMenuAction,
     test,
     typeBar,
 } from './fixtures';
@@ -53,12 +55,10 @@ function symbols(document: ChartDocumentV2, bar: number, section = 0): string[] 
     return content.events.map((event) => (event.kind === 'chord' ? event.symbol : '?'));
 }
 async function exportCurrent(page: Page) {
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const path = await (await download).path();
     const document = JSON.parse(await readFile(path!, 'utf8'));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     return document;
 }
 
@@ -126,7 +126,7 @@ test('a practice nudge is said apart from a chart change, and both wait for Save
     expect(kept.chart.score.key).toBe(before === 'D' ? 'E' : 'D');
 });
 
-test('export and Save a copy include a typed bar but do not overwrite the original save', async ({
+test('export and Duplicate include a typed bar but do not overwrite the original save', async ({
     page,
 }) => {
     await openEditor(page);
@@ -136,8 +136,7 @@ test('export and Save a copy include a typed bar but do not overwrite the origin
     expect(await savedBlue(page)).toEqual(original);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
     await typeBar(page, 1, 'Am7 D7');
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
+    await songMenuAction(page, 'Duplicate');
     // While editing, the title is the header's input (#1726).
     await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket — copy');
     expect(symbols(await exportCurrent(page), 1)).toEqual(['Am7', 'D7']);
@@ -149,18 +148,19 @@ test('a queued close event cannot shut a dialog that has already been reopened (
 }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeVisible();
-    // `close()` queues its `close` event. When an action closes the menu and "Song actions"
-    // reopens it before that task runs, the stale event arrives at an OPEN dialog — this is it.
+    await songMenuAction(page, 'Export…');
+    const dialog = page.getByTestId('export-dialog');
+    await expect(dialog).toBeVisible();
+    // `close()` queues its `close` event. When an action closes a dialog and it is reopened
+    // before that task runs, the stale event arrives at an OPEN dialog — this is it.
     await page.evaluate(() =>
-        document.querySelector('dialog.modal-box')?.dispatchEvent(new Event('close')),
+        document.querySelector('[data-testid="export-dialog"]')?.dispatchEvent(new Event('close')),
     );
     await page.waitForTimeout(100);
-    await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeVisible();
+    await expect(dialog).toBeVisible();
     // A real close still reports.
     await page.keyboard.press('Escape');
-    await expect(page.getByRole('button', { name: 'Export file', exact: true })).toBeHidden();
+    await expect(dialog).toBeHidden();
 });
 
 test('tempo allows sequential typing, Enter, blur, Escape and single step commits', async ({
@@ -342,8 +342,7 @@ test('a revision conflict retains typed chords and allows an independent copy', 
     await expect(await openBar(page, 1)).toHaveValue('Dm7 G7');
     expect(await savedBlue(page)).toEqual(newer);
     await leaveBar(page);
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
+    await songMenuAction(page, 'Duplicate');
     // While editing, the title is the header's input (#1726).
     await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket — copy');
     expect(symbols(await exportCurrent(page), 1)).toEqual(['Dm7', 'G7']);

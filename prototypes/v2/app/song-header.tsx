@@ -1,3 +1,4 @@
+import type { RefObject } from 'react';
 import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 
@@ -28,6 +29,9 @@ interface SongHeaderProps {
     onShowNeck: () => void;
     onEditChart: () => void;
     onSave: () => void;
+    /** The •••, which the Song menu opens at (#1756). */
+    menuButtonRef: RefObject<HTMLButtonElement | null>;
+    /** Opens the Song menu, or closes it when it is open; ignored while busy. */
     onMenu: () => void;
     /** The title typed in the header while editing (#1726): an unsaved change, kept by Save. */
     onTitle: (title: string) => void;
@@ -56,6 +60,7 @@ export function SongHeader({
     onShowNeck,
     onEditChart,
     onSave,
+    menuButtonRef,
     onMenu,
     onTitle,
 }: SongHeaderProps) {
@@ -162,9 +167,14 @@ export function SongHeader({
                     {sharedDraft && !newSongDraft ? 'Keep a copy' : 'Save'}
                 </button>
                 <button
+                    ref={menuButtonRef}
                     className="icon-button menu-btn"
                     aria-label="Song actions"
-                    disabled={busy}
+                    aria-haspopup="menu"
+                    aria-expanded={false}
+                    // `aria-disabled`, not `disabled`: the Song menu hands focus back here as a
+                    // choice starts, and a disabled button would drop it (#1755).
+                    aria-disabled={busy || undefined}
                     onClick={onMenu}
                 >
                     •••

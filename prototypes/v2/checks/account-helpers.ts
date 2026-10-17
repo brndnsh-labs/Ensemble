@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { RECOVERY_CODE_SHAPE } from '../lib/account/messages';
-import { editorRevealed, expect, seedStarters } from './fixtures';
+import { editorRevealed, expect, openSongMenu, seedStarters, songMenu } from './fixtures';
 
 /**
  * The account specs' shared page driving (#1262, extracted for #1263).
@@ -191,28 +191,24 @@ export async function newSongOnTheStand(page: Page): Promise<void> {
 }
 
 /**
- * Open Song actions to read the sync facts (#1460): `SyncStatus` moved from the stand's own
- * footer into a "Status" section here, so every spec that used to read `sync-status`/
- * `sync-local`/`sync-cloud`/`sync-offline`/`sync-failure` directly off the stand now opens this
- * dialog first. Waits on the section itself, not just the dialog, since a signed-out/guest chart
- * opens the SAME dialog with no Status section at all.
+ * Open the Song menu to read the sync facts (#1460): `SyncStatus` moved from the stand's own
+ * footer into the menu, above its actions (#1756), so every spec that used to read
+ * `sync-status`/`sync-local`/`sync-cloud`/`sync-offline`/`sync-failure` directly off the stand
+ * opens it first. Waits on the facts themselves, not just the menu, since a signed-out/guest
+ * chart opens the SAME menu with no facts at all.
  */
 export async function openSongActions(page: Page): Promise<void> {
-    await page.getByRole('button', { name: 'Song actions' }).click();
+    await openSongMenu(page);
     await expect(page.getByTestId('sync-status')).toBeVisible();
 }
 
 /**
- * `<dialog>` is modal (`showModal()`), so nothing on the stand behind it — Save, Play, another
- * row — is reachable until this closes it. Scoped to `song-menu` specifically (its "Close"
- * button text is not unique on the page: the always-mounted `SongRowMenu` has its own), and
- * waits for the dialog to actually leave its open state rather than just for the click to
- * register, since a caller's very next line is often exactly one of those now-inert controls.
+ * Closes the Song menu (Esc, as a musician would), and waits for it to be gone, since a caller's
+ * very next line is often a control the open menu's outside press would only have closed it on.
  */
 export async function closeSongActions(page: Page): Promise<void> {
-    const dialog = page.getByTestId('song-menu');
-    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(dialog).not.toHaveAttribute('open', '');
+    await page.keyboard.press('Escape');
+    await expect(songMenu(page)).toHaveCount(0);
 }
 
 /** Retitle and commit. The Save button going disabled is the shell's own "committed" signal. */

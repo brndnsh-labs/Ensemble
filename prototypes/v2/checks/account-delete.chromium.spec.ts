@@ -14,7 +14,7 @@ import {
     songTitles,
     uploadOf,
 } from './account-helpers';
-import { expect, accountTest as test } from './fixtures';
+import { expect, songMenuAction, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -37,8 +37,7 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /** Song menu → "Delete from my account", stopping on the confirm step. */
 async function openDeleteConfirm(page: Page): Promise<void> {
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByTestId('delete-from-account').click();
+    await songMenuAction(page, 'Delete…');
     await expect(page.getByTestId('delete-song-confirm')).toBeVisible();
 }
 

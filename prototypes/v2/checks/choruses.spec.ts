@@ -1,10 +1,10 @@
 import type { Page } from '@playwright/test';
 import {
     appUrl,
-    closeSongMenu,
     editorRevealed,
     expect,
-    openWholeSong,
+    formLength,
+    pickFormLength,
     songLink,
     test,
 } from './fixtures';
@@ -75,14 +75,11 @@ test('a chart set to 2 choruses plays two and stops; Loop plays on; the count sa
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
     await page.getByLabel('Song title').fill('Two choruses');
-    // The new song's four bars (C, G, Am, F) are the form: short, so a pass is quick.
-    await openWholeSong(page);
-    const choruses = page.getByLabel('Choruses', { exact: true });
-    await expect(choruses).toHaveValue('loop');
-    await choruses.selectOption('2');
-    await expect(choruses).toHaveValue('2');
-    await closeSongMenu(page);
+    // The new song's four bars (C, G, Am, F) are the form: short, so a pass is quick. The count
+    // is the chart footer's form-length menu (#1511), its one home since #1756.
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    expect(await formLength(page)).toBe('Repeats continuously');
+    await pickFormLength(page, 'Plays 2 times');
     const tempo = page.getByLabel('Tempo', { exact: true });
     await tempo.fill('240');
     await tempo.press('Enter');
@@ -110,15 +107,11 @@ test('a chart set to 2 choruses plays two and stops; Loop plays on; the count sa
     // The count saved, and reopens with the song.
     await page.reload();
     await songLink(page, 'Two choruses').first().click();
-    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await openWholeSong(page);
-    await expect(choruses).toHaveValue('2');
+    expect(await formLength(page)).toBe('Plays 2 times');
 
     // Back to Loop: the band plays on past the second pass.
-    await choruses.selectOption('loop');
-    await expect(choruses).toHaveValue('loop');
-    await closeSongMenu(page);
-    await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    await pickFormLength(page, 'Repeats continuously');
+    expect(await formLength(page)).toBe('Repeats continuously');
     await arm(page);
     await play.click();
     await expect.poll(() => passes(page), { timeout: 45_000 }).toBeGreaterThanOrEqual(3);

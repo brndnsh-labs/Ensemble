@@ -3,12 +3,14 @@ import {
     closeBarDock,
     editorRevealed,
     expect,
+    exportAs,
     leaveBar,
     measureSong,
     openBar,
     seedGuestDocuments,
     seedStarters,
     songLink,
+    songMenuAction,
     starterDocuments,
     typeBar,
 } from './fixtures';
@@ -82,8 +84,7 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('120');
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
@@ -182,8 +183,7 @@ test('two tabs cannot overwrite a newer save; a conflicting take can become a co
         second.getByRole('alert').filter({ hasText: 'saved in another tab' }),
     ).toBeVisible();
     await expect(second.getByLabel('Tempo', { exact: true })).toHaveValue('105');
-    await second.getByRole('button', { name: 'Song actions' }).click();
-    await second.getByRole('button', { name: 'Save a copy', exact: true }).click();
+    await songMenuAction(second, 'Duplicate');
     await expect(
         second.getByRole('heading', { name: 'Blue pocket — copy', exact: true }),
     ).toBeVisible();
@@ -212,13 +212,11 @@ test('file export/import is detached; invalid input never changes the active son
     await typeBar(page, 1, 'Am7 D7');
     await leaveBar(page);
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['Am7', 'D7']);
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file' }).click();
+    await exportAs(page, 'Song file');
     const exported = await download;
     const path = await exported.path();
     expect(path).toBeTruthy();
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByLabel('Import Ensemble document').setInputFiles(path!);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -279,8 +277,7 @@ test('an older competing draft remains explicitly recoverable after another tab 
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByText(/Preserved drafts \(/).click();
+    await songMenuAction(page, /Preserved drafts \(/);
     await page.getByRole('button', { name: /Blue pocket · 105 BPM/ }).click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('105');
     await expect(

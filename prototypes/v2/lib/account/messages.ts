@@ -156,6 +156,9 @@ export const REMOTE_UPDATE_MESSAGES = {
 export const PURGE_MESSAGES = {
     question: 'Delete from this device too?',
     detail: 'Unsaved changes to it will be lost.',
+    /** A song the cloud never confirmed (#1756): no cloud delete came first, and none can. */
+    unconfirmedQuestion: 'Delete this song from this device?',
+    unconfirmedDetail: 'It isn’t in your account, so this removes the only copy.',
     bulkDetail:
         'They’re deleted from this device too. Unsaved changes to them will be lost. This can’t be undone.',
     bulk: (count: number) =>

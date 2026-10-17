@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { expect, seedStarters, songLink, test } from './fixtures';
+import { expect, exportAs, seedStarters, songLink, test } from './fixtures';
 
 // Authored in `lib/starters.ts`: 12 one-bar-per-chord measures (`C7 | F7 | ...`)
 // in 4/4 at 110 BPM. Hardcoded here rather than read back through the UI so this
@@ -175,9 +175,8 @@ test('Export MIDI downloads a valid multi-track file matching the chart', async 
     await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export MIDI' }).click();
+    await exportAs(page, 'MIDI');
     const downloadEvent = await download;
     // Filename derived from the song title, same as `exportSong` (#1277) — the
     // shared exporter appends the extension itself.
@@ -190,7 +189,6 @@ test('Export MIDI downloads a valid multi-track file matching the chart', async 
     const dest = testInfo.outputPath('export.mid');
     await downloadEvent.saveAs(dest);
     const { parsed } = await readSettledMidi(dest);
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     expect(parsed.format).toBe(1);
     // The conductor track + drums/bass/comp: the band engine's `.mid` sink writes a lead track
@@ -223,11 +221,9 @@ test('Export MIDI during playback does not stop or glitch the band', async ({ pa
     // for the music stand, not a bug. Exit it via the same toggle a musician
     // would use before opening the menu mid-song.
     await page.getByRole('button', { name: 'Show controls' }).click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export MIDI' }).click();
+    await exportAs(page, 'MIDI');
     await download;
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     // Still playing: the export renders the band's own event stream offline and never touches
     // the live host, so the transport must not have stopped or needed a restart.

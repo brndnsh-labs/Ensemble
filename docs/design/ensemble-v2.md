@@ -20,7 +20,7 @@ payments, a public community catalog, and a visualizer redesign are outside the 
 1. **Quick jam:** choose a blues/preset, vary key/genre/tempo, mute the part you play, start.
 2. **Keep a song:** enter a chart such as Minor Swing, customize the band, explicitly Save.
 3. **Return:** reopen the latest device-local experiment, visibly unsaved, with Revert to saved.
-   Keep one evolving setup; Save a copy creates a separate song when an experiment earns it.
+   Keep one evolving setup; Duplicate creates a separate song when an experiment earns it.
 4. **Another device:** optional passkey account; explicit saves upload, including a frozen
    queued snapshot when offline. Later unsaved edits never enter that queued snapshot.
    Automatically download the whole cloud library and required sounds for offline use.
@@ -40,8 +40,8 @@ not a production file format or runtime. Home exposes quick jam, recent songs, s
 new/import. The chart is a music stand during playback. Tempo, genre, instrument mutes and
 transport are primary controls; key is one obvious action away. Loop/start belongs at the
 relevant section. How many times the form plays belongs at the end of the form (#1511): the
-chart footer's "N bars · repeats continuously" is a button that sets it, the same setting as the
-Song menu's Choruses (#1726), and on a text chart a pick first makes the measure copy "Try the bar
+chart footer's "N bars · repeats continuously" is a button that sets it, its one home since the
+Song menu's Choruses went (#1756), and on a text chart a pick first makes the measure copy "Try the bar
 editor · keep original" makes, leaving the original as it was. Detailed band, sound, practice
 and device controls get deliberate homes.
 

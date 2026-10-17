@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { appUrl, expect, seedStarters, songLink, test, typeBar } from './fixtures';
+import { appUrl, expect, seedStarters, songLink, songMenuAction, test, typeBar } from './fixtures';
 
 /**
  * Browser history (#1700): each view — the songbook, All songs, Standards, a song — is one
@@ -89,11 +89,11 @@ test('Back with a dialog open closes the dialog and keeps the song', async ({ pa
     await seedStarters(page);
     await songLink(page, 'Blue pocket').first().click();
     await onSong(page, 'Blue pocket');
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    const menu = page.getByTestId('song-menu');
-    await expect(menu).toBeVisible();
+    await songMenuAction(page, 'Export…');
+    const dialog = page.getByTestId('export-dialog');
+    await expect(dialog).toBeVisible();
     await page.goBack();
-    await expect(menu).toBeHidden();
+    await expect(dialog).toBeHidden();
     await onSong(page, 'Blue pocket');
     // And the song's entry is still there: one more Back leaves it.
     await page.goBack();
@@ -120,8 +120,7 @@ test('Back from a shared link lands on the songbook with the link consumed', asy
     });
     await seedStarters(page);
     await songLink(page, 'Blue pocket').first().click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Copy link', exact: true }).click();
+    await songMenuAction(page, 'Copy link');
     const link = await page.getByTestId('share-link-fallback').inputValue();
     // A fresh load of the link, as a tap on it elsewhere would be (same path, so a bare goto
     // would only change the hash in place).
@@ -163,9 +162,9 @@ test('Back with a dialog open keeps Forward intact', async ({ page }) => {
     // All songs is ahead of the songbook now. A dialog over the songbook, then Back…
     await songLink(page, 'Blue pocket').first().click();
     await onSong(page, 'Blue pocket');
-    await page.getByRole('button', { name: 'Song actions' }).click();
+    await songMenuAction(page, 'Export…');
     await page.goBack();
-    await expect(page.getByTestId('song-menu')).toBeHidden();
+    await expect(page.getByTestId('export-dialog')).toBeHidden();
     await onSong(page, 'Blue pocket');
     await page.goBack();
     await home(page);

@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
-import { appUrl, expect, test } from './fixtures';
+import { appUrl, expect, songMenu, songMenuAction, test } from './fixtures';
 
 /**
  * The read-only standards catalog (#1439): a fresh device's guest songbook is genuinely empty
@@ -144,7 +144,8 @@ test('editing an open standard writes nothing to recovery storage', async ({ pag
         )
         .toBe(0);
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
+    await songMenuAction(page, 'More');
+    await expect(songMenu(page, 'more')).toBeVisible();
     await expect(page.getByText(/Preserved drafts \(/)).toHaveCount(0);
 });
 

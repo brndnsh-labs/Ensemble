@@ -495,7 +495,7 @@ test('new song / save-a-copy naming stays distinct from the row menu’s "<title
     page,
 }) => {
     // Sanity check that the row-menu duplicate suffix ("copy", no dash) does not collide with
-    // the stand's own "Save a copy" suffix ("— copy"), which a shared helper could confuse.
+    // the stand's own Duplicate suffix ("— copy"), which a shared helper could confuse.
     await page.goto(appUrl());
     await newSongOnTheStand(page);
     await saveAs(page, 'Original tune');

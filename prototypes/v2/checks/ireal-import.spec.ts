@@ -3,7 +3,7 @@ import { dirname, resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import { expectVisitsFollowForm } from './chart-visits';
-import { appUrl, test as base, expect, songLink } from './fixtures';
+import { appUrl, test as base, expect, exportAs, songLink } from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -44,12 +44,10 @@ async function savedDocuments(page: Page): Promise<ChartDocument[]> {
 }
 
 async function exportCurrent(page: Page): Promise<ChartDocument> {
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const downloaded = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const path = await (await downloaded).path();
     const document = JSON.parse(await readFile(path!, 'utf8')) as ChartDocument;
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     return document;
 }
 

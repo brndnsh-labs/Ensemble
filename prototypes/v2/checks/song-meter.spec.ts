@@ -61,8 +61,8 @@ test('a bar whose written lengths cannot follow blocks the change and is named',
     const menu = await openWholeSong(page);
     await menu.getByLabel('Song meter').selectOption('3/4');
 
-    // The refusal closes the Song menu itself and names the bar.
-    await expect(page.getByTestId('song-menu')).toBeHidden();
+    // The refusal closes Song settings itself and names the bar.
+    await expect(page.getByTestId('song-settings')).toBeHidden();
     await expect(alert(page)).toContainText('A · bar 1');
     await expect(alert(page)).toContainText('Nothing was changed');
     await expect(page.locator('.song-subtitle')).toContainText('4/4');

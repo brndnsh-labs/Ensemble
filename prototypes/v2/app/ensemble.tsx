@@ -101,12 +101,13 @@ import {
     DeleteCollectionDialog,
 } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
+import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
 import { GuidedForm } from './guided-form';
-import { ImportDialog } from './import-dialog';
+import { downloadImportSource, ImportDialog } from './import-dialog';
 import { NeckView } from './neck-view';
 import { SongHeader } from './song-header';
-import { SongMenu } from './song-menu';
+import { SongMenu, type SongMenuView } from './song-menu';
 import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
 import { type FeaturedSummary, Songbook, type StandardsEntry } from './songbook';
 import { StandardsBrowser } from './standards-browser';
@@ -199,7 +200,7 @@ const sameMusic = (a: ChartDocument, b: ChartDocument) =>
  * fact and a pair of them is a pair that can disagree. #1299 carried the owner separately for the
  * draft path only, which left the Save path binding a chart to a STORE and not to a library: expire
  * as A, answer "Sign in again" with B's passkey, and `storeSave` still read `'account'` and filed
- * A's chart — or, on `Save a copy`, a fresh create of A's music — inside B's account.
+ * A's chart — or, on Duplicate, a fresh create of A's music — inside B's account.
  *
  * `ownerId` is REQUIRED for an account chart (#1311 patch review R1). An account binding with no
  * owner is an unfenced binding — `belongsToAnotherAccount` reads a null as "makes no claim", so
@@ -478,7 +479,7 @@ export default function Ensemble() {
      * A session can expire without any user gesture — `createSaveTransport`/`createLibraryTransport`
      * call `session.markExpired()` on any 401 — and `signedIn` flips to false underneath a chart
      * that is still the account's. Without this, `storeSave` would silently re-route to the guest
-     * repository: plain Save reports a nonsense conflict, and `Save a copy` (which passes
+     * repository: plain Save reports a nonsense conflict, and Duplicate (which passes
      * `expected = null`) SUCCEEDS and writes account content into guest IndexedDB.
      *
      * The `ownerId` half answers the other question that store alone could not (#1311): WHICH
@@ -652,7 +653,12 @@ export default function Ensemble() {
     const { stage, toggleTheme } = useStageTheme();
     const [following, setFollowing] = useState(true);
     const offline = useOfflineInstall();
-    const [menu, setMenu] = useState(false);
+    // The Song menu (•••, #1756): which of its lists or small dialogs is showing, else null.
+    const [songMenu, setSongMenu] = useState<SongMenuView | null>(null);
+    const songMenuTrigger = useRef<HTMLButtonElement>(null);
+    // Export… (#1756), its own dialog off the Song menu.
+    const [exportOpen, setExportOpen] = useState(false);
+    const exportDialogRef = useRef<HTMLDialogElement>(null);
     const standKeys = useRef<((event: KeyboardEvent) => void) | null>(null);
     const [importing, setImporting] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
@@ -672,7 +678,7 @@ export default function Ensemble() {
     const [showControls, setShowControls] = useState(false);
     const [pendingSound, setPendingSound] = useState<{ lane: string; value: string } | null>(null);
     // #1278 — a distinct busy flag from `busy` (which `run()` sets for every
-    // action) so the audio-export Cancel button in `SongMenu` stays clickable
+    // action) so the audio-export Cancel button in `ExportDialog` stays clickable
     // for the whole render, not just disabled the instant the export starts.
     const [exportingAudio, setExportingAudio] = useState(false);
     const [exportAudioProgress, setExportAudioProgress] = useState('');
@@ -766,6 +772,8 @@ export default function Ensemble() {
         id: string;
         title: string;
         hasRecovery: boolean;
+        /** Asked from the Song menu (#1756): the song is the one on the stand. */
+        onStand?: boolean;
     } | null>(null);
     const guestDeleteDialogRef = useRef<HTMLDialogElement>(null);
     // The row menu's account delete confirm (#1440 review P2) — reuses `DeleteSongDialog`, the
@@ -779,9 +787,15 @@ export default function Ensemble() {
     const rowDeleteDialogRef = useRef<HTMLDialogElement>(null);
     // Delete from this device for good (#1754): one song the account no longer holds or never
     // received (`title` set), or every "No longer in your account" row at once (`title` null).
-    const [purgeTarget, setPurgeTarget] = useState<{ ids: string[]; title: string | null } | null>(
-        null,
-    );
+    // `unconfirmed`: the cloud never confirmed the one song, so no cloud delete came first and
+    // this copy is the only one; `onStand`: asked from the Song menu, about the chart on the stand
+    // (#1756).
+    const [purgeTarget, setPurgeTarget] = useState<{
+        ids: string[];
+        title: string | null;
+        unconfirmed?: boolean;
+        onStand?: boolean;
+    } | null>(null);
     const purgeDialogRef = useRef<HTMLDialogElement>(null);
     // The songbook's own status line (#1440 review P2) — set only by row actions (renamed,
     // duplicated, deleted, "hasn't reached your account yet"), NEVER the stand's `message`
@@ -984,6 +998,18 @@ export default function Ensemble() {
      */
     const rowInAccount = accountsOn && signedIn && sync.observation?.remoteRevision != null;
     /**
+     * Whether the Song menu's Delete… has a song to delete (#1756): a saved one, guest or
+     * account. Not a shared or new-song draft (nothing is stored), and not an account chart this
+     * device cannot act for — its session gone, or another account attached (#1311) — which
+     * `inAccount` and the purge's own owner fence would refuse anyway.
+     */
+    const standDeletable =
+        current !== null &&
+        saved !== null &&
+        !sharedDraft &&
+        (standStore?.store === 'guest' ||
+            (standStore?.store === 'account' && accountsOn && signedIn && !standMismatch));
+    /**
      * Is the Save at the head of this song's outbox refused, and which way (#1267)?
      *
      * Deliberately NOT `inAccount`: that answer also requires a confirmed `remoteRevision`, and a
@@ -1117,7 +1143,6 @@ export default function Ensemble() {
     // One document is all this needs, so it comes from the home slices (#1441), never a full read.
     const template =
         liveHome?.rows[0] ?? liveHome?.continued ?? guestHome?.rows[0] ?? defaultTemplate;
-    const dialog = useRef<HTMLDialogElement>(null);
     const accountDialogRef = useRef<HTMLDialogElement>(null);
     const accountPageDialogRef = useRef<HTMLDialogElement>(null);
     const deleteDialogRef = useRef<HTMLDialogElement>(null);
@@ -1536,6 +1561,14 @@ export default function Ensemble() {
             }
             const from = navEntry.current;
             const open = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')];
+            if (open.length === 0 && document.querySelector('.menu [role="menu"]')) {
+                // An anchored menu (#1755) is open over the page, the Song menu among them
+                // (#1756): Back closes it as it closes a dialog. `<Menu>` hears Escape on the
+                // document whatever has focus.
+                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+                undoPop(target, from);
+                return;
+            }
             if (open.length > 0) {
                 // Back closes what is open over the page first, as a phone's Back does, and the
                 // page itself stays: step back onto its entry.
@@ -1690,12 +1723,21 @@ export default function Ensemble() {
         }
     }, [editing, measureId]);
     useEffect(() => {
-        if (menu) {
-            dialog.current?.showModal();
+        if (exportOpen) {
+            exportDialogRef.current?.showModal();
         } else {
-            dialog.current?.close();
+            exportDialogRef.current?.close();
         }
-    }, [menu]);
+    }, [exportOpen]);
+    // The Song menu belongs to the chart on the stand: none left there, nothing of it stays open
+    // (a delete from another tab, a sign-out), so the next ••• opens it rather than closing it.
+    const standOpen = current !== null;
+    useEffect(() => {
+        if (!standOpen) {
+            setSongMenu(null);
+            setExportOpen(false);
+        }
+    }, [standOpen]);
     useEffect(() => {
         if (bandOpen) {
             // Refreshed on every open: these fields can drift from what the sheet last
@@ -3081,7 +3123,7 @@ export default function Ensemble() {
                 // Every pending bar, by the editor's own rules (`commitBarDrafts`).
                 return applyScore(commitBarDrafts(current.chart.score, barDrafts.latest()));
             } catch (error) {
-                setMenu(false);
+                closeSongMenus();
                 showEditor();
                 // The bar that needs fixing is selected and opens on the chart, its text ready to
                 // correct (#1723), with the refusal in the shell's error line. A fresh opening, so
@@ -3137,7 +3179,7 @@ export default function Ensemble() {
             clearBuffers();
             return next;
         } catch (error) {
-            setMenu(false);
+            closeSongMenus();
             showEditor();
             setEditorRequest((request) => request + 1);
             throw error;
@@ -3392,9 +3434,9 @@ export default function Ensemble() {
         setEditing(false);
         setFollowing(true);
         if (recovery?.conflict) {
-            // #1460 review P2 #3 — this needs reading time and a decision (Save a copy), not a
+            // #1460 review P2 #3 — this needs reading time and a decision (Duplicate), not a
             // ~4s window: `warning` persists with its own close button.
-            setMessage('Recovered draft is based on an older save. Save a copy to keep both.', {
+            setMessage('Recovered draft is based on an older save. Duplicate it to keep both.', {
                 tone: 'warning',
             });
         } else if (recovery) {
@@ -4085,7 +4127,7 @@ export default function Ensemble() {
                 await accountSync.watch(target.id);
                 if (accountSync.getSnapshot().observation?.remoteRevision == null) {
                     releaseRowDeleteClaim();
-                    setPurgeTarget({ ids: [target.id], title: target.title });
+                    setPurgeTarget({ ids: [target.id], title: target.title, unconfirmed: true });
                     return;
                 }
                 setRowDeleteFailure(null);
@@ -4104,8 +4146,33 @@ export default function Ensemble() {
         if (!target) {
             return;
         }
+        if (target.onStand) {
+            // The chart as it stands, pending bars included, as the stand's own Export writes it.
+            void run(exportSong);
+            return;
+        }
         void run(async () => {
             const document = await exportableRowDocument(target.id);
+            if (document) {
+                exportDocument(document);
+            }
+        });
+    }
+    /**
+     * The delete-from-this-device step's Export (#1756): for a song the cloud never confirmed it
+     * is the only way to keep a copy. The stand's chart as it stands, or the row's newest version.
+     */
+    function exportPurgeTarget() {
+        const target = purgeTarget;
+        if (!target || target.title === null) {
+            return;
+        }
+        if (target.onStand) {
+            void run(exportSong);
+            return;
+        }
+        void run(async () => {
+            const document = await exportableRowDocument(target.ids[0]);
             if (document) {
                 exportDocument(document);
             }
@@ -4216,6 +4283,17 @@ export default function Ensemble() {
             if (target.title !== null && purged.size === 1) {
                 setDeletedRowId(target.ids[0]);
             }
+            // Asked from the Song menu (#1756): the purged song is the one on the stand.
+            const onStand = currentNow.current;
+            if (onStand && purged.has(onStand.id)) {
+                leaveDeletedSong();
+            } else if (target.onStand && result.held.length > 0) {
+                // The account holds it after all (a Save landed meanwhile): it stays on the stand,
+                // and the reason is said there, not on a songbook nobody is looking at.
+                setPurgeTarget(null);
+                setError(PURGE_MESSAGES.held);
+                return;
+            }
             setPurgeTarget(null);
             await refreshSongs();
             setHomeNoticeState(
@@ -4230,9 +4308,9 @@ export default function Ensemble() {
     /**
      * The guest songbook's own delete (#1440) — local-only, never used for an account song.
      *
-     * Never needs to clear the stand: row menus render only while `current` is null, so the
-     * target here can never be the open chart (review #1440 P5 — an earlier branch tested that
-     * unreachable state). Deleting the Continue song or a song with a live draft both resolve by
+     * From a row menu the target is never the open chart (row menus render only while `current`
+     * is null); from the Song menu (#1756) it is, and the stand goes back to the songbook once the
+     * song is gone. Deleting the Continue song or a song with a live draft both resolve by
      * inertness instead: `lastOpenedSong`'s stale pointer (like the account's own `lastOpenedKey`)
      * is never read as proof a song still exists — `continuedSave`'s `.find` against the freshly
      * re-read `songs` list is, so a pointer left behind after this runs is simply never matched.
@@ -4244,6 +4322,10 @@ export default function Ensemble() {
         }
         void run(async () => {
             await repository.remove(target.id);
+            if (target.onStand) {
+                volatileDrafts.current.delete(target.id);
+                leaveDeletedSong();
+            }
             forgetOpenedGuest(target.id);
             // Starred and every other collection keep the id (#1474: a song delete never rewrites
             // a collection); it no longer resolves, so it is simply not shown.
@@ -4269,11 +4351,11 @@ export default function Ensemble() {
      *
      * `intent.owner` is the account these bytes belong to (#1311), and it is a PARAMETER rather
      * than a read of `currentStore` because the two kinds of caller genuinely differ. A Save, a
-     * `Save a copy`, an editor upgrade and a recovered-draft copy are all the chart on the stand's
+     * Duplicate, an editor upgrade and a recovered-draft copy are all the chart on the stand's
      * music under a new wrapper, so they carry the stand's owner and are refused when it is not
      * the attached one. A brand-new song, an imported file and a shared-link copy are nobody's
      * yet: they pass null and belong to whichever account is live. Deriving this from the document
-     * id would get `Save a copy` exactly backwards — a fresh id carrying A's music.
+     * id would get Duplicate exactly backwards — a fresh id carrying A's music.
      *
      * `intent.stand` is who owns the BINDING afterwards (#1311 patch review R1b). Only `save()`
      * both commits and keeps the result on the stand without going through `open()`; every other
@@ -4292,7 +4374,7 @@ export default function Ensemble() {
             if (currentStore.current?.store === 'account' && !signedIn) {
                 // The session lapsed under an account chart. Falling through would write it to
                 // the GUEST songbook — a conflict that isn't one on a plain Save, and a silent
-                // copy of account content into guest storage on `Save a copy` (#1266). The full
+                // copy of account content into guest storage on Duplicate (#1266). The full
                 // sign-out flow, including what to offer instead, is #1269's.
                 throw new Error(
                     'Your session expired — sign in again to save this to your account. Your changes stay on this device.',
@@ -4389,6 +4471,106 @@ export default function Ensemble() {
         }
         return result;
     }
+    /** Closes the Song menu (#1756), whichever list or small dialog it shows, and Export…. */
+    function closeSongMenus() {
+        setSongMenu(null);
+        setExportOpen(false);
+    }
+    /** The •••: opens the Song menu, or closes it while one of its lists is showing. */
+    function toggleSongMenu() {
+        if (busy || !current) {
+            return;
+        }
+        if (songMenu === 'actions' || songMenu === 'more') {
+            setSongMenu(null);
+            return;
+        }
+        const document = current;
+        void run(async () => {
+            setRecoveryOptions(await recoveryOptionsFor(document));
+            setSongMenu('actions');
+        });
+    }
+    /** Export…'s formats (#1756). Each closes the dialog once its file is written. */
+    function exportAs(format: ExportFormat) {
+        if (format === 'mix' || format === 'stems') {
+            void exportAudioFile(format);
+            return;
+        }
+        void run(async () => {
+            try {
+                if (format === 'song') {
+                    exportSong();
+                } else if (format === 'midi') {
+                    await exportMidiFile();
+                } else if (current?.schemaVersion === 2 && current.importSource) {
+                    downloadImportSource(current.importSource.text);
+                }
+            } finally {
+                // Written or refused, it closes: a refusal is in the error line behind it.
+                setExportOpen(false);
+            }
+        });
+    }
+    /**
+     * Delete… from the Song menu (#1756), for any saved song on the stand, routed as the row
+     * menu's `requestDeleteRow` routes a row: an account song the cloud holds goes through the
+     * cloud delete (`deleteFromAccount`); one the account no longer holds ("No longer in your
+     * account") or never confirmed goes through delete-from-this-device (`purgeConfirmed`); a
+     * guest song through the guest confirm (`deleteGuestSong`). Each confirm takes the song off
+     * the stand once it is gone (`leaveDeletedSong`).
+     */
+    function requestDeleteStand() {
+        if (!current || !standDeletable) {
+            return;
+        }
+        if (standStore?.store === 'account') {
+            const target = { id: current.id, title: current.title };
+            // Asked of the candidates directly, as `requestDeleteRow` does: `standCandidate` is
+            // null while a Save is queued, and a song the account deleted under a queued Save
+            // must still go to this device's delete, not a cloud delete that only answers
+            // `retained`.
+            if (
+                sync.candidates.some(
+                    (row) => row.documentId === target.id && row.kind === 'deleted',
+                )
+            ) {
+                setPurgeTarget({ ids: [target.id], title: target.title, onStand: true });
+                return;
+            }
+            void run(async () => {
+                // This song's own observation, read now, not whatever the watch last held.
+                await accountSync.watch(target.id);
+                if (accountSync.getSnapshot().observation?.remoteRevision == null) {
+                    setPurgeTarget({
+                        ids: [target.id],
+                        title: target.title,
+                        unconfirmed: true,
+                        onStand: true,
+                    });
+                    return;
+                }
+                setDeleteFailure(null);
+                setDeleteOpen(true);
+            });
+            return;
+        }
+        setGuestDeleteTarget({
+            id: current.id,
+            title: current.title,
+            // The stand's unsaved changes are a draft too, and the delete takes them with it.
+            hasRecovery: dirty || repository.recoverySlotCount(current.id) > 0,
+            onStand: true,
+        });
+    }
+    /** A song just deleted leaves the stand for the songbook (#1270, #1756). */
+    function leaveDeletedSong() {
+        runtime.stop();
+        setCurrent(null);
+        setSaved(null);
+        bindStand(null);
+        clearBuffers();
+    }
     /**
      * Delete the open chart from the cloud (#1270) — the one destructive account operation in the
      * product, and deliberately not a side effect of anything else.
@@ -4428,12 +4610,8 @@ export default function Ensemble() {
                 // toast would leave the musician guessing whether it worked.
                 return;
             }
-            runtime.stop();
             setDeleteOpen(false);
-            setCurrent(null);
-            setSaved(null);
-            bindStand(null);
-            clearBuffers();
+            leaveDeletedSong();
             setDeletedRowId(documentId);
             await refreshSongs();
             // The songbook's own line (#1440 review P2), not the stand's `message`: this delete
@@ -5032,9 +5210,11 @@ export default function Ensemble() {
         // A copy moves the stand onto the new song (`setCurrent(result)` above) — say so by
         // name, or the musician goes on editing what they think is the original (#1700).
         setMessage(
-            copy ? `Saved as “${next.title}” · you’re on the copy now` : 'Saved on this device',
+            copy
+                ? `Duplicated as “${next.title}” · you’re on the copy now`
+                : 'Saved on this device',
         );
-        setMenu(false);
+        closeSongMenus();
     }
     function newSong() {
         void run(async () => {
@@ -5112,7 +5292,7 @@ export default function Ensemble() {
         // Capability preflight before creating a copy or changing the active song.
         checkPlayable(converted.chart.score);
         // The stand's owner (#1311): a converted copy is the open chart's music, so it is as
-        // much that account's as a `Save a copy` is.
+        // much that account's as a Duplicate is.
         const created = await storeSave(converted, null, {
             owner: standOwner(),
             stand: false,
@@ -5239,7 +5419,7 @@ export default function Ensemble() {
             if (result.kind === 'blocked') {
                 // The Song menu closes onto the bar that would not fit, so the refusal (the
                 // shell's error line) and the bar it names are both in view.
-                setMenu(false);
+                closeSongMenus();
                 setMeasureId(result.measureId);
                 throw new Error(result.message);
             }
@@ -5312,6 +5492,8 @@ export default function Ensemble() {
             setBusy(false);
             setExportingAudio(false);
             setExportAudioProgress('');
+            // Done, cancelled or refused, Export… closes; a refusal is in the error line.
+            setExportOpen(false);
         }
     }
     // "Upgrade old songs" (#1738). The account songbook joins once its library has downloaded
@@ -6087,12 +6269,8 @@ export default function Ensemble() {
                                 }
                             })
                         }
-                        onMenu={() =>
-                            void run(async () => {
-                                setRecoveryOptions(await recoveryOptionsFor(current));
-                                setMenu(true);
-                            })
-                        }
+                        menuButtonRef={songMenuTrigger}
+                        onMenu={toggleSongMenu}
                     />
                     <TransportBar
                         current={current}
@@ -6424,7 +6602,7 @@ export default function Ensemble() {
                          * `role="status"` live regions, so leaving this one mounted too would
                          * announce the one change twice.
                          */}
-                        {standSyncFailureVisible && standSyncFailure && !menu && (
+                        {standSyncFailureVisible && standSyncFailure && songMenu !== 'actions' && (
                             <div
                                 className="stand-sync-failure"
                                 role="status"
@@ -6471,28 +6649,26 @@ export default function Ensemble() {
                 </main>
             )}
             <SongMenu
-                dialogRef={dialog}
+                view={songMenu}
+                anchor={() =>
+                    songMenuTrigger.current?.isConnected ? songMenuTrigger.current : null
+                }
                 current={current}
                 saved={saved}
                 busy={busy}
                 dirty={dirty}
-                shareLinkFallback={shareLinkFallback}
+                canDelete={standDeletable}
                 recoveryOptions={recoveryOptions}
-                inAccount={inAccount}
                 syncStatus={syncStatus}
-                onClose={() => setMenu(false)}
+                shareLinkFallback={shareLinkFallback}
+                onView={setSongMenu}
                 onShare={() => void run(shareChartLink)}
-                onSaveCopy={() => void run(() => save(true))}
-                onExport={() => void run(exportSong)}
-                onExportMidi={() => void run(exportMidiFile)}
-                exportingAudio={exportingAudio}
-                exportAudioProgress={exportAudioProgress}
-                onExportAudioMix={() => void exportAudioFile('mix')}
-                onExportAudioStems={() => void exportAudioFile('stems')}
-                onCancelExportAudio={() => runtime.cancelExportAudio()}
+                onDuplicate={() => void run(() => save(true))}
+                onExport={() => setExportOpen(true)}
+                onDelete={requestDeleteStand}
+                onCloseShareLink={() => setShareLinkFallback(null)}
                 onSongMeter={changeSongMeter}
                 onSongMode={(isMinor) => change(() => runtime.setMode(isMinor), true)}
-                onChoruses={changeChoruses}
                 onRevert={() =>
                     void run(() => {
                         if (!saved) {
@@ -6506,14 +6682,8 @@ export default function Ensemble() {
                         draft(reverted, reverted);
                         clearBuffers();
                         selectSection(saved);
-                        setMenu(false);
                     })
                 }
-                onDeleteFromAccount={() => {
-                    setDeleteFailure(null);
-                    setMenu(false);
-                    setDeleteOpen(true);
-                }}
                 onOpenRecovery={(record) =>
                     void run(async () => {
                         updateChart();
@@ -6534,10 +6704,23 @@ export default function Ensemble() {
                         // The stand moves onto the copy; say so, or the musician goes on editing
                         // what they think is the song they had open (#1700).
                         setMessage(`Opened “${copy.title}” · the song you had open is unchanged`);
-                        setMenu(false);
+                        closeSongMenus();
                     })
                 }
             />
+            {current && (
+                <ExportDialog
+                    dialogRef={exportDialogRef}
+                    title={current.title}
+                    busy={busy}
+                    hasSource={current.schemaVersion === 2 && !!current.importSource}
+                    exportingAudio={exportingAudio}
+                    exportAudioProgress={exportAudioProgress}
+                    onExport={exportAs}
+                    onCancelAudio={() => runtime.cancelExportAudio()}
+                    onClose={() => setExportOpen(false)}
+                />
+            )}
             {accountsOn && (
                 <SignInDialog
                     dialogRef={accountDialogRef}
@@ -6769,7 +6952,9 @@ export default function Ensemble() {
                     dialogRef={purgeDialogRef}
                     title={purgeTarget.title}
                     count={purgeTarget.ids.length}
+                    unconfirmed={!!purgeTarget.unconfirmed}
                     busy={busy}
+                    onExport={purgeTarget.title === null ? null : exportPurgeTarget}
                     onConfirm={purgeConfirmed}
                     onClose={() => setPurgeTarget(null)}
                 />

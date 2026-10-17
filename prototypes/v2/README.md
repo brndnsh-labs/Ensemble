@@ -110,7 +110,7 @@ local browser projects and never deploys.
   There is no v1 import (retired in #1736): v1's songs were copied over while it existed, and
   the `ensemble_*` keys are left on the device, inert and never read or deleted.
 - IndexedDB `ensemble-v2-preview` holds explicit saves with atomic revision comparison. Local
-  recovery keys are writer-scoped; older competing drafts remain accessible in Song actions.
+  recovery keys are writer-scoped; older competing drafts remain accessible in the Song menu's More › Preserved drafts….
   Quota errors retain the current draft in memory and warn before leaving the page where the
   browser supports that prompt. Browser eviction/clearing can still remove local data: export
   valuable charts. This preview does not promise durable cloud backup.
@@ -176,12 +176,12 @@ the section's settings offer the same at section scope (#1376). Any meter change
 menu also holds **Repeat or ending…**, **Advanced · per-bar repeat and ending markers**, **Hold
 last chord**, **Insert bar after** and **Delete bar**.
 Global Key transposes the entire score. The song's title is typed in the header while editing.
-**Song mode** (the Song menu ••• → Chart, beside Song meter) sets the song's own major/minor
+**Song mode** (the Song menu ••• → More › Song settings…, beside Song meter, #1756) sets the song's own major/minor
 (#1375) without rewriting chord names or moving the key: A minor is A, then Minor, not a
 relative-key swap to C. **Song meter** sets the song's own meter: equal-length bars re-divide, a
 section or bar with its own meter keeps it, and a bar whose written lengths cannot follow blocks
-the change and is selected for you — nothing is rounded. **Choruses** counts how many times the
-form plays (or Repeats continuously).
+the change and is selected for you — nothing is rounded. How many times the form plays (or Repeats
+continuously) is the chart footer's form-length menu.
 Delete bar removes the bar (a key/meter change it wrote passes to the next bar, so the rest of the
 section sounds the same; a section's only bar takes the section with it) and the section letter's
 **Delete section** removes the whole section (#1373). Both refuse, changing nothing, when it would
@@ -262,7 +262,7 @@ coexistence/production migration has not shipped. Prefer a corrective release an
 
 ## Legacy editing and returning to practice (#1175)
 
-- Save, Save a copy and export include all currently typed section text. Update chart is an
+- Save, Duplicate and Export… include all currently typed section text. Update chart is an
   optional playable preview, not a prerequisite for saving. Raw buffers survive section/view
   changes and enable Save. Playback, key/feel changes, adding a section and returning to the
   songbook validate/apply the buffers first; unsupported text keeps the editor open for correction.

@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, openBand, seedStarters, songLink, test } from './fixtures';
+import type { Page } from '@playwright/test';
+import { appUrl, expect, exportAs, openBand, seedStarters, songLink, test } from './fixtures';
 
 // Same starter facts `checks/midi-export.spec.ts` hardcodes, for the same reason: an
 // independent check on the exporter, not a mirror of the app's own arranger math.
@@ -49,7 +50,7 @@ function parseWav(buf: Buffer): ParsedWav {
     };
 }
 
-test('Export audio (mix) downloads a valid WAV of plausible duration, and the live chart is unchanged after', async ({
+test('Export → Audio (mix) downloads a valid WAV of plausible duration, and the live chart is unchanged after', async ({
     page,
 }, testInfo) => {
     // A WAV mix render does real per-step note generation AND full audio
@@ -63,15 +64,13 @@ test('Export audio (mix) downloads a valid WAV of plausible duration, and the li
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
     const before = await page.locator('.sheet').innerText();
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download', { timeout: 100_000 });
-    await page.getByRole('button', { name: 'Export audio (mix)' }).click();
+    await exportAs(page, 'Audio (mix)');
     const downloadEvent = await download;
     expect(downloadEvent.suggestedFilename()).toBe('Blue pocket.wav');
     const dest = testInfo.outputPath('mix.wav');
     await downloadEvent.saveAs(dest);
     const wav = parseWav(await readFile(dest));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     expect(wav.numChannels).toBe(2);
     expect(wav.bitsPerSample).toBe(16);
@@ -88,7 +87,7 @@ test('Export audio (mix) downloads a valid WAV of plausible duration, and the li
     expect(after).toBe(before);
 });
 
-test('Export audio during playback does not stop or glitch the band', async ({ page }) => {
+test('Export → Audio during playback does not stop or glitch the band', async ({ page }) => {
     // Same single-render cost as the plain mix export test above (this
     // environment has shown real variance on that one too), plus the offline
     // render's step-generation loop now shares the main thread with the live
@@ -102,11 +101,9 @@ test('Export audio during playback does not stop or glitch the band', async ({ p
     // Same performance-focus chrome hide as `checks/midi-export.spec.ts` — exit
     // it to reach "Song actions" mid-song.
     await page.getByRole('button', { name: 'Show controls' }).click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download', { timeout: 100_000 });
-    await page.getByRole('button', { name: 'Export audio (mix)' }).click();
+    await exportAs(page, 'Audio (mix)');
     await download;
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
 
     // The render runs on a detached clone via a fresh `OfflineAudioContext`
     // (`renderClonedStateToWav`); it must never touch the live scheduler.
@@ -114,7 +111,11 @@ test('Export audio during playback does not stop or glitch the band', async ({ p
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 
-test('Cancel stops an in-flight export before any download', async ({ page }) => {
+/**
+ * Blue pocket on the stand with the grand piano chosen but evicted, and its manifest fetch held
+ * back 4s once armed: an export's own `prepareSounds` then has slow work to do.
+ */
+async function slowGrandExport(page: Page) {
     // Delay (never fail) only the pack's OWN manifest fetch once armed — not
     // every sample file, which would stack a serial multi-second delay onto
     // each of `grand`'s 21 samples (`prepareSound` fetches at concurrency 1) —
@@ -160,10 +161,12 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
         }
         Object.assign(window, { __delayPack: true });
     });
+}
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
+test('Cancel stops an in-flight export before any download', async ({ page }) => {
+    await slowGrandExport(page);
     const download = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);
-    await page.getByRole('button', { name: 'Export audio (mix)' }).click();
+    await exportAs(page, 'Audio (mix)');
     await expect(page.getByText(/Preparing Acoustic Grand Piano/)).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
     expect(await download).toBeNull();
@@ -176,7 +179,28 @@ test('Cancel stops an in-flight export before any download', async ({ page }) =>
     // rather than being stuck "in progress" forever.
     await expect(page.getByText(/Preparing Acoustic Grand Piano/)).toBeHidden({ timeout: 15_000 });
     await expect(page.locator('.error-banner')).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Export audio (mix)' })).toBeEnabled();
+    await expect(page.getByTestId('export-dialog')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
+});
+
+test('Esc never closes Export… while audio renders: Cancel stays in reach (#1756)', async ({
+    page,
+}) => {
+    await slowGrandExport(page);
+    await exportAs(page, 'Audio (mix)');
+    const dialog = page.getByTestId('export-dialog');
+    await expect(page.getByText(/Preparing Acoustic Grand Piano/)).toBeVisible();
+    // A browser honours a refused `cancel` only with fresh user activation, so the third Esc
+    // closes a modal dialog anyway; the dialog opens itself again while the render runs.
+    for (let press = 0; press < 3; press += 1) {
+        await page.keyboard.press('Escape');
+    }
+    await expect(dialog).toBeVisible();
+    await expect(page.getByText(/Preparing Acoustic Grand Piano/)).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(dialog).toBeHidden({ timeout: 15_000 });
+    await expect(page.locator('.error-banner')).toHaveCount(0);
 });
 
 test('A pack that fails to install surfaces an error, never a silent synth fallback', async ({
@@ -218,10 +242,8 @@ test('A pack that fails to install surfaces an error, never a silent synth fallb
         Object.assign(window, { __breakPack: true });
     });
 
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download', { timeout: 3000 }).catch(() => null);
-    await page.getByRole('button', { name: 'Export audio (mix)' }).click();
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    await exportAs(page, 'Audio (mix)');
     await expect(page.locator('.error-banner')).toBeVisible();
     // Never a WAV rendered with a silent synth stand-in for the unavailable pack.
     expect(await download).toBeNull();

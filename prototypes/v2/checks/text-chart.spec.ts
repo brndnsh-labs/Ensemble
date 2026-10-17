@@ -3,15 +3,16 @@ import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import {
     appUrl,
-    closeSongMenu,
     editorRevealed,
     expect,
+    exportAs,
+    formLength,
     leaveBar,
     openBar,
-    openWholeSong,
     seedGuestDocuments,
     settled,
     songLink,
+    songMenuAction,
     starterTextCharts,
     typeBar,
 } from './fixtures';
@@ -65,12 +66,10 @@ async function savedBlue(page: Page) {
     });
 }
 async function exportCurrent(page: Page) {
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file', exact: true }).click();
+    await exportAs(page, 'Song file');
     const path = await (await download).path();
     const document = JSON.parse(await readFile(path!, 'utf8'));
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     return document;
 }
 
@@ -106,15 +105,6 @@ async function pick(page: Page, choice: string) {
     await expect(formMenu(page)).toHaveCount(0);
 }
 
-/** The Song menu's Choruses select, read in Edit with the menu open, then closed again. */
-async function songMenuChoruses(page: Page): Promise<string> {
-    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await openWholeSong(page);
-    const value = await page.getByLabel('Choruses', { exact: true }).inputValue();
-    await closeSongMenu(page);
-    await page.getByRole('button', { name: 'Chart', exact: true }).click();
-    return value;
-}
 async function convertBlue(page: Page) {
     await seedTextCharts(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
@@ -155,7 +145,7 @@ test('typed chords are unsaved work: Save includes every edited section without 
     expect((await savedBlue(page)).chart.arrangement.sections[0].value).toBe('Am7 | D7');
 });
 
-test('export and Save a copy include typed text but do not overwrite the original save', async ({
+test('export and Duplicate include typed text but do not overwrite the original save', async ({
     page,
 }) => {
     await openEditor(page);
@@ -167,8 +157,7 @@ test('export and Save a copy include typed text but do not overwrite the origina
     expect(await savedBlue(page)).toEqual(original);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
     await page.getByLabel('Chord text').fill('Am7 | D7 | Gmaj7');
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
+    await songMenuAction(page, 'Duplicate');
     // While editing, the title is the header's input (#1726).
     await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket — copy');
     expect((await exportCurrent(page)).chart.arrangement.sections[0].value).toBe(
@@ -232,11 +221,15 @@ test('unsupported text blocks save, export, navigation and transforms without lo
         await expect(page.getByLabel('Section', { exact: true })).toHaveValue(second);
         expect(await savedBlue(page)).toEqual(original);
     }
-    for (const action of ['Save a copy', 'Export file']) {
-        await page.getByRole('button', { name: 'Song actions' }).click();
-        await page.getByRole('button', { name: action, exact: true }).click();
+    for (const action of [
+        () => songMenuAction(page, 'Duplicate'),
+        () => exportAs(page, 'Song file'),
+    ]) {
+        await action();
         await expect(page.locator('.error-banner')).toContainText('unsupported chord spelling');
         await expect(page.getByLabel('Chord text')).toHaveValue('C | potato | G');
+        // The refusal closes Export… onto the editor it names.
+        await expect(page.getByTestId('export-dialog')).toBeHidden();
     }
     await page.getByLabel('Key', { exact: true }).selectOption('D');
     await expect(page.getByLabel('Key', { exact: true })).toHaveValue('C');
@@ -252,8 +245,7 @@ test('unsupported text blocks save, export, navigation and transforms without lo
             return event.defaultPrevented;
         }),
     ).toBe(true);
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await expect(page.getByLabel('Chord text')).toHaveValue(
         original.chart.arrangement.sections[0].value,
     );
@@ -370,8 +362,7 @@ test('a revision conflict retains typed chords and allows an independent copy', 
     await expect(page.locator('.error-banner')).toContainText('saved in another tab');
     await expect(page.getByLabel('Chord text')).toHaveValue('Dm7 | G7');
     expect(await savedBlue(page)).toEqual(newer);
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Save a copy', exact: true }).click();
+    await songMenuAction(page, 'Duplicate');
     // While editing, the title is the header's input (#1726).
     await expect(page.getByLabel('Song title')).toHaveValue('Blue pocket — copy');
     expect((await exportCurrent(page)).chart.arrangement.sections[0].value).toBe('Dm7 | G7');
@@ -470,13 +461,11 @@ test('file export/import is detached; invalid input never changes the active son
     await page.getByLabel('Chord text').fill('Am7 | D7 | Gmaj7 | Cmaj7');
     await page.getByRole('button', { name: 'Update chart' }).click();
     await expect(page.locator('.bar')).toHaveCount(4);
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file' }).click();
+    await exportAs(page, 'Song file');
     const exported = await download;
     const path = await exported.path();
     expect(path).toBeTruthy();
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByLabel('Import Ensemble document').setInputFiles(path!);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -691,7 +680,7 @@ test('on a saved text chart, a count converts a copy and leaves the original unt
 
     await pick(page, 'Plays 3 times');
     await expect(footer).toHaveText('12 bars · plays 3 times, then ends');
-    expect(await songMenuChoruses(page)).toBe('3');
+    expect(await formLength(page)).toBe('Plays 3 times');
     const stored = await documents(page);
     // The original is exactly as it was; the copy is a new measure chart beside it.
     expect(stored.find((d) => d.id === 'starter-blues')).toEqual(original);
@@ -727,16 +716,14 @@ test('on an opened text chart, a count makes the measure copy and counts it (#15
     await expect(page.getByTestId('stand-toast')).toContainText('Editable copy created');
     await expect(footer).toHaveText('12 bars · plays 2 times, then ends');
     await expect(page.locator('.chart-bottom')).not.toContainText('repeats continuously');
-    // The copy is a measure chart: Edit opens its bars, not the text panel, and the Song menu
-    // agrees on the count.
+    // The copy is a measure chart: Edit opens its bars, not the text panel, and the footer's
+    // menu holds the count.
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     await expect(page.locator('.edit-panel')).toHaveCount(0);
     await expect(await openBar(page, 1)).toBeVisible();
     await leaveBar(page);
-    await openWholeSong(page);
-    await expect(page.getByLabel('Choruses', { exact: true })).toHaveValue('2');
-    await closeSongMenu(page);
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
+    expect(await formLength(page)).toBe('Plays 2 times');
 
     // What the conversion stored is the button's copy, with the count as one unsaved edit on
     // top; the original is untouched beside it.

@@ -1,7 +1,7 @@
 // The sound packs: installing, routing and recovering them, and the feels that follow them.
 // Split from `foundation.spec.ts` so CI's shard deal can put the two halves on different legs.
 import { readFile } from 'node:fs/promises';
-import { appUrl, expect, seedStarters, songLink } from './fixtures';
+import { appUrl, expect, exportAs, seedStarters, songLink, songMenuAction } from './fixtures';
 import {
     closeSounds,
     LANES,
@@ -32,8 +32,7 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     await page.getByLabel('Chords sound', { exact: true }).selectOption('synth');
     await expect(page.getByLabel('Chords sound', { exact: true })).toBeEnabled();
     await closeSounds(page);
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
     // Nothing is retained for a chart that matches its committed version (#1299 patch review P1).
     // A revert used to leave a recovery slot identical to the save — a draft of nothing, which
@@ -50,11 +49,9 @@ test('manual sounds save, revert, export/import and play sampled audio after off
             ),
         )
         .toBe(0);
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file' }).click();
+    await exportAs(page, 'Song file');
     const file = await (await download).path();
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByLabel('Import Ensemble document').setInputFiles(file!);
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:grand');
     // Observe decoded, nonzero sample buffers reaching actual playback sources.
@@ -226,9 +223,8 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await closeSounds(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file' }).click();
+    await exportAs(page, 'Song file');
     const path = await (await download).path();
     const exported = JSON.parse(await readFile(path!, 'utf8'));
     expect(exported.chart.band.soloist).toMatchObject({
@@ -236,7 +232,6 @@ test('one install applies genre sounds, preserves manual overrides and follows f
         autoSound: true,
     });
     expect(exported.chart.band.chords).toMatchObject({ voice: 'pack:rhodes', autoSound: false });
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
     await page.getByLabel('Import Ensemble document').setInputFiles(path!);
     await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
     await expect(page.locator('.error-banner')).toHaveCount(0);
@@ -266,8 +261,7 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
     await page.getByRole('button', { name: 'Stop playback' }).click();
-    await page.getByRole('button', { name: 'Song actions' }).click();
-    await page.getByRole('button', { name: 'Revert to saved' }).click();
+    await songMenuAction(page, 'Revert to saved');
     await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Funk');
     await openSounds(page);
     await expect(page.getByLabel('Drums sound', { exact: true })).toHaveValue('auto');
@@ -541,9 +535,8 @@ test('a feel staged for the next bar settles when the musician stops inside it',
     expect(settleHistory.some((text) => text.includes('Updating'))).toBe(false);
     await expect(page.getByLabel('Style', { exact: true })).toHaveValue('Rock');
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: 'Song actions' }).click();
     const download = page.waitForEvent('download');
-    await page.getByRole('button', { name: 'Export file' }).click();
+    await exportAs(page, 'Song file');
     const exported = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
     // Blues would have left its genre and its swing behind a 'Rock' picker label — one
     // half-changed setup in one document. The genre is stored once, by name.

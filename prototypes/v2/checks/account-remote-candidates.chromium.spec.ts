@@ -12,7 +12,7 @@ import {
     signUp,
     songTitles,
 } from './account-helpers';
-import { expect, accountTest as test } from './fixtures';
+import { expect, songMenuAction, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
 /**
@@ -219,8 +219,7 @@ test('a tombstoned song held by an unsaved draft is marked and offered a new ide
 
         // Device two deletes the song from the account.
         await openSong(second, 'Set list');
-        await second.getByRole('button', { name: 'Song actions' }).click();
-        await second.getByTestId('delete-from-account').click();
+        await songMenuAction(second, 'Delete…');
         await second.getByTestId('delete-song-confirm').click();
         await expect(second.getByRole('button', { name: 'Song actions' })).toHaveCount(0);
 
