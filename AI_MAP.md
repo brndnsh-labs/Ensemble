@@ -75,7 +75,6 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `prototypes/v2/lib/voicings/index.ts` | The voicings engine's public surface (shell voicings and triad grips, #1585/#1588): three-note R/3/7 shells for 7th chords, closed triads in three inversions and power chords (#1588), on guitar and ukulele; a Viterbi pass over grips and one over fingers, root-motion and finger-move narration. Pure TS, vendored from the Shell Voicing Map handoff; no DOM, audio or state. | `voiceBandChart`, `NECK_INSTRUMENTS`, `voiceChart`, `rootMove`, `fingerMoves` |
 | `prototypes/v2/lib/voicings/adapter.ts` | Ensemble's chords as voicing input: `ChordFacts` (the band's chord authority) → one of the six shell qualities, six triads or the power chord, the Freddie-Green reduction named in `approximation`, the root spelled by `spellPitchClass` as the chart sheet spells it. The engine has no parser or root table of its own. | `voicingChord`, `spellRoot` |
 | `prototypes/v2/lib/voicings/voice-chart.ts` | A whole `BandChart` voiced in one pass, written chords only, each voicing carrying its `globalIndex` and `approximation`; `NECK_INSTRUMENTS`, the one pref-id → instrument table. | `voiceBandChart`, `NeckPrefs`, `NECK_INSTRUMENTS` |
-| `prototypes/v2/lib/legacy-band-chart.ts` | A measure-less (v1) chart as a `BandChart`, over the old engine's maps (`stepMap[i]` performs written chord `i`; bars from `lib/lead-sheet.ts`'s `measureOfGlobalIndex`), so Neck mode follows v1 charts too. `useChartView` returns it as `followChart`. Interim seam until v1 charts are drawn from the band's timeline. | `legacyBandChart` |
 | `prototypes/v2/lib/voicings/home-window.ts` | Where the hand sits for a key (#1598): the home window a chart opens with until the musician moves it — the window holding the I, IV and V roots (then the key's other roots) nearest the nut on the low strings. `lib/session.ts`'s `defaultNeckHome` applies it to a guitar; `voice-chart.ts`'s `chartHomeKey` reads the key. | `keyHomeWindow`, `lowestFret`, `HOME_FRETS` |
 | `prototypes/v2/lib/voicings/types.ts` | The engine's data contracts: `Spelled`, `Quality`, `Voicing`, `ChartChord`, `VoiceOptions`. | — |
 | `prototypes/v2/lib/voicings/theory.ts` | Degree and quality tables, degree spelling. | `DEGREES`, `QUALITIES`, `spellDegree` |
@@ -126,7 +125,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
-| `public/engine/chords-engine.ts` | Chord parsing and naming for a measure-less chart's display (`arranger.progression`); no voicing. | `validateProgression`, `getChordDetails` |
+| `public/engine/chords-engine.ts` | The old chord parser. The app reads none of it since #1739; only `public/songbook/legacy-score.ts` ("Upgrade old songs") and tests use it, until #1740 deletes both. | `readLegacyChordToken` |
 | `public/engine/note-spelling.ts` | Canonical pitch-class → letter-name spelling policy (sharp/flat by key), shared by the chart render path and the chord editor. | `spellPitchClass` |
 | `public/data/note-names.ts` | Pure pitch-class name table; re-exported by config without pulling genre data into notation-only editors. | `KEY_ORDER` |
 | `public/engine/transpose.ts` | Single shared progression-text transposer for absolute transpose + relative-key switch. | `transposeChordText` |
@@ -172,18 +171,15 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 ## UI (the v2 app)
 
 `prototypes/v2/app/` holds every surface (songbook, chart sheet with its in-place bar, bar and
-section menus, transport, Song menu, sounds panel, a text chart's editor, account pages) and `prototypes/v2/lib/` the runtime bridge, songbook repository and
+section menus, transport, Song menu, sounds panel, account pages) and `prototypes/v2/lib/` the runtime bridge, songbook repository and
 account sync. Per-surface ownership is the navigation table in `prototypes/v2/CLAUDE.md`.
 
 ## High-Level Controllers & Integration
 
 | Path | Responsibility |
 | :--- | :--- |
-| `public/controllers/arranger-controller.ts` | Transpose the chart's key (`transposeKey`), the one entry the stand's runtime uses. |
 | `public/controllers/instrument-controller.ts` | Per-instrument state and preset routing. |
-| `public/controllers/practice-controller.ts` | Section practice — a section's step bounds, for start-from-here (#1016). |
 | `public/export/detached-generation-state.ts` | Offline-render state clone (the band's WAV export and the listening-gate tools): preserves generation settings while stripping live handles and runtime buffers. |
-| `public/song/lead-sheet-model.ts` | Shared lead-sheet shaping: chords grouped into measures and section blocks. |
 | `public/platform.ts` | Browser hacks (WakeLock, Audio Unlock). |
 | `public/utils.ts` | Pure musical/math primitives: pitch conversion + key normalization. No DOM, no Web Audio, no persistence. | `getFrequency` |
 | `public/sanitize.ts` | Main-thread string sanitization (dangerous-char stripping, song-seed normalizing). | `stripDangerousChars`, `normalizeSongSeed` |

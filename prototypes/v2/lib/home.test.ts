@@ -60,14 +60,6 @@ describe('firstBars (#1441)', () => {
         expect(firstBars(blues, 8)).toEqual(['C7', 'C7', 'C7', 'C7', 'F7', 'F7', 'C7', 'C7']);
         expect(firstBars(blues, 4)).toHaveLength(4);
     });
-
-    it('splits a measure-less chart at its bar lines', () => {
-        const legacy = {
-            schemaVersion: 1,
-            chart: { arrangement: { sections: [{ value: 'Dm7 | G7 |\nCmaj7 | A7' }] } },
-        } as never;
-        expect(firstBars(legacy, 8)).toEqual(['Dm7', 'G7', 'Cmaj7', 'A7']);
-    });
 });
 
 describe('openedAgo (#1441)', () => {

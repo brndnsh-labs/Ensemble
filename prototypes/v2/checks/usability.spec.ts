@@ -19,9 +19,6 @@ import {
     typeBar,
 } from './fixtures';
 
-// The text chart's editor (Chord text, Section, ＋ Section, Update chart, Edit section) has its
-// own spec, `text-chart.spec.ts` (#1733); the starters here are measure charts.
-
 async function openEditor(page: Page) {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();

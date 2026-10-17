@@ -3,9 +3,7 @@
 Since #1358 `public/` is a library, not an app: the v2 music stand (`prototypes/v2`) compiles it
 through the `@engine/*` alias, and `prototypes/v2/lib/runtime.ts` is its one main-thread host.
 The main-thread plumbing layer: `state.ts` + the `state/*.ts` family — the `deepSignal`
-slices plus the non-slice plumbing that sits beside them (`state/state-effects.ts`) — the `controllers/*.ts` family
-(`controllers/arranger-controller.ts`,
-`controllers/instrument-controller.ts`, …), and
+slices plus the non-slice plumbing that sits beside them (`state/state-effects.ts`) — `controllers/instrument-controller.ts`, and
 `config.ts`. Only the slice files are exempt from `npm run check-mutations`; the
 plumbing dispatches like any other consumer. For the voices and the audio graph, see
 `public/engine/CLAUDE.md`; the band engine that plays them is `band/`. This file is the traps

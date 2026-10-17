@@ -6,7 +6,7 @@
  */
 import { parseIRealImport } from '@engine/songbook/ireal-import';
 import { describe, expect, it } from 'vitest';
-import { accountChart } from '../../../tests/utils/account-songbook-fixture';
+import { accountScoreChart } from '../../../tests/utils/account-songbook-fixture';
 import {
     type CollectionDocument,
     MAX_COLLECTION_SONGS,
@@ -41,7 +41,7 @@ function playlist(songs: string[][], name?: string): string {
 const steps = { shouldYield: () => true, yieldNow: async () => {} };
 
 async function plan(source: string): Promise<PlaylistPlan> {
-    const built = await planPlaylist(parseIRealImport(source), accountChart(), steps);
+    const built = await planPlaylist(parseIRealImport(source), accountScoreChart(), steps);
     if (!built) {
         throw new Error('The plan was cancelled.');
     }
@@ -54,14 +54,9 @@ function counter(prefix = 'new') {
 }
 
 function held(title: string, composer: string, id: string): ChartDocument {
-    // A v1 document has no composer field, so a held song with a composer is a v2 import.
     return composer
-        ? ({
-              ...accountChart(title, id),
-              schemaVersion: 2,
-              metadata: { composer },
-          } as unknown as ChartDocument)
-        : accountChart(title, id);
+        ? { ...accountScoreChart(title, id), metadata: { composer } }
+        : accountScoreChart(title, id);
 }
 
 const SOURCE = playlist(
@@ -105,7 +100,7 @@ describe('planning a whole-playlist import (#1478)', () => {
     it('reports progress and stops when cancelled', async () => {
         const progress: number[] = [];
         let yields = 0;
-        const cancelled = await planPlaylist(parseIRealImport(SOURCE), accountChart(), {
+        const cancelled = await planPlaylist(parseIRealImport(SOURCE), accountScoreChart(), {
             shouldYield: () => true,
             yieldNow: async () => {
                 yields += 1;

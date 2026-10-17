@@ -25,7 +25,7 @@
 import { writtenChart } from '@engine/songbook/codec';
 import { type ConversionNote, proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import type { CodecIssue } from '@engine/songbook/types';
-import { type ChartDocument, validateDocument } from './documents';
+import { type ChartDocument, type StoredDocument, validateDocument } from './documents';
 
 /** One reason or change, about one bar where the converter could say which. */
 export interface UpgradeNote {
@@ -65,7 +65,7 @@ function canonical(value: unknown): string {
 }
 
 /** A document as the current writer would store it (`writtenChart`). */
-function asWrittenToday<T extends ChartDocument>(document: T): T {
+function asWrittenToday<T extends StoredDocument>(document: T): T {
     return { ...document, chart: writtenChart(document.chart) };
 }
 
@@ -86,7 +86,7 @@ function isCollection(document: unknown): boolean {
  * band or performance field the codec no longer accepts (#1741) differs from `writtenChart`'s
  * field-by-field copy, so it is listed as an old leftover rather than ignored.
  */
-export function needsUpgrade(document: ChartDocument): boolean {
+export function needsUpgrade(document: StoredDocument): boolean {
     if (isCollection(document)) {
         return false;
     }
@@ -113,7 +113,7 @@ function noteOf(issue: CodecIssue | ConversionNote): UpgradeNote {
  * as it will be stored — with its own `updatedAt`, which the upgrade keeps — through the full
  * validator.
  */
-function settles(document: ChartDocument, updatedAt: string): boolean {
+function settles(document: StoredDocument, updatedAt: string): boolean {
     try {
         const stored = validateDocument({ ...document, updatedAt });
         return stored.schemaVersion === 2 && !needsUpgrade(stored);
@@ -137,7 +137,7 @@ function lossy(notes: readonly ConversionNote[]): UpgradeNote[] {
  * tone. Same id and the same `updatedAt` — an upgrade is not an edit (DECISION 2026-10-16); the
  * revision is the Save's to advance.
  */
-export function upgradeDocument(document: ChartDocument): DocumentUpgrade {
+export function upgradeDocument(document: StoredDocument): DocumentUpgrade {
     if (!needsUpgrade(document)) {
         return { kind: 'current' };
     }
@@ -164,7 +164,7 @@ export function upgradeDocument(document: ChartDocument): DocumentUpgrade {
 }
 
 /** Does this retained draft hold anything the current writer would not write? */
-export function draftNeedsUpgrade(document: ChartDocument): boolean {
+export function draftNeedsUpgrade(document: StoredDocument): boolean {
     if (document.schemaVersion === 1) {
         return true;
     }
@@ -175,7 +175,7 @@ export function draftNeedsUpgrade(document: ChartDocument): boolean {
  * What one retained DRAFT becomes, rewritten in place: a text chart converted, and either kind
  * written as today's writer writes it (`writtenChart`).
  */
-export function upgradeDraftDocument(document: ChartDocument): DocumentUpgrade {
+export function upgradeDraftDocument(document: StoredDocument): DocumentUpgrade {
     if (!draftNeedsUpgrade(document)) {
         return { kind: 'current' };
     }
@@ -209,7 +209,7 @@ export function unreadableLooksOld(stored: unknown): boolean {
         return false;
     }
     try {
-        return needsUpgrade(stored as ChartDocument);
+        return needsUpgrade(stored as StoredDocument);
     } catch {
         return true;
     }
@@ -222,7 +222,7 @@ export interface UpgradeDraft {
     documentId: string;
     writerId: string;
     capturedAt: string;
-    document: ChartDocument;
+    document: StoredDocument;
     /** The draft exactly as stored, for the backup. */
     stored: unknown;
     /** Its exact stored bytes: what "unchanged since the backup" is compared on. */
@@ -316,7 +316,7 @@ export interface UpgradeStore {
     kind: UpgradeStoreKind;
     /** Every song, read fresh: each readable one with its row as stored; each other row too. */
     songs(): Promise<{
-        songs: Array<{ document: ChartDocument; stored: unknown }>;
+        songs: Array<{ document: StoredDocument; stored: unknown }>;
         unreadable: UpgradeUnreadableRow[];
     }>;
     /** Every retained draft, all writers, read fresh; each one that does not read too. */
@@ -347,7 +347,7 @@ export interface UpgradeStore {
 
 export interface PlannedSong {
     store: UpgradeStoreKind;
-    document: ChartDocument;
+    document: StoredDocument;
     stored: unknown;
 }
 
@@ -394,7 +394,7 @@ export interface UpgradePace {
  * on. A draft whose song this device does not hold readably — an orphan, or a song row that would
  * not read — is LIVE too: nothing here can say what it was an experiment on.
  */
-function isLive(draft: UpgradeDraft, songs: ReadonlyMap<string, ChartDocument>): boolean {
+function isLive(draft: UpgradeDraft, songs: ReadonlyMap<string, StoredDocument>): boolean {
     const song = songs.get(draft.documentId);
     return song === undefined || draft.capturedAt >= song.updatedAt;
 }
@@ -557,13 +557,19 @@ export interface UpgradeOutcome {
     upgraded: UpgradeEntry[];
     /** Upgraded songs and drafts with the converter's lossy notes — not tone for tone. */
     changed: Array<UpgradeEntry & { draft: boolean; notes: UpgradeNote[] }>;
-    /** Refused by the converter: left exactly as they were. */
-    refused: Array<UpgradeEntry & { reasons: UpgradeNote[] }>;
+    /**
+     * Refused by the converter: left exactly as they were. `opens`: the app can open it to fix
+     * (a measure chart); a text chart cannot be opened since #1739.
+     */
+    refused: Array<UpgradeEntry & { reasons: UpgradeNote[]; opens: boolean }>;
     /** Not attempted, or a Save that was refused: left exactly as they were, with why. */
-    skipped: Array<UpgradeEntry & { reason: string }>;
+    skipped: Array<UpgradeEntry & { reason: string; opens: boolean }>;
     /** Drafts rewritten in place. */
     draftsConverted: number;
-    /** Drafts left exactly as they are, with why; `openable` when it is unsaved work on a song. */
+    /**
+     * Drafts left exactly as they are, with why; `openable` when it is unsaved work on a song the
+     * app can open (a text chart cannot be, #1739).
+     */
     draftsKept: Array<UpgradeEntry & { reason: string; openable: boolean }>;
     /** Stores that could not be read. */
     failures: Array<{ store: UpgradeStoreKind; message: string }>;
@@ -631,14 +637,16 @@ export async function runUpgrade(
         }
         for (const { document } of songs) {
             const entry = { store: store.kind, id: document.id, title: document.title };
+            // Only a measure chart can be opened to fix: a text chart is refused on open (#1739).
+            const opens = document.schemaVersion === 2;
             try {
                 if (live.has(document.id) || options.unsavedHere(store.kind, document.id)) {
-                    outcome.skipped.push({ ...entry, reason: UPGRADE_SKIPS.unsaved });
+                    outcome.skipped.push({ ...entry, reason: UPGRADE_SKIPS.unsaved, opens });
                     continue;
                 }
                 const result = upgradeDocument(document);
                 if (result.kind === 'refused') {
-                    outcome.refused.push({ ...entry, reasons: result.reasons });
+                    outcome.refused.push({ ...entry, reasons: result.reasons, opens });
                     continue;
                 }
                 if (result.kind === 'current') {
@@ -655,6 +663,7 @@ export async function runUpgrade(
                             failure instanceof UpgradeRefusal && failure.reason === 'elsewhere'
                                 ? moved
                                 : message(failure),
+                        opens,
                     });
                     continue;
                 }
@@ -668,7 +677,7 @@ export async function runUpgrade(
         }
         // Drafts after songs, against what is stored NOW: a draft saved or discarded since is
         // done; one captured again since the plan is left alone.
-        let now: Map<string, ChartDocument>;
+        let now: Map<string, StoredDocument>;
         let current: Map<string, UpgradeDraft>;
         try {
             const [fresh, freshDrafts] = await Promise.all([store.songs(), store.drafts()]);
@@ -687,7 +696,7 @@ export async function runUpgrade(
                 outcome.draftsKept.push({
                     ...entry,
                     reason,
-                    openable: song !== undefined && reason === UPGRADE_SKIPS.draftLive,
+                    openable: song?.schemaVersion === 2 && reason === UPGRADE_SKIPS.draftLive,
                 });
             try {
                 const held = current.get(`${draft.documentId}:${draft.writerId}`);

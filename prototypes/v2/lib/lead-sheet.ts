@@ -2,9 +2,8 @@ import type { SemanticScore } from '../../../public/songbook/score-types';
 import type { FormattedChordNames } from '../../../public/types';
 
 /**
- * What the chart sheet draws for one written event. The old engine's `LeadSheetChord` satisfies
- * it as-is; the band engine's display (`band-chart.ts`) builds it from the score and timeline
- * without pretending to be an old-engine `Chord` (no voicing, no step-grid parse).
+ * What the chart sheet draws for one written event, built by the band's display
+ * (`band-chart.ts`) from the score and timeline (no voicing, no step-grid parse).
  */
 export interface ChartChord {
     /** Display identity, and what a tap auditions. Negative = a bar the form never reaches. */
@@ -19,7 +18,7 @@ export interface ChartChord {
     timeSignature: string;
     absName: string;
     display?: FormattedChordNames;
-    /** Absent on the old engine, which can only ever show chords. */
+    /** A chord, a hold or no chord. */
     kind?: 'chord' | 'hold' | 'no-chord';
     fermata?: boolean;
 }
@@ -40,7 +39,7 @@ export interface ChartBlock {
 
 /**
  * Lay the written bars out in written order, one block per section (a seamless section joins
- * the block before it). Shared by both engines' displays.
+ * the block before it).
  */
 export function writtenBlocks<M extends ChartMeasure>(
     score: SemanticScore,
@@ -71,27 +70,4 @@ export function writtenBlocks<M extends ChartMeasure>(
         }
     }
     return blocks;
-}
-
-/**
- * Every written event's `globalIndex`, bucketed by which WRITTEN MEASURE it belongs to (an
- * ordinal position among every measure in `blocks`, in written order). This is a measure-less
- * (v1) chart's only notion of "performed bar" — v1 has no repeat/ending marks (`ScoreDirection`
- * is a schemaVersion-2 concept only), so its performance is one straight pass and "written
- * measure" and "performed bar" name the exact same thing there. For a schemaVersion-2 chart,
- * `BandSlot.bar` (`band-chart.ts`) is the real performed-bar identity instead — see
- * `nextBarIndex`'s doc (`app/use-chart-view.ts`) for why the two must NOT be conflated.
- */
-export function measureOfGlobalIndex(blocks: ChartBlock[]): Map<number, number> {
-    const map = new Map<number, number>();
-    let m = 0;
-    for (const block of blocks) {
-        for (const measure of block.measures) {
-            for (const chord of measure.chords) {
-                map.set(chord.globalIndex, m);
-            }
-            m += 1;
-        }
-    }
-    return map;
 }

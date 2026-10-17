@@ -26,7 +26,7 @@ import {
 import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
 import { decodeSaveRequest } from '../../prototypes/v2/lib/sync/request.js';
 import type { SaveTransport } from '../../prototypes/v2/lib/sync/send.js';
-import { accountChart } from '../utils/account-songbook-fixture.js';
+import { accountChart, accountScoreChart } from '../utils/account-songbook-fixture.js';
 
 /**
  * Collections, the second synced document kind (#1474), against real IndexedDB in both engines.
@@ -704,7 +704,7 @@ describe('guest collections (#1474) live beside the songbook, never inside it', 
 
     it('saves, lists and deletes without upgrading or writing the songbook database', async () => {
         const songs = ['one', 'two', 'three'].map((id) => ({
-            ...accountChart(`Guest ${id}`, id),
+            ...accountScoreChart(`Guest ${id}`, id),
         }));
         await seedVersionOne(GUEST, (db) => db.createObjectStore('documents', { keyPath: 'id' }), {
             documents: songs,

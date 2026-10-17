@@ -118,10 +118,9 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     expect(errors).toEqual([]);
 });
 
-// The band reads its chart when it starts. A measure-less chart's key change while playing
-// (the starters are measure-less) must reach it: the song restarts from the top in the new
-// key, as a measure-based chart's does, instead of playing on in the old one.
-test('changing the key of a measure-less chart while it plays restarts the band in the new key', async ({
+// The band reads its chart when it starts. A key change while playing must reach it: the song
+// restarts from the top in the new key instead of playing on in the old one.
+test('changing the key of a chart while it plays restarts the band in the new key', async ({
     page,
 }) => {
     test.setTimeout(60_000);

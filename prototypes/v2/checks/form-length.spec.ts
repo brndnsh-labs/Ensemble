@@ -4,9 +4,8 @@ import { appUrl, editorRevealed, expect, formLength, test } from './fixtures';
 
 /**
  * #1511: the chart footer's "N bars · repeats continuously" is the form-length control, and
- * since #1756 the only one: it sets `score.choruses` (#1475), and on a text
- * (schema 1) chart a pick first makes the measure copy "Try the bar editor · keep original"
- * makes. Passes are counted from the chart's own pointer, as `choruses.spec.ts` does.
+ * since #1756 the only one: it sets `score.choruses` (#1475). Passes are counted from the
+ * chart's own pointer, as `choruses.spec.ts` does.
  */
 
 declare global {

@@ -746,10 +746,6 @@ html [hidden] {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
-.section-name {
-    font-size: 11px;
-    color: var(--muted);
-}
 .bars {
     display: grid;
     grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1075,37 +1071,6 @@ button.bar-number {
     box-shadow: var(--shadow);
     pointer-events: auto;
 }
-.edit-panel {
-    width: 286px;
-    flex-shrink: 0;
-    border-left: 1px solid var(--line);
-    background: var(--surface);
-    overflow: auto;
-    padding: 24px 22px;
-}
-.edit-panel > p {
-    font-size: 12px;
-    color: var(--muted);
-    line-height: 1.6;
-    margin-bottom: 12px;
-}
-.edit-panel h2 {
-    font-size: 20px;
-    margin-bottom: 8px;
-}
-.panel-label {
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--muted);
-    font-weight: 650;
-    display: block;
-    margin: 20px 0 9px;
-}
-.edit-panel > .btn {
-    width: 100%;
-    margin-top: 12px;
-}
 .popover {
     position: fixed;
     z-index: 30;
@@ -1200,10 +1165,6 @@ dialog textarea {
     }
     .chart-scroll {
         padding: 23px 28px 35px;
-    }
-    .edit-panel {
-        width: 260px;
-        padding: 21px 18px;
     }
     .song-actions .btn {
         padding: 9px 11px;
@@ -1417,9 +1378,6 @@ dialog textarea {
         margin-bottom: 8px;
         gap: 7px;
     }
-    .section-name {
-        font-size: 10px;
-    }
     .section-letter {
         font-size: 11px;
         min-width: 22px;
@@ -1466,12 +1424,9 @@ dialog textarea {
         font-size: 12px;
         padding: 0 14px;
     }
-    /* Editing on a phone (#1705): the chart above, a text chart's editor docked below it like a
-       sheet, each scrolling on its own — so the section being edited and its editor are on screen
-       together (a measure chart has no editor beside it since #1726).
-       It used to be one column with the editor above the chart, where editing bar 23 meant
-       scrolling between a form at the top and the bar far below it. `clip`, not `hidden`, so no
-       programmatic scroll moves the two panes as one. */
+    /* Editing on a phone (#1705): the chart scrolls on its own, inside the workspace, so the bar
+       dock and the keyboard (#1724) sit below it. `clip`, not `hidden`, so no programmatic
+       scroll moves the page with it. */
     .workspace-body.editing {
         display: flex;
         flex-direction: column;
@@ -1482,21 +1437,6 @@ dialog textarea {
         min-height: 0;
         overflow: auto;
         padding-bottom: 16px;
-    }
-    .edit-panel {
-        flex: 0 0 auto;
-        width: 100%;
-        max-height: 45dvh;
-        border-left: 0;
-        border-top: 1px solid var(--line);
-        border-radius: 16px 16px 0 0;
-        box-shadow: 0 -6px 18px #0000000f;
-        overflow: auto;
-        overscroll-behavior: contain;
-        padding: 16px 20px max(16px, env(safe-area-inset-bottom));
-    }
-    .edit-panel > p {
-        margin-bottom: 15px;
     }
     /* Typing a bar on a phone (#1724): its field is docked on the keyboard (`bar-dock.css`), so
        the transport row folds away while it is up and the chart keeps two or three rows above
@@ -1514,9 +1454,6 @@ dialog textarea {
             var(--stand-stack-height, 0px) +
             8px
         );
-    }
-    .panel-label {
-        margin-top: 10px;
     }
     .editing .bars {
         row-gap: 9px;
@@ -1633,15 +1570,6 @@ dialog textarea {
     .editing .chart-scroll {
         overflow: auto;
     }
-    .edit-panel {
-        width: 260px;
-        max-height: none;
-        border-left: 1px solid var(--line);
-        border-top: 0;
-        border-radius: 0;
-        box-shadow: none;
-        overflow: auto;
-    }
     .chord {
         font-size: 27px;
     }
@@ -1733,10 +1661,6 @@ dialog textarea {
     opacity: 1;
     cursor: default;
 }
-.section-text:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 3px;
-}
 .bar {
     gap: 8px;
     flex-wrap: wrap;
@@ -1807,15 +1731,6 @@ dialog textarea {
     height: 0;
     overflow: hidden;
 }
-.preview-note {
-    font-size: 12px;
-    line-height: 1.7;
-    background: var(--green-light);
-    color: var(--green);
-    padding: 13px 16px;
-    border-radius: 10px;
-    margin-top: 18px;
-}
 .file-input {
     display: none;
 }
@@ -1866,34 +1781,6 @@ dialog textarea {
 }
 .band-button:hover {
     background: var(--hover);
-}
-.section-text {
-    width: 100%;
-    resize: vertical;
-    min-height: 145px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 12px;
-    background: var(--paper);
-    line-height: 1.8;
-    font-family: ui-monospace, monospace;
-    font-size: 13px;
-}
-.edit-panel input {
-    max-width: 100%;
-}
-.edit-panel .section-text,
-.edit-panel select {
-    font-size: 16px;
-}
-.edit-panel select {
-    width: 100%;
-    min-height: 44px;
-    padding: 8px 12px;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--paper);
-    color: var(--ink);
 }
 .modal-box {
     background: var(--surface);
@@ -2046,12 +1933,6 @@ dialog textarea {
     line-height: 1;
     letter-spacing: 0;
 }
-.section-edit {
-    font-size: 11px;
-    color: var(--accent);
-    margin-left: auto;
-    text-decoration: underline;
-}
 .bar-context {
     position: absolute;
     top: 3px;
@@ -2145,18 +2026,12 @@ dialog textarea {
     opacity: 0.6;
 }
 @media (max-width: 760px) {
-    .preview-note {
-        font-size: 11px;
-    }
     .header-right {
         gap: 7px;
     }
     .setting-select {
         font-size: 12px;
         max-width: 116px;
-    }
-    .section-edit {
-        font-size: 10px;
     }
     .error-banner {
         font-size: 11px;
@@ -2381,7 +2256,6 @@ dialog textarea {
     --bar-min: clamp(86px, 15vh, 150px);
     --chord-size: clamp(30px, 4.8vh, 52px);
     --section-letter-size: clamp(12px, 2vh, 21px);
-    --section-name-size: clamp(11px, 1.5vh, 15px);
     min-height: 100%;
     display: flex;
     flex-direction: column;
@@ -2409,9 +2283,6 @@ dialog textarea {
     font-size: var(--section-letter-size, 12px);
     min-width: 2em;
     height: 1.9em;
-}
-.song-open .section-name {
-    font-size: var(--section-name-size, 11px);
 }
 .performance-focus .song-subtitle,
 .performance-focus .mode-switch,
@@ -3589,7 +3460,6 @@ html[data-theme="stage"] {
     max-width: 5.5em;
     text-align: center;
 }
-.song-open .chart-scroll[data-page] .section-name,
 .song-open .chart-scroll[data-page] .section-repeat {
     font-size: 10px;
     line-height: 1.2;

@@ -13,9 +13,6 @@ import {
     exportAs,
     leaveBar,
     openSectionMenu,
-    seedGuestDocuments,
-    songLink,
-    starterTextCharts,
     test,
 } from './fixtures';
 
@@ -588,81 +585,6 @@ test('the next-bar cue strengthens only in the last felt beat, not at the downbe
     await pollSamples(page, (s) => s.activeId === 'B2' && s.nextValue === 'soon', {
         timeoutMs: 2_000,
     });
-    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-});
-
-test('a measure-less (v1) chart gets the next-bar cue and "soon" too', async ({ page }) => {
-    test.setTimeout(20_000);
-    // #1458 patch review P2-2: `runtime.inLastBeat()` used to gate on `bandChartView()`, which is
-    // built only for a schemaVersion-2 chart — but `runtime.ts`'s `scoreForBand` converts a v1
-    // chart to the SAME timeline shape before it ever reaches the band host, so a v1 chart plays
-    // through the identical engine timeline and deserves the identical cue. A v1 chart carries no
-    // `data-measure-id` at all (`writtenBars` is schemaVersion-2-only in `use-chart-view.ts`), so
-    // this identifies bars by their (distinct) chord text instead of `sampleChart`'s usual id.
-    const [starter] = starterTextCharts();
-    await seedGuestDocuments(page, [
-        {
-            ...starter,
-            id: 'lookahead-text',
-            title: 'Lookahead text chart',
-            chart: {
-                ...starter.chart,
-                arrangement: {
-                    ...starter.chart.arrangement,
-                    key: 'C',
-                    isMinor: false,
-                    sections: [{ id: 'a', label: 'A', value: 'C7 | D7 | E7 | F7', repeat: 1 }],
-                },
-                performance: { ...starter.chart.performance, bpm: 240 },
-            },
-        },
-    ]);
-    await songLink(page, 'Lookahead text chart').click();
-    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C7']);
-
-    async function sampleV1() {
-        return page.evaluate(() => {
-            const active = document.querySelector('.bar[data-active="true"]');
-            const nextEls = document.querySelectorAll('.bar[data-next]');
-            const nextEl = nextEls[0] ?? null;
-            const chordText = (bar: Element | null) =>
-                bar?.querySelector('.chord')?.textContent ?? null;
-            return {
-                activeChord: chordText(active),
-                nextChord: chordText(nextEl),
-                nextValue: nextEl?.getAttribute('data-next') ?? null,
-                nextCount: nextEls.length,
-            };
-        });
-    }
-
-    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    const deadline1 = Date.now() + 15_000;
-    let atDownbeat: Awaited<ReturnType<typeof sampleV1>> | null = null;
-    while (Date.now() < deadline1) {
-        const sample = await sampleV1();
-        if (sample.activeChord === 'D7') {
-            atDownbeat = sample;
-            break;
-        }
-        await page.waitForTimeout(40);
-    }
-    expect(atDownbeat, 'the second bar (D7) should become active').not.toBeNull();
-    expect(atDownbeat?.nextCount, 'a v1 chart should get the next-bar cue too').toBe(1);
-    expect(atDownbeat?.nextChord).toBe('E7');
-    expect(atDownbeat?.nextValue, 'must not already be "soon" right at the downbeat').toBe('true');
-
-    const deadline2 = Date.now() + 2_000;
-    let sawSoon = false;
-    while (Date.now() < deadline2) {
-        const sample = await sampleV1();
-        if (sample.activeChord === 'D7' && sample.nextValue === 'soon') {
-            sawSoon = true;
-            break;
-        }
-        await page.waitForTimeout(40);
-    }
-    expect(sawSoon, 'a v1 chart should get "soon" too, not just the plain cue').toBe(true);
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 

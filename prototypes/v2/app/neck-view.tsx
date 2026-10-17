@@ -25,7 +25,7 @@ import './neck-view.css';
 // `onStrum`. The fretboard itself is `<Neck>` (#1586).
 
 interface NeckViewProps {
-    /** The band's chart (`legacyBandChart` for a measure-less one), or null for an empty chart. */
+    /** The band's chart, or null for an empty chart. */
     band: BandChart | null;
     /** Every written chord's grip, keyed by `globalIndex` (`useNeckVoicing`). */
     voiced: ReadonlyMap<number, VoicedBandChord> | null;

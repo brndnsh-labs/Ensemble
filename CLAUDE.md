@@ -117,7 +117,7 @@ Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music s
 
 ### Runtime bootstrap (`prototypes/v2/lib/runtime.ts`)
 
-One runtime per page, independent of React mounts. `initialize()` seeds the installed sounds, subscribes to dispatches so `handleEffects()` and `syncBand()` (the band host's settings) run on every one, then `rebuild()`s: `validateProgression` → `analyzeFormUI` → `flushBuffers()`. No logic worker runs. Play, stop and the exports go through the band host (`lib/band-host.ts`). The React shell (`prototypes/v2/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v2 opens charts from its own songbook and saves one only when the musician asks; v1's load/save layer (`hydrateState`, `loadFromUrl`, `saveCurrentState`) was deleted in #1424.
+One runtime per page, independent of React mounts. `initialize()` seeds the installed sounds, subscribes to dispatches so `handleEffects()` and `syncBand()` (the band host's settings) run on every one, then `rebuild()`s: `flushBuffers()`, gains and reverb sends. No logic worker runs. Play, stop and the exports go through the band host (`lib/band-host.ts`). The React shell (`prototypes/v2/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v2 opens charts from its own songbook and saves one only when the musician asks; v1's load/save layer (`hydrateState`, `loadFromUrl`, `saveCurrentState`) was deleted in #1424.
 
 ### State (`public/state.ts`, `public/state/`)
 
@@ -132,7 +132,7 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 
 - **Sanctioned (real-time hot paths):** the `synth-*.ts` family — direct audio param writes for synthesis. No site outside the engine dir is sanctioned today: the BPM reschedule in `app-controller.ts` and `flushBuffer()`'s voice-continuity writes were deleted with the state they wrote.
 - **Sanctioned exception (init-only):** `public/engine/engine.ts` `initAudio()`, `public/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
-- **Sanctioned exception (detached render clone):** the clone `prototypes/v2/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` belongs here too: it writes `arranger.progression` on **its passed-in `state`**, which is the live tree on the main path and a detached clone on the export path, so a dispatch there would silently corrupt live state during an offline stem render.
+- **Sanctioned exception (detached render clone):** the clone `prototypes/v2/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export. `public/engine/chords-engine.ts`'s `validateProgression` still carries a marker for the same reason (it writes `arranger.progression` on its passed-in `state`), though nothing but its tests calls it since #1739; #1740 deletes it.
 - **Everything else routes through reducers.** Any site not in the three categories above must dispatch.
 
 Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches the bare, cast (`(slice as Mutable<…>).f =`), and aliased-handle assignment idioms, treating a `@direct-mutation` marker anywhere in the statement as the exemption. The skip list is **content-based, not path-based**: a file is exempt only if it *declares* a slice (contains `deepSignal<`), plus `*reducer*` by name. That deliberately keeps the non-slice plumbing that lives alongside the slices (`state/state-effects.ts`) inside the guard — a blanket `state/` path skip would exempt them the moment they moved into that directory. Two known limits: **`scripts/` is not in scope** (it has its own unmigrated sites), and **array-method mutation is invisible** to an assignment-based guard (`arr.push/shift/pop` on a slice field is unmarked and unenforced; `state/history.ts`, the one known site, was deleted).
@@ -145,8 +145,8 @@ Every page plays the ground-up band engine: `band/` is a pure, deterministic `pe
 score's timeline, driven live by `prototypes/v2/lib/band-host.ts` and exported through the same
 event stream (`.mid`, WAV). Read `band/CLAUDE.md` and `docs/design/band-engine.md` before touching
 it. The old worker-based generator is gone (#1404): `public/engine` now holds the voices, sample
-packs and audio graph the band plays through, plus the chord parser the measure-less charts'
-display still uses (`chords-engine.ts`'s `validateProgression`).
+packs and audio graph the band plays through, plus the old chord parser (`chords-engine.ts`),
+which the app no longer reads (#1739): only "Upgrade old songs" and tests use it, until #1740.
 
 The listening-gate tools (`npm run mix:report` and `mix:ab`/`mix:verify`/`mix:spectro`/`mix:plant`
 built on it) render the band engine: `scripts/band-scene.ts` composes each scene in node

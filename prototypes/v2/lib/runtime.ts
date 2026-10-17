@@ -10,12 +10,9 @@ import {
     type Timeline,
     toMidi,
 } from '@band/index';
-import { transposeKey } from '@engine/controllers/arranger-controller';
 import { flushBuffers, togglePower } from '@engine/controllers/instrument-controller';
-import { getSectionStepBounds } from '@engine/controllers/practice-controller';
 import { autoVoiceForGenre } from '@engine/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@engine/data/smart-genres';
-import { validateProgression } from '@engine/engine/chords-engine';
 import {
     initAudio,
     killAllNotes,
@@ -31,10 +28,9 @@ import {
 import { warmDrumBuffers } from '@engine/engine/synth-drums';
 import { transposeChordText } from '@engine/engine/transpose';
 import { unlockAudio } from '@engine/platform';
-import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
+
 import type { SemanticScore } from '@engine/songbook/score-types';
 import {
-    type ChartContent,
     type ChartLaneMix,
     type ChartNotation,
     DEFAULT_SOLOIST_TRADE_CHORUSES,
@@ -78,15 +74,9 @@ import {
     VOICE_FOR_COMP,
     VOICE_FOR_LEAD,
 } from './band-voices';
-import {
-    type ChartDocument,
-    type DocumentContent,
-    scoreArrangementView,
-    validateDocument,
-} from './documents';
+import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
 import { checkPlayable } from './engine-mode';
 import { genreSwing } from './genre-swing';
-import { legacyChordFacts } from './legacy-band-chart';
 import {
     countInPreference,
     masterVolumePreference,
@@ -102,7 +92,7 @@ import {
 } from './sounds';
 import { track } from './telemetry';
 
-export type { ChartContent, ChartDocument, StemInstrument };
+export type { ChartDocument, StemInstrument };
 export { GENRE_NAMES };
 
 let boot: Promise<void> | undefined;
@@ -140,7 +130,7 @@ let currentTimeline: { score: SemanticScore; timeline: Timeline } | null = null;
 // ---------------------------------------------------------------- the band engine
 // The band engine (`band/`, docs/design/band-engine.md) plays, through the shared voices,
 // buses and sound packs. The old worker/scheduler generator no longer runs in the app (#1404).
-/** One sixteenth in band ticks: the old engine's step, so step maps convert exactly. */
+/** One sixteenth in band ticks: the unit of `playback.startStep` (`sectionSteps`). */
 const STEP_TICKS = PPQ / 4;
 /** A native style with a lead picks its lead instrument's sound. */
 function bandAutoLead(genre: string | undefined): InstrumentVoice | null {
@@ -171,11 +161,10 @@ function bandAutoComp(genre: string | undefined): InstrumentVoice | null {
 }
 let band: BandHost | null = null;
 let bandSeed = '';
-let bandScore: { key: string; score: SemanticScore } | null = null;
 let drumWarmup: ReturnType<typeof setTimeout> | null = null;
 /**
  * The chart sheet's view of the open score, read from the score and its timeline
- * (`band-chart.ts`). Null for a measure-less chart, which the old engine's maps still draw.
+ * (`band-chart.ts`). Null until a chart is open.
  */
 let bandView: BandChart | null = null;
 
@@ -194,35 +183,12 @@ function handScore(host: BandHost): void {
     host.setScore(score, currentTimeline?.score === score ? currentTimeline.timeline : undefined);
 }
 
-/** The chart as a semantic score; a measure-less (v1) chart converts on the fly. */
+/** The open chart's score: what the band plays. */
 function scoreForBand(): SemanticScore {
-    if (currentScore) {
-        return currentScore;
+    if (!currentScore) {
+        throw new Error('Open a chart first.');
     }
-    const content = captureContent();
-    const key = JSON.stringify(content.arrangement);
-    if (bandScore?.key === key) {
-        return bandScore.score;
-    }
-    const now = new Date(0).toISOString();
-    const proposal = proposeLegacyScoreConversion(
-        JSON.stringify({
-            schemaVersion: 1,
-            id: 'live',
-            title: 'live',
-            createdAt: now,
-            updatedAt: now,
-            revision: 0,
-            chart: content,
-        }),
-    );
-    if (proposal.kind !== 'candidate') {
-        throw new Error(
-            'This chart cannot play on the new engine yet. Convert it to measures first.',
-        );
-    }
-    bandScore = { key, score: proposal.value.chart.score };
-    return bandScore.score;
+    return currentScore;
 }
 
 /** The band style the chart's genre plays. */
@@ -360,16 +326,7 @@ export function songTick(): number | null {
  * a sample, and a chord shorter than the two periods together could go unpainted.
  */
 export function playheadSlot(tick: number | null): number {
-    if (tick == null) {
-        return -1;
-    }
-    if (bandView) {
-        return slotAt(bandView, tick);
-    }
-    const step = Math.floor(tick / STEP_TICKS);
-    return getState().arranger.stepMap.findIndex(
-        (entry) => entry.start <= step && step < entry.end,
-    );
+    return tick == null || !bandView ? -1 : slotAt(bandView, tick);
 }
 
 /** The count-in beat sounding now (0 is "1"), or null when no count-in is. */
@@ -454,21 +411,18 @@ function mix(lane: ChartLaneMix): ChartLaneMix {
     };
 }
 
+/** The settings a chart saves beside its score. */
+export type ChartSettings = Pick<DocumentContent, 'performance' | 'band'>;
+/** What `apply` installs: a score (null before any chart is open) and its settings. */
+type Session = ChartSettings & { score: SemanticScore | null };
+
 /**
- * Explicit semantic projection, never a clone of the live/audio state tree. It writes the music
- * and the settings the band honours, nothing else (DECISION 2026-09-26).
+ * Explicit semantic projection, never a clone of the live/audio state tree. It writes the
+ * settings the band honours, nothing else (DECISION 2026-09-26).
  */
-export function captureContent(): ChartContent {
+export function captureContent(): ChartSettings {
     const { arranger: a, playback: p, chords: c, bass: b, soloist: s, groove: g } = getState();
     return clone({
-        arrangement: {
-            sections: a.sections,
-            key: a.key,
-            timeSignature: a.timeSignature,
-            grouping: a.grouping,
-            isMinor: a.isMinor,
-            notation: a.notation,
-        },
         performance: {
             bpm: p.bpm,
             seed: a.seed,
@@ -501,16 +455,10 @@ export function captureContent(): ChartContent {
                 genre: g.lastSmartGenre,
             },
         },
-    } as ChartContent);
+    } as ChartSettings);
 }
 
 function rebuild(): void {
-    validateProgression(getState(), dispatch);
-    // A bar-level score has no chord text for `validateProgression` to parse, so its step maps
-    // come out empty: that is expected, not an unplayable chart.
-    if (!bandView && !getState().arranger.progression.length) {
-        throw new Error('The chart has no playable chords. Check your chord text.');
-    }
     // Silences whatever is still sounding. (Its worker flush does nothing: no worker runs.)
     flushBuffers();
     restoreGains(getState());
@@ -519,15 +467,15 @@ function rebuild(): void {
     }
 }
 
-function captureSessionContent(): DocumentContent {
-    const content = captureContent();
-    return currentScore
-        ? { score: clone(currentScore), performance: content.performance, band: content.band }
-        : content;
+function captureSession(): Session {
+    return { score: currentScore && clone(currentScore), ...captureContent() };
 }
 
 export function captureDocument(document: ChartDocument): ChartDocument {
-    return validateDocument({ ...document, chart: captureSessionContent() });
+    return validateDocument({
+        ...document,
+        chart: { score: clone(scoreForBand()), ...captureContent() },
+    });
 }
 
 /** One runtime per browser page, independent of React mount/unmount and route views. */
@@ -641,9 +589,9 @@ function halt(ringOut: boolean): void {
 
 /**
  * Section tap menu's "Start here" (#1422). `bounds.start` is already the section's FIRST
- * PERFORMED visit, not a written position: both `sectionSteps` (band-timeline visits) and `getSectionStepBounds` (the old engine's
- * `sectionMap`) collapse every occurrence of the id to `{ min(start), max(end) }`, and since
- * ticks only increase across one pass, that min is the earliest one. So a repeated section (a
+ * PERFORMED visit, not a written position: `sectionSteps` (band-timeline visits) collapses every
+ * occurrence of the id to `{ min(start), max(end) }`, and since ticks only increase across one
+ * pass, that min is the earliest one. So a repeated section (a
  * second ending, a `repeat` count) still lands on the bar a musician would actually call "the
  * top of the section," not wherever it happens to recur.
  *
@@ -658,7 +606,7 @@ export async function startSection(
     sectionId: string,
     progress: (text: string) => void = () => {},
 ): Promise<boolean> {
-    const bounds = bandView ? sectionSteps(bandView, sectionId) : getSectionStepBounds(sectionId);
+    const bounds = bandView && sectionSteps(bandView, sectionId);
     if (!bounds) {
         return false;
     }
@@ -825,7 +773,7 @@ export function setAutoIntensity(auto: boolean): void {
 }
 
 /**
- * Click track on/off — `runtime-derived`, session-only by design, never part of `ChartContent`
+ * Click track on/off — `runtime-derived`, session-only by design, never part of a saved chart
  * or a preferences key; it resets to its default on the next boot.
  */
 export function setMetronome(enabled: boolean): void {
@@ -855,13 +803,8 @@ export function setCountIn(enabled: boolean): void {
 }
 
 /**
- * Chord-notation preference — `document`-owned, but the ONE Feel-sheet field split
- * across the dual chart schema: a schemaVersion-1 chart keeps it on `arranger.notation`
- * directly (what `dispatch` below writes, and what `captureContent()`'s `arrangement`
- * projection reads), while a schemaVersion-2 (score) chart's saved copy lives on the
- * authored `currentScore.notation` instead — `captureSessionContent()` clones
- * `currentScore` verbatim for that schema and never reads `arranger.notation` for it.
- * Patch both so either schema's next `captureDocument()` reflects the change. No
+ * Chord-notation preference — `document`-owned, saved on the score (`currentScore.notation`,
+ * which `captureDocument()` clones); the arranger slice mirrors it as `apply` does. No
  * `rebuild()`/`editScore()`: notation is a pure display selector over the chord's
  * already-precomputed `display: FormattedChordNames` (all three notations are always
  * present), so it never touches arrangement layout or the band.
@@ -941,26 +884,29 @@ function applyGenre(name: string): void {
  * `compiled` is the timeline `checkPlayable` just compiled from this same score, when the caller
  * asked: the chart is then compiled once on its way to the stand, not twice (#1665).
  */
-function apply(content: DocumentContent, compiled?: Timeline): void {
-    const score = 'score' in content ? clone(content.score) : null;
-    // A score is drawn from the band's own timeline; the old engine's maps derive empty for it
-    // (`rebuild`), so nothing stale answers for this chart.
+function apply(content: Session, compiled?: Timeline): void {
+    const score = content.score && clone(content.score);
+    // A score is drawn and played from the band's own timeline.
     const timeline = score ? (compiled ?? compileTimeline(score)) : null;
-    const view = score && timeline ? bandChart(score, timeline) : null;
-    const arrangement = score ? scoreArrangementView(score) : (content as ChartContent).arrangement;
     currentScore = score;
     currentTimeline = score && timeline ? { score, timeline } : null;
-    bandView = view;
-    // By name, like the band below.
-    for (const key of [
-        'sections',
-        'key',
-        'timeSignature',
-        'grouping',
-        'isMinor',
-        'notation',
-    ] as const) {
-        param('arranger', key, arrangement[key]);
+    bandView = score && timeline ? bandChart(score, timeline) : null;
+    if (score) {
+        // The arranger slice mirrors the score's settings for the engine's readers (the synth
+        // kit tunes its toms to `arranger.key`; a section's `instruments` mute lanes), by name.
+        const sections = score.sections.map(
+            ({ measures: _measures, meter, grouping: _grouping, ...section }) => ({
+                ...section,
+                value: '',
+                ...(meter ? { timeSignature: meter } : {}),
+            }),
+        );
+        param('arranger', 'sections', sections);
+        param('arranger', 'key', score.key);
+        param('arranger', 'timeSignature', score.meter);
+        param('arranger', 'grouping', score.grouping);
+        param('arranger', 'isMinor', score.isMinor);
+        param('arranger', 'notation', score.notation);
     }
     const { performance, band } = content;
     param('arranger', 'seed', performance.seed);
@@ -994,9 +940,9 @@ function apply(content: DocumentContent, compiled?: Timeline): void {
 
 export function load(document: ChartDocument): void {
     const checked = validateDocument(document);
-    const timeline = checked.schemaVersion === 2 ? checkPlayable(checked.chart.score) : undefined;
+    const timeline = checkPlayable(checked.chart.score);
     stop();
-    const previous = captureSessionContent();
+    const previous = captureSession();
     loading = true;
     try {
         apply(checked.chart, timeline);
@@ -1084,7 +1030,7 @@ export async function setGenre(
         throw new Error('Unknown genre.');
     }
     const wasPlaying = getState().playback.isPlaying;
-    const previous = captureSessionContent();
+    const previous = captureSession();
     // The genre's swing is its band style's (`genreSwing`), the one swing authority.
     const swing = genreSwing(name);
     const payload = {
@@ -1182,55 +1128,45 @@ export function setEnabled(module: InstrumentModule, enabled: boolean): void {
     }
 }
 export function transpose(delta: number): void {
-    if (currentScore) {
-        const score = clone(currentScore);
-        score.key = transposeKeyName(score.key, delta);
-        for (const section of score.sections) {
-            if (section.key) {
-                section.key = transposeKeyName(section.key, delta);
+    const score = clone(scoreForBand());
+    score.key = transposeKeyName(score.key, delta);
+    for (const section of score.sections) {
+        if (section.key) {
+            section.key = transposeKeyName(section.key, delta);
+        }
+        for (const measure of section.measures) {
+            if (measure.key) {
+                measure.key = transposeKeyName(measure.key, delta);
             }
-            for (const measure of section.measures) {
-                if (measure.key) {
-                    measure.key = transposeKeyName(measure.key, delta);
-                }
-                if (measure.content.kind === 'events') {
-                    for (const event of measure.content.events) {
-                        if (event.kind === 'chord') {
-                            event.symbol = transposeChordText(event.symbol, delta);
-                            if (event.alternates) {
-                                event.alternates = event.alternates.map((symbol) =>
-                                    transposeChordText(symbol, delta),
-                                );
-                            }
+            if (measure.content.kind === 'events') {
+                for (const event of measure.content.events) {
+                    if (event.kind === 'chord') {
+                        event.symbol = transposeChordText(event.symbol, delta);
+                        if (event.alternates) {
+                            event.alternates = event.alternates.map((symbol) =>
+                                transposeChordText(symbol, delta),
+                            );
                         }
                     }
                 }
             }
         }
-        const wasPlaying = getState().playback.isPlaying;
-        editScore(score);
-        if (wasPlaying) {
-            startBand();
-        }
-        return;
     }
-    transposeKey(delta);
-    // The band reads its score only when it starts, so a playing band hears the new key only
-    // when it is handed the chart again; `setScore` restarts the song from the top, as a
-    // measure-based chart's key change does (`editScore`).
-    if (band?.playing) {
-        handScore(band);
+    const wasPlaying = getState().playback.isPlaying;
+    editScore(score);
+    if (wasPlaying) {
+        startBand();
     }
 }
 /**
  * The song's own major/minor (#1375) — `score.isMinor` only, never a section or bar override.
  * Chord names are not rewritten, and the key stays where it is: unlike v1's relative-key toggle,
- * v2's key is the score's own, so a musician who wants A minor picks A, then Minor. Measure-based
- * charts only, like the song's meter beside it in the transport's Key popover (#1757).
+ * v2's key is the score's own, so a musician who wants A minor picks A, then Minor.
+ * Beside the song's meter in the transport's Key popover (#1757).
  */
 export function setMode(isMinor: boolean): void {
     if (!currentScore) {
-        throw new Error('Open a measure-based chart first.');
+        throw new Error('Open a chart first.');
     }
     if (currentScore.isMinor === isMinor) {
         return;
@@ -1244,12 +1180,12 @@ export function setMode(isMinor: boolean): void {
 /**
  * How many choruses the song plays before the band stops (#1475): `score.choruses`, 1–16 from the
  * chart footer's form-length menu. `undefined` is Loop ("Repeats continuously"), the default — the field is removed, so
- * the band loops the form forever as every chart did before. Measure-based charts only, like the
- * song's mode; a playing band restarts from the top, as a mode change does.
+ * the band loops the form forever as every chart did before. A playing
+ * band restarts from the top, as a mode change does.
  */
 export function setChoruses(choruses: number | undefined): void {
     if (!currentScore) {
-        throw new Error('Open a measure-based chart first.');
+        throw new Error('Open a chart first.');
     }
     if (currentScore.choruses === choruses) {
         return;
@@ -1268,30 +1204,12 @@ export function setChoruses(choruses: number | undefined): void {
 }
 export function editScore(score: SemanticScore): void {
     const timeline = checkPlayable(score);
-    const before = captureSessionContent();
+    const before = captureSession();
     stop();
     loading = true;
     try {
         const { performance, band } = before;
         apply({ score, performance, band }, timeline);
-        rebuild();
-    } catch (error) {
-        apply(before);
-        rebuild();
-        throw error;
-    } finally {
-        loading = false;
-    }
-}
-export function editSections(sections: ChartContent['arrangement']['sections']): void {
-    if (currentScore) {
-        throw new Error('Use the measure editor for this chart.');
-    }
-    const before = captureSessionContent();
-    stop();
-    loading = true;
-    try {
-        param('arranger', 'sections', clone(sections));
         rebuild();
     } catch (error) {
         apply(before);
@@ -1325,18 +1243,11 @@ function sound(
     });
 }
 export function audition(index: number): void {
-    sound((state) => {
-        if (bandView) {
-            // Band-engine chords are named and voiced by the band's chord authority; a hold or
-            // N.C. has nothing of its own to sound.
-            const chord = bandView.chords[index]?.chord;
-            return chord ? auditionMidis(chord).map(getFrequency) : undefined;
-        }
-        // A measure-less chart has no band view, so read the chord the old maps name the way the
-        // band would (`legacyChordFacts`): the tap then sounds the same notes as on any chart.
-        const old = state.arranger.progression[index];
-        const facts = old && legacyChordFacts(old);
-        return facts ? auditionMidis(facts).map(getFrequency) : undefined;
+    sound(() => {
+        // Chords are named and voiced by the band's chord authority; a hold or N.C. has nothing
+        // of its own to sound.
+        const chord = bandView?.chords[index]?.chord;
+        return chord ? auditionMidis(chord).map(getFrequency) : undefined;
     }, 0);
 }
 /**
@@ -1474,7 +1385,7 @@ export function state(): EnsembleState {
     return getState();
 }
 
-/** The band's view of the open score, or null for a measure-less chart, which the old maps draw. */
+/** The band's view of the open score, or null before a chart is open. */
 export function bandChartView(): BandChart | null {
     return bandView;
 }
@@ -1482,10 +1393,7 @@ export function bandChartView(): BandChart | null {
 /**
  * Is playback in the last FELT pulse of its performed bar right now, or already within the
  * jump-ahead's fixed real-time lead of the barline at a fast tempo (#1458's Following
- * look-ahead)? `BandHost.inLastPulse` does the actual work, off `this.timeline` directly rather
- * than `bandChartView()` — that reads the SAME timeline `runtime.ts`'s `scoreForBand` compiles
- * for a measure-less (v1) chart too, so this works for v1 exactly like a schemaVersion-2 chart
- * (P2-2: the old `!bandView` gate wrongly denied v1 charts this cue and the jump-ahead both).
+ * look-ahead)? `BandHost.inLastPulse` does the actual work, off the timeline it plays.
  *
  * Pure engine read off `songTick()`'s `tick`, not the chart's `active` slot: React only commits
  * `active` on its next render, so a caller that read `active`'s bar from the DOM (the Following
@@ -1508,19 +1416,15 @@ export function inLastBeat(tick: number | null): boolean {
  *
  * `tick` and `slot` are the pair the stand already read this paint (`songTick()`, then
  * `playheadSlot(tick)`, #1506), so this costs one slot lookup and `BandHost.inLastPulseBefore`'s
- * bar search — no second walk of the slots per frame. The slot's end comes from wherever
- * `playheadSlot` found the slot: the band chart's `BandSlot.to`, or for a measure-less (v1) chart
- * the step map's `end` in band ticks, which is the `to` `legacyBandChart` gives the same slot —
- * so the neck's v1 follow gets the same cue, off the one timeline the band plays either schema
- * from. The beat itself is the host's (`inLastPulseBefore`), the meter's own pulse or 600ms; a slot no
- * longer than that is in it throughout. False while stopped, counting in, or off any
- * slot.
+ * bar search — no second walk of the slots per frame. The slot's end is the band chart's
+ * `BandSlot.to`. The beat itself is the host's (`inLastPulseBefore`), the meter's own pulse or
+ * 600ms; a slot no longer than that is in it throughout. False while stopped, counting in, or off
+ * any slot.
  */
 export function inLastBeatOfSlot(tick: number | null, slot: number): boolean {
     if (tick == null || slot < 0 || !band) {
         return false;
     }
-    const step = bandView ? undefined : getState().arranger.stepMap[slot];
-    const end = bandView ? bandView.slots[slot]?.to : step && step.end * STEP_TICKS;
+    const end = bandView?.slots[slot]?.to;
     return end !== undefined && band.inLastPulseBefore(tick, end);
 }

@@ -3,7 +3,7 @@ import { homeRequest } from '../../prototypes/v2/lib/home.js';
 import type { AccountScope } from '../../prototypes/v2/lib/sync/protocol.js';
 import { ACCOUNT_DATABASE } from '../../prototypes/v2/lib/sync/protocol.js';
 import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import { accountChart } from '../utils/account-songbook-fixture.js';
+import { accountChart, accountScoreChart } from '../utils/account-songbook-fixture.js';
 
 /**
  * The account songbook's home read (#1441) against real IndexedDB in both engines: the owner's
@@ -58,13 +58,13 @@ afterEach(async () => {
 describe('AccountSongbook.home (#1441)', () => {
     it('reads the opened songs by id and counts only this owner', async () => {
         for (let i = 0; i < 12; i++) {
-            await book.save(scopeA, accountChart(`Song ${i}`, `song-${i}`), null);
+            await book.save(scopeA, accountScoreChart(`Song ${i}`, `song-${i}`), null);
         }
         // Another owner's songs are outside the range, for the count as much as the fill.
         await putRaw({
             ownerId: B,
             documentId: 'song-b',
-            document: accountChart('B', 'song-b'),
+            document: accountScoreChart('B', 'song-b'),
             remoteRevision: null,
         });
         const opened = new Map([
@@ -81,7 +81,7 @@ describe('AccountSongbook.home (#1441)', () => {
 
     it('survives a corrupt record a full list refuses', async () => {
         for (let i = 0; i < 9; i++) {
-            await book.save(scopeA, accountChart(`Song ${i}`, `song-${i}`), null);
+            await book.save(scopeA, accountScoreChart(`Song ${i}`, `song-${i}`), null);
         }
         // Sorts after every `song-*` id, so neither the by-id reads nor the fill reach it.
         await putRaw({
@@ -101,7 +101,7 @@ describe('AccountSongbook.home (#1441)', () => {
     });
 
     it('counts and leaves out a corrupt record it does read', async () => {
-        await book.save(scopeA, accountChart('Good', 'good'), null);
+        await book.save(scopeA, accountScoreChart('Good', 'good'), null);
         await putRaw({
             ownerId: A,
             documentId: 'bad',
@@ -117,9 +117,22 @@ describe('AccountSongbook.home (#1441)', () => {
         expect(slice.unreadable).toBe(2);
     });
 
+    it('leaves a text chart out and counts it: the app no longer opens one (#1739)', async () => {
+        await book.save(scopeA, accountScoreChart('Bars', 'bars'), null);
+        await book.save(scopeA, accountChart('Text', 'text'), null);
+        const slice = await book.home(
+            scopeA,
+            homeRequest(new Map([['text', '2026-01-01T00:00:00.000Z']]), 'text'),
+        );
+        expect(slice.count).toBe(2);
+        expect(slice.continued).toBeNull();
+        expect(slice.rows.map((row) => row.id)).toEqual(['bars']);
+        expect(slice.unreadable).toBeGreaterThan(0);
+    });
+
     it('tops the list up past an opened song that will not read', async () => {
         for (let i = 0; i < 10; i++) {
-            await book.save(scopeA, accountChart(`Song ${i}`, `song-${i}`), null);
+            await book.save(scopeA, accountScoreChart(`Song ${i}`, `song-${i}`), null);
         }
         await putRaw({
             ownerId: A,

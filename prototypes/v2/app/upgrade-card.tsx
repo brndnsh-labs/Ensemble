@@ -303,14 +303,15 @@ export function UpgradeCard({
                                 {outcome.refused.map((entry) => (
                                     <li key={`${entry.store}:${entry.id}`}>
                                         <strong>{entry.title}</strong>{' '}
-                                        {openButton(
-                                            entry.store,
-                                            entry.id,
-                                            entry.title,
-                                            entry.reasons.find(
-                                                (reason) => reason.sectionIndex !== undefined,
-                                            )?.sectionIndex,
-                                        )}
+                                        {entry.opens &&
+                                            openButton(
+                                                entry.store,
+                                                entry.id,
+                                                entry.title,
+                                                entry.reasons.find(
+                                                    (reason) => reason.sectionIndex !== undefined,
+                                                )?.sectionIndex,
+                                            )}
                                         <Notes notes={entry.reasons} />
                                     </li>
                                 ))}
@@ -324,7 +325,8 @@ export function UpgradeCard({
                                 {outcome.skipped.map((entry) => (
                                     <li key={`${entry.store}:${entry.id}`}>
                                         <strong>{entry.title}</strong> — {entry.reason}{' '}
-                                        {openButton(entry.store, entry.id, entry.title)}
+                                        {entry.opens &&
+                                            openButton(entry.store, entry.id, entry.title)}
                                     </li>
                                 ))}
                             </ul>

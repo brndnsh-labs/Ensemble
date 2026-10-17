@@ -29,18 +29,19 @@ import {
 } from '../lib/account/sync-loop';
 import { songsOnlyIn } from '../lib/collections';
 import {
-    arrangementOf,
     blankSong,
-    convertedCopy,
+    currentFormat,
     genreOf,
+    isCurrentFormat,
+    OLD_FORMAT_REFUSAL,
     type SectionChange,
+    type StoredDocument,
     withBarAfter,
     withoutMeasure,
     withoutSection,
     withSectionAfter,
     withSectionSettings,
 } from '../lib/documents';
-import { validateEditorText } from '../lib/editor';
 import { checkPlayable } from '../lib/engine-mode';
 import { firstBars } from '../lib/first-bars';
 import type { HomeSlice } from '../lib/home';
@@ -111,7 +112,6 @@ import { SongMenu, type SongMenuView } from './song-menu';
 import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
 import { type FeaturedSummary, Songbook, type StandardsEntry } from './songbook';
 import { StandardsBrowser } from './standards-browser';
-import { TextChartEditor } from './text-chart-editor';
 import { TransportBar } from './transport-bar';
 import {
     type BarDraft,
@@ -249,10 +249,22 @@ type StandStore = { store: 'account'; ownerId: string } | { store: 'guest' };
  * in document-ID order instead — the right choice for a resumable cursor, and an arbitrary one to
  * a musician — so the ordering a person sees is the shell's to apply, not storage's to change.
  */
-function libraryDocuments(library: SavedSong[]): ChartDocument[] {
+function libraryDocuments(library: SavedSong[]): StoredDocument[] {
     return library
         .map((song) => song.document)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/**
+ * The entries whose document the app opens. A text chart (schemaVersion 1) is left out of every
+ * list and offer (#1739), never out of a backup: it stays stored for "Upgrade old songs".
+ */
+function openable<T extends { document: StoredDocument }>(
+    entries: readonly T[],
+): Array<T & { document: ChartDocument }> {
+    return entries.filter((entry): entry is T & { document: ChartDocument } =>
+        isCurrentFormat(entry.document),
+    );
 }
 
 /**
@@ -317,8 +329,8 @@ async function readSignOutPlan(
     owner: string | null,
 ): Promise<{
     plan: SignOutPreflight;
-    drafts: Map<string, ChartDocument>;
-    songs: ChartDocument[];
+    drafts: Map<string, StoredDocument>;
+    songs: StoredDocument[];
 }> {
     const plan = await accountSync.signOutPreflight(owner);
     return {
@@ -540,7 +552,7 @@ export default function Ensemble() {
      * export is prepared, replaced by what `open()` reads back, and dropped the moment the account
      * leaves this device.
      */
-    const accountDrafts = useRef(new Map<string, ChartDocument>());
+    const accountDrafts = useRef(new Map<string, StoredDocument>());
     /**
      * The last account this loop actually attached to, null only before the first one. Deliberately
      * NOT cleared on detach: an expiry publishes `owner: null` on its way past, so a ref that
@@ -639,8 +651,6 @@ export default function Ensemble() {
     // editor overlays whichever mode it is, and leaving the editor by any path lands back on it.
     // The neck shows on `neck && !editing`.
     const [neck, setNeck] = useState(false);
-    const [sectionId, setSectionId] = useState('');
-    const [buffers, setBuffers] = useState(new Map<string, string>());
     const [measureId, setMeasureId] = useState('');
     const [pendingMeasures, setPendingMeasures] = useState(false);
     const pendingText = useRef(false);
@@ -678,12 +688,10 @@ export default function Ensemble() {
     measureIdNow.current = measureId;
     // An Undo pressed while another action ran, to run once it is done.
     const undoAfterWork = useRef(false);
-    const [editorRequest, setEditorRequest] = useState(0);
-    const revealedEditorRequest = useRef(0);
-    // #1440 — set just before an `editorRequest` bump that should focus the title field (in the
-    // header since #1726) instead of the reveal effect's usual target (a row-menu Rename opening
-    // the song to recover a live draft, review P1). Read and cleared by that same effect.
-    const focusTitleOnReveal = useRef(false);
+    // #1440 — bumped to focus the title field (in the header since #1726) once the editor is up:
+    // a row-menu Rename opening the song to recover a live draft (review P1).
+    const [titleRequest, setTitleRequest] = useState(0);
+    const focusedTitleRequest = useRef(0);
     const [search, setSearch] = useState('');
     const [playing, setPlaying] = useState(false);
     const [playbackPending, setPlaybackPending] = useState(false);
@@ -743,7 +751,7 @@ export default function Ensemble() {
     const [exportingAudio, setExportingAudio] = useState(false);
     const [exportAudioProgress, setExportAudioProgress] = useState('');
     const [recoveryOptions, setRecoveryOptions] = useState<
-        ReturnType<typeof repository.recoveriesFor>
+        Array<{ document: ChartDocument; capturedAt: string }>
     >([]);
     // A chart opened from a `#chart=` share link: unsaved by definition (no `saved`
     // baseline), until "Keep a copy" commits it as a normal library document. A ref AND a state
@@ -925,7 +933,7 @@ export default function Ensemble() {
      * off with this too, since it is read at the moment the step opens rather than whenever the
      * library list last happened to refresh.
      */
-    const [signOutSongs, setSignOutSongs] = useState<ChartDocument[] | null>(null);
+    const [signOutSongs, setSignOutSongs] = useState<StoredDocument[] | null>(null);
     /**
      * The sentence the OPEN step produced, rendered inside its own dialog (#1351 patch R3/R12).
      *
@@ -1250,7 +1258,6 @@ export default function Ensemble() {
     // changing bar), so the last-beat window (several 60ms ticks) triggers it exactly once
     // rather than on every tick it stays true.
     const followJumpedFor = useRef<number | null>(null);
-    const editPanel = useRef<HTMLElement>(null);
     // Moved up from beside its JSX consumers so the Following effects below — which need
     // `activeBar` (patch review P3-2) — can read it without a forward reference; `useChartView`
     // has no render boundary of its own, so calling it here instead of later changes nothing
@@ -1270,13 +1277,8 @@ export default function Ensemble() {
     const neckVoicing = useNeckVoicing(followChart, neckShowing);
     // The chart reads as one page where it can (#1712); editing, it scrolls at a reading size.
     useChartFit(scroll, !current || neckShowing ? null : editing ? 'edit' : 'page', blocks);
-    const hasPendingText = buffers.size > 0 || pendingMeasures;
-    const text =
-        buffers.get(sectionId) ??
-        (current
-            ? arrangementOf(current).sections.find((section) => section.id === sectionId)?.value
-            : '') ??
-        '';
+    // Bars typed but not yet applied (#1723).
+    const hasPendingText = pendingMeasures;
     // An untouched new song is not unsaved work: there is nothing in it to lose (#1707).
     const dirty =
         hasPendingText ||
@@ -1296,9 +1298,9 @@ export default function Ensemble() {
         !!saved &&
         sameMusic(current, saved);
     const playbackActive = playing || playbackPending;
-    // Typing on the chart (#1723) is for a measure chart in the editor; leaving it closes the
-    // field (what it held is applied or still pending, never lost).
-    const typeOnChart = editing && current?.schemaVersion === 2;
+    // Typing on the chart (#1723) is for the editor; leaving it closes the field (what it held is
+    // applied or still pending, never lost).
+    const typeOnChart = editing && !!current;
     useEffect(() => {
         if (!typeOnChart) {
             setOpenBar(null);
@@ -1311,15 +1313,13 @@ export default function Ensemble() {
     const keptBars = useMemo(
         () =>
             new Map(
-                keptBaseline?.schemaVersion === 2
-                    ? keptBaseline.chart.score.sections.flatMap((section) =>
-                          section.measures.map((m) => [m.id, JSON.stringify(m)] as const),
-                      )
-                    : [],
+                keptBaseline?.chart.score.sections.flatMap((section) =>
+                    section.measures.map((m) => [m.id, JSON.stringify(m)] as const),
+                ) ?? [],
             ),
         [keptBaseline],
     );
-    const liveScore = typeOnChart && current?.schemaVersion === 2 ? current.chart.score : null;
+    const liveScore = typeOnChart && current ? current.chart.score : null;
     const liveBars = useMemo(
         () =>
             new Map(
@@ -1433,20 +1433,14 @@ export default function Ensemble() {
         setStandStore(null);
         markSharedDraft(true);
         pendingText.current = false;
-        setBuffers(new Map());
         setPendingMeasures(false);
         barDrafts.retire();
         setRecoveryHealthy(true);
         setEditing(false);
         setFollowing(true);
         setMessage(note);
-        const section = arrangementOf(document).sections[0];
-        setSectionId(section.id);
-        if (document.schemaVersion === 2) {
-            setMeasureId(
-                document.chart.score.sections.find((s) => s.id === section.id)!.measures[0].id,
-            );
-        }
+        const section = document.chart.score.sections[0];
+        setMeasureId(section.measures[0].id);
     }
     // `landDraftOnStand` is a component-scope function declaration, a new reference every
     // render, which useExhaustiveDependencies rightly rejects as a hook dependency.
@@ -1508,7 +1502,9 @@ export default function Ensemble() {
             if (!alive) {
                 return;
             }
-            if (document) {
+            if (document && !isCurrentFormat(document)) {
+                setError(OLD_FORMAT_REFUSAL);
+            } else if (document) {
                 openSharedDraft(document, 'Opened from a shared link · not saved yet');
                 if (wantsAutoplay) {
                     setPendingAutoplay(true);
@@ -1754,25 +1750,14 @@ export default function Ensemble() {
             setPendingAutoplay(false);
         }
     }, [playing]);
-    // Into the editor, the input it is for takes focus (#1235): the title for a row-menu Rename
-    // (#1440), a text chart's chord text. A measure chart takes none (#1726): its bars are typed
-    // where they are read, opened by a press on one, and every bar stays on the page as written.
+    // Into the editor for a row-menu Rename (#1440), the title takes focus (#1235). Nothing else
+    // does (#1726): bars are typed where they are read, opened by a press on one.
     useEffect(() => {
-        if (editing && !busy && editorRequest !== revealedEditorRequest.current) {
-            revealedEditorRequest.current = editorRequest;
-            const focusTitle = focusTitleOnReveal.current;
-            focusTitleOnReveal.current = false;
-            if (focusTitle) {
-                document.querySelector<HTMLInputElement>('#title')?.focus();
-                return;
-            }
-            // A measure chart has no text editor (`editPanel` stays null), so nothing moves.
-            const input = editPanel.current?.querySelector<HTMLTextAreaElement>('textarea');
-            input?.focus({ preventScroll: true });
-            editPanel.current?.scrollIntoView({ block: 'start' });
-            input?.scrollIntoView({ block: 'nearest' });
+        if (editing && !busy && titleRequest !== focusedTitleRequest.current) {
+            focusedTitleRequest.current = titleRequest;
+            document.querySelector<HTMLInputElement>('#title')?.focus();
         }
-    }, [editing, editorRequest, busy]);
+    }, [editing, titleRequest, busy]);
     // The bar being edited stays in view of the chart (#1705) — pressed, moved to by Tab or the
     // dock's ‹ ›, or made by a bar or section action.
     useEffect(() => {
@@ -2822,22 +2807,8 @@ export default function Ensemble() {
     }
     function clearBuffers() {
         pendingText.current = false;
-        setBuffers(new Map());
         setPendingMeasures(false);
         barDrafts.retire();
-    }
-    function editText(value: string) {
-        const next = new Map(buffers);
-        if (
-            value ===
-            (current ? arrangementOf(current).sections.find((s) => s.id === sectionId)?.value : '')
-        ) {
-            next.delete(sectionId);
-        } else {
-            next.set(sectionId, value);
-        }
-        pendingText.current = next.size > 0;
-        setBuffers(next);
     }
     // Section tap menu's "Start here" (#1422): jump playback to a section's first performed
     // bar. From the section's menu in Edit (#1726), a name or count still in its field goes in
@@ -2856,10 +2827,7 @@ export default function Ensemble() {
         runtime.warmAudio();
         void run(async () => {
             if (pending.length > 0) {
-                const next = updateChart();
-                if (next.schemaVersion === 2) {
-                    applyScore(withSectionChanges(next.chart.score, id, pending));
-                }
+                applyScore(withSectionChanges(updateChart().chart.score, id, pending));
             }
             await runtime.startSection(id, setSoundProgress);
             setSoundProgress('');
@@ -2875,11 +2843,10 @@ export default function Ensemble() {
         setNeck(mode === 'neck');
         rememberStandMode(mode);
     }
-    function revealEditor(id = sectionId) {
+    /** The stand's Edit chart: the band stops, the editor opens. */
+    function editChart() {
         runtime.stop();
-        setSectionId(id);
         showEditor();
-        setEditorRequest((request) => request + 1);
     }
     /** Adopt `score` as the chart. `onlyBar` names the one pending bar it folded in (leaving a
      * bar on the chart, #1723), and only that draft retires; otherwise every draft does. */
@@ -2887,8 +2854,8 @@ export default function Ensemble() {
         // The chart as it is now, not as this render saw it: an action that waited its turn
         // (`run`) and a second change in one action both build on the latest.
         const current = currentNow.current;
-        if (current?.schemaVersion !== 2) {
-            throw new Error('Open a measure-based chart first.');
+        if (!current) {
+            throw new Error('Open a chart first.');
         }
         const candidate = repository.validated({ ...current, chart: { ...current.chart, score } });
         runtime.load(candidate);
@@ -2936,7 +2903,7 @@ export default function Ensemble() {
     }
     function applyBar(measureId: string) {
         const current = currentNow.current;
-        if (current?.schemaVersion !== 2 || working.current) {
+        if (!current || working.current) {
             return;
         }
         const pending = barDrafts.latest();
@@ -2977,7 +2944,7 @@ export default function Ensemble() {
     }
     /** Select a bar and, where the quick editor can edit it, open its field on the chart. */
     function openBarField(measureId: string, select: OpenBar['select'] = 'end') {
-        if (current?.schemaVersion !== 2) {
+        if (!current) {
             return;
         }
         if (openBar?.id === measureId) {
@@ -2992,7 +2959,7 @@ export default function Ensemble() {
     }
     /** What the chart's in-bar field asks of the shell (#1723); null unless it can be used. */
     function barEditing(): BarEditing | null {
-        if (!typeOnChart || current?.schemaVersion !== 2) {
+        if (!typeOnChart || !current) {
             return null;
         }
         const score = current.chart.score;
@@ -3080,7 +3047,7 @@ export default function Ensemble() {
     }
     /** What the section letter's menu asks of the shell (#1726); null unless editing bars. */
     function sectionEditing(): SectionEditing | null {
-        if (!typeOnChart || current?.schemaVersion !== 2) {
+        if (!typeOnChart || !current) {
             return null;
         }
         return {
@@ -3097,7 +3064,7 @@ export default function Ensemble() {
      * instead, as Save opens it.
      */
     function openBarForm(measureId: string): boolean {
-        if (current?.schemaVersion !== 2 || working.current) {
+        if (!current || working.current) {
             return false;
         }
         try {
@@ -3130,7 +3097,7 @@ export default function Ensemble() {
     /** The opening bar's own repeat and ending markers, for the Repeats and endings dialog's
      * per-bar view (#1758): a draft change, as the bar menu's Advanced markers were. */
     function barMarkers(measureId: string): BarMarkers | null {
-        if (current?.schemaVersion !== 2) {
+        if (!current) {
             return null;
         }
         const field = barField(current.chart.score, barDrafts.drafts, measureId);
@@ -3166,16 +3133,12 @@ export default function Ensemble() {
     function insertBarAfter(after: string) {
         void run(() => {
             const next = updateChart();
-            if (next.schemaVersion !== 2) {
-                return;
-            }
             const inserted = withBarAfter(next.chart.score, after);
             if (inserted.kind === 'blocked') {
                 throw new Error(inserted.message);
             }
             applyScore(inserted.score);
             setMeasureId(inserted.measureId);
-            setSectionId(inserted.sectionId);
             setOpenBar({ id: inserted.measureId, select: 'all' });
         });
     }
@@ -3191,16 +3154,12 @@ export default function Ensemble() {
             const before = currentNow.current;
             const drafts = barDrafts.latest();
             const next = updateChart();
-            if (next.schemaVersion !== 2) {
-                return;
-            }
             const result = withoutMeasure(next.chart.score, measureId);
             if (result.kind === 'blocked') {
                 throw new Error(result.message);
             }
             applyScore(result.score);
             setMeasureId(result.measureId);
-            setSectionId(result.sectionId);
             const ids = result.score.sections.flatMap((s) => s.measures.map((m) => m.id));
             const from = ids.indexOf(result.measureId);
             const nearest = [...ids.slice(0, from + 1).reverse(), ...ids.slice(from + 1)].find(
@@ -3212,7 +3171,7 @@ export default function Ensemble() {
             } else {
                 setOpenBar(null);
             }
-            if (before?.schemaVersion === 2) {
+            if (before) {
                 const bars = before.chart.score.sections;
                 const holding = bars.find((s) => s.measures.some((m) => m.id === measureId));
                 const number = bars.flatMap((s) => s.measures).findIndex((m) => m.id === measureId);
@@ -3224,7 +3183,7 @@ export default function Ensemble() {
                     before,
                     drafts,
                     measureId,
-                    sectionId: holding?.id ?? sectionId,
+                    sectionId: holding?.id ?? '',
                     reopen: measureId,
                 });
             }
@@ -3282,7 +3241,6 @@ export default function Ensemble() {
             draft(restored);
             barDrafts.restore(undo.drafts);
             setMeasureId(undo.measureId);
-            setSectionId(undo.sectionId);
             if (undo.reopen && typeOnChart) {
                 // Its field takes focus as it opens.
                 setOpenBar({ id: undo.reopen, select: 'end' });
@@ -3299,73 +3257,30 @@ export default function Ensemble() {
         if (!current) {
             throw new Error('Open a song first.');
         }
-        if (current.schemaVersion === 2) {
-            if (barDrafts.latest().size === 0) {
-                return current;
-            }
-            try {
-                // Every pending bar, by the editor's own rules (`commitBarDrafts`).
-                return applyScore(commitBarDrafts(current.chart.score, barDrafts.latest()));
-            } catch (error) {
-                closeSongMenus();
-                showEditor();
-                // The bar that needs fixing is selected and opens on the chart, its text ready to
-                // correct (#1723), with the refusal in the shell's error line. A fresh opening, so
-                // the blur of the field Save was pressed from cannot close it. Not for a bar
-                // refused for its repeat or ending settings: those are fixed through its bar menu's
-                // Repeat or ending…, so the field is left closed over them (#1724) and the bar
-                // stays selected.
-                if (error instanceof BarDraftError && error.measureId) {
-                    setMeasureId(error.measureId);
-                    const field = barField(
-                        current.chart.score,
-                        barDrafts.latest(),
-                        error.measureId,
-                    );
-                    setOpenBar(
-                        field && field.text !== null && !error.inForm
-                            ? { id: error.measureId, select: 'end' }
-                            : null,
-                    );
-                }
-                throw error;
-            }
-        }
-        if (!buffers.size) {
+        if (barDrafts.latest().size === 0) {
             return current;
         }
         try {
-            const sections = arrangementOf(current).sections.map((section) => ({
-                ...section,
-                value: buffers.get(section.id) ?? section.value,
-            }));
-            for (const section of sections) {
-                if (buffers.has(section.id)) {
-                    try {
-                        validateEditorText(section.label, section.value);
-                    } catch (error) {
-                        setSectionId(section.id);
-                        throw error;
-                    }
-                }
-            }
-            // Check the canonical document bounds before rebuilding the playable chart.
-            const candidate = repository.validated({
-                ...current,
-                chart: {
-                    ...current.chart,
-                    arrangement: { ...arrangementOf(current), sections },
-                },
-            });
-            runtime.editSections(arrangementOf(candidate).sections);
-            const next = runtime.captureDocument(candidate);
-            draft(next);
-            clearBuffers();
-            return next;
+            // Every pending bar, by the editor's own rules (`commitBarDrafts`).
+            return applyScore(commitBarDrafts(current.chart.score, barDrafts.latest()));
         } catch (error) {
             closeSongMenus();
             showEditor();
-            setEditorRequest((request) => request + 1);
+            // The bar that needs fixing is selected and opens on the chart, its text ready to
+            // correct (#1723), with the refusal in the shell's error line. A fresh opening, so
+            // the blur of the field Save was pressed from cannot close it. Not for a bar
+            // refused for its repeat or ending settings: those are fixed through its bar menu's
+            // Repeat or ending…, so the field is left closed over them (#1724) and the bar
+            // stays selected.
+            if (error instanceof BarDraftError && error.measureId) {
+                setMeasureId(error.measureId);
+                const field = barField(current.chart.score, barDrafts.latest(), error.measureId);
+                setOpenBar(
+                    field && field.text !== null && !error.inForm
+                        ? { id: error.measureId, select: 'end' }
+                        : null,
+                );
+            }
             throw error;
         }
     }
@@ -3493,15 +3408,9 @@ export default function Ensemble() {
         }
     }
     function selectSection(document: ChartDocument, id?: string) {
-        const section =
-            arrangementOf(document).sections.find((s) => s.id === id) ||
-            arrangementOf(document).sections[0];
-        setSectionId(section.id);
-        if (document.schemaVersion === 2) {
-            setMeasureId(
-                document.chart.score.sections.find((s) => s.id === section.id)!.measures[0].id,
-            );
-        }
+        const sections = document.chart.score.sections;
+        const section = sections.find((s) => s.id === id) || sections[0];
+        setMeasureId(section.measures[0].id);
     }
     /**
      * The retained experiment to offer for a chart being opened, from the songbook it came from
@@ -3528,8 +3437,12 @@ export default function Ensemble() {
         if (signedIn) {
             try {
                 const held = await accountSync.retainedDraft(document.id);
-                if (held) {
-                    return { recovery: held, unreadable: false };
+                // A text chart's draft is not offered: the app does not open one (#1739).
+                if (held && isCurrentFormat(held.document)) {
+                    return {
+                        recovery: { document: held.document, conflict: held.conflict },
+                        unreadable: false,
+                    };
                 }
             } catch {
                 unreadable = true;
@@ -3552,7 +3465,7 @@ export default function Ensemble() {
      * an offer, and a missing offer is not a claim about anything.
      */
     async function recoveryOptionsFor(document: ChartDocument) {
-        const slots = repository.recoveriesFor(document);
+        const slots = openable(repository.recoveriesFor(document));
         // A chart whose account is not the attached one has no rows to read here either (#1311):
         // `preservedDrafts` would query B's store for A's document id, which is at best nothing.
         if (currentStore.current?.store !== 'account' || standBelongsElsewhere()) {
@@ -3560,7 +3473,7 @@ export default function Ensemble() {
         }
         let held: Array<{ document: ChartDocument; capturedAt: string }> = [];
         try {
-            held = await accountSync.preservedDrafts(document.id);
+            held = openable(await accountSync.preservedDrafts(document.id));
         } catch {
             /* Unreadable account store; the legacy slots below are still worth offering. */
         }
@@ -3821,7 +3734,7 @@ export default function Ensemble() {
             const documents = libraryDocuments(await accountSync.listLibrary(owner));
             if (read === accountLibraryRead.current) {
                 accountSongsOwner.current = owner;
-                setAccountSongs(documents);
+                setAccountSongs(documents.filter(isCurrentFormat));
                 setAccountLibraryFailure(null);
             }
         } catch (failure) {
@@ -3840,7 +3753,8 @@ export default function Ensemble() {
      */
     async function readLiveSong(id: string): Promise<ChartDocument | null> {
         if (signedIn) {
-            return accountSync.readSong(id, sessionOwner);
+            const song = await accountSync.readSong(id, sessionOwner);
+            return song && currentFormat(song);
         }
         return repository.get(id);
     }
@@ -4171,9 +4085,8 @@ export default function Ensemble() {
             if (recovery || unreadable || volatileDrafts.current.has(document.id)) {
                 const opened = await open(document);
                 draft({ ...opened.current, title: trimmed }, opened.saved);
-                focusTitleOnReveal.current = true;
                 showEditor();
-                setEditorRequest((n) => n + 1);
+                setTitleRequest((n) => n + 1);
                 // Re-review P3 — BOTH branches are `warning`: touch has no hover to pause an
                 // `info` message's ~4s clock, so a musician who tapped Rename and looked away for
                 // a moment would otherwise lose an important "your title is queued, Save to keep
@@ -4586,7 +4499,7 @@ export default function Ensemble() {
             // Save is one of the four things that runs a pass. Not awaited: the commit is
             // already durable, and the upload is the loop's problem from here.
             void accountSync.run();
-            return song.document;
+            return currentFormat(song.document);
         } catch (failure) {
             // A mismatch is not a failed Save (#1311 patch review R5): nothing on this device
             // went wrong, and "Save failed on this device" would blame the one store that is
@@ -4688,7 +4601,7 @@ export default function Ensemble() {
                     exportSong();
                 } else if (format === 'midi') {
                     await exportMidiFile();
-                } else if (current?.schemaVersion === 2 && current.importSource) {
+                } else if (current?.importSource) {
                     downloadImportSource(current.importSource.text);
                 }
             } finally {
@@ -4897,7 +4810,7 @@ export default function Ensemble() {
             setCurrent(moved);
             // As resolved on this device, like `current` (#1405), or the chip reports a sound
             // resolved on open as an unsaved change.
-            setSaved(runtime.withLoadedSounds(resolution.document));
+            setSaved(runtime.withLoadedSounds(currentFormat(resolution.document)));
             // The account the transaction actually SETTLED TO, reported back by the loop rather
             // than read from this render's snapshot (#1311 patch review R1).
             bindStand({ store: 'account', ownerId: resolution.ownerId });
@@ -4963,6 +4876,13 @@ export default function Ensemble() {
         // The frozen offer names a document as well as a revision, and the step's title comes
         // from `current`: an offer for any other song is not the one this step described.
         if (!current || update === null || update.documentId !== current.id) {
+            return;
+        }
+        if (update.oldFormat) {
+            // The account's version is a text chart, which the app no longer opens (#1739).
+            // Refused BEFORE the transaction: adopting it would discard this device's experiment
+            // and drafts for a version the stand could not then open. Nothing changes.
+            setAdoptRemoteFailure(OLD_FORMAT_REFUSAL);
             return;
         }
         // Captured before the awaits, like `owner`: whether anything was at stake is what the
@@ -5039,7 +4959,7 @@ export default function Ensemble() {
             // re-read throws first, `open()` never runs and the stand goes on showing the
             // discarded document as clean — and the next keystroke retains it back into the store
             // as a draft of a song that no longer holds that music.
-            await open(resolution.document);
+            await open(currentFormat(resolution.document));
             // The account the transaction actually SETTLED TO, reported back by the loop rather
             // than read from this render's snapshot (#1311 patch review R1). `open()` binds the
             // stand from the session a moment earlier; this is the same rule `keepBothVersions`
@@ -5182,13 +5102,13 @@ export default function Ensemble() {
      * Synchronous by design — see `readSignOutPlan` for why the account half is prefetched rather
      * than awaited between two downloads.
      */
-    function latestLocalVersion(song: ChartDocument): ChartDocument {
+    function latestLocalVersion(song: StoredDocument): StoredDocument {
         const retained = volatileDrafts.current.get(song.id) ?? accountDrafts.current.get(song.id);
         if (retained) {
             return retained;
         }
         try {
-            return repository.recoveryFor(song)?.document ?? song;
+            return (isCurrentFormat(song) && repository.recoveryFor(song)?.document) || song;
         } catch {
             /* Unreadable slot; the committed copy is still worth a file. */
             return song;
@@ -5407,7 +5327,7 @@ export default function Ensemble() {
             const document = repository.validated(blankSong(template));
             landDraftOnStand(document, '');
             markSharedDraft(true, true);
-            revealEditor(arrangementOf(document).sections[0].id);
+            editChart();
         });
     }
     /** Whether the new song on the stand is still exactly as New song made it (#1707). */
@@ -5462,59 +5382,10 @@ export default function Ensemble() {
         track('chart_created');
         return created;
     }
-    /**
-     * "Try the bar editor · keep original": saves a measure copy of the text chart on the stand
-     * and opens it, leaving the original as it was. Null when the stand holds no text chart.
-     * Throws, before anything is created, when the chart cannot be converted or played.
-     */
-    async function openMeasureCopy() {
-        const original = updateChart();
-        if (original.schemaVersion !== 1) {
-            return null;
-        }
-        const converted = convertedCopy(original);
-        // Capability preflight before creating a copy or changing the active song.
-        checkPlayable(converted.chart.score);
-        // The stand's owner (#1311): a converted copy is the open chart's music, so it is as
-        // much that account's as a Duplicate is.
-        const created = await storeSave(converted, null, {
-            owner: standOwner(),
-            stand: false,
-        });
-        await refreshSongs();
-        return { created, ...(await open(created)) };
-    }
-    function upgradeEditor() {
-        void run(async () => {
-            const opened = await openMeasureCopy();
-            if (!opened) {
-                return;
-            }
-            revealEditor(arrangementOf(opened.created).sections[0].id);
-            setMessage('Editable copy created · your original song is unchanged');
-        });
-    }
-    /**
-     * How many times the band plays the form (#1475), from the Song menu or the chart footer
-     * (#1511): one unsaved edit. A text chart has no count, so the footer's pick first makes the
-     * same measure copy "Try the bar editor · keep original" makes, then counts the copy.
-     */
+    /** How many times the band plays the form (#1475), from the chart footer (#1511): one
+     * unsaved edit. */
     function changeChoruses(choruses: number | undefined) {
-        if (current?.schemaVersion !== 1) {
-            change(() => runtime.setChoruses(choruses), true);
-            return;
-        }
-        void run(async () => {
-            const opened = await openMeasureCopy();
-            if (!opened) {
-                return;
-            }
-            runtime.setChoruses(choruses);
-            // `open()` just bound the copy, so its baseline is passed in: this render's `saved`
-            // still describes the original.
-            draft(runtime.captureDocument(opened.current), opened.saved);
-            setMessage('Editable copy created · your original song is unchanged');
-        });
+        change(() => runtime.setChoruses(choruses), true);
     }
     /**
      * The section letter's "Add section after" (#1726): pending bars commit first, then a section
@@ -5523,9 +5394,6 @@ export default function Ensemble() {
     function addSectionAfter(sectionId: string, pending: readonly SectionChange[]) {
         void run(() => {
             const next = updateChart();
-            if (next.schemaVersion !== 2) {
-                return;
-            }
             // A name or count still in its field goes in first, in the same action (#1726).
             const score = withSectionChanges(next.chart.score, sectionId, pending);
             const result = withSectionAfter(score, sectionId);
@@ -5537,7 +5405,6 @@ export default function Ensemble() {
             }
             applyScore(result.score);
             setMeasureId(result.measureId);
-            setSectionId(result.sectionId);
             setOpenBar({ id: result.measureId, select: 'all' });
         });
     }
@@ -5550,9 +5417,6 @@ export default function Ensemble() {
             const drafts = barDrafts.latest();
             const selected = measureIdNow.current;
             const next = updateChart();
-            if (next.schemaVersion !== 2) {
-                return;
-            }
             // A field's typing goes in first, so a refused delete keeps it (#1726).
             const score = withSectionChanges(next.chart.score, sectionId, pending);
             const result = withoutSection(score, sectionId);
@@ -5564,8 +5428,7 @@ export default function Ensemble() {
             }
             applyScore(result.score);
             setMeasureId(result.measureId);
-            setSectionId(result.sectionId);
-            const deleted = before?.schemaVersion === 2 ? before : null;
+            const deleted = before;
             const section = deleted?.chart.score.sections.find((s) => s.id === sectionId);
             if (deleted && section) {
                 offerUndo({
@@ -5602,9 +5465,6 @@ export default function Ensemble() {
         void run(() => {
             // Pending bar edits are committed first, as for every other chart edit.
             const next = updateChart();
-            if (next.schemaVersion !== 2) {
-                return;
-            }
             applyScore(withSectionChanges(next.chart.score, id, changes));
         });
     }
@@ -5613,9 +5473,6 @@ export default function Ensemble() {
             // Pending bar edits are committed first, by the editor's own rules, so the change is
             // made to the one validated candidate rather than beside unchecked typing.
             const next = updateChart();
-            if (next.schemaVersion !== 2) {
-                return;
-            }
             const result = withSongMeter(next.chart.score, meter);
             if (result.kind === 'blocked') {
                 // The Key popover closes onto the bar that would not fit, so the refusal (the
@@ -5641,9 +5498,9 @@ export default function Ensemble() {
      * cap. There is no E2E coverage for either engine here — WebKit/Firefox-specific handling
      * (batching into one archive, or a click-through per file) is unverified and out of scope.
      */
-    function exportDocument(candidate: ChartDocument) {
+    function exportDocument(candidate: StoredDocument) {
         const url = URL.createObjectURL(
-            new Blob([JSON.stringify(repository.validated(candidate), null, 2)], {
+            new Blob([JSON.stringify(repository.storedValidated(candidate), null, 2)], {
                 type: 'application/json',
             }),
         );
@@ -5743,9 +5600,13 @@ export default function Ensemble() {
                 }
                 const opened = await open(document);
                 setAllSongsOpen(false);
-                // Into its editor — a text chart's is `TextChartEditor` — on the section named.
-                const sections = arrangementOf(opened.current).sections;
-                revealEditor(sections[sectionIndex ?? 0]?.id ?? sections[0]?.id);
+                // Into its editor, on the section named. (A text chart is refused before here,
+                // by `readLiveSong`, with `OLD_FORMAT_REFUSAL`: the app no longer opens one.)
+                selectSection(
+                    opened.current,
+                    opened.current.chart.score.sections[sectionIndex ?? 0]?.id,
+                );
+                editChart();
             }),
     });
     // The Continue card (#1441): the live songbook's own "last opened" song, read by id with the
@@ -5762,9 +5623,10 @@ export default function Ensemble() {
         // only answers for a song this TAB has opened or prefetched, though — on a cold load the
         // map is empty and the card previews the committed copy, which is the honest answer here
         // rather than a claim about a draft nobody has read (#1299 patch review P3).
+        const accountHeld = accountDrafts.current.get(featuredSave.id);
         const held =
             volatileDrafts.current.get(featuredSave.id) ??
-            accountDrafts.current.get(featuredSave.id);
+            (accountHeld && isCurrentFormat(accountHeld) ? accountHeld : undefined);
         let resolved: ChartDocument;
         try {
             resolved =
@@ -5785,8 +5647,8 @@ export default function Ensemble() {
             title: resolved.title,
             genre: genreOf(resolved),
             bpm: resolved.chart.performance.bpm,
-            key: arrangementOf(resolved).key,
-            isMinor: arrangementOf(resolved).isMinor,
+            key: resolved.chart.score.key,
+            isMinor: resolved.chart.score.isMinor,
             bars,
         };
     }, [featuredSave, current]);
@@ -6292,9 +6154,7 @@ export default function Ensemble() {
                             throw new Error('Chart files must be 1 MB or smaller.');
                         }
                         const candidate = repository.validated(JSON.parse(await source.text()));
-                        if (candidate.schemaVersion === 2) {
-                            checkPlayable(candidate.chart.score);
-                        }
+                        checkPlayable(candidate.chart.score);
                         // No owner claim (#1311): a file off this device's disk is nobody's chart
                         // until it is committed, so it belongs to whichever account is live —
                         // never to whoever happens to be on the stand behind this dialog.
@@ -6317,9 +6177,7 @@ export default function Ensemble() {
                     onClose={() => setImporting(false)}
                     onAdd={async (candidate) => {
                         const checked = repository.validated(candidate);
-                        if (checked.schemaVersion === 2) {
-                            checkPlayable(checked.chart.score);
-                        }
+                        checkPlayable(checked.chart.score);
                         if (current) {
                             updateChart();
                         }
@@ -6335,11 +6193,9 @@ export default function Ensemble() {
                         // Both `irealbook`/`irealb` decode the same iReal Pro format; the
                         // telemetry vocabulary tracks the format, not the decoder variant.
                         track('chart_imported', {
-                            format:
-                                checked.schemaVersion === 2 &&
-                                checked.importSource?.format?.startsWith('ireal')
-                                    ? 'ireal'
-                                    : 'file',
+                            format: checked.importSource?.format?.startsWith('ireal')
+                                ? 'ireal'
+                                : 'file',
                         });
                         track('chart_opened', { source: 'import' });
                     }}
@@ -6516,7 +6372,7 @@ export default function Ensemble() {
                         onToggleControls={() => setShowControls(!showControls)}
                         onShowChart={() => showStand('chart')}
                         onShowNeck={() => showStand('neck')}
-                        onEditChart={() => revealEditor()}
+                        onEditChart={editChart}
                         onTitle={(title) => draft({ ...current, title })}
                         onSave={() =>
                             void run(async () => {
@@ -6549,8 +6405,7 @@ export default function Ensemble() {
                         onKeyClose={() => setKeyOpen(false)}
                         onKey={(key) =>
                             change(
-                                () =>
-                                    runtime.transpose(keyDistance(arrangementOf(current).key, key)),
+                                () => runtime.transpose(keyDistance(current.chart.score.key, key)),
                                 true,
                             )
                         }
@@ -6723,18 +6578,12 @@ export default function Ensemble() {
                                         activeEvent={activeEvent}
                                         writtenBars={writtenBars}
                                         writtenSections={writtenSections}
-                                        editing={editing}
-                                        selectedMeasureId={
-                                            editing && current.schemaVersion === 2
-                                                ? measureId
-                                                : null
-                                        }
+                                        selectedMeasureId={editing ? measureId : null}
                                         busy={busy}
                                         playing={playing}
                                         playbackActive={playbackActive}
                                         totalBars={totalBars}
                                         onStartHere={(id) => startHereSection(id)}
-                                        onEditSection={(block) => revealEditor(block.id)}
                                         barEdit={barEditing()}
                                         sectionEdit={sectionEditing()}
                                         onAudition={(index) => runtime.audition(index)}
@@ -6763,57 +6612,6 @@ export default function Ensemble() {
                                 }}
                                 onClose={() => setBarForm(null)}
                                 onApply={applyForm}
-                            />
-                        )}
-                        {current.schemaVersion === 1 && (
-                            <TextChartEditor
-                                panelRef={editPanel}
-                                current={current}
-                                editing={editing}
-                                busy={busy}
-                                sectionId={sectionId}
-                                buffers={buffers}
-                                text={text}
-                                onUpgrade={upgradeEditor}
-                                onSelectSection={(id) => selectSection(current, id)}
-                                onEditText={editText}
-                                onUpdateChart={() =>
-                                    void run(() => {
-                                        updateChart();
-                                    })
-                                }
-                                onAddSection={() =>
-                                    void run(() => {
-                                        const next = updateChart();
-                                        const id = crypto.randomUUID();
-                                        const sections = [
-                                            ...arrangementOf(next).sections,
-                                            {
-                                                id,
-                                                label: String.fromCharCode(
-                                                    65 +
-                                                        (arrangementOf(current).sections.length %
-                                                            26),
-                                                ),
-                                                value: 'C | C | F | G',
-                                                repeat: 1,
-                                            },
-                                        ];
-                                        repository.validated({
-                                            ...next,
-                                            chart: {
-                                                ...next.chart,
-                                                arrangement: {
-                                                    ...arrangementOf(next),
-                                                    sections,
-                                                },
-                                            },
-                                        });
-                                        runtime.editSections(sections);
-                                        draft(runtime.captureDocument(next));
-                                        revealEditor(id);
-                                    })
-                                }
                             />
                         )}
                     </div>
@@ -7022,7 +6820,7 @@ export default function Ensemble() {
                     dialogRef={exportDialogRef}
                     title={current.title}
                     busy={busy}
-                    hasSource={current.schemaVersion === 2 && !!current.importSource}
+                    hasSource={!!current.importSource}
                     exportingAudio={exportingAudio}
                     exportAudioProgress={exportAudioProgress}
                     onExport={exportAs}

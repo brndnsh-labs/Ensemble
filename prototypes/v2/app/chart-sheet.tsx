@@ -10,7 +10,7 @@ import {
     useState,
 } from 'react';
 import { flushSync } from 'react-dom';
-import { arrangementOf, type SectionChange } from '../lib/documents';
+import type { SectionChange } from '../lib/documents';
 import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
@@ -47,9 +47,8 @@ function chorusChoice(choruses: number | undefined): string {
 
 /**
  * The visible chord symbol in the chart's current notation (#1276). `chord.display`
- * (`FormattedChordNames`) is precomputed for all three notations by
- * `chords-engine.validateProgression()` regardless of which one is selected — the
- * same shared field v1's `ChordVisualizer.tsx` read — so switching notation is a
+ * (`FormattedChordNames`) is precomputed for all three notations by `chordNames`
+ * (`lib/band-chart.ts`) regardless of which one is selected, so switching notation is a
  * pure read-time choice, never a re-analysis of the chord.
  */
 function chordSymbol(chord: ChartChord, notation: ChartNotation): ReactNode {
@@ -143,7 +142,7 @@ export interface BarEditing {
 /**
  * What the section letter's menu edits while editing a measure chart (#1726): the section's
  * settings, and adding or deleting a section. Each commits pending bars first, as every chart edit
- * does. Null outside Edit, and for a text chart.
+ * does. Null outside Edit.
  */
 export interface SectionEditing {
     score: SemanticScore;
@@ -172,7 +171,6 @@ interface ChartSheetProps {
     activeEvent: { start: number; end: number } | null;
     writtenBars: Map<string, WrittenBar>;
     writtenSections: Map<string, WrittenSection>;
-    editing: boolean;
     /** The bar selected while editing (#1700) — ringed on the chart, the bar its field opens
      * in. Null when not editing a measure chart. */
     selectedMeasureId: string | null;
@@ -183,17 +181,13 @@ interface ChartSheetProps {
     /** Section tap menu's "Start here" (#1422) — jumps playback to the section's first
      * performed bar, starting it if stopped. */
     onStartHere: (sectionId: string | undefined) => void;
-    /** A text chart's "Edit section" link while editing: that section in its text editor. A
-     * measure chart has none; its section letter opens the section's menu (#1726). */
-    onEditSection: (block: ChartBlock) => void;
     /** Set while editing a measure chart (#1723); null otherwise. */
     barEdit: BarEditing | null;
     /** Set while editing a measure chart (#1726); null otherwise. */
     sectionEdit: SectionEditing | null;
     onAudition: (globalIndex: number) => void;
     /** How many times the band plays the form, then stops (#1511, the footer's menu);
-     * `undefined` repeats it continuously. On a text chart the shell makes the measure copy
-     * first, as "Try the bar editor · keep original" does. */
+     * `undefined` repeats it continuously. */
     onChoruses: (choruses: number | undefined) => void;
 }
 
@@ -211,14 +205,12 @@ export function ChartSheet({
     activeEvent,
     writtenBars,
     writtenSections,
-    editing,
     selectedMeasureId,
     busy,
     playing,
     playbackActive,
     totalBars,
     onStartHere,
-    onEditSection,
     barEdit,
     sectionEdit,
     onAudition,
@@ -282,7 +274,7 @@ export function ChartSheet({
 
     // The footer's form-length menu (#1511): how many times the band plays the form, a `<Menu>`
     // at the footer button (#1755).
-    const choruses = current.schemaVersion === 2 ? current.chart.score.choruses : undefined;
+    const choruses = current.chart.score.choruses;
     const [formMenu, setFormMenu] = useState(false);
     const formMenuTrigger = useRef<HTMLButtonElement>(null);
     // The menu closes with the footer: playback hides it, and so does a busy shell.
@@ -437,7 +429,7 @@ export function ChartSheet({
             barEdit?.onOpen(measureId);
         }
     }
-    const notation = arrangementOf(current).notation;
+    const notation = current.chart.score.notation;
     let barNumber = 0;
     let lastContext: string | null = null;
     return (
@@ -471,36 +463,15 @@ export function ChartSheet({
                         >
                             {block.label || 'A'}
                         </button>
-                        {/* A bare key beside the section letter read as a second letter ("A  C").
-                            A measure chart already prints key · meter on the section's first bar
-                            (`.bar-context`), so only a text chart says it here, in words (#1700). */}
-                        {current.schemaVersion === 1 && (
-                            <span className="section-name">
-                                Key of{' '}
-                                {arrangementOf(current).sections.find((s) => s.id === block.id)
-                                    ?.key || arrangementOf(current).key}
-                                {arrangementOf(current).isMinor ? ' minor' : ''}
+                        {(current.chart.score.sections.find((s) => s.id === block.id)?.repeat ??
+                            1) > 1 && (
+                            <span className="section-repeat">
+                                Section ×
+                                {
+                                    current.chart.score.sections.find((s) => s.id === block.id)
+                                        ?.repeat
+                                }
                             </span>
-                        )}
-                        {current.schemaVersion === 2 &&
-                            (current.chart.score.sections.find((s) => s.id === block.id)?.repeat ??
-                                1) > 1 && (
-                                <span className="section-repeat">
-                                    Section ×
-                                    {
-                                        current.chart.score.sections.find((s) => s.id === block.id)
-                                            ?.repeat
-                                    }
-                                </span>
-                            )}
-                        {editing && current.schemaVersion === 1 && (
-                            <button
-                                className="section-edit"
-                                disabled={busy}
-                                onClick={() => onEditSection(block)}
-                            >
-                                Edit section
-                            </button>
                         )}
                     </div>
                     <div className="bars">
@@ -669,23 +640,22 @@ export function ChartSheet({
                                             )}
                                         </span>
                                     )}
-                                    {current.schemaVersion === 2 &&
-                                        (sectionSeam || context !== previousContext) && (
-                                            <span className="bar-context">
-                                                {sectionSeam && owningSection && (
-                                                    <b
-                                                        aria-label={`Section ${owningSection.label}, ${owningSection.repeat} total passes`}
-                                                        title={`Section ${owningSection.label}, ${owningSection.repeat} total passes`}
-                                                    >
-                                                        {owningSection.label} · ×
-                                                        {owningSection.repeat} ·{' '}
-                                                    </b>
-                                                )}
-                                                {measure.chords[0]?.key}
-                                                {measure.chords[0]?.keyIsMinor ? 'm' : ''} ·{' '}
-                                                {measure.chords[0]?.timeSignature}
-                                            </span>
-                                        )}
+                                    {(sectionSeam || context !== previousContext) && (
+                                        <span className="bar-context">
+                                            {sectionSeam && owningSection && (
+                                                <b
+                                                    aria-label={`Section ${owningSection.label}, ${owningSection.repeat} total passes`}
+                                                    title={`Section ${owningSection.label}, ${owningSection.repeat} total passes`}
+                                                >
+                                                    {owningSection.label} · ×{owningSection.repeat}{' '}
+                                                    ·{' '}
+                                                </b>
+                                            )}
+                                            {measure.chords[0]?.key}
+                                            {measure.chords[0]?.keyIsMinor ? 'm' : ''} ·{' '}
+                                            {measure.chords[0]?.timeSignature}
+                                        </span>
+                                    )}
                                     {notes
                                         .filter((note) => note.placement === 'above')
                                         .map((note, index) => (
@@ -800,13 +770,7 @@ export function ChartSheet({
                                                         ? activeEvent.end
                                                         : c.end
                                                 }
-                                                style={
-                                                    current.schemaVersion === 2
-                                                        ? {
-                                                              flex: c.end - c.start,
-                                                          }
-                                                        : undefined
-                                                }
+                                                style={{ flex: c.end - c.start }}
                                                 key={c.globalIndex}
                                                 // An editable bar's chords open its field while
                                                 // editing (#1723): not a stop of their own (the
@@ -913,11 +877,6 @@ export function ChartSheet({
                     className="form-length-menu"
                     anchor={() => formMenuTrigger.current}
                     align="end"
-                    note={
-                        current.schemaVersion === 1
-                            ? 'Counting choruses turns this chart into bars; the original is kept.'
-                            : undefined
-                    }
                     onClose={() => setFormMenu(false)}
                     items={chorusChoices.map((count) => ({
                         id: String(count ?? 'loop'),

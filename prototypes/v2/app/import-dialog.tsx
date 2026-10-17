@@ -154,9 +154,7 @@ export function ImportDialog({
             }
             if (text.trimStart().startsWith('{')) {
                 const candidate = validateDocument(JSON.parse(text));
-                if (candidate.schemaVersion === 2) {
-                    checkPlayable(candidate.chart.score);
-                }
+                checkPlayable(candidate.chart.score);
                 setNative(candidate);
                 return;
             }

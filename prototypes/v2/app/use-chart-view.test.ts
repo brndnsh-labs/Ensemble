@@ -1,11 +1,9 @@
 /**
  * The Following look-ahead's next-bar cue (#1458). Pinned here: `nextBarIndex`'s bar-skip and
- * wrap rules, and `measureOfGlobalIndex`'s (`lib/lead-sheet.ts`) written-measure bucketing, in isolation from the band
- * engine and React — `use-chart-view.test.ts`'s own sibling coverage for what
+ * wrap rules, in isolation from the band engine and React — the sibling coverage for what
  * `band-chart.test.ts` pins at the `BandChart` level (`BandSlot.bar`).
  */
 import { describe, expect, it } from 'vitest';
-import { type ChartBlock, measureOfGlobalIndex } from '../lib/lead-sheet';
 import { nextBarIndex } from './use-chart-view';
 
 /** A minimal item `nextBarIndex` can walk: `start` in steps, `bar` its performed-bar ordinal. */
@@ -55,23 +53,5 @@ describe('nextBarIndex', () => {
         expect(nextBarIndex([], 0, barOf)).toBeNull();
         expect(nextBarIndex([item(0, 0)], -1, barOf)).toBeNull();
         expect(nextBarIndex([item(0, 0)], 5, barOf)).toBeNull();
-    });
-});
-
-describe('measureOfGlobalIndex', () => {
-    const block = (measures: { chords: { globalIndex: number }[] }[]): ChartBlock =>
-        ({ measures }) as unknown as ChartBlock;
-
-    it('buckets every chord by its measure ordinal, across every block', () => {
-        const blocks = [
-            block([{ chords: [{ globalIndex: 0 }] }, { chords: [{ globalIndex: 1 }] }]),
-            block([{ chords: [{ globalIndex: 2 }, { globalIndex: 3 }] }]),
-        ];
-        const map = measureOfGlobalIndex(blocks);
-        expect(map.get(0)).toBe(0);
-        expect(map.get(1)).toBe(1);
-        // Both chords of the third (two-chord) measure share its ordinal.
-        expect(map.get(2)).toBe(2);
-        expect(map.get(3)).toBe(2);
     });
 });

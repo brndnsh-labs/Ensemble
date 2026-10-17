@@ -527,10 +527,7 @@ export class BandHost {
      * same tick the moment a beat is at least `leadMs` long.
      *
      * A method here rather than on `BandChart` (`bars`/`barAt`, `lib/band-chart.ts`) because
-     * this reads `this.timeline` directly, which exists for a measure-less (v1) chart too —
-     * `runtime.ts`'s `scoreForBand` converts one before it ever reaches the host, so the SAME
-     * timeline plays either schema — while `BandChart` itself is built only for schemaVersion 2
-     * (P2-2: the old `!bandView` gate wrongly denied v1 charts this cue and the jump-ahead both).
+     * this reads `this.timeline`, the one the band is playing.
      */
     inLastPulse(tick: number, leadMs = 600): boolean {
         const bar = this.barContaining(tick);

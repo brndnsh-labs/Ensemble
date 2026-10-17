@@ -1,20 +1,21 @@
 import { readFileSync } from 'node:fs';
 import type { Download, Page } from '@playwright/test';
-import type { ChartDocument } from '../lib/documents';
-import { validateDocument } from '../lib/documents';
+import { type StoredDocument, validateStoredDocument } from '../lib/documents';
 import { bandForGenre } from '../lib/standards';
 import { upgradeDocument } from '../lib/upgrade';
-import { editorRevealed, expect, seedGuestDocuments, songLink, test } from './fixtures';
+import { expect, seedGuestDocuments, songLink, test } from './fixtures';
 
 /**
  * "Upgrade old songs" (#1738), the guest songbook's product moment on both projects: the card
  * shows while anything old is stored here, offers ONE backup file first, rewrites each song in
  * place (same id, same edit date, next revision) through the ordinary Save, lists what it refused
- * with a way into the text editor, never writes over or deletes a draft, and finishes an
- * interrupted run.
+ * (a text chart it cannot convert stays as it is: the app no longer opens one, #1739), never
+ * writes over or deletes a draft, and finishes an interrupted run.
  *
- * The rules themselves are `lib/upgrade.test.ts`; the account half — the outbox drains and the
- * server holds schema 2 — is `account-upgrade-old-songs.chromium.spec.ts`.
+ * The rules themselves are `lib/upgrade.test.ts`. The account half has had no product spec since
+ * #1739: its old spec put text charts in the account by adopting guest ones, which no longer
+ * happens. An account can still hold a text chart from before, and the upgrade still converts it;
+ * the gap is accepted until #1740 deletes the upgrade.
  */
 
 const RECOVERY = 'ensemble-v2-preview:recovery:';
@@ -25,9 +26,9 @@ function textChart(
     title: string,
     sections: Array<[label: string, value: string]>,
     options: { revision?: number; stamp?: string } = {},
-): ChartDocument {
+): StoredDocument {
     const stamp = options.stamp ?? '2026-09-01T12:00:00.000Z';
-    return validateDocument({
+    return validateStoredDocument({
         schemaVersion: 1,
         id,
         title,
@@ -54,7 +55,7 @@ function textChart(
     });
 }
 
-async function documents(page: Page): Promise<ChartDocument[]> {
+async function documents(page: Page): Promise<StoredDocument[]> {
     return page.evaluate(async () => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
             const request = indexedDB.open('ensemble-v2-preview', 1);
@@ -62,7 +63,7 @@ async function documents(page: Page): Promise<ChartDocument[]> {
             request.onerror = () => reject(request.error);
         });
         try {
-            return await new Promise<ChartDocument[]>((resolve, reject) => {
+            return await new Promise<StoredDocument[]>((resolve, reject) => {
                 const request = db.transaction('documents').objectStore('documents').getAll();
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => reject(request.error);
@@ -137,8 +138,13 @@ test('old songs are backed up in one file, upgraded in place with their edit dat
     await expect(card(page).getByRole('heading', { name: 'Upgrade old songs (3)' })).toBeVisible();
     await expect(card(page)).toContainText('3 songs here are saved in the old format');
     await expect(card(page)).toContainText('Close Ensemble in other tabs first.');
-    const orderBefore = await allSongsOrder(page, 'recentAdded');
-    const titleOrderBefore = await allSongsOrder(page, 'title');
+    // A text chart is not listed: the app no longer opens one (#1739).
+    expect(await allSongsOrder(page, 'title')).toEqual(['Current']);
+    // Once upgraded, every song sits where its own dates and title put it.
+    const orderBefore = [...seeded]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt) || a.title.localeCompare(b.title))
+        .map((song) => song.title);
+    const titleOrderBefore = seeded.map((song) => song.title).sort((a, b) => a.localeCompare(b));
 
     await card(page).getByRole('button', { name: 'Upgrade old songs…' }).click();
     const files: Download[] = [];
@@ -211,7 +217,7 @@ test('old songs are backed up in one file, upgraded in place with their edit dat
     expect((await documents(page)).find((document) => document.id === 'old-turn')).toEqual(turned);
 });
 
-test('a refused chart is listed by bar and reason, untouched, keeps the card up, and Open lands in its text editor on that section', async ({
+test('a refused chart is listed by bar and reason, untouched, keeps the card up, and offers no Open: the app no longer opens a text chart', async ({
     page,
 }) => {
     const refused = textChart('refused', 'Odd changes', [
@@ -232,41 +238,26 @@ test('a refused chart is listed by bar and reason, untouched, keeps the card up,
     await expect(listed).toContainText('bar 2, section B “Xyz7”:');
     expect(await documents(page)).toEqual([refused]);
 
-    await listed.getByRole('button', { name: 'Open Odd changes' }).click();
-    await expect(page.getByRole('heading', { name: 'Odd changes', exact: true })).toBeVisible();
-    await editorRevealed(page);
-    await expect(page.locator('#section')).toHaveValue('section-1');
-    await expect(page.getByLabel('Chord text')).toHaveValue('G | Xyz7 | C | C');
-
-    // Fixed in the text editor and saved, it upgrades on the next run.
-    await page.getByLabel('Chord text').fill('G | G7 | C | C');
-    await page.getByRole('button', { name: 'Update chart' }).click();
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await upgradeWithoutBackup(page);
-    await expect(card(page).getByRole('heading', { name: 'Upgraded 1 song' })).toBeVisible();
-    expect((await documents(page))[0]).toMatchObject({ id: 'refused', schemaVersion: 2 });
-    await card(page).getByRole('button', { name: 'Done' }).click();
-    await expect(card(page)).toHaveCount(0);
+    // The text editor is gone (#1739), so there is nothing to open it into.
+    await expect(listed.getByRole('button', { name: 'Open Odd changes' })).toHaveCount(0);
 });
 
-test('a song with unsaved edits is left alone, its draft untouched, until it is saved', async ({
-    page,
-}) => {
+test('a song with unsaved edits is left alone, and its draft untouched', async ({ page }) => {
     const edited = textChart('edited', 'Work in progress', [['A', 'C | F | G | C']]);
     const other = textChart('other', 'Other song', [['A', 'Am | Dm | E7 | Am']]);
     await seedGuestDocuments(page, [edited, other]);
-    await songLink(page, 'Work in progress').click();
-    await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await editorRevealed(page);
-    await page.getByLabel('Chord text').fill('C | F | G7 | C');
-    await page.getByRole('button', { name: 'Update chart' }).click();
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    // Unsaved text an older build's editor kept for it: a live draft, newer than the song.
+    await seedSlot(
+        page,
+        `${RECOVERY}old-tab:edited`,
+        JSON.stringify({
+            capturedAt: new Date().toISOString(),
+            document: textChart('edited', 'Work in progress', [['A', 'C | F | G7 | C']]),
+        }),
+    );
     const before = await slots(page);
-    expect(Object.values(before).join()).toContain('G7');
-    // The card's scan is latched on the songbooks' counts, which an edit does not move; a reload
-    // (or pressing Upgrade, which always re-reads) sees the new draft.
+    // The card's scan is latched on the songbooks' counts, which a draft does not move; a reload
+    // (or pressing Upgrade, which always re-reads) sees it.
     await page.reload();
     await scanned(page);
 
@@ -289,26 +280,10 @@ test('a song with unsaved edits is left alone, its draft untouched, until it is 
     expect(stored.find((document) => document.id === 'other')?.schemaVersion).toBe(2);
     expect(await slots(page)).toEqual(before);
 
-    // Its unsaved draft is listed too, with the same way in.
-    await expect(
-        card(page)
-            .getByTestId('upgrade-drafts')
-            .getByRole('button', { name: 'Open Work in progress' }),
-    ).toBeVisible();
-    await card(page)
-        .getByTestId('upgrade-skipped')
-        .getByRole('button', { name: 'Open Work in progress' })
-        .click();
-    await expect(page.getByLabel('Chord text')).toHaveValue('C | F | G7 | C');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await upgradeWithoutBackup(page);
-    const upgraded = (await documents(page)).find((document) => document.id === 'edited')!;
-    expect(upgraded.schemaVersion).toBe(2);
-    expect(JSON.stringify(upgraded)).toContain('"G7"');
-    await card(page).getByRole('button', { name: 'Done' }).click();
-    await expect(card(page)).toHaveCount(0);
+    // Its unsaved draft is listed too. A text chart no longer opens (#1739), so neither offers
+    // Open, and the song and its draft stay put.
+    await expect(card(page).getByTestId('upgrade-drafts')).toContainText('Work in progress');
+    await expect(card(page).getByRole('button', { name: 'Open Work in progress' })).toHaveCount(0);
 });
 
 /** A recovery slot left by a tab long gone, for a song this device does not hold. */
@@ -462,11 +437,16 @@ test('the backup holds exactly what the run then changes: a song saved after it 
 test('opening a song ends a backup step: the file speaks for a songbook that may have moved', async ({
     page,
 }) => {
-    await seedGuestDocuments(page, [textChart('a', 'Song a', [['A', 'C | F']])]);
+    // Song b is current, so it opens; Song a is the text chart the backup is for.
+    const current = upgradeDocument(textChart('b', 'Song b', [['A', 'C | G']]));
+    if (current.kind !== 'upgraded') {
+        throw new Error('fixture did not convert');
+    }
+    await seedGuestDocuments(page, [textChart('a', 'Song a', [['A', 'C | F']]), current.document]);
     await card(page).getByRole('button', { name: 'Upgrade old songs…' }).click();
     await card(page).getByRole('button', { name: 'Download backup' }).click();
     await expect(card(page).getByRole('button', { name: /I have the file/ })).toBeVisible();
-    await songLink(page, 'Song a').click();
+    await songLink(page, 'Song b').click();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(card(page)).toHaveAttribute('data-phase', 'idle');
     await expect(card(page).getByRole('button', { name: /I have the file/ })).toHaveCount(0);

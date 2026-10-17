@@ -468,22 +468,15 @@ the song once through with its ending, a lead track only when the lead played.
 **The chart sheet** draws a score from the score and its timeline (`prototypes/v2/lib/band-chart.ts`),
 not from the old engine's plan, so any chart the timeline compiles opens, edits and plays:
 holds show as `/`, N.C. as `N.C.`, a fermata sits over its chord, and off-grid lengths keep
-their exact widths. `validateProgression` has no chord text to parse in such a score, so the `arranger` step
-maps derive empty. Every path that lets a chart onto the stand (open, edit,
+their exact widths. Every path that lets a chart onto the stand (open, edit,
 import, the guided form) asks `checkPlayable` in `lib/engine-mode.ts`: on the band engine
-that is `validateSemanticScore` plus `compileTimeline`. A measure-less (v1) chart is still drawn from the old maps.
-Its chord names come from the old parser (`validateProgression`) while the band plays the
-written token, so the two are held to each other: **the chart shows what the band plays**
-(DECISION 2026-10-12, #1662). A lowercase numeral is read literally as minor, on any degree:
+that is `validateSemanticScore` plus `compileTimeline`. A measure-less (v1) chart is no longer opened at all
+(#1739); "Upgrade old songs" converts one through `proposeLegacyScoreConversion`
+(`public/songbook/legacy-score.ts`), which converts every token the old parser read (#1737), and
+`tests/unit/songbook/legacy-score.test.ts` holds that conversion to the old parser's own playing.
+A lowercase numeral is read literally as minor, on any degree (DECISION 2026-10-12, #1662):
 `vii` is a B minor triad in C, `i7b9` a Cm7b9, and `i11` a Cm11 (#1674: a dominant 11th is
-written without a third, so the numeral's case gives it a minor one; `I11` stays C11). `parseChord` reads every name the old parser writes, so a tap
-and the neck sound the chord that is shown. `prototypes/v2/lib/legacy-band-chart.test.ts` holds
-the everyday qualities, every root spelling, to it. The band plays such a chart through
-`proposeLegacyScoreConversion` (`public/songbook/legacy-score.ts`), which converts every token
-the old parser read (#1737); `tests/unit/songbook/legacy-score.test.ts` holds the conversion to
-the old parser's own playing, and names each spelling where the band now plays the written
-chord instead (a tone the old parser dropped, two written alterations it rounded to `7alt`, a
-lowercase numeral it kept major). For those few, the sheet still shows the old parser's name. On the
+written without a third, so the numeral's case gives it a minor one; `I11` stays C11). On the
 band engine the measure editor can put a fermata on (or take it off) a bar's last event: the flag is
 editor state carried across the bar's text round-trip, never encoded in chord text.
 

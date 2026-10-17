@@ -1,5 +1,4 @@
 import type { RefObject } from 'react';
-import { arrangementOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 
 interface SongHeaderProps {
@@ -119,7 +118,7 @@ export function SongHeader({
                                         : 'Saved on this device'}
                         </span>
                         <span>{totalBars} bars</span>
-                        <span>{arrangementOf(current).timeSignature}</span>
+                        <span>{current.chart.score.meter}</span>
                     </div>
                 </div>
             </div>
