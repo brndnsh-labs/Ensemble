@@ -2125,93 +2125,6 @@ dialog textarea {
         font-size: 11px;
     }
 }
-.sound-install {
-    background: var(--green-light);
-    border-radius: 12px;
-    padding: 16px;
-}
-.sound-install p {
-    margin: 10px 0;
-    color: var(--ink);
-}
-.sound-install small,
-.sounds-status {
-    color: var(--muted);
-    font-size: 12px;
-}
-.sounds-status {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 16px;
-}
-.sound-choices {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 16px;
-    padding-top: 16px;
-}
-/* One compact block per lane (#1275): heading, sound/style/density/mode
-   selects, then the volume + reverb sliders — grouped so the whole lane
-   reads as one unit at music-stand distance instead of a flat control list. */
-.sound-lane {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    min-width: 0;
-    padding: 12px;
-    border: 1px solid var(--line);
-    border-radius: 10px;
-}
-.sound-lane h3 {
-    font-size: 13px;
-    margin: 0;
-}
-.sound-choices label {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-size: 13px;
-    min-width: 0;
-}
-.sound-choices select {
-    width: 100%;
-    min-height: 44px;
-    font: inherit;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    padding: 8px;
-    background: var(--surface);
-    color: var(--ink);
-}
-.sound-choices small {
-    font-size: 10px;
-    color: var(--muted);
-    line-height: 1.4;
-}
-.sound-range-control {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-.sound-range-control input[type="range"] {
-    flex: 1 1 auto;
-    min-width: 0;
-    min-height: 32px;
-    accent-color: var(--green);
-}
-.sound-range-value {
-    flex: 0 0 auto;
-    width: 2.4em;
-    text-align: right;
-    font-variant-numeric: tabular-nums;
-    color: var(--muted);
-}
-.resolved-sound {
-    display: block;
-    color: var(--green);
-    margin-bottom: 5px;
-}
 .band-note,
 .sound-progress {
     font-size: 12px;
@@ -2366,22 +2279,6 @@ dialog textarea {
 .band-note {
     margin: 4px 0 0;
 }
-.sound-lane-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-}
-.sound-choices .lane-switch {
-    flex-direction: row;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    color: var(--muted);
-}
-.sound-lane.muted > :not(.sound-lane-head) {
-    opacity: 0.55;
-}
 @media (max-width: 760px) {
     .feel-panel {
         padding: 18px;
@@ -2502,9 +2399,6 @@ dialog textarea {
     }
 }
 @media (max-width: 760px) {
-    .sound-choices {
-        grid-template-columns: minmax(0, 1fr);
-    }
     .song-open .song-header {
         padding: 8px 12px;
         gap: 6px;
