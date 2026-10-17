@@ -2,14 +2,13 @@ import { asHeldDevice, releaseApi, shapeApi } from './account-helpers';
 import { appUrl, expect, seedStarters, test } from './fixtures';
 
 /**
- * The per-device account switch (#1262, default flipped on by the cutover #1357), on both
- * projects and with no account API at all.
+ * The account entry point (#1262, on every device since the cutover #1357), on both projects and
+ * with no account API at all.
  *
  * This is the plain guest fixture on purpose: the claims here are about a device that has never
- * signed in and a server it cannot talk to. Accounts are on by default now, so the one `/api/*`
- * request a guest makes is every device's startup path — and it must never be able to hold up
- * the songbook, the chart or playback. `?accounts=off` is the way out, and it has to be worth
- * having: a device that asked for it makes no request at all.
+ * signed in and a server it cannot talk to. Accounts are part of the product, so the one
+ * `/api/*` request a device that holds an account makes is on its startup path — and it must
+ * never be able to hold up the songbook, the chart or playback.
  */
 
 /** Every `/api/*` request the page makes, as `METHOD /path`. */
@@ -59,80 +58,24 @@ test('a device that holds an account does ask for its session, once', async ({ p
     await expect.poll(() => calls).toEqual(['GET /api/auth/session']);
 });
 
-test('?accounts=off turns every account surface off, and makes no request at all', async ({
+test('a device left opted out by the retired `?accounts=off` gets the product, and its key stays', async ({
     page,
 }) => {
+    // The per-device opt-out went in #1743. A device that still carries its stored 'off' is an
+    // ordinary device now: the key is inert, nothing reads it, and nothing removes it either.
+    await page.goto(appUrl('build.json'));
+    await page.evaluate(() => localStorage.setItem('ensemble-v2-preview:accounts', 'off'));
     const calls = apiCalls(page);
 
     await page.goto(appUrl('?accounts=off'));
     await expect(page.getByTestId('library-heading')).toBeVisible();
-    // The parameter is consumed, exactly as the opt-in was: the choice belongs to this device,
-    // not to a URL somebody might share.
-    expect(page.url()).not.toContain('accounts=');
-    await expect(page.getByTestId('library-loading')).toHaveCount(0);
-    await expect(page.getByTestId('account-sign-in')).toHaveCount(0);
-    await expect(page.getByTestId('account-entry')).toHaveCount(0);
-
-    // Not "no session request" — NO request. The gate is in front of the client, not inside it.
-    expect(calls).toEqual([]);
-});
-
-test('the opted-out notice is the way back, in the product, without a reload', async ({ page }) => {
-    const calls = apiCalls(page);
-
-    await page.goto(appUrl('?accounts=off'));
-    // Consuming the parameter strips it, so without this notice the only route back would be a
-    // query parameter nobody has written down.
-    const notice = page.getByTestId('accounts-off');
-    await expect(notice).toBeVisible();
-    await expect(notice).toContainText('Account features are off on this device.');
-    expect(calls).toEqual([]);
-
-    await page.getByTestId('accounts-turn-on').click();
-
-    // Same page, no navigation: the shell re-renders into the state a fresh load would reach.
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
-    await expect(notice).toHaveCount(0);
-    await expect(page.getByTestId('library-loading')).toHaveCount(0);
-    // Still nothing on the wire: this device has never held an account, so switching the UI
-    // back on gives it the entry point, not a request. Signing in is what changes that.
     await page.waitForTimeout(500);
+    // Still nothing on the wire: this device has never held an account (`deviceMayHoldAccount`).
     expect(calls).toEqual([]);
-
-    // It stuck: a reload comes back on, with no parameter involved.
-    await page.reload();
-    await expect(page.getByTestId('account-sign-in')).toBeVisible();
-    await expect(page.getByTestId('accounts-off')).toHaveCount(0);
-});
-
-test('a default profile is never shown the opted-out notice', async ({ page }) => {
-    await page.goto(appUrl());
-    await expect(page.getByTestId('account-sign-in')).toBeVisible();
-    await expect(page.getByTestId('accounts-off')).toHaveCount(0);
-    // NOTE: this guards the claim, not the `resolved` gate that `ensemble.tsx` puts in front of
-    // the notice. Measured 2026-09-20 with a MutationObserver over the whole document: with that
-    // gate removed the notice is still never attached, because the switch's effect resolves
-    // before `ready` flips and the songbook therefore never mounts with `enabled` still false.
-    // The gate is insurance against that ordering changing, and it is deliberately not
-    // discoverable from out here — do not add a contrived test claiming otherwise.
-});
-
-test('the opt-out survives a reload with no parameter in the URL', async ({ page }) => {
-    await page.goto(appUrl('?accounts=off'));
-    await expect(page.getByTestId('account-sign-in')).toHaveCount(0);
-
-    // A second load of the plain URL: the device's answer is what decides, and the default must
-    // not quietly reassert itself the moment the parameter is gone.
-    const calls = apiCalls(page);
-    await page.reload();
-    await expect(page.getByTestId('library-heading')).toBeVisible();
-    await expect(page.getByTestId('library-loading')).toHaveCount(0);
-    await expect(page.getByTestId('account-sign-in')).toHaveCount(0);
-    expect(calls).toEqual([]);
-
-    // And back on request, which is the only thing that may overturn it.
-    await page.goto(appUrl('?accounts=on'));
-    await expect(page.getByTestId('account-sign-in')).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('ensemble-v2-preview:accounts'))).toBe(
+        'off',
+    );
 });
 
 test('a default profile still plays as a guest when the server is unreachable', async ({

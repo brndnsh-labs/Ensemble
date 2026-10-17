@@ -9,8 +9,8 @@ Fresh Claude/Codex/other-agent sessions start with [the v2 handoff](CLAUDE.md).
 
 ## Accounts and the account-local store (#1177 onward)
 
-Accounts are on by default since the cutover (#1357); `?accounts=off` opts a device out. Sign-in
-is a passkey, with a downloadable recovery code, against the account API in `../v2-api/`.
+Accounts are on for every device since the cutover (#1357). Sign-in is a passkey, with a
+downloadable recovery code, against the account API in `../v2-api/`.
 `lib/sync/` is the account-local IndexedDB repository and explicit Save outbox; `lib/account/`
 wires it to the session, the sync loop and the account UI in `app/account/`. The guest songbook
 is a separate store and is never uploaded implicitly, and a device that has never held an

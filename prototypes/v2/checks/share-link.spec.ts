@@ -190,7 +190,10 @@ test('an old v1 `?s=` or `?prog=` link opens the songbook and is ignored, URL un
     expect(errors).toEqual([]);
 });
 
-test('a `#chart=` link consumes `?accounts=` without applying it', async ({ page, context }) => {
+test('a `#chart=` link is consumed and leaves the rest of the query string', async ({
+    page,
+    context,
+}) => {
     await withoutClipboard(page);
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
@@ -200,13 +203,10 @@ test('a `#chart=` link consumes `?accounts=` without applying it', async ({ page
 
     const fresh = await context.newPage();
     await withoutClipboard(fresh);
-    await fresh.goto(appUrl(`?accounts=off&utm_source=email${hash}`));
+    await fresh.goto(appUrl(`?utm_source=email${hash}`));
     await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
     await expect(fresh.locator('.song-subtitle')).toContainText('Opened from a shared link');
-    // The account flag is neither applied nor left in the tidied URL; the rest survives.
+    // Only the hash goes: a reload must not reopen the link over live work.
     expect(new URL(fresh.url()).search).toBe('?utm_source=email');
     expect(new URL(fresh.url()).hash).toBe('');
-    expect(
-        await fresh.evaluate(() => localStorage.getItem('ensemble-v2-preview:accounts')),
-    ).toBeNull();
 });

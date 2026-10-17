@@ -4,11 +4,7 @@ import {
     assertBuiltInKept,
     BuiltInCollectionError,
     type CollectionDocument,
-    isCollectionSongId,
-    MAX_COLLECTION_SONGS,
-    newStarred,
     resolvedSongIds,
-    STARRED_COLLECTION_ID,
     validateCollection,
 } from './collections';
 import { type ChartDocument, validateDocument } from './documents';
@@ -649,34 +645,6 @@ export async function editCollection(
             reject(failure || new Error('Saving the collection failed. Storage may be full.'));
         tx.onabort = () => reject(failure || new Error('Saving the collection was interrupted.'));
     });
-}
-
-/**
- * Copy the device-local stars (#1440's `ensemble-v2-preview:starred`, read by `lib/session.ts`'s
- * `legacyStarredIds`) into the built-in Starred collection, once (#1477).
- *
- * A COPY: the old key is never written or removed here, so the migration is reversible — an older
- * build still finds every star it had. Idempotent by construction, because it runs only while this
- * songbook has no Starred at all: once one exists (made here or by a later star), the old key is
- * inert, and a song unstarred since is not starred again on the next load. No stars, no Starred —
- * it is never created empty. One transaction, so two tabs migrating at once write it once.
- *
- * `true` when this call created it.
- */
-export async function migrateGuestStars(legacy: ReadonlySet<string>): Promise<boolean> {
-    if (![...legacy].some(isCollectionSongId)) {
-        return false;
-    }
-    // A guest's Starred only ever lives at its fixed id: nothing re-creates it elsewhere, since a
-    // guest collection has no outbox and so no `'gone'` conflict to resolve.
-    const created = await editCollection(STARRED_COLLECTION_ID, (current) =>
-        current === null
-            ? // Only ids a collection can hold (#1477 review): one id the old key accepted but the
-              // decoder would refuse must not fail the whole copy on every load.
-              newStarred([...legacy].filter(isCollectionSongId).slice(0, MAX_COLLECTION_SONGS))
-            : null,
-    );
-    return created !== null;
 }
 
 /**

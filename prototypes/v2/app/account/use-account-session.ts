@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * The two hooks the shell needs to render an account entry point (#1262), and nothing else — the
+ * The hook the shell needs to render an account entry point (#1262), and nothing else — the
  * sign-in dialog owns its own ceremony state, so `app/ensemble.tsx` gains wiring, not a state
  * machine.
  *
- * Both hooks are deliberately effect-driven rather than render-driven: `localStorage`, `location`
+ * It is deliberately effect-driven rather than render-driven: `localStorage`, `location`
  * and `fetch` are all unavailable during the static export's prerender, and reading them during
  * render would also make the server and client HTML disagree. Resolving them after mount means
  * the first paint is always the plain guest app — which is the contract anyway, since accounts
@@ -14,7 +14,6 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { accountApi, accountSession } from '../../lib/account/client';
-import { accountsEnabled, setAccountsEnabled, syncAccountsFlag } from '../../lib/account/feature';
 import { deviceMayHoldAccount } from '../../lib/account/held-account';
 import type { AccountFailure } from '../../lib/account/messages';
 import { recoveryEnrolled, signOut } from '../../lib/account/passkeys';
@@ -38,51 +37,6 @@ const snapshot = () => accountSession.getSnapshot();
  * song list.
  */
 const FIRST_READ_DEADLINE_MS = 4_000;
-
-export interface AccountsSwitch {
-    /**
-     * Whether the account UI is on for this device — the default since the cutover (#1357), off
-     * only for a profile that asked with `?accounts=off`. `false` until `resolved`, so nothing
-     * account-shaped is ever in the first render: the prerendered HTML has no storage to read,
-     * and the guest app is what every device sees first whatever this settles on.
-     */
-    enabled: boolean;
-    /**
-     * `true` once this device's answer has actually been read. It exists so the songbook can tell
-     * "off" from "not asked yet" — without it, the opted-out notice would flash on every load of
-     * every device, since `enabled` starts `false` for all of them.
-     */
-    resolved: boolean;
-    /**
-     * The way back from `?accounts=off`, for the notice the songbook renders (#1357). No reload:
-     * every account surface in `ensemble.tsx` is derived from this hook's `enabled` through hooks
-     * that key off it — `useAccountSession(accountsOn && ready)` starts the session read, and
-     * `useAccountLibrary(accountsOn, …)` stays detached until a session says otherwise — so
-     * flipping it re-renders the shell into exactly the state a fresh load would have reached.
-     */
-    turnOn: () => void;
-}
-
-/**
- * This device's account switch. Applies and strips a `?accounts=` parameter on the way.
- */
-export function useAccountsSwitch(): AccountsSwitch {
-    const [state, setState] = useState<{ enabled: boolean; resolved: boolean }>({
-        enabled: false,
-        resolved: false,
-    });
-    useEffect(() => {
-        setState({ enabled: syncAccountsFlag(), resolved: true });
-    }, []);
-    const turnOn = useCallback(() => {
-        setAccountsEnabled(true);
-        // Read back rather than assuming `true`: unreadable storage swallows the write, and this
-        // hook's answer is whatever `accountsEnabled` says — which for that device is also `true`,
-        // so the switch still works, it just does not persist past this page.
-        setState({ enabled: accountsEnabled(), resolved: true });
-    }, []);
-    return { enabled: state.enabled, resolved: state.resolved, turnOn };
-}
 
 export interface AccountView {
     session: SessionState;
@@ -184,7 +138,7 @@ export interface AccountView {
 
 /**
  * Reads the account session, and only while `active` — the caller passes
- * `accountsEnabled && songbookReady`, so the one bootstrap read lands after the songbook is up
+ * `songbookReady`, so the one bootstrap read lands after the songbook is up
  * and is never awaited by startup or playback.
  */
 export function useAccountSession(active: boolean): AccountView {

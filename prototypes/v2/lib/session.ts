@@ -93,41 +93,6 @@ export function forgetOpened(id: string): void {
     }
 }
 
-const STARRED = 'ensemble-v2-preview:starred';
-
-/**
- * The device-local stars #1440 kept here — one small JSON blob of song ids — READ ONLY since
- * #1477. Stars are now the built-in Starred collection (`lib/collections.ts`), and this key is
- * what the guest's one-time copy reads (`migrateGuestStars` in `lib/repository.ts`). Nothing
- * writes or removes it any more: it is left exactly as it was, so the copy is reversible and an
- * older build still finds every star it had.
- */
-export function legacyStarredIds(): Set<string> {
-    const ids = new Set<string>();
-    let raw: string | null = null;
-    try {
-        raw = localStorage.getItem(STARRED);
-    } catch {
-        return ids;
-    }
-    if (!raw) {
-        return ids;
-    }
-    try {
-        const parsed: unknown = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-            for (const id of parsed) {
-                if (typeof id === 'string') {
-                    ids.add(id);
-                }
-            }
-        }
-    } catch {
-        // An unreadable ledger only costs "nothing starred"; never block startup on it.
-    }
-    return ids;
-}
-
 const ALL_SONGS_SORT = 'ensemble-v2-preview:all-songs-sort';
 export type AllSongsSort = 'title' | 'recentOpened' | 'recentAdded' | 'composer' | 'tempo';
 const ALL_SONGS_SORTS: readonly AllSongsSort[] = [

@@ -5,7 +5,6 @@ import {
     countInPreference,
     defaultNeckHome,
     forgetOpened,
-    legacyStarredIds,
     type NeckPreferences,
     neckPreferences,
     openedAtMap,
@@ -82,22 +81,6 @@ describe('per-song opened-at (#1440)', () => {
     it('drops an unreadable ledger to "never opened" rather than throwing', () => {
         store.set('ensemble-v2-preview:opened-at', 'not json');
         expect(openedAtMap().size).toBe(0);
-    });
-});
-
-describe('the legacy device-local stars (#1440, read-only since #1477)', () => {
-    it('is empty on a fresh device', () => {
-        expect(legacyStarredIds().size).toBe(0);
-    });
-
-    it('reads the ids #1440 wrote, skipping anything that is not a string', () => {
-        store.set('ensemble-v2-preview:starred', JSON.stringify(['song-1', 7, 'song-2']));
-        expect(legacyStarredIds()).toEqual(new Set(['song-1', 'song-2']));
-    });
-
-    it('drops an unreadable ledger to "nothing starred" rather than throwing', () => {
-        store.set('ensemble-v2-preview:starred', 'not json');
-        expect(legacyStarredIds().size).toBe(0);
     });
 });
 

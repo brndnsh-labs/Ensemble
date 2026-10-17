@@ -15,7 +15,6 @@ import {
     libraryDownloaded,
     pendingGuestCollections,
 } from '../lib/account/adopt-guest';
-import { stripAccountsParam } from '../lib/account/feature';
 import { heldAccountBanner, PURGE_MESSAGES } from '../lib/account/messages';
 import {
     AccountMismatchError,
@@ -81,7 +80,7 @@ import {
 import { PurgeSongsDialog } from './account/purge-songs';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { SignOutDialog, type SignOutMode } from './account/sign-out';
-import { useAccountSession, useAccountsSwitch } from './account/use-account-session';
+import { useAccountSession } from './account/use-account-session';
 import { AllSongs } from './all-songs';
 import { type FeelSnapshot, GrooveTab, PracticeTab } from './band-groove';
 import type { Lane } from './band-lanes';
@@ -872,15 +871,16 @@ export default function Ensemble() {
     // permission) — the visible fallback the acceptance criteria calls for.
     const [shareLinkFallback, setShareLinkFallback] = useState<string | null>(null);
     const sharedLinkHandled = useRef(false);
-    // Accounts are on by default since the cutover (#1262, flipped by #1357); `?accounts=off` is
-    // the per-device way out, and it silences the entry point, the dialog and every `/api/*`
-    // request. `accounts.turnOn` is the way back, offered on the songbook — the parameter is
-    // stripped from the URL the moment it applies, so it cannot be the only route. `ready` gates
-    // the session read so it lands after the songbook is up; nothing here is ever awaited by
-    // startup.
-    const accounts = useAccountsSwitch();
-    const accountsOn = accounts.enabled;
-    const account = useAccountSession(accountsOn && ready);
+    // Accounts are part of the product on every device (#1357; the `?accounts=off` opt-out went in
+    // #1743). The account surfaces mount with the app rather than in the prerendered HTML
+    // (`accountsMounted`), so the first paint is the plain guest app and no account control is on
+    // screen before React can answer it. `ready` gates the session read so it lands after the
+    // songbook is up; nothing here is ever awaited by startup.
+    const [accountsMounted, setAccountsMounted] = useState(false);
+    useEffect(() => {
+        setAccountsMounted(true);
+    }, []);
+    const account = useAccountSession(ready);
     const [accountDialog, setAccountDialog] = useState<AccountDialogMode | null>(null);
     // The account page (#1264: passkeys, sessions, recovery code) is a second, independent
     // dialog from the sign-in one above — opening it never touches `accountDialog`, and vice
@@ -960,13 +960,13 @@ export default function Ensemble() {
     // #1266 — signed in, the songbook IS the account library. `current?.id` is the chart on the
     // stand: the loop hands it to the download's `isActive` so a remote update can never be
     // swapped in underneath whoever is playing.
-    const signedIn = accountsOn && account.session.status === 'signedIn';
+    const signedIn = account.session.status === 'signedIn';
     /**
      * #1269 — this device WAS signed in and the server no longer agrees, in THIS page load. Still
      * what the sync chip reads: it is a fact about the session, and "sign in again to upload it"
      * is only true while the queue's own explanation is on screen beside it.
      */
-    const expiredSession = accountsOn && account.session.status === 'expired';
+    const expiredSession = account.session.status === 'expired';
     /**
      * This device HOLDS an account and has no live session for it (#1351 patch R1) — the banner's
      * condition, and the one state in which "Sign out on this device" exists.
@@ -981,7 +981,6 @@ export default function Ensemble() {
      * is false without the session state ever mattering.
      */
     const heldWithoutSession =
-        accountsOn &&
         heldOwner !== null &&
         (account.session.status === 'expired' || account.session.status === 'guest');
     /**
@@ -996,7 +995,7 @@ export default function Ensemble() {
               ? 'expired'
               : 'guest',
     );
-    const sync = useAccountLibrary(accountsOn, account.session, current?.id ?? null);
+    const sync = useAccountLibrary(account.session, current?.id ?? null);
     // #1477 — the live songbook's collections, and the star set every surface reads (Starred's
     // songs). Read keyed on the ATTACHED owner, written to whichever songbook `signedIn` names.
     const collections = useCollections({
@@ -1039,7 +1038,6 @@ export default function Ensemble() {
      * account copy?" deserves to be asked outright rather than inferred.
      */
     const inAccount =
-        accountsOn &&
         signedIn &&
         standStore?.store === 'account' &&
         !standMismatch &&
@@ -1054,7 +1052,7 @@ export default function Ensemble() {
      * doc comment above — so this dialog does not render for it either, rather than opening on an
      * action with nothing to do.
      */
-    const rowInAccount = accountsOn && signedIn && sync.observation?.remoteRevision != null;
+    const rowInAccount = signedIn && sync.observation?.remoteRevision != null;
     /**
      * Whether the Song menu's Delete… has a song to delete (#1756): a saved one, guest or
      * account. Not a shared or new-song draft (nothing is stored), and not an account chart this
@@ -1066,7 +1064,7 @@ export default function Ensemble() {
         saved !== null &&
         !sharedDraft &&
         (standStore?.store === 'guest' ||
-            (standStore?.store === 'account' && accountsOn && signedIn && !standMismatch));
+            (standStore?.store === 'account' && signedIn && !standMismatch));
     /**
      * Is the Save at the head of this song's outbox refused, and which way (#1267)?
      *
@@ -1084,11 +1082,7 @@ export default function Ensemble() {
      * device is concerned (#1311), so the banner — whose only button WRITES — is not offered.
      */
     const conflict: 'none' | 'version' | 'gone' =
-        accountsOn &&
-        signedIn &&
-        standStore?.store === 'account' &&
-        !standMismatch &&
-        current !== null
+        signedIn && standStore?.store === 'account' && !standMismatch && current !== null
             ? (sync.observation?.conflict ?? 'none')
             : 'none';
     /**
@@ -1107,7 +1101,6 @@ export default function Ensemble() {
      * into an ordinary refused-Save conflict with Keep both on it.
      */
     const standCandidate =
-        accountsOn &&
         signedIn &&
         standStore?.store === 'account' &&
         !standMismatch &&
@@ -1192,7 +1185,7 @@ export default function Ensemble() {
     // still out — rendering the guest list and then swapping it for the account library is a
     // wrong answer, not a loading state), and what the live songbook's home holds. `settled` flips
     // on any answer, so an offline cold start still shows the guest songbook.
-    const songbookLoading = (accountsOn && ready && !account.settled) || liveHome === null;
+    const songbookLoading = (ready && !account.settled) || liveHome === null;
     // The band/sound defaults a brand-new or imported song is built from. Falls back through:
     // the live songbook's most recently opened song, else the guest songbook's (a fresh account's
     // library is legitimately empty), else the standards catalog's own defaults (#1439) — a fresh
@@ -1473,16 +1466,13 @@ export default function Ensemble() {
         };
         // Consumed on load either way: a corrupt/foreign payload must not resurrect on
         // reload, and a successfully opened draft must not resurrect after "Keep a copy"
-        // replaces it with a saved document. The hash goes, and so does the account flag — a
-        // share link must never carry a feature-flag side effect (`accountsFlagRequest` refuses
-        // to APPLY one; leaving it in the tidied URL would just let the next reload apply it
-        // instead). Everything else survives.
+        // replaces it with a saved document. Only the hash goes; the query string survives.
         const consumeLink = () =>
             window.history.replaceState(
                 // Keeps the shell's history entry (#1700); only the URL is tidied.
                 window.history.state,
                 '',
-                window.location.pathname + stripAccountsParam(window.location.search),
+                window.location.pathname + window.location.search,
             );
         // `?autoplay=1` on a `#chart=` link (#1732) arms playback; read before `consumeLink`
         // strips it.
@@ -1997,11 +1987,9 @@ export default function Ensemble() {
     /**
      * #1351 patch R1 — read which account this device HOLDS, from storage.
      *
-     * Deliberately off the guest first-paint path, on three counts: `ready` means the guest
-     * songbook is already up, `settled` means the first session read has answered (or the
-     * deadline released it), and `accountsOn` is false for a device that opted out — which since
-     * #1357 is the only device that skips this entirely, the default having flipped to on.
-     * Nothing here is ever awaited by startup or by playback.
+     * Deliberately off the guest first-paint path, on two counts: `ready` means the guest
+     * songbook is already up, and `settled` means the first session read has answered (or the
+     * deadline released it). Nothing here is ever awaited by startup or by playback.
      *
      * `unknown` is excluded rather than read: the answer would be fine, but acting on it is not —
      * see `heldWithoutSession`.
@@ -2013,7 +2001,7 @@ export default function Ensemble() {
      */
     // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate re-run trigger.
     useEffect(() => {
-        if (!accountsOn || !ready || !account.settled || account.session.status === 'unknown') {
+        if (!ready || !account.settled || account.session.status === 'unknown') {
             return;
         }
         let alive = true;
@@ -2025,7 +2013,7 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [accountsOn, ready, account.settled, account.session.status, sync.owner]);
+    }, [ready, account.settled, account.session.status, sync.owner]);
     // #1269 — the sign-out preflight. The session state is a dependency, not just a guard, and
     // each step watches the state that gives it a question to ask: the ordinary one is moot the
     // moment the session it would revoke is gone, and the device one (#1351) the moment this
@@ -3441,32 +3429,33 @@ export default function Ensemble() {
     }
     /**
      * Every preserved draft the song menu can offer for the chart on the stand (#1299 patch
-     * review P2) — newest first, from BOTH namespaces.
+     * review P2) — newest first, from the namespace the chart lives in.
      *
      * Since #1299 an account chart's experiments live in the account database, so a guest-only
      * list made a second tab's experiment on this song unreachable: nothing in the product could
      * open it, and the only thing that mentioned it was a sign-out warning. The account rows are
      * the live ones (`preservedDrafts`), which is also why this list can never offer text a Save
-     * has already moved past. The guest slots stay merged in because a build from before #1299
-     * may have left one under an account id, and that is the musician's own work too.
+     * has already moved past. A guest chart's are its own `localStorage` slots.
      *
-     * An unreadable account store answers with the guest half rather than an error: the menu is
-     * an offer, and a missing offer is not a claim about anything.
+     * An unreadable account store answers with nothing rather than an error: the menu is an
+     * offer, and a missing offer is not a claim about anything.
      */
-    async function recoveryOptionsFor(document: ChartDocument) {
-        const slots = repository.recoveriesFor(document);
+    async function recoveryOptionsFor(
+        document: ChartDocument,
+    ): Promise<Array<{ document: ChartDocument; capturedAt: string }>> {
+        if (currentStore.current?.store !== 'account') {
+            return repository.recoveriesFor(document);
+        }
         // A chart whose account is not the attached one has no rows to read here either (#1311):
         // `preservedDrafts` would query B's store for A's document id, which is at best nothing.
-        if (currentStore.current?.store !== 'account' || standBelongsElsewhere()) {
-            return slots;
+        if (standBelongsElsewhere()) {
+            return [];
         }
-        let held: Array<{ document: ChartDocument; capturedAt: string }> = [];
         try {
-            held = await accountSync.preservedDrafts(document.id);
+            return await accountSync.preservedDrafts(document.id);
         } catch {
-            /* Unreadable account store; the legacy slots below are still worth offering. */
+            return [];
         }
-        return [...held, ...slots].sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
     }
     /**
      * Returns the resolved `{ current, saved }` pair it just committed to state (#1440 review
@@ -4982,13 +4971,9 @@ export default function Ensemble() {
      * server that could have refused. Its refusals are reported INSIDE the step (patch R3), since
      * the dialog is modal and `run()`'s banner is inert behind it.
      *
-     * The recovery slots go last and by id, and since #1299 they are belt and braces: an account
-     * chart's unsaved text is in that account's database, which `clearAccount` has just emptied.
-     * What this still reaches is a slot left under an account id by a build from before that — the
-     * same plaintext on the same shared device — so it stays. `clearRecovery` takes EVERY writer's
-     * slot for each id, not just this page load's, and by `documentIds` rather than `atRisk`:
-     * every one of this account's documents is being removed from this device, so every one of
-     * their slots goes with it.
+     * An account chart's unsaved text is in that account's database (#1299), which `clearAccount`
+     * has just emptied; this tab's in-memory drafts go by `documentIds` rather than `atRisk`,
+     * since every one of this account's documents is being removed from this device.
      */
     function signOutOfAccount() {
         const documentIds = signOutPlan?.documentIds ?? [];
@@ -5046,11 +5031,6 @@ export default function Ensemble() {
             accountDrafts.current = new Map();
             for (const id of documentIds) {
                 volatileDrafts.current.delete(id);
-                try {
-                    repository.clearRecovery(id);
-                } catch {
-                    /* Recovery is a convenience; a stale entry must not fail the sign-out. */
-                }
             }
             // Read live rather than from the `sync` snapshot this render closed over: the loop
             // publishes this during the sign-out above. A wipe that failed after a confirmed
@@ -5105,18 +5085,17 @@ export default function Ensemble() {
      * (`forgetDeletedAccount` — fence, forget, `markSignedOut`), with no logout round trip in
      * front of it: the delete route already removed the session row and cleared the cookie, so a
      * logout could only answer "already gone". Everything after that is the same shell cleanup
-     * sign-out does, including the account songs' guest recovery slots — belt and braces since
-     * #1299, and still the only place a slot written by an older build of this app can be.
+     * sign-out does.
      *
      * Never `signOutPlan`'s ids here: that plan only exists while the sign-out step is open. The
      * account library the shell is already holding is the same set of documents.
      */
     async function forgetDeletedAccount() {
         const owner = heldOwner;
-        // Every song this account held here, for the guest-slot sweep below. The library the
-        // account page asked for (#1441) is normally already read; if not, it is read now, before
-        // the local clear removes it — and a read that fails sweeps nothing rather than blocking
-        // the deletion, since these slots are belt and braces.
+        // Every song this account held here, for this tab's in-memory drafts below. The library
+        // the account page asked for (#1441) is normally already read; if not, it is read now,
+        // before the local clear removes it — and a read that fails forgets nothing rather than
+        // blocking the deletion.
         const documentIds = (
             accountSongs ??
             (await accountSync
@@ -5142,11 +5121,6 @@ export default function Ensemble() {
         accountDrafts.current = new Map();
         for (const id of documentIds) {
             volatileDrafts.current.delete(id);
-            try {
-                repository.clearRecovery(id);
-            } catch {
-                /* Recovery is a convenience; a stale entry must not fail the deletion. */
-            }
         }
         // Read live rather than from the `sync` snapshot this render closed over, exactly as
         // `signOutOfAccount` does: a wipe that failed after the account was already deleted is
@@ -5619,7 +5593,7 @@ export default function Ensemble() {
      * menu. One object, two consumers, never two derivations that could disagree.
      */
     const syncStatusProps: SyncStatusProps | null =
-        accountsOn && current && (signedIn || expiredSession)
+        current && (signedIn || expiredSession)
             ? {
                   savedRevision: saved ? saved.revision : null,
                   editing: dirty ? 'dirty' : 'clean',
@@ -5933,7 +5907,7 @@ export default function Ensemble() {
                     </div>
                 )}
                 <div className="header-right">
-                    {accountsOn && (
+                    {accountsMounted && (
                         <AccountEntry
                             session={account.session}
                             unprotected={account.recoveryEnrolled === false}
@@ -6257,16 +6231,7 @@ export default function Ensemble() {
                     loading={songbookLoading}
                     // #1357 patch P1-4 — the first session read was released by its deadline
                     // rather than answered, so this list is a fallback and says so.
-                    accountFallback={accountsOn && account.fellBack}
-                    // #1357 patch P2-1 — the in-product way back from `?accounts=off`. Gated on
-                    // `resolved` so it cannot be rendered before this device's answer is read,
-                    // when `enabled` is `false` for everybody. Insurance rather than an observed
-                    // fix: today the switch's effect resolves before `ready` flips, so the
-                    // songbook never mounts in that state anyway (measured — see the note in
-                    // `checks/account-entry.spec.ts`). It costs one boolean and it stops that
-                    // ordering being load-bearing.
-                    accountsOff={accounts.resolved && !accountsOn}
-                    onEnableAccounts={accounts.turnOn}
+                    accountFallback={account.fellBack}
                     // #1310, widened #1362 — only the account library can have one waiting; signed
                     // out the loop publishes none at all, so this is the same empty list either way.
                     remoteCandidates={remoteCandidateRows}
@@ -6762,7 +6727,7 @@ export default function Ensemble() {
                     onClose={() => setExportOpen(false)}
                 />
             )}
-            {accountsOn && (
+            {accountsMounted && (
                 <SignInDialog
                     dialogRef={accountDialogRef}
                     mode={accountDialog ?? 'signIn'}
@@ -6771,7 +6736,7 @@ export default function Ensemble() {
                     onAccountChanged={account.refresh}
                 />
             )}
-            {accountsOn && (
+            {accountsMounted && (
                 <AccountPage
                     dialogRef={accountPageDialogRef}
                     open={accountPageOpen}
@@ -6852,7 +6817,7 @@ export default function Ensemble() {
                     }}
                 />
             )}
-            {accountsOn && signedIn && (
+            {signedIn && (
                 <AdoptGuestDialog
                     dialogRef={adoptDialogRef}
                     open={adoptOpen}
@@ -6863,7 +6828,7 @@ export default function Ensemble() {
                     }}
                 />
             )}
-            {accountsOn && (signedIn || heldWithoutSession) && (
+            {(signedIn || heldWithoutSession) && (
                 <SignOutDialog
                     dialogRef={signOutDialogRef}
                     mode={signOutStep ?? 'session'}

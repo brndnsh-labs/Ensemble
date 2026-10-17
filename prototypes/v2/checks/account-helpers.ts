@@ -124,10 +124,8 @@ export async function releaseApi(page: Page): Promise<void> {
 export const CODE_SHAPE = RECOVERY_CODE_SHAPE;
 
 /**
- * Land on the songbook with the account UI available — which since the cutover (#1357) is the
- * plain URL, no parameter. Deliberately not `?accounts=on`: every account spec then rides the
- * real default, so a regression that took the entry point away from an ordinary visitor fails
- * here rather than hiding behind an opt-in nobody types any more.
+ * Land on the songbook with the account UI available — which since the cutover (#1357) is every
+ * visit, so a regression that took the entry point away from an ordinary visitor fails here.
  *
  * Seeds the three `lib/starters.ts`-shaped guest songs (`seedStarters`, #1439) before landing:
  * a fresh guest songbook is genuinely empty now that starter seeding is retired, but every

@@ -139,9 +139,8 @@ table, Save, read and delete routes; and the same per-owner document cap.
   `'gone'` Starred's songs INTO another Starred this device holds rather than minting a second
   one (never into one the same merge is also resolving — that waits a sweep, so no Save is ever
   chained onto one the merge retired); it cannot unite two devices that never saw each other's, which is why the guard is the
-  guarantee. The device-local stars that came before (#1440) are COPIED in
-  once and never deleted: a guest's only while no Starred exists, an account's once per device
-  behind a `stars-migrated:<owner>` meta marker written in the same transaction as the Save.
+  guarantee. The device-local stars that came before (#1440) were copied in
+  once by a migration retired in #1743; their old key and rows are inert and never deleted.
 - **Collections are counted where songs are.** The sign-out preflight reports unsent collection
   Saves apart from songs (they have no file to export), and the sync chip counts them across the
   account, since a collection is never the watched document.

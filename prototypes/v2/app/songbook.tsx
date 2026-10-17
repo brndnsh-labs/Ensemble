@@ -57,10 +57,6 @@ interface SongbookProps {
      * story, and saying nothing would make a fallback indistinguishable from an answer.
      */
     accountFallback: boolean;
-    /** True when this device opted out with `?accounts=off` (#1357) — and only once known. */
-    accountsOff: boolean;
-    /** Turns the account surfaces back on for this device, in place, with no reload. */
-    onEnableAccounts: () => void;
     /**
      * The account songs `reconcile` preserved a remote observation for rather than applying it over
      * this device's unsaved work (#1310, widened #1362). Document id plus kind — the id decides
@@ -137,8 +133,6 @@ export function Songbook(props: SongbookProps) {
         accountLibrary,
         loading,
         accountFallback,
-        accountsOff,
-        onEnableAccounts,
         remoteCandidates,
         featured,
         search,
@@ -194,18 +188,6 @@ export function Songbook(props: SongbookProps) {
             {accountFallback && !loading && (
                 <p className="library-notice" role="status" data-testid="account-fallback">
                     {ACCOUNT_SWITCH_MESSAGES.fallback}
-                </p>
-            )}
-            {accountsOff && (
-                <p className="library-notice" role="status" data-testid="accounts-off">
-                    <span>{ACCOUNT_SWITCH_MESSAGES.off}</span>
-                    <button
-                        className="account-btn"
-                        data-testid="accounts-turn-on"
-                        onClick={onEnableAccounts}
-                    >
-                        {ACCOUNT_SWITCH_MESSAGES.turnOn}
-                    </button>
                 </p>
             )}
             {home !== null && home.unreadable > 0 && (

@@ -3,12 +3,8 @@ import {
     assertBuiltInKept,
     BuiltInCollectionError,
     isCollectionCandidate,
-    MAX_COLLECTION_SONGS,
     mergeSongIds,
-    newStarred,
     resolvedSongIds,
-    STARRED_COLLECTION_ID,
-    starredOf,
 } from '../collections';
 import {
     HOME_FILL_SPARE,
@@ -55,12 +51,8 @@ import {
     type SaveOperation,
     type SaveReceipt,
     type SaveRefusalReason,
-    type Star,
     type SyncDocument,
     snapshot,
-    starKey,
-    starPrefix,
-    starsMigratedKey,
     syncDocument,
 } from './protocol';
 import {
@@ -73,7 +65,6 @@ import {
     savedOpenedAt,
     savedOperation,
     savedSong,
-    savedStar,
 } from './records';
 
 export const DEFAULT_LIST_LIMIT = 50;
@@ -277,12 +268,11 @@ function commitDeleted(
     tx.table('songs').delete([scope.ownerId, documentId]);
     tx.table('meta').delete(key);
     tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
-    // The opened-at/star preferences go with it too (#1440 review P3), in this SAME transaction:
+    // The opened-at preference goes with it too (#1440 review P3), in this SAME transaction:
     // the song has just left the library by both of `commitDeleted`'s callers (this device's own
     // acknowledged delete, or a download adopting another device's tombstone), and a preference
     // row that outlived it would be a leftover with no song left to describe.
     tx.table('meta').delete(openedKey(scope.ownerId, documentId));
-    tx.table('meta').delete(starKey(scope.ownerId, documentId));
     return 'removed';
 }
 
@@ -802,9 +792,10 @@ export class AccountSongbook {
      * account can no longer commit anything — and then this. Passing the old scope here would fail
      * that very fence, and passing the new one would not describe these records at all. The owner
      * is instead the explicit bound on every range below, so this can only ever reach the account
-     * it was named with. The opened-at and star preferences (#1440) go with the rest: they are
-     * per-owner device data exactly like the last-opened pointer, and a device that has forgotten
-     * an account must not keep naming that account's songs as starred or recently opened.
+     * it was named with. The opened-at preferences (#1440) go with the rest: they are per-owner
+     * device data exactly like the last-opened pointer, and a device that has forgotten an account
+     * must not keep naming that account's songs as recently opened. (#1440's `star:` rows and
+     * #1477's `stars-migrated:` markers are inert since #1743 and nothing touches them.)
      *
      * One transaction: a sign-out that removed the songs and left the outbox behind would leave
      * queued Saves for an account this device no longer holds, and the next sign-in as that same
@@ -830,7 +821,6 @@ export class AccountSongbook {
                 candidatePrefix(ownerId),
                 deletionPrefix(ownerId),
                 openedPrefix(ownerId),
-                starPrefix(ownerId),
             ]) {
                 tx.table('meta').delete(IDBKeyRange.bound(prefix, `${prefix}￿`, false, true));
             }
@@ -838,9 +828,6 @@ export class AccountSongbook {
             // that is being removed in this same transaction, so leaving it would point the next
             // sign-in at a chart this device no longer holds.
             tx.table('meta').delete(lastOpenedKey(ownerId));
-            // The star copy's marker (#1477), one key per owner: it describes the `star:` rows just
-            // removed, and a later sign-in as this owner starts with none to copy.
-            tx.table('meta').delete(starsMigratedKey(ownerId));
             tx.finish(undefined);
         });
     }
@@ -1493,121 +1480,6 @@ export class AccountSongbook {
     }
 
     /**
-     * Copy this device's `star:` rows (#1440) into the account's built-in Starred collection, once
-     * per device (#1477). For an account that is the union of what THIS device has: the stars are
-     * added after whatever Starred already holds (a download from another device, or a star made
-     * here since), in the order the rows sort.
-     *
-     * - **A copy.** The `star:` rows are never removed here, so the migration is reversible; they
-     *   become inert. Sign-out still clears them with the rest of the account (`clearAccount`).
-     * - **Once.** A `stars-migrated:` marker (`starsMigratedKey`) is written in the SAME transaction
-     *   as the Save, so a song unstarred after the copy is never starred again by a later run, and
-     *   two tabs migrating at once queue one Save between them.
-     * - **Never an empty Starred.** No rows, no Save — the marker alone is written.
-     * - **Not at the cap.** A create that `editCollection` would refuse writes nothing at all, not
-     *   even the marker, so the copy is tried again on a later load.
-     *
-     * `'migrated'` when it queued a Save, `'nothing'` when there was nothing to copy, `'done'` when
-     * this device had already migrated, `'full'` when the account has no room for a Starred yet.
-     */
-    async migrateStars(scope: AccountScope): Promise<'migrated' | 'nothing' | 'done' | 'full'> {
-        scope = copyScope(scope);
-        const operationId = crypto.randomUUID();
-        const marker = starsMigratedKey(scope.ownerId);
-        return this.database.run('readwrite', scope, (tx) => {
-            tx.read(tx.table('meta').get(marker), (done: unknown) => {
-                if (done !== undefined) {
-                    return tx.finish('done');
-                }
-                const mark = () =>
-                    tx.table('meta').put({
-                        key: marker,
-                        ownerId: scope.ownerId,
-                        migratedAt: new Date().toISOString(),
-                    });
-                const prefix = starPrefix(scope.ownerId);
-                const range = IDBKeyRange.bound(prefix, `${prefix}￿`, false, true);
-                tx.read(tx.table('meta').getAll(range), (rows: Star[]) => {
-                    const stars: string[] = [];
-                    for (const row of rows) {
-                        try {
-                            stars.push(savedStar(row, scope, row.documentId).documentId);
-                        } catch {
-                            // `starredIds`' posture: one corrupt row costs only its own star.
-                        }
-                    }
-                    if (stars.length === 0) {
-                        mark();
-                        return tx.finish('nothing');
-                    }
-                    const owned = IDBKeyRange.bound(
-                        [scope.ownerId],
-                        [scope.ownerId, []],
-                        false,
-                        true,
-                    );
-                    tx.read(
-                        tx.table('collections').getAll(owned, MAX_REMOTE_CANDIDATES + 1),
-                        (rows: SavedCollection[]) => {
-                            const saved = rows.map((row) => {
-                                identifier(row?.documentId);
-                                return savedCollection(row, scope, row.documentId);
-                            });
-                            const previous = starredOf(saved);
-                            const target = previous?.documentId ?? STARRED_COLLECTION_ID;
-                            const document = previous
-                                ? {
-                                      ...previous.document,
-                                      songIds: mergeSongIds(previous.document.songIds, stars),
-                                  }
-                                : newStarred(stars.slice(0, MAX_COLLECTION_SONGS));
-                            if (
-                                previous &&
-                                document.songIds.length === previous.document.songIds.length
-                            ) {
-                                // Every star is already in Starred: nothing to queue.
-                                mark();
-                                return tx.finish('nothing');
-                            }
-                            const enqueue = () =>
-                                queueOf(tx, scope, target, collectionSnapshot, (queue) => {
-                                    enqueueCollection(
-                                        tx,
-                                        scope,
-                                        collectionSnapshot(document),
-                                        previous,
-                                        previous?.document.revision ?? null,
-                                        operationId,
-                                        queue,
-                                    );
-                                    mark();
-                                    tx.finish('migrated');
-                                });
-                            if (previous) {
-                                return enqueue();
-                            }
-                            tx.read(
-                                tx.table('songs').getKey([scope.ownerId, target]),
-                                (song: IDBValidKey | undefined) => {
-                                    if (song !== undefined) {
-                                        throw new Error('This id already belongs to a song.');
-                                    }
-                                    documentCount(tx, scope, (count) => {
-                                        if (count >= MAX_REMOTE_CANDIDATES) {
-                                            return tx.finish('full');
-                                        }
-                                        enqueue();
-                                    });
-                                },
-                            );
-                        },
-                    );
-                });
-            });
-        });
-    }
-
-    /**
      * Resolve every collection whose outbox head is a conflict, without asking (#1477, decided on
      * #1443) — the way out a parked collection Save otherwise lacks: new Saves would chain behind
      * it until "Too many pending Saves", a cloud delete would conflict and a download would report
@@ -2171,7 +2043,7 @@ export class AccountSongbook {
      * longer holds. Each id loses, in ONE transaction for the whole list: its `songs` row, every
      * writer's `drafts` row, its WHOLE outbox queue (never a single operation: a queued Save's
      * `base` names the one before it, so an orphaned op would brick every pass — `keepBoth`'s
-     * precedent), and its `remote:`, `delete:`, `opened:` and `star:` meta rows. Receipts stay, as
+     * precedent), and its `remote:`, `delete:` and `opened:` meta rows. Receipts stay, as
      * `commitDeleted` keeps them: they record Saves already acknowledged, not work.
      *
      * Never a cloud operation: no tombstone, no operation queued, no `delete:` freeze written, no
@@ -2255,7 +2127,6 @@ export class AccountSongbook {
                                         tx.table('meta').delete(
                                             openedKey(scope.ownerId, documentId),
                                         );
-                                        tx.table('meta').delete(starKey(scope.ownerId, documentId));
                                         result.purged.push(documentId);
                                         next();
                                     },
@@ -2349,47 +2220,6 @@ export class AccountSongbook {
                     }
                 }
                 tx.finish(map);
-            });
-        });
-    }
-
-    /**
-     * Star or unstar one song on this device — #1440's per-device `star:` row, presence being the
-     * whole fact. LEGACY since #1477: stars are the built-in Starred collection now, and nothing in
-     * the app writes these rows any more; `migrateStars` copies them once and leaves them. Kept as
-     * the one writer of the old shape, which the migration's own tests seed through.
-     */
-    async setStarred(scope: AccountScope, documentId: string, starred: boolean): Promise<void> {
-        scope = copyScope(scope);
-        identifier(documentId);
-        return this.database.run('readwrite', scope, (tx) => {
-            const key = starKey(scope.ownerId, documentId);
-            if (starred) {
-                tx.table('meta').put({ key, ownerId: scope.ownerId, documentId } satisfies Star);
-            } else {
-                tx.table('meta').delete(key);
-            }
-            tx.finish(undefined);
-        });
-    }
-
-    /** Every song this account starred on this device under #1440's `star:` rows (legacy, #1477). */
-    async starredIds(scope: AccountScope): Promise<Set<string>> {
-        scope = copyScope(scope);
-        return this.database.run('readonly', scope, (tx) => {
-            const prefix = starPrefix(scope.ownerId);
-            const range = IDBKeyRange.bound(prefix, `${prefix}￿`, false, true);
-            tx.read(tx.table('meta').getAll(range), (rows: Star[]) => {
-                const ids = new Set<string>();
-                for (const row of rows) {
-                    try {
-                        ids.add(savedStar(row, scope, row.documentId).documentId);
-                    } catch {
-                        // One corrupt row must not cost every OTHER song its star (#1440
-                        // review P3) — same posture as `openedAtMap` above.
-                    }
-                }
-                tx.finish(ids);
             });
         });
     }

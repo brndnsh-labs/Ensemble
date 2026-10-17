@@ -180,15 +180,9 @@ export const PURGE_MESSAGES = {
  * the song list hostage — but the list that then appears is the GUEST one, and on a signed-in
  * device that is a different library under the same heading. Saying so is the difference between
  * a fallback and a wrong answer; the line goes the moment a real answer lands, late or not.
- *
- * `off` is the way back from `?accounts=off`. The opt-out is per-device and the parameter is
- * stripped from the URL as soon as it is applied, so without this line the only route back is a
- * query parameter nobody has written down — which is not an opt-out, it is a trapdoor.
  */
 export const ACCOUNT_SWITCH_MESSAGES = {
     fallback: 'Couldn’t reach your account — showing this device’s songbook.',
-    off: 'Account features are off on this device.',
-    turnOn: 'Turn on',
 } as const;
 
 /**

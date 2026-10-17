@@ -42,12 +42,11 @@ const snapshot = () => accountSync.getSnapshot();
  * resume at the end of a rate-limit back-off (`armResume`, #1478), which this hook does not own.
  */
 export function useAccountLibrary(
-    enabled: boolean,
     session: SessionState,
     activeDocumentId: string | null,
 ): SyncSnapshot {
     const sync = useSyncExternalStore(subscribe, snapshot, snapshot);
-    const owner = enabled && session.status === 'signedIn' ? session.owner : null;
+    const owner = session.status === 'signedIn' ? session.owner : null;
 
     useEffect(() => {
         if (owner === null) {

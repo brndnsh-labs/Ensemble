@@ -10,7 +10,6 @@ import {
     withSong,
 } from '../lib/collections';
 import * as repository from '../lib/repository';
-import { legacyStarredIds } from '../lib/session';
 
 /** One collection as the songbook shows it: the stored document, plus the songs that resolve. */
 export interface CollectionEntry {
@@ -61,10 +60,7 @@ interface PendingStar {
  *
  * **Starred is a collection now.** The star set every surface reads is Starred's `songIds`, and a
  * star toggle is one collection Save. Starred is created LAZILY, on the first star — never at
- * startup, so an account already at its document cap is never handed a Save it cannot take — and
- * the one-time copy of the device-local stars (#1440) runs before the first read of each songbook:
- * `migrateGuestStars` for a guest, `accountSync.migrateStars` for an account. Both are idempotent
- * and neither creates Starred without a star to put in it.
+ * startup, so an account already at its document cap is never handed a Save it cannot take.
  */
 export function useCollections({
     signedIn,
@@ -100,18 +96,10 @@ export function useCollections({
         const mine = ++read.current;
         const writesAtStart = writesDone.current;
         try {
-            let next: CollectionEntry[];
-            // The one-time copy of the device-local stars runs first, in its own catch: a copy
-            // that cannot run today (storage refused, the account at its cap) is tried again on
-            // the next read, and must not cost the musician the collections they already have.
-            if (owner === null) {
-                // A copy, once: the old key is left exactly as it is (`migrateGuestStars`).
-                await repository.migrateGuestStars(legacyStarredIds()).catch(() => false);
-                next = await repository.listCollections();
-            } else {
-                await accountSync.migrateStars(owner).catch(() => {});
-                next = await accountSync.listCollections(owner);
-            }
+            const next =
+                owner === null
+                    ? await repository.listCollections()
+                    : await accountSync.listCollections(owner);
             if (mine === read.current && owner === ownerRef.current) {
                 setCollections(next);
                 setPendingStars((previous) => {
