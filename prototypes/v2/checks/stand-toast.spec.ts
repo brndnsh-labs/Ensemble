@@ -195,7 +195,9 @@ test('Resume follow only appears playing with Following off, and hides on resume
     const pill = page.getByTestId('resume-follow');
     await expect(pill).toBeVisible();
     const pillBox = await pill.boundingBox();
-    expect(pillBox?.height).toBeGreaterThanOrEqual(44);
+    // 44px tap target. A layout box can read 43.9999 under load (sub-pixel rounding while the pill
+    // animates in), so the floor allows half a pixel; a real regression loses whole pixels.
+    expect(pillBox?.height).toBeGreaterThanOrEqual(43.5);
 
     // Tapping it resumes Following and hides the pill again — the only direction left; turning
     // Following off is a scroll/wheel/touch gesture now, not a click on this control.
