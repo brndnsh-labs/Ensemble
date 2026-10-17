@@ -317,7 +317,12 @@ async function readSignOutPlan(
     const plan = await accountSync.signOutPreflight(owner);
     return {
         plan: withLocalDrafts(plan, volatile),
-        drafts: await accountSync.retainedDrafts(plan.atRisk, owner),
+        // Not for a row this build cannot read (a text chart, #1740): it has no draft to read
+        // and is exported as stored.
+        drafts: await accountSync.retainedDrafts(
+            plan.atRisk.filter((id) => !plan.unreadable.some((row) => row.documentId === id)),
+            owner,
+        ),
         songs: libraryDocuments(await accountSync.listLibrary(owner)),
     };
 }
@@ -474,6 +479,9 @@ export default function Ensemble() {
     );
     // Null until the account library has actually been read — an empty array is a claim.
     const [accountSongs, setAccountSongs] = useState<ChartDocument[] | null>(null);
+    // The song rows that read could not hand back (a text chart, #1740), counted with it: read
+    // only beside `accountSongs`, so a stale count is never shown without the list it goes with.
+    const [accountUnreadable, setAccountUnreadable] = useState(0);
     const [accountLibraryFailure, setAccountLibraryFailure] = useState<string | null>(null);
     /**
      * Which full libraries a surface has asked for (#1441). A ref, because every refresh path reads
@@ -3713,9 +3721,11 @@ export default function Ensemble() {
         const read = ++accountLibraryRead.current;
         try {
             const documents = libraryDocuments(await accountSync.listLibrary(owner));
+            const unreadable = await accountSync.unreadableSongs(owner);
             if (read === accountLibraryRead.current) {
                 accountSongsOwner.current = owner;
                 setAccountSongs(documents);
+                setAccountUnreadable(unreadable.length);
                 setAccountLibraryFailure(null);
             }
         } catch (failure) {
@@ -6768,14 +6778,17 @@ export default function Ensemble() {
                     onClose={() => setAccountPageOpen(false)}
                     onAccountChanged={account.refresh}
                     online={account.online}
-                    // The full list's length once read, else the store's own `count()` from the
-                    // home slice (#1441) — both are whole-library facts, neither a partial read.
+                    // The full list's length once read (with the rows it could not hand back, which
+                    // the export writes too), else the store's own `count()` from the home slice
+                    // (#1441) — both are whole-library facts, neither a partial read.
                     accountSongCount={
-                        accountSongs?.length ??
-                        (accountHome !== null && accountHome.owner === sessionOwner
-                            ? accountHome.slice.count
-                            : null)
+                        accountSongs !== null
+                            ? accountSongs.length + accountUnreadable
+                            : accountHome !== null && accountHome.owner === sessionOwner
+                              ? accountHome.slice.count
+                              : null
                     }
+                    accountUnreadableCount={accountSongs !== null ? accountUnreadable : 0}
                     onExportAccountSongs={() =>
                         void run(async () => {
                             // EVERY song, unlike the sign-out step's at-risk subset (#1271): the

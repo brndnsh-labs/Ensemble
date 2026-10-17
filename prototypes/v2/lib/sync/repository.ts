@@ -3415,11 +3415,38 @@ export class AccountSongbook {
                     }
                     if (stored && isRetiredSchema(stored.document)) {
                         // A text chart left in this mirror (schema 1, retired in #1740): `list`
-                        // steps over it, so the plan saw no record here. It is the only copy of
-                        // whatever it holds on this device, and this build cannot read it to
-                        // compare, so nothing is written over it and nothing throws: the pass
-                        // goes on (#1769 is the general way out of a row that will not read).
-                        return tx.finish('superseded');
+                        // steps over it, so the plan saw no record here, and this build cannot
+                        // read it. Nothing throws, so the pass goes on.
+                        //
+                        // When the account confirmed this row (a remote revision) and nothing is
+                        // queued for it, the row holds nothing the account has not got, and the
+                        // account's newer version replaces it as it would a clean record —
+                        // otherwise the song would never appear and be fetched every pass. A row
+                        // the account never confirmed, or one with a Save queued, may be the
+                        // only copy of its music: nothing is written over it (#1769 is the
+                        // general way out of a row that will not read).
+                        tx.read(
+                            tx.table('operations').index('song').count([scope.ownerId, documentId]),
+                            (queued: number) => {
+                                if (
+                                    observed.kind !== 'version' ||
+                                    active ||
+                                    queued > 0 ||
+                                    typeof stored.remoteRevision !== 'string'
+                                ) {
+                                    return tx.finish('superseded');
+                                }
+                                tx.table('songs').put({
+                                    ownerId: scope.ownerId,
+                                    documentId,
+                                    document: observed.document,
+                                    remoteRevision: observed.revision,
+                                } satisfies SavedSong);
+                                tx.table('meta').delete(key);
+                                tx.finish('advanced');
+                            },
+                        );
+                        return;
                     }
                     const song = stored ? savedSong(stored, scope, documentId) : null;
                     liveDrafts(tx, scope, documentId, song, (drafts: number) => {

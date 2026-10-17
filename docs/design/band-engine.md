@@ -470,10 +470,10 @@ not from the old engine's plan, so any chart the timeline compiles opens, edits 
 holds show as `/`, N.C. as `N.C.`, a fermata sits over its chord, and off-grid lengths keep
 their exact widths. Every path that lets a chart onto the stand (open, edit,
 import, the guided form) asks `checkPlayable` in `lib/engine-mode.ts`: on the band engine
-that is `validateSemanticScore` plus `compileTimeline`. A measure-less (v1) chart is no longer opened at all
-(#1739); "Upgrade old songs" converts one through `proposeLegacyScoreConversion`
-(`public/songbook/legacy-score.ts`), which converts every token the old parser read (#1737), and
-`tests/unit/songbook/legacy-score.test.ts` holds that conversion to the old parser's own playing.
+that is `validateSemanticScore` plus `compileTimeline`. A measure-less (v1) chart is not read at
+all: the app stopped opening one in #1739, and #1740 deleted its codec, the old chord parser
+(`chords-engine.ts`) and the "Upgrade old songs" converter (`legacy-score.ts`) with it. A chart is
+one schema, 2.
 A lowercase numeral is read literally as minor, on any degree (DECISION 2026-10-12, #1662):
 `vii` is a B minor triad in C, `i7b9` a Cm7b9, and `i11` a Cm11 (#1674: a dominant 11th is
 written without a third, so the numeral's case gives it a minor one; `I11` stays C11). On the

@@ -67,6 +67,8 @@ interface AccountPageProps {
      * never reads storage itself.
      */
     accountSongCount: number | null;
+    /** How many of those this app can no longer open (a text chart, #1740): exported as stored. */
+    accountUnreadableCount: number;
     /** Write one file per song in the account library, before deletion takes them (#1271). */
     onExportAccountSongs: () => void;
     /**
@@ -110,6 +112,7 @@ export function AccountPage({
     onAccountChanged,
     online,
     accountSongCount,
+    accountUnreadableCount,
     onExportAccountSongs,
     onAccountDeleted,
     onOpenAdopt,
@@ -419,6 +422,7 @@ export function AccountPage({
                     online={online}
                     busy={busy}
                     songCount={accountSongCount}
+                    unreadableCount={accountUnreadableCount}
                     failure={actionFailure}
                     onExport={onExportAccountSongs}
                     onConfirm={() => void runDelete()}

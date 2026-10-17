@@ -10,9 +10,10 @@ are separate from the implementation described here.
 
 ## Current playable checkpoint
 
-- Every chart the app opens is a semantic document. A v1 text chart is refused with a plain
-  message (#1739); "Upgrade old songs" (#1738) converts one in place, and refuses a bar it
-  cannot convert.
+- Every chart the app opens is a semantic document, and since #1740 the only kind there is. A v1
+  text chart arriving as a file or a link is refused with a plain message; one left in a store is
+  left out, never read. "Upgrade old songs" (#1738), which converted them in place, was deleted
+  with the v1 codec once every device was upgraded.
 - The measure editor accepts chord text and optional length pickers. Save, export, key/feel
   transforms, playback and Home check every pending bar first. Failed validation retains raw
   buffers; successful adoption retires them before a subsequent transpose. Revert clears them
@@ -115,13 +116,14 @@ playback restriction must not retroactively invalidate untouched legacy songs.
   with `app/section-settings.tsx`'s fields). Preserve the reserved conductor gestures; outside
   Edit the letter's tap stays "Start here".
 
-## Legacy-code evidence (unchanged v1 path)
+## Legacy-code evidence (historical: the v1 path was deleted in #1740)
 
-`ChartSection.value` in `public/songbook/types.ts` is authored text. Its codec allows
+What follows describes the v1 code as it stood when this contract was written; none of it is in
+the tree any more. `ChartSection.value` in `public/songbook/types.ts` was authored text. Its codec allows
 1,000 characters per section, 500 sections, and repeat counts from 1 to 64. There is no
 canonical measure/event field. Codec validation is not proof the music is playable.
 
-`parseProgressionPart` in `public/engine/chords-engine.ts` divides a bar's meter counts
+`parseProgressionPart` in `public/engine/chords-engine.ts` divided a bar's meter counts
 equally between tokens, resolves chord identity and generates voicings in the same pass.
 `updateProgressionCache` independently rounds each chord to sixteenth-note steps. The
 lead-sheet model uses those generated chords, not an authored measure model.
@@ -304,7 +306,8 @@ The bar-text printer represents only events; it refuses fermatas rather than dro
 Sections, annotations, navigation and unsupported editing buffers must remain owned by the
 chart editor. No claim of a full-score text serialization is made yet.
 
-The pure `proposeLegacyScoreConversion` API returns either a detached candidate or a blocked
+Historical (deleted with the v1 codec in #1740): the pure `proposeLegacyScoreConversion` API
+(`public/songbook/legacy-score.ts`) returned either a detached candidate or a blocked
 report, always alongside the exact original JSON string. It does not persist anything or
 certify audible equivalence. Since #1737 it converts everything the old parser
 (`validateProgression`) read and played: each token as written when the chart vocabulary holds
@@ -317,7 +320,7 @@ bars and sections are dropped, as the old parser gave them no time. It retains s
 settings and reports the detached preset association. What the old parser only guessed at
 (no root or quality it knew), a sus with no spelling that keeps it, and a bar with more chords
 than sixteenths block the song, with a reason per bar (song, section, bar as the sheet numbers
-it, why); there is no partial candidate. `tests/unit/songbook/legacy-score.test.ts` is the
+it, why); there was no partial candidate. `tests/unit/songbook/legacy-score.test.ts` was the
 old-vs-new differential. For it the vocabulary gained `7#9b13`, `9b13` and `13b9#11`.
 
 ### Engine bridge and gates
@@ -437,6 +440,9 @@ never enters analytics or error payloads.
   payloads unless a lossless conversion is proven. Snapshot sharing remains detached.
 - No boot-time bulk rewrite. A production rollback must retain access to v1 records and
   preserve newer records for re-upgrade/export; it must not overwrite them through an old app.
+
+*Done and retired: #1740 deleted the card below, its converter and every v1 reader once every
+device was upgraded and `/admin` showed no schema-1 chart. The decision is kept as the record.*
 
 > **DECISION 2026-10-16 (#1738, Retire v1).** Supersedes "convert only a detached copy" and
 > "no boot-time bulk rewrite" for ONE explicit action: the songbook home's **Upgrade old songs**

@@ -187,17 +187,9 @@ describe('a text chart left in the account mirror (#1740)', () => {
         expect(cloud.ids).toEqual([...expected, 'zz-set']);
     });
 
-    it('does not stop a download: the rest is adopted, and the row is never written over', async () => {
-        await putTextChartSong('song-a');
-        const clean = { ...accountChart('Clean', 'song-a'), revision: 4 };
-        const other = { ...accountChart('Other', 'song-b'), revision: 0 };
-        const docs = new Map<string, { revision: string; document: unknown }>([
-            ['song-a', { revision: 'r-new', document: clean }],
-            ['song-b', { revision: 'r1', document: other }],
-            // A text chart the server still holds is refused like any body it cannot read.
-            ['song-c', { revision: 'r1', document: textChart('song-c') }],
-        ]);
-        const result = await runLibraryDownload(
+    /** One download pass over a cloud holding exactly `docs`. */
+    function download(docs: Map<string, { revision: string; document: unknown }>) {
+        return runLibraryDownload(
             book,
             scope,
             {
@@ -227,17 +219,70 @@ describe('a text chart left in the account mirror (#1740)', () => {
                 typeof runLibraryDownload
             >[3],
         );
-        expect(result.advanced).toEqual(['song-b']);
+    }
+
+    it('does not stop a download, and a confirmed row with nothing queued takes the account version', async () => {
+        await putTextChartSong('song-a');
+        const clean = { ...accountChart('Clean', 'song-a'), revision: 4 };
+        const other = { ...accountChart('Other', 'song-b'), revision: 0 };
+        const docs = new Map<string, { revision: string; document: unknown }>([
+            ['song-a', { revision: 'r-new', document: clean }],
+            ['song-b', { revision: 'r1', document: other }],
+            // A text chart the server still holds is refused like any body it cannot read.
+            ['song-c', { revision: 'r1', document: textChart('song-c') }],
+        ]);
+        const result = await download(docs);
+        // The old row held nothing the account had not got: it is replaced, as a clean record
+        // would be, rather than fetched again on every pass and never shown.
+        expect(result.advanced).toEqual(['song-a', 'song-b']);
         expect(result.failures).toEqual([
             expect.objectContaining({ documentId: 'song-c', reason: 'malformed-body' }),
         ]);
+        expect(await book.read(scope, 'song-a')).toMatchObject({
+            remoteRevision: 'r-new',
+            document: { title: 'Clean', revision: 4 },
+        });
         expect((await book.read(scope, 'song-b'))?.document.title).toBe('Other');
-        // The only copy of whatever the old row holds here stays exactly as it was.
+        expect(await storedSong('song-c')).toBeUndefined();
+        // The next pass has nothing left to fetch for it.
+        expect((await download(docs)).advanced).toEqual([]);
+    });
+
+    it('is never written over while it may be the only copy: a Save queued, or never confirmed', async () => {
+        await putTextChartSong('song-a');
+        // A queued Save for the row, as an older build left it (the queue is only counted).
+        await put('operations', {
+            ownerId: OWNER,
+            documentId: 'song-a',
+            operationId: 'op-old',
+            localRevision: 1,
+            snapshot: textChart('song-a'),
+            base: { revision: 'r-old' },
+            wireBody: null,
+            status: 'queued',
+        });
+        // A row the account never confirmed.
+        await put('songs', {
+            ownerId: OWNER,
+            documentId: 'song-b',
+            document: textChart('song-b'),
+            remoteRevision: null,
+        });
+        const docs = new Map<string, { revision: string; document: unknown }>([
+            ['song-a', { revision: 'r-new', document: accountChart('Clean', 'song-a') }],
+            ['song-b', { revision: 'r1', document: accountChart('Clean', 'song-b') }],
+        ]);
+        const result = await download(docs);
+        expect(result.advanced).toEqual([]);
+        expect(result.failures).toEqual([]);
         expect(await storedSong('song-a')).toMatchObject({
             document: textChart('song-a'),
             remoteRevision: 'r-old',
         });
-        expect(await storedSong('song-c')).toBeUndefined();
+        expect(await storedSong('song-b')).toMatchObject({
+            document: textChart('song-b'),
+            remoteRevision: null,
+        });
     });
 
     it('is handed back, as stored, for a sign-out or deletion export', async () => {

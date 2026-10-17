@@ -44,6 +44,8 @@ export interface DeleteAccountStepProps {
      * click that silently writes nothing — the same rule the sign-out step's `songsReady` follows.
      */
     songCount: number | null;
+    /** How many of `songCount` this app can no longer open (a text chart, #1740). */
+    unreadableCount: number;
     failure: AccountFailure | null;
     /** Writes one file per song in the account library. Never disabled by the network. */
     onExport: () => void;
@@ -57,6 +59,7 @@ export function DeleteAccountStep({
     online,
     busy,
     songCount,
+    unreadableCount,
     failure,
     onExport,
     onConfirm,
@@ -98,6 +101,13 @@ export function DeleteAccountStep({
                         : `${songCount} songs are in your account songbook.`}{' '}
                     Export them first if you want to keep them — a file on this device is the only
                     copy that survives.
+                </p>
+            )}
+            {unreadableCount > 0 && (
+                <p className="status-detail" data-testid="delete-account-unreadable">
+                    {unreadableCount === 1
+                        ? 'One of them is a song this app can no longer open — the export keeps its file as it is.'
+                        : `${unreadableCount} of them are songs this app can no longer open — the export keeps their files as they are.`}
                 </p>
             )}
             {songCount === null && (

@@ -93,6 +93,7 @@ export function SignOutDialog({
     const unsent = preflight?.unsentSaves ?? 0;
     const drafts = preflight?.drafts ?? 0;
     const exposed = preflight?.atRisk.length ?? 0;
+    const unreadable = preflight?.unreadable.length ?? 0;
     // Collection changes still queued (#1477): committed work like an unsent song Save, but with
     // no file to export, so they never add to `exposed` — only to what the step warns about.
     const collections = preflight?.unsentCollections ?? 0;
@@ -168,6 +169,15 @@ export function SignOutDialog({
                                 ? 'One unsaved experiment is kept on this device.'
                                 : `${drafts} unsaved experiments are kept on this device.`}{' '}
                             They were never in your account — export what you want to keep.
+                        </p>
+                    )}
+                    {unreadable > 0 && (
+                        // Song rows this app can no longer open (a text chart, #1740): nothing else
+                        // here mentions them, and signing out removes them.
+                        <p className="status-detail" data-testid="sign-out-unreadable">
+                            {unreadable === 1
+                                ? 'One song this app can no longer open will be removed — export it to keep the file.'
+                                : `${unreadable} songs this app can no longer open will be removed — export them to keep the files.`}
                         </p>
                     )}
                     {!atRisk && (

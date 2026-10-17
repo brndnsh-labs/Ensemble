@@ -43,11 +43,13 @@ export interface OutboxPassResult {
  * across kinds. So the cursor stays one document id, and a caller resuming a sweep — `drain` in
  * `lib/account/sync-loop.ts` — needs to know nothing about collections.
  *
- * Each store is paged to the same limit after the same cursor; the first `limit` ids of the union
- * are necessarily among those two pages, so the merge is exact. The songs page is still the full
- * validated `list` read it always was, so a song record that does not validate still fails the
- * pass rather than being stepped over. Two transactions rather than one: pages were never a
- * snapshot of the library (`list`), and the cursor is an id, not an offset.
+ * Each store is paged to the same limit after the same cursor, and each page reports how far it
+ * READ (its own cursor). The merge keeps only ids up to the nearer of the two cursors, which both
+ * pages have read in full, so it is exact even when a songs page hands back fewer songs than it
+ * read: `list` steps over a retired text chart (#1740), listing nothing for it, while its cursor
+ * still moves past. Any other song record that does not validate still fails the pass rather than
+ * being stepped over (#1769). Two transactions rather than one: pages were never a snapshot of the
+ * library (`list`), and the cursor is an id, not an offset.
  */
 async function outboxPage(
     songbook: AccountSongbook,
