@@ -19,52 +19,28 @@ on its own when a new tag is unhealthy (below), or `git revert` and a PR for a b
 /var/lib/docker/volumes/{ensembletest,ensemble}-api-data/   SQLite database (named volume)
 ```
 
-### What the edge config must do (#1355 → #1356)
+### What the edge config must do
 
-The root-scope service worker and web manifest landed ahead of the web image, and they put five
-hard requirements on whatever serves `/` after the flip. Getting any of them wrong strands a
-returning browser on a shell that no longer exists, and a service worker is the one thing a
-user cannot fix by reloading.
+The site-root service worker and web manifest put four hard requirements on whatever serves
+`/`. Getting one wrong strands an installed browser on a shell that no longer exists, and a
+service worker is the one thing a user cannot fix by reloading.
 
-- **`/v2/sw.js` must be served as a FILE, never redirected.** The root build emits
-  `out/v2/sw.js`: a tombstone that retires the beta's `/v2/`-scoped worker, forwards its windows
-  to the same path without the prefix (query and fragment intact) and unregisters itself. It is
-  the only way to reach a browser holding that worker, because that worker answers its whole
-  scope from cache — a bookmarked `/v2/` never reaches the origin at all — and its ONE remaining
-  request is the update check for `/v2/sw.js`, which the spec fetches with redirects disabled.
-  So the blanket `/v2/* → /` redirect must carve out `/v2/sw.js`. Everything else under `/v2/`
-  redirects as planned.
-- **`/sw.js` and `/v2/sw.js` stay `no-store`**, as the current config already keeps the v1
-  worker. The registration also asks for `updateViaCache: 'none'`, but the origin must not be
-  the thing that pins a browser to the old script.
+- **`/sw.js` stays `no-store`.** The registration also asks for `updateViaCache: 'none'`, but
+  the origin must not be the thing that pins a browser to the old script.
 - **`/manifest.json` must keep being served at that exact path**, with `no-cache` like the other
-  mutable entry points. It deliberately reuses v1's path, `id`, name and colours so an installed
-  v1 PWA updates in place instead of becoming a second app; moving or renaming it mints a new
-  identity.
-- **The `/v2/* → /` redirect should carry the rest of the path and the query**: `/v2/x?y` →
-  `/x?y`, which is what the tombstone does for the windows it can reach, so a browser gets the
-  same destination either way. A blanket redirect to `/` throws away whichever old link the
-  musician actually followed.
-- **No SPA fallback.** The worker now serves the cached shell for a navigation the NETWORK
-  refuses, which is an offline affordance, not a rewrite rule: online, a missing path must still
-  be a real 404, exactly as this layout already promises.
-
-One residual the edge cannot fix, recorded so it is not mistaken for a bug: a browser whose v1
-caches were already evicted under storage pressure still holds v1's registration but offers the
-new worker no evidence that it is replacing v1, so the update installs and WAITS until that
-browser's last v1 tab closes, then activates normally. It self-heals at the next tab close, and
-the alternative — skipping waiting on a timer, with no evidence — would risk swapping the code
-out from under a running band. Waiting is the safe side of that trade.
-
-A second one: the first root worker deletes every `ensemble-v2-preview-*` cache, including the
-shell of a `/v2/` beta tab that is open at that moment. Online that tab's next navigation falls
-through to the network, meets the redirect and lands on `/`; OFFLINE it gets a network-error page
-until the device reconnects. The beta's cache was always going to be deleted at the cut.
+  mutable entry points, and its `id: '/'` must never change: that `id` is the installed app's
+  identity, and a new one makes a second app on the home screen.
+- **No SPA fallback.** The worker serves the cached shell for a navigation the NETWORK refuses,
+  which is an offline affordance, not a rewrite rule: online, a missing path must still be a
+  real 404.
+- **`/v2/...` is a plain 404** like any other missing path. The old beta path, its `/v2/sw.js`
+  tombstone and the `/v2/* → /` redirect were retired in #1742 once no device still held the
+  beta's worker.
 
 ### The `ensemble-web` image (#1356)
 
 `hosting/web/` is the in-repo half of decision 1: a `Dockerfile`, the `nginx.conf` that answers
-the five requirements above, and `smoke.mjs`, which turns each of them into an assertion against
+the four requirements above, and `smoke.mjs`, which turns each of them into an assertion against
 a container that is actually running. Together they build
 `ghcr.io/brndnsh-labs/ensemble-web:sha-<commit>` — the v2 stand exported at
 `/` (#1734) inside `nginxinc/nginx-unprivileged`, the base image is pinned
@@ -92,34 +68,20 @@ assumed, and it speaks raw `node:http` rather than `fetch` because the assertion
 status codes, `Location` and `Content-Encoding` — all three of which `fetch` hides by following,
 decoding or both. It checks the root HTML and its `/_next/` references, `build.json`'s
 `sourceRevision` and the image's `org.opencontainers.image.revision` label against the commit it
-was built from, `/sw.js` and its `SCOPE`, the `/v2/sw.js` tombstone served as a file with no
-`Location`, each `/v2/*` redirect's exact target **parsed** back to this origin rather than
-prefix-tested, the manifest's `id`, immutable vs no-cache vs no-store policy, MIME types, byte
-ranges and gzip on text but not on audio, an exact 404 for every deterministic refusal (missing
-paths, `/api/*`, dotfiles, `/50x.html`) and 403-or-404 for the one directory case, uid 101, a
-read-only root filesystem, and the image's own `HEALTHCHECK` command.
+was built from, `/sw.js` and its `SCOPE`, the manifest's `id`, immutable vs no-cache vs no-store
+policy, MIME types, byte ranges and gzip on text but not on audio, an exact 404 with no
+`Location` for every deterministic refusal (missing paths, `/api/*`, dotfiles, `/50x.html`, and
+the retired `/v2/...` path in every shape, the open-redirect ones included) and 403-or-404 for
+the one directory case, uid 101, a read-only root filesystem, and the image's own `HEALTHCHECK`
+command. An SPA `try_files … /index.html` fallback fails it: missing paths answer 200 with the
+app shell.
 
-It was mutation-tested four ways, each of which fails it:
-
-| Mutation | What the smoke reports |
-| --- | --- |
-| `/v2/sw.js` carve-out removed | `/v2/sw.js` answers 308 with `Location: /sw.js` instead of the tombstone |
-| SPA `try_files … /index.html` fallback added | missing paths answer 200 with the app shell |
-| `absolute_redirect on` | `Location: http://127.0.0.1/x/y?a=b` instead of `/x/y?a=b` |
-| open-redirect guard removed from `$ensemble_v2_moved` | `/v2//evil.example/x` → `//evil.example/x`, which resolves to `http://evil.example` |
-
-That last row is why the redirect assertion parses instead of testing a `/` prefix:
-`'//evil.example/x'.startsWith('/')` is perfectly true, and an earlier version of this script
-passed against a config that would have sent a returning musician off-origin.
-
-What the config does: tmpfs pid/temp paths, `server_tokens
-off`, the dotfile and `/api/*` 404s, the no-SPA-fallback `try_files`, and the no-store/no-cache
-policy for workers and mutable entry points, over a single document root with `/v2/*` as a
-redirect. Beyond that: the `/v2/sw.js`
-carve-out, `absolute_redirect off` (this container speaks plain HTTP on a LAN port behind Caddy
-and Cloudflare, so an absolute `Location` would publish that address to a public browser),
-an open-redirect guard in front of it (a second separator right after `/v2/` means the rest of
-the target is an authority, not a path), long-lived immutable caching for `/_next/static/`, gzip
+What the config does: tmpfs pid/temp paths, `server_tokens off`, the dotfile and `/api/*` 404s,
+the no-SPA-fallback `try_files`, and the no-store/no-cache policy for the worker and mutable
+entry points, over a single document root. Beyond that: `absolute_redirect off` (this container
+speaks plain HTTP on a LAN port behind Caddy and Cloudflare, so the one redirect nginx still
+makes on its own — a directory request without its trailing slash — must not publish that
+address to a public browser), long-lived immutable caching for `/_next/static/`, gzip
 for text only, and two of the three response headers `docs/SECURITY.md` F5 names as needing the
 web-server layer: `X-Content-Type-Options: nosniff` and `frame-ancestors 'none'`. F5's third is
 HSTS, which is deliberately not set here — it belongs to Caddy and is ignored over plain HTTP
@@ -131,8 +93,7 @@ CI builds it in two places. `web-image` in `ci.yml` runs on a merge to `main`, b
 audition, #1358): it builds the root export, pushes `:sha-<commit>` — plus `:main` on `main`
 only — pulls the sha tag back and runs the smoke script against it. `v2-root-image.yml` is the PR-time
 proof that needs no registry — same build, `load: true` instead of `push`, same smoke script —
-so a rule as easy to get wrong as the `/v2/sw.js` carve-out is provable on the pull request that
-writes it. Neither one touches the required contexts. **Since the cutover (#1357) `deploy` does
+so an edge rule is provable on the pull request that writes it. Neither one touches the required contexts. **Since the cutover (#1357) `deploy` does
 `needs:` `web-image`**, which is the inverse of #1356's rule and for the same reason it was
 written: this image is now the release, so a red build must stop it rather than be stepped
 around. Since #1400 the root build's Playwright suite is part of the required `v2-suite`

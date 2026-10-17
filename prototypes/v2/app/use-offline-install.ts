@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { migrateSoundCacheBase } from '../lib/sounds';
 
 /**
  * Registers this app's service worker at the site root and reports whether the app shell is
@@ -19,35 +18,12 @@ export function useOfflineInstall(): OfflineInstall {
     });
     useEffect(() => {
         let alive = true;
-        // Two pieces of tidying the cutover leaves behind, neither of which the app waits
-        // for (#1355).
-        //
-        // The beta's worker at `/v2/` has its own tombstone (`scripts/offline.mjs` emits
-        // `out/v2/sw.js`), but that only runs for someone who goes back to the old address.
-        // Most people will simply arrive at `/`, where that registration would otherwise
-        // sit forever, holding a scope the site no longer serves. Only `/v2/` is
-        // unregistered here; this app's own registration is at `/`.
-        if ('serviceWorker' in navigator) {
-            void navigator.serviceWorker
-                .getRegistrations()
-                .then((registrations) => {
-                    for (const registration of registrations) {
-                        if (new URL(registration.scope).pathname === '/v2/') {
-                            void registration.unregister();
-                        }
-                    }
-                })
-                .catch(() => {});
-        }
-        // And the packs the musician already downloaded, whose cache keys carried the old
-        // base. See `migrateSoundCacheBase`.
-        void migrateSoundCacheBase();
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker
                 .register('/sw.js', { scope: '/', updateViaCache: 'none' })
                 .then(async (registration) => {
-                    // navigator.serviceWorker.ready may resolve the old root app's
-                    // worker. Only this registration earns the preview's ready label.
+                    // Wait on THIS registration's worker: only a shell that finished
+                    // installing earns the ready label.
                     if (registration.active?.state !== 'activated') {
                         await new Promise<void>((resolve, reject) => {
                             const worker =
@@ -55,7 +31,7 @@ export function useOfflineInstall(): OfflineInstall {
                                 registration.waiting ||
                                 registration.active;
                             if (!worker) {
-                                reject(new Error('No preview worker'));
+                                reject(new Error('No service worker'));
                                 return;
                             }
                             const check = () => {

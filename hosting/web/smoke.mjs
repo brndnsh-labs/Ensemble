@@ -1,4 +1,4 @@
-// Prove a RUNNING ensemble-web container against hosting/README.md's cutover contract.
+// Prove a RUNNING ensemble-web container against hosting/README.md's edge contract.
 //
 //   node hosting/web/smoke.mjs <image> <expected revision>
 //
@@ -135,12 +135,6 @@ try {
         index.text.slice(0, 200),
     );
     check(
-        !index.text.includes('/v2/_next/'),
-        'GET / body',
-        'no /v2/_next/ references (this is the root build)',
-        'found /v2/_next/',
-    );
-    check(
         index.headers['cache-control'] === 'no-cache',
         'GET / cache-control',
         'no-cache',
@@ -185,7 +179,7 @@ try {
     }
     check(sourceRevision === revision, 'GET /build.json sourceRevision', revision, sourceRevision);
 
-    // --- Service workers -------------------------------------------------------------------
+    // --- The service worker ----------------------------------------------------------------
     const worker = await text('/sw.js');
     check(worker.status === 200, 'GET /sw.js', '200', worker.status);
     check(
@@ -201,77 +195,9 @@ try {
         worker.text.match(/const SCOPE = [^\n]*/)?.[0] ?? '<no SCOPE line>',
     );
 
-    // The single most important line in the config. A browser still holding the beta's
-    // `/v2/`-scoped worker reaches this origin through nothing but the update check for this
-    // path, and a service-worker script fetch refuses to follow a redirect. A 308 here — the
-    // obvious thing to write — strands that browser on a dead release permanently.
-    const tombstone = await text('/v2/sw.js');
-    check(
-        tombstone.status === 200,
-        'GET /v2/sw.js',
-        '200 (a FILE — never a redirect: a worker script fetch rejects one)',
-        tombstone.status,
-    );
-    check(
-        tombstone.headers.location === undefined,
-        'GET /v2/sw.js location',
-        'no Location header',
-        tombstone.headers.location,
-    );
-    check(
-        tombstone.headers['cache-control'] === 'no-store',
-        'GET /v2/sw.js cache-control',
-        'no-store',
-        tombstone.headers['cache-control'],
-    );
-    check(
-        tombstone.text.includes('self.registration.unregister()'),
-        'GET /v2/sw.js body',
-        'the beta tombstone, which unregisters itself',
-        tombstone.text.slice(0, 200),
-    );
-
-    // --- The beta path retires -------------------------------------------------------------
-    // `node:http` sends `path` verbatim, so the last two rows reach nginx with the separators
-    // intact — a client that normalised the path would quietly test something else.
-    for (const [path, location] of [
-        ['/v2/', '/'],
-        ['/v2', '/'],
-        ['/v2/x/y?a=b', '/x/y?a=b'],
-        ['/v2?a=b', '/?a=b'],
-        // Open-redirect shapes. Slicing `/v2` off the front of these leaves an AUTHORITY, not
-        // a path: `//evil.example/x` is protocol-relative, and `/\/evil.example/x` reads the
-        // same way because a WHATWG URL parser treats `\` as a separator in a special scheme.
-        // #1355's tombstone declines to forward exactly these and leaves them to this config.
-        ['/v2//evil.example/x', '/'],
-        ['/v2/\\/evil.example/x', '/'],
-    ]) {
-        const moved = await request(path);
-        check(moved.status === 308, `GET ${path}`, '308', moved.status);
-        check(
-            moved.headers.location === location,
-            `GET ${path} location`,
-            location,
-            moved.headers.location,
-        );
-        // Parsed, never prefix-tested: `'//evil.example/x'.startsWith('/')` is true and sends
-        // the browser off-origin. Behind Caddy and Cloudflare an absolute Location would also
-        // publish the container's own scheme, host and LAN port to a public browser.
-        let resolved;
-        try {
-            resolved = new URL(moved.headers.location ?? '', 'http://127.0.0.1').origin;
-        } catch (error) {
-            resolved = `URL parse failed: ${error.message}`;
-        }
-        check(
-            resolved === 'http://127.0.0.1',
-            `GET ${path} location`,
-            'resolves back to this origin',
-            `${moved.headers.location} -> ${resolved}`,
-        );
-    }
-
-    // --- The web manifest keeps v1's installed identity ------------------------------------
+    // --- The web manifest keeps the installed app's identity --------------------------------
+    // `id: '/'` is what every installed copy of the app is keyed by; a different one is a
+    // second app on the home screen. See `prototypes/v2/scripts/offline.mjs`.
     const manifest = await text('/manifest.json');
     check(manifest.status === 200, 'GET /manifest.json', '200', manifest.status);
     check(
@@ -390,6 +316,9 @@ try {
     // `=404` fallback for the rest — so the assertion is exact. `/50x.html` is in the list
     // because the base image ships one: this artifact must contain the export and nothing else,
     // and nginx's stock error page is both a lie about what is deployed and a version tell.
+    // The old beta path `/v2/...` is retired (#1742): a plain 404 like any other missing path,
+    // never a redirect. `node:http` sends `path` verbatim, so the separator shapes reach nginx
+    // intact.
     for (const path of [
         '/there-is-no-such-page',
         '/deeper/missing/page/',
@@ -399,9 +328,22 @@ try {
         '/.env',
         '/v2/.env',
         '/50x.html',
+        '/v2',
+        '/v2/',
+        '/v2/sw.js',
+        '/v2/x/y?a=b',
+        '/v2?a=b',
+        '/v2//evil.example/x',
+        '/v2/\\/evil.example/x',
     ]) {
         const missing = await text(path);
         check(missing.status === 404, `GET ${path}`, '404', missing.status);
+        check(
+            missing.headers.location === undefined,
+            `GET ${path} location`,
+            'no Location header',
+            missing.headers.location,
+        );
         // The SPA-fallback tell: app HTML behind a path the artifact does not contain.
         check(
             !missing.text.includes('/_next/static/'),
@@ -476,5 +418,5 @@ if (failures.length > 0) {
     process.exit(1);
 }
 console.log(
-    `PASS: ${image} serves the root stand at ${revision} — /v2/sw.js is a file, /v2/* redirects relative, no SPA fallback, non-root read-only runtime`,
+    `PASS: ${image} serves the root stand at ${revision} — /v2/* is a plain 404, no SPA fallback, non-root read-only runtime`,
 );

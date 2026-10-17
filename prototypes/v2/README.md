@@ -79,7 +79,7 @@ npm run test:e2e --prefix prototypes/v2
 ```
 
 Those three commands build and check the app, which is served from the site root and nowhere
-else (#1734). They are what CI's `v2-suite` runs, including `root-handover.chromium.spec.ts`.
+else (#1734). They are what CI's `v2-suite` runs.
 
 For UI development, `npm run dev --prefix prototypes/v2`, then visit `http://localhost:3100/`.
 Sound-pack assets and their integrity index are assembled by the build script: use the built
@@ -123,10 +123,10 @@ local browser projects and never deploys.
   with nothing installed stays built-in-only until a sound-selection/install gesture. Starters
   and new songs start on Follow feel. Existing decoding,
   sample playback, calibrated gain and voice effects are reused without musical changes. A host
-  asset-fetch adapter maps original pack URLs into `/v2/packs/`, never root-app storage. The
+  asset-fetch adapter maps original pack URLs into `/packs/`. The
   production host retains its ordinary fetch path.
 - The app shell caches a build-specific SHA256 sound-file index; sounds download on selection
-  or playback, not during app-shell installation. `ensemble-v2-sounds-v1` stores content-addressed,
+  or playback, not during app-shell installation. `ensemble-v2-sounds-v1` (a frozen name: renaming it orphans every downloaded pack) stores content-addressed,
   verified bytes independently of app upgrades. Readiness checks every required file (not just
   a manifest marker); selection waits for caching and decoding before changing a voice. Failed
   playback preparation leaves the chart readable and unchanged, with an error instead of silent
@@ -297,10 +297,9 @@ a tag, verified through the host's public `/build.json` (`sourceRevision` = the 
   the test host back on `main`.
 - **Rollback** — release the previous tag (`../../hosting/README.md`), or `git revert` → PR.
 
-`/v2/*` is an edge redirect to the same path at the root, except `/v2/sw.js`, which is a real
-file that forwards the beta's windows (#1355). The default build base is still `/v2`, but CI's
-`v2-suite` builds and tests the shipped `/` build (#1400); `.github/workflows/v2-root-image.yml`
-smoke-tests its image on a PR and `web-image` after the merge.
+The old beta path `/v2/...` is a plain 404 (#1742). CI's `v2-suite` builds and tests the
+shipped `/` build; `.github/workflows/v2-root-image.yml` smoke-tests its image on a PR and
+`web-image` after the merge.
 
 Compatibility caveat: manual-only preview builds before Follow feel support reject documents
 with `autoSound: true`. Do not roll a browser's songbook back to those builds after saving Follow

@@ -25,7 +25,7 @@ is required.
 
 **The v2 music stand IS the site (cutover #1357).** `ensemble.brndn.zip/` serves the
 `prototypes/v2/` Next static export built at `/`, inside the `ensemble-web`
-image; `/v2/*` is an edge redirect to the same path without the prefix. A merge to `main`
+image; the old beta path `/v2/...` is a plain 404 (#1742). A merge to `main`
 releases it: the CI `deploy` job publishes no files at all any more — it releases this commit's
 `ensemble-web` and `ensemble-api` tags to prod and then test, and asserts each host's public
 `/build.json` names the commit. So:
