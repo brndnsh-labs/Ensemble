@@ -134,3 +134,21 @@ test('on a phone it is a sheet from the foot of the screen, closed by its backdr
     await expect(popover).toHaveCount(0);
     await expect(keyButton(page)).toBeFocused();
 });
+
+test('focus moving elsewhere on the page closes it; focus going nowhere does not', async ({
+    page,
+}) => {
+    await openBlue(page);
+    const popover = await openKeyPopover(page);
+    // A blur to nothing (WebKit mid-tap, a select disabled for its change) keeps it open.
+    await popover.getByLabel('Mode', { exact: true }).evaluate((field) => {
+        (field as HTMLElement).focus();
+        (field as HTMLElement).blur();
+    });
+    await expect(popover).toBeVisible();
+    // Focus carried out of it to another field (iOS's ‹ › arrows do this) leaves it.
+    await popover.getByLabel('Mode', { exact: true }).focus();
+    await page.getByLabel('Tempo', { exact: true }).focus();
+    await expect(popover).toHaveCount(0);
+    await expect(page.getByLabel('Tempo', { exact: true })).toBeFocused();
+});

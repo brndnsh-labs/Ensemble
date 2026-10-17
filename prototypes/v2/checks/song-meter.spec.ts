@@ -64,6 +64,10 @@ test('a bar whose written lengths cannot follow blocks the change and is named',
     // The refusal closes the Key popover itself and names the bar.
     await expect(menu).toHaveCount(0);
     await expect(alert(page)).toContainText('A · bar 1');
+    // Focus is not dropped to the page with the popover: it lands on the bar to fix, or Key.
+    await expect
+        .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'none'))
+        .not.toBe('BODY');
     await expect(alert(page)).toContainText('Nothing was changed');
     await expect(page.locator('.song-subtitle')).toContainText('4/4');
     await expect((await openKeyPopover(page)).getByLabel('Meter', { exact: true })).toHaveValue(

@@ -29,6 +29,39 @@ export function songKeyLabel(current: ChartDocument): string {
     return `${keyLabel(normalizeKey(arrangement.key))}${arrangement.isMinor ? 'm' : ''}`;
 }
 
+/** Frames to wait for the selected bar's number to be enabled again once the change settles. */
+const SETTLE_FRAMES = 30;
+
+/**
+ * Where focus goes when the shell closes the popover under it: the selected bar's number (a
+ * refused change selects the bar to fix) once it is enabled again, else the Key button. Only
+ * while focus is still nowhere: a bar field the refusal opened keeps it.
+ */
+function landFocus(anchor: () => Element | null): void {
+    let frames = 0;
+    const nowhere = () => !document.activeElement || document.activeElement === document.body;
+    function attempt() {
+        if (!nowhere()) {
+            return;
+        }
+        const bar = document.querySelector<HTMLButtonElement>('.bar.selected .bar-number');
+        if (bar instanceof HTMLButtonElement && !bar.disabled) {
+            bar.focus({ preventScroll: true });
+            return;
+        }
+        if (bar && frames < SETTLE_FRAMES) {
+            frames += 1;
+            requestAnimationFrame(attempt);
+            return;
+        }
+        const trigger = anchor();
+        if (trigger instanceof HTMLElement && trigger.isConnected) {
+            trigger.focus({ preventScroll: true });
+        }
+    }
+    requestAnimationFrame(attempt);
+}
+
 interface KeyPopoverProps {
     current: ChartDocument;
     busy: boolean;
@@ -102,6 +135,14 @@ export function KeyPopover({
 
     useEffect(() => {
         node.current?.querySelector<HTMLElement>('select')?.focus({ preventScroll: true });
+        // Closed by the shell rather than by itself (a refused meter, a bar that won't apply), the
+        // popover takes the focused select with it and focus falls to the page. It goes to the
+        // bar the refusal selected, else back to the Key button.
+        return () => {
+            if (!closed.current) {
+                landFocus(latest.current.anchor);
+            }
+        };
     }, []);
     // A select is disabled while its change is made, which drops focus to the page — and Esc
     // with it. Back where it was once the change is done, as the section menu does.
@@ -162,6 +203,20 @@ export function KeyPopover({
                 onKeyDown={onKeyDown}
                 onFocus={(event) => {
                     lastFocus.current = event.target;
+                }}
+                onBlur={(event) => {
+                    // Focus moving somewhere else on the page (iOS's ‹ › field arrows, a Tab that
+                    // skips buttons) leaves it. Focus going nowhere does not: WebKit blurs a field
+                    // to null mid-tap, and a select disabled for its change drops focus too. The
+                    // Key button's own press toggles it shut (its click).
+                    const to = event.relatedTarget;
+                    if (
+                        to instanceof Node &&
+                        !event.currentTarget.contains(to) &&
+                        !latest.current.anchor()?.contains(to)
+                    ) {
+                        close(false);
+                    }
                 }}
             >
                 {sheet && (

@@ -640,13 +640,20 @@ export async function openKeyPopover(page: Page): Promise<Locator> {
     return popover;
 }
 
-/** Closes the Key popover (Esc) if it is open. */
+/**
+ * Closes the Key popover with an Esc sent to the popover itself, if it is still open. Checked and
+ * sent in one step in the page: a refusal can close it first, and an Esc pressed then would land
+ * on whatever took focus (a bar field, putting back its text).
+ */
 export async function closeKeyPopover(page: Page): Promise<void> {
-    const popover = keyPopover(page);
-    if (await popover.isVisible()) {
-        await page.keyboard.press('Escape');
-        await expect(popover).toHaveCount(0);
-    }
+    await page.evaluate(() => {
+        document
+            .querySelector('[data-testid="key-popover"]')
+            ?.dispatchEvent(
+                new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+            );
+    });
+    await expect(keyPopover(page)).toHaveCount(0);
 }
 
 /** Picks the song's key in the Key popover (a value: 'Eb', not 'E♭'), then closes it. */
