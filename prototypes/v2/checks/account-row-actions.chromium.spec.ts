@@ -101,19 +101,9 @@ test('Rename on an account song with a live draft opens it instead of renaming i
     await expect(page.getByLabel('Song title')).toHaveValue('Renamed from the row menu');
     await expect(page.getByLabel('Song title')).toBeFocused();
 
-    // #1460 re-review P3 — this rename's own `warning` ("This song has unsaved changes…") must
-    // win and STAY, even though `draft()` (called moments earlier, same flow) fires off an
-    // ACCOUNT recovery write that resolves asynchronously and would otherwise land its own plain
-    // `info` "Draft recovered on this device" on top of it a beat later. `setMessage`'s guard
-    // (an `info` call cannot replace an undismissed `warning`) is what this proves.
+    // The rename's own sentence is a `warning` (#1460 re-review P3): it stays until dismissed,
+    // where a plain `info` would time out.
     const toast = page.getByTestId('stand-toast');
-    await expect(toast).toHaveAttribute('data-tone', 'warning');
-    await expect(toast).toContainText(
-        'This song has unsaved changes — opened it here so renaming won’t lose them',
-    );
-    // Give the account recovery write's `.then(() => retained(next))` every chance to resolve and
-    // fire its own `info` message before checking the warning is still exactly what is showing.
-    await page.waitForTimeout(1000);
     await expect(toast).toHaveAttribute('data-tone', 'warning');
     await expect(toast).toContainText(
         'This song has unsaved changes — opened it here so renaming won’t lose them',

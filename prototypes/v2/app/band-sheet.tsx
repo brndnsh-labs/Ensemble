@@ -1,6 +1,6 @@
 import type { ReactNode, RefObject } from 'react';
 import { useRef } from 'react';
-import { backdropDismiss, whenClosed } from './dialog-close';
+import { dialogRule } from './dialog-close';
 
 export const BAND_TABS = [
     { id: 'players', label: 'Players' },
@@ -57,8 +57,7 @@ export function BandSheet({
             className="feel-panel band-panel"
             ref={dialogRef}
             aria-labelledby="band-title"
-            onClose={whenClosed(onClose)}
-            {...backdropDismiss}
+            {...dialogRule({ onClose })}
         >
             <div className="feel-heading">
                 <h2 id="band-title">Band</h2>

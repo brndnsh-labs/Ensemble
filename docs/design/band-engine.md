@@ -183,7 +183,7 @@ expression devices take turns rather than stack; one peak note per cycle.
       drummer makes you the soloist for every pass but a returned head, even where the trade
       can't happen (the drums off, a drummer who doesn't solo): the band's
       soloist never plays over you, but it does play the head when it comes back.
-    - **The head returns** (the Trade sheet's "Head returns" setting, `SoloistTradeChoruses`,
+    - **The head returns** (the Trade tab's "Melody comes back" setting, `SoloistTradeChoruses`,
       default 2 choruses): with `choruses` set to N, the cycle is the head, then N traded
       passes, then the head again, repeating for as long as the performance loops (pass 0 =
       head, passes 1..N traded, pass N+1 = head, …). "Never (keep trading)" is the original

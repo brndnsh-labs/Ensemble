@@ -1,5 +1,10 @@
 import type { Page } from '@playwright/test';
-import { createAccountThroughDialog, openWithAccounts } from './account-helpers';
+import {
+    accountChip,
+    createAccountThroughDialog,
+    openSignOut,
+    openWithAccounts,
+} from './account-helpers';
 import { expect, openSongMenu, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
 
@@ -83,7 +88,7 @@ test('a guest collection arrives in the account on sign-in, and an unsent collec
 
     // The sign-out step says so, apart from songs, and offers the sync that would send it.
     await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await page.getByTestId('account-sign-out').click();
+    await openSignOut(page);
     await expect(page.getByTestId('sign-out-collections')).toContainText('to your collections');
     await expect(page.getByTestId('sign-out-clear')).toHaveCount(0);
     await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out anyway');
@@ -134,7 +139,7 @@ test('a device whose songs are already in the account is offered its collections
 
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
-        await expect(second.getByTestId('account-sign-out')).toBeVisible();
+        await expect(accountChip(second)).toBeVisible();
 
         // No song is missing from the account, but this device's Starred is: the offer opens on
         // its own, about the collections alone.

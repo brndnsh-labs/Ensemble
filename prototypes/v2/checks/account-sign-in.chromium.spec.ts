@@ -1,9 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
 import {
+    accountChip,
     CODE_SHAPE,
     createAccountThroughDialog,
     dismissAdoptGuestPrompt,
+    openAccountPage,
     openWithAccounts,
     persistedState,
 } from './account-helpers';
@@ -155,7 +157,7 @@ test('signing out and back in, then in again on a fresh profile, reaches the sam
     const authenticator = await addVirtualAuthenticator(page);
     await openWithAccounts(page);
     await createAccountThroughDialog(page);
-    await page.keyboard.press('Escape');
+    await page.getByTestId('recovery-not-now').click();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
     // #1268's adoption prompt auto-opens once the account library has downloaded (this device's
     // guest starters are not in the account). Unrelated to this spec, but it is a modal: every
@@ -164,7 +166,10 @@ test('signing out and back in, then in again on a fresh profile, reaches the sam
 
     // P1-3: offline, sign-out must be disabled with a visible, honest reason rather than shipping
     // enabled and failing silently against a server it cannot reach (rollout decision 9 S2).
-    const signOutButton = page.getByTestId('account-sign-out');
+    // On the account page since #1760: the header keeps only its account chip.
+    await expect(page.getByTestId('account-entry').getByText('Sign out')).toHaveCount(0);
+    const accountPage = await openAccountPage(page);
+    const signOutButton = accountPage.getByTestId('account-sign-out');
     await page.context().setOffline(true);
     await expect(signOutButton).toBeDisabled();
     await expect(page.getByTestId('account-offline-note')).toHaveText(
@@ -186,7 +191,7 @@ test('signing out and back in, then in again on a fresh profile, reaches the sam
     await page.getByTestId('account-sign-in').click();
     await page.getByTestId('account-do-sign-in').click();
     await expect(page.locator('dialog.account-dialog')).toBeHidden();
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(accountChip(page)).toBeVisible();
     // Protection is account state on the server, so it survives the round trip untouched.
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
 
@@ -205,7 +210,7 @@ test('signing out and back in, then in again on a fresh profile, reaches the sam
         await second.getByTestId('account-sign-in').click();
         // `login/options` is usernameless — nothing is typed, and no `register/*` call happens.
         await second.getByTestId('account-do-sign-in').click();
-        await expect(second.getByRole('button', { name: 'Sign out' })).toBeVisible();
+        await expect(accountChip(second)).toBeVisible();
         // It landed on the SAME account, not a new one: that account is the unprotected one.
         await expect(second.getByTestId('account-finish-protecting')).toBeVisible();
     } finally {

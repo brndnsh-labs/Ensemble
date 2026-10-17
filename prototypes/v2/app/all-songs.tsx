@@ -5,6 +5,7 @@ import { starredOf } from '../lib/collections';
 import { arrangementOf, composerOf, genreOf } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import type { AllSongsSort } from '../lib/session';
+import { Menu } from './menu';
 import type { CollectionEntry } from './use-collections';
 
 /** A user collection's view is its id, prefixed so it can never collide with the three below. */
@@ -114,8 +115,8 @@ interface AllSongsProps {
  * user's own collections follow under a "Collections" heading, with "New collection" last.
  * Choosing Starred or a collection shows its songs in the COLLECTION'S order — the sort select
  * gains a "Collection order" choice, picked on entering the view and never remembered as the
- * device's sort — and a user collection offers Rename and Delete… above its rows. Starred offers
- * neither: it is built in.
+ * device's sort — and a user collection's name above its rows has a ⋯ `<Menu>` (#1760) of Rename…
+ * and Delete…, so its red Delete is not always on show. Starred has neither: it is built in.
  */
 export function AllSongs({
     songs: library,
@@ -155,6 +156,9 @@ export function AllSongs({
     const allFilter = useRef<HTMLButtonElement>(null);
     /** The collection whose disappearance just sent the view back to All songs (R5). */
     const fellBackFrom = useRef<string | null>(null);
+    /** The collection bar's ⋯ and whether its menu is open (#1760). */
+    const collectionMenuButton = useRef<HTMLButtonElement>(null);
+    const [collectionMenu, setCollectionMenu] = useState(false);
     // Same courtesy `StandardsBrowser` gives the standards browse view: opening this moves focus
     // to its own heading. Restoring focus on the way OUT is the shell's job instead (#1440 review
     // P3, `app/ensemble.tsx`'s `allSongsEntryRef`) — see `StandardsBrowser`'s own note on why a
@@ -171,6 +175,11 @@ export function AllSongs({
     const activeCollection = view.startsWith('collection:')
         ? (userCollections.find((entry) => `collection:${entry.document.id}` === view) ?? null)
         : null;
+    // Another view (or the collection going) closes its ⋯ menu; the next one opens closed.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `view` is the reset trigger.
+    useEffect(() => {
+        setCollectionMenu(false);
+    }, [view]);
     // A collection deleted (here, or by another device's sync) while it is the view falls back to
     // All songs rather than showing an empty list under a name that no longer exists.
     useEffect(() => {
@@ -499,26 +508,57 @@ export function AllSongs({
                         <div className="collection-bar" data-testid="collection-bar">
                             <h2>{activeCollection.document.name}</h2>
                             <button
-                                className="btn"
-                                data-testid="collection-rename"
-                                disabled={busy}
-                                onClick={() =>
-                                    onRenameCollection(
-                                        activeCollection.document.id,
-                                        activeCollection.document.name,
-                                    )
-                                }
+                                ref={collectionMenuButton}
+                                className="icon-button collection-more"
+                                aria-label={`Actions for the collection ${activeCollection.document.name}`}
+                                aria-haspopup="menu"
+                                aria-expanded={false}
+                                // `aria-disabled`, so the menu can hand focus back to it (#1755).
+                                aria-disabled={busy || undefined}
+                                data-testid="collection-more"
+                                onClick={() => {
+                                    if (!busy || collectionMenu) {
+                                        setCollectionMenu(!collectionMenu);
+                                    }
+                                }}
                             >
-                                Rename
+                                ⋯
                             </button>
-                            <button
-                                className="btn danger"
-                                data-testid="collection-delete"
-                                disabled={busy}
-                                onClick={() => onDeleteCollection(activeCollection.document.id)}
-                            >
-                                Delete…
-                            </button>
+                            {collectionMenu && (
+                                <Menu
+                                    label={`Actions for the collection ${activeCollection.document.name}`}
+                                    title={activeCollection.document.name}
+                                    anchor={() => collectionMenuButton.current}
+                                    align="end"
+                                    onClose={() => setCollectionMenu(false)}
+                                    items={[
+                                        {
+                                            id: 'rename',
+                                            label: 'Rename…',
+                                            testId: 'collection-rename',
+                                            disabled: busy,
+                                            onSelect: () => {
+                                                setCollectionMenu(false);
+                                                onRenameCollection(
+                                                    activeCollection.document.id,
+                                                    activeCollection.document.name,
+                                                );
+                                            },
+                                        },
+                                        {
+                                            id: 'delete',
+                                            label: 'Delete…',
+                                            testId: 'collection-delete',
+                                            danger: true,
+                                            disabled: busy,
+                                            onSelect: () => {
+                                                setCollectionMenu(false);
+                                                onDeleteCollection(activeCollection.document.id);
+                                            },
+                                        },
+                                    ]}
+                                />
+                            )}
                         </div>
                     )}
                     {loaded && accountLibrary && onRemoveGone && goneIds.length > 0 && (

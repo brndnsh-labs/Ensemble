@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import {
+    accountChip,
     backToSongbook,
     closeSongActions,
     createAccountThroughDialog,
@@ -234,7 +235,7 @@ test('a second device signing into the same account is offered nothing, and queu
 
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
-        await expect(second.getByTestId('account-sign-out')).toBeVisible();
+        await expect(accountChip(second)).toBeVisible();
 
         // The download lands, and with it every song the first device adopted.
         await expect(second.getByTestId('library-heading')).toHaveText('Your account songbook');

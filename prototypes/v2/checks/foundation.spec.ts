@@ -280,7 +280,7 @@ test('an older competing draft remains explicitly recoverable after another tab 
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
-    await songMenuAction(page, /Preserved drafts \(/);
+    await songMenuAction(page, /Older drafts \(/);
     await page.getByRole('button', { name: /Blue pocket · 105 BPM/ }).click();
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('105');
     await expect(

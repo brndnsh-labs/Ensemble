@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import {
     backToSongbook,
+    draftKept,
     newSongOnTheStand,
     openSong,
     openWithAccounts,
@@ -88,7 +89,7 @@ test('a song no longer in your account is deleted from the stand with nothing se
     await openSong(page, 'Set list');
     await page.getByRole('button', { name: 'Edit chart' }).click();
     await page.getByLabel('Song title').fill('Set list — my words');
-    await expect(page.getByText('Draft recovered on this device')).toBeVisible();
+    await draftKept(page, 'Set list — my words');
     await backToSongbook(page);
 
     // Delete it from the account and keep it here: the row is marked.

@@ -97,6 +97,7 @@ test('a collection keeps its own order, and deleting it keeps every song', async
     await page.keyboard.press('Escape');
 
     // Delete, box left unchecked: the collection goes, every song stays.
+    await page.getByTestId('collection-more').click();
     await page.getByTestId('collection-delete').click();
     await expect(page.getByTestId('delete-collection-songs-stay')).toHaveText(
         'The 3 songs in it stay in your songbook.',
@@ -129,6 +130,7 @@ test('“also delete” removes only the songs that are in no other collection',
     await expect(page.getByRole('button', { name: /^Starred/ })).toHaveText('Starred 1');
 
     await collectionFilter(page, 'Friday gig').click();
+    await page.getByTestId('collection-more').click();
     await page.getByTestId('collection-delete').click();
     await expect(page.getByTestId('delete-collection-also-songs')).not.toBeChecked();
     await page.getByTestId('delete-collection-also-songs').check();
@@ -157,6 +159,7 @@ test('Starred is a built-in collection: no rename, no delete, not offered to “
     // Starred shows in the order songs were starred.
     await expect(rows(page)).toHaveText(['Blue pocket', 'Minor swing sketch']);
     await expect(page.getByTestId('collection-bar')).toHaveCount(0);
+    await expect(page.getByTestId('collection-more')).toHaveCount(0);
     await expect(page.getByTestId('collection-rename')).toHaveCount(0);
     await expect(page.getByTestId('collection-delete')).toHaveCount(0);
     // It is not one of the user's collections either.
@@ -185,6 +188,7 @@ test('New collection, then Rename, from the All songs page', async ({ page }) =>
     await collectionFilter(page, 'Practice').click();
     await expect(page.locator('.all-songs-empty')).toContainText('No songs in this collection yet');
 
+    await page.getByTestId('collection-more').click();
     await page.getByTestId('collection-rename').click();
     await expect(page.getByTestId('collection-name-input')).toHaveValue('Practice');
     await page.getByTestId('collection-name-input').fill('Sunday practice');
@@ -268,6 +272,7 @@ test('“also delete” decides at confirm time, not from the count the dialog o
     await openAllSongs(page);
     await addToNew(page, 'Minor swing sketch', 'Friday gig');
     await collectionFilter(page, 'Friday gig').click();
+    await page.getByTestId('collection-more').click();
     await page.getByTestId('collection-delete').click();
     await expect(page.locator('.collection-delete-also')).toHaveText(
         'Also delete the 1 song that is in no other collection',
@@ -323,6 +328,7 @@ test('“also delete” never deletes a song that arrived after the dialog opene
     await openAllSongs(page);
     await addToNew(page, 'Minor swing sketch', 'Friday gig');
     await collectionFilter(page, 'Friday gig').click();
+    await page.getByTestId('collection-more').click();
     await page.getByTestId('collection-delete').click();
     await expect(page.locator('.collection-delete-also')).toHaveText(
         'Also delete the 1 song that is in no other collection',

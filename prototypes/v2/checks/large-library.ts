@@ -201,7 +201,7 @@ export async function importTemplate(page: Page): Promise<ChartDocumentV2> {
     const source = `<!doctype html><html><body><a href="${fixture.realExport.sanitizedUrl}">Perf fixture</a></body></html>`;
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Import chart', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Review import' });
+    const dialog = page.getByRole('dialog', { name: /^(Import a chart|Review import)$/ });
     await expect(dialog).toBeVisible();
     await dialog.getByLabel('Import chart file', { exact: true }).setInputFiles({
         name: 'perf-fixture.html',

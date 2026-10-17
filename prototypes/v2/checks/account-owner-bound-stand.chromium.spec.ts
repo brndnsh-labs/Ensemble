@@ -178,7 +178,7 @@ test('a chart from another account is exportable but can never be saved into the
         .click();
     await page.getByTestId('account-create').click();
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
-    await page.keyboard.press('Escape');
+    await page.getByTestId('recovery-not-now').click();
     // B's account library downloads, but #1268's adoption prompt does NOT open here: a chart is
     // on the stand, and the offer waits for the songbook (it is answered there, below).
 

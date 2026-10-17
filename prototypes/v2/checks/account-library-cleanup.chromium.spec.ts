@@ -1,6 +1,7 @@
 import type { Page } from '@playwright/test';
 import {
     backToSongbook,
+    draftKept,
     newSongOnTheStand,
     openSong,
     openWithAccounts,
@@ -31,7 +32,7 @@ async function songHeldByADraft(page: Page, title: string): Promise<void> {
     await openSong(page, title);
     await page.getByRole('button', { name: 'Edit chart' }).click();
     await page.getByLabel('Song title').fill(`${title} — my words`);
-    await expect(page.getByText('Draft recovered on this device')).toBeVisible();
+    await draftKept(page, `${title} — my words`);
     await backToSongbook(page);
 }
 

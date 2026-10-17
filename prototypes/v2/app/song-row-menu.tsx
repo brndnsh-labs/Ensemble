@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_COLLECTION_NAME } from '../lib/collections';
-import { backdropDismiss, whenClosed } from './dialog-close';
+import { closeDialog, dialogRule } from './dialog-close';
 import { Menu } from './menu';
 
 export interface SongRowMenuTarget {
@@ -49,8 +49,9 @@ interface SongRowMenuProps {
  *
  * Rename… and "Add to collection…" ask for more than a pick, so each opens a small dialog in
  * place of the list: a text field for the new title; the user collections, each a button (one
- * the song is already in says so and is disabled), and a name field for a new one. Escape, a
- * backdrop tap and Cancel close it, and the browser hands focus back to the ⋯ the menu left it on.
+ * the song is already in says so and is disabled), and a name field for a new one. Escape and
+ * Cancel close it, and a backdrop tap does until something is typed (`dialogRule`); the browser
+ * hands focus back to the ⋯ the menu left it on.
  */
 export function SongRowMenu({
     song,
@@ -86,7 +87,7 @@ export function SongRowMenu({
         if (asking) {
             dialog.current?.showModal();
         } else {
-            dialog.current?.close();
+            closeDialog(dialog.current);
         }
     }, [asking]);
     // Entering "Add to collection…" moves focus INTO it (#1477 review R5), as Rename's autofocus
@@ -171,9 +172,14 @@ export function SongRowMenu({
                 ref={dialog}
                 className="modal-box row-menu"
                 aria-labelledby="row-menu-heading"
-                onCancel={onClose}
-                onClose={whenClosed(onClose)}
-                {...backdropDismiss}
+                // A title or a collection name typed and not yet saved holds against a backdrop
+                // tap (#1760); Esc and Cancel still close it.
+                {...dialogRule({
+                    onClose,
+                    keep:
+                        (view === 'rename' && title !== (song?.title ?? '')) ||
+                        (view === 'collections' && newName !== ''),
+                })}
             >
                 {song && view === 'rename' ? (
                     <form
@@ -199,14 +205,6 @@ export function SongRowMenu({
                         </label>
                         <div className="dialog-actions">
                             <button
-                                className="btn primary"
-                                type="submit"
-                                data-testid="row-menu-rename-save"
-                                disabled={busy || !title.trim()}
-                            >
-                                Save
-                            </button>
-                            <button
                                 className="btn"
                                 type="button"
                                 data-testid="row-menu-rename-cancel"
@@ -214,6 +212,14 @@ export function SongRowMenu({
                                 onClick={onClose}
                             >
                                 Cancel
+                            </button>
+                            <button
+                                className="btn primary"
+                                type="submit"
+                                data-testid="row-menu-rename-save"
+                                disabled={busy || !title.trim()}
+                            >
+                                Save
                             </button>
                         </div>
                     </form>
@@ -267,6 +273,9 @@ export function SongRowMenu({
                             />
                         </label>
                         <div className="dialog-actions">
+                            <button className="btn" type="button" disabled={busy} onClick={onClose}>
+                                Cancel
+                            </button>
                             <button
                                 className="btn primary"
                                 type="submit"
@@ -274,9 +283,6 @@ export function SongRowMenu({
                                 disabled={busy || !newName.trim()}
                             >
                                 Create and add
-                            </button>
-                            <button className="btn" type="button" disabled={busy} onClick={onClose}>
-                                Cancel
                             </button>
                         </div>
                     </form>

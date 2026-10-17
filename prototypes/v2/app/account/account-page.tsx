@@ -14,7 +14,7 @@ import {
     revokeOtherSessions,
     revokePasskey,
 } from '../../lib/account/passkeys';
-import { whenClosed } from '../dialog-close';
+import { dialogRule } from '../dialog-close';
 import { AccountFailureNotice } from './account-failure';
 import { DeleteAccountStep } from './delete-account';
 import { RecoveryCodeStep } from './recovery-code-step';
@@ -88,7 +88,18 @@ interface AccountPageProps {
      * anything (#1268 patch review P0 — see `libraryDownloaded` in `lib/account/adopt-guest.ts`).
      */
     adoptReady: boolean;
+    /** A sign-out is running (`account.signingOut`): its button waits. */
+    signingOut: boolean;
+    /**
+     * Sign out (#1760: moved here from the header, which keeps only its account chip). The shell
+     * closes this page and opens the sign-out preflight (`sign-out.tsx`), which names what leaving
+     * costs before it costs it.
+     */
+    onSignOut: () => void;
 }
+
+/** Sign out needs a round trip to revoke the server session (rollout decision 9 S2). */
+const SIGN_OUT_OFFLINE = 'Sign out needs a connection';
 
 type Section = 'main' | 'replaceCode' | 'signedOut' | 'deleteAccount' | 'deleted';
 
@@ -103,6 +114,8 @@ export function AccountPage({
     onAccountDeleted,
     onOpenAdopt,
     adoptReady,
+    signingOut,
+    onSignOut,
 }: AccountPageProps) {
     const [section, setSection] = useState<Section>('main');
     const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
@@ -379,8 +392,14 @@ export function AccountPage({
             ref={dialogRef}
             className="modal-box account-page"
             aria-labelledby="account-page-title"
-            onCancel={onClose}
-            onClose={whenClosed(onClose)}
+            // A new recovery code on screen is shown once and never again: only its own buttons
+            // close the page then (#1760). Otherwise Esc always closes it (every await re-checks
+            // `openRef`), and a backdrop tap does not while an action runs or on the delete step.
+            {...dialogRule({
+                onClose,
+                busy: section === 'replaceCode' && code !== '',
+                keep: busy || section === 'replaceCode' || section === 'deleteAccount',
+            })}
         >
             {section === 'replaceCode' && code !== '' ? (
                 <RecoveryCodeStep
@@ -532,6 +551,21 @@ export function AccountPage({
 
                     <section aria-labelledby="account-page-sessions-heading">
                         <h3 id="account-page-sessions-heading">Sessions</h3>
+                        {/* Offline it is disabled with its reason said out loud rather than
+                            shipped enabled to fail against a server it cannot reach. */}
+                        <button
+                            className="btn"
+                            data-testid="account-sign-out"
+                            disabled={busy || signingOut || !online}
+                            onClick={onSignOut}
+                        >
+                            Sign out
+                        </button>
+                        {!online && (
+                            <p className="status-detail" data-testid="account-offline-note">
+                                {SIGN_OUT_OFFLINE}
+                            </p>
+                        )}
                         <button
                             className="btn"
                             data-testid="sign-out-others"

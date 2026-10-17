@@ -1,9 +1,11 @@
 import type { Page } from '@playwright/test';
 import { ACCOUNT_DATABASE } from '../lib/sync/protocol';
 import {
+    accountChip,
     backToSongbook,
     closeSongActions,
     dismissAdoptGuestPrompt,
+    draftKept,
     newSongOnTheStand,
     openSong,
     openSongActions,
@@ -48,7 +50,7 @@ async function signInOnSecondDevice(page: Page): Promise<void> {
     await openWithAccounts(page);
     await page.getByTestId('account-sign-in').click();
     await page.getByTestId('account-do-sign-in').click();
-    await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
+    await expect(accountChip(page)).toBeVisible();
     // A fresh profile: its own seeded guest songs (`openWithAccounts`, #1439), none of them in the account, so #1268's prompt
     // opens here too once the download lands.
     await dismissAdoptGuestPrompt(page);
@@ -57,14 +59,13 @@ async function signInOnSecondDevice(page: Page): Promise<void> {
 /**
  * Retitle without saving, and wait for the store to have taken it.
  *
- * The wait is the point, not politeness: `draft()` writes the account row fire-and-forget, and the
- * sentence below is published only once that write has answered (#1299 patch review P3). Triggering
- * the download pass before it lands would be a race against the very row that makes this record
- * held.
+ * The wait is the point, not politeness: `draft()` writes the account row fire-and-forget
+ * (#1299 patch review P3), and `draftKept` reads that row back. Triggering the download pass
+ * before it lands would be a race against the very row that makes this record held.
  */
 async function retitleWithoutSaving(page: Page, title: string): Promise<void> {
     await page.getByLabel('Song title').fill(title);
-    await expect(page.getByText('Draft recovered on this device')).toBeVisible();
+    await draftKept(page, title);
     await openSongActions(page);
     await expect(page.getByTestId('sync-local')).toHaveText('Unsaved changes');
     await closeSongActions(page);

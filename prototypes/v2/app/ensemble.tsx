@@ -101,6 +101,7 @@ import {
     DeleteCollectionDialog,
 } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
+import { closeDialog } from './dialog-close';
 import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
 import { type BarMarkers, GuidedForm } from './guided-form';
@@ -598,17 +599,16 @@ export default function Ensemble() {
     const [message, setMessageState] = useState('');
     const [messageTone, setMessageToneState] = useState<MessageTone>('info');
     const [messageToken, setMessageToken] = useState(0);
-    // Re-review P3 — a REF, not the `messageTone` state value, because an async caller (the
-    // retention flow below sets "Draft recovered on this device" from inside a promise chain)
-    // closes over whatever `messageTone` was when IT started, which can be stale by the time it
+    // Re-review P3 — a REF, not the `messageTone` state value, because an async caller (one that
+    // sets its message from inside a promise chain) closes over whatever `messageTone` was when IT started, which can be stale by the time it
     // resolves. The ref is always current at call time, which is what the guard below needs.
     const messageToneRef = useRef<MessageTone>('info');
     function setMessage(text: string, options?: { tone?: MessageTone }) {
         const tone = options?.tone ?? 'info';
         // Re-review P3 — a transient `info` message must not silently replace an undismissed
         // `warning`: the rename flow's own warning ("This song has unsaved changes…") was getting
-        // overwritten moments later by the async draft-retention path's plain "Draft recovered on
-        // this device". A `warning` can still replace another `warning` (a newer one supersedes);
+        // overwritten moments later by an async path's plain `info` (the draft-retention toast
+        // then, retired in #1760). A `warning` can still replace another `warning` (a newer one supersedes);
         // only an `info` call is held off. The close button (below) is the one place `messageTone`
         // resets afterward — a dismissed warning must not go on blocking every `info` forever.
         if (messageToneRef.current === 'warning' && tone === 'info') {
@@ -1788,7 +1788,7 @@ export default function Ensemble() {
         if (exportOpen) {
             exportDialogRef.current?.showModal();
         } else {
-            exportDialogRef.current?.close();
+            closeDialog(exportDialogRef.current);
         }
     }, [exportOpen]);
     // The Song menu belongs to the chart on the stand: none left there, nothing of it stays open
@@ -1807,14 +1807,14 @@ export default function Ensemble() {
             setFeel(feelSnapshot());
             bandDialog.current?.showModal();
         } else {
-            bandDialog.current?.close();
+            closeDialog(bandDialog.current);
         }
     }, [bandOpen]);
     useEffect(() => {
         if (accountDialog) {
             accountDialogRef.current?.showModal();
         } else {
-            accountDialogRef.current?.close();
+            closeDialog(accountDialogRef.current);
         }
     }, [accountDialog]);
     // #1266 — the account library is re-read on sign-in and whenever the loop reports it changed
@@ -1926,7 +1926,7 @@ export default function Ensemble() {
         if (accountPageOpen) {
             accountPageDialogRef.current?.showModal();
         } else {
-            accountPageDialogRef.current?.close();
+            closeDialog(accountPageDialogRef.current);
         }
     }, [accountPageOpen]);
     // `inAccount` is a dependency, not just a guard: the confirm step unmounts when the answer
@@ -1940,7 +1940,7 @@ export default function Ensemble() {
         if (deleteOpen) {
             deleteDialogRef.current?.showModal();
         } else {
-            deleteDialogRef.current?.close();
+            closeDialog(deleteDialogRef.current);
         }
     }, [deleteOpen, inAccount]);
     // #1477 — the collection dialogs, driven from their state like the delete dialog above.
@@ -1948,28 +1948,28 @@ export default function Ensemble() {
         if (collectionNaming) {
             collectionNameDialogRef.current?.showModal();
         } else {
-            collectionNameDialogRef.current?.close();
+            closeDialog(collectionNameDialogRef.current);
         }
     }, [collectionNaming]);
     useEffect(() => {
         if (collectionDeleteTarget) {
             collectionDeleteDialogRef.current?.showModal();
         } else {
-            collectionDeleteDialogRef.current?.close();
+            closeDialog(collectionDeleteDialogRef.current);
         }
     }, [collectionDeleteTarget]);
     useEffect(() => {
         if (guestDeleteTarget) {
             guestDeleteDialogRef.current?.showModal();
         } else {
-            guestDeleteDialogRef.current?.close();
+            closeDialog(guestDeleteDialogRef.current);
         }
     }, [guestDeleteTarget]);
     useEffect(() => {
         if (purgeTarget) {
             purgeDialogRef.current?.showModal();
         } else {
-            purgeDialogRef.current?.close();
+            closeDialog(purgeDialogRef.current);
         }
     }, [purgeTarget]);
     // Closes itself if `rowInAccount` goes false while open (the same posture the stand's own
@@ -1992,7 +1992,7 @@ export default function Ensemble() {
         if (rowDeleteTarget) {
             rowDeleteDialogRef.current?.showModal();
         } else {
-            rowDeleteDialogRef.current?.close();
+            closeDialog(rowDeleteDialogRef.current);
         }
     }, [rowDeleteTarget, rowInAccount]);
     // Focus returns to the entry point on the way back from either sub-view (#1440 review P3),
@@ -2066,7 +2066,7 @@ export default function Ensemble() {
             if (moot) {
                 setSignOutStep(null);
             }
-            signOutDialogRef.current?.close();
+            closeDialog(signOutDialogRef.current);
             return;
         }
         signOutDialogRef.current?.showModal();
@@ -2124,7 +2124,7 @@ export default function Ensemble() {
         if (adoptOpen) {
             adoptDialogRef.current?.showModal();
         } else {
-            adoptDialogRef.current?.close();
+            closeDialog(adoptDialogRef.current);
         }
     }, [adoptOpen]);
     /**
@@ -2157,7 +2157,7 @@ export default function Ensemble() {
         if (adoptRemoteOffer !== null) {
             adoptRemoteDialogRef.current?.showModal();
         } else {
-            adoptRemoteDialogRef.current?.close();
+            closeDialog(adoptRemoteDialogRef.current);
         }
     }, [adoptRemoteOffer, adoptRemoteOffered]);
     /**
@@ -2684,10 +2684,15 @@ export default function Ensemble() {
         const reason = failure instanceof Error ? failure.message : String(failure);
         setError(`Draft is only in this tab: ${reason.replace(/\.$/, '')}. Export before closing.`);
     }
+    /**
+     * The draft is kept for recovery on this device. Said by the header's "locally recovered"
+     * alone — never a toast (#1760): this runs on EVERY edit, and "Draft recovered on this
+     * device" told a musician who had recovered nothing that they had, an edit at a time. A real
+     * recovery is announced where it happens, by `open()` ("Recovered your unsaved changes").
+     */
     function retained(next: ChartDocument) {
         volatileDrafts.current.delete(next.id);
         setRecoveryHealthy(true);
-        setMessage('Draft recovered on this device');
     }
     /**
      * Retain nothing for one chart, in the songbook it came from — the account's `drafts` rows or
@@ -2774,7 +2779,7 @@ export default function Ensemble() {
         // copy"/Save is what turns it into a library entry, and `open()` clears the flag the
         // moment that happens. Writing recovery storage for it here would key a slot under
         // the shared id (a catalog id for a standard) that nothing but a Save — which this isn't
-        // — ever clears, so "Preserved drafts" would grow by one per edited-but-unsaved visit.
+        // — ever clears, so "Older drafts" would grow by one per edited-but-unsaved visit.
         // Read from the ref (#1512): a caller that has just awaited `open()` holds a closure
         // whose `sharedDraft` still describes the chart that was on the stand before it.
         if (sharedDraftNow.current) {
@@ -4909,8 +4914,7 @@ export default function Ensemble() {
                 accountDrafts.current.set(moved.id, moved);
                 // Reported only once the store has answered, like `draft()` (#1299 patch review
                 // P3): the flag is a claim about a write that can still fail. The success arm sets
-                // no message — this resolution has its own sentence below, and a later "Draft
-                // recovered on this device" would land on top of it.
+                // no message — this resolution has its own sentence below.
                 accountSync.recover(moved, moved.revision, resolution.ownerId).then(
                     () => setRecoveryHealthy(true),
                     (failure: unknown) => retainInTab(moved, failure),
@@ -5130,8 +5134,8 @@ export default function Ensemble() {
             setSignOutPlan(null);
             setSignOutSongs(null);
             // Unconditional: `saved` is an account chart's committed baseline, and nothing of that
-            // account may outlive the sign-out. (The header carrying Sign out is hidden while a
-            // chart is open, so in practice `currentStore` is already null by the time this runs —
+            // account may outlive the sign-out. (The header's account chip, the way to Sign out,
+            // is hidden while a chart is open, so in practice `currentStore` is already null by the time this runs —
             // which is exactly why the guard below must not be what protects `saved`.)
             setSaved(null);
             if (currentStore.current?.store === 'account') {
@@ -5631,8 +5635,8 @@ export default function Ensemble() {
     /**
      * Write one chart to a file on this device. Extracted from `exportSong` for #1269's sign-out
      * preflight, which exports songs from the LIBRARY rather than the stand — the header (and its
-     * Sign out button) is hidden while a chart is open, so at that moment there is no chart on the
-     * stand to export and the work at risk is named by document id.
+     * account chip, the way to Sign out) is hidden while a chart is open, so at that moment there
+     * is no chart on the stand to export and the work at risk is named by document id.
      *
      * `onExportAccountSongs`'s export-everything offer (#1271) and the sign-out preflight's own
      * export both call this once per song in a plain loop, one user gesture triggering several
@@ -6139,9 +6143,6 @@ export default function Ensemble() {
                         <AccountEntry
                             session={account.session}
                             unprotected={account.recoveryEnrolled === false}
-                            busy={account.signingOut}
-                            online={account.online}
-                            signOutFailure={account.signOutFailure}
                             onSignIn={() => setAccountDialog('signIn')}
                             onFinishProtecting={() => setAccountDialog('recovery')}
                             onOpenAccount={() => {
@@ -6149,12 +6150,6 @@ export default function Ensemble() {
                                 // (#1271), so it asks for it the moment it opens (#1441).
                                 wantLibrary('account');
                                 setAccountPageOpen(true);
-                            }}
-                            onSignOut={() => {
-                                setSignOutPlan(null);
-                                setSignOutSongs(null);
-                                setSignOutStepFailure(null);
-                                setSignOutStep('session');
                             }}
                         />
                     )}
@@ -6552,6 +6547,7 @@ export default function Ensemble() {
                         countInBeat={countInBeat}
                         onPlayToggle={togglePlayback}
                         onBand={() => openBand(lastBandTab.current)}
+                        bandTab={bandTab}
                         onTempo={(value) => change(() => runtime.setTempo(value))}
                         keyOpen={keyOpen}
                         onKeyToggle={() => setKeyOpen((open) => !open)}
@@ -7108,6 +7104,16 @@ export default function Ensemble() {
                     // Same P0 gate as the auto-prompt above: until this device has downloaded the
                     // account library once, "which songs are missing?" has no honest answer here.
                     adoptReady={libraryDownloaded(sync.documents)}
+                    signingOut={account.signingOut}
+                    // Sign out lives on the account page (#1760). The page closes first, as it does
+                    // for the adoption offer, so the preflight is never a modal over a modal.
+                    onSignOut={() => {
+                        setAccountPageOpen(false);
+                        setSignOutPlan(null);
+                        setSignOutSongs(null);
+                        setSignOutStepFailure(null);
+                        setSignOutStep('session');
+                    }}
                 />
             )}
             {accountsOn && signedIn && (

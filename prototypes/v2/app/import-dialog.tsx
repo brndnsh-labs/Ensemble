@@ -16,6 +16,7 @@ import {
 } from '../lib/playlist-import';
 import { directionLabel } from '../lib/score-labels';
 import { capRefusal, MAX_REMOTE_CANDIDATES } from '../lib/sync/repository';
+import { closeDialog, dialogRule } from './dialog-close';
 import './import-dialog.css';
 
 export function downloadImportSource(text: string) {
@@ -117,7 +118,7 @@ export function ImportDialog({
         element.showModal();
         return () => {
             request.current++;
-            element.close();
+            closeDialog(element);
             if (opener?.isConnected) {
                 opener.focus();
             }
@@ -357,11 +358,19 @@ export function ImportDialog({
         }
     }
 
+    // The title says where the musician is (#1760): choosing a file, then reviewing what it held.
+    const title = result || native ? 'Review import' : 'Import a chart';
     return (
         <dialog
             ref={dialog}
             className="import-dialog"
-            aria-label="Review import"
+            aria-label={title}
+            // A backdrop tap closes it only before anything is chosen or typed (#1760): a file
+            // being read, a link typed or a chart under review would be lost to a stray tap.
+            {...dialogRule({
+                onClose,
+                keep: busy || link.trim() !== '' || result !== null || native !== null,
+            })}
             onCancel={(event) => {
                 event.preventDefault();
                 // Reading is cancellable (closing stops the parse — `request` moves on unmount and
@@ -371,7 +380,7 @@ export function ImportDialog({
                 }
             }}
         >
-            <h2>Review import</h2>
+            <h2>{title}</h2>
             <p>Open an iReal Pro export or an Ensemble file. Everything stays on this device.</p>
             <label className="import-field">
                 Choose a chart file
@@ -740,6 +749,18 @@ export function ImportDialog({
             )}
             {error && <p role="alert">{error}</p>}
             <div className="dialog-actions">
+                {source && (
+                    <button
+                        className="btn"
+                        disabled={busy}
+                        onClick={() => downloadImportSource(source)}
+                    >
+                        Download original source
+                    </button>
+                )}
+                <button className="btn" disabled={writing} onClick={onClose}>
+                    Cancel
+                </button>
                 {whole ? (
                     <button
                         className="btn primary"
@@ -764,18 +785,6 @@ export function ImportDialog({
                         onClick={() => void add()}
                     >
                         {busy ? 'Working…' : 'Add to songbook'}
-                    </button>
-                )}
-                <button className="btn" disabled={writing} onClick={onClose}>
-                    Cancel
-                </button>
-                {source && (
-                    <button
-                        className="btn"
-                        disabled={busy}
-                        onClick={() => downloadImportSource(source)}
-                    >
-                        Download original source
                     </button>
                 )}
             </div>

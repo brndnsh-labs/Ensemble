@@ -1,6 +1,8 @@
 import {
+    accountChip,
     closeSongActions,
     newSongOnTheStand,
+    openSignOut,
     openSongActions,
     openWithAccounts,
     saveAndUpload,
@@ -65,7 +67,7 @@ test('a song saved on one device opens on another, and the guest songbook is unt
         // The opt-in is per device, so this profile asks for the account UI itself.
         await second.getByTestId('account-sign-in').click();
         await second.getByTestId('account-do-sign-in').click();
-        await expect(second.getByRole('button', { name: 'Sign out' })).toBeVisible();
+        await expect(accountChip(second)).toBeVisible();
         // Signing in is a trigger: A arrives without the musician asking for a download.
         await expect(songTitles(second)).toHaveText('Take A');
 
@@ -100,7 +102,7 @@ test('a song saved on one device opens on another, and the guest songbook is unt
     // edit this device kept and the account never got, about to be removed. So the step NAMES it
     // and the destructive button says "anyway" — "everything has reached your account" here would
     // be the preflight lying about the retained draft the two assertions above just proved.
-    await page.getByTestId('account-sign-out').click();
+    await openSignOut(page);
     await expect(page.getByTestId('sign-out-drafts')).toContainText(
         'One unsaved experiment is kept on this device',
     );

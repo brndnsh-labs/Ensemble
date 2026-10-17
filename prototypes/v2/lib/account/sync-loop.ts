@@ -868,7 +868,7 @@ export interface SyncLoop {
     retainedDraft(documentId: string): Promise<RetainedDraft | null>;
     /**
      * Every LIVE retained experiment for one account chart, newest first — what the song menu's
-     * "Preserved drafts" list offers (#1299 patch review P2). `retainedDraft` is the same read
+     * "Older drafts" list offers (#1299 patch review P2). `retainedDraft` is the same read
      * narrowed to the newest row; this is how a SECOND tab's experiment is reachable at all.
      */
     preservedDrafts(

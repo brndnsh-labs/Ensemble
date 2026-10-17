@@ -82,7 +82,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Import chart', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Review import' });
+    const dialog = page.getByRole('dialog', { name: /^(Import a chart|Review import)$/ });
     await expect(dialog).toBeVisible();
     const before = await savedDocuments(page);
     await dialog.getByLabel('Import chart file', { exact: true }).setInputFiles({
@@ -162,7 +162,7 @@ test('an unsupported pasted chart preserves the songbook and downloads its exact
 }) => {
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Import chart', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Review import' });
+    const dialog = page.getByRole('dialog', { name: /^(Import a chart|Review import)$/ });
     await dialog.getByText('Or paste an iReal link', { exact: true }).click();
     const source = openProtocol('T44[C   |Cnotachord   |G7   Z');
     const before = await savedDocuments(page);
@@ -216,7 +216,7 @@ for (const study of [
     }) => {
         await page.goto(appUrl());
         await page.getByRole('button', { name: 'Import chart', exact: true }).click();
-        const dialog = page.getByRole('dialog', { name: 'Review import' });
+        const dialog = page.getByRole('dialog', { name: /^(Import a chart|Review import)$/ });
         await dialog.getByText('Or paste an iReal link', { exact: true }).click();
         await dialog.getByLabel('iReal link', { exact: true }).fill(openProtocol(study.body));
         await dialog.getByRole('button', { name: 'Review link', exact: true }).click();

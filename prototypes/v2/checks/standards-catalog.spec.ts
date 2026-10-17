@@ -117,7 +117,7 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
  * A shared draft — a standard here, a `#chart=` link in `share-link.spec.ts` — belongs to no songbook yet (`landDraftOnStand`'s own doc comment:
  * "no recovery-storage write"). `draft()` used to write one anyway on every edit, keyed under
  * the standard's own catalog id (`ensemble-v2-preview:recovery:<writer>:standard-…`) — a slot
- * nothing but a Save, which this never is, ever clears, so "Preserved drafts (N)" grew by one per
+ * nothing but a Save, which this never is, ever clears, so "Older drafts (N)" grew by one per
  * edited-but-unsaved visit.
  */
 test('editing an open standard writes nothing to recovery storage', async ({ page }) => {
@@ -146,7 +146,7 @@ test('editing an open standard writes nothing to recovery storage', async ({ pag
 
     await songMenuAction(page, 'More');
     await expect(songMenu(page, 'more')).toBeVisible();
-    await expect(page.getByText(/Preserved drafts \(/)).toHaveCount(0);
+    await expect(page.getByText(/Older drafts \(/)).toHaveCount(0);
 });
 
 /**

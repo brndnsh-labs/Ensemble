@@ -1733,7 +1733,7 @@ describe('the sync loop retains an account chart’s unsaved experiment', () => 
     });
 
     it('offers every live retained draft to the menu, newest first, and no superseded one', async () => {
-        // The song menu's "Preserved drafts" list (#1299 patch review P2). Without it a SECOND
+        // The song menu's "Older drafts" list (#1299 patch review P2). Without it a SECOND
         // tab's experiment on this song is unreachable: nothing in the product can open it, and
         // the only thing that mentions it is a sign-out warning.
         const loop = await attached(

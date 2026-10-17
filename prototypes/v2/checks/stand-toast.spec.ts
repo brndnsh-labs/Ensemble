@@ -117,11 +117,20 @@ test('the same message set again inside the first 4s gets a fresh 4s window', as
     // updating in place would leave nothing for a live region's mutation observer to react to. A
     // custom property set directly on the DOM element instance survives an in-place text update
     // but is lost the moment React unmounts/remounts the node.
-    const stillMarked = await page.evaluate(() => {
-        const span = document.querySelector('[data-testid="stand-toast"] span');
-        return (span as unknown as { __marker?: boolean } | null)?.__marker === true;
-    });
-    expect(stillMarked).toBe(false);
+    // Polled, not read once: the toast already says "Saved on this device" from the first Save,
+    // so the assertion above passes before the second Save lands. Until #1760 an edit's own
+    // "Draft recovered" toast sat between the two and hid that race. The window stays inside
+    // the first toast's 4s, so a span that is never replaced still fails here.
+    await expect
+        .poll(
+            () =>
+                page.evaluate(() => {
+                    const span = document.querySelector('[data-testid="stand-toast"] span');
+                    return (span as unknown as { __marker?: boolean } | null)?.__marker === true;
+                }),
+            { timeout: 2000 },
+        )
+        .toBe(false);
 
     // ~3s after the SECOND set (4.5s after the first): still up. Without the re-arm, the FIRST
     // window (armed at t=0, due at t≈4000ms) would already have cleared it by now.

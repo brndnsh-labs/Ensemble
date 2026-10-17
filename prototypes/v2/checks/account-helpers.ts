@@ -1,5 +1,6 @@
 import type { Page } from '@playwright/test';
 import { RECOVERY_CODE_SHAPE } from '../lib/account/messages';
+import { ACCOUNT_DATABASE } from '../lib/sync/protocol';
 import { editorRevealed, expect, openSongMenu, seedStarters, songMenu } from './fixtures';
 
 /**
@@ -169,12 +170,39 @@ export async function dismissAdoptGuestPrompt(page: Page): Promise<void> {
     await expect(dialog).toBeHidden();
 }
 
+/**
+ * The signed-in header's account chip (#1760): "Signed in", or "Account" beside "Finish
+ * protecting your account". It is the header's only signed-in control, so it is the signal that a
+ * sign-in has landed.
+ */
+export const accountChip = (page: Page) =>
+    page
+        .getByTestId('account-entry')
+        .locator('[data-testid="account-state"], [data-testid="account-open"]');
+
+/** The account page (#1264), opened from the header's chip. */
+export async function openAccountPage(page: Page) {
+    const accountPage = page.locator('dialog.account-page');
+    await accountChip(page).click();
+    await expect(accountPage).toBeVisible();
+    return accountPage;
+}
+
+/** Sign out, from the account page (#1760), to the sign-out preflight (#1269). */
+export async function openSignOut(page: Page): Promise<void> {
+    const accountPage = await openAccountPage(page);
+    await accountPage.getByTestId('account-sign-out').click();
+    await expect(accountPage).toBeHidden();
+    await expect(page.locator('dialog[aria-labelledby="sign-out-title"]')).toBeVisible();
+}
+
 /** Creates an account and walks away from the recovery step, which costs no second enrolment. */
 export async function signUp(page: Page): Promise<void> {
     await page.getByTestId('account-sign-in').click();
     await page.getByTestId('account-create').click();
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
-    await page.keyboard.press('Escape');
+    // Not Esc: a code on screen is shown once, and only its own buttons close the step (#1760).
+    await page.getByTestId('recovery-not-now').click();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
     // #1268's adoption prompt auto-opens once the account library has downloaded, and this
     // device's guest starters are not in the account — it is unrelated to this spec, but it is a
@@ -209,6 +237,49 @@ export async function openSongActions(page: Page): Promise<void> {
 export async function closeSongActions(page: Page): Promise<void> {
     await page.keyboard.press('Escape');
     await expect(songMenu(page)).toHaveCount(0);
+}
+
+/**
+ * Wait until this device's account database holds an unsaved draft titled `title` (#1299): the
+ * row that makes a record "held" against a download or a cloud delete. Read from IndexedDB
+ * itself, because nothing on screen says when that write has landed — the toast that used to
+ * ("Draft recovered on this device") went in #1760, since it fired on every edit.
+ */
+export async function draftKept(page: Page, title: string): Promise<void> {
+    await expect
+        .poll(() =>
+            page.evaluate(
+                ([name, wanted]) =>
+                    new Promise<boolean>((resolve) => {
+                        const request = indexedDB.open(name);
+                        request.onerror = () => resolve(false);
+                        request.onsuccess = () => {
+                            const db = request.result;
+                            if (!db.objectStoreNames.contains('drafts')) {
+                                db.close();
+                                resolve(false);
+                                return;
+                            }
+                            const read = db.transaction('drafts', 'readonly').objectStore('drafts');
+                            const all = read.getAll();
+                            all.onsuccess = () => {
+                                db.close();
+                                resolve(
+                                    (all.result as { document?: { title?: string } }[]).some(
+                                        (row) => row.document?.title === wanted,
+                                    ),
+                                );
+                            };
+                            all.onerror = () => {
+                                db.close();
+                                resolve(false);
+                            };
+                        };
+                    }),
+                [ACCOUNT_DATABASE, title] as const,
+            ),
+        )
+        .toBe(true);
 }
 
 /** Retitle and commit. The Save button going disabled is the shell's own "committed" signal. */

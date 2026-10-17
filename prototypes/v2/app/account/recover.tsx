@@ -58,14 +58,24 @@ interface RecoverFlowProps {
     onClose: () => void;
     /** Re-read the session (and recovery status) once a ceremony has changed it. */
     onAccountChanged: () => void;
+    /**
+     * Whether the replacement code is on screen (#1760): shown once and never again, so the
+     * dialog takes no Esc and no backdrop tap while it is. A stable setter.
+     */
+    onCodeShown: (shown: boolean) => void;
 }
 
-export function RecoverFlow({ onBack, onClose, onAccountChanged }: RecoverFlowProps) {
+export function RecoverFlow({ onBack, onClose, onAccountChanged, onCodeShown }: RecoverFlowProps) {
     const [step, setStep] = useState<Step>('code');
     const [typedCode, setTypedCode] = useState('');
     const [newCode, setNewCode] = useState('');
     const [busy, setBusy] = useState(false);
     const [failure, setFailure] = useState<AccountFailure | null>(null);
+    const codeShown = step === 'done' && newCode !== '';
+    useEffect(() => {
+        onCodeShown(codeShown);
+    }, [codeShown, onCodeShown]);
+    useEffect(() => () => onCodeShown(false), [onCodeShown]);
 
     /**
      * Every await below outlives a possible close — a passkey prompt is a human pressing a

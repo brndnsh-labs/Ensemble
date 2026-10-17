@@ -2,7 +2,7 @@
 
 import type { RefObject } from 'react';
 import { PURGE_MESSAGES } from '../../lib/account/messages';
-import { whenClosed } from '../dialog-close';
+import { dialogRule } from '../dialog-close';
 
 /**
  * The confirm step for deleting account songs from THIS DEVICE for good (#1754): one song a cloud
@@ -48,14 +48,7 @@ export function PurgeSongsDialog({
             className="modal-box"
             aria-labelledby="purge-songs-title"
             data-testid="purge-songs"
-            onCancel={(event) => {
-                if (busy) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
-            onClose={whenClosed(onClose)}
+            {...dialogRule({ onClose, busy })}
         >
             {title === null ? (
                 <>
@@ -85,20 +78,20 @@ export function PurgeSongsDialog({
                     </button>
                 )}
                 <button
-                    className="btn danger"
-                    data-testid="purge-songs-confirm"
-                    disabled={busy}
-                    onClick={onConfirm}
-                >
-                    {title === null ? 'Remove' : 'Delete'}
-                </button>
-                <button
                     className="btn"
                     data-testid="purge-songs-cancel"
                     disabled={busy}
                     onClick={onClose}
                 >
                     Cancel
+                </button>
+                <button
+                    className="btn danger"
+                    data-testid="purge-songs-confirm"
+                    disabled={busy}
+                    onClick={onConfirm}
+                >
+                    {title === null ? 'Remove' : 'Delete'}
                 </button>
             </div>
         </dialog>

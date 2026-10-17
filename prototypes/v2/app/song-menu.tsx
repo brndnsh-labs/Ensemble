@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useRef } from 'react';
 import type * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
-import { backdropDismiss, whenClosed } from './dialog-close';
+import { closeDialog, dialogRule } from './dialog-close';
 import { Menu, type MenuItem } from './menu';
 
 type Recovery = ReturnType<typeof repository.recoveriesFor>[number];
@@ -52,7 +52,7 @@ function useModal(open: boolean) {
                 ref.current?.showModal();
             }
         } else {
-            ref.current?.close();
+            closeDialog(ref.current);
         }
     }, [open]);
     return ref;
@@ -65,7 +65,7 @@ function useModal(open: boolean) {
  * (Export… is the shell's `ExportDialog`).
  *
  * More opens a second `<Menu>` in place of the first, at the same •••: Revert to saved and
- * Preserved drafts… (when this device holds any). A submenu beside the first would be a second
+ * Older drafts… (when this device holds any). A submenu beside the first would be a second
  * list to aim at on a laptop and makes no sense in a phone's sheet; swapping the list keeps one
  * menu on screen, and Esc still lands back on the •••.
  *
@@ -150,7 +150,7 @@ export function SongMenu({
             ? [
                   {
                       id: 'drafts',
-                      label: `Preserved drafts (${recoveryOptions.length})…`,
+                      label: `Older drafts (${recoveryOptions.length})…`,
                       testId: 'song-menu-drafts',
                       disabled: busy,
                       onSelect: () => onView('drafts'),
@@ -179,11 +179,9 @@ export function SongMenu({
                 className="modal-box"
                 aria-labelledby="preserved-drafts-title"
                 data-testid="preserved-drafts"
-                onCancel={close}
-                onClose={whenClosed(close)}
-                {...backdropDismiss}
+                {...dialogRule({ onClose: close })}
             >
-                <h2 id="preserved-drafts-title">Preserved drafts</h2>
+                <h2 id="preserved-drafts-title">Older drafts</h2>
                 <p>
                     Older or competing drafts are kept here even after a newer save. Open one as an
                     independent copy; the song you have open is unchanged.
@@ -222,9 +220,7 @@ export function SongMenu({
                 className="modal-box"
                 aria-labelledby="share-link-title"
                 data-testid="share-link"
-                onCancel={onCloseShareLink}
-                onClose={whenClosed(onCloseShareLink)}
-                {...backdropDismiss}
+                {...dialogRule({ onClose: onCloseShareLink })}
             >
                 <h2 id="share-link-title">Copy this link</h2>
                 {shareLinkFallback !== null && (

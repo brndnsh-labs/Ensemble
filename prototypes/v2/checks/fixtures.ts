@@ -589,7 +589,7 @@ export async function openSongMenu(page: Page): Promise<Locator> {
 
 /**
  * Chooses one row of the Song menu (#1756), opening it first: a top-level action (Copy link,
- * Duplicate, Export…, Delete…) or one under More (Revert to saved, Preserved drafts (N)…). A
+ * Duplicate, Export…, Delete…) or one under More (Revert to saved, Older drafts (N)…). A
  * row that is `aria-disabled` is waited on, as a disabled button is.
  */
 export async function songMenuAction(page: Page, name: string | RegExp): Promise<void> {

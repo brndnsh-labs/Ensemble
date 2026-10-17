@@ -110,7 +110,7 @@ local browser projects and never deploys.
   There is no v1 import (retired in #1736): v1's songs were copied over while it existed, and
   the `ensemble_*` keys are left on the device, inert and never read or deleted.
 - IndexedDB `ensemble-v2-preview` holds explicit saves with atomic revision comparison. Local
-  recovery keys are writer-scoped; older competing drafts remain accessible in the Song menu's More › Preserved drafts….
+  recovery keys are writer-scoped; older competing drafts remain accessible in the Song menu's More › Older drafts….
   Quota errors retain the current draft in memory and warn before leaving the page where the
   browser supports that prompt. Browser eviction/clearing can still remove local data: export
   valuable charts. This preview does not promise durable cloud backup.

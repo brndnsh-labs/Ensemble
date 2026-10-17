@@ -1,13 +1,13 @@
 import type { RefObject } from 'react';
 import { useEffect, useState } from 'react';
 import { MAX_COLLECTION_NAME } from '../lib/collections';
-import { whenClosed } from './dialog-close';
+import { dialogRule } from './dialog-close';
 
 /**
  * The two collection dialogs of the All songs page (#1477): naming one (New collection, Rename)
  * and deleting one. Both follow the row menu's pattern — the shell owns the `dialogRef` and drives
- * `showModal()`/`close()` from its own state, so Escape, the backdrop and focus restore are the
- * browser's own `<dialog>` behavior. Presentational: every write is the shell's.
+ * `showModal()`/`close()` from its own state, and `dialogRule` (#1760) closes them: a name typed
+ * and not saved holds against a backdrop tap. Presentational: every write is the shell's.
  */
 
 export type CollectionNameRequest =
@@ -36,19 +36,13 @@ export function CollectionNameDialog({
         setName(request?.kind === 'rename' ? request.name : '');
     }, [request]);
     const trimmed = name.trim();
+    const typed = name !== (request?.kind === 'rename' ? request.name : '');
     return (
         <dialog
             ref={dialogRef}
             className="modal-box"
             aria-labelledby="collection-name-title"
-            onCancel={(event) => {
-                if (busy) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
-            onClose={whenClosed(onClose)}
+            {...dialogRule({ onClose, busy, keep: typed })}
         >
             <form
                 onSubmit={(event) => {
@@ -74,6 +68,9 @@ export function CollectionNameDialog({
                     />
                 </label>
                 <div className="dialog-actions">
+                    <button className="btn" type="button" disabled={busy} onClick={onClose}>
+                        Cancel
+                    </button>
                     <button
                         className="btn primary"
                         type="submit"
@@ -81,9 +78,6 @@ export function CollectionNameDialog({
                         disabled={busy || !trimmed}
                     >
                         {request?.kind === 'rename' ? 'Save' : 'Create'}
-                    </button>
-                    <button className="btn" type="button" disabled={busy} onClick={onClose}>
-                        Cancel
                     </button>
                 </div>
             </form>
@@ -143,14 +137,7 @@ export function DeleteCollectionDialog({
             ref={dialogRef}
             className="modal-box"
             aria-labelledby="delete-collection-title"
-            onCancel={(event) => {
-                if (busy) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
-            onClose={whenClosed(onClose)}
+            {...dialogRule({ onClose, busy })}
         >
             <h2 id="delete-collection-title">Delete the collection “{target?.name}”?</h2>
             <p data-testid="delete-collection-songs-stay">
@@ -195,20 +182,20 @@ export function DeleteCollectionDialog({
             )}
             <div className="dialog-actions">
                 <button
-                    className="btn danger"
-                    data-testid="delete-collection-confirm"
-                    disabled={busy || blocked}
-                    onClick={() => onConfirm(alsoSongs)}
-                >
-                    {alsoSongs ? 'Delete collection and songs' : 'Delete collection'}
-                </button>
-                <button
                     className="btn"
                     data-testid="delete-collection-cancel"
                     disabled={busy}
                     onClick={onClose}
                 >
                     Cancel
+                </button>
+                <button
+                    className="btn danger"
+                    data-testid="delete-collection-confirm"
+                    disabled={busy || blocked}
+                    onClick={() => onConfirm(alsoSongs)}
+                >
+                    {alsoSongs ? 'Delete collection and songs' : 'Delete collection'}
                 </button>
             </div>
         </dialog>

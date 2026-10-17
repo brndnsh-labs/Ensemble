@@ -1,7 +1,7 @@
 'use client';
 
 import type { RefObject } from 'react';
-import { whenClosed } from '../dialog-close';
+import { dialogRule } from '../dialog-close';
 
 /**
  * The confirm step for taking the account's newer version of the open song (#1310).
@@ -20,13 +20,14 @@ import { whenClosed } from '../dialog-close';
  *
  * Three rules, the same three `delete-song.tsx` holds, for the same reasons:
  *
- * 1. **The export is offered, not implied**, and it comes FIRST — before the destructive button, in
- *    reading order — because a file on the musician's own disk is the only copy of this experiment
+ * 1. **The export is offered, not implied**, and it comes FIRST — before Cancel and the
+ *    destructive button, which is last (#1760) — because a file on the musician's own disk is the only copy of this experiment
  *    that survives either answer. It writes the chart as it stands on the stand, edits included.
  * 2. **What is lost is named before it is risked.** The song by name, and the experiment as the
  *    thing that goes: a sentence about "syncing" would describe a housekeeping task rather than a
  *    discard.
- * 3. **Nothing dismisses this step while the write is in flight** — not Cancel, not Escape. The
+ * 3. **Nothing dismisses this step while the write is in flight** — not Cancel, not Escape, not a
+ *    backdrop tap. The
  *    answer to a destructive question is written here.
  *
  * Offline is deliberately NOT a gate, unlike deleting or signing out. This sends nothing: the
@@ -62,14 +63,7 @@ export function AdoptRemoteDialog({
             ref={dialogRef}
             className="modal-box"
             aria-labelledby="adopt-remote-title"
-            onCancel={(event) => {
-                if (busy) {
-                    event.preventDefault();
-                    return;
-                }
-                onClose();
-            }}
-            onClose={whenClosed(onClose)}
+            {...dialogRule({ onClose, busy })}
         >
             <h2 id="adopt-remote-title">Use your account’s version of “{title}”?</h2>
             <p>
@@ -111,19 +105,20 @@ export function AdoptRemoteDialog({
                 </button>
                 <button
                     className="btn"
-                    data-testid="adopt-remote-confirm"
-                    disabled={busy}
-                    onClick={onConfirm}
-                >
-                    Use the account’s version
-                </button>
-                <button
-                    className="btn"
                     data-testid="adopt-remote-cancel"
                     disabled={busy}
                     onClick={onClose}
                 >
                     Cancel
+                </button>
+                <button
+                    // Red only when it discards unsaved edits; with none, it loses nothing (#1760).
+                    className={unsavedEdits ? 'btn danger' : 'btn'}
+                    data-testid="adopt-remote-confirm"
+                    disabled={busy}
+                    onClick={onConfirm}
+                >
+                    Use the account’s version
                 </button>
             </div>
         </dialog>

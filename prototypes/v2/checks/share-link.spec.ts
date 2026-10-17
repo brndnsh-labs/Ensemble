@@ -100,7 +100,7 @@ test('editing an opened share link before Keep a copy writes nothing to recovery
 
     await songMenuAction(fresh, 'More');
     await expect(songMenu(fresh, 'more')).toBeVisible();
-    await expect(fresh.getByText(/Preserved drafts \(/)).toHaveCount(0);
+    await expect(fresh.getByText(/Older drafts \(/)).toHaveCount(0);
 });
 
 test('a share link too long to play is refused with the reason, not silently (#1632)', async ({
