@@ -73,8 +73,7 @@ await writeFile(
 // rather than send it as an nginx response header, because the Playwright preview server
 // (scripts/serve.mjs) sets no headers at all — an nginx-only policy would never be exercised
 // by the one suite that checks it. `hosting/web/nginx.conf` keeps `frame-ancestors` (a `<meta>`
-// CSP cannot carry that directive) and its comment now points here instead of claiming the app
-// still carries its own header-shaped policy from v1's deleted `index.html`.
+// CSP cannot carry that directive) and its comment points here.
 //
 // A static export has no per-request nonce, so every inline `<script>` (the constant theme
 // script in `app/layout.tsx`, plus the per-page RSC streaming pushes Next itself emits) gets its
@@ -190,7 +189,7 @@ const shellCaches = 'ensemble-v2-root-';
 
 // What an in-scope navigation gets when it is not in the cache. The scope is the origin, so
 // `/anything` reaches this handler. The rule: a navigation that the NETWORK refuses falls back
-// to the cached shell, so `/?accounts=on` still opens a working stand on a train. A 404 is a
+// to the cached shell, so a page with a query (`/?autoplay=1`) still opens a working stand on a train. A 404 is a
 // fetch that SUCCEEDED, so a real missing path stays a real missing path, and a subresource
 // request is never given HTML.
 const navigationFallback = `

@@ -160,7 +160,7 @@ export function commitDelete(db: DatabaseSync, command: DeleteCommand): DeleteOu
             // at the cap out of its own remedy, and the remedy is the whole point of the endpoint.
             //
             // Exempting the refusal is not free, but the residual is NOT the one the stage-3
-            // review accepted for Save's receipts (`docs/design/ensemble-v2-rollout.md` decision
+            // review accepted for Save's receipts (`docs/archive/ensemble-v2-rollout.md` decision
             // 11, #1256) — that decision covered an unbounded fresh-operation-id loop against one
             // tombstone, and step 2 above closes exactly that loop by writing no receipt on the
             // already-tombstoned path. After that fix, the only receipt a delete can still leave

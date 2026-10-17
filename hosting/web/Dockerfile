@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # The `ensemble-web` image (#1356): the v2 music stand, built at `/`, inside
-# an unprivileged nginx. Decision 1 of docs/design/ensemble-v2-rollout.md — the static site
+# an unprivileged nginx. Decision 1 of docs/archive/ensemble-v2-rollout.md — the static site
 # becomes an immutable artifact released by tag like the API, and rollback is the previous tag.
 #
 # Build context: hosting/web — three small files, of which this one COPYs two. (`smoke.mjs`

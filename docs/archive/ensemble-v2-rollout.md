@@ -1,11 +1,16 @@
 # Ensemble v2 rollout: from beta stand to the site
 
+*Archived 2026-10-17 (#1744). Every phase shipped, and the Retire v1 milestone (#1735–#1744)
+removed what the hard cut left behind. The numbered decisions still bind where living docs and
+code comments cite them (decision 1, the hosting shape; decision 9, the sync scope); the phase
+plan and its v1 compatibility steps are history.*
+
 **DECISION 2026-09-15.** Brandon set the goal: v2 becomes the Ensemble site, hosted on
 docker04 as containers like every other first-party app, with accounts that store a library on
 our server. He gave broad latitude to run the work once the decisions below were made. This
 document is the durable record of those decisions and the phase plan; the live tracker is the
 GitHub milestones it names. It supersedes the "no production cutover is authorized" language in
-[`ensemble-v2.md`](ensemble-v2.md) and [`ensemble-v2-sync.md`](ensemble-v2-sync.md) — the
+[`ensemble-v2.md`](../design/ensemble-v2.md) and [`ensemble-v2-sync.md`](../design/ensemble-v2-sync.md) — the
 cutover is now authorized *as the end of this plan*, gated by the acceptance in each phase, not by
 a further product decision.
 
@@ -57,7 +62,7 @@ a further product decision.
 
 9. **Phase 3/4 simplifications (DECISION 2026-09-17, Brandon: "keep this simple and modern +
    easy to maintain long term").** These supersede the matching paragraphs of
-   [`ensemble-v2-sync.md`](ensemble-v2-sync.md); do not build the superseded machinery from
+   [`ensemble-v2-sync.md`](../design/ensemble-v2-sync.md); do not build the superseded machinery from
    that contract.
    - **S1 — manifest diff, not a change feed.** The client pages an `(id, revision, deleted)`
      manifest and diffs it against local records. No server watermark, cursor expiry or

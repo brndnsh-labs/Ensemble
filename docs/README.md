@@ -17,14 +17,14 @@ This folder groups the living documentation for Ensemble.
 
 - [`docs/design/chords-3.md`](design/chords-3.md) — keyboard/guitar player architecture, Acoustic pilot, and listening comparison.
 - [`docs/design/ensemble-v2.md`](design/ensemble-v2.md) — approved home, local-first songbook and music-stand direction; isolated preview and later account/import boundaries.
-- [`docs/design/ensemble-v2-charts.md`](design/ensemble-v2-charts.md) — semantic-chart/full iReal compatibility direction, additive codec, live measure editor/conservative import, and remaining compatibility boundaries.
+- [`docs/design/ensemble-v2-charts.md`](design/ensemble-v2-charts.md) — semantic-chart/full iReal compatibility direction, the one chart schema (2) and how schema 1 was retired, live measure editor/conservative import, and remaining iReal boundaries.
 - [`docs/design/ensemble-v2-sync.md`](design/ensemble-v2-sync.md) — approved recovery direction, implemented account-local outbox, staged cloud/offline acceptance and hosting decisions (#1172).
-- [`hosting/README.md`](../hosting/README.md) — the shared test/production stack on docker04: the `ensemble-web` and `ensemble-api` images, release-by-tag from CI, the cutover's edge config, and the static runtime kept as v1's rollback until it is cleaned up.
+- [`hosting/README.md`](../hosting/README.md) — the shared test/production stack on docker04: the `ensemble-web` and `ensemble-api` images, release-by-tag from CI, and the edge config.
 - [`prototypes/v2/CLAUDE.md`](../prototypes/v2/CLAUDE.md) — cross-provider v2 handoff, delivery rules, test gates and ownership boundaries.
 - [`docs/design/ensemble-v2-next-batch.md`](design/ensemble-v2-next-batch.md) — next bounded cycle batch; approval/filing state is explicit in the document.
 - [`docs/design/ensemble-v2-guided-form.md`](design/ensemble-v2-guided-form.md) — guided repeat/ending authoring, compiler-derived previews and advanced-form preservation (#1176).
 
-- [`docs/design/`](design/) — living design docs for load-bearing models: [`design/songbook.md`](design/songbook.md) (durable chart documents, migration, and rollback), [`design/timing-model.md`](design/timing-model.md) (the three-tier micro-timing law + the uniform-shift proof), and [`design/write-ownership.md`](design/write-ownership.md) (the write-ownership invariant — runtime never writes a document/preferences field; composes with the timing-model law).
+- [`docs/design/`](design/) — living design docs for load-bearing models: [`design/songbook.md`](design/songbook.md) (durable chart documents and their ownership boundary; its v1 migration plan is history), [`design/timing-model.md`](design/timing-model.md) (the three-tier micro-timing law + the uniform-shift proof), and [`design/write-ownership.md`](design/write-ownership.md) (the write-ownership invariant — runtime never writes a document/preferences field; composes with the timing-model law).
 - [`docs/guides/`](guides/) — implementation notes and reference guides.
 - [`docs/guides/PERFORMANCE_GUIDELINES.md`](guides/PERFORMANCE_GUIDELINES.md) — hot-loop performance notes.
 - [`docs/guides/musical-engine-patterns.md`](guides/musical-engine-patterns.md) — reusable recipes for generative-engine work (5 smells in critique tests, coordination patterns, loop-awareness, final-stage multiplier discipline, seeded determinism). Extracted from the completed musical audit.
@@ -32,7 +32,6 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/ensemble-v2-auth-threat-model.md`](design/ensemble-v2-auth-threat-model.md) — account authentication controls, residual risks and the outstanding proxy verification gate (#1192).
 - [`docs/design/ensemble-v2-document-authorization-review.md`](design/ensemble-v2-document-authorization-review.md) — stage-3 exit gate (#1204): independent authorization/IDOR review of the owner-bound document API, its exit receipt and residual risks.
 - [`docs/design/band-engine.md`](design/band-engine.md) — DECISION 2026-09-23/25: the ground-up band engine (`band/`), the default since the 2026-09-25 cutover, and the only engine the app runs.
-- [`docs/design/ensemble-v2-rollout.md`](design/ensemble-v2-rollout.md) — DECISION 2026-09-15: v2 becomes the site; immutable images on docker04, core-parity bar, hard cut of v1, five phased milestones.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
 - [`docs/agents/`](agents/) — repo config read by the general-purpose engineering skills: [`issue-tracker.md`](agents/issue-tracker.md), [`triage-labels.md`](agents/triage-labels.md) (triage roles mapped onto `status:*`), [`domain.md`](agents/domain.md) (where the glossary and decisions live).
 - [`docs/FLAKY_TESTS.md`](FLAKY_TESTS.md) — registry of known-flaky tests, the four flake classes (unseeded-statistical / ordering-dependent / e2e-timing / slow-legitimate), and their fixes. Diagnose new flakes with the `/flake` skill.
@@ -42,5 +41,6 @@ This folder groups the living documentation for Ensemble.
 Frozen archives — historical context only. The live tracker is GitHub issues (see CLAUDE.md § Work Pipeline); do not pick up work from these.
 
 - [`docs/archive/`](archive/) — completed reports and archived audits, including [`TECH_DEBT.md`](archive/TECH_DEBT.md) (the May 2026 state-discipline audit snapshot; its remaining mutation finding was superseded by the detached-render exception in `CLAUDE.md`), [`TYPESCRIPT_MIGRATION.md`](archive/TYPESCRIPT_MIGRATION.md) (the finished TS migration) and [`soloist-phrase-first.md`](archive/soloist-phrase-first.md) (design proposal for the deleted soloist generator).
+- [`docs/archive/ensemble-v2-rollout.md`](archive/ensemble-v2-rollout.md) — DECISION 2026-09-15: v2 becomes the site; immutable images on docker04, core-parity bar, hard cut of v1, five phased milestones. Archived in #1744 once every phase shipped; decisions 1 (hosting shape) and 9 (sync scope) are still cited by number.
 - [`docs/synth-audit/`](synth-audit/) — **⛔ frozen archive** of the synth-realism audit (7 epics, shipped). Live synth work is GitHub issues, Track `synth`.
 - [`docs/audit/FOLLOWUPS.md`](audit/FOLLOWUPS.md) — **⛔ frozen archive** of the musical-audit follow-up backlog. Live follow-ups are `finding`/`backlog` issues on the GitHub tracker. The audit cycle itself is archived at [`docs/archive/musical-audit-2026-05/`](archive/musical-audit-2026-05/).

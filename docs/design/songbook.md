@@ -5,6 +5,14 @@ design targets and must ship as separately reviewed stories.
 **Date:** 2026-08-26
 **Amended 2026-09-26 (#1424):** v1's session writer and reader that §1 and §10 describe
 (`saveCurrentState()`, `hydrateState()`) are deleted; a chart document is the only save.
+**Amended 2026-10-17 (#1740, #1744, Retire v1):** there is one chart schema, 2
+(`public/songbook/document-v2.ts`). The version-1 `ChartDocument` codec, its converter and every
+v1 reader are deleted; a schema-1 chart is refused with a plain message (see
+[the chart contract's Compatibility section](ensemble-v2-charts.md#compatibility)). So the
+version-1 shapes in §2, the `ensemble_currentState` migration and coexistence window in §6, and
+the legacy-session steps in §3 and §9 are history: the design they record shipped and was then
+retired. `public/songbook/codec.ts` survives only as the codecs' shared plumbing (the bounded
+structural walk, the version gate, JSON decode/encode).
 **Goal:** Let a musician keep, reopen, share, and back up multiple songs without making the live
 arranger state, browser storage, or share URL into accidental document formats.
 
@@ -81,8 +89,9 @@ audio muting, and similar browser/device choices. Preferences have their own ver
 
 The canonical ownership table is enforced by `public/songbook/state-ownership.ts`. It is typed
 against every top-level live-state field, so adding a state field without choosing exactly one
-owner fails typecheck. The legacy writer has a separate behavioral reachability guard; this keeps
-its compatibility payload unchanged without making the new codecs depend on that old shape.
+owner fails typecheck. Nothing reads the table at run time: it is a classification and a
+type guard, not the thing that decides what a chart stores. What a chart stores is decided by its
+capture (`prototypes/v2/lib/runtime.ts`'s `captureContent`) and the schema-2 codec.
 
 | Owner | Canonical fields |
 | :--- | :--- |
@@ -129,10 +138,11 @@ with `withFollowFeel` applied) and rewrote them, and Brandon ran it on every dev
 left pending. A chart like that which never went through the upgrade, or a recovered copy of a
 draft captured before then, now keeps its built-in lanes pinned instead of following the feel.
 
-`public/songbook/types.ts` owns the semantic version-1 shapes. `public/songbook/codec.ts` validates
-the complete untrusted candidate before returning a detached typed value; unknown future versions
-remain recoverable source data rather than being coerced into version-1 defaults. Structural
-limits run first: 1 MiB serialized input, depth 32, 100,000 visited nodes, and 500 sections.
+`public/songbook/types.ts` owns the chart's settings types and `document-v2.ts` validates
+the complete untrusted candidate (through `codec.ts`'s shared walk) before returning a detached
+typed value; a schema-1 chart is refused as a historical version, and an unknown future version
+comes back as `future-version` with its source kept, never coerced into defaults. Structural limits run first: 1 MiB serialized input, depth
+32, 100,000 visited nodes, and 500 sections.
 
 ### `DocumentSession`
 

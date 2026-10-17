@@ -32,7 +32,7 @@ releases it: the CI `deploy` job publishes no files at all any more — it relea
 
 - A story touching **`prototypes/v2/**`** is live at `ensemble.brndn.zip/` on merge, gated by
   the required `v2-checks` context (v2 build + its Playwright suite) alongside `checks` and
-  `e2e-tests`. There is no longer a v1 app beside it for it to regress; it is the release.
+  `e2e-tests`. There is no other app beside it; it is the release.
 - A PR that **cannot reach the app** skips the Playwright legs, and `v2-checks` reports green
   without them: every changed file is under `docs/`, `tests/`, `band/test/`, `.claude/`, or is a
   `*.md` or a `band/**/*.test.ts` (the `changes` job in `ci.yml` holds the list). Anything else
@@ -40,12 +40,14 @@ releases it: the CI `deploy` job publishes no files at all any more — it relea
   path reaches neither the export nor the suite.
 - A story touching **`public/**`** is live production code on that same merge — the shared
   songbook codecs, engine hooks and state slices very much included, since the v2 export
-  compiles `public/`, so `v2-checks` must stay green. v1's own UI shell is gone (#1358).
-- **The cutover is a hard cut.** No `/v1/` grace path. v1's browser data is not read at all
-  (the import was retired in #1736); an old `?s=` share link is ignored (#1735). The plan
-  and its decisions are [`docs/design/ensemble-v2-rollout.md`](docs/design/ensemble-v2-rollout.md)
-  (DECISION 2026-09-15): API online → document API → accounts in the product → core parity →
-  hard cut.
+  compiles `public/`, so `v2-checks` must stay green.
+- **Nothing of v1 is read or served.** One chart schema, 2: a schema-1 text chart is refused in
+  plain words, never converted (#1740; [the chart contract's Compatibility
+  section](docs/design/ensemble-v2-charts.md#compatibility)). v1's browser data is never read
+  (#1736), an old `?s=` link is ignored (#1735), and `/v1/` and `/v2/...` are plain 404s
+  (#1742). Don't add a compatibility path for any of it back without a decision. The plan that
+  got here is archived at [`docs/archive/ensemble-v2-rollout.md`](docs/archive/ensemble-v2-rollout.md);
+  its numbered decisions are still cited where they bind.
 
 **One app.** Since #1358 `public/` is not an app: it is the engine/state/songbook library that
 `prototypes/v2` imports through the `@engine/*` alias (`prototypes/v2/next.config.mjs`). The only
@@ -54,7 +56,7 @@ engine/state rules below are about `public/` and bind every caller of it.
 
 ## Mandatory Checklist (before any change)
 
-1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code). A `document`/`preferences`-owned field (`public/songbook/state-ownership.ts`) is written **only** by user intent — a UI dispatch or hydration; a runtime system's modulation of it lives in a paired `runtime-derived` sibling field, composed at read time — see `docs/design/write-ownership.md`.
+1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code). A `document`/`preferences`-classified field (`public/songbook/state-ownership.ts`, a type-checked classification, not a persistence switch) is written **only** by user intent — a UI dispatch or hydration; a runtime system's modulation of it lives in a paired `runtime-derived` sibling field, composed at read time — see `docs/design/write-ownership.md`.
 2. **UI updates** belong in `prototypes/v2/app/`. A component never calls `dispatch`/`getState` itself: the engine is reached through `prototypes/v2/lib/runtime.ts`, which is the only v2 file that does.
 3. **Tests:** `npm test` (unit/integration) AND the v2 suite (`npm run build --prefix prototypes/v2`, then `npm run test:e2e --prefix prototypes/v2`) before concluding — for a `public/` change too, since the v2 export compiles it.
 4. **Refactors:** grep the whole repo (`public/`, `prototypes/`, `tests/`, `scripts/`, `docs/`, `.github/`) for usages before renaming or moving anything. Update all imports in the same pass.
@@ -125,7 +127,7 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - Hosts read with `getState()` and listen with `subscribe()` (`public/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
 - `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
-- **Write-ownership invariant** (`docs/design/write-ownership.md`): a `document`- or `preferences`-owned field (per `public/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST`, which governs persistence) is written only by user intent, never by a runtime system (conductor, trade block, worker). Runtime modulation of one lands on a paired `runtime-derived` sibling field and is composed at the read site. No such field is live today: the last, `playback.conductorVelocity`, went with the old engine's conductor (#1437), so the next runtime system to modulate a setting sets the precedent. This is the ownership-domain analogue of `docs/design/timing-model.md`'s one-authority-per-domain law for timing.
+- **Write-ownership invariant** (`docs/design/write-ownership.md`): a `document`- or `preferences`-owned field (per `public/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST`: a `satisfies`-checked classification that makes a new state field fail typecheck until it is classified. Nothing reads it at run time, so it does not decide what is saved: a chart stores what `captureContent` captures and the schema-2 codec accepts) is written only by user intent, never by a runtime system (conductor, trade block, worker). Runtime modulation of one lands on a paired `runtime-derived` sibling field and is composed at the read site. No such field is live today: the last, `playback.conductorVelocity`, went with the old engine's conductor (#1437), so the next runtime system to modulate a setting sets the precedent. This is the ownership-domain analogue of `docs/design/timing-model.md`'s one-authority-per-domain law for timing.
 #### `@direct-mutation` policy
 
 `// @direct-mutation` is a sanctioned escape hatch. Use it only in these categories:
@@ -145,8 +147,8 @@ Every page plays the ground-up band engine: `band/` is a pure, deterministic `pe
 score's timeline, driven live by `prototypes/v2/lib/band-host.ts` and exported through the same
 event stream (`.mid`, WAV). Read `band/CLAUDE.md` and `docs/design/band-engine.md` before touching
 it. The old worker-based generator is gone (#1404): `public/engine` now holds the voices, sample
-packs and audio graph the band plays through. The old chord parser went with the v1 text-chart
-format (#1740): a chart is one schema, 2 (`public/songbook/document-v2.ts`), its music a score.
+packs and audio graph the band plays through. A chart is one schema, 2
+(`public/songbook/document-v2.ts`), its music a score; the old text-chart parser is gone (#1740).
 
 The listening-gate tools (`npm run mix:report` and `mix:ab`/`mix:verify`/`mix:spectro`/`mix:plant`
 built on it) render the band engine: `scripts/band-scene.ts` composes each scene in node
@@ -203,7 +205,7 @@ Each band lane keeps to its register slot — bass 23–57, keyboard comp 52–8
 - One canonical internal name per concept. UI labels can be friendlier, but state keys, config keys, persisted payloads, and code paths normalize to the canonical form.
 - Aliases live near the data/config that owns the concept — don't scatter alias checks across components, tests, docs, and controllers.
 - Before any rename: grep the entire repo (`public/`, `prototypes/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
-- Preserve compatibility shims when a rename touches saved sessions, share URLs, or presets.
+- A rename that touches a field saved charts or `#chart=` links carry needs a decision on stored data: the chart codec is strict, so a chart still holding the old name stops opening.
 - Split labels from logic: display labels in UI/data layer, behavior keys in engine/config layer. A pretty label should not silently become a runtime enum unless that is the intended canonical key.
 - Known alias family: `Neo-Soul`/`Neo` — the live pairing, in `GENRE_OVERRIDES` (`public/data/smart-genres.ts`). Add new aliases to that same map instead of creating one-off fixes. **`Rock`/`Shred` is NOT a live alias** — `Shred` is a retired phantom key (see the canon bullet above) with no alias map anywhere in `public/`; don't resurrect the pairing.
 

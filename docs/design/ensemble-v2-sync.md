@@ -163,7 +163,7 @@ table, Save, read and delete routes; and the same per-owner document cap.
   drain reads as one; `collectionOutbox` reads only collection queues for the same reason. At the
   server's 120 Saves a minute a 1,350-song import takes at least twelve minutes of passes.
 - **A rate-limited upload resumes by itself (DECISION 2026-10-02, Brandon, #1478).** The loop's
-  one time-based trigger, amending [rollout decision 9](ensemble-v2-rollout.md): a pass that ends on
+  one time-based trigger, amending [rollout decision 9](../archive/ensemble-v2-rollout.md): a pass that ends on
   a 429 arms ONE timer for the end of the back-off (`armResume` in `lib/account/sync-loop.ts`), only
   while the page is attached to that owner, visible and has work queued (Saves in the outbox, or a
   download the limit cut short). Every pass clears it as it starts, so whichever trigger runs first
@@ -279,7 +279,7 @@ they store identity/digest/result, not an unlimited duplicate chart archive.
 
 ## Downloads, offline readiness, and switching accounts
 
-> **Superseded in part, DECISION 2026-09-17** ([rollout](ensemble-v2-rollout.md) decision 9).
+> **Superseded in part, DECISION 2026-09-17** ([rollout](../archive/ensemble-v2-rollout.md) decision 9).
 > S1 replaces the change feed, watermark and cursor with a paged manifest diff. S2 removes the
 > offline logout barrier: sign-out needs a connection. S3 removes account switching on one
 > profile. The preservation rules below — never overwrite drafts, queued saves or an active
@@ -354,7 +354,8 @@ without fresh authentication. Recommend storing a second passkey before it is ne
 Follow-up sharing publishes a detached, explicitly previewed snapshot, not a live document URL.
 Use a non-guessable share capability, guest playback, independent keep-copy, and owner revocation.
 Exclude raw import source and account metadata from the public snapshot unless a separately
-reviewed feature explicitly requires it. Old v1 links stay valid. A revoked link cannot recall
+reviewed feature explicitly requires it. (Old v1 `?s=` links were to stay valid; since #1735 they
+are not read at all.) A revoked link cannot recall
 copies that recipients already saved; make that limitation visible before publishing.
 
 Cloud document deletion is an explicit online operation with a tombstone and recovery/export
@@ -469,7 +470,8 @@ Decisions:
    cutover and public v2/account release retain their own explicit gates.
 
 Docker is **not** mandated for the v1/v2 static app, and no production cutover is authorized by
-any of the above. What remains open on #1172 is operational, not architectural: backup/restore
+any of the above. *(Superseded: [rollout](../archive/ensemble-v2-rollout.md) decision 1 made both
+halves container images, the cutover shipped in #1357, and v1 is gone.)* What remains open on #1172 is operational, not architectural: backup/restore
 rehearsal on a real database, and the physical Edge/macOS + iPhone acceptance in stage 6.
 
 ## Staged implementation acceptance

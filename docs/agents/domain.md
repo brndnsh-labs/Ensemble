@@ -11,7 +11,8 @@ copy of either would drift.
   each concept.
 - **Decisions** live in `docs/design/*.md` as dated `DECISION YYYY-MM-DD` entries inside the
   design doc for that area, such as `write-ownership.md`, `timing-model.md` or
-  `ensemble-v2-rollout.md`. Read the doc for the area you are about to touch.
+  `band-engine.md` (a finished plan's decisions move to `docs/archive/` with it, such as
+  `ensemble-v2-rollout.md`). Read the doc for the area you are about to touch.
   `docs/README.md` indexes them.
 
 ## Use the glossary's vocabulary

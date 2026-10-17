@@ -4,9 +4,7 @@
  * Encodes/decodes a chart document (schema 2, the only one since #1740) as a URL hash
  * fragment: `#chart=<base64url(deflate(JSON))>`. A link that carries a schema-1 text chart
  * decodes to `RETIRED_CHART_LINK`, so the app can say plainly why it does not open.
- * Old v1 `?s=` links are not opened at all (#1735; see
- * `docs/design/ensemble-v2-rollout.md`'s 2026-09-15 decision: v2-only links, no
- * v1 dual-open).
+ * Old v1 `?s=` links are not read at all (#1735).
  *
  * Trust boundary: a link carries portable musical intent only — no account,
  * session or retry metadata. That isn't a promise kept by this file's code; it's

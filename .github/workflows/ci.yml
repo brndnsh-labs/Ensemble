@@ -389,7 +389,7 @@ jobs:
           test "$CHANGES" = success && test "$APP" = false && test "$SUITE" = skipped
 
   # Publish the v2 account API as an immutable image on every merge to main —
-  # decision 1 of docs/design/ensemble-v2-rollout.md (#1216). The API suite itself
+  # decision 1 of docs/archive/ensemble-v2-rollout.md (#1216). The API suite itself
   # already runs inside `checks`, so this job only builds, pushes and smoke-tests
   # the image; nothing consumes it yet (that is #1219's release step). Fork PRs
   # never reach it: it runs on the main push only, and the package is public so
@@ -485,7 +485,7 @@ jobs:
           exit 1
 
   # Publish the v2 music stand as an immutable static image on every merge to main —
-  # decision 1 of docs/design/ensemble-v2-rollout.md (#1356), the other half of the pair
+  # decision 1 of docs/archive/ensemble-v2-rollout.md (#1356), the other half of the pair
   # `api-image` above already ships. Since the cutover (#1357) this image IS the site: the
   # `deploy` job below releases it to production, so it `needs:` this one and a red image
   # build stops the release outright. That inverts #1356's "must not hold up today's release"

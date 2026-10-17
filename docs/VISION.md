@@ -23,7 +23,7 @@ Musicians who want to practice, write, teach, or perform — alone, or with peop
 
 Unlike AI music generators that produce audio from statistical patterns, Ensemble follows real musical rules. It understands chord quality, voice leading, scale modes, rhythm-section conventions and song form. The result is a band that plays *your* chart — not an approximation of what music statistically sounds like.
 
-**Sharing is a marquee feature.** A teacher sends a link; the student opens that exact chart on the stand. The link carries a frozen snapshot, so later edits by the author never change what the student hears, and neither end needs an account. Keeping a shared chart makes an independent copy. Old v1 share links still open, best-effort.
+**Sharing is a marquee feature.** A teacher sends a link; the student opens that exact chart on the stand. The link carries a frozen snapshot, so later edits by the author never change what the student hears, and neither end needs an account. Keeping a shared chart makes an independent copy. Old v1 `?s=` links are no longer read (#1735).
 
 ## What Ensemble is not
 
@@ -39,7 +39,7 @@ Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are f
 
 **Offline-first; the server is optional.** The stand is a static app that works fully offline once installed. One small account API adds sync and backup; losing it never stops the band.
 
-**No lock-in.** Guest play is first-class. Charts import (iReal Pro, v1 data) and export (MIDI, audio) without an account, and an account holder's songbook is theirs to take elsewhere.
+**No lock-in.** Guest play is first-class. Charts import (iReal Pro, Ensemble song files) and export (MIDI, audio) without an account, and an account holder's songbook is theirs to take elsewhere.
 
 **Private charts stay private.** Analytics are aggregate and allow-listed; chart contents, titles and identities never cross that boundary (#1389).
 
@@ -51,7 +51,7 @@ Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are f
 
 ## UI direction
 
-One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, the standards catalog, new/import), the chart sheet, the transport, a sounds panel, and editing on the chart itself (#1726: a bar typed in place with its bar menu, a section from its letter, the whole song from the Song menu; only an old text chart keeps a small editor beside it). Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
+One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, the standards catalog, new/import), the chart sheet, the transport, a sounds panel, and editing on the chart itself (#1726: a bar typed in place with its bar menu, a section from its letter, the whole song from the Song menu). Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
 
 The stand has three modes — Chart, Neck and Edit chart. Neck (#1587) puts a guitar or ukulele fretboard in place of the chart: the grip for the chord sounding now (a shell voicing for a 7th chord, a closed triad or a power chord otherwise), a preview of the next grip on the last beat before the change, and one line saying how the hand gets there.
 
@@ -62,13 +62,13 @@ Designed for laptop, tablet and phone alike. Tablet is the sweet spot: readable 
 *Last updated: 2026-09-25. The GitHub tracker is the source of truth; this is the priority order.*
 
 1. **Finish v2 editing.** Every score field needs a writer: major/minor (#1375), beat grouping (#1376), one section-settings surface (#1374), removing a bar or section (#1373). Milestone "V2 — parity".
-2. **Close out the cutover.** Retire the v1 runtime once the flip has held (#1384); verify two-device and cold-start behaviour on real phones (#1273); privacy-preserving analytics (#1389); audition links that carry intensity, part mutes and autoplay (#1382).
+2. **Close out the cutover.** The v1 runtime (#1384) and every v1 compatibility path (the Retire v1 milestone, #1735–#1744) are gone, and analytics (#1389) and full audition links (#1382) shipped. Still open: two-device and cold-start behaviour on real phones (#1273).
 3. **Musical depth, on the band engine (#1404).** The comp answering the soloist's gaps, trading fours, ensemble kicks and idiomatic odd meters; then retiring the old engine and its tests, and the audio/synth rewrite. The old engine's parked design calls (#1148, #1149, #1161, #1162, #1164) and listening sweep (#534) are re-read against the band before any of them is built.
 4. **The live performer, last.** The band-leader gesture probe (#937) and tempo breathing (#936), both opt-in by the principle above.
 
 ## Key decisions
 
-- **v2 is the product (2026-09-22, #1357).** A hard cut from v1: the music stand serves the site root, and v1's UI shell is deleted (#1358). v1 browser data is reachable only through v2's import.
+- **v2 is the product (2026-09-22, #1357).** A hard cut from v1: the music stand serves the site root, and v1's UI shell is deleted (#1358). Since the Retire v1 milestone (2026-10) nothing of v1 is read: its browser data and `?s=` links are ignored, and a schema-1 chart is refused in plain words.
 - **Accounts are optional and exist for the songbook** — passkey sign-in, explicit Save, whole-library offline download. Playing and sharing never require one.
 - **Offline-first static app plus one small API**, released as container images; `main` is continuously deployed.
 - **Semantic charts with an honest import boundary** (#1171): imports preview what they keep and explain what they can't represent.

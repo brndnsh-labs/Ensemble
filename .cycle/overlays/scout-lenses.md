@@ -21,7 +21,7 @@ A music tool used **hands-on-instrument, eyes-on-a-chart** — a11y is core UX, 
 
 ### `security` — hardening (the *least* burndown-able lens; deliberately small here)
 A static PWA plus a small account API (`prototypes/v2-api/`: passkeys, sessions, recovery codes,
-chart sync); no payments. The surface is **untrusted input** (share links, imported v1 data,
+chart sync); no payments. The surface is **untrusted input** (share links, imported files,
 synced chart bodies), **the account boundary**, and **dependency CVEs**.
 - **Look for:** `npm audit` CVEs (run it); share-link / import / chart-codec parsing that trusts
   shape without validation (a malformed payload that can crash the app or inject through to the
