@@ -10,6 +10,7 @@ import {
     type StandardEntry,
     type StandardShelf,
 } from '../lib/standards';
+import { UpgradeCard, type UpgradeOffer } from './upgrade-card';
 
 /** The Continue card's display facts (#1441) — always one of the musician's own songs. */
 export interface FeaturedSummary {
@@ -109,6 +110,14 @@ interface SongbookProps {
     libraryFailure: string | null;
     onImport: () => void;
     onNewSong: () => void;
+    /**
+     * "Upgrade old songs" (#1738): null while there is nothing in the old format here and no
+     * outcome to show — the card is never on the page then.
+     */
+    upgrade: UpgradeOffer | null;
+    /** The upgrade scan has landed (#1738), published as `data-upgrade-scan` for checks. */
+    upgradeSettled: boolean;
+    upgradeActions: Omit<Parameters<typeof UpgradeCard>[0], 'offer' | 'busy'>;
     /** Per-device star set (#1440) — same source the row ⋯ menu's Star/Unstar writes through. */
     starred: ReadonlySet<string>;
     onToggleStar: (id: string) => void;
@@ -142,6 +151,7 @@ export function Songbook(props: SongbookProps) {
         remoteCandidates,
         featured,
         search,
+        upgrade,
         busy,
         offline,
     } = props;
@@ -168,7 +178,11 @@ export function Songbook(props: SongbookProps) {
         wasFirstVisit.current = firstVisit;
     }, [firstVisit, props.lastRemovedId]);
     return (
-        <main className="home" data-layout={firstVisit ? 'first-visit' : 'everyday'}>
+        <main
+            className="home"
+            data-layout={firstVisit ? 'first-visit' : 'everyday'}
+            data-upgrade-scan={props.upgradeSettled ? 'settled' : 'pending'}
+        >
             {firstVisitIntro ? (
                 <p className="home-library" data-testid="library-heading">
                     {libraryName}
@@ -238,6 +252,8 @@ export function Songbook(props: SongbookProps) {
                     </p>
                 </section>
             )}
+            {/* Below the page's h1 in both layouts, so its own h2 never outranks it. */}
+            {upgrade && <UpgradeCard offer={upgrade} busy={busy} {...props.upgradeActions} />}
             {query ? (
                 <SearchResults
                     query={query}

@@ -437,6 +437,59 @@ never enters analytics or error payloads.
 - No boot-time bulk rewrite. A production rollback must retain access to v1 records and
   preserve newer records for re-upgrade/export; it must not overwrite them through an old app.
 
+> **DECISION 2026-10-16 (#1738, Retire v1).** Supersedes "convert only a detached copy" and
+> "no boot-time bulk rewrite" for ONE explicit action: the songbook home's **Upgrade old songs**
+> card. Brandon is the only user, and the schema-1 readers and legacy band/performance fields can
+> only be deleted once nothing stored uses them. There is still no startup or background rewrite.
+>
+> - **What counts.** A schema-1 chart; a chart whose stored content differs from what today's
+>   writer stores (`writtenChart` + `withFollowFeel`: the legacy fields `/admin` counts, a missing
+>   groove `genre`, an old built-in sound pin); a retained draft that is schema 1 or carries legacy
+>   fields; and an old-format row that will not read. Never a collection. Both songbooks on the
+>   device — the guest one always, the account one once its library has downloaded
+>   (`needsUpgrade`, `draftNeedsUpgrade`, `planUpgrade` in `prototypes/v2/lib/upgrade.ts`). The
+>   card stays on the home while ANY of that remains, so its absence means nothing old is stored
+>   on this device.
+> - **Backup first: one file, and exactly what the run changes.** A single human-readable JSON
+>   archive of the songs and drafts the run will change and of the leftovers it cannot (below),
+>   each as it is stored, with store, id and title (`upgradeBackup`). The run then touches ONLY
+>   what that plan holds: each song is saved against its planned revision and each draft
+>   rewritten only while it holds its planned bytes, so anything changed after the file was
+>   written is left alone ("Changed since your backup — upgrade again"). Opening a song, or the
+>   songbooks changing under the backup step, ends it. "Upgrade without a backup" plans at the
+>   musician's confirm instead.
+> - **In place, through the ordinary Save, same edit date.** Same id, a new revision, the song's
+>   own `updatedAt` kept (an upgrade is not an edit; the songbook's order and the server body
+>   keep it too): the guest repository's `save` and the account's Save, each with one
+>   upgrade-only option (`keepUpdatedAt`, `upgrade`). The account Save queues an ordinary outbox
+>   operation, so account songs reach the server by the normal drain. A text chart goes through
+>   `proposeLegacyScoreConversion` (#1737); a refusal leaves the song exactly as it was and lists
+>   its section, bar and reason with a way to open it in the text editor. A lossy conversion
+>   (`tones-dropped`) is listed as "upgraded with changes", for songs and drafts alike.
+> - **Never over unsaved work or a stuck queue — checked when writing.** A song with a live draft
+>   or this tab's unsaved text is skipped. The account Save re-checks inside its own transaction
+>   and refuses over a live draft, a conflicted or refused outbox head, an account version waiting
+>   or a frozen delete; the guest Save re-checks the recovery slots just before writing. Each is
+>   listed, never forced.
+> - **The run never deletes anything.** A live draft is never rewritten (it is unsaved work, with
+>   Open). A dead draft is rewritten in place (same writer, same `capturedAt`). The upgrade Save
+>   does not sweep superseded draft rows as an ordinary Save does.
+> - **Leftovers are the musician's to remove, one at a time, after a backup.** What the upgrade
+>   cannot fix — a dead draft the converter refuses, an orphan draft, a draft of a song row that
+>   will not read, an old row or draft that will not read (one a newer app wrote is not listed) —
+>   is listed with "Remove — it's in your backup", offered only once a backup file holds that row
+>   byte for byte ("Download these first" writes one after a run without a backup); a row with no
+>   stored document has no bytes to hold and is never removable. Remove deletes exactly that row
+>   and only while it still holds those bytes, in one transaction or check: a guest recovery slot,
+>   an account draft row, an unreadable song row — never a live draft of a song that reads. It is a
+>   LOCAL delete — never a tombstone, an outbox operation or a request — so an account song row the
+>   server holds (a confirmed `remoteRevision`), with a Save queued, an account version waiting or
+>   a delete frozen is never removed. A songbook that would not read is an error with "Try
+>   again", never removable.
+> - **Interrupt-safe and idempotent.** Each document is one transaction, so a closed tab leaves
+>   every song wholly old or wholly new; the next run re-reads and finishes the rest. An upgraded
+>   document is checked to need no upgrade itself, so a second run is a no-op.
+
 ## Device acceptance and next stories
 
 Four measures per normal laptop/tablet row; two per portrait phone row as the starting

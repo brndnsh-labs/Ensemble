@@ -69,6 +69,8 @@ import type { SavedSong } from '../lib/sync/protocol';
 import type { KeepBothResolution } from '../lib/sync/repository';
 import type { Progress } from '../lib/sync/status';
 import { initializeTelemetry, track } from '../lib/telemetry';
+import type { UpgradePace } from '../lib/upgrade';
+import { accountUpgradeStore, guestUpgradeStore } from '../lib/upgrade-stores';
 import { AccountEntry } from './account/account-entry';
 import { AccountPage } from './account/account-page';
 import { AdoptGuestDialog } from './account/adopt-guest';
@@ -127,6 +129,7 @@ import { useCollections } from './use-collections';
 import { useNeckVoicing } from './use-neck-view';
 import { useOfflineInstall } from './use-offline-install';
 import { useStageTheme } from './use-stage-theme';
+import { useUpgrade } from './use-upgrade';
 
 /**
  * Deep equality over plain JSON data that ignores the order of object keys: a chart read back
@@ -5210,6 +5213,57 @@ export default function Ensemble() {
             setExportAudioProgress('');
         }
     }
+    // "Upgrade old songs" (#1738). The account songbook joins once its library has downloaded
+    // here — before that, an upgrade of an older local copy would only be refused by the server's
+    // compare-and-swap. The guest songbook is always in: signed in, its old songs could still be
+    // added to the account by #1268's offer.
+    const upgradeAccountOwner =
+        signedIn &&
+        sessionOwner !== null &&
+        sync.owner === sessionOwner &&
+        libraryDownloaded(sync.documents)
+            ? sessionOwner
+            : null;
+    function upgradeStores(pace?: UpgradePace) {
+        return upgradeAccountOwner === null
+            ? [guestUpgradeStore(pace)]
+            : [accountUpgradeStore(upgradeAccountOwner, pace), guestUpgradeStore(pace)];
+    }
+    const upgrade = useUpgrade({
+        active: ready && !current && !songbookLoading,
+        signedIn,
+        stores: upgradeStores,
+        scanKey: `${upgradeAccountOwner}:${liveHome?.count}:${guestHome?.count}`,
+        // A song this tab holds unsaved text for that no store has yet (`volatileDrafts`), or an
+        // account draft this tab knows of; a stored live draft is the run's own check.
+        unsavedHere: (store, id) =>
+            volatileDrafts.current.has(id) ||
+            (store === 'account' && accountDrafts.current.has(id)),
+        run: (task) => run(task),
+        afterRun: async (outcome) => {
+            if (outcome.upgraded.some((entry) => entry.store === 'account')) {
+                // One pass for the whole run, as the guest adoption does: every Save is already
+                // committed and queued, and the outbox owns sending it from here.
+                void accountSync.run();
+            }
+            await refreshSongs();
+            if (signedIn && outcome.upgraded.some((entry) => entry.store === 'guest')) {
+                await refreshGuest();
+            }
+        },
+        open: (id, sectionIndex) =>
+            void run(async () => {
+                const document = await readLiveSong(id);
+                if (!document) {
+                    throw new Error('Song no longer exists.');
+                }
+                const opened = await open(document);
+                setAllSongsOpen(false);
+                // Into its editor — a text chart's is `TextChartEditor` — on the section named.
+                const sections = arrangementOf(opened.current).sections;
+                revealEditor(sections[sectionIndex ?? 0]?.id ?? sections[0]?.id);
+            }),
+    });
     // The Continue card (#1441): the live songbook's own "last opened" song, read by id with the
     // home slice, else its most recently opened row. A device with no songs has no card at all —
     // it gets the first-visit layout, where the standards are the page.
@@ -5881,6 +5935,9 @@ export default function Ensemble() {
                     onNewSong={newSong}
                     onOpenSong={openSong}
                     lastRemovedId={deletedRowId}
+                    upgrade={upgrade.offer}
+                    upgradeSettled={upgrade.settled}
+                    upgradeActions={upgrade.actions}
                 />
             ) : (
                 <main

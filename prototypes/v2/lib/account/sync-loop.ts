@@ -816,7 +816,26 @@ export interface SyncLoop {
         document: ChartDocument,
         expected: number | null,
         owner: string | null,
+        /** #1738's upgrade Save only — see `AccountSongbook.save`. */
+        options?: { upgrade?: boolean },
     ): Promise<SavedSong>;
+    /**
+     * Every song this account holds here for "Upgrade old songs" (#1738): paged, the event loop
+     * handed back between pages (`pace`), and a row that does not read reported rather than
+     * failing the read (`AccountSongbook.upgradePage`). Scoped like `listLibrary`.
+     */
+    upgradeLibrary(
+        owner: string | null,
+        pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> },
+    ): Promise<{
+        songs: Array<{ song: SavedSong; stored: unknown }>;
+        unreadable: Array<{
+            documentId: string;
+            reason: string;
+            document: unknown;
+            serverHeld: boolean;
+        }>;
+    }>;
     /**
      * Retain this writer's unsaved experiment on an account chart (#1299) — the account half of
      * `lib/repository.ts`'s guest `recover`, and emphatically NOT an upload: it writes one row to
@@ -869,6 +888,47 @@ export interface SyncLoop {
         documentIds: string[],
         owner?: string | null,
     ): Promise<Map<string, ChartDocument>>;
+    /**
+     * Every retained draft this account has on this device, every song and every writer, live or
+     * not (`AccountSongbook.allDrafts`) — what "Upgrade old songs" (#1738) finds old-format drafts
+     * among. Scoped like `listLibrary`.
+     */
+    listDrafts(owner?: string | null): Promise<{
+        drafts: Array<{ draft: Draft; stored: unknown }>;
+        unreadable: Array<{
+            documentId: string;
+            writerId: string;
+            capturedAt: unknown;
+            reason: string;
+            stored: unknown;
+        }>;
+    }>;
+    /**
+     * Remove one retained draft row, or one song row that will not read, that the musician chose
+     * from "Upgrade old songs"' leftovers (#1738) — guarded on the backed-up bytes, local only,
+     * never a cloud delete (`AccountSongbook.removeDraftRow`/`removeUnreadableSong`). Fenced on
+     * `owner` like every write here.
+     */
+    removeDraftRow(
+        draft: { documentId: string; writerId: string },
+        raw: string,
+        owner: string | null,
+    ): Promise<'removed' | 'changed' | 'gone' | 'live'>;
+    removeUnreadableSong(
+        documentId: string,
+        raw: string,
+        owner: string | null,
+    ): Promise<'removed' | 'changed' | 'gone' | 'held'>;
+    /**
+     * Rewrite one retained draft in place, never a live one and never a deletion
+     * (`AccountSongbook.replaceDraft`). #1738's draft half: purely local, nothing queued or sent.
+     * Fenced on `owner` like every write here.
+     */
+    replaceDraft(
+        draft: { documentId: string; writerId: string; capturedAt: string; raw: string },
+        next: ChartDocument,
+        owner: string | null,
+    ): Promise<'replaced' | 'changed' | 'live' | 'gone'>;
     /**
      * Drop this writer's retained experiment, once a Save has committed what it held.
      *
@@ -1871,11 +1931,36 @@ export function createSyncLoop(
             const current = await heldScope(owner);
             return (await songbook.read(current, documentId))?.document ?? null;
         },
-        async save(document, expected, owner) {
+        async upgradeLibrary(owner, pace) {
+            const current = await heldScope(owner);
+            const songs: Array<{ song: SavedSong; stored: unknown }> = [];
+            const unreadable: Array<{
+                documentId: string;
+                reason: string;
+                document: unknown;
+                serverHeld: boolean;
+            }> = [];
+            let cursor: string | undefined;
+            // A small page, so each transaction's validation is a short slice of main thread.
+            for (let page = 0; page <= MAX_REMOTE_CANDIDATES / 10; page += 1) {
+                const listing = await songbook.upgradePage(current, cursor, 10);
+                songs.push(...listing.songs);
+                unreadable.push(...listing.unreadable);
+                if (listing.nextAfterDocumentId === null) {
+                    return { songs, unreadable };
+                }
+                cursor = listing.nextAfterDocumentId;
+                if (pace?.shouldYield()) {
+                    await pace.yieldNow();
+                }
+            }
+            throw new Error('Account library paging did not terminate.');
+        },
+        async save(document, expected, owner, options) {
             // #1311: before `songbook.save`, deliberately. A Save refused here has written
             // nothing at all — no record, no queued operation, no bump of this owner's library.
             const current = await ownedScope(owner);
-            const song = await songbook.save(current, document, expected);
+            const song = await songbook.save(current, document, expected, options);
             publish({ libraryVersion: state.libraryVersion + 1 });
             await observe();
             return song;
@@ -1903,6 +1988,18 @@ export function createSyncLoop(
                 }
             }
             return held;
+        },
+        async listDrafts(owner = null) {
+            return songbook.allDrafts(await heldScope(owner));
+        },
+        async removeDraftRow(draft, raw, owner) {
+            return songbook.removeDraftRow(await ownedScope(owner), draft, raw);
+        },
+        async removeUnreadableSong(documentId, raw, owner) {
+            return songbook.removeUnreadableSong(await ownedScope(owner), documentId, raw);
+        },
+        async replaceDraft(draft, next, owner) {
+            return songbook.replaceDraft(await ownedScope(owner), draft, next);
         },
         async discardDraft(documentId, owner) {
             await songbook.discardDraft(await ownedScope(owner), documentId, writerId);
