@@ -159,9 +159,8 @@ jobs:
   # ones — the export compiles public/ through webpack, so any engine change can
   # break it. Starts alongside `checks`, not after it (#1223).
   #
-  # It builds at `/`, the only base there is (#1734). The root-only specs
-  # (`root-handover.chromium.spec.ts`) run here, and `v2-root-image.yml` keeps only the image
-  # smoke test.
+  # It builds at `/`, the only base there is (#1734), and `v2-root-image.yml` keeps only the
+  # image smoke test.
   #
   # SHARDED by duration × browser. The suite is wait-bound, not CPU-bound: measured
   # 2026-09-16 on a 4-core box, 100 tests take 245s on three workers and still
@@ -328,10 +327,12 @@ jobs:
             echo '::error::build.json is still keyed under /v2/'; exit 1
           fi
           grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
-          # The cutover's own artifacts (#1355): the web manifest v1's installed PWA updates
-          # into, and the tombstone that retires the beta's `/v2/` worker.
+          # The web manifest the installed app updates through, and no `/v2/` tree: the old
+          # beta path is a plain 404 since #1742, so nothing may be exported under it.
           test -f prototypes/v2/out/manifest.json
-          test -f prototypes/v2/out/v2/sw.js
+          if [ -e prototypes/v2/out/v2 ]; then
+            echo '::error::the export still has a /v2/ tree'; exit 1
+          fi
 
       # The bundle-size tripwire (#1388): one ceiling on the export's total JavaScript,
       # ~25% over its baseline, so it fails only on an accident such as an eager import.
@@ -560,10 +561,12 @@ jobs:
           # `set -e` ignores a command inverted with `!`, so each negative is an explicit `if`.
           set -euo pipefail
           grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
-          # The cutover's own artifacts (#1355): the web manifest v1's installed PWA updates
-          # into, and the tombstone that retires the beta's `/v2/` worker.
+          # The web manifest the installed app updates through, and no `/v2/` tree: the old
+          # beta path is a plain 404 since #1742, so nothing may be exported under it.
           test -f prototypes/v2/out/manifest.json
-          test -f prototypes/v2/out/v2/sw.js
+          if [ -e prototypes/v2/out/v2 ]; then
+            echo '::error::the export still has a /v2/ tree'; exit 1
+          fi
           if grep -q '/v2/_next/' prototypes/v2/out/index.html; then
             echo '::error::index.html still references /v2/_next'; exit 1
           fi
@@ -604,7 +607,7 @@ jobs:
 
       # Prove the pushed bytes serve: pull the sha tag back from the registry and run the
       # container under the same flags the stack uses. Fails the run (so the tag stays
-      # unreleased) on a redirected /v2/sw.js, an SPA fallback, an absolute redirect, a wrong
+      # unreleased) on an SPA fallback, a `/v2/...` that is anything but a plain 404, a wrong
       # revision or any of the other contract lines in hosting/web/smoke.mjs.
       - name: Smoke-test the pushed image
         run: |

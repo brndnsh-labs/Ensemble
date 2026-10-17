@@ -35,6 +35,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Root cause (2026-10-13):** the self-reloading v1 stand-in (`scripts/serve.mjs`, `v1Page(true)`) calls `location.reload()` on `controllerchange`, as v1's `pwa.ts` did. The test waited for "a controller is set" and then called `page.reload()`. That condition is already true in the document the page is about to throw away, so the test's reload could collide with the page's own. Measured with a probe after the poll: in 4 of 40 runs the page was mid-navigation at that moment. The "not yet diagnosed" candidate above was right.
 - **Fix:** the test records, as each document starts, whether a worker already controlled it (`bornControlled`), and waits for a document that loaded under the worker (`loadedUnder`) before its own reload. It waits on the condition; no timeout changed. After: the whole spec 15/15 (180 tests), and this test 40/40 under contention (2 pinned cores, 3 spinners, 3 workers). The original never failed locally in 40 runs, so the fix is argued from the measured window, not from a red-to-green.
 - **Last seen:** 2026-10-13 (`main`, `6c782fc1`).
+- **Retired (2026-10-17, #1742):** the v1 handover, its stand-ins and this spec were deleted. Kept as a record of the self-reloading-page race (`loadedUnder`).
 
 ### 🟢 `prototypes/v2/checks/songbook-home.spec.ts` — "one search returns your songs and the standards, grouped"
 
