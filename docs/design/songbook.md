@@ -122,8 +122,12 @@ moved from runtime state into the chart as `performance.energy`, absent reading 
 and the `lastSmartGenre`/`genreFeel` pair left the format: a chart that carries one is refused
 like any other unknown field — by the app, and by the account API, which decodes with the same
 codec — and `groove.genre` is required. `chartGenre`, `writtenArrangement` and the read-time
-Follow-feel upgrade (`withFollowFeel`) went with them; every chart that still reads was written
-after both changes.
+Follow-feel upgrade (`withFollowFeel`) went with them. `/admin` never counted the charts that
+upgrade still had work on (saved before 2026-09-25 with a lane pinned to the built-in sound); the
+basis for dropping it is that "Upgrade old songs" counted them (`needsUpgrade` compared each chart
+with `withFollowFeel` applied) and rewrote them, and Brandon ran it on every device with nothing
+left pending. A chart like that which never went through the upgrade, or a recovered copy of a
+draft captured before then, now keeps its built-in lanes pinned instead of following the feel.
 
 `public/songbook/types.ts` owns the semantic version-1 shapes. `public/songbook/codec.ts` validates
 the complete untrusted candidate before returning a detached typed value; unknown future versions

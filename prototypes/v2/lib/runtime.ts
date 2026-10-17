@@ -951,7 +951,7 @@ function apply(content: DocumentContent, compiled?: Timeline): void {
     currentScore = score;
     currentTimeline = score && timeline ? { score, timeline } : null;
     bandView = view;
-    // By name, like the band below: an old chart's legacy `lastChordPreset` is read by nothing.
+    // By name, like the band below.
     for (const key of [
         'sections',
         'key',

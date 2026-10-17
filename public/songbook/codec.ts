@@ -33,7 +33,10 @@ type JsonRecord = Record<string, unknown>;
 const NOTATIONS = new Set(['roman', 'name', 'nns']);
 const SOLOIST_MODES = new Set(['monophonic', 'guitar']);
 const SOLOIST_TRADE_WITH = new Set(['off', 'soloist', 'drums']);
-// `harmony` is a retired lane (#1436), kept so an old chart's section override round-trips.
+// `harmony` is a retired lane (#1436), kept so an old chart's section override round-trips. It
+// stays on purpose after #1741 dropped the lane itself: no count (`/admin` or the upgrade card)
+// ever covered this key, so nothing proves a stored chart doesn't carry it, and refusing it
+// could lock real charts out. Drop it only after a count shows none.
 const SECTION_INSTRUMENTS = ['groove', 'bass', 'chords', 'harmony', 'soloist'] as const;
 const PROTOTYPE_MEMBER_NAMES = new Set(Object.getOwnPropertyNames(Object.prototype));
 const PACK_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;

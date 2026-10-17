@@ -104,7 +104,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Exports / Symbols |
 | :--- | :--- | :--- |
-| `public/songbook/types.ts` | Version-1 portable chart schema, kept independent of live state slices. A chart holds the music plus the settings the band honours; the old engine's fields are typed as legacy (read, never written). The `WorkspacePreferences` codec this file also typed had no reader anywhere — deleted in #1381. | `ChartDocument`, `ChartContent`, `ChartEnergy` |
+| `public/songbook/types.ts` | Version-1 portable chart schema, kept independent of live state slices. A chart holds the music plus the settings the band honours, and nothing of the old engine's (its fields left the format in #1741). The `WorkspacePreferences` codec this file also typed had no reader anywhere — deleted in #1381. | `ChartDocument`, `ChartContent`, `ChartEnergy` |
 | `public/songbook/codec.ts` | Pure complete-candidate validation plus JSON encode/decode, including explicit invalid/current/future-version results. Strict: an unknown field is refused, the old engine's band and performance fields included (#1741), and the groove's `genre` is required. `writtenSettings`/`writtenChart` give a chart's settings exactly as capture writes them. | `validateChartDocument`, `decodeChartDocument`, `encodeChartDocument`, `writtenSettings`, `writtenChart` |
 | `public/songbook/score-types.ts` | Document-v2 authored-score types: exact events, measures, context, repeat and jump directions; isolated preview adoption preserves v1 sources. | `ChartDocumentV2`, `SemanticScore`, `ScoreMeasure`, `ScoreDirection` |
 | `public/songbook/score-duration.ts` | Bounded rational quarter-note arithmetic and exact sixteenth-grid capability checks. | `scoreDuration`, `scoreMeter`, `durationToSteps` |
@@ -165,7 +165,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Data |
 | :--- | :--- | :--- |
-| `public/data/smart-genres.ts` | High-level genre configurations + the genre-naming authority (canon name ↔ feel ↔ groove strategy key). | `SMART_GENRES`, `canonToFeel`, `feelToCanon`, `GROOVE_STRATEGY_BY_GENRE`, `isLatinGrooveFamily` |
+| `public/data/smart-genres.ts` | High-level genre configurations + the genre-naming authority (canon name, feel, and the retired groove strategy key). A genre's feel is read off its entry, `SMART_GENRES[name].feel`. | `SMART_GENRES`, `GENRE_NAMES`, `SmartGenre` |
 | `public/data/sound-packs.ts` | Catalog of installable sample packs, read by v2's `lib/sounds.ts`. | `SOUND_PACKS`, `packsForInstrument` |
 | `public/data/genre-sound-map.ts` | Genre → instrument sound defaults consumed by Auto-follow mode (#675). | `GENRE_SOUND_MAP`, `autoVoiceForGenre` |
 
