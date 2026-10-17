@@ -1,9 +1,11 @@
 import type { Page } from '@playwright/test';
 import {
     appUrl,
+    closeKeyPopover,
     expect,
     exportAs,
     exportDialog,
+    openKeyPopover,
     openSongMenu,
     phoneWidth,
     seedGuestDocuments,
@@ -75,7 +77,7 @@ test('the ••• opens five actions, Delete… last after a divider, and no f
     await expect(menu).toHaveCount(0);
 });
 
-test('More swaps in Revert to saved and Song settings…; Choruses is the footer’s alone', async ({
+test('More holds Revert to saved; the song settings are the Key popover’s, Choruses the footer’s', async ({
     page,
 }) => {
     await openBlue(page);
@@ -84,8 +86,8 @@ test('More swaps in Revert to saved and Song settings…; Choruses is the footer
     const more = songMenu(page, 'more');
     await expect(more).toBeVisible();
     await expect(menu).toHaveCount(0);
-    // Nothing to revert yet, and no preserved drafts to list.
-    await expect(more.getByRole('menuitem')).toHaveText(['Revert to saved', 'Song settings…']);
+    // Nothing to revert yet and no preserved drafts to list; no Song settings any more (#1757).
+    await expect(more.getByRole('menuitem')).toHaveText(['Revert to saved']);
     await expect(more.getByRole('menuitem', { name: 'Revert to saved' })).toHaveAttribute(
         'aria-disabled',
         'true',
@@ -95,15 +97,12 @@ test('More swaps in Revert to saved and Song settings…; Choruses is the footer
     await expect(more).toHaveCount(0);
     await expect(trigger(page)).toBeFocused();
 
-    // Song settings… holds Song meter and Song mode, and nothing about choruses.
-    await songMenuAction(page, 'Song settings…');
-    const settings = page.getByTestId('song-settings');
-    await expect(settings.getByLabel('Song meter')).toHaveValue('4/4');
-    await expect(settings.getByLabel('Song mode')).toHaveValue('major');
-    await expect(settings.getByLabel('Choruses')).toHaveCount(0);
-    await settings.getByRole('button', { name: 'Close', exact: true }).click();
-    await expect(settings).toBeHidden();
-    await expect(trigger(page)).toBeFocused();
+    // Meter and Mode are the transport's Key popover's, and it has nothing about choruses.
+    const popover = await openKeyPopover(page);
+    await expect(popover.getByLabel('Meter', { exact: true })).toHaveValue('4/4');
+    await expect(popover.getByLabel('Mode', { exact: true })).toHaveValue('major');
+    await expect(popover.getByLabel('Choruses')).toHaveCount(0);
+    await closeKeyPopover(page);
 });
 
 test('Export… offers each format by a plain name and writes the song file', async ({ page }) => {

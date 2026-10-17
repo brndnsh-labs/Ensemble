@@ -3,7 +3,15 @@ import { dirname, resolve } from 'node:path';
 import type { Page } from '@playwright/test';
 import type { ChartDocument } from '../lib/documents';
 import { expectVisitsFollowForm } from './chart-visits';
-import { appUrl, test as base, expect, exportAs, songLink } from './fixtures';
+import {
+    appUrl,
+    test as base,
+    expect,
+    exportAs,
+    keyButton,
+    pickSongKey,
+    songLink,
+} from './fixtures';
 
 const test = base.extend<{ disconnect: () => Promise<void> }>({
     disconnect: async ({ browserName, context, request }, use) => {
@@ -94,7 +102,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
     await dialog.getByRole('button', { name: 'Add to songbook', exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await expect(page.locator('.song-title')).toHaveText('Blues fixture');
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('C');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: C');
     await expect(page.locator('.bar')).toHaveCount(12);
     const imported = (await savedDocuments(page)).find(
         (document) => document.title === 'Blues fixture',
@@ -114,7 +122,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
     await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(1);
     await page.screenshot({ path: info.outputPath('import-stand.png') });
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     const exported = await exportCurrent(page);
@@ -141,7 +149,7 @@ test('an iReal HTML preview is inert, explicitly added, transposed, exported and
     await disconnect();
     await page.reload();
     await songLink(page, 'Blues fixture').click();
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: D');
     await expect(page.locator('.bar')).toHaveCount(12);
     expect((await savedDocuments(page)).find((document) => document.id === imported.id)).toEqual(
         saved,

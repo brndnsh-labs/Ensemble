@@ -1,12 +1,12 @@
 import type { Page } from '@playwright/test';
 import {
     appUrl,
-    closeSongMenu,
+    closeKeyPopover,
     editorRevealed,
     expect,
     leaveBar,
     openBar,
-    openWholeSong,
+    openKeyPopover,
     test,
     typeBar,
 } from './fixtures';
@@ -31,10 +31,10 @@ test('a new song can be put in 3/4, and it plays', async ({ page }) => {
     // An unchecked bar edit is committed with the change, not left beside it.
     await typeBar(page, 1, 'C Dm');
 
-    const menu = await openWholeSong(page);
-    await menu.getByLabel('Song meter').selectOption('3/4');
-    await expect(menu.getByLabel('Song meter')).toHaveValue('3/4');
-    await closeSongMenu(page);
+    const menu = await openKeyPopover(page);
+    await menu.getByLabel('Meter', { exact: true }).selectOption('3/4');
+    await expect(menu.getByLabel('Meter', { exact: true })).toHaveValue('3/4');
+    await closeKeyPopover(page);
 
     await expect(page.locator('.song-subtitle')).toContainText('3/4');
     await expect(page.locator('.bar-context').first()).toHaveText('C · 3/4');
@@ -58,16 +58,22 @@ test('a bar whose written lengths cannot follow blocks the change and is named',
     await leaveBar(page);
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C', 'Dm', 'G7']);
 
-    const menu = await openWholeSong(page);
-    await menu.getByLabel('Song meter').selectOption('3/4');
+    const menu = await openKeyPopover(page);
+    await menu.getByLabel('Meter', { exact: true }).selectOption('3/4');
 
-    // The refusal closes Song settings itself and names the bar.
-    await expect(page.getByTestId('song-settings')).toBeHidden();
+    // The refusal closes the Key popover itself and names the bar.
+    await expect(menu).toHaveCount(0);
     await expect(alert(page)).toContainText('A · bar 1');
+    // Focus is not dropped to the page with the popover: it lands on the bar to fix, or Key.
+    await expect
+        .poll(() => page.evaluate(() => document.activeElement?.tagName ?? 'none'))
+        .not.toBe('BODY');
     await expect(alert(page)).toContainText('Nothing was changed');
     await expect(page.locator('.song-subtitle')).toContainText('4/4');
-    await expect((await openWholeSong(page)).getByLabel('Song meter')).toHaveValue('4/4');
-    await closeSongMenu(page);
+    await expect((await openKeyPopover(page)).getByLabel('Meter', { exact: true })).toHaveValue(
+        '4/4',
+    );
+    await closeKeyPopover(page);
     // The bar that needs the decision is the one now selected; opening it shows its lengths.
     await expect(page.locator('.bar').first()).toHaveClass(/\bselected\b/);
     await expect(await openBar(page, 1)).toHaveValue('C:2 Dm:1 G7:1');

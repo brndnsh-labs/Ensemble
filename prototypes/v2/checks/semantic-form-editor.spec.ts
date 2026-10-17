@@ -7,8 +7,10 @@ import {
     editorRevealed,
     expect,
     exportAs,
+    keyButton,
     leaveBar,
     openBar,
+    pickSongKey,
     songLink,
     songMenuAction,
 } from './fixtures';
@@ -219,7 +221,7 @@ test('a form built bar by bar applies without a refusal, saves from the hidden e
         before.filter((document) => document.id !== exported.id),
     );
 
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await expectWrittenStand(page, ['D', 'A', 'Bm', 'G']);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -245,7 +247,7 @@ test('a form built bar by bar applies without a refusal, saves from the hidden e
     await disconnect();
     await page.reload();
     await songLink(page, 'Two ending study').click();
-    await expect(page.getByLabel('Key', { exact: true })).toHaveValue('D');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: D');
     await expectWrittenStand(page, ['D', 'A', 'Bm', 'G']);
     await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
     const fourth = await barForm(page, 4);

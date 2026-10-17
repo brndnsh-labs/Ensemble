@@ -1,6 +1,16 @@
-import { expect, openBand, seedStarters, songLink, songMenuAction, test } from './fixtures';
+import {
+    closeKeyPopover,
+    expect,
+    openBand,
+    openKeyPopover,
+    seedStarters,
+    songLink,
+    songMenuAction,
+    test,
+} from './fixtures';
 
-// #1276 — the Band sheet's Groove and Practice tabs: swing/swing grid/humanize/chord notation and the
+// #1276 — the Band sheet's Groove and Practice tabs: swing/swing grid/humanize (and chord notation,
+// which is the transport's Key popover's since #1757) and the
 // chart's energy — auto intensity/band intensity, saved with the chart since the
 // chart-format decision of 2026-09-26 (document-owned), master volume (a device
 // preference, persisted independent of Save), and the metronome (runtime-derived,
@@ -39,7 +49,8 @@ test('every Band-sheet control has an accessible name', async ({ page }) => {
     await expect(page.getByLabel('Master volume', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Metronome', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Count-in', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Chord notation', { exact: true })).toBeVisible();
+    // Chord notation is the Key popover's alone (#1757).
+    await expect(page.getByLabel('Chord notation', { exact: true })).toHaveCount(0);
 });
 
 test('document-owned feel fields (swing, swing grid, humanize, notation) persist through save, reload and revert', async ({
@@ -60,11 +71,13 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(swing).toHaveValue('100');
     await expect(swingGrid).toHaveValue('8th');
     await expect(humanize).toHaveValue('20');
-    await openBand(page, 'Practice');
+    await closeBand(page);
+    await openKeyPopover(page);
     await expect(notation).toHaveValue('name');
 
     await notation.selectOption('roman');
     await expect(notation).toHaveValue('roman');
+    await closeKeyPopover(page);
     await openBand(page, 'Groove');
     await setRange(page, 'Swing', 60);
     await swingGrid.selectOption('16th');
@@ -72,7 +85,7 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(swing).toHaveValue('60');
     await expect(swingGrid).toHaveValue('16th');
     await expect(humanize).toHaveValue('55');
-    // Notation re-renders the chart immediately, not just the sheet's own select.
+    // Notation re-renders the chart immediately, not just the popover's own select.
     await expect(page.locator('.chord-button').first()).not.toHaveText('C7');
     await closeBand(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
@@ -84,9 +97,10 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(swing).toHaveValue('100');
     await expect(swingGrid).toHaveValue('8th');
     await expect(humanize).toHaveValue('20');
-    await openBand(page, 'Practice');
-    await expect(notation).toHaveValue('name');
     await closeBand(page);
+    await openKeyPopover(page);
+    await expect(notation).toHaveValue('name');
+    await closeKeyPopover(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     // Redo the edits and this time save them.
@@ -94,9 +108,10 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await setRange(page, 'Swing', 60);
     await swingGrid.selectOption('16th');
     await setRange(page, 'Humanize', 55);
-    await openBand(page, 'Practice');
-    await notation.selectOption('roman');
     await closeBand(page);
+    await openKeyPopover(page);
+    await notation.selectOption('roman');
+    await closeKeyPopover(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
@@ -107,7 +122,8 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(swing).toHaveValue('60');
     await expect(swingGrid).toHaveValue('16th');
     await expect(humanize).toHaveValue('55');
-    await openBand(page, 'Practice');
+    await closeBand(page);
+    await openKeyPopover(page);
     await expect(notation).toHaveValue('roman');
 });
 

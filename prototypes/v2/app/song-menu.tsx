@@ -1,4 +1,3 @@
-import { TIME_SIGNATURES } from '@engine/config';
 import { type ReactNode, useEffect, useRef } from 'react';
 import type * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
@@ -12,7 +11,7 @@ type Recovery = ReturnType<typeof repository.recoveriesFor>[number];
  * small dialogs a More item opens. The shell holds it, so an action that fails (a bar that will
  * not fit a new meter) can close whatever is open.
  */
-export type SongMenuView = 'actions' | 'more' | 'settings' | 'drafts';
+export type SongMenuView = 'actions' | 'more' | 'drafts';
 
 interface SongMenuProps {
     view: SongMenuView | null;
@@ -42,10 +41,6 @@ interface SongMenuProps {
     onOpenRecovery: (record: Recovery) => void;
     onDelete: () => void;
     onCloseShareLink: () => void;
-    /** The song's own meter (`score.meter`), not a section's or a bar's. Measure charts only. */
-    onSongMeter: (meter: string) => void;
-    /** The song's own major/minor (`score.isMinor`, #1375), never a section or bar override. */
-    onSongMode: (isMinor: boolean) => void;
 }
 
 /** Drives a `<dialog>`'s `showModal()`/`close()` from whether it should be open. */
@@ -69,13 +64,13 @@ function useModal(open: boolean) {
  * fields and no help text: anything that needs more than a pick opens its own small dialog
  * (Export… is the shell's `ExportDialog`).
  *
- * More opens a second `<Menu>` in place of the first, at the same •••: Revert to saved, Preserved
- * drafts… (when this device holds any) and, for a measure chart, Song settings…. A submenu beside
- * the first would be a second list to aim at on a laptop and makes no sense in a phone's sheet;
- * swapping the list keeps one menu on screen, and Esc still lands back on the •••.
+ * More opens a second `<Menu>` in place of the first, at the same •••: Revert to saved and
+ * Preserved drafts… (when this device holds any). A submenu beside the first would be a second
+ * list to aim at on a laptop and makes no sense in a phone's sheet; swapping the list keeps one
+ * menu on screen, and Esc still lands back on the •••.
  *
- * Song settings… (Song meter and Song mode) is a stopgap until the transport's Key popover
- * (#1757) takes them; Choruses lives only on the chart footer's form-length menu.
+ * The song's key, mode, meter and chord notation are the transport's Key popover's (#1757);
+ * Choruses lives only on the chart footer's form-length menu.
  */
 export function SongMenu({
     view,
@@ -96,11 +91,7 @@ export function SongMenu({
     onOpenRecovery,
     onDelete,
     onCloseShareLink,
-    onSongMeter,
-    onSongMode,
 }: SongMenuProps) {
-    const score = current?.schemaVersion === 2 ? current.chart.score : null;
-    const settings = useModal(view === 'settings' && score !== null);
     const drafts = useModal(view === 'drafts');
     const shareLink = useModal(shareLinkFallback !== null);
     const close = () => onView(null);
@@ -166,17 +157,6 @@ export function SongMenu({
                   },
               ]
             : []),
-        ...(score
-            ? [
-                  {
-                      id: 'settings',
-                      label: 'Song settings…',
-                      testId: 'song-menu-settings',
-                      disabled: busy,
-                      onSelect: () => onView('settings'),
-                  },
-              ]
-            : []),
     ];
     return (
         <>
@@ -194,54 +174,6 @@ export function SongMenu({
                     onClose={close}
                 />
             )}
-            {/* Song meter and Song mode until the transport's Key popover takes them (#1757).
-                Each is one unsaved change, as a bar is. */}
-            <dialog
-                ref={settings}
-                className="modal-box song-settings"
-                aria-labelledby="song-settings-title"
-                data-testid="song-settings"
-                onCancel={close}
-                onClose={whenClosed(close)}
-                {...backdropDismiss}
-            >
-                <h2 id="song-settings-title">Song settings</h2>
-                {score && (
-                    <div className="song-menu-fields">
-                        <label htmlFor="song-meter">Song meter</label>
-                        <select
-                            id="song-meter"
-                            disabled={busy}
-                            value={score.meter}
-                            onChange={(e) => onSongMeter(e.target.value)}
-                        >
-                            {[...new Set([...Object.keys(TIME_SIGNATURES), score.meter])].map(
-                                (meter) => (
-                                    <option key={meter}>{meter}</option>
-                                ),
-                            )}
-                        </select>
-                        <label htmlFor="song-mode">Song mode</label>
-                        <select
-                            id="song-mode"
-                            disabled={busy}
-                            value={score.isMinor ? 'minor' : 'major'}
-                            onChange={(e) => onSongMode(e.target.value === 'minor')}
-                        >
-                            <option value="major">Major</option>
-                            <option value="minor">Minor</option>
-                        </select>
-                        <p className="field-hint">
-                            A section or bar with its own meter or mode keeps it.
-                        </p>
-                    </div>
-                )}
-                <div className="dialog-actions">
-                    <button className="btn" onClick={close}>
-                        Close
-                    </button>
-                </div>
-            </dialog>
             <dialog
                 ref={drafts}
                 className="modal-box"

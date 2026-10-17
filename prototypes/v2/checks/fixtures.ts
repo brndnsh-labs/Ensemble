@@ -581,8 +581,8 @@ export async function openSongMenu(page: Page): Promise<Locator> {
 
 /**
  * Chooses one row of the Song menu (#1756), opening it first: a top-level action (Copy link,
- * Duplicate, Export…, Delete…) or one under More (Revert to saved, Preserved drafts (N)…, Song
- * settings…). A row that is `aria-disabled` is waited on, as a disabled button is.
+ * Duplicate, Export…, Delete…) or one under More (Revert to saved, Preserved drafts (N)…). A
+ * row that is `aria-disabled` is waited on, as a disabled button is.
  */
 export async function songMenuAction(page: Page, name: string | RegExp): Promise<void> {
     const menu = await openSongMenu(page);
@@ -617,27 +617,50 @@ export async function exportAs(
     return dialog;
 }
 
+/** The transport's Key button (#1757), named for the key it shows: "Key: B♭", "Key: Cm". */
+export const keyButton = (page: Page): Locator => page.getByRole('button', { name: /^Key: / });
+
+/** The transport's Key popover (#1757): the song's Key, Mode, Meter and Chord notation. */
+export const keyPopover = (page: Page): Locator =>
+    page.getByRole('dialog', { name: 'Key and meter' });
+
 /**
- * Opens the whole song's settings (#1756: Song menu → More → Song settings…), the Song meter and
- * Song mode the transport's Key popover (#1757) will take. Returns the dialog; `closeSongMenu`
- * closes it again (it is modal: nothing behind it takes a click while it is open).
+ * Opens the Key popover from the transport, if it is not open already, and returns it. On a phone
+ * the bar dock hides the transport while a bar is open (#1724), so the bar is left (Done) first.
  */
-export async function openWholeSong(page: Page): Promise<Locator> {
-    const settings = page.getByTestId('song-settings');
-    if (!(await settings.isVisible())) {
-        await songMenuAction(page, 'Song settings…');
+export async function openKeyPopover(page: Page): Promise<Locator> {
+    const popover = keyPopover(page);
+    if (!(await popover.isVisible())) {
+        if (await page.locator('.bar-dock').isVisible()) {
+            await closeBarDock(page);
+        }
+        await keyButton(page).click();
     }
-    await expect(settings.getByLabel('Song meter')).toBeEnabled();
-    return settings;
+    await expect(popover.getByLabel('Key', { exact: true })).toBeEnabled();
+    return popover;
 }
 
-/** Closes the Song settings dialog if it is open. */
-export async function closeSongMenu(page: Page): Promise<void> {
-    const settings = page.getByTestId('song-settings');
-    if (await settings.isVisible()) {
-        await settings.getByRole('button', { name: 'Close', exact: true }).click();
-        await expect(settings).toBeHidden();
-    }
+/**
+ * Closes the Key popover with an Esc sent to the popover itself, if it is still open. Checked and
+ * sent in one step in the page: a refusal can close it first, and an Esc pressed then would land
+ * on whatever took focus (a bar field, putting back its text).
+ */
+export async function closeKeyPopover(page: Page): Promise<void> {
+    await page.evaluate(() => {
+        document
+            .querySelector('[data-testid="key-popover"]')
+            ?.dispatchEvent(
+                new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }),
+            );
+    });
+    await expect(keyPopover(page)).toHaveCount(0);
+}
+
+/** Picks the song's key in the Key popover (a value: 'Eb', not 'E♭'), then closes it. */
+export async function pickSongKey(page: Page, key: string): Promise<void> {
+    const popover = await openKeyPopover(page);
+    await popover.getByLabel('Key', { exact: true }).selectOption(key);
+    await closeKeyPopover(page);
 }
 
 /** Picks how many times the form plays from the chart footer's form-length menu (#1511). */

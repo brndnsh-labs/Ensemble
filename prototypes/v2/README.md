@@ -175,12 +175,14 @@ does not transpose chord names; where the bar's meter has more than one idiomati
 the section's settings offer the same at section scope (#1376). Any meter change resets it. The
 menu also holds **Repeat or ending…**, **Advanced · per-bar repeat and ending markers**, **Hold
 last chord**, **Insert bar after** and **Delete bar**.
-Global Key transposes the entire score. The song's title is typed in the header while editing.
-**Song mode** (the Song menu ••• → More › Song settings…, beside Song meter, #1756) sets the song's own major/minor
+The song's title is typed in the header while editing. The transport's **Key** button opens one
+small popover (#1757) holding the song's Key, Mode, Meter and Chord notation, each changed as it is
+picked. Key transposes the entire score. **Mode** sets the song's own major/minor
 (#1375) without rewriting chord names or moving the key: A minor is A, then Minor, not a
-relative-key swap to C. **Song meter** sets the song's own meter: equal-length bars re-divide, a
+relative-key swap to C. **Meter** sets the song's own meter: equal-length bars re-divide, a
 section or bar with its own meter keeps it, and a bar whose written lengths cannot follow blocks
-the change and is selected for you — nothing is rounded. How many times the form plays (or Repeats
+the change and is selected for you — nothing is rounded. A text chart's popover holds Key and
+Chord notation only. How many times the form plays (or Repeats
 continuously) is the chart footer's form-length menu.
 Delete bar removes the bar (a key/meter change it wrote passes to the next bar, so the rest of the
 section sounds the same; a section's only bar takes the section with it) and the section letter's
@@ -190,7 +192,7 @@ bar carrying repeat/navigation marks — remove the marks or the whole section i
 section letter in Edit opens that section's menu (#1374, #1726): it names the section (1–24
 characters), sets how many times it plays (1–64), gives it its own key, mode or meter or returns
 each to the song's, and adds a section after it (one bar in the song's key and meter) or deletes
-it. A section meter change re-fits that section's bars by Song meter's rule and resets its beat
+it. A section meter change re-fits that section's bars by the song meter's rule and resets its beat
 grouping; a bar with its own override keeps it. Save includes pending bars even with the editor
 hidden.
 

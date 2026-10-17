@@ -1,4 +1,12 @@
-import { appUrl, barField, closeSongMenu, expect, leaveBar, openWholeSong, test } from './fixtures';
+import {
+    appUrl,
+    barField,
+    closeKeyPopover,
+    expect,
+    leaveBar,
+    openKeyPopover,
+    test,
+} from './fixtures';
 
 /**
  * #1700 — while editing a measure chart, the chart shows which bar the editor holds, and a tap
@@ -75,10 +83,10 @@ test('the bar being edited and its editor are on screen together, wherever the b
     await leaveBar(page);
     await expect(other).toHaveClass(/\bselected\b/);
 
-    // The whole-song settings are the Song menu's More › Song settings… (#1756).
-    await expect(page.getByLabel('Song meter')).toBeHidden();
-    await openWholeSong(page);
-    await expect(page.getByLabel('Song meter')).toBeVisible();
-    await closeSongMenu(page);
-    await expect(page.getByLabel('Song meter')).toBeHidden();
+    // The whole-song settings are the transport's Key popover (#1757).
+    await expect(page.getByLabel('Meter', { exact: true })).toBeHidden();
+    await openKeyPopover(page);
+    await expect(page.getByLabel('Meter', { exact: true })).toBeVisible();
+    await closeKeyPopover(page);
+    await expect(page.getByLabel('Meter', { exact: true })).toBeHidden();
 });

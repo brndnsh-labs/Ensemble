@@ -5,10 +5,12 @@ import {
     closeBarDock,
     expect,
     exportAs,
+    keyButton,
     leaveBar,
     openBar,
     openSectionMenu,
     phoneWidth,
+    pickSongKey,
     seedStarters,
     settled,
     songLink,
@@ -109,9 +111,8 @@ test('a practice nudge is said apart from a chart change, and both wait for Save
 
     // Transposing rewrites the chords: a chart change, whatever else changed with it.
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
-    const key = page.getByLabel('Key', { exact: true });
-    const before = await key.inputValue();
-    await key.selectOption(before === 'D' ? 'E' : 'D');
+    const before = (await keyButton(page).getAttribute('aria-label'))?.replace('Key: ', '');
+    await pickSongKey(page, before === 'D' ? 'E' : 'D');
     await expect(status).toHaveText('Unsaved changes · locally recovered');
     await expect(status).toHaveClass('unsaved');
 

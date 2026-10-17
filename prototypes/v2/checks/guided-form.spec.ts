@@ -9,6 +9,7 @@ import {
     exportAs,
     leaveBar,
     openBar,
+    pickSongKey,
     songLink,
     songMenuAction,
     test,
@@ -175,11 +176,11 @@ test('guided endings survive save, copy, export, transpose, Revert and offline r
     const copy = await exported(page);
     expect(copy.id).not.toBe(source.id);
     expect(copy.chart).toEqual(source.chart);
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await expect(page.locator('.bar .chord')).toHaveText(['D', 'A', 'Bm', 'G']);
     await songMenuAction(page, 'Revert to saved');
     await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
-    await page.getByLabel('Key', { exact: true }).selectOption('D');
+    await pickSongKey(page, 'D');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await expect

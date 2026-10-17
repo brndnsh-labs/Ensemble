@@ -1,9 +1,9 @@
-import { KEY_ORDER } from '@engine/config';
-import { normalizeKey } from '@engine/utils';
-import { Fragment } from 'react';
-import { arrangementOf, genreOf } from '../lib/documents';
+import type { ChartNotation } from '@engine/songbook/types';
+import { Fragment, useRef } from 'react';
+import { genreOf } from '../lib/documents';
 import { type ChartDocument, GENRE_NAMES } from '../lib/runtime';
 import { type Lane, visibleLanes } from './band-lanes';
+import { KeyPopover, songKeyLabel } from './key-popover';
 import { TempoControl } from './tempo-control';
 
 interface TransportBarProps {
@@ -15,7 +15,16 @@ interface TransportBarProps {
     countInBeat: number | null;
     onPlayToggle: () => void;
     onTempo: (bpm: number) => void;
+    /** Whether the Key popover (#1757) is open. The shell holds it, so a refused meter can
+     * close it onto the bar that would not fit. */
+    keyOpen: boolean;
+    /** The Key button: opens the popover, or closes it while it is open. */
+    onKeyToggle: () => void;
+    onKeyClose: () => void;
     onKey: (key: string) => void;
+    onMode: (isMinor: boolean) => void;
+    onMeter: (meter: string) => void;
+    onNotation: (notation: ChartNotation) => void;
     onGenre: (genre: string) => void;
     /** Opens the Band sheet (#1703) on the tab the musician was last on. */
     onBand: () => void;
@@ -33,7 +42,13 @@ export function TransportBar({
     countInBeat,
     onPlayToggle,
     onTempo,
+    keyOpen,
+    onKeyToggle,
+    onKeyClose,
     onKey,
+    onMode,
+    onMeter,
+    onNotation,
     onGenre,
     onBand,
     onToggleLane,
@@ -45,6 +60,8 @@ export function TransportBar({
     // Filled only while the band really trades; asked for but blocked, it stays hollow.
     const trading = trade !== 'off' && !tradeBlocked;
     const partner = trade === 'soloist' ? 'soloist' : 'drummer';
+    const keyButton = useRef<HTMLButtonElement>(null);
+    const keyLabel = songKeyLabel(current);
     return (
         <div className="transport-bar">
             <div className="transport-cluster">
@@ -73,25 +90,44 @@ export function TransportBar({
                     onCommit={onTempo}
                 />
             </div>
+            {/* The song's key, mode, meter and chord notation, one popover (#1757). The small
+                label above is the column's, as Tempo's and Style's are; the button's own name
+                says the whole thing. `aria-disabled` while busy, so focus can come back to it. */}
             <div className="key-setting">
-                <label className="setting-label" htmlFor="song-key">
+                <span className="setting-label" aria-hidden="true">
                     Key
-                </label>
-                <select
-                    id="song-key"
-                    className="setting-select"
-                    disabled={busy}
-                    // The picker lists flat spellings only; an imported `F#` is shown as its `Gb`.
-                    value={normalizeKey(arrangementOf(current).key)}
-                    onChange={(event) => onKey(event.target.value)}
+                </span>
+                <button
+                    ref={keyButton}
+                    type="button"
+                    className="setting-select key-button"
+                    aria-label={`Key: ${keyLabel}`}
+                    aria-haspopup="dialog"
+                    aria-expanded={keyOpen}
+                    aria-disabled={(busy && !keyOpen) || undefined}
+                    onClick={() => {
+                        if (!busy || keyOpen) {
+                            onKeyToggle();
+                        }
+                    }}
                 >
-                    {KEY_ORDER.map((key) => (
-                        <option key={key} value={key}>
-                            {key}
-                            {arrangementOf(current).isMinor ? 'm' : ''}
-                        </option>
-                    ))}
-                </select>
+                    {keyLabel}
+                    <span className="key-button-caret" aria-hidden="true">
+                        ▾
+                    </span>
+                </button>
+                {keyOpen && (
+                    <KeyPopover
+                        current={current}
+                        busy={busy}
+                        anchor={() => (keyButton.current?.isConnected ? keyButton.current : null)}
+                        onKey={onKey}
+                        onMode={onMode}
+                        onMeter={onMeter}
+                        onNotation={onNotation}
+                        onClose={onKeyClose}
+                    />
+                )}
             </div>
             <div className="genre-setting">
                 <label className="setting-label" htmlFor="genre">

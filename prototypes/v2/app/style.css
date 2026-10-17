@@ -1794,12 +1794,6 @@ dialog textarea {
     border-radius: 10px;
     margin-top: 18px;
 }
-.field-hint {
-    font-size: 11px;
-    line-height: 1.6;
-    color: var(--muted);
-    margin: 6px 0 0;
-}
 .file-input {
     display: none;
 }
@@ -1819,6 +1813,20 @@ dialog textarea {
     color: var(--ink);
     max-width: 125px;
     cursor: pointer;
+}
+/* The transport's Key (#1757): reads as the select it replaced — the key in the setting's weight
+   and a small caret — and opens the Key popover. Never wider than the select was: the phone's
+   transport row has about 10px to spare on CI's WebKit. */
+.key-button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 2px;
+    white-space: nowrap;
+}
+.key-button-caret {
+    color: var(--muted);
+    font-size: 10px;
 }
 /* Opens the Band sheet (#1703) beside the style select. Bordered like the other buttons in the
    bar: as muted text with no chrome it read as a cut-off label, not a button (UI audit). Its
@@ -1875,24 +1883,40 @@ dialog textarea {
     width: min(480px, calc(100vw - 32px));
     box-shadow: var(--shadow);
 }
-/* Song settings (#1756): Song meter and Song mode, until the transport's Key popover (#1757). */
-.song-menu-fields {
+/* The transport's Key popover (#1757): Key, Mode, Meter and Chord notation. The box is `<Menu>`'s
+   (`menu.css`); on a laptop each field is a label beside its select, on a phone's sheet one
+   above the other at touch size. */
+.key-popover-fields {
     display: grid;
-    gap: 4px;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 12px;
+    padding: 6px 9px;
 }
-.song-menu-fields label {
+.key-popover-fields label {
     font-size: 12px;
     font-weight: 650;
-    margin-top: 8px;
+    color: var(--muted);
 }
-.song-menu-fields select {
-    width: 100%;
-    min-height: 44px;
-    padding: 8px 12px;
+.key-popover-fields select {
+    min-height: 32px;
+    padding: 4px 8px;
     border: 1px solid var(--line);
     border-radius: 8px;
     background: var(--surface);
     color: var(--ink);
+    font: inherit;
+}
+.menu-sheet .key-popover-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+}
+.menu-sheet .key-popover-fields label {
+    margin-top: 8px;
+}
+.menu-sheet .key-popover-fields select {
+    min-height: 44px;
+    padding: 8px 12px;
     /* 16px or more, or iOS zooms the page in on focus. */
     font-size: 16px;
 }

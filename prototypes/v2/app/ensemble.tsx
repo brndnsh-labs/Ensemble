@@ -658,6 +658,14 @@ export default function Ensemble() {
     const songMenuTrigger = useRef<HTMLButtonElement>(null);
     // Export… (#1756), its own dialog off the Song menu.
     const [exportOpen, setExportOpen] = useState(false);
+    // The transport's Key popover (#1757): the song's key, mode, meter and chord notation.
+    const [keyOpen, setKeyOpen] = useState(false);
+    // It is about the song on the stand: another song (or none) closes it.
+    const standId = current?.id;
+    // biome-ignore lint/correctness/useExhaustiveDependencies: the stand's song changing is the trigger.
+    useEffect(() => {
+        setKeyOpen(false);
+    }, [standId]);
     const exportDialogRef = useRef<HTMLDialogElement>(null);
     const standKeys = useRef<((event: KeyboardEvent) => void) | null>(null);
     const [importing, setImporting] = useState(false);
@@ -1561,10 +1569,11 @@ export default function Ensemble() {
             }
             const from = navEntry.current;
             const open = [...document.querySelectorAll<HTMLDialogElement>('dialog[open]')];
-            if (open.length === 0 && document.querySelector('.menu [role="menu"]')) {
+            if (open.length === 0 && document.querySelector('.menu')) {
                 // An anchored menu (#1755) is open over the page, the Song menu among them
-                // (#1756): Back closes it as it closes a dialog. `<Menu>` hears Escape on the
-                // document whatever has focus.
+                // (#1756), or the transport's Key popover (#1757): Back closes it as it closes a
+                // dialog. Both hear Escape on the document whatever has focus
+                // (`useAnchoredDismiss`).
                 document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
                 undoPop(target, from);
                 return;
@@ -4471,10 +4480,14 @@ export default function Ensemble() {
         }
         return result;
     }
-    /** Closes the Song menu (#1756), whichever list or small dialog it shows, and Export…. */
+    /**
+     * Closes the Song menu (#1756), whichever list or small dialog it shows, Export… and the
+     * transport's Key popover (#1757): a refusal is shown with nothing open over it.
+     */
     function closeSongMenus() {
         setSongMenu(null);
         setExportOpen(false);
+        setKeyOpen(false);
     }
     /** The •••: opens the Song menu, or closes it while one of its lists is showing. */
     function toggleSongMenu() {
@@ -5417,7 +5430,7 @@ export default function Ensemble() {
             }
             const result = withSongMeter(next.chart.score, meter);
             if (result.kind === 'blocked') {
-                // The Song menu closes onto the bar that would not fit, so the refusal (the
+                // The Key popover closes onto the bar that would not fit, so the refusal (the
                 // shell's error line) and the bar it names are both in view.
                 closeSongMenus();
                 setMeasureId(result.measureId);
@@ -6280,6 +6293,9 @@ export default function Ensemble() {
                         onPlayToggle={togglePlayback}
                         onBand={() => openBand(lastBandTab.current)}
                         onTempo={(value) => change(() => runtime.setTempo(value))}
+                        keyOpen={keyOpen}
+                        onKeyToggle={() => setKeyOpen((open) => !open)}
+                        onKeyClose={() => setKeyOpen(false)}
                         onKey={(key) =>
                             change(
                                 () =>
@@ -6287,6 +6303,9 @@ export default function Ensemble() {
                                 true,
                             )
                         }
+                        onMode={(isMinor) => change(() => runtime.setMode(isMinor), true)}
+                        onMeter={changeSongMeter}
+                        onNotation={(notation) => change(() => runtime.setNotation(notation), true)}
                         onGenre={(genre) =>
                             change(async () => {
                                 // Tracked HERE, not inside `runtime.setGenre` (#1389): this is
@@ -6385,7 +6404,6 @@ export default function Ensemble() {
                         }
                         practice={
                             <PracticeTab
-                                current={current}
                                 busy={busy}
                                 feel={feel}
                                 onMetronome={(enabled) =>
@@ -6405,9 +6423,6 @@ export default function Ensemble() {
                                         runtime.setCountIn(enabled);
                                         setFeel((f) => ({ ...f, countIn: enabled }));
                                     })
-                                }
-                                onNotation={(notation) =>
-                                    change(() => runtime.setNotation(notation))
                                 }
                             />
                         }
@@ -6667,8 +6682,6 @@ export default function Ensemble() {
                 onExport={() => setExportOpen(true)}
                 onDelete={requestDeleteStand}
                 onCloseShareLink={() => setShareLinkFallback(null)}
-                onSongMeter={changeSongMeter}
-                onSongMode={(isMinor) => change(() => runtime.setMode(isMinor), true)}
                 onRevert={() =>
                     void run(() => {
                         if (!saved) {
