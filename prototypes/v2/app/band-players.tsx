@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { ChartDocument } from '../lib/runtime';
 import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
 import { type Lane, visibleLanes } from './band-lanes';
+import './band-players.css';
 import { useRangeCommit } from './use-range-commit';
 
 interface RangeSettingProps {
@@ -75,8 +76,10 @@ interface PlayersTabProps {
 }
 
 /**
- * The Band sheet's Players tab (#1703): each lane on or off, its sound, volume and reverb — what
- * the Sounds panel held, plus the on/off the transport's chips also offer as a quick toggle.
+ * The Band sheet's Players tab (#1703): each lane on or off and on which sound, one row apiece, so
+ * the tab fits a phone screen (#1759). Volume and reverb sit behind each lane's Mix disclosure,
+ * closed until asked for; the one-off install-all is a quiet link at the bottom. The on/off the
+ * transport's chips also offer as a quick toggle stays here as a quieter switch.
  */
 export function PlayersTab({
     current,
@@ -93,44 +96,21 @@ export function PlayersTab({
 }: PlayersTabProps) {
     return (
         <>
-            <div className="sound-install">
-                <button className="btn primary" disabled={busy} onClick={onInstallAll}>
-                    {busy ? 'Preparing sounds…' : 'Install all & use style sounds'}
-                </button>
-                <p>
-                    About {allSoundsSizeMB.toFixed(1)} MB. Chooses sounds for this song's style;
-                    changing the style follows along. Save to keep this setup.
-                </p>
-                <small>
-                    {allSoundsOffline === null
-                        ? 'Checking installed sounds…'
-                        : allSoundsOffline
-                          ? 'All sound packs available offline'
-                          : 'Missing downloads will be installed. Completed files are reused.'}
-                </small>
-            </div>
-            <p className="sound-progress" role="status">
-                {soundProgress}
-            </p>
-            <div className="sounds-status">
-                <span>
-                    {soundsOffline === null
-                        ? 'Checking downloads…'
-                        : soundsOffline
-                          ? 'Song sounds available offline'
-                          : 'Some sounds need downloading'}
-                </span>
-            </div>
-            <div className="sound-choices">
+            <div className="player-rows">
                 {visibleLanes.map(([lane, label]) => {
                     const band = current.chart.band[lane];
                     const pack = packsForInstrument(lane).find(
                         (entry) => band.voice === `pack:${entry.id}`,
                     );
                     return (
-                        <div className={`sound-lane ${band.enabled ? '' : 'muted'}`} key={lane}>
-                            <div className="sound-lane-head">
+                        <div className={`player-row ${band.enabled ? '' : 'muted'}`} key={lane}>
+                            <div className="player-head">
                                 <h3>{label}</h3>
+                                {band.autoSound && (
+                                    <span className="resolved-sound">
+                                        Using {pack?.name || 'Built-in'}
+                                    </span>
+                                )}
                                 <label className="lane-switch">
                                     <input
                                         type="checkbox"
@@ -143,59 +123,79 @@ export function PlayersTab({
                                     <span>{band.enabled ? 'On' : 'Off'}</span>
                                 </label>
                             </div>
-                            <label>
-                                {label} sound
-                                <select
-                                    aria-label={`${label} sound`}
-                                    value={
-                                        pendingSound?.lane === lane
-                                            ? pendingSound.value
-                                            : band.autoSound
-                                              ? 'auto'
-                                              : band.voice
-                                    }
+                            <select
+                                aria-label={`${label} sound`}
+                                value={
+                                    pendingSound?.lane === lane
+                                        ? pendingSound.value
+                                        : band.autoSound
+                                          ? 'auto'
+                                          : band.voice
+                                }
+                                disabled={busy}
+                                onChange={(event) => onChooseSound(lane, event.target.value)}
+                            >
+                                <option value="auto">Follow style</option>
+                                <option value="synth">Built-in</option>
+                                {packsForInstrument(lane).map((entry) => (
+                                    <option key={entry.id} value={`pack:${entry.id}`}>
+                                        {entry.name} · {entry.approxSizeMB} MB
+                                    </option>
+                                ))}
+                            </select>
+                            <details className="lane-mix">
+                                <summary aria-label={`${label} mix`}>Mix</summary>
+                                <RangeSetting
+                                    label={`${label} volume`}
+                                    ariaLabel={`${label} volume`}
+                                    value={band.volume}
                                     disabled={busy}
-                                    onChange={(event) => onChooseSound(lane, event.target.value)}
-                                >
-                                    <option value="auto">Follow style</option>
-                                    <option value="synth">Built-in</option>
-                                    {packsForInstrument(lane).map((entry) => (
-                                        <option key={entry.id} value={`pack:${entry.id}`}>
-                                            {entry.name} · {entry.approxSizeMB} MB
-                                        </option>
-                                    ))}
-                                </select>
-                                <small>
-                                    {band.autoSound && (
-                                        <span className="resolved-sound">
-                                            Using {pack?.name || 'Built-in'}
-                                        </span>
-                                    )}
-                                    {pack?.attribution}
-                                </small>
-                            </label>
-                            <RangeSetting
-                                label={`${label} volume`}
-                                ariaLabel={`${label} volume`}
-                                value={band.volume}
-                                disabled={busy}
-                                onCommit={(value) => onVolume(lane, value)}
-                            />
-                            <RangeSetting
-                                label={`${label} reverb`}
-                                ariaLabel={`${label} reverb`}
-                                value={band.reverb}
-                                disabled={busy}
-                                onCommit={(value) => onReverb(lane, value)}
-                            />
+                                    onCommit={(value) => onVolume(lane, value)}
+                                />
+                                <RangeSetting
+                                    label={`${label} reverb`}
+                                    ariaLabel={`${label} reverb`}
+                                    value={band.reverb}
+                                    disabled={busy}
+                                    onCommit={(value) => onReverb(lane, value)}
+                                />
+                                {pack?.attribution && <small>{pack.attribution}</small>}
+                            </details>
                         </div>
                     );
                 })}
             </div>
-            <p className="band-note">
-                Choosing a sound downloads it for offline use. Save keeps your choices with this
-                song. Browser storage can still be cleared or evicted.
+            <p className="sound-progress" role="status">
+                {soundProgress}
             </p>
+            <div className="players-foot">
+                <button
+                    type="button"
+                    className="install-all"
+                    disabled={busy}
+                    onClick={onInstallAll}
+                >
+                    {busy ? 'Preparing sounds…' : 'Install all & use style sounds'}
+                </button>
+                <small>
+                    About {allSoundsSizeMB.toFixed(1)} MB. Chooses sounds for this song's style;
+                    changing the style follows along. Save to keep this setup.
+                </small>
+                <small>
+                    {allSoundsOffline === null
+                        ? 'Checking installed sounds…'
+                        : allSoundsOffline
+                          ? 'All sound packs available offline'
+                          : 'Missing downloads will be installed. Completed files are reused.'}
+                </small>
+                <small>
+                    {soundsOffline === null
+                        ? 'Checking downloads…'
+                        : soundsOffline
+                          ? 'Song sounds available offline'
+                          : 'Some sounds need downloading'}
+                </small>
+            </div>
         </>
     );
 }

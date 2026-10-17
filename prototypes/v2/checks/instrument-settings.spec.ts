@@ -9,6 +9,16 @@ import { appUrl, expect, openBand, seedStarters, songLink, test } from './fixtur
 async function openSounds(page: import('@playwright/test').Page) {
     await openBand(page, 'Players');
 }
+/** A lane's volume and reverb sit behind its Mix disclosure (#1759), closed until asked for. */
+async function openMix(page: import('@playwright/test').Page, label: string) {
+    const mix = page.locator('details.lane-mix', {
+        has: page.locator(`summary[aria-label="${label} mix"]`),
+    });
+    if ((await mix.getAttribute('open')) === null) {
+        await mix.locator('summary').click();
+    }
+    await expect(mix).toHaveAttribute('open', '');
+}
 async function closeSounds(page: import('@playwright/test').Page) {
     await page.getByRole('button', { name: 'Close band' }).click();
 }
@@ -51,6 +61,9 @@ test('every per-instrument sound control has a lane-scoped accessible name', asy
     // (docs/design/band-engine.md).
     for (const label of ['Drums', 'Bass', 'Chords', 'Soloist']) {
         await expect(page.getByLabel(`${label} sound`, { exact: true })).toBeVisible();
+        // Closed by default (#1759): the sliders are there once the lane's Mix is opened.
+        await expect(page.getByLabel(`${label} volume`, { exact: true })).toBeHidden();
+        await openMix(page, label);
         await expect(page.getByLabel(`${label} volume`, { exact: true })).toBeVisible();
         await expect(page.getByLabel(`${label} reverb`, { exact: true })).toBeVisible();
         await expect(page.getByLabel(`${label} style`, { exact: true })).toHaveCount(0);
@@ -71,6 +84,7 @@ test('bass volume persists through save, reload, revert and a share link', async
     await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);
 
+    await openMix(page, 'Bass');
     const bassVolume = page.getByLabel('Bass volume', { exact: true });
     // Assert the known starting point before changing it.
     await expect(bassVolume).toHaveValue('100');
@@ -84,12 +98,14 @@ test('bass volume persists through save, reload, revert and a share link', async
     await page.getByRole('button', { name: 'Song actions' }).click();
     await page.getByRole('button', { name: 'Revert to saved' }).click();
     await openSounds(page);
+    await openMix(page, 'Bass');
     await expect(bassVolume).toHaveValue('100');
     await closeSounds(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     // Redo the edits and this time save them.
     await openSounds(page);
+    await openMix(page, 'Bass');
     await setRange(page, 'Bass volume', 40);
     await closeSounds(page);
     await page.getByRole('button', { name: 'Save', exact: true }).click();
@@ -98,6 +114,7 @@ test('bass volume persists through save, reload, revert and a share link', async
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openSounds(page);
+    await openMix(page, 'Bass');
     await expect(bassVolume).toHaveValue('40');
     await closeSounds(page);
 
@@ -130,5 +147,25 @@ test('bass volume persists through save, reload, revert and a share link', async
     await fresh.goto(link);
     await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
     await openSounds(fresh);
+    await openMix(fresh, 'Bass');
     await expect(fresh.getByLabel('Bass volume', { exact: true })).toHaveValue('40');
+});
+
+// #1759 — with every Mix closed, Players is one screen on a phone: the tab's panel needs no scroll.
+test('the Players tab fits a 390x844 screen with no scrolling', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await openSounds(page);
+    const panel = page.getByRole('tabpanel');
+    await expect(panel.locator('details.lane-mix[open]')).toHaveCount(0);
+    // The install-all link is the last thing in the tab, and it is on screen.
+    await expect(
+        page.getByRole('button', { name: 'Install all & use style sounds' }),
+    ).toBeInViewport();
+    const [scrollHeight, clientHeight] = await panel.evaluate((el) => [
+        el.scrollHeight,
+        el.clientHeight,
+    ]);
+    expect(scrollHeight).toBeLessThanOrEqual(clientHeight);
 });

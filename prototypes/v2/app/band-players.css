@@ -1,0 +1,141 @@
+/* The Band sheet's Players tab (#1703, #1759): one row per lane — name, the sound it follows, an
+   on/off switch and select — with volume and reverb behind a closed "Mix" disclosure, so the tab
+   fits a phone screen (390×844) with every disclosure closed. */
+.player-rows {
+    display: flex;
+    flex-direction: column;
+}
+.player-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 10px;
+    padding: 6px 0 8px;
+    border-bottom: 1px solid var(--line);
+}
+.player-head {
+    flex: 1 1 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+.player-head h3 {
+    font-size: 14px;
+    margin: 0;
+}
+.player-row select {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 44px;
+    font: inherit;
+    font-size: 13px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--surface);
+    color: var(--ink);
+}
+.resolved-sound {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+    color: var(--green);
+}
+/* The switch is the quieter duplicate of the transport's lane chip. */
+.player-row .lane-switch {
+    margin-left: auto;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--muted);
+}
+.player-row.muted select,
+.player-row.muted .resolved-sound {
+    opacity: 0.55;
+}
+.lane-mix {
+    flex: 0 0 auto;
+    font-size: 13px;
+}
+.lane-mix summary {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 8px;
+    color: var(--muted);
+    cursor: pointer;
+}
+/* Open, the disclosure takes its own line under the row, summary first. */
+.lane-mix[open] {
+    flex: 1 1 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-bottom: 4px;
+}
+.lane-mix[open] summary {
+    min-height: 32px;
+    padding: 0;
+}
+.lane-mix small {
+    font-size: 10px;
+    color: var(--muted);
+    line-height: 1.4;
+}
+.sound-range {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+    min-width: 0;
+}
+.sound-range-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.sound-range-control input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 32px;
+    accent-color: var(--green);
+}
+.sound-range-value {
+    flex: 0 0 auto;
+    width: 2.4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+.players-foot {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    padding-top: 10px;
+    color: var(--muted);
+}
+.players-foot small {
+    font-size: 11px;
+    line-height: 1.4;
+}
+/* Install-all is a one-off, so it reads as a link, not the tab's loudest button. */
+.install-all {
+    padding: 0;
+    min-height: 32px;
+    font: inherit;
+    font-size: 13px;
+    color: var(--green);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.install-all:disabled {
+    color: var(--muted);
+    text-decoration: none;
+}
