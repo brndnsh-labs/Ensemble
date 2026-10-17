@@ -2348,7 +2348,17 @@ export class AccountSongbook {
     ): Promise<{
         /** Each readable song, with its stored document exactly as read (`stored`). */
         songs: Array<{ song: SavedSong; stored: unknown }>;
-        unreadable: Array<{ documentId: string; reason: string; document: unknown }>;
+        /**
+         * Each row that will not read, with its raw `document`, and whether the account holds it
+         * on the server (a confirmed `remoteRevision`): a local row the server would only send
+         * again, which is never offered for removal.
+         */
+        unreadable: Array<{
+            documentId: string;
+            reason: string;
+            document: unknown;
+            serverHeld: boolean;
+        }>;
         nextAfterDocumentId: string | null;
     }> {
         scope = copyScope(scope);
@@ -2368,8 +2378,12 @@ export class AccountSongbook {
             tx.read(tx.table('songs').getAll(range, limit + 1), (rows: SavedSong[]) => {
                 const window = rows.slice(0, limit);
                 const songs: Array<{ song: SavedSong; stored: unknown }> = [];
-                const unreadable: Array<{ documentId: string; reason: string; document: unknown }> =
-                    [];
+                const unreadable: Array<{
+                    documentId: string;
+                    reason: string;
+                    document: unknown;
+                    serverHeld: boolean;
+                }> = [];
                 for (const row of window) {
                     try {
                         identifier(row?.documentId);
@@ -2382,6 +2396,7 @@ export class AccountSongbook {
                             documentId: String(row?.documentId),
                             reason: failure instanceof Error ? failure.message : String(failure),
                             document: row?.document,
+                            serverHeld: row?.remoteRevision != null,
                         });
                     }
                 }
@@ -2401,29 +2416,137 @@ export class AccountSongbook {
      * read is reported (ids and reason) and left alone rather than failing the rest, as a home read treats a song.
      */
     async allDrafts(scope: AccountScope): Promise<{
-        drafts: Draft[];
-        unreadable: Array<{ documentId: string; writerId: string; reason: string }>;
+        /** Each readable draft, with its stored `document` exactly as read (`stored`). */
+        drafts: Array<{ draft: Draft; stored: unknown }>;
+        unreadable: Array<{
+            documentId: string;
+            writerId: string;
+            capturedAt: unknown;
+            reason: string;
+            stored: unknown;
+        }>;
     }> {
         scope = copyScope(scope);
         return this.database.run('readonly', scope, (tx) => {
             // `clearAccount`'s owner bound: it stops at this owner's last row.
             const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
             tx.read(tx.table('drafts').getAll(owned), (rows: Draft[]) => {
-                const drafts: Draft[] = [];
-                const unreadable: Array<{ documentId: string; writerId: string; reason: string }> =
-                    [];
+                const drafts: Array<{ draft: Draft; stored: unknown }> = [];
+                const unreadable: Array<{
+                    documentId: string;
+                    writerId: string;
+                    capturedAt: unknown;
+                    reason: string;
+                    stored: unknown;
+                }> = [];
                 for (const row of rows) {
                     try {
-                        drafts.push(savedDraft(row, scope, row?.documentId));
+                        drafts.push({
+                            draft: savedDraft(row, scope, row?.documentId),
+                            stored: row.document,
+                        });
                     } catch (failure) {
                         unreadable.push({
                             documentId: String(row?.documentId),
                             writerId: String(row?.writerId),
+                            capturedAt: row?.capturedAt,
                             reason: failure instanceof Error ? failure.message : String(failure),
+                            stored: row?.document,
                         });
                     }
                 }
                 tx.finish({ drafts, unreadable });
+            });
+        });
+    }
+
+    /**
+     * Remove ONE retained draft row the musician chose to remove from "Upgrade old songs"'
+     * leftovers (#1738) — only if it still holds exactly the bytes the backup file holds (`raw`,
+     * its stored `document` as JSON). Purely local: a draft never leaves this device, so nothing
+     * is queued or sent. `'live'` refuses a live draft of a song this device can read (unsaved
+     * work, which has its own way back); `'changed'` and `'gone'` write nothing.
+     */
+    async removeDraftRow(
+        scope: AccountScope,
+        draft: { documentId: string; writerId: string },
+        raw: string,
+    ): Promise<'removed' | 'changed' | 'gone' | 'live'> {
+        scope = copyScope(scope);
+        const { documentId, writerId } = draft;
+        identifier(documentId);
+        identifier(writerId);
+        return this.database.run('readwrite', scope, (tx) => {
+            tx.read(tx.table('songs').get([scope.ownerId, documentId]), (song: unknown) => {
+                let saved: SavedSong | null = null;
+                try {
+                    saved = song ? savedSong(song as SavedSong, scope, documentId) : null;
+                } catch {
+                    // A song row that does not read: nothing can say this draft is live on it.
+                }
+                const key = [scope.ownerId, documentId, writerId];
+                tx.read(tx.table('drafts').get(key), (row: Draft | undefined) => {
+                    if (!row) {
+                        return tx.finish('gone');
+                    }
+                    if (JSON.stringify(row.document) !== raw) {
+                        return tx.finish('changed');
+                    }
+                    if (saved && liveDraft(row, saved)) {
+                        return tx.finish('live');
+                    }
+                    tx.table('drafts').delete(key);
+                    tx.finish('removed');
+                });
+            });
+        });
+    }
+
+    /**
+     * Remove ONE song row that will not read, chosen by the musician from "Upgrade old songs"'
+     * leftovers (#1738), only if it still holds exactly the backed-up bytes (`raw`) and still
+     * does not read. A LOCAL row delete and nothing more: no tombstone, no outbox operation, no
+     * request — it is never a cloud delete (#1270). So it refuses (`'held'`) a row the account
+     * holds on the server (a confirmed `remoteRevision`: the next download would only bring it
+     * back, and the musician should hear that, not see it vanish and return) or one with a Save
+     * still queued (deleting it would strand that operation).
+     */
+    async removeUnreadableSong(
+        scope: AccountScope,
+        documentId: string,
+        raw: string,
+    ): Promise<'removed' | 'changed' | 'gone' | 'held'> {
+        scope = copyScope(scope);
+        identifier(documentId);
+        return this.database.run('readwrite', scope, (tx) => {
+            const key = [scope.ownerId, documentId];
+            tx.read(tx.table('songs').get(key), (row: SavedSong | undefined) => {
+                if (!row) {
+                    return tx.finish('gone');
+                }
+                if (JSON.stringify(row.document) !== raw) {
+                    return tx.finish('changed');
+                }
+                try {
+                    savedSong(row, scope, documentId);
+                    // It reads now (a newer build, a repaired row): not a leftover any more.
+                    return tx.finish('changed');
+                } catch {
+                    // Still unreadable: the row this removal is about.
+                }
+                if (row.remoteRevision != null) {
+                    return tx.finish('held');
+                }
+                tx.read(
+                    tx.table('operations').index('song').getAll(key),
+                    (operations: unknown[]) => {
+                        if (operations.length) {
+                            return tx.finish('held');
+                        }
+                        tx.table('songs').delete(key);
+                        tx.finish('removed');
+                    },
+                );
             });
         });
     }

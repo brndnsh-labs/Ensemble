@@ -829,7 +829,12 @@ export interface SyncLoop {
         pace?: { shouldYield: () => boolean; yieldNow: () => Promise<void> },
     ): Promise<{
         songs: Array<{ song: SavedSong; stored: unknown }>;
-        unreadable: Array<{ documentId: string; reason: string; document: unknown }>;
+        unreadable: Array<{
+            documentId: string;
+            reason: string;
+            document: unknown;
+            serverHeld: boolean;
+        }>;
     }>;
     /**
      * Retain this writer's unsaved experiment on an account chart (#1299) — the account half of
@@ -889,9 +894,31 @@ export interface SyncLoop {
      * among. Scoped like `listLibrary`.
      */
     listDrafts(owner?: string | null): Promise<{
-        drafts: Draft[];
-        unreadable: Array<{ documentId: string; writerId: string; reason: string }>;
+        drafts: Array<{ draft: Draft; stored: unknown }>;
+        unreadable: Array<{
+            documentId: string;
+            writerId: string;
+            capturedAt: unknown;
+            reason: string;
+            stored: unknown;
+        }>;
     }>;
+    /**
+     * Remove one retained draft row, or one song row that will not read, that the musician chose
+     * from "Upgrade old songs"' leftovers (#1738) — guarded on the backed-up bytes, local only,
+     * never a cloud delete (`AccountSongbook.removeDraftRow`/`removeUnreadableSong`). Fenced on
+     * `owner` like every write here.
+     */
+    removeDraftRow(
+        draft: { documentId: string; writerId: string },
+        raw: string,
+        owner: string | null,
+    ): Promise<'removed' | 'changed' | 'gone' | 'live'>;
+    removeUnreadableSong(
+        documentId: string,
+        raw: string,
+        owner: string | null,
+    ): Promise<'removed' | 'changed' | 'gone' | 'held'>;
     /**
      * Rewrite one retained draft in place, never a live one and never a deletion
      * (`AccountSongbook.replaceDraft`). #1738's draft half: purely local, nothing queued or sent.
@@ -1907,7 +1934,12 @@ export function createSyncLoop(
         async upgradeLibrary(owner, pace) {
             const current = await heldScope(owner);
             const songs: Array<{ song: SavedSong; stored: unknown }> = [];
-            const unreadable: Array<{ documentId: string; reason: string; document: unknown }> = [];
+            const unreadable: Array<{
+                documentId: string;
+                reason: string;
+                document: unknown;
+                serverHeld: boolean;
+            }> = [];
             let cursor: string | undefined;
             // A small page, so each transaction's validation is a short slice of main thread.
             for (let page = 0; page <= MAX_REMOTE_CANDIDATES / 10; page += 1) {
@@ -1959,6 +1991,12 @@ export function createSyncLoop(
         },
         async listDrafts(owner = null) {
             return songbook.allDrafts(await heldScope(owner));
+        },
+        async removeDraftRow(draft, raw, owner) {
+            return songbook.removeDraftRow(await ownedScope(owner), draft, raw);
+        },
+        async removeUnreadableSong(documentId, raw, owner) {
+            return songbook.removeUnreadableSong(await ownedScope(owner), documentId, raw);
         },
         async replaceDraft(draft, next, owner) {
             return songbook.replaceDraft(await ownedScope(owner), draft, next);

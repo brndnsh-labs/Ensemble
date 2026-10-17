@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { framePace } from '../lib/playlist-import';
 import {
+    leftoverKey,
     planUpgrade,
     runUpgrade,
+    type UpgradeLeftover,
     type UpgradeOutcome,
+    type UpgradePace,
     type UpgradePlan,
+    UpgradeScanCancelled,
     type UpgradeStore,
     type UpgradeStoreKind,
     upgradeBackup,
@@ -17,13 +21,13 @@ export interface UpgradeDeps {
     active: boolean;
     signedIn: boolean;
     /** The stores to read and upgrade, built fresh per call (`lib/upgrade-stores.ts`). */
-    stores: () => UpgradeStore[];
+    stores: (pace?: UpgradePace) => UpgradeStore[];
     /**
      * What makes a fresh scan worth its read: which stores there are, and their song counts. The
      * scan is LATCHED on it — coming back to the home with the same key does not read again — and
      * not on every Save: a scan reads and validates every song, and the home reads only what it
      * shows (#1441). A song that becomes old-format some other way waits for the next key or a
-     * reload; a run always re-reads.
+     * reload; pressing Upgrade always re-reads.
      */
     scanKey: string;
     /** Unsaved text this TAB holds for a song that no store has yet. */
@@ -47,9 +51,38 @@ function download(name: string, text: string) {
 }
 
 /**
- * "Upgrade old songs" (#1738): the card's state and its steps — offer, backup, run, outcome.
- * The shell supplies the stores and its own lock; everything that decides what is written is
- * `lib/upgrade.ts`.
+ * `framePace`, stopped: a scan that a newer one has superseded throws out of its next yield
+ * instead of reading the rest of the songbook for nothing.
+ */
+function cancellablePace(signal: AbortSignal): UpgradePace {
+    const pace = framePace();
+    const check = () => {
+        if (signal.aborted) {
+            throw new UpgradeScanCancelled();
+        }
+    };
+    return {
+        shouldYield: () => signal.aborted || pace.shouldYield(),
+        yieldNow: async () => {
+            check();
+            await pace.yieldNow();
+            check();
+        },
+    };
+}
+
+const REMOVAL_MESSAGES = {
+    removed: 'Removed.',
+    changed: 'It changed since your backup, so it was left as it is.',
+    gone: 'It was already gone.',
+    live: 'It is unsaved work on a song here now, so it was left as it is. Open the song instead.',
+    held: 'Your account holds it on the server, so removing it here would not remove it. It was left as it is.',
+} as const;
+
+/**
+ * "Upgrade old songs" (#1738): the card's state and its steps — offer, backup, run, outcome —
+ * and the musician's own removal of what the upgrade cannot fix. The shell supplies the stores
+ * and its own lock; everything that decides what is written is `lib/upgrade.ts`.
  */
 export function useUpgrade(deps: UpgradeDeps): {
     offer: UpgradeOffer | null;
@@ -61,9 +94,16 @@ export function useUpgrade(deps: UpgradeDeps): {
     latest.current = deps;
     const [plan, setPlan] = useState<UpgradePlan | null>(null);
     const [phase, setPhase] = useState<UpgradeOffer['phase']>('idle');
-    const [backedUp, setBackedUp] = useState(false);
+    // The plan a backup file was written from — exactly what the run then touches — and the scan
+    // key the backup step was opened under.
+    const [backup, setBackup] = useState<{ plan: UpgradePlan } | null>(null);
+    const [backupKey, setBackupKey] = useState<string | null>(null);
+    // Leftovers a backup file holds, by identity, with the exact bytes it holds them as: Remove is
+    // offered only for these, and only while the row still holds those bytes.
+    const [inBackup, setInBackup] = useState<ReadonlyMap<string, string>>(new Map());
     const [progress, setProgress] = useState<UpgradeOffer['progress']>(null);
     const [outcome, setOutcome] = useState<UpgradeOutcome | null>(null);
+    const [notice, setNotice] = useState('');
     // The key the plan on screen was read for: the same key is not read again.
     const [scannedKey, setScannedKey] = useState<string | null>(null);
 
@@ -71,27 +111,42 @@ export function useUpgrade(deps: UpgradeDeps): {
         if (!deps.active || phase !== 'idle' || scannedKey === deps.scanKey) {
             return;
         }
-        let alive = true;
         const key = deps.scanKey;
-        // Paced: it runs behind the home page and must not freeze it.
-        planUpgrade(latest.current.stores(), framePace()).then(
+        const control = new AbortController();
+        // Paced: it runs behind the home page and must not freeze it. Superseded, it stops.
+        planUpgrade(
+            latest.current.stores(cancellablePace(control.signal)),
+            cancellablePace(control.signal),
+        ).then(
             (next) => {
-                if (alive) {
+                if (!control.signal.aborted) {
                     setPlan(next);
                     setScannedKey(key);
                 }
             },
             () => {
-                // A failed scan shows no card; the next key asks again.
-                if (alive) {
+                // A superseded scan is simply over; a failed one shows no card until the next key.
+                if (!control.signal.aborted) {
                     setScannedKey(key);
                 }
             },
         );
-        return () => {
-            alive = false;
-        };
+        return () => control.abort();
     }, [deps.active, deps.scanKey, phase, scannedKey]);
+
+    // A backup step is for the songbook as the backup read it: opening a song, or the songbooks
+    // changing under the step, ends it — the file on disk then speaks for a plan no run will use.
+    useEffect(() => {
+        if (phase === 'backup' && (!deps.active || deps.scanKey !== backupKey)) {
+            setBackup(null);
+            setPhase('idle');
+        }
+    }, [phase, deps.active, deps.scanKey, backupKey]);
+
+    const rescan = async () => {
+        setPlan(await planUpgrade(latest.current.stores()));
+        setScannedKey(latest.current.scanKey);
+    };
 
     const count = plan ? upgradeCount(plan) : 0;
     const offer: UpgradeOffer | null =
@@ -101,33 +156,51 @@ export function useUpgrade(deps: UpgradeDeps): {
                   phase,
                   songs: plan?.songs.length ?? 0,
                   drafts: plan?.drafts.length ?? 0,
-                  unreadable: plan?.unreadable ?? [],
+                  leftovers: (plan?.leftovers ?? []).map((leftover) => ({
+                      leftover,
+                      removable:
+                          !leftover.serverHeld &&
+                          inBackup.get(leftoverKey(leftover)) === leftover.raw,
+                  })),
                   failures: plan?.failures ?? [],
                   account: deps.signedIn,
-                  backedUp,
+                  backedUp: backup !== null,
                   progress,
                   outcome,
+                  notice,
                   openable: deps.signedIn ? 'account' : 'guest',
               };
 
-    const start = () =>
-        void latest.current.run(async () => {
-            // Fresh, not the card's count: what the backup writes is what the run then finds.
-            const fresh = await planUpgrade(latest.current.stores());
-            setPlan(fresh);
-            setBackedUp(false);
-            setOutcome(null);
-            setPhase(fresh.songs.length + fresh.drafts.length ? 'backup' : 'idle');
+    const holdInBackup = (leftovers: readonly UpgradeLeftover[]) =>
+        setInBackup((held) => {
+            const next = new Map(held);
+            for (const leftover of leftovers) {
+                if (!leftover.serverHeld) {
+                    next.set(leftoverKey(leftover), leftover.raw);
+                }
+            }
+            return next;
         });
 
     return {
         offer,
         settled: scannedKey === deps.scanKey,
         actions: {
-            onStart: start,
+            onStart: () =>
+                void latest.current.run(async () => {
+                    // Fresh, not the card's count: the backup and the run are this plan.
+                    const fresh = await planUpgrade(latest.current.stores());
+                    setPlan(fresh);
+                    setScannedKey(latest.current.scanKey);
+                    setBackup(null);
+                    setOutcome(null);
+                    setNotice('');
+                    setBackupKey(latest.current.scanKey);
+                    setPhase(fresh.songs.length + fresh.drafts.length ? 'backup' : 'idle');
+                }),
             onBackup: () => {
-                // ONE file, synchronously inside the click, before anything is touched: every
-                // song and draft this run may change, each as it is stored (DECISION 2026-10-16).
+                // ONE file, synchronously inside the click, before anything is touched: exactly
+                // what this plan will change, and what it cannot (DECISION 2026-10-16).
                 if (!plan) {
                     return;
                 }
@@ -136,34 +209,74 @@ export function useUpgrade(deps: UpgradeDeps): {
                     `ensemble-pre-upgrade-originals-${stamp.slice(0, 10)}.json`,
                     upgradeBackup(plan, stamp),
                 );
-                setBackedUp(true);
+                setBackup({ plan });
+                holdInBackup(plan.leftovers);
             },
             onRun: () =>
                 void latest.current.run(async () => {
+                    const backedUp = backup;
                     setPhase('running');
                     setProgress(null);
                     try {
-                        const result = await runUpgrade(latest.current.stores(), {
+                        // With a backup: exactly the plan the file was written from. Without one:
+                        // a plan made now, at the musician's confirm.
+                        const target =
+                            backedUp?.plan ?? (await planUpgrade(latest.current.stores()));
+                        const result = await runUpgrade(latest.current.stores(), target, {
+                            backedUp: backedUp !== null,
                             unsavedHere: latest.current.unsavedHere,
                             onProgress: (done, total) => setProgress({ done, total }),
                             yieldNow: () => new Promise((resolve) => setTimeout(resolve, 0)),
                         });
                         setOutcome(result);
                         await latest.current.afterRun(result);
-                        setPlan(await planUpgrade(latest.current.stores()));
-                        setScannedKey(latest.current.scanKey);
+                        await rescan();
                     } finally {
-                        setBackedUp(false);
+                        setBackup(null);
                         setPhase('done');
                     }
                 }),
             onCancel: () => {
-                setBackedUp(false);
+                setBackup(null);
                 setPhase('idle');
             },
+            onDownloadLeftovers: () => {
+                if (!plan) {
+                    return;
+                }
+                const stamp = new Date().toISOString();
+                download(
+                    `ensemble-old-leftovers-${stamp.slice(0, 10)}.json`,
+                    upgradeBackup(plan, stamp, true),
+                );
+                holdInBackup(plan.leftovers);
+            },
+            onRemove: (leftover) =>
+                void latest.current.run(async () => {
+                    // Only what a backup file holds, byte for byte — checked here, and again by
+                    // the store against the row as it is now.
+                    if (inBackup.get(leftoverKey(leftover)) !== leftover.raw) {
+                        throw new Error('Download it first: it is not in a backup file yet.');
+                    }
+                    const store = latest.current
+                        .stores()
+                        .find((candidate) => candidate.kind === leftover.store);
+                    if (!store) {
+                        throw new Error('That songbook is not available right now.');
+                    }
+                    const result = await store.remove(leftover);
+                    setNotice(`${leftover.title}: ${REMOVAL_MESSAGES[result]}`);
+                    await rescan();
+                }),
+            onRetry: () =>
+                void latest.current.run(async () => {
+                    setNotice('');
+                    await rescan();
+                }),
             onOpen: (documentId, sectionIndex) => latest.current.open(documentId, sectionIndex),
             onDone: () => {
                 setOutcome(null);
+                setNotice('');
                 setPhase('idle');
             },
         },

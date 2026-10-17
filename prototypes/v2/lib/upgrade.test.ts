@@ -17,7 +17,9 @@ import {
     type UpgradeDraft,
     UpgradeRefusal,
     type UpgradeRefusalReason,
+    UpgradeScanCancelled,
     type UpgradeStore,
+    type UpgradeUnreadableRow,
     unreadableLooksOld,
     upgradeBackup,
     upgradeCount,
@@ -232,11 +234,14 @@ describe('upgradeDocument', () => {
 });
 
 describe('upgradeBackup', () => {
-    it('is one archive of exactly the songs and drafts the run may change, as stored', async () => {
+    it('is one archive of exactly what the plan changes and cannot, each as stored', async () => {
         const old = textChart('a', 'C');
         const stored = { ...old, extra: 'as stored' };
         const draft = draftOf(textChart('s', 'C | G'), '2026-09-01T00:00:00.000Z', 'w1');
-        const { store } = fakeStore('guest', [old, currentChart('s')], [draft], { a: stored });
+        const orphan = draftOf(textChart('gone', 'C'), '2026-09-01T00:00:00.000Z', 'w2');
+        const { store } = fakeStore('guest', [old, currentChart('s')], [draft, orphan], {
+            a: stored,
+        });
         const archive = JSON.parse(upgradeBackup(await planUpgrade([store]), 'now'));
         expect(archive).toMatchObject({
             format: 'ensemble-pre-upgrade-originals',
@@ -253,13 +258,29 @@ describe('upgradeBackup', () => {
                 original: draft.stored,
             },
         ]);
+        expect(archive.leftovers).toEqual([
+            {
+                store: 'guest',
+                kind: 'draft',
+                id: 'gone',
+                writerId: 'w2',
+                title: 'gone',
+                reason: UPGRADE_SKIPS.draftOrphan,
+                original: orphan.stored,
+            },
+        ]);
+        const leftoversOnly = JSON.parse(upgradeBackup(await planUpgrade([store]), 'now', true));
+        expect(leftoversOnly.songs).toEqual([]);
+        expect(leftoversOnly.drafts).toEqual([]);
+        expect(leftoversOnly.leftovers).toHaveLength(1);
     });
 });
 
 /**
  * A store with the real rules: an upgrade Save compare-and-swaps on the revision, keeps
  * `updatedAt`, refuses over a live draft and deletes none; a draft rewrite compare-and-swaps on
- * `capturedAt`, refuses a live draft (an orphan counts as live) and reports a vanished row.
+ * `capturedAt`, refuses a live draft (an orphan counts as live) and reports a vanished row; a
+ * removal deletes one row only while it still holds the bytes it was planned with.
  */
 function fakeStore(
     kind: 'guest' | 'account',
@@ -270,7 +291,8 @@ function fakeStore(
     const state = {
         songs: new Map(songs.map((song) => [song.id, song])),
         drafts: new Map(drafts.map((draft) => [`${draft.documentId}:${draft.writerId}`, draft])),
-        unreadable: [] as Array<{ id: string; reason: string; stored: unknown }>,
+        unreadable: [] as UpgradeUnreadableRow[],
+        unreadableDrafts: [] as UpgradeUnreadableRow[],
         saves: 0,
         /** Throw on the Nth Save (from 1), as a tab killed mid-run stops writing. */
         dieAt: Number.POSITIVE_INFINITY,
@@ -291,7 +313,10 @@ function fakeStore(
             })),
             unreadable: state.unreadable,
         }),
-        drafts: async () => ({ drafts: [...state.drafts.values()], unreadable: [] }),
+        drafts: async () => ({
+            drafts: [...state.drafts.values()],
+            unreadable: state.unreadableDrafts,
+        }),
         save: async (document, expected) => {
             state.beforeSave(document.id);
             if (state.saves + 1 >= state.dieAt) {
@@ -324,8 +349,31 @@ function fakeStore(
             if (live(held)) {
                 return 'live';
             }
-            state.drafts.set(key, { ...held, document: next });
+            state.drafts.set(key, { ...held, document: next, raw: JSON.stringify(next) });
             return 'replaced';
+        },
+        remove: async (leftover) => {
+            if (leftover.kind === 'song') {
+                const index = state.unreadable.findIndex((row) => row.id === leftover.id);
+                if (index < 0) {
+                    return 'gone';
+                }
+                if (state.unreadable[index].raw !== leftover.raw) {
+                    return 'changed';
+                }
+                state.unreadable.splice(index, 1);
+                return 'removed';
+            }
+            const key = `${leftover.id}:${leftover.writerId}`;
+            const held = state.drafts.get(key);
+            if (!held) {
+                return 'gone';
+            }
+            if (held.raw !== leftover.raw) {
+                return 'changed';
+            }
+            state.drafts.delete(key);
+            return 'removed';
         },
     };
     return { store, state };
@@ -338,11 +386,20 @@ function draftOf(document: ChartDocument, capturedAt: string, writerId = 'w1'): 
         capturedAt,
         document,
         stored: document,
+        raw: JSON.stringify(document),
         handle: null,
     };
 }
 
-const none = { unsavedHere: () => false };
+const none = { backedUp: false, unsavedHere: () => false };
+
+/** Plan now, then run that plan — "Upgrade without a backup". */
+async function upgrade(
+    stores: UpgradeStore[],
+    options: Partial<Parameters<typeof runUpgrade>[2]> = {},
+) {
+    return runUpgrade(stores, await planUpgrade(stores), { ...none, ...options });
+}
 
 describe('runUpgrade', () => {
     it('upgrades every old song through the store Save, keeping its edit date, and a second run is a no-op', async () => {
@@ -352,7 +409,7 @@ describe('runUpgrade', () => {
             currentChart('c'),
         ]);
         expect(upgradeCount(await planUpgrade([store]))).toBe(2);
-        const outcome = await runUpgrade([store], none);
+        const outcome = await upgrade([store]);
         expect(outcome.upgraded.map((entry) => entry.id)).toEqual(['a', 'b']);
         expect(state.songs.get('a')).toMatchObject({
             schemaVersion: 2,
@@ -362,9 +419,31 @@ describe('runUpgrade', () => {
         expect(state.songs.get('b')?.updatedAt).toBe(NEW);
         expect(state.songs.get('c')?.revision).toBe(1);
         expect(upgradeCount(await planUpgrade([store]))).toBe(0);
-        const again = await runUpgrade([store], none);
+        const again = await upgrade([store]);
         expect(again.upgraded).toEqual([]);
         expect(state.saves).toBe(2);
+    });
+
+    it('touches only what the backed-up plan holds, and leaves what changed since alone', async () => {
+        const { store, state } = fakeStore('guest', [textChart('a', 'C'), textChart('b', 'F')]);
+        const dead = draftOf(textChart('c', 'C | G'), '2026-09-01T00:00:00.000Z');
+        state.songs.set('c', currentChart('c'));
+        state.drafts.set('c:w1', dead);
+        const backedUp = await planUpgrade([store]);
+        // After the backup: `b` saved elsewhere, the draft captured again, a new old song.
+        state.songs.set('b', { ...state.songs.get('b')!, revision: 9 });
+        state.drafts.set('c:w1', { ...dead, raw: `${dead.raw} ` });
+        state.songs.set('late', textChart('late', 'G'));
+        const outcome = await runUpgrade([store], backedUp, { ...none, backedUp: true });
+        expect(outcome.upgraded.map((entry) => entry.id)).toEqual(['a']);
+        expect(outcome.skipped).toMatchObject([
+            { id: 'b', reason: UPGRADE_SKIPS.changedSinceBackup },
+        ]);
+        expect(outcome.draftsKept).toMatchObject([
+            { id: 'c', reason: UPGRADE_SKIPS.changedSinceBackup, openable: false },
+        ]);
+        expect(state.songs.get('late')?.schemaVersion).toBe(1);
+        expect(state.songs.get('b')?.schemaVersion).toBe(1);
     });
 
     it('finishes an interrupted run: each song wholly old or wholly new, the rest on the next run', async () => {
@@ -374,13 +453,13 @@ describe('runUpgrade', () => {
             textChart('c', 'G'),
         ]);
         state.dieAt = 2;
-        const first = await runUpgrade([store], none);
+        const first = await upgrade([store]);
         expect(first.upgraded).toHaveLength(1);
         expect([...state.songs.values()].map((song) => song.schemaVersion).sort()).toEqual([
             1, 1, 2,
         ]);
         state.dieAt = Number.POSITIVE_INFINITY;
-        const second = await runUpgrade([store], none);
+        const second = await upgrade([store]);
         expect(second.upgraded).toHaveLength(2);
         expect([...state.songs.values()].every((song) => song.schemaVersion === 2)).toBe(true);
     });
@@ -388,7 +467,7 @@ describe('runUpgrade', () => {
     it('lists a refused song with its bars, leaves it exactly as it was, and still counts it', async () => {
         const refused = textChart('r', 'C | Xyz7');
         const { store, state } = fakeStore('guest', [refused]);
-        const outcome = await runUpgrade([store], none);
+        const outcome = await upgrade([store]);
         expect(outcome.refused).toMatchObject([{ id: 'r', reasons: [{ bar: 2 }] }]);
         expect(state.songs.get('r')).toEqual(refused);
         expect(upgradeCount(await planUpgrade([store]))).toBe(1);
@@ -398,7 +477,7 @@ describe('runUpgrade', () => {
         const withDraft = textChart('d', 'C', NEW);
         const live = draftOf(textChart('d', 'C | G', NEW), '2026-10-11T00:00:00.000Z');
         const { store, state } = fakeStore('account', [withDraft, textChart('u', 'F')], [live]);
-        const outcome = await runUpgrade([store], { unsavedHere: (_store, id) => id === 'u' });
+        const outcome = await upgrade([store], { unsavedHere: (_store, id) => id === 'u' });
         expect(outcome.skipped.map((entry) => [entry.id, entry.reason])).toEqual([
             ['d', UPGRADE_SKIPS.unsaved],
             ['u', UPGRADE_SKIPS.unsaved],
@@ -414,7 +493,7 @@ describe('runUpgrade', () => {
         const { store, state } = fakeStore('guest', [textChart('a', 'C', NEW)]);
         const late = draftOf(textChart('a', 'C | F7'), '2026-10-12T00:00:00.000Z', 'other-tab');
         state.beforeSave = () => state.drafts.set('a:other-tab', late);
-        const outcome = await runUpgrade([store], none);
+        const outcome = await upgrade([store]);
         expect(outcome.skipped).toMatchObject([{ id: 'a', reason: UPGRADE_SKIPS.unsaved }]);
         expect(state.songs.get('a')?.schemaVersion).toBe(1);
         expect(state.drafts.get('a:other-tab')).toEqual(late);
@@ -427,7 +506,7 @@ describe('runUpgrade', () => {
             textChart('c', 'C'),
         ]);
         state.refuse = { a: 'refused', b: 'waiting', c: 'deleting' };
-        const outcome = await runUpgrade([store], none);
+        const outcome = await upgrade([store]);
         expect(outcome.skipped.map((entry) => entry.reason)).toEqual([
             UPGRADE_SKIPS.refused,
             UPGRADE_SKIPS.waiting,
@@ -441,7 +520,7 @@ describe('runUpgrade', () => {
         const dead = draftOf(textChart('s', 'C | G'), '2026-09-01T00:00:00.000Z', 'old-tab');
         const { store, state } = fakeStore('guest', [song], [dead]);
         expect(upgradeCount(await planUpgrade([store]))).toBe(1);
-        const outcome = await runUpgrade([store], none);
+        const outcome = await upgrade([store]);
         expect(outcome.draftsConverted).toBe(1);
         const kept = state.drafts.get('s:old-tab');
         expect(kept?.capturedAt).toBe(dead.capturedAt);
@@ -452,7 +531,7 @@ describe('runUpgrade', () => {
     it('rewrites a dead schema-2 draft that carries legacy fields', async () => {
         const dead = draftOf(legacyFieldsChart('s'), '2026-09-01T00:00:00.000Z');
         const { store, state } = fakeStore('guest', [currentChart('s')], [dead]);
-        const outcome = await runUpgrade([store], none);
+        const outcome = await upgrade([store]);
         expect(outcome.draftsConverted).toBe(1);
         expect(JSON.stringify(state.drafts.get('s:w1')?.document)).not.toContain('"complexity"');
     });
@@ -460,30 +539,61 @@ describe('runUpgrade', () => {
     it('carries a converted draft’s lossy notes into the outcome', async () => {
         const dead = draftOf(textChart('s', LOSSY), '2026-09-01T00:00:00.000Z');
         const { store } = fakeStore('guest', [currentChart('s')], [dead]);
-        const outcome = await runUpgrade([store], none);
+        const outcome = await upgrade([store]);
         expect(outcome.changed).toMatchObject([{ id: 's', draft: true, notes: [{ bar: 1 }] }]);
     });
 
-    it('keeps an orphan draft — no song here to say it is dead — and lists it', async () => {
+    it('plans what it cannot fix as leftovers, each with its own reason, and never touches one', async () => {
         const orphan = draftOf(textChart('gone', 'C | G'), '2026-09-01T00:00:00.000Z');
-        const { store, state } = fakeStore('account', [], [orphan]);
-        const outcome = await runUpgrade([store], none);
-        expect(outcome.draftsConverted).toBe(0);
-        expect(outcome.draftsKept).toMatchObject([
-            { id: 'gone', reason: UPGRADE_SKIPS.draftOrphan, openable: false },
+        const ofUnreadable = draftOf(textChart('bad', 'C'), '2026-09-01T00:00:00.000Z', 'w9');
+        const refused = draftOf(textChart('s', 'C | Xyz7'), '2026-09-01T00:00:00.000Z');
+        const { store, state } = fakeStore(
+            'account',
+            [currentChart('s')],
+            [orphan, ofUnreadable, refused],
+        );
+        state.unreadable = [
+            {
+                id: 'bad',
+                reason: 'Cannot open this chart',
+                stored: { schemaVersion: 1 },
+                raw: '{"schemaVersion":1}',
+            },
+            {
+                id: 'future',
+                reason: 'a newer document version',
+                stored: { schemaVersion: 3 },
+                raw: '{"schemaVersion":3}',
+            },
+        ];
+        const plan = await planUpgrade([store]);
+        expect(plan.drafts).toEqual([]);
+        expect(
+            plan.leftovers.map((leftover) => [leftover.kind, leftover.id, leftover.reason]),
+        ).toEqual([
+            ['song', 'bad', 'Cannot open this chart'],
+            ['draft', 'gone', UPGRADE_SKIPS.draftOrphan],
+            ['draft', 'bad', UPGRADE_SKIPS.draftUnreadableSong],
+            ['draft', 's', UPGRADE_SKIPS.draftRefused],
         ]);
-        expect(state.drafts.get('gone:w1')).toEqual(orphan);
-        expect(upgradeCount(await planUpgrade([store]))).toBe(1);
+        expect(plan.leftovers[3].reasons).toMatchObject([{ bar: 2 }]);
+        expect(upgradeCount(plan)).toBe(4);
+        const outcome = await runUpgrade([store], plan, none);
+        expect(outcome.draftsConverted).toBe(0);
+        expect(state.drafts.size).toBe(3);
+        expect(state.unreadable).toHaveLength(2);
     });
 
-    it('never deletes a draft, even one that will not convert', async () => {
-        const bad = draftOf(textChart('s', 'C | Xyz7'), '2026-09-01T00:00:00.000Z');
-        const { store, state } = fakeStore('guest', [currentChart('s')], [bad]);
-        const outcome = await runUpgrade([store], none);
-        expect(outcome.draftsKept).toMatchObject([
-            { reason: UPGRADE_SKIPS.draftRefused, reasons: [{ bar: 2 }], openable: true },
-        ]);
-        expect(state.drafts.get('s:w1')).toEqual(bad);
+    it('a leftover removal deletes exactly that row, only while it holds the planned bytes', async () => {
+        const orphan = draftOf(textChart('gone', 'C | G'), '2026-09-01T00:00:00.000Z');
+        const { store, state } = fakeStore('guest', [], [orphan]);
+        const [leftover] = (await planUpgrade([store])).leftovers;
+        state.drafts.set('gone:w1', { ...orphan, raw: `${orphan.raw} ` });
+        expect(await store.remove(leftover)).toBe('changed');
+        expect(state.drafts.size).toBe(1);
+        const [fresh] = (await planUpgrade([store])).leftovers;
+        expect(await store.remove(fresh)).toBe('removed');
+        expect(upgradeCount(await planUpgrade([store]))).toBe(0);
     });
 
     it('treats a draft gone before its rewrite as done, not as a conflict', async () => {
@@ -494,31 +604,38 @@ describe('runUpgrade', () => {
             state.drafts.delete('s:w1');
             return replace(draft, next);
         };
-        const outcome = await runUpgrade([store], none);
+        const outcome = await upgrade([store]);
         expect(outcome.draftsKept).toEqual([]);
-    });
-
-    it('counts and lists unreadable old rows, and leaves them', async () => {
-        const { store, state } = fakeStore('guest', []);
-        state.unreadable = [
-            { id: 'bad', reason: 'Cannot open this chart', stored: { schemaVersion: 1 } },
-            { id: 'future', reason: 'a newer document version', stored: { schemaVersion: 3 } },
-        ];
-        const plan = await planUpgrade([store]);
-        expect(plan.unreadable).toEqual([
-            { store: 'guest', id: 'bad', reason: 'Cannot open this chart', kind: 'song' },
-        ]);
-        expect(upgradeCount(plan)).toBe(1);
     });
 
     it('covers both stores, account first', async () => {
         const account = fakeStore('account', [textChart('a', 'C')]);
         const guest = fakeStore('guest', [textChart('g', 'C')]);
-        const outcome = await runUpgrade([account.store, guest.store], none);
+        const outcome = await upgrade([account.store, guest.store]);
         expect(outcome.upgraded.map((entry) => `${entry.store}:${entry.id}`)).toEqual([
             'account:a',
             'guest:g',
         ]);
+    });
+
+    it('stops a superseded scan at its next yield', async () => {
+        const { store } = fakeStore(
+            'guest',
+            Array.from({ length: 5 }, (_, index) => textChart(`s${index}`, 'C')),
+        );
+        let yields = 0;
+        await expect(
+            planUpgrade([store], {
+                shouldYield: () => true,
+                yieldNow: async () => {
+                    yields += 1;
+                    if (yields === 2) {
+                        throw new UpgradeScanCancelled();
+                    }
+                },
+            }),
+        ).rejects.toBeInstanceOf(UpgradeScanCancelled);
+        expect(yields).toBe(2);
     });
 
     it('reports progress over songs and drafts', async () => {
@@ -529,10 +646,7 @@ describe('runUpgrade', () => {
             [draftOf(textChart('s', 'C'), '2026-09-01T00:00:00.000Z')],
         );
         const seen: string[] = [];
-        await runUpgrade([store], {
-            ...none,
-            onProgress: (done, total) => seen.push(`${done}/${total}`),
-        });
+        await upgrade([store], { onProgress: (done, total) => seen.push(`${done}/${total}`) });
         expect(seen).toEqual(['0/2', '1/2', '2/2']);
     });
 });

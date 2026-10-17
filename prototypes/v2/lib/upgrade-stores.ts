@@ -4,23 +4,31 @@
  * `save` or by the account's Save (`accountSync.save`, which commits and queues one outbox
  * operation compare-and-swapped on its base revision) — each with the upgrade's one option, which
  * keeps the song's `updatedAt` and, for the account, re-checks inside its own transaction what may
- * not be written over. A draft is only ever rewritten in place, never deleted.
+ * not be written over. A draft is only ever rewritten in place by the run. A leftover row is
+ * removed only at the musician's own press, guarded on its backed-up bytes, and only ever locally.
  */
 import { accountSync } from './account/sync-loop';
-import { framePace } from './playlist-import';
 import * as repository from './repository';
 import { LocalRevisionError } from './sync/protocol';
 import { UpgradeSaveRefused } from './sync/repository';
-import { UpgradeRefusal, type UpgradeStore } from './upgrade';
+import { type UpgradePace, UpgradeRefusal, type UpgradeStore } from './upgrade';
 
 /** This device's guest songbook, signed in or not: its songs can still be added to an account. */
-export function guestUpgradeStore(): UpgradeStore {
+export function guestUpgradeStore(pace?: UpgradePace): UpgradeStore {
     return {
         kind: 'guest',
         songs: async () => {
             // Paced: this read runs behind the songbook home, and must not freeze it.
-            const { documents, unreadable } = await repository.listReadable(framePace());
-            return { songs: documents, unreadable };
+            const { documents, unreadable } = await repository.listReadable(pace);
+            return {
+                songs: documents,
+                unreadable: unreadable.map((row) => ({
+                    id: row.id,
+                    reason: row.reason,
+                    stored: row.stored,
+                    raw: JSON.stringify(row.stored),
+                })),
+            };
         },
         drafts: async () => {
             const { slots, unreadable } = repository.recoverySlots();
@@ -31,9 +39,16 @@ export function guestUpgradeStore(): UpgradeStore {
                     capturedAt: slot.capturedAt,
                     document: slot.document,
                     stored: JSON.parse(slot.raw),
+                    raw: slot.raw,
                     handle: slot,
                 })),
-                unreadable: unreadable.map(({ id, reason }) => ({ id, reason })),
+                unreadable: unreadable.map((row) => ({
+                    id: row.id,
+                    reason: row.reason,
+                    stored: row.raw,
+                    raw: row.raw,
+                    handle: row.key,
+                })),
             };
         },
         save: async (document, expected) => {
@@ -59,6 +74,16 @@ export function guestUpgradeStore(): UpgradeStore {
         },
         replaceDraft: async (draft, next) =>
             repository.replaceRecoverySlot(draft.handle as repository.RecoverySlot, next),
+        remove: async (leftover) => {
+            if (leftover.kind === 'song') {
+                return repository.removeUnreadableSong(leftover.id, leftover.raw);
+            }
+            const key =
+                typeof leftover.handle === 'string'
+                    ? leftover.handle
+                    : (leftover.handle as repository.RecoverySlot).key;
+            return repository.removeRecoverySlot(key, leftover.raw);
+        },
     };
 }
 
@@ -67,36 +92,42 @@ export function guestUpgradeStore(): UpgradeStore {
  * Call only once the library has downloaded (`libraryDownloaded`): an upgrade of a copy older than
  * the account's would only be refused by the server's compare-and-swap.
  */
-export function accountUpgradeStore(owner: string): UpgradeStore {
+export function accountUpgradeStore(owner: string, pace?: UpgradePace): UpgradeStore {
     return {
         kind: 'account',
         songs: async () => {
             // Paged and paced (`upgradeLibrary`), and a row that will not read is reported.
-            const { songs, unreadable } = await accountSync.upgradeLibrary(owner, framePace());
+            const { songs, unreadable } = await accountSync.upgradeLibrary(owner, pace);
             return {
                 songs: songs.map(({ song, stored }) => ({ document: song.document, stored })),
-                unreadable: unreadable.map(({ documentId, reason, document }) => ({
-                    id: documentId,
-                    reason,
-                    stored: document,
+                unreadable: unreadable.map((row) => ({
+                    id: row.documentId,
+                    reason: row.reason,
+                    stored: row.document,
+                    raw: JSON.stringify(row.document),
+                    serverHeld: row.serverHeld,
                 })),
             };
         },
         drafts: async () => {
             const { drafts, unreadable } = await accountSync.listDrafts(owner);
             return {
-                drafts: drafts.map((draft) => ({
+                drafts: drafts.map(({ draft, stored }) => ({
                     documentId: draft.documentId,
                     writerId: draft.writerId,
                     capturedAt: draft.capturedAt,
                     document: draft.document,
-                    // Stored through `snapshot`, which the read applies again: the same document.
-                    stored: draft.document,
+                    // The row's own `document`, exactly as read — not the decoded copy.
+                    stored,
+                    raw: JSON.stringify(stored),
                     handle: null,
                 })),
-                unreadable: unreadable.map(({ documentId, reason }) => ({
-                    id: documentId,
-                    reason,
+                unreadable: unreadable.map((row) => ({
+                    id: row.documentId,
+                    writerId: row.writerId,
+                    reason: row.reason,
+                    stored: row.stored,
+                    raw: JSON.stringify(row.stored),
                 })),
             };
         },
@@ -114,5 +145,13 @@ export function accountUpgradeStore(owner: string): UpgradeStore {
             }
         },
         replaceDraft: (draft, next) => accountSync.replaceDraft(draft, next, owner),
+        remove: (leftover) =>
+            leftover.kind === 'song'
+                ? accountSync.removeUnreadableSong(leftover.id, leftover.raw, owner)
+                : accountSync.removeDraftRow(
+                      { documentId: leftover.id, writerId: leftover.writerId ?? '' },
+                      leftover.raw,
+                      owner,
+                  ),
     };
 }

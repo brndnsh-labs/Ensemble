@@ -450,10 +450,14 @@ never enters analytics or error payloads.
 >   (`needsUpgrade`, `draftNeedsUpgrade`, `planUpgrade` in `prototypes/v2/lib/upgrade.ts`). The
 >   card stays on the home while ANY of that remains, so its absence means nothing old is stored
 >   on this device.
-> - **Backup first: one file.** A single human-readable JSON archive of exactly the songs and
->   drafts the run may change, each as it is stored, with store, id and title
->   (`upgradeBackup`). The run starts only after "I have the file", or an explicit "Upgrade
->   without a backup".
+> - **Backup first: one file, and exactly what the run changes.** A single human-readable JSON
+>   archive of the songs and drafts the run will change and of the leftovers it cannot (below),
+>   each as it is stored, with store, id and title (`upgradeBackup`). The run then touches ONLY
+>   what that plan holds: each song is saved against its planned revision and each draft
+>   rewritten only while it holds its planned bytes, so anything changed after the file was
+>   written is left alone ("Changed since your backup — upgrade again"). Opening a song, or the
+>   songbooks changing under the backup step, ends it. "Upgrade without a backup" plans at the
+>   musician's confirm instead.
 > - **In place, through the ordinary Save, same edit date.** Same id, a new revision, the song's
 >   own `updatedAt` kept (an upgrade is not an edit; the songbook's order and the server body
 >   keep it too): the guest repository's `save` and the account's Save, each with one
@@ -467,11 +471,19 @@ never enters analytics or error payloads.
 >   and refuses over a live draft, a conflicted or refused outbox head, an account version waiting
 >   or a frozen delete; the guest Save re-checks the recovery slots just before writing. Each is
 >   listed, never forced.
-> - **Drafts are never deleted.** A live draft — and an orphan, or one whose song row will not
->   read, which `liveDraft`'s rule also counts as live — is never rewritten. A dead draft is
->   rewritten in place (same writer, same `capturedAt`, so exactly as live or dead as before); one
->   the converter refuses is kept and listed with Open. The upgrade Save does not sweep superseded
->   draft rows as an ordinary Save does.
+> - **The run never deletes anything.** A live draft is never rewritten (it is unsaved work, with
+>   Open). A dead draft is rewritten in place (same writer, same `capturedAt`). The upgrade Save
+>   does not sweep superseded draft rows as an ordinary Save does.
+> - **Leftovers are the musician's to remove, one at a time, after a backup.** What the upgrade
+>   cannot fix — a dead draft the converter refuses, an orphan draft, a draft of a song row that
+>   will not read, an old row that will not read — is listed with "Remove — it's in your backup",
+>   offered only once a backup file holds that row byte for byte ("Download these first" writes
+>   one after a run without a backup). Remove deletes exactly that row and only while it still
+>   holds those bytes, in one transaction or check: a guest recovery slot, an account draft row,
+>   an unreadable song row. It is a LOCAL delete — never a tombstone, an outbox operation or a
+>   request — so an account song row the server holds (a confirmed `remoteRevision`) or with a
+>   Save queued is never offered for removal. A songbook that would not read is an error with
+>   "Try again", never removable.
 > - **Interrupt-safe and idempotent.** Each document is one transaction, so a closed tab leaves
 >   every song wholly old or wholly new; the next run re-reads and finishes the rest. An upgraded
 >   document is checked to need no upgrade itself, so a second run is a no-op.

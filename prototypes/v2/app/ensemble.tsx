@@ -87,6 +87,7 @@ import type { SavedSong } from '../lib/sync/protocol';
 import type { KeepBothResolution } from '../lib/sync/repository';
 import type { Progress } from '../lib/sync/status';
 import { initializeTelemetry, track } from '../lib/telemetry';
+import type { UpgradePace } from '../lib/upgrade';
 import { accountUpgradeStore, guestUpgradeStore } from '../lib/upgrade-stores';
 import { hasV1SharePayload, openV1ShareLink, stripV1ShareParams } from '../lib/v1-link';
 import { AccountEntry } from './account/account-entry';
@@ -5664,10 +5665,10 @@ export default function Ensemble() {
         libraryDownloaded(sync.documents)
             ? sessionOwner
             : null;
-    function upgradeStores() {
+    function upgradeStores(pace?: UpgradePace) {
         return upgradeAccountOwner === null
-            ? [guestUpgradeStore()]
-            : [accountUpgradeStore(upgradeAccountOwner), guestUpgradeStore()];
+            ? [guestUpgradeStore(pace)]
+            : [accountUpgradeStore(upgradeAccountOwner, pace), guestUpgradeStore(pace)];
     }
     const upgrade = useUpgrade({
         active: ready && !current && !songbookLoading,

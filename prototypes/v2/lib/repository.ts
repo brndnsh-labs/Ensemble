@@ -485,10 +485,10 @@ export interface RecoverySlot {
  */
 export function recoverySlots(): {
     slots: RecoverySlot[];
-    unreadable: Array<{ key: string; id: string; reason: string }>;
+    unreadable: Array<{ key: string; id: string; reason: string; raw: string }>;
 } {
     const slots: RecoverySlot[] = [];
-    const unreadable: Array<{ key: string; id: string; reason: string }> = [];
+    const unreadable: Array<{ key: string; id: string; reason: string; raw: string }> = [];
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -528,6 +528,7 @@ export function recoverySlots(): {
                 key,
                 id: documentId,
                 reason: failure instanceof Error ? failure.message : String(failure),
+                raw: raw ?? '',
             });
         }
     }
@@ -565,6 +566,67 @@ export function replaceRecoverySlot(
         throw new Error('Unable to verify the upgraded draft. The old one may still be there.');
     }
     return 'replaced';
+}
+
+/**
+ * Remove ONE recovery slot the musician chose to remove from "Upgrade old songs"' leftovers
+ * (#1738), only if it still holds exactly the bytes the backup file holds (`raw`). A slot
+ * captured again since (`'changed'`) or already gone (`'gone'`) is left alone.
+ */
+export function removeRecoverySlot(key: string, raw: string): 'removed' | 'changed' | 'gone' {
+    if (!key.startsWith(RECOVERY)) {
+        throw new Error('Not a recovery slot.');
+    }
+    const held = localStorage.getItem(key);
+    if (held === null) {
+        return 'gone';
+    }
+    if (held !== raw) {
+        return 'changed';
+    }
+    localStorage.removeItem(key);
+    return 'removed';
+}
+
+/**
+ * Remove ONE guest song row that will not read, chosen by the musician from "Upgrade old songs"'
+ * leftovers (#1738): one transaction, only if the row still holds exactly the backed-up bytes
+ * (`raw`, the row as JSON) and still does not validate. Its recovery slots are separate
+ * leftovers, each removed on its own.
+ */
+export async function removeUnreadableSong(
+    id: string,
+    raw: string,
+): Promise<'removed' | 'changed' | 'gone'> {
+    const db = await open();
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        const read = store.get(id);
+        let outcome: 'removed' | 'changed' | 'gone' = 'gone';
+        read.onsuccess = () => {
+            const row = read.result;
+            if (row === undefined) {
+                outcome = 'gone';
+                return;
+            }
+            let readable = true;
+            try {
+                validated(row);
+            } catch {
+                readable = false;
+            }
+            if (readable || JSON.stringify(row) !== raw) {
+                outcome = 'changed';
+                return;
+            }
+            store.delete(id);
+            outcome = 'removed';
+        };
+        tx.oncomplete = () => resolve(outcome);
+        tx.onerror = () => reject(new Error('Remove failed. Storage may be unavailable.'));
+        tx.onabort = () => reject(new Error('Remove was interrupted.'));
+    });
 }
 
 export function clearOwnRecovery(id: string): void {

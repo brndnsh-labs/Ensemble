@@ -233,7 +233,22 @@ export interface UpgradeDraft {
     document: ChartDocument;
     /** The draft exactly as stored, for the backup. */
     stored: unknown;
+    /** Its exact stored bytes: what "unchanged since the backup" is compared on. */
+    raw: string;
     handle: unknown;
+}
+
+/** A stored row that will not read, as a store hands it to the plan. */
+export interface UpgradeUnreadableRow {
+    id: string;
+    /** A draft's writer, for a draft row. */
+    writerId?: string;
+    reason: string;
+    stored: unknown;
+    raw: string;
+    /** An account song the server holds: removing the local row would not remove it. */
+    serverHeld?: boolean;
+    handle?: unknown;
 }
 
 export const UPGRADE_SKIPS = {
@@ -244,9 +259,11 @@ export const UPGRADE_SKIPS = {
         'Your account has a newer version of it waiting. Open it and choose which to keep first.',
     deleting: 'It is being deleted from your account. Let that finish first.',
     elsewhere: 'It was saved somewhere else while upgrading. Upgrade again.',
+    changedSinceBackup: 'Changed since your backup — upgrade again.',
     draftLive: 'Unsaved changes in the old format. Open the song, then Save or discard them.',
-    draftOrphan: 'Unsaved changes for a song this device no longer holds. Left as they are.',
-    draftRefused: 'Unsaved changes that could not be converted. Left as they are.',
+    draftOrphan: 'Unsaved changes for a song this device no longer holds.',
+    draftUnreadableSong: 'Unsaved changes for a song that will not read on this device.',
+    draftRefused: 'Old unsaved changes that could not be converted.',
 } as const;
 
 /** Why a store's upgrade Save wrote nothing, decided at write time. */
@@ -261,21 +278,45 @@ export class UpgradeRefusal extends Error {
 }
 
 /**
- * One songbook's ordinary paths, as the run needs them. Implemented by `lib/upgrade-stores.ts`
- * over the guest repository and `accountSync`; faked in the unit tests.
+ * Something old the upgrade cannot fix, listed so the musician can deal with it (DECISION
+ * 2026-10-16): a dead draft the converter refuses, a draft of a song this device does not hold or
+ * cannot read, and an old row that will not read. The run never removes one; the musician may,
+ * one at a time, once the backup holds it (`UpgradeStore.remove`).
+ */
+export interface UpgradeLeftover {
+    store: UpgradeStoreKind;
+    kind: 'song' | 'draft';
+    id: string;
+    writerId?: string;
+    title: string;
+    reason: string;
+    reasons?: UpgradeNote[];
+    /** The row as stored, for the backup. */
+    stored: unknown;
+    /** Its exact stored bytes, compared before a removal. */
+    raw: string;
+    /** The account holds it on the server, so a local removal would not remove it. */
+    serverHeld: boolean;
+    handle: unknown;
+}
+
+/** One leftover's identity, across scans. */
+export const leftoverKey = (leftover: UpgradeLeftover) =>
+    `${leftover.store}:${leftover.kind}:${leftover.id}:${leftover.writerId ?? ''}`;
+
+/**
+ * One songbook's own paths, as the run needs them. Implemented by `lib/upgrade-stores.ts` over
+ * the guest repository and `accountSync`; faked in the unit tests.
  */
 export interface UpgradeStore {
     kind: UpgradeStoreKind;
-    /** Every song, read fresh: each readable one with its row as stored; each other row by id. */
+    /** Every song, read fresh: each readable one with its row as stored; each other row too. */
     songs(): Promise<{
         songs: Array<{ document: ChartDocument; stored: unknown }>;
-        unreadable: Array<{ id: string; reason: string; stored: unknown }>;
+        unreadable: UpgradeUnreadableRow[];
     }>;
-    /** Every retained draft, all writers, read fresh; a draft that does not read, by id. */
-    drafts(): Promise<{
-        drafts: UpgradeDraft[];
-        unreadable: Array<{ id: string; reason: string }>;
-    }>;
+    /** Every retained draft, all writers, read fresh; each one that does not read too. */
+    drafts(): Promise<{ drafts: UpgradeDraft[]; unreadable: UpgradeUnreadableRow[] }>;
     /**
      * The store's upgrade Save: its ordinary Save, compare-and-swapped on `expected`, keeping the
      * document's `updatedAt`, never deleting a draft, and re-checking AT WRITE TIME that nothing
@@ -291,6 +332,12 @@ export interface UpgradeStore {
         draft: UpgradeDraft,
         next: ChartDocument,
     ): Promise<'replaced' | 'changed' | 'live' | 'gone'>;
+    /**
+     * Remove ONE leftover row, at the musician's own press — a local delete of exactly that row,
+     * only while it still holds `leftover.raw`; never a cloud delete. `held`: the account holds
+     * it on the server, so it is not removed here.
+     */
+    remove(leftover: UpgradeLeftover): Promise<'removed' | 'changed' | 'gone' | 'live' | 'held'>;
 }
 
 export interface PlannedSong {
@@ -302,7 +349,7 @@ export interface PlannedSong {
 export interface PlannedDraft {
     store: UpgradeStoreKind;
     draft: UpgradeDraft;
-    /** The title of the song it is a draft of, else the draft's own. */
+    /** The title of the song it is a draft of. */
     title: string;
 }
 
@@ -310,111 +357,180 @@ export interface PlannedDraft {
 export interface UpgradePlan {
     /** The songs `needsUpgrade` picks. */
     songs: PlannedSong[];
-    /** The drafts `draftNeedsUpgrade` picks, live or not. */
+    /** The drafts `draftNeedsUpgrade` picks on a song this device holds: dead ones to rewrite,
+     * live ones (unsaved work) to leave and list. */
     drafts: PlannedDraft[];
-    /** Rows that would not read and look old: left alone, listed, and counted. */
-    unreadable: Array<{
-        store: UpgradeStoreKind;
-        id: string;
-        reason: string;
-        kind: 'song' | 'draft';
-    }>;
+    /** What the upgrade cannot fix: listed, counted, removable by the musician. */
+    leftovers: UpgradeLeftover[];
     /** A store that could not be read, with why. */
     failures: Array<{ store: UpgradeStoreKind; message: string }>;
 }
 
 /**
- * The card's number: everything still old on this device — songs, drafts, unreadable old rows and
- * stores that could not be read. Zero means nothing old is stored here.
+ * The card's number: everything still old on this device — songs, drafts, leftovers and stores
+ * that could not be read. Zero means nothing old is stored here.
  */
 export function upgradeCount(plan: UpgradePlan): number {
-    return plan.songs.length + plan.drafts.length + plan.unreadable.length + plan.failures.length;
+    return plan.songs.length + plan.drafts.length + plan.leftovers.length + plan.failures.length;
 }
 
 function message(failure: unknown): string {
     return failure instanceof Error ? failure.message : String(failure);
 }
 
-/** Hands the event loop back between slices of a long read (`framePace`). */
+/** Hands the event loop back between slices of a long read (`framePace`); may throw to stop it. */
 export interface UpgradePace {
     shouldYield: () => boolean;
     yieldNow: () => Promise<void>;
+}
+
+/**
+ * A draft's liveness, by `liveDraft`'s rule: captured at or after the committed version it sits
+ * on. A draft whose song this device does not hold readably — an orphan, or a song row that would
+ * not read — is LIVE too: nothing here can say what it was an experiment on.
+ */
+function isLive(draft: UpgradeDraft, songs: ReadonlyMap<string, ChartDocument>): boolean {
+    const song = songs.get(draft.documentId);
+    return song === undefined || draft.capturedAt >= song.updatedAt;
 }
 
 export async function planUpgrade(
     stores: readonly UpgradeStore[],
     pace?: UpgradePace,
 ): Promise<UpgradePlan> {
-    const plan: UpgradePlan = { songs: [], drafts: [], unreadable: [], failures: [] };
+    const plan: UpgradePlan = { songs: [], drafts: [], leftovers: [], failures: [] };
     for (const store of stores) {
+        let songs: Awaited<ReturnType<UpgradeStore['songs']>>;
+        let drafts: Awaited<ReturnType<UpgradeStore['drafts']>>;
         try {
-            const [songs, drafts] = await Promise.all([store.songs(), store.drafts()]);
-            const titles = new Map(
-                songs.songs.map(({ document }) => [document.id, document.title]),
-            );
-            for (const { document, stored } of songs.songs) {
-                if (needsUpgrade(document)) {
-                    plan.songs.push({ store: store.kind, document, stored });
-                }
-                if (pace?.shouldYield()) {
-                    await pace.yieldNow();
-                }
-            }
-            for (const row of songs.unreadable) {
-                if (unreadableLooksOld(row.stored)) {
-                    plan.unreadable.push({
-                        store: store.kind,
-                        id: row.id,
-                        reason: row.reason,
-                        kind: 'song',
-                    });
-                }
-            }
-            for (const row of drafts.unreadable) {
-                plan.unreadable.push({ ...row, store: store.kind, kind: 'draft' });
-            }
-            for (const draft of drafts.drafts) {
-                if (draftNeedsUpgrade(draft.document)) {
-                    plan.drafts.push({
-                        store: store.kind,
-                        draft,
-                        title: titles.get(draft.documentId) ?? draft.document.title,
-                    });
-                }
-            }
+            [songs, drafts] = await Promise.all([store.songs(), store.drafts()]);
         } catch (failure) {
+            if (failure instanceof UpgradeScanCancelled) {
+                throw failure;
+            }
             plan.failures.push({ store: store.kind, message: message(failure) });
+            continue;
+        }
+        const readable = new Map(songs.songs.map(({ document }) => [document.id, document]));
+        const unreadableSongs = new Set(songs.unreadable.map((row) => row.id));
+        for (const { document, stored } of songs.songs) {
+            if (needsUpgrade(document)) {
+                plan.songs.push({ store: store.kind, document, stored });
+            }
+            if (pace?.shouldYield()) {
+                await pace.yieldNow();
+            }
+        }
+        const leftover = (
+            row: Omit<UpgradeLeftover, 'store' | 'serverHeld'> & { serverHeld?: boolean },
+        ) =>
+            plan.leftovers.push({ ...row, store: store.kind, serverHeld: row.serverHeld ?? false });
+        for (const row of songs.unreadable) {
+            if (unreadableLooksOld(row.stored)) {
+                leftover({ ...row, kind: 'song', title: row.id, handle: row.handle });
+            }
+        }
+        for (const row of drafts.unreadable) {
+            leftover({ ...row, kind: 'draft', title: row.id, handle: row.handle });
+        }
+        for (const draft of drafts.drafts) {
+            if (!draftNeedsUpgrade(draft.document)) {
+                continue;
+            }
+            const song = readable.get(draft.documentId);
+            const base = {
+                kind: 'draft' as const,
+                id: draft.documentId,
+                writerId: draft.writerId,
+                title: song?.title ?? draft.document.title,
+                stored: draft.stored,
+                raw: draft.raw,
+                handle: draft.handle,
+            };
+            if (!song) {
+                leftover({
+                    ...base,
+                    reason: unreadableSongs.has(draft.documentId)
+                        ? UPGRADE_SKIPS.draftUnreadableSong
+                        : UPGRADE_SKIPS.draftOrphan,
+                });
+                continue;
+            }
+            if (!isLive(draft, readable)) {
+                const result = upgradeDraftDocument(draft.document);
+                if (result.kind === 'refused') {
+                    leftover({
+                        ...base,
+                        reason: UPGRADE_SKIPS.draftRefused,
+                        reasons: result.reasons,
+                    });
+                    continue;
+                }
+            }
+            plan.drafts.push({ store: store.kind, draft, title: song.title });
+        }
+        if (pace?.shouldYield()) {
+            await pace.yieldNow();
         }
     }
     return plan;
 }
 
+/** A superseded scan, stopped by its pace (`app/use-upgrade.ts`). */
+export class UpgradeScanCancelled extends Error {
+    constructor() {
+        super('Superseded upgrade scan.');
+    }
+}
+
 /**
  * The backup (DECISION 2026-10-16): ONE human-readable JSON file holding exactly what this run
- * may change — every song and draft the plan picks — each as it is stored, with its store, id
- * and title. Written once, before anything is touched.
+ * may change — every song and draft the plan picks — and every leftover the musician may then
+ * remove, each as it is stored, with its store, id and title. Written once, before anything is
+ * touched. `leftoversOnly` is the file "Download these first" writes after a run without one.
  */
-export function upgradeBackup(plan: UpgradePlan, createdAt = new Date().toISOString()): string {
+export function upgradeBackup(
+    plan: UpgradePlan,
+    createdAt = new Date().toISOString(),
+    leftoversOnly = false,
+): string {
     return JSON.stringify(
         {
             format: 'ensemble-pre-upgrade-originals',
             version: 1,
             createdAt,
-            about: 'An archive of the songs and unsaved drafts "Upgrade old songs" was about to change, each exactly as it was stored before the upgrade ran ("original").',
-            songs: plan.songs.map(({ store, document, stored }) => ({
-                store,
-                id: document.id,
-                title: document.title,
-                original: stored,
-            })),
-            drafts: plan.drafts.map(({ store, draft, title }) => ({
-                store,
-                id: draft.documentId,
-                title,
-                writerId: draft.writerId,
-                capturedAt: draft.capturedAt,
-                original: draft.stored,
-            })),
+            about: leftoversOnly
+                ? 'An archive of old songs and unsaved drafts "Upgrade old songs" could not upgrade, each exactly as it was stored ("original"), kept before any of them is removed.'
+                : 'An archive of the songs and unsaved drafts "Upgrade old songs" was about to change, and of the old ones it cannot change, each exactly as it was stored before the upgrade ran ("original").',
+            songs: leftoversOnly
+                ? []
+                : plan.songs.map(({ store, document, stored }) => ({
+                      store,
+                      id: document.id,
+                      title: document.title,
+                      original: stored,
+                  })),
+            drafts: leftoversOnly
+                ? []
+                : plan.drafts.map(({ store, draft, title }) => ({
+                      store,
+                      id: draft.documentId,
+                      title,
+                      writerId: draft.writerId,
+                      capturedAt: draft.capturedAt,
+                      original: draft.stored,
+                  })),
+            leftovers: plan.leftovers
+                .filter((leftover) => !leftover.serverHeld)
+                .map((leftover) => ({
+                    store: leftover.store,
+                    kind: leftover.kind,
+                    id: leftover.id,
+                    ...(leftover.writerId === undefined ? {} : { writerId: leftover.writerId }),
+                    title: leftover.title,
+                    reason: leftover.reason,
+                    original: leftover.stored,
+                })),
         },
         null,
         2,
@@ -438,15 +554,15 @@ export interface UpgradeOutcome {
     skipped: Array<UpgradeEntry & { reason: string }>;
     /** Drafts rewritten in place. */
     draftsConverted: number;
-    /** Drafts left exactly as they are, with why; `openable` when the song is on this device. */
-    draftsKept: Array<
-        UpgradeEntry & { reason: string; reasons?: UpgradeNote[]; openable: boolean }
-    >;
+    /** Drafts left exactly as they are, with why; `openable` when it is unsaved work on a song. */
+    draftsKept: Array<UpgradeEntry & { reason: string; openable: boolean }>;
     /** Stores that could not be read. */
     failures: Array<{ store: UpgradeStoreKind; message: string }>;
 }
 
 export interface UpgradeRunOptions {
+    /** The run follows a backup of `plan`: anything changed since is "changed since your backup". */
+    backedUp: boolean;
     /** Unsaved text this TAB holds for a song (a draft no store has yet). */
     unsavedHere(store: UpgradeStoreKind, documentId: string): boolean;
     /** Called after every document, done of total. */
@@ -456,22 +572,14 @@ export interface UpgradeRunOptions {
 }
 
 /**
- * A draft's liveness, by `liveDraft`'s rule: captured at or after the committed version it sits
- * on. A draft whose song this device does not hold readably — an orphan, or a song row that would
- * not read — is LIVE too: nothing here can say what it was an experiment on.
- */
-function isLive(draft: UpgradeDraft, songs: ReadonlyMap<string, ChartDocument>): boolean {
-    const song = songs.get(draft.documentId);
-    return song === undefined || draft.capturedAt >= song.updatedAt;
-}
-
-/**
- * Upgrade every store in turn. Re-reads each store first (a plan shown on the card can be a moment
- * old), upgrades its songs one Save at a time, then re-reads and rewrites its old dead drafts in
- * place. Nothing here forces or deletes anything: every refusal is a line in the outcome.
+ * Upgrade exactly what `plan` holds — the plan the backup file was written from, or one made at
+ * the musician's "Upgrade without a backup" — and nothing else: each song is saved against its
+ * PLANNED revision and each draft rewritten only while it still holds its planned bytes, so
+ * anything changed since is left alone and said. Nothing here forces or deletes anything.
  */
 export async function runUpgrade(
     stores: readonly UpgradeStore[],
+    plan: UpgradePlan,
     options: UpgradeRunOptions,
 ): Promise<UpgradeOutcome> {
     const outcome: UpgradeOutcome = {
@@ -481,10 +589,9 @@ export async function runUpgrade(
         skipped: [],
         draftsConverted: 0,
         draftsKept: [],
-        failures: [],
+        failures: [...plan.failures],
     };
-    const plan = await planUpgrade(stores);
-    outcome.failures.push(...plan.failures);
+    const moved = options.backedUp ? UPGRADE_SKIPS.changedSinceBackup : UPGRADE_SKIPS.elsewhere;
     const total = plan.songs.length + plan.drafts.length;
     let done = 0;
     const step = async () => {
@@ -494,16 +601,18 @@ export async function runUpgrade(
     };
     options.onProgress?.(0, total);
     for (const store of stores) {
-        if (plan.failures.some((failure) => failure.store === store.kind)) {
+        const songs = plan.songs.filter((song) => song.store === store.kind);
+        const drafts = plan.drafts.filter((draft) => draft.store === store.kind);
+        if (!songs.length && !drafts.length) {
             continue;
         }
         let live: Set<string>;
         try {
-            const [songs, drafts] = await Promise.all([store.songs(), store.drafts()]);
-            const committed = new Map(songs.songs.map(({ document }) => [document.id, document]));
+            const [fresh, freshDrafts] = await Promise.all([store.songs(), store.drafts()]);
+            const committed = new Map(fresh.songs.map(({ document }) => [document.id, document]));
             // Every draft, any format: a live one is unsaved work on its song.
             live = new Set(
-                drafts.drafts
+                freshDrafts.drafts
                     .filter((draft) => isLive(draft, committed))
                     .map((draft) => draft.documentId),
             );
@@ -511,7 +620,7 @@ export async function runUpgrade(
             outcome.failures.push({ store: store.kind, message: message(failure) });
             continue;
         }
-        for (const { document } of plan.songs.filter((song) => song.store === store.kind)) {
+        for (const { document } of songs) {
             const entry = { store: store.kind, id: document.id, title: document.title };
             try {
                 if (live.has(document.id) || options.unsavedHere(store.kind, document.id)) {
@@ -527,9 +636,17 @@ export async function runUpgrade(
                     continue;
                 }
                 try {
+                    // The PLANNED revision: a song saved since the plan loses this
+                    // compare-and-swap and is left alone.
                     await store.save(result.document, document.revision);
                 } catch (failure) {
-                    outcome.skipped.push({ ...entry, reason: message(failure) });
+                    outcome.skipped.push({
+                        ...entry,
+                        reason:
+                            failure instanceof UpgradeRefusal && failure.reason === 'elsewhere'
+                                ? moved
+                                : message(failure),
+                    });
                     continue;
                 }
                 outcome.upgraded.push(entry);
@@ -540,33 +657,39 @@ export async function runUpgrade(
                 await step();
             }
         }
-        // Drafts after songs, read AGAIN: a writer may have saved or discarded a draft meanwhile,
-        // and only what is there now is acted on.
-        let drafts: UpgradeDraft[];
+        // Drafts after songs, against what is stored NOW: a draft saved or discarded since is
+        // done; one captured again since the plan is left alone.
         let now: Map<string, ChartDocument>;
+        let current: Map<string, UpgradeDraft>;
         try {
-            const [songs, fresh] = await Promise.all([store.songs(), store.drafts()]);
-            now = new Map(songs.songs.map(({ document }) => [document.id, document]));
-            drafts = fresh.drafts.filter((draft) => draftNeedsUpgrade(draft.document));
+            const [fresh, freshDrafts] = await Promise.all([store.songs(), store.drafts()]);
+            now = new Map(fresh.songs.map(({ document }) => [document.id, document]));
+            current = new Map(
+                freshDrafts.drafts.map((draft) => [`${draft.documentId}:${draft.writerId}`, draft]),
+            );
         } catch (failure) {
             outcome.failures.push({ store: store.kind, message: message(failure) });
             continue;
         }
-        for (const draft of drafts) {
+        for (const { draft, title } of drafts) {
             const song = now.get(draft.documentId);
-            const entry = {
-                store: store.kind,
-                id: draft.documentId,
-                title: song?.title ?? draft.document.title,
-            };
-            const keep = (reason: string, reasons?: UpgradeNote[]) =>
+            const entry = { store: store.kind, id: draft.documentId, title: song?.title ?? title };
+            const keep = (reason: string) =>
                 outcome.draftsKept.push({
                     ...entry,
                     reason,
-                    reasons,
-                    openable: song !== undefined,
+                    openable: song !== undefined && reason === UPGRADE_SKIPS.draftLive,
                 });
             try {
+                const held = current.get(`${draft.documentId}:${draft.writerId}`);
+                if (!held) {
+                    // Saved or discarded since the plan: nothing is left to upgrade.
+                    continue;
+                }
+                if (held.raw !== draft.raw) {
+                    keep(moved);
+                    continue;
+                }
                 if (isLive(draft, now)) {
                     // Unsaved work: the musician's to Save or discard, never ours to rewrite.
                     keep(song ? UPGRADE_SKIPS.draftLive : UPGRADE_SKIPS.draftOrphan);
@@ -574,7 +697,7 @@ export async function runUpgrade(
                 }
                 const result = upgradeDraftDocument(draft.document);
                 if (result.kind === 'refused') {
-                    keep(UPGRADE_SKIPS.draftRefused, result.reasons);
+                    keep(UPGRADE_SKIPS.draftRefused);
                     continue;
                 }
                 if (result.kind === 'current') {
@@ -589,7 +712,7 @@ export async function runUpgrade(
                 } else if (written === 'live') {
                     keep(UPGRADE_SKIPS.draftLive);
                 } else if (written === 'changed') {
-                    keep(UPGRADE_SKIPS.elsewhere);
+                    keep(moved);
                 }
                 // `gone`: that writer saved or discarded it since; nothing is left to upgrade.
             } catch (failure) {

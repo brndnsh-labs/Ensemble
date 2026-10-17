@@ -121,11 +121,16 @@ describe('allDrafts', () => {
         await putDraft({ ...draft('w3', OLD), ownerId: 'owner-b' });
         await putDraft({ ...draft('w4', OLD), document: { schemaVersion: 99 } });
         const { drafts, unreadable } = await book.allDrafts(scope);
-        expect(drafts.map((row) => `${row.documentId}:${row.writerId}`).sort()).toEqual([
+        expect(drafts.map(({ draft }) => `${draft.documentId}:${draft.writerId}`).sort()).toEqual([
             'other:w2',
             'study:w1',
         ]);
-        expect(unreadable).toMatchObject([{ documentId: DOC, writerId: 'w4' }]);
+        // The row's own document, exactly as stored — not the decoded copy.
+        const stored = drafts.find(({ draft }) => draft.writerId === 'w1')?.stored;
+        expect(JSON.stringify(stored)).toBe(JSON.stringify(draft('w1', OLD).document));
+        expect(unreadable).toMatchObject([
+            { documentId: DOC, writerId: 'w4', stored: { schemaVersion: 99 } },
+        ]);
     });
 });
 
@@ -278,3 +283,96 @@ describe("save's upgrade option", () => {
         expect((await book.read(scope, DOC))?.document.revision).toBe(0);
     });
 });
+
+/** A song row this build cannot read back, written as a download or an older build left it. */
+function putSong(row: object): Promise<unknown> {
+    return raw((db) => settled(db.transaction('songs', 'readwrite').objectStore('songs').put(row)));
+}
+
+function songRow(documentId: string): Promise<unknown> {
+    return raw((db) =>
+        settled(db.transaction('songs', 'readonly').objectStore('songs').get([OWNER, documentId])),
+    );
+}
+
+describe('removing an upgrade leftover (#1738)', () => {
+    it('removes a draft row only while it holds the backed-up bytes, and never a live one', async () => {
+        await putDraft(draft('orphan', OLD));
+        const bytes = JSON.stringify(draft('orphan', OLD).document);
+        expect(
+            await book.removeDraftRow(scope, { documentId: DOC, writerId: 'orphan' }, `${bytes} `),
+        ).toBe('changed');
+        expect(await draftRow(DOC, 'orphan')).toBeDefined();
+        // An orphan (no song here) is removable once the bytes match; nothing is queued.
+        expect(
+            await book.removeDraftRow(scope, { documentId: DOC, writerId: 'orphan' }, bytes),
+        ).toBe('removed');
+        expect(await draftRow(DOC, 'orphan')).toBeUndefined();
+        expect(await book.pending(scope, DOC)).toEqual([]);
+        expect(
+            await book.removeDraftRow(scope, { documentId: DOC, writerId: 'orphan' }, bytes),
+        ).toBe('gone');
+
+        await book.save(scope, accountChart('Saved'), null);
+        await book.recover(scope, 'live-tab', accountChart('Unsaved'), 0);
+        const live = (await draftRow(DOC, 'live-tab'))!;
+        expect(
+            await book.removeDraftRow(
+                scope,
+                { documentId: DOC, writerId: 'live-tab' },
+                JSON.stringify(live.document),
+            ),
+        ).toBe('live');
+        expect(await draftRow(DOC, 'live-tab')).toEqual(live);
+    });
+
+    it('removes an unreadable local song row and nothing else: no tombstone, no outbox', async () => {
+        const broken = { schemaVersion: 1, id: 'broken', title: 42, chart: null };
+        await putSong({
+            ownerId: OWNER,
+            documentId: 'broken',
+            document: broken,
+            remoteRevision: null,
+        });
+        const bytes = JSON.stringify(broken);
+        expect(await book.removeUnreadableSong(scope, 'broken', `${bytes} `)).toBe('changed');
+        expect(await book.removeUnreadableSong(scope, 'broken', bytes)).toBe('removed');
+        expect(await songRow('broken')).toBeUndefined();
+        expect(await book.pending(scope, 'broken')).toEqual([]);
+        expect(await metaRowFor(deletionKey(OWNER, 'broken'))).toBeUndefined();
+        expect(await book.removeUnreadableSong(scope, 'broken', bytes)).toBe('gone');
+    });
+
+    it('refuses a song row the server holds, one with a Save queued, and one that reads', async () => {
+        const broken = { schemaVersion: 1, id: 'held', title: 42, chart: null };
+        await putSong({
+            ownerId: OWNER,
+            documentId: 'held',
+            document: broken,
+            remoteRevision: 'cloud-3',
+        });
+        expect(await book.removeUnreadableSong(scope, 'held', JSON.stringify(broken))).toBe('held');
+        expect(await songRow('held')).toBeDefined();
+
+        await book.save(scope, accountChart('Readable'), null);
+        const readable = (await songRow(DOC)) as { document: unknown };
+        expect(await book.removeUnreadableSong(scope, DOC, JSON.stringify(readable.document))).toBe(
+            'changed',
+        );
+        expect(await songRow(DOC)).toBeDefined();
+
+        // A queued Save on an id whose row then stops reading: removing it would strand the Save.
+        await putSong({
+            ownerId: OWNER,
+            documentId: DOC,
+            document: broken,
+            remoteRevision: null,
+        });
+        expect(await book.removeUnreadableSong(scope, DOC, JSON.stringify(broken))).toBe('held');
+        expect(await songRow(DOC)).toBeDefined();
+    });
+});
+
+function metaRowFor(key: string): Promise<unknown> {
+    return raw((db) => settled(db.transaction('meta', 'readonly').objectStore('meta').get(key)));
+}

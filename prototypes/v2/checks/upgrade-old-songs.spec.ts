@@ -338,36 +338,165 @@ test('a song with unsaved edits is left alone, its draft untouched, until it is 
     await expect(card(page)).toHaveCount(0);
 });
 
-test('an orphan draft and an unreadable old song are listed and left exactly as they are', async ({
+/** A recovery slot left by a tab long gone, for a song this device does not hold. */
+function orphanSlot() {
+    const orphan = textChart('not-here', 'Song from elsewhere', [['A', 'C | G']]);
+    return {
+        key: `${RECOVERY}some-old-tab:not-here`,
+        value: JSON.stringify({ capturedAt: '2026-09-02T00:00:00.000Z', document: orphan }),
+    };
+}
+
+async function seedSlot(page: Page, key: string, value: string): Promise<void> {
+    await page.evaluate(([k, v]) => localStorage.setItem(k, v), [key, value]);
+}
+
+test('leftovers the upgrade cannot fix are listed, removable only once backed up, one row at a time, until nothing old is left', async ({
     page,
 }) => {
-    const orphan = textChart('not-here', 'Song from elsewhere', [['A', 'C | G']]);
-    const orphanKey = `${RECOVERY}some-old-tab:not-here`;
-    const orphanSlot = JSON.stringify({ capturedAt: '2026-09-02T00:00:00.000Z', document: orphan });
-    await page.addInitScript(
-        ([key, value]) => {
-            if (!localStorage.getItem(key)) {
-                localStorage.setItem(key, value);
-            }
-        },
-        [orphanKey, orphanSlot],
-    );
+    const slot = orphanSlot();
     const corrupt = { schemaVersion: 1, id: 'zz-corrupt', title: 42, chart: null };
-    await seedGuestDocuments(page, [textChart('fine', 'Fine', [['A', 'C | F']]), corrupt]);
+    const fine = textChart('fine', 'Fine', [['A', 'C | F']]);
+    await seedGuestDocuments(page, [fine, corrupt]);
+    await seedSlot(page, slot.key, slot.value);
+    await page.reload();
     await expect(card(page).getByRole('heading', { name: 'Upgrade old songs (3)' })).toBeVisible();
-    await expect(card(page).getByTestId('upgrade-unreadable')).toContainText('zz-corrupt');
+    const leftovers = card(page).getByTestId('upgrade-leftovers');
+    await expect(leftovers).toContainText('zz-corrupt');
+    await expect(leftovers).toContainText(
+        'Song from elsewhere (unsaved draft not-here, guest songbook) — Unsaved changes for a song this device no longer holds.',
+    );
+    // Nothing is removable before a backup file holds it.
+    await expect(leftovers.getByRole('button', { name: /^Remove/ })).toHaveCount(0);
+
     await upgradeWithoutBackup(page);
     await expect(
-        card(page).getByRole('heading', {
-            name: '2 items left in the old format — open each to fix',
-        }),
+        card(page).getByRole('heading', { name: '2 old items here the upgrade can’t fix' }),
     ).toBeVisible();
-    await expect(card(page).getByTestId('upgrade-drafts')).toContainText(
-        'Song from elsewhere (unsaved draft) — Unsaved changes for a song this device no longer holds',
+    await expect(leftovers.getByRole('button', { name: /^Remove/ })).toHaveCount(0);
+    expect((await slots(page))[slot.key]).toBe(slot.value);
+
+    const files: Download[] = [];
+    page.on('download', (download) => files.push(download));
+    await leftovers.getByRole('button', { name: 'Download these first' }).click();
+    await expect.poll(() => files.length).toBe(1);
+    const archive = JSON.parse(readFileSync((await files[0].path())!, 'utf8'));
+    expect(archive.songs).toEqual([]);
+    expect(archive.drafts).toEqual([]);
+    expect(
+        archive.leftovers.map((entry: { kind: string; id: string; original: unknown }) => [
+            entry.kind,
+            entry.id,
+            entry.original,
+        ]),
+    ).toEqual([
+        ['song', 'zz-corrupt', corrupt],
+        ['draft', 'not-here', JSON.parse(slot.value)],
+    ]);
+    await expect(leftovers.getByRole('button', { name: 'Download these first' })).toHaveCount(0);
+
+    // A current, live draft of the upgraded song beside it: nothing old, and nothing to remove.
+    const fineNow = (await documents(page)).find((row) => row.id === 'fine')!;
+    const other = {
+        key: `${RECOVERY}keep-tab:fine`,
+        value: JSON.stringify({ capturedAt: new Date().toISOString(), document: fineNow }),
+    };
+    await seedSlot(page, other.key, other.value);
+    await leftovers
+        .getByRole('button', { name: 'Remove Song from elsewhere — it’s in your backup' })
+        .click();
+    await expect(card(page).getByTestId('upgrade-progress')).toHaveText(
+        'Song from elsewhere: Removed.',
     );
-    await expect(card(page).getByTestId('upgrade-unreadable')).toContainText('zz-corrupt');
-    expect((await slots(page))[orphanKey]).toBe(orphanSlot);
+    // Exactly that row: the slot beside it and the songbook are untouched.
+    const after = await slots(page);
+    expect(after[slot.key]).toBeUndefined();
+    expect(after[other.key]).toBe(other.value);
     expect((await documents(page)).find((row) => row.id === 'zz-corrupt')).toEqual(corrupt);
+
+    await leftovers
+        .getByRole('button', { name: 'Remove zz-corrupt — it’s in your backup' })
+        .click();
+    await expect(
+        // The run's own outcome heads the card again: nothing old is left to list.
+        card(page).getByRole('heading', { name: 'Upgraded 1 song' }),
+    ).toBeVisible();
+    expect(await documents(page)).toEqual([
+        expect.objectContaining({ id: 'fine', schemaVersion: 2 }),
+    ]);
+    await card(page).getByRole('button', { name: 'Done' }).click();
+    await expect(card(page)).toHaveCount(0);
+});
+
+test('the backup holds exactly what the run then changes: a song saved after it is left alone', async ({
+    page,
+}) => {
+    const songs = ['x', 'y', 'z'].map((id) => textChart(id, `Song ${id}`, [['A', 'C | F | G']]));
+    const slot = orphanSlot();
+    await seedGuestDocuments(page, songs);
+    await seedSlot(page, slot.key, slot.value);
+    await page.reload();
+    await expect(card(page).getByRole('heading', { name: 'Upgrade old songs (4)' })).toBeVisible();
+    await card(page).getByRole('button', { name: 'Upgrade old songs…' }).click();
+    const files: Download[] = [];
+    page.on('download', (download) => files.push(download));
+    await card(page).getByRole('button', { name: 'Download backup' }).click();
+    await expect.poll(() => files.length).toBe(1);
+    const archive = JSON.parse(readFileSync((await files[0].path())!, 'utf8'));
+    expect(archive.songs.map((entry: { original: unknown }) => entry.original)).toEqual(songs);
+
+    // Another tab saves song x after the backup was written.
+    const edited = { ...songs[0], title: 'Song x, edited elsewhere', revision: 3 };
+    await page.evaluate(async (row) => {
+        const db = await new Promise<IDBDatabase>((resolve, reject) => {
+            const request = indexedDB.open('ensemble-v2-preview', 1);
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
+        });
+        await new Promise<void>((resolve, reject) => {
+            const tx = db.transaction('documents', 'readwrite');
+            tx.objectStore('documents').put(row);
+            tx.oncomplete = () => resolve();
+            tx.onerror = () => reject(tx.error);
+        });
+        db.close();
+    }, edited);
+
+    await card(page)
+        .getByRole('button', { name: /I have the file/ })
+        .click();
+    await expect(card(page)).toHaveAttribute('data-phase', 'done');
+    await expect(card(page).getByTestId('upgrade-done-count')).toHaveText('Upgraded 2 songs.');
+    await expect(card(page).getByTestId('upgrade-skipped')).toContainText(
+        'Song x — Changed since your backup — upgrade again.',
+    );
+    const stored = await documents(page);
+    expect(stored.find((row) => row.id === 'x')).toEqual(edited);
+    expect(
+        stored
+            .filter((row) => row.schemaVersion === 2)
+            .map((row) => row.id)
+            .sort(),
+    ).toEqual(['y', 'z']);
+    // The backup held the leftover too, so it is removable at once.
+    await expect(
+        card(page)
+            .getByTestId('upgrade-leftovers')
+            .getByRole('button', { name: 'Remove Song from elsewhere — it’s in your backup' }),
+    ).toBeVisible();
+});
+
+test('opening a song ends a backup step: the file speaks for a songbook that may have moved', async ({
+    page,
+}) => {
+    await seedGuestDocuments(page, [textChart('a', 'Song a', [['A', 'C | F']])]);
+    await card(page).getByRole('button', { name: 'Upgrade old songs…' }).click();
+    await card(page).getByRole('button', { name: 'Download backup' }).click();
+    await expect(card(page).getByRole('button', { name: /I have the file/ })).toBeVisible();
+    await songLink(page, 'Song a').click();
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(card(page)).toHaveAttribute('data-phase', 'idle');
+    await expect(card(page).getByRole('button', { name: /I have the file/ })).toHaveCount(0);
 });
 
 test('a run cut short by a reload leaves each song old or new, and the next run finishes it', async ({
