@@ -12,7 +12,7 @@ interface Placement {
     /** Which of the anchor's edges the menu lines up with: its left (`start`) or right (`end`). */
     align: 'start' | 'end';
     /** The anchor has scrolled off the screen (or left the page): the menu closes rather than
-     * follow it away. Without it the menu stays where it was last placed. */
+     * follow it away. Without it the menu keeps following, clamped to the screen. */
     onGone?: () => void;
 }
 
@@ -45,8 +45,14 @@ export function useAnchoredPlacement(
             if (!menu) {
                 return;
             }
-            if (!rect || rect.bottom < 0 || rect.top > window.innerHeight) {
+            if (!rect) {
                 latest.current.onGone?.();
+                return;
+            }
+            // Off the screen: a caller with `onGone` closes; one without keeps the menu placed,
+            // clamped to the screen's edge, rather than frozen where the anchor last was.
+            if ((rect.bottom < 0 || rect.top > window.innerHeight) && latest.current.onGone) {
+                latest.current.onGone();
                 return;
             }
             const width = menu.offsetWidth;
@@ -69,10 +75,15 @@ export function useAnchoredPlacement(
         }
         document.addEventListener('scroll', place, true);
         window.addEventListener('resize', place);
+        const placed = node.current;
         return () => {
             grown.disconnect();
             document.removeEventListener('scroll', place, true);
             window.removeEventListener('resize', place);
+            // Placement turning off (the window narrowing to a phone sheet) hands the box back to
+            // the stylesheet: an inline `left`/`top` would beat the sheet's own and draw it narrow.
+            placed?.style.removeProperty('left');
+            placed?.style.removeProperty('top');
         };
     }, [enabled, align, node]);
 }

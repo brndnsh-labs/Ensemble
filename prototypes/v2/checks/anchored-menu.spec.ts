@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, phoneWidth, seedStarters, test } from './fixtures';
 
 /**
@@ -22,6 +22,24 @@ async function openRowMenu(page: Page) {
     await expect(menu).toBeVisible();
     await expect(trigger).toHaveAttribute('aria-expanded', 'true');
     return { trigger, menu };
+}
+
+/** Waits out the menu's entry (the laptop's pop, the phone's slide), so its box is final. */
+async function settledMenu(page: Page) {
+    await page
+        .locator('.menu')
+        .evaluate((box) => Promise.all(box.getAnimations().map((animation) => animation.finished)));
+}
+
+/** The right edges of the menu and of the ⋯ it was opened from line up (a laptop). */
+async function alignedTo(page: Page, trigger: Locator) {
+    await settledMenu(page);
+    const at = await trigger.boundingBox();
+    const placed = await page.locator('.menu-anchored').boundingBox();
+    if (!at || !placed) {
+        throw new Error('no boxes');
+    }
+    expect(Math.abs(placed.x + placed.width - (at.x + at.width))).toBeLessThan(2);
 }
 
 test('the row ⋯ opens a list of rows with Delete… last, after a divider, and no modal', async ({
@@ -55,6 +73,7 @@ test('on a laptop the menu sits at its ⋯, and Esc or a press outside closes it
     test.skip(phoneWidth(page), 'the laptop popover');
     const { trigger, menu } = await openRowMenu(page);
     const box = page.locator('.menu-anchored');
+    await settledMenu(page);
     const at = await trigger.boundingBox();
     const placed = await box.boundingBox();
     const viewport = page.viewportSize();
@@ -63,7 +82,7 @@ test('on a laptop the menu sits at its ⋯, and Esc or a press outside closes it
     }
     // Under the ⋯ (or over it, where there is no room below), lined up with its right edge.
     expect(placed.y >= at.y + at.height || placed.y + placed.height <= at.y).toBe(true);
-    expect(Math.abs(placed.x + placed.width - (at.x + at.width))).toBeLessThan(2);
+    await alignedTo(page, trigger);
     expect(placed.x).toBeGreaterThanOrEqual(0);
     expect(placed.x + placed.width).toBeLessThanOrEqual(viewport.width);
     await expect(page.locator('.menu-backdrop')).toHaveCount(0);
@@ -130,11 +149,19 @@ test('on a phone the menu is a sheet from the foot of the screen, closed by its 
     await expect(sheet.locator('.menu-title')).toHaveText('Blue pocket');
     await expect(page.locator('.menu-backdrop')).toBeVisible();
 
-    // A tap on the backdrop closes it — and only it: the row under the tap is not opened.
-    await page.mouse.click(10, 10);
+    // A tap on the backdrop, right over a song's row, closes the sheet — and only it: the song
+    // under the tap is not opened.
+    const link = await page.locator('.all-songs-table .song-link').first().boundingBox();
+    const sheetBox = await sheet.boundingBox();
+    if (!link || !sheetBox) {
+        throw new Error('no boxes');
+    }
+    expect(link.y + link.height).toBeLessThan(sheetBox.y);
+    await page.mouse.click(link.x + link.width / 2, link.y + link.height / 2);
     await expect(menu).toHaveCount(0);
     await expect(page.locator('.menu-backdrop')).toHaveCount(0);
     await expect(page.getByRole('heading', { name: /All songs/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Edit chart', exact: true })).toHaveCount(0);
     await expect(trigger).toBeFocused();
 
     // Esc closes the sheet too.
@@ -158,6 +185,49 @@ test('a choice closes the menu and runs; Delete… still asks first', async ({ p
         page.locator('.all-songs-table .song-row', { hasText: 'Blue pocket' }),
     ).toHaveCount(1);
     await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('another row’s ⋯, activated with no press before it, opens a fresh menu at that ⋯', async ({
+    page,
+}) => {
+    const { trigger, menu } = await openRowMenu(page);
+    const other = page
+        .locator('.all-songs-table .song-row', { hasText: 'After hours' })
+        .getByRole('button', { name: 'More actions for After hours' });
+    // A click alone — a screen reader's activation, say — with no press to close the first menu.
+    await other.dispatchEvent('click');
+    const second = page.getByRole('menu', { name: 'Actions for After hours' });
+    await expect(second).toBeVisible();
+    await expect(menu).toHaveCount(0);
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await expect(other).toHaveAttribute('aria-expanded', 'true');
+    await expect(second.getByRole('menuitem').first()).toBeFocused();
+    if (!phoneWidth(page)) {
+        await alignedTo(page, other);
+    }
+    await page.keyboard.press('Escape');
+    await expect(second).toHaveCount(0);
+    await expect(other).toBeFocused();
+});
+
+test('a menu open as the window narrows to a phone becomes a full-width sheet', async ({
+    page,
+}) => {
+    test.skip(phoneWidth(page), 'starts at a laptop width');
+    const { menu } = await openRowMenu(page);
+    await settledMenu(page);
+    await page.setViewportSize({ width: 390, height: 800 });
+    await expect(page.locator('.menu-sheet')).toBeVisible();
+    await settledMenu(page);
+    await expect
+        .poll(async () => {
+            const box = await page.locator('.menu-sheet').boundingBox();
+            return (
+                box && [Math.round(box.x), Math.round(box.width), Math.round(box.y + box.height)]
+            );
+        })
+        .toEqual([0, 390, 800]);
+    await expect(menu).toBeVisible();
 });
 
 test('with reduced motion the menu appears without moving', async ({ page }) => {

@@ -757,6 +757,9 @@ export default function Ensemble() {
     // that row's ⋯ (#1755).
     const [rowMenuFor, setRowMenuFor] = useState<SongRowMenuTarget | null>(null);
     const rowMenuTrigger = useRef<HTMLElement | null>(null);
+    // Counts openings, so a ⋯ activated while another row's menu is open (a click with no
+    // press before it: a screen reader, a script) mounts a fresh menu at the new ⋯.
+    const [rowMenuOpening, setRowMenuOpening] = useState(0);
     // The guest-only delete confirm (#1440).
     const [guestDeleteTarget, setGuestDeleteTarget] = useState<{
         id: string;
@@ -3888,6 +3891,7 @@ export default function Ensemble() {
             return;
         }
         rowMenuTrigger.current = trigger;
+        setRowMenuOpening((n) => n + 1);
         // The next row action starting clears whatever the LAST one said (#1440 review P2) — an
         // Export or a Star from this new menu would otherwise leave an unrelated "Renamed to…"
         // sitting on screen indefinitely.
@@ -6613,6 +6617,7 @@ export default function Ensemble() {
             )}
             <SongRowMenu
                 song={rowMenuFor}
+                opening={rowMenuOpening}
                 anchor={() => (rowMenuTrigger.current?.isConnected ? rowMenuTrigger.current : null)}
                 starred={!!rowMenuFor && starred.has(rowMenuFor.id)}
                 busy={busy}

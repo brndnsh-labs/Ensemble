@@ -31,7 +31,7 @@
         opacity var(--motion-fast) var(--ease-out),
         transform var(--motion-fast) var(--ease-out);
 }
-:where(button):not(:disabled, .bars *, [aria-haspopup]):active {
+:where(button):not(:disabled, [aria-disabled="true"], .bars *, [aria-haspopup]):active {
     transform: scale(0.97);
 }
 
@@ -200,7 +200,7 @@ dialog[open]::backdrop {
         --motion-slow: 0ms;
         --motion-rise: 0px;
     }
-    :where(button):not(:disabled, .bars *, [aria-haspopup]):active {
+    :where(button):not(:disabled, [aria-disabled="true"], .bars *, [aria-haspopup]):active {
         transform: none;
     }
 }

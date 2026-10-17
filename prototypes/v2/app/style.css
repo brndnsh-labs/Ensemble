@@ -82,7 +82,10 @@ button {
     cursor: pointer;
     color: inherit;
 }
-button:disabled {
+/* `aria-disabled` reads the same as `disabled`: it is the disabled state of a button that must
+   keep focus (a menu's trigger, #1755; the bar dock's keys), which `disabled` would drop. */
+button:disabled,
+button[aria-disabled="true"] {
     cursor: default;
     opacity: 0.45;
 }
@@ -939,7 +942,7 @@ button.bar-number {
     content: "▾";
     color: var(--muted);
 }
-.chart-bottom .form-length:hover:not(:disabled) {
+.chart-bottom .form-length:hover:not([aria-disabled="true"]) {
     border-color: var(--muted);
 }
 .chart-bottom em {

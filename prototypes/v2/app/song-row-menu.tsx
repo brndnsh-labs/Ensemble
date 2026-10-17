@@ -19,6 +19,8 @@ export interface RowMenuCollection {
 interface SongRowMenuProps {
     /** The song this menu is about while the shell has it open, else null. */
     song: SongRowMenuTarget | null;
+    /** Which opening this is (the shell counts them): each one mounts a fresh menu. */
+    opening: number;
     /** The row's ⋯, which the menu opens at and hands focus back to. */
     anchor: () => Element | null;
     starred: boolean;
@@ -52,6 +54,7 @@ interface SongRowMenuProps {
  */
 export function SongRowMenu({
     song,
+    opening,
     anchor,
     starred,
     busy,
@@ -109,6 +112,9 @@ export function SongRowMenu({
         <>
             {song && view === 'actions' && (
                 <Menu
+                    // A new opening is a new menu: placed at its own ⋯, its own `aria-expanded`
+                    // and focus, even when another row's was open a moment before.
+                    key={`${song.id}:${opening}`}
                     label={`Actions for ${song.title}`}
                     title={song.title}
                     anchor={anchor}
