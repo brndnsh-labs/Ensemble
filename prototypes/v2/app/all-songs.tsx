@@ -81,7 +81,7 @@ interface AllSongsProps {
     onBack: () => void;
     onOpenSong: (id: string) => void;
     onToggleStar: (id: string) => void;
-    onOpenRowMenu: (id: string, title: string) => void;
+    onOpenRowMenu: (id: string, title: string, trigger: HTMLElement) => void;
     /**
      * The id THIS TAB's own row action just removed from the library (#1440 review P5), or null.
      * `document.activeElement === document.body` — the old guard — is also the ordinary resting
@@ -648,9 +648,15 @@ export function AllSongs({
                                                 <button
                                                     className="icon-button row-more"
                                                     aria-label={`More actions for ${song.title}`}
-                                                    disabled={busy}
-                                                    onClick={() =>
-                                                        onOpenRowMenu(song.id, song.title)
+                                                    aria-haspopup="menu"
+                                                    aria-expanded={false}
+                                                    aria-disabled={busy || undefined}
+                                                    onClick={(event) =>
+                                                        onOpenRowMenu(
+                                                            song.id,
+                                                            song.title,
+                                                            event.currentTarget,
+                                                        )
                                                     }
                                                 >
                                                     ⋯

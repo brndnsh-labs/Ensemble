@@ -716,10 +716,9 @@ test('on an opened text chart, a count makes the measure copy and counts it (#15
 
     await footer.click();
     const menu = formMenu(page);
-    await expect(page.locator('.form-length-note')).toHaveText(
+    await expect(menu).toHaveAccessibleDescription(
         'Counting choruses turns this chart into bars; the original is kept.',
     );
-    await expect(menu).toHaveAttribute('aria-describedby', 'form-length-note');
     await expect(
         menu.getByRole('menuitemradio', { name: 'Repeats continuously', exact: true }),
     ).toHaveAttribute('aria-checked', 'true');

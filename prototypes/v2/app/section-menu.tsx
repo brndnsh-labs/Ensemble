@@ -1,10 +1,11 @@
 'use client';
 
 import type { ScoreSection, SemanticScore } from '@engine/songbook/score-types';
-import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 import type { SectionChange } from '../lib/documents';
 import './bar-menu.css';
 import { type SectionField, SectionNameFields, SectionSelects } from './section-settings';
+import { useAnchoredPlacement } from './use-anchored-placement';
 
 interface SectionMenuProps {
     score: SemanticScore;
@@ -123,46 +124,13 @@ export function SectionMenu({
         return () => document.removeEventListener('pointerdown', outside, true);
     }, []);
 
-    // Under the letter on a laptop, kept on screen and followed through a scroll, as the bar menu
-    // follows its bar; closed once the letter has scrolled away.
-    useLayoutEffect(() => {
-        if (sheet) {
-            return;
-        }
-        function place() {
-            const menu = node.current;
-            const rect = latest.current.anchor()?.getBoundingClientRect();
-            if (!menu || !rect) {
-                return;
-            }
-            if (rect.bottom < 0 || rect.top > window.innerHeight) {
-                closeRef.current(false);
-                return;
-            }
-            const width = menu.offsetWidth;
-            const height = menu.offsetHeight;
-            const left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8));
-            const below = rect.bottom + 6;
-            const top =
-                below + height > window.innerHeight - 8 && rect.top - 6 - height >= 8
-                    ? rect.top - 6 - height
-                    : Math.max(8, Math.min(below, window.innerHeight - height - 8));
-            menu.style.left = `${left}px`;
-            menu.style.top = `${top}px`;
-        }
-        place();
-        const grown = new ResizeObserver(place);
-        if (node.current) {
-            grown.observe(node.current);
-        }
-        document.addEventListener('scroll', place, true);
-        window.addEventListener('resize', place);
-        return () => {
-            grown.disconnect();
-            document.removeEventListener('scroll', place, true);
-            window.removeEventListener('resize', place);
-        };
-    }, [sheet]);
+    // Under the letter on a laptop, the shared anchored placement (#1755): followed through a
+    // scroll, as the bar menu follows its bar, and closed once the letter has scrolled away.
+    useAnchoredPlacement(node, anchor, {
+        enabled: !sheet,
+        align: 'start',
+        onGone: () => closeRef.current(false),
+    });
 
     return (
         <div

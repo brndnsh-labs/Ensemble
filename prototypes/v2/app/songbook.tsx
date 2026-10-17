@@ -122,7 +122,7 @@ interface SongbookProps {
     starred: ReadonlySet<string>;
     onToggleStar: (id: string) => void;
     /** Opens the row ⋯ menu (Star/Unstar, Rename, Duplicate, Export file, Delete…) for one song. */
-    onOpenRowMenu: (id: string, title: string) => void;
+    onOpenRowMenu: (id: string, title: string, trigger: HTMLElement) => void;
     /** #1440's full-library page — the "All N songs →" link. */
     onOpenAllSongs: () => void;
     /** Where focus returns after leaving the All songs page (#1440 review P3). */
@@ -542,8 +542,16 @@ function RecentSongs({
                                         <button
                                             className="icon-button row-more"
                                             aria-label={`More actions for ${song.title}`}
-                                            disabled={busy}
-                                            onClick={() => onOpenRowMenu(song.id, song.title)}
+                                            aria-haspopup="menu"
+                                            aria-expanded={false}
+                                            aria-disabled={busy || undefined}
+                                            onClick={(event) =>
+                                                onOpenRowMenu(
+                                                    song.id,
+                                                    song.title,
+                                                    event.currentTarget,
+                                                )
+                                            }
                                         >
                                             ⋯
                                         </button>

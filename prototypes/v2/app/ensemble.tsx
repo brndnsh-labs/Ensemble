@@ -752,10 +752,11 @@ export default function Ensemble() {
     // The collection THIS TAB's own delete just removed (#1477 review R5) — `deletedRowId`'s rule.
     const [deletedCollectionId, setDeletedCollectionId] = useState<string | null>(null);
     const collectionDeleteDialogRef = useRef<HTMLDialogElement>(null);
-    // The row ⋯ menu (#1440), shared by the All songs page and the songbook home. One dialog
-    // instance for whichever row is targeted, per `SongRowMenu`'s own note on why.
+    // The row ⋯ menu (#1440), shared by the All songs page and the songbook home. One menu
+    // instance for whichever row is targeted, per `SongRowMenu`'s own note on why; anchored at
+    // that row's ⋯ (#1755).
     const [rowMenuFor, setRowMenuFor] = useState<SongRowMenuTarget | null>(null);
-    const rowMenuDialogRef = useRef<HTMLDialogElement>(null);
+    const rowMenuTrigger = useRef<HTMLElement | null>(null);
     // The guest-only delete confirm (#1440).
     const [guestDeleteTarget, setGuestDeleteTarget] = useState<{
         id: string;
@@ -1828,14 +1829,7 @@ export default function Ensemble() {
             deleteDialogRef.current?.close();
         }
     }, [deleteOpen, inAccount]);
-    useEffect(() => {
-        if (rowMenuFor) {
-            rowMenuDialogRef.current?.showModal();
-        } else {
-            rowMenuDialogRef.current?.close();
-        }
-    }, [rowMenuFor]);
-    // #1477 — the collection dialogs, driven from their state like the row menu above.
+    // #1477 — the collection dialogs, driven from their state like the delete dialog above.
     useEffect(() => {
         if (collectionNaming) {
             collectionNameDialogRef.current?.showModal();
@@ -3882,7 +3876,18 @@ export default function Ensemble() {
     function closeRowMenu() {
         setRowMenuFor(null);
     }
-    function openRowMenu(id: string, title: string) {
+    /** A row's ⋯ (#1755): opens the menu at it, or closes it when it is already open there. */
+    function openRowMenu(id: string, title: string, trigger: HTMLElement) {
+        // The ⋯ is `aria-disabled` while busy rather than `disabled`, so the menu's focus can go
+        // back to it during the action it started.
+        if (busy) {
+            return;
+        }
+        if (rowMenuFor?.id === id && rowMenuTrigger.current === trigger) {
+            closeRowMenu();
+            return;
+        }
+        rowMenuTrigger.current = trigger;
         // The next row action starting clears whatever the LAST one said (#1440 review P2) — an
         // Export or a Star from this new menu would otherwise leave an unrelated "Renamed to…"
         // sitting on screen indefinitely.
@@ -6607,8 +6612,8 @@ export default function Ensemble() {
                 />
             )}
             <SongRowMenu
-                dialogRef={rowMenuDialogRef}
                 song={rowMenuFor}
+                anchor={() => (rowMenuTrigger.current?.isConnected ? rowMenuTrigger.current : null)}
                 starred={!!rowMenuFor && starred.has(rowMenuFor.id)}
                 busy={busy}
                 onClose={closeRowMenu}

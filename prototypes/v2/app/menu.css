@@ -1,0 +1,154 @@
+/* The anchored menu (#1755, `menu.tsx`). On a laptop a compact list at its trigger, placed by
+   `useAnchoredPlacement`; at phone width a sheet from the screen's foot over a light backdrop.
+   Rows, not `.btn`s: a menu is a list to pick from, not a form. Motion reads `motion.css`'s
+   tokens, so reduced motion turns it off there. */
+.menu {
+    position: fixed;
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow);
+    overflow: auto;
+    overscroll-behavior: contain;
+    font-size: 13px;
+}
+.menu-anchored {
+    /* Placed by script; until then it sits out of sight rather than flash at the corner. */
+    top: -9999px;
+    left: -9999px;
+    min-width: 180px;
+    max-width: min(300px, calc(100vw - 16px));
+    max-height: calc(100dvh - 16px);
+    padding: 5px;
+    border-radius: 11px;
+    animation: menu-pop var(--motion-fast) var(--ease-out);
+}
+/* It opens up OR down, depending on room, so it grows from its own centre rather than slide from
+   a side that might be wrong. */
+@keyframes menu-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.96);
+    }
+}
+.menu-sheet {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 80dvh;
+    padding: 8px max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom))
+        max(10px, env(safe-area-inset-left));
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    font-size: 16px;
+    animation: menu-slide-up var(--motion-base) var(--ease-out);
+}
+@keyframes menu-slide-up {
+    from {
+        transform: translateY(100%);
+    }
+}
+/* A light backdrop: the page dimmed a little, never blurred, so it still reads as the page the
+   sheet belongs to. A tap on it closes the sheet. */
+.menu-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 59;
+    background: light-dark(#20272026, #00000059);
+    animation: menu-fade var(--motion-base) var(--ease-out);
+}
+@keyframes menu-fade {
+    from {
+        opacity: 0;
+    }
+}
+/* A grab handle, so the sheet reads as one at a glance. Decorative. */
+.menu-sheet::before {
+    content: "";
+    flex: none;
+    align-self: center;
+    width: 36px;
+    height: 4px;
+    margin: 0 0 8px;
+    border-radius: 2px;
+    background: var(--line);
+}
+.menu-list {
+    display: flex;
+    flex-direction: column;
+}
+.menu-title {
+    margin: 0;
+    padding: 2px 10px 8px;
+    color: var(--muted);
+    font-size: 13px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.menu-note {
+    margin: 0;
+    padding: 6px 9px 8px;
+    color: var(--muted);
+    font-size: 11px;
+    line-height: 1.5;
+}
+.menu-item {
+    display: flex;
+    flex: none;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 34px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 7px;
+    background: none;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.menu-sheet .menu-item {
+    min-height: 48px;
+}
+.menu-item:hover,
+.menu-item:focus-visible {
+    background: var(--hover);
+}
+.menu-item:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: -1px;
+}
+.menu-item[aria-checked="true"] {
+    color: var(--green);
+    background: var(--green-light);
+    font-weight: 600;
+}
+/* The tick is what `aria-checked` already says: drawn, with empty alternative text so it is not
+   read into the item's name. (A browser without the `/ ""` form drops the tick; the colour stays.) */
+.menu-item[aria-checked="true"]::after {
+    content: "✓" / "";
+}
+.menu-item[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: default;
+}
+.menu-hint {
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 400;
+}
+.menu-danger {
+    color: var(--danger);
+}
+.menu-divider {
+    flex: none;
+    height: 1px;
+    margin: 4px 6px;
+    background: var(--line);
+}
