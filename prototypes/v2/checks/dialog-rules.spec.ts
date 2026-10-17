@@ -49,6 +49,21 @@ async function keepsOnBackdrop(page: Page, dialog: Locator): Promise<void> {
     await expect(dialog).toBeVisible();
 }
 
+/**
+ * Only the dialog's own buttons close it (`busy`): Esc is refused, the backdrop too, and a close
+ * that gets past the refusal anyway — Chrome honours a refused `cancel` only with fresh user
+ * activation, so a repeated Esc or Android's Back closes the dialog outright — re-opens it.
+ */
+async function holdsOpen(page: Page, dialog: Locator): Promise<void> {
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await keepsOnBackdrop(page, dialog);
+    await dialog.evaluate((node: HTMLDialogElement) => node.close());
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveJSProperty('open', true);
+}
+
 /** The dialog's last row of buttons, by name, in reading order. */
 async function actions(dialog: Locator): Promise<string[]> {
     const names = await dialog
@@ -164,10 +179,16 @@ test('the songbook: Rename and New collection keep what is typed, the collection
     // Add to collection…, nothing typed: a backdrop tap closes it.
     await more.click();
     await page.getByTestId('row-menu-add-to-collection').click();
-    await closesOnBackdrop(
-        page,
-        page.getByRole('dialog', { name: 'Add “Blue pocket” to a collection' }),
-    );
+    const addTo = page.getByRole('dialog', { name: 'Add “Blue pocket” to a collection' });
+    await closesOnBackdrop(page, addTo);
+    // A new collection's name typed: kept against a stray tap; Esc is the way out on purpose.
+    await more.click();
+    await page.getByTestId('row-menu-add-to-collection').click();
+    await page.getByTestId('row-menu-new-collection-input').fill('Practice');
+    await keepsOnBackdrop(page, addTo);
+    await expect(page.getByTestId('row-menu-new-collection-input')).toHaveValue('Practice');
+    await page.keyboard.press('Escape');
+    await expect(addTo).toBeHidden();
 
     // New collection: closes untouched, keeps a typed name.
     const name = page.getByRole('dialog', { name: 'New collection' });
@@ -244,8 +265,39 @@ test('import is titled for its state and keeps a typed link; sign-in closes on a
     await expect(reviewing).toBeHidden();
 
     // The sign-in step, before anything is asked of a passkey: nothing to lose.
+    const signIn = page.locator('dialog.account-dialog');
     await page.getByTestId('account-sign-in').click();
-    await closesOnBackdrop(page, page.locator('dialog.account-dialog'));
+    await closesOnBackdrop(page, signIn);
+});
+
+test('Older drafts and the Copy link fallback close on a backdrop tap', async ({
+    page,
+    context,
+}) => {
+    // No clipboard, so Copy link always shows its fallback (as `share-link.spec.ts` does).
+    await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true });
+    });
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await songMenuAction(page, 'Copy link');
+    await expect(page.getByTestId('share-link-fallback')).toBeVisible();
+    await closesOnBackdrop(page, page.getByRole('dialog', { name: 'Copy this link' }));
+
+    // An older competing draft (`foundation.spec.ts`): this tab's tempo change, another tab's Save.
+    const second = await context.newPage();
+    await second.goto(appUrl());
+    await songLink(second, 'Blue pocket', 'Blues').click();
+    await page.getByRole('button', { name: 'Slower', exact: true }).click();
+    await second.getByRole('button', { name: 'Faster', exact: true }).click();
+    await second.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(second.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await second.close();
+    await page.reload();
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await songMenuAction(page, /Older drafts \(/);
+    await closesOnBackdrop(page, page.getByRole('dialog', { name: 'Older drafts' }));
 });
 
 test('Repeats and endings closes on a backdrop tap until a bar is chosen in it', async ({
@@ -304,6 +356,70 @@ accountTest.describe('signed in', () => {
             expect(names.at(-2)).toBe('Cancel');
             await closesOnBackdrop(page, signOut);
             await expect(entry.getByTestId('account-open')).toBeVisible();
+        },
+    );
+
+    accountTest(
+        'the sign-in recover stage keeps against a backdrop tap; Esc closes it',
+        async ({ page }) => {
+            // Chromium only: the recover stage is offered where passkeys are (WebKit here has none).
+            await addVirtualAuthenticator(page);
+            await openWithAccounts(page);
+            const signIn = page.locator('dialog.account-dialog');
+            await page.getByTestId('account-sign-in').click();
+            await signIn.getByTestId('account-recover').click();
+            await expect(
+                signIn.getByRole('heading', { name: 'Take your songbook with you.' }),
+            ).toHaveCount(0);
+            await keepsOnBackdrop(page, signIn);
+            await page.keyboard.press('Escape');
+            await expect(signIn).toBeHidden();
+        },
+    );
+
+    accountTest(
+        'a recovery code on screen holds the page open; the delete step keeps against a backdrop tap; a running sign-out takes no Esc',
+        async ({ page }) => {
+            await addVirtualAuthenticator(page);
+            await openWithAccounts(page);
+            await signUp(page);
+
+            // Replace recovery code: the new code is shown once, so only its buttons close it.
+            const accountPage = await openAccountPage(page);
+            await accountPage.getByTestId('replace-recovery-code').click();
+            await expect(accountPage.getByTestId('recovery-code')).toBeVisible();
+            await holdsOpen(page, accountPage);
+            await expect(accountPage.getByTestId('recovery-code')).toBeVisible();
+            await accountPage.getByTestId('recovery-not-now').click();
+            await expect(accountPage.getByRole('heading', { name: 'Your account.' })).toBeVisible();
+
+            // The delete step takes a typed confirmation: a backdrop tap keeps it, Esc closes.
+            await accountPage.getByTestId('delete-account-open').click();
+            await accountPage.getByTestId('delete-account-input').fill('del');
+            await keepsOnBackdrop(page, accountPage);
+            await expect(accountPage.getByTestId('delete-account-confirm')).toBeVisible();
+            await page.keyboard.press('Escape');
+            await expect(accountPage).toBeHidden();
+
+            // A sign-out in flight: the logout is held, and nothing but its answer closes the step.
+            let release = () => {};
+            const held = new Promise<void>((resolve) => {
+                release = resolve;
+            });
+            await page.route('**/api/auth/logout', async (route) => {
+                await held;
+                await route.continue();
+            });
+            await openAccountPage(page);
+            await accountPage.getByTestId('account-sign-out').click();
+            const signOut = page.locator('dialog[aria-labelledby="sign-out-title"]');
+            await expect(signOut.getByTestId('sign-out-confirm')).toBeEnabled();
+            await signOut.getByTestId('sign-out-confirm').click();
+            await expect(signOut.getByTestId('sign-out-cancel')).toBeDisabled();
+            await holdsOpen(page, signOut);
+            release();
+            await expect(signOut).toBeHidden();
+            await expect(page.getByTestId('account-sign-in')).toBeVisible();
         },
     );
 });

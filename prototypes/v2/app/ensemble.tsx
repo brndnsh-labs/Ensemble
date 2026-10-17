@@ -101,6 +101,7 @@ import {
     DeleteCollectionDialog,
 } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
+import { closeDialog } from './dialog-close';
 import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
 import { type BarMarkers, GuidedForm } from './guided-form';
@@ -1787,7 +1788,7 @@ export default function Ensemble() {
         if (exportOpen) {
             exportDialogRef.current?.showModal();
         } else {
-            exportDialogRef.current?.close();
+            closeDialog(exportDialogRef.current);
         }
     }, [exportOpen]);
     // The Song menu belongs to the chart on the stand: none left there, nothing of it stays open
@@ -1806,14 +1807,14 @@ export default function Ensemble() {
             setFeel(feelSnapshot());
             bandDialog.current?.showModal();
         } else {
-            bandDialog.current?.close();
+            closeDialog(bandDialog.current);
         }
     }, [bandOpen]);
     useEffect(() => {
         if (accountDialog) {
             accountDialogRef.current?.showModal();
         } else {
-            accountDialogRef.current?.close();
+            closeDialog(accountDialogRef.current);
         }
     }, [accountDialog]);
     // #1266 — the account library is re-read on sign-in and whenever the loop reports it changed
@@ -1925,7 +1926,7 @@ export default function Ensemble() {
         if (accountPageOpen) {
             accountPageDialogRef.current?.showModal();
         } else {
-            accountPageDialogRef.current?.close();
+            closeDialog(accountPageDialogRef.current);
         }
     }, [accountPageOpen]);
     // `inAccount` is a dependency, not just a guard: the confirm step unmounts when the answer
@@ -1939,7 +1940,7 @@ export default function Ensemble() {
         if (deleteOpen) {
             deleteDialogRef.current?.showModal();
         } else {
-            deleteDialogRef.current?.close();
+            closeDialog(deleteDialogRef.current);
         }
     }, [deleteOpen, inAccount]);
     // #1477 — the collection dialogs, driven from their state like the delete dialog above.
@@ -1947,28 +1948,28 @@ export default function Ensemble() {
         if (collectionNaming) {
             collectionNameDialogRef.current?.showModal();
         } else {
-            collectionNameDialogRef.current?.close();
+            closeDialog(collectionNameDialogRef.current);
         }
     }, [collectionNaming]);
     useEffect(() => {
         if (collectionDeleteTarget) {
             collectionDeleteDialogRef.current?.showModal();
         } else {
-            collectionDeleteDialogRef.current?.close();
+            closeDialog(collectionDeleteDialogRef.current);
         }
     }, [collectionDeleteTarget]);
     useEffect(() => {
         if (guestDeleteTarget) {
             guestDeleteDialogRef.current?.showModal();
         } else {
-            guestDeleteDialogRef.current?.close();
+            closeDialog(guestDeleteDialogRef.current);
         }
     }, [guestDeleteTarget]);
     useEffect(() => {
         if (purgeTarget) {
             purgeDialogRef.current?.showModal();
         } else {
-            purgeDialogRef.current?.close();
+            closeDialog(purgeDialogRef.current);
         }
     }, [purgeTarget]);
     // Closes itself if `rowInAccount` goes false while open (the same posture the stand's own
@@ -1991,7 +1992,7 @@ export default function Ensemble() {
         if (rowDeleteTarget) {
             rowDeleteDialogRef.current?.showModal();
         } else {
-            rowDeleteDialogRef.current?.close();
+            closeDialog(rowDeleteDialogRef.current);
         }
     }, [rowDeleteTarget, rowInAccount]);
     // Focus returns to the entry point on the way back from either sub-view (#1440 review P3),
@@ -2065,7 +2066,7 @@ export default function Ensemble() {
             if (moot) {
                 setSignOutStep(null);
             }
-            signOutDialogRef.current?.close();
+            closeDialog(signOutDialogRef.current);
             return;
         }
         signOutDialogRef.current?.showModal();
@@ -2123,7 +2124,7 @@ export default function Ensemble() {
         if (adoptOpen) {
             adoptDialogRef.current?.showModal();
         } else {
-            adoptDialogRef.current?.close();
+            closeDialog(adoptDialogRef.current);
         }
     }, [adoptOpen]);
     /**
@@ -2156,7 +2157,7 @@ export default function Ensemble() {
         if (adoptRemoteOffer !== null) {
             adoptRemoteDialogRef.current?.showModal();
         } else {
-            adoptRemoteDialogRef.current?.close();
+            closeDialog(adoptRemoteDialogRef.current);
         }
     }, [adoptRemoteOffer, adoptRemoteOffered]);
     /**
@@ -2778,7 +2779,7 @@ export default function Ensemble() {
         // copy"/Save is what turns it into a library entry, and `open()` clears the flag the
         // moment that happens. Writing recovery storage for it here would key a slot under
         // the shared id (a catalog id for a standard) that nothing but a Save — which this isn't
-        // — ever clears, so "Preserved drafts" would grow by one per edited-but-unsaved visit.
+        // — ever clears, so "Older drafts" would grow by one per edited-but-unsaved visit.
         // Read from the ref (#1512): a caller that has just awaited `open()` holds a closure
         // whose `sharedDraft` still describes the chart that was on the stand before it.
         if (sharedDraftNow.current) {
@@ -6546,7 +6547,7 @@ export default function Ensemble() {
                         countInBeat={countInBeat}
                         onPlayToggle={togglePlayback}
                         onBand={() => openBand(lastBandTab.current)}
-                        bandOpen={bandOpen}
+                        bandTab={bandTab}
                         onTempo={(value) => change(() => runtime.setTempo(value))}
                         keyOpen={keyOpen}
                         onKeyToggle={() => setKeyOpen((open) => !open)}

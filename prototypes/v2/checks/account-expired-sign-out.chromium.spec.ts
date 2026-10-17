@@ -338,7 +338,7 @@ test('the control belongs to the expired banner, not to whoever is signed in now
         .click();
     await page.getByTestId('account-create').click();
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
-    await page.keyboard.press('Escape');
+    await page.getByTestId('recovery-not-now').click();
 
     // A's chart is still on the stand and says whose it is (#1311) — and the control is gone,
     // because the banner that carried it is gone: this session is not expired, it is B's.

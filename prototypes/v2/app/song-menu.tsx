@@ -1,7 +1,7 @@
 import { type ReactNode, useEffect, useRef } from 'react';
 import type * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
-import { dialogRule } from './dialog-close';
+import { closeDialog, dialogRule } from './dialog-close';
 import { Menu, type MenuItem } from './menu';
 
 type Recovery = ReturnType<typeof repository.recoveriesFor>[number];
@@ -52,7 +52,7 @@ function useModal(open: boolean) {
                 ref.current?.showModal();
             }
         } else {
-            ref.current?.close();
+            closeDialog(ref.current);
         }
     }, [open]);
     return ref;

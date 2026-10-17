@@ -201,7 +201,8 @@ export async function signUp(page: Page): Promise<void> {
     await page.getByTestId('account-sign-in').click();
     await page.getByTestId('account-create').click();
     await expect(page.getByTestId('recovery-code')).toHaveText(CODE_SHAPE);
-    await page.keyboard.press('Escape');
+    // Not Esc: a code on screen is shown once, and only its own buttons close the step (#1760).
+    await page.getByTestId('recovery-not-now').click();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
     // #1268's adoption prompt auto-opens once the account library has downloaded, and this
     // device's guest starters are not in the account — it is unrelated to this spec, but it is a

@@ -392,10 +392,12 @@ export function AccountPage({
             ref={dialogRef}
             className="modal-box account-page"
             aria-labelledby="account-page-title"
-            // Esc always closes it (every await re-checks `openRef`); a backdrop tap does not while
-            // an action runs, a new recovery code is on screen, or the delete step is open (#1760).
+            // A new recovery code on screen is shown once and never again: only its own buttons
+            // close the page then (#1760). Otherwise Esc always closes it (every await re-checks
+            // `openRef`), and a backdrop tap does not while an action runs or on the delete step.
             {...dialogRule({
                 onClose,
+                busy: section === 'replaceCode' && code !== '',
                 keep: busy || section === 'replaceCode' || section === 'deleteAccount',
             })}
         >

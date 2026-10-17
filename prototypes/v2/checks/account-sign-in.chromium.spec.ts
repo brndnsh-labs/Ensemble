@@ -157,7 +157,7 @@ test('signing out and back in, then in again on a fresh profile, reaches the sam
     const authenticator = await addVirtualAuthenticator(page);
     await openWithAccounts(page);
     await createAccountThroughDialog(page);
-    await page.keyboard.press('Escape');
+    await page.getByTestId('recovery-not-now').click();
     await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
     // #1268's adoption prompt auto-opens once the account library has downloaded (this device's
     // guest starters are not in the account). Unrelated to this spec, but it is a modal: every

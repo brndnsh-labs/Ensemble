@@ -64,6 +64,8 @@ export function SignInDialog({
     const [failure, setFailure] = useState<AccountFailure | null>(null);
     /** `'recover'` swaps the dialog's body for the #1263 flow until the dialog closes. */
     const [stage, setStage] = useState<'entry' | 'recover'>('entry');
+    /** The recover stage's replacement code is on screen (`RecoverFlow`'s `onCodeShown`). */
+    const [recoverCodeShown, setRecoverCodeShown] = useState(false);
     // Resolved after mount: `browserSupportsWebAuthn()` reads `window`, which the static export's
     // prerender does not have.
     const [supported, setSupported] = useState(true);
@@ -214,10 +216,14 @@ export function SignInDialog({
             ref={dialogRef}
             className="modal-box account-dialog"
             aria-labelledby="account-dialog-title"
-            // Esc always closes it: every await here re-checks `openRef`. A backdrop tap does not
-            // while a ceremony runs, a recovery code is on screen (shown once) or one is being
-            // typed (#1760).
-            {...dialogRule({ onClose, keep: busy || code !== '' || stage === 'recover' })}
+            // A recovery code on screen is shown once and never again: only its own buttons close
+            // the dialog then (#1760). Otherwise Esc always closes it (every await here re-checks
+            // `openRef`), and a backdrop tap does not while a ceremony runs or a code is typed.
+            {...dialogRule({
+                onClose,
+                busy: code !== '' || recoverCodeShown,
+                keep: busy || stage === 'recover',
+            })}
         >
             {!supported ? (
                 <>
@@ -249,6 +255,7 @@ export function SignInDialog({
                     onBack={() => setStage('entry')}
                     onClose={onClose}
                     onAccountChanged={onAccountChanged}
+                    onCodeShown={setRecoverCodeShown}
                 />
             ) : mode === 'recovery' ? (
                 <>

@@ -16,7 +16,7 @@ import {
 } from '../lib/playlist-import';
 import { directionLabel } from '../lib/score-labels';
 import { capRefusal, MAX_REMOTE_CANDIDATES } from '../lib/sync/repository';
-import { dialogRule } from './dialog-close';
+import { closeDialog, dialogRule } from './dialog-close';
 import './import-dialog.css';
 
 export function downloadImportSource(text: string) {
@@ -118,7 +118,7 @@ export function ImportDialog({
         element.showModal();
         return () => {
             request.current++;
-            element.close();
+            closeDialog(element);
             if (opener?.isConnected) {
                 opener.focus();
             }

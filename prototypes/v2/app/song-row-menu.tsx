@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_COLLECTION_NAME } from '../lib/collections';
-import { dialogRule } from './dialog-close';
+import { closeDialog, dialogRule } from './dialog-close';
 import { Menu } from './menu';
 
 export interface SongRowMenuTarget {
@@ -87,7 +87,7 @@ export function SongRowMenu({
         if (asking) {
             dialog.current?.showModal();
         } else {
-            dialog.current?.close();
+            closeDialog(dialog.current);
         }
     }, [asking]);
     // Entering "Add to collection…" moves focus INTO it (#1477 review R5), as Rename's autofocus

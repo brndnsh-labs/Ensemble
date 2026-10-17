@@ -224,7 +224,8 @@ export function SignOutDialog({
                     Cancel
                 </button>
                 <button
-                    className="btn"
+                    // Red when it discards work this device holds ("Sign out anyway", #1760).
+                    className={atRisk ? 'btn danger' : 'btn'}
                     data-testid="sign-out-confirm"
                     // Never while the preflight is unread: "Sign out" with nothing said about
                     // what is at stake is the preflight not having happened.

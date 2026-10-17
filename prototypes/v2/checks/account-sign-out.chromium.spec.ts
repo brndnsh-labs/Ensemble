@@ -88,6 +88,7 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     await openSignOut(page);
     await expect(page.getByTestId('sign-out-clear')).toBeVisible();
     await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out');
+    await expect(page.getByTestId('sign-out-confirm')).not.toHaveClass(/\bdanger\b/);
     await expect(page.getByTestId('sign-out-export')).toHaveCount(0);
     await page.getByTestId('sign-out-cancel').click();
 
@@ -139,6 +140,8 @@ test('sign-out names the work it would destroy, then leaves nothing of that acco
     );
     await expect(page.getByTestId('sign-out-clear')).toHaveCount(0);
     await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out anyway');
+    // It discards work this device holds, so it is the red button, last (#1760).
+    await expect(page.getByTestId('sign-out-confirm')).toHaveClass(/\bdanger\b/);
 
     // Export is offered beside the destructive button, never implied, and it names the songs it
     // would actually write: a file on the musician's own disk is the only thing that survives

@@ -112,7 +112,8 @@ export function AdoptRemoteDialog({
                     Cancel
                 </button>
                 <button
-                    className="btn"
+                    // Red only when it discards unsaved edits; with none, it loses nothing (#1760).
+                    className={unsavedEdits ? 'btn danger' : 'btn'}
                     data-testid="adopt-remote-confirm"
                     disabled={busy}
                     onClick={onConfirm}

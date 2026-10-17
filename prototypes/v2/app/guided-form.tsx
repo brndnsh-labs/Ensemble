@@ -12,7 +12,7 @@ import {
     guidedGroups,
     guidedRoute,
 } from '../lib/guided-form';
-import { dialogRule } from './dialog-close';
+import { closeDialog, dialogRule } from './dialog-close';
 import { FormControls } from './form-controls';
 import './guided-form.css';
 
@@ -92,7 +92,7 @@ export function GuidedForm({
             document.activeElement instanceof HTMLElement ? document.activeElement : null;
         element.showModal();
         return () => {
-            element.close();
+            closeDialog(element);
             if (opener?.isConnected) {
                 opener.focus();
             }
