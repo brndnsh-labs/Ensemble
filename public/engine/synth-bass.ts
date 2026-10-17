@@ -30,8 +30,8 @@ export function killBassNote(state: EnsembleState): void {
 // voice — a P-Bass / J-Bass lives at 41–200 Hz and adding an octave-down sine
 // drops the perceived foundation below where a real bass guitar even goes
 // (S5 listening gate, 2026-05-22). The two members here are the styles whose
-// UI labels literally promise sub character — `'Hip Hop (808/Sub)'` and
-// `'Dub (Reggae)'` (see `public/data/instrument-styles.ts`).
+// UI labels literally promised sub character — `'Hip Hop (808/Sub)'` and
+// `'Dub (Reggae)'`; the genre routes set them (`bass` in `public/data/smart-genres.ts`).
 const SUB_BASS_STYLES = new Set<string>(['hiphop', 'dub']);
 
 /**

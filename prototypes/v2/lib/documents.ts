@@ -1,4 +1,4 @@
-import { chartGenre, writtenSettings } from '@engine/songbook/codec';
+import { writtenSettings } from '@engine/songbook/codec';
 import { validateAnyChartDocument } from '@engine/songbook/document-v2';
 import { proposeLegacyScoreConversion } from '@engine/songbook/legacy-score';
 import { validateSemanticScore } from '@engine/songbook/score-codec';
@@ -16,9 +16,9 @@ import { withSectionMeter } from './song-meter';
 export type ChartDocument = LegacyDocument | ChartDocumentV2;
 export type DocumentContent = ChartDocument['chart'];
 
-/** The chart's genre, by name — however the chart stored it (see `chartGenre`). */
+/** The chart's genre, by name (`GENRE_NAMES`). */
 export function genreOf(document: ChartDocument): string {
-    return chartGenre(document.chart.band.groove);
+    return document.chart.band.groove.genre;
 }
 
 /**
@@ -83,56 +83,9 @@ export function convertedCopy(document: LegacyDocument): ChartDocumentV2 {
         id: crypto.randomUUID(),
         revision: 0,
         title: `${document.title.slice(0, 140)} — editable copy`,
-        // A new chart, so written as a chart is today: the source's legacy fields stay with it.
+        // A new chart, so written as a chart is today (`writtenSettings`).
         chart: { ...proposal.value.chart, ...writtenSettings(proposal.value.chart) },
     };
-}
-
-/**
- * When Follow feel became what an untouched lane means (#1405, DECISION 2026-09-24). Before
- * this, every starter saved each lane as `voice: 'synth', autoSound: false`: a default nobody
- * chose, which pinned every song to the built-in sounds however many packs were installed.
- */
-export const FOLLOW_FEEL_SINCE = '2026-09-25T01:00:00.000Z';
-
-/**
- * Open a song written before {@link FOLLOW_FEEL_SINCE} with its built-in-pinned lanes on Follow
- * feel. A lane pinned to a named sound was a choice, and keeps it.
- *
- * A read-time upgrade rather than a rewrite of every stored song: nothing is written until the
- * musician's own next Save, which persists it, so no song is uploaded or re-revisioned behind
- * their back. It is keyed on when the song was last written because the stored shape of an
- * old default and of a Built-in picked on purpose is the same; every Save restamps `updatedAt`,
- * so a lane set to Built-in from here on stays exactly where it was put. Returns `document`
- * itself when nothing changes.
- *
- * Every path that restamps a document it did not open through the stand needs it too, or an old
- * default gets a fresh stamp and reads as a choice from then on: adoption into an account, file
- * import, a preserved draft saved as a copy. A draft passes its own `capturedAt` as `writtenAt`.
- */
-export function withFollowFeel<T extends ChartDocument>(
-    document: T,
-    writtenAt = document.updatedAt,
-): T {
-    if (writtenAt >= FOLLOW_FEEL_SINCE) {
-        return document;
-    }
-    const band = document.chart.band;
-    const pinned = (Object.keys(band) as Array<keyof typeof band>).filter((lane) => {
-        const mix = band[lane];
-        return mix && !mix.autoSound && mix.voice === 'synth';
-    });
-    if (!pinned.length) {
-        return document;
-    }
-    const next = structuredClone(document);
-    for (const lane of pinned) {
-        const mix = next.chart.band[lane];
-        if (mix) {
-            mix.autoSound = true;
-        }
-    }
-    return next;
 }
 
 /**
@@ -147,7 +100,7 @@ export function followingFeel<T extends ChartDocument['chart']['band']>(band: T)
 
 /** A fresh four-bar measure chart that borrows `base`'s band and performance setup. Not yet validated. */
 export function blankSong(base: ChartDocument) {
-    // As a chart is written today: an old base chart's legacy fields stay behind.
+    // As a chart is written today (`writtenSettings`): energy stored, trade settings only while trading.
     const setup = writtenSettings(base.chart);
     return {
         schemaVersion: 2,

@@ -54,32 +54,6 @@ function textChart(
     });
 }
 
-/** A measure (schema-2) chart still carrying the old engine's band fields, stored before #1424. */
-function legacyFieldsChart(): ChartDocument {
-    const upgraded = upgradeDocument(
-        textChart('legacy-fields', 'Legacy fields', [['A', 'C | F | G7 | C']], {
-            stamp: '2026-08-20T09:30:00.000Z',
-        }),
-    );
-    if (upgraded.kind !== 'upgraded') {
-        throw new Error('fixture did not convert');
-    }
-    const { genre: _genre, ...groove } = upgraded.document.chart.band.groove;
-    return validateDocument({
-        ...upgraded.document,
-        revision: 5,
-        chart: {
-            ...upgraded.document.chart,
-            performance: { ...upgraded.document.chart.performance, complexity: 0.6 },
-            band: {
-                ...upgraded.document.chart.band,
-                chords: { ...upgraded.document.chart.band.chords, style: 'smart', octave: 60 },
-                groove: { ...groove, lastSmartGenre: 'Blues', genreFeel: 'Blues', measures: 1 },
-            },
-        },
-    });
-}
-
 async function documents(page: Page): Promise<ChartDocument[]> {
     return page.evaluate(async () => {
         const db = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -149,13 +123,16 @@ test('old songs are backed up in one file, upgraded in place with their edit dat
     const turnaround = textChart('old-turn', 'Turnaround', [['A', 'Dm7 G7 | Cmaj7 | Am7 | D7']], {
         stamp: '2026-09-01T08:00:00.000Z',
     });
-    const legacy = legacyFieldsChart();
+    const vamp = textChart('old-vamp', 'Old vamp', [['A', 'C | F | G7 | C']], {
+        revision: 5,
+        stamp: '2026-08-20T09:30:00.000Z',
+    });
     // Already current: nothing in the backup, nothing written.
     const current = upgradeDocument(textChart('current', 'Current', [['A', 'C | G']]));
     if (current.kind !== 'upgraded') {
         throw new Error('fixture did not convert');
     }
-    const seeded = [blues, turnaround, legacy, current.document];
+    const seeded = [blues, turnaround, vamp, current.document];
     await seedGuestDocuments(page, seeded);
     await expect(card(page).getByRole('heading', { name: 'Upgrade old songs (3)' })).toBeVisible();
     await expect(card(page)).toContainText('3 songs here are saved in the old format');
@@ -175,9 +152,9 @@ test('old songs are backed up in one file, upgraded in place with their edit dat
     expect(archive.format).toBe('ensemble-pre-upgrade-originals');
     expect(archive.drafts).toEqual([]);
     expect(archive.songs.map((entry: { id: string }) => entry.id).sort()).toEqual([
-        'legacy-fields',
         'old-blues',
         'old-turn',
+        'old-vamp',
     ]);
     for (const entry of archive.songs) {
         const original = seeded.find((song) => song.id === entry.id)!;
@@ -193,18 +170,14 @@ test('old songs are backed up in one file, upgraded in place with their edit dat
     await expect(card(page).getByTestId('upgrade-refused')).toHaveCount(0);
 
     const stored = await documents(page);
-    for (const original of [blues, turnaround, legacy]) {
+    for (const original of [blues, turnaround, vamp]) {
         const now = stored.find((document) => document.id === original.id)!;
-        // Same id, the next revision, the SAME edit dates, the current format, no old fields.
+        // Same id, the next revision, the SAME edit dates, the current format.
         expect(now.schemaVersion).toBe(2);
         expect(now.revision).toBe(original.revision + 1);
         expect(now.title).toBe(original.title);
         expect(now.updatedAt).toBe(original.updatedAt);
         expect(now.createdAt).toBe(original.createdAt);
-        const json = JSON.stringify(now.chart);
-        for (const field of ['"complexity"', '"lastSmartGenre"', '"genreFeel"', '"octave"']) {
-            expect(json).not.toContain(field);
-        }
         expect(now.chart.band.groove.genre).toBe('Blues');
     }
     expect(stored.find((document) => document.id === 'current')).toEqual(current.document);

@@ -35,7 +35,6 @@ import {
     genreOf,
     type SectionChange,
     withBarAfter,
-    withFollowFeel,
     withoutMeasure,
     withoutSection,
     withSectionAfter,
@@ -205,9 +204,9 @@ function keptAs(after: ChartDocument, next: ChartDocument): boolean {
 }
 
 /**
- * Compared as written today (`writtenChart`), not as stored: a change undone by hand on an old
- * chart, which still carries its legacy fields, must not read as an edit — which would
- * otherwise hold an account draft against every later remote advance.
+ * Compared as written today (`writtenChart`), not as stored: a chart stored without a field the
+ * app now always writes (energy) must not read as edited once captured — which would otherwise
+ * hold an account draft against every later remote advance.
  */
 const same = (a: ChartDocument, b: ChartDocument) =>
     a.title === b.title && sameData(writtenChart(a.chart), writtenChart(b.chart));
@@ -1425,10 +1424,9 @@ export default function Ensemble() {
      */
     function landDraftOnStand(document: ChartDocument, note: string) {
         setStandardDraft(false);
-        const withFeel = withFollowFeel(document);
-        runtime.load(withFeel);
+        runtime.load(document);
         setSaved(null);
-        const landed = runtime.withLoadedSounds(withFeel);
+        const landed = runtime.withLoadedSounds(document);
         setCurrent(landed);
         draftBaseline.current = landed;
         currentStore.current = null;
@@ -1442,11 +1440,11 @@ export default function Ensemble() {
         setEditing(false);
         setFollowing(true);
         setMessage(note);
-        const section = arrangementOf(withFeel).sections[0];
+        const section = arrangementOf(document).sections[0];
         setSectionId(section.id);
-        if (withFeel.schemaVersion === 2) {
+        if (document.schemaVersion === 2) {
             setMeasureId(
-                withFeel.chart.score.sections.find((s) => s.id === section.id)!.measures[0].id,
+                document.chart.score.sections.find((s) => s.id === section.id)!.measures[0].id,
             );
         }
     }
@@ -3577,10 +3575,7 @@ export default function Ensemble() {
         document: ChartDocument,
     ): Promise<{ current: ChartDocument; saved: ChartDocument }> {
         const { recovery, unreadable } = await retainedDraftFor(document);
-        // A retained draft opens exactly as the musician left it; only the stored song is
-        // upgraded (`withFollowFeel`, #1405).
-        const stored = withFollowFeel(document);
-        const next = volatileDrafts.current.get(document.id) || recovery?.document || stored;
+        const next = volatileDrafts.current.get(document.id) || recovery?.document || document;
         if (signedIn && !unreadable) {
             // What the store just answered, replacing whatever this tab believed about that song —
             // including nothing, on the first open after a reload.
@@ -3591,7 +3586,7 @@ export default function Ensemble() {
         }
         runtime.load(next);
         const onDevice = runtime.withLoadedSounds(next);
-        const savedBaseline = next === stored ? onDevice : stored;
+        const savedBaseline = next === document ? onDevice : document;
         setSaved(savedBaseline);
         setCurrent(onDevice);
         // The songbook this chart came from AND the account it belongs to, for as long as it is
@@ -6304,7 +6299,7 @@ export default function Ensemble() {
                         // until it is committed, so it belongs to whichever account is live —
                         // never to whoever happens to be on the stand behind this dialog.
                         const result = await storeSave(
-                            { ...withFollowFeel(candidate), id: crypto.randomUUID() },
+                            { ...candidate, id: crypto.randomUUID() },
                             null,
                             { owner: null, stand: false },
                         );
@@ -7006,7 +7001,7 @@ export default function Ensemble() {
                         // song it was a draft of.
                         const copy = await storeSave(
                             {
-                                ...withFollowFeel(record.document, record.capturedAt),
+                                ...record.document,
                                 id: crypto.randomUUID(),
                                 title: `${record.document.title.slice(0, 140)} — recovered`,
                             },

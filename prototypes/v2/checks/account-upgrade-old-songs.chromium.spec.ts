@@ -1,5 +1,4 @@
 import type { Page } from '@playwright/test';
-import { GENRE_PATH, LEGACY_CHART_PATHS } from '../../v2-api/src/db/admin-overview';
 import { createAccountThroughDialog } from './account-helpers';
 import { expect, seedGuestDocuments, starterTextCharts, accountTest as test } from './fixtures';
 import { addVirtualAuthenticator } from './virtual-authenticator';
@@ -7,8 +6,8 @@ import { addVirtualAuthenticator } from './virtual-authenticator';
 /**
  * "Upgrade old songs" (#1738) on an account, against the real API: each account song is
  * upgraded by the account's own Save, which queues it in the outbox, and the ordinary drain
- * uploads it — so the SERVER ends up holding schema 2 with none of the legacy fields the operator
- * page counts (#1731, `LEGACY_CHART_PATHS`), the same chords, and the song's own edit date.
+ * uploads it — so the SERVER ends up holding schema 2 with its genre, the same chords, and the
+ * song's own edit date.
  *
  * `*.chromium.spec.ts`: the CDP virtual authenticator is Chromium-only. The guest half, both
  * projects, is `upgrade-old-songs.spec.ts`.
@@ -39,20 +38,6 @@ async function serverDocuments(page: Page) {
             }),
         );
     });
-}
-
-/** The value at one of the admin overview's JSON paths (`$.a.b.c`), or undefined. */
-function at(body: unknown, path: string): unknown {
-    return path
-        .slice(2)
-        .split('.')
-        .reduce<unknown>(
-            (value, key) =>
-                value && typeof value === 'object'
-                    ? (value as Record<string, unknown>)[key]
-                    : undefined,
-            body,
-        );
 }
 
 /** A server body read back as JSON. */
@@ -128,11 +113,8 @@ test('account songs are upgraded in place through the outbox, and the server hol
         // …the same chords…
         expect(chords(document)).toEqual(chords(old.document));
         expect(chords(document).length).toBeGreaterThan(0);
-        // …and nothing the operator page counts as legacy.
-        for (const path of LEGACY_CHART_PATHS) {
-            expect(at(document, path), path).toBeUndefined();
-        }
-        expect(at(document, GENRE_PATH)).toBeTruthy();
+        // …and its genre, the one band field the server's codec requires.
+        expect(document.chart.band.groove.genre).toBeTruthy();
     }
 
     await card(page).getByRole('button', { name: 'Done' }).click();

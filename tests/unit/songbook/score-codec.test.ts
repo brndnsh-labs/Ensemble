@@ -69,7 +69,6 @@ function legacyFixture(value = 'C G7 | Dm7 G7'): ChartDocument {
                 timeSignature: '4/4',
                 grouping: null,
                 notation: 'name',
-                lastChordPreset: 'My preset',
                 sections: [
                     {
                         id: 'a',
@@ -84,37 +83,23 @@ function legacyFixture(value = 'C G7 | Dm7 G7'): ChartDocument {
                     },
                 ],
             },
-            performance: { bpm: 120, complexity: 0.5, seed: 'ABC123', randomizeSeed: false },
+            performance: { bpm: 120, seed: 'ABC123', randomizeSeed: false },
             band: {
                 chords: {
                     ...mix,
-                    style: 'smart',
-                    octave: 48,
-                    instrument: 'Piano',
-                    density: 'rich',
                 },
-                bass: { ...mix, style: 'smart', octave: 36 },
-                harmony: { ...mix, style: 'smart', octave: 60, complexity: 0.5 },
+                bass: { ...mix },
                 soloist: {
                     ...mix,
-                    style: 'smart',
-                    octave: 72,
-                    preset: 'trumpet',
                     mode: 'monophonic',
                     autoMode: false,
-                    phrasingIntensity: 0.5,
-                    tradeMode: 'manual',
                 },
                 groove: {
                     ...mix,
-                    measures: 1,
                     swing: 50,
                     swingSub: '8th',
                     humanize: 0,
-                    lastDrumPreset: 'Basic Rock',
-                    genreFeel: 'Jazz',
-                    lastSmartGenre: 'Jazz',
-                    pattern: [],
+                    genre: 'Jazz',
                 },
             },
         },
@@ -540,9 +525,6 @@ describe('pure legacy conversion proposals', () => {
                 { id: 'measure-2' },
             ],
         });
-        expect(converted.notes).toContainEqual(
-            expect.objectContaining({ code: 'preset-detached' }),
-        );
         expect(proposeLegacyScoreConversion(source)).toEqual(converted);
         expect(decodeChartDocument(source)).toEqual({ kind: 'ok', value: legacy });
     });

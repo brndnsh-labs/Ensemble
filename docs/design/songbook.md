@@ -117,6 +117,18 @@ save. No stored document is rewritten. The genre, once stored twice (`lastSmartG
 `genreFeel`), is `groove.genre`; the old pair is read as a fallback (`chartGenre`). Band energy
 moved from runtime state into the chart as `performance.energy`, absent reading as `'auto'`.
 
+**Amended 2026-10-17 (#1741, Retire v1).** The lazy drop is over. Once "Upgrade old songs"
+(#1738) had rewritten every stored chart and `/admin` counted none left, the old engine's fields
+and the `lastSmartGenre`/`genreFeel` pair left the format: a chart that carries one is refused
+like any other unknown field — by the app, and by the account API, which decodes with the same
+codec — and `groove.genre` is required. `chartGenre`, `writtenArrangement` and the read-time
+Follow-feel upgrade (`withFollowFeel`) went with them. `/admin` never counted the charts that
+upgrade still had work on (saved before 2026-09-25 with a lane pinned to the built-in sound); the
+basis for dropping it is that "Upgrade old songs" counted them (`needsUpgrade` compared each chart
+with `withFollowFeel` applied) and rewrote them, and Brandon ran it on every device with nothing
+left pending. A chart like that which never went through the upgrade, or a recovered copy of a
+draft captured before then, now keeps its built-in lanes pinned instead of following the feel.
+
 `public/songbook/types.ts` owns the semantic version-1 shapes. `public/songbook/codec.ts` validates
 the complete untrusted candidate before returning a detached typed value; unknown future versions
 remain recoverable source data rather than being coerced into version-1 defaults. Structural

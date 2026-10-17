@@ -90,7 +90,6 @@ function Overview({ overview }: { overview: AdminOverview }) {
                             </li>
                         ))}
                     <li>Old-format charts: {charts.bySchemaVersion['1'] ?? 0}</li>
-                    <li>Charts with old band settings: {charts.withLegacyFields}</li>
                 </ul>
             </section>
             <section aria-labelledby="admin-accounts">

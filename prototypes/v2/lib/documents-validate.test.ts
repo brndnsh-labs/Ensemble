@@ -52,16 +52,12 @@ function legacyDocument(): LegacyDocument {
             },
             performance: { bpm: 120, seed: '', randomizeSeed: true },
             band: {
-                chords: { ...mix(), style: 'smart', octave: 48, density: 'standard' },
-                bass: { ...mix(), style: 'smart', octave: 36 },
+                chords: mix(),
+                bass: mix(),
                 soloist: {
                     ...mix(),
-                    style: 'smart',
-                    octave: 72,
-                    preset: 'trumpet',
                     mode: 'monophonic',
                     autoMode: true,
-                    tradeMode: 'manual',
                 },
                 groove: { ...mix(), swing: 0, swingSub: '8th', humanize: 0, genre: 'Rock' },
             },

@@ -6,7 +6,7 @@
  */
 import { writtenChart } from '@engine/songbook/codec';
 import { describe, expect, it } from 'vitest';
-import { blankSong, type ChartDocument, FOLLOW_FEEL_SINCE, validateDocument } from './documents';
+import { blankSong, type ChartDocument, validateDocument } from './documents';
 import { bandForGenre } from './standards';
 import {
     draftNeedsUpgrade,
@@ -70,22 +70,26 @@ function currentChart(id: string): ChartDocument {
     });
 }
 
-/** A measure chart still carrying the old engine's fields and no groove genre. */
-function legacyFieldsChart(id: string): ChartDocument {
+/** A measure chart stored before energy was saved with it: today's writer would add it. */
+function staleChart(id: string): ChartDocument {
     const current = currentChart(id);
-    const { genre: _genre, ...groove } = current.chart.band.groove;
-    return validateDocument({
+    const { energy: _energy, ...performance } = current.chart.performance;
+    return validateDocument({ ...current, chart: { ...current.chart, performance } });
+}
+
+/** `currentChart` as a raw stored row, still carrying a field of the old engine's (#1741). */
+function retiredFieldsRow(id: string): unknown {
+    const current = currentChart(id);
+    return {
         ...current,
         chart: {
             ...current.chart,
-            performance: { ...current.chart.performance, complexity: 0.4 },
             band: {
                 ...current.chart.band,
-                chords: { ...current.chart.band.chords, style: 'funk', octave: 55 },
-                groove: { ...groove, lastSmartGenre: 'Jazz', genreFeel: 'Jazz', measures: 1 },
+                groove: { ...current.chart.band.groove, lastSmartGenre: 'Jazz' },
             },
         },
-    });
+    };
 }
 
 describe('needsUpgrade', () => {
@@ -106,36 +110,8 @@ describe('needsUpgrade', () => {
         expect(needsUpgrade(validateDocument(reordered))).toBe(false);
     });
 
-    it('picks a measure chart with legacy band/performance fields or no groove genre', () => {
-        expect(needsUpgrade(legacyFieldsChart('l'))).toBe(true);
-        const current = currentChart('g');
-        const { genre: _genre, ...groove } = current.chart.band.groove;
-        expect(
-            needsUpgrade(
-                validateDocument({
-                    ...current,
-                    chart: {
-                        ...current.chart,
-                        // A chart from before the genre was stored once names it the old way.
-                        band: {
-                            ...current.chart.band,
-                            groove: { ...groove, lastSmartGenre: 'Rock' },
-                        },
-                    },
-                }),
-            ),
-        ).toBe(true);
-    });
-
-    it('picks an old built-in pin that Follow feel would move, and not one written since', () => {
-        const pinned = currentChart('p');
-        pinned.chart.band.chords = {
-            ...pinned.chart.band.chords,
-            voice: 'synth',
-            autoSound: false,
-        };
-        expect(needsUpgrade({ ...pinned, updatedAt: OLD })).toBe(true);
-        expect(needsUpgrade({ ...pinned, updatedAt: FOLLOW_FEEL_SINCE })).toBe(false);
+    it("picks a measure chart today's writer would write differently", () => {
+        expect(needsUpgrade(staleChart('l'))).toBe(true);
     });
 
     it('never picks a collection', () => {
@@ -163,25 +139,18 @@ describe('upgradeDocument', () => {
         expect(next.createdAt).toBe(old.createdAt);
         expect(next.schemaVersion).toBe(2);
         expect(next.schemaVersion === 2 && next.chart.score.sections[0].measures).toHaveLength(4);
-        // Follow feel is applied against the song's own (old) write time, as opening it would.
-        expect(next.chart.band.chords.autoSound).toBe(true);
         expect(result.changes).toEqual([]);
         // Stored as it is — its old edit date kept — it needs nothing more.
         expect(needsUpgrade(next)).toBe(false);
     });
 
-    it('strips the legacy fields and stores the genre once', () => {
-        const result = upgradeDocument(legacyFieldsChart('l'));
-        expect(result.kind).toBe('upgraded');
-        if (result.kind !== 'upgraded') {
-            return;
-        }
-        const json = JSON.stringify(result.document);
-        for (const field of ['complexity', 'style', 'octave', 'genreFeel', 'lastSmartGenre']) {
-            expect(json).not.toContain(`"${field}"`);
-        }
-        expect(json).not.toContain('"measures":1');
-        expect(result.document.chart.band.groove.genre).toBe('Jazz');
+    it("writes a stale measure chart as today's writer does", () => {
+        const stale = staleChart('l');
+        const result = upgradeDocument(stale);
+        expect(result.kind === 'upgraded' && result.document).toEqual({
+            ...stale,
+            chart: writtenChart(stale.chart),
+        });
     });
 
     it('leaves a current song alone', () => {
@@ -208,29 +177,27 @@ describe('upgradeDocument', () => {
         expect(result.kind === 'upgraded' && result.changes[0]).toMatchObject({ bar: 1 });
     });
 
-    it('converts a draft without restamping Follow feel, carrying its lossy notes', () => {
-        const old = textChart('d', 'C | F', OLD);
-        const result = upgradeDraftDocument(old);
-        expect(result.kind === 'upgraded' && result.document.chart.band.chords.autoSound).toBe(
-            old.chart.band.chords.autoSound,
-        );
+    it('converts a draft, carrying its lossy notes', () => {
+        const result = upgradeDraftDocument(textChart('d', 'C | F', OLD));
+        expect(result.kind === 'upgraded' && result.document.schemaVersion).toBe(2);
         expect(upgradeDraftDocument(currentChart('d'))).toEqual({ kind: 'current' });
         const lossy = upgradeDraftDocument(textChart('d', LOSSY));
         expect(lossy.kind === 'upgraded' && lossy.changes).toHaveLength(1);
     });
 
-    it('rewrites a schema-2 draft carrying legacy fields, and nothing else', () => {
+    it('rewrites a stale schema-2 draft, and nothing else', () => {
         expect(draftNeedsUpgrade(currentChart('d'))).toBe(false);
-        expect(draftNeedsUpgrade(legacyFieldsChart('d'))).toBe(true);
-        const result = upgradeDraftDocument(legacyFieldsChart('d'));
-        expect(result.kind === 'upgraded' && JSON.stringify(result.document)).not.toContain(
-            '"complexity"',
-        );
+        expect(draftNeedsUpgrade(staleChart('d'))).toBe(true);
+        const result = upgradeDraftDocument(staleChart('d'));
+        expect(result.kind === 'upgraded' && result.document.chart.performance.energy).toBe('auto');
     });
 
     it('counts an unreadable row as old unless a newer app wrote it', () => {
         expect(unreadableLooksOld({ schemaVersion: 1, id: 'x', title: 42 })).toBe(true);
         expect(unreadableLooksOld({ schemaVersion: 3, id: 'x' })).toBe(false);
+        // A measure chart that will not read because it still carries a retired field (#1741).
+        expect(() => validateDocument(retiredFieldsRow('x'))).toThrow();
+        expect(unreadableLooksOld(retiredFieldsRow('x'))).toBe(true);
     });
 });
 
@@ -406,7 +373,7 @@ describe('runUpgrade', () => {
     it('upgrades every old song through the store Save, keeping its edit date, and a second run is a no-op', async () => {
         const { store, state } = fakeStore('guest', [
             textChart('a', 'C | F | G | C', OLD),
-            legacyFieldsChart('b'),
+            staleChart('b'),
             currentChart('c'),
         ]);
         expect(upgradeCount(await planUpgrade([store]))).toBe(2);
@@ -529,12 +496,38 @@ describe('runUpgrade', () => {
         expect(upgradeCount(await planUpgrade([store]))).toBe(0);
     });
 
-    it('rewrites a dead schema-2 draft that carries legacy fields', async () => {
-        const dead = draftOf(legacyFieldsChart('s'), '2026-09-01T00:00:00.000Z');
+    it('rewrites a dead stale schema-2 draft', async () => {
+        const dead = draftOf(staleChart('s'), '2026-09-01T00:00:00.000Z');
         const { store, state } = fakeStore('guest', [currentChart('s')], [dead]);
         const outcome = await upgrade([store]);
         expect(outcome.draftsConverted).toBe(1);
-        expect(JSON.stringify(state.drafts.get('s:w1')?.document)).not.toContain('"complexity"');
+        expect(state.drafts.get('s:w1')?.document.chart.performance.energy).toBe('auto');
+    });
+
+    it('lists a song or draft that still carries a retired field as a leftover, and runs on', async () => {
+        const row = retiredFieldsRow('r');
+        const { store, state } = fakeStore('account', [textChart('a', 'C')]);
+        state.unreadable = [
+            { id: 'r', reason: 'Cannot open this chart', stored: row, raw: JSON.stringify(row) },
+        ];
+        state.unreadableDrafts = [
+            {
+                id: 'r',
+                writerId: 'w1',
+                reason: 'Cannot open this draft',
+                stored: { capturedAt: OLD, document: row },
+                document: row,
+                raw: JSON.stringify({ capturedAt: OLD, document: row }),
+            },
+        ];
+        const plan = await planUpgrade([store]);
+        expect(plan.leftovers.map((leftover) => [leftover.kind, leftover.id])).toEqual([
+            ['song', 'r'],
+            ['draft', 'r'],
+        ]);
+        const outcome = await runUpgrade([store], plan, none);
+        expect(outcome.upgraded.map((entry) => entry.id)).toEqual(['a']);
+        expect(state.unreadable[0].stored).toBe(row);
     });
 
     it('carries a converted draft’s lossy notes into the outcome', async () => {

@@ -1,15 +1,13 @@
-import type { ChordDensity, InstrumentVoice, SectionInstrumentKey, SwingSub } from '../types.js';
+import type { InstrumentVoice, SectionInstrumentKey, SwingSub } from '../types.js';
 
 export const CHART_DOCUMENT_SCHEMA_VERSION = 1 as const;
 
 export type ChartDocumentSchemaVersion = typeof CHART_DOCUMENT_SCHEMA_VERSION;
 export type ChartNotation = 'roman' | 'name' | 'nns';
 export type SoloistMode = 'monophonic' | 'guitar';
-export type SoloistTradeMode = 'manual' | 'sections' | 'loops';
 /**
  * Trading with the player on the band engine: who the band trades with ('off' when it doesn't)
- * and how many bars a turn lasts. Distinct from the old engine's `SoloistTradeMode`, which
- * switches the soloist on and off by section or loop.
+ * and how many bars a turn lasts.
  */
 export type SoloistTradeWith = 'off' | 'soloist' | 'drums';
 export type SoloistTradeBars = 2 | 4 | 8;
@@ -21,22 +19,6 @@ export const SOLOIST_TRADE_BARS: readonly SoloistTradeBars[] = [2, 4, 8];
  */
 export type SoloistTradeChoruses = 0 | 1 | 2 | 3 | 4;
 export const DEFAULT_SOLOIST_TRADE_CHORUSES: SoloistTradeChoruses = 2;
-export const CHART_GROOVE_PATTERN_LANE_NAMES = [
-    'Kick',
-    'Snare',
-    'HiHat',
-    'Open',
-    'Clave',
-    'Conga',
-    'Bongo',
-    'Perc',
-    'Shaker',
-    'Guiro',
-    'High Tom',
-    'Mid Tom',
-    'Low Tom',
-] as const;
-export type ChartGroovePatternLaneName = (typeof CHART_GROOVE_PATTERN_LANE_NAMES)[number];
 
 export interface ChartSection {
     id: string;
@@ -58,11 +40,6 @@ export interface ChartArrangement {
     grouping: number[] | null;
     isMinor: boolean;
     notation: ChartNotation;
-    /**
-     * Legacy (v1's preset library, #1424): the name of the preset the chords last came from.
-     * Read, never written, like the old engine's fields below.
-     */
-    lastChordPreset?: string;
 }
 
 /**
@@ -74,11 +51,9 @@ export type ChartEnergy = number | 'auto';
 
 /*
  * What a chart holds: the music plus the settings the band honours (DECISION 2026-09-26, #1404).
- * The fields marked "Legacy" belonged to the old worker-based engine, deleted in #1415. They are
- * still ACCEPTED when a chart is read, so an old saved chart, an account copy or an imported
- * file opens without error. The codec reproduces them exactly as stored, so a Save an older build
- * queued still matches its own bytes on the server. Nothing reads them and capture never writes
- * them, so each chart sheds them on its next save. No stored document is rewritten to drop them.
+ * The old worker-based engine's band and performance fields (deleted with it in #1415) are gone
+ * from the format too (#1741): a document that still carries one is refused, like any other
+ * unknown field.
  */
 
 export interface ChartPerformance {
@@ -87,8 +62,6 @@ export interface ChartPerformance {
     randomizeSeed: boolean;
     /** Absent reads as `'auto'`. See {@link ChartEnergy}. */
     energy?: ChartEnergy;
-    /** Legacy (old engine): read, never written. */
-    complexity?: number;
 }
 
 export interface ChartLaneMix {
@@ -97,24 +70,6 @@ export interface ChartLaneMix {
     autoSound: boolean;
     volume: number;
     reverb: number;
-}
-
-export interface ChartChords extends ChartLaneMix {
-    /** Legacy (old engine): read, never written. */
-    style?: string;
-    /** Legacy (old engine): read, never written. */
-    instrument?: string;
-    /** Legacy (old engine): read, never written. */
-    octave?: number;
-    /** Legacy (old engine): read, never written. */
-    density?: ChordDensity;
-}
-
-export interface ChartBass extends ChartLaneMix {
-    /** Legacy (old engine): read, never written. */
-    style?: string;
-    /** Legacy (old engine): read, never written. */
-    octave?: number;
 }
 
 export interface ChartSoloist extends ChartLaneMix {
@@ -128,60 +83,20 @@ export interface ChartSoloist extends ChartLaneMix {
     tradeBars?: SoloistTradeBars;
     /** Absent reads as 2. See `SoloistTradeChoruses`. */
     tradeChoruses?: SoloistTradeChoruses;
-    /** Legacy (old engine): read, never written. */
-    style?: string;
-    /** Legacy (old engine): read, never written. */
-    preset?: 'trumpet';
-    /** Legacy (old engine): read, never written. */
-    octave?: number;
-    /** Legacy (old engine): read, never written. */
-    phrasingIntensity?: number;
-    /** Legacy (the old engine's section/loop trading): read, never written. */
-    tradeMode?: SoloistTradeMode;
-}
-
-/** Legacy (old engine): the whole lane is read, never written. The band has no harmony lane. */
-export interface ChartHarmony extends ChartLaneMix {
-    style: string;
-    octave: number;
-    complexity: number;
-}
-
-/** Legacy (the old engine's step sequencer): read, never written. */
-export interface ChartGroovePatternLane {
-    name: ChartGroovePatternLaneName;
-    steps: number[];
 }
 
 export interface ChartGroove extends ChartLaneMix {
     swing: number;
     swingSub: SwingSub;
     humanize: number;
-    /**
-     * The chart's genre, stored once: a canonical genre NAME (`GENRE_NAMES` in
-     * `public/data/smart-genres.ts`). Absent only in a chart saved before 2026-09-26, which
-     * stored it twice as the legacy `lastSmartGenre`/`genreFeel` pair — so read it through
-     * `chartGenre` (`public/songbook/codec.ts`), never directly.
-     */
-    genre?: string;
-    /** Legacy (old engine): read, never written. */
-    measures?: number;
-    /** Legacy (old engine): read, never written. */
-    lastDrumPreset?: string;
-    /** Legacy: the genre's engine feel. Read as a fallback for `genre`, never written. */
-    genreFeel?: string;
-    /** Legacy: the genre's name. Read as a fallback for `genre`, never written. */
-    lastSmartGenre?: string;
-    /** Legacy (the old engine's step sequencer): read, never written. */
-    pattern?: ChartGroovePatternLane[];
+    /** The chart's genre: a canonical genre NAME (`GENRE_NAMES` in `public/data/smart-genres.ts`). */
+    genre: string;
 }
 
 export interface ChartBand {
-    chords: ChartChords;
-    bass: ChartBass;
+    chords: ChartLaneMix;
+    bass: ChartLaneMix;
     soloist: ChartSoloist;
-    /** Legacy (old engine): read, never written. */
-    harmony?: ChartHarmony;
     groove: ChartGroove;
 }
 

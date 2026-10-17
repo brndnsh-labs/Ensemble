@@ -28,7 +28,7 @@ test('a listed account sees accounts against the cap and the account list', asyn
                     signedInLast7Days: 2,
                 },
                 documents: { total: 12, bytes: 48_000 },
-                charts: { total: 11, bySchemaVersion: { '1': 4, '2': 7 }, withLegacyFields: 5 },
+                charts: { total: 11, bySchemaVersion: { '1': 4, '2': 7 } },
                 authFailuresLast24Hours: 0,
                 list: [
                     {
@@ -71,7 +71,6 @@ test('a listed account sees accounts against the cap and the account list', asyn
     const formats = page.getByRole('region', { name: 'Chart formats' });
     await expect(formats).toContainText('Format 2 charts: 7');
     await expect(formats).toContainText('Old-format charts: 4');
-    await expect(formats).toContainText('Charts with old band settings: 5');
     const rows = page.locator('.admin-table tbody tr');
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(1)).toContainText('mineAcct');
@@ -97,7 +96,7 @@ test('a malformed chart count is a failed load, not a half-rendered page', async
                     signedInLast7Days: 0,
                 },
                 documents: { total: 0, bytes: 0 },
-                charts: { total: 'many', bySchemaVersion: {}, withLegacyFields: 0 },
+                charts: { total: 'many', bySchemaVersion: {} },
                 authFailuresLast24Hours: 0,
                 list: [],
                 listTruncated: false,

@@ -709,7 +709,7 @@ const LANE_REVERB = { chords: 0.3, bass: 0.05, soloist: 0.6, groove: 0.2 } as co
 /**
  * A genre-appropriate `ChartBand`, built from the same pure config tables `runtime.setGenre`
  * reads (`SMART_GENRES`, `genreSwing`) rather than the live runtime itself: the current band
- * engine plays entirely off `band.groove.genre` (`chartGenre`) at playback time, so nothing
+ * engine plays entirely off `band.groove.genre` at playback time, so nothing
  * genre-specific needs to be pre-resolved through a live dispatch. This keeps the catalog
  * buildable — and testable in plain Node — without booting audio or engine state. Every lane
  * follows the sounds this device has installed (`autoSound: true`, #1405); the soloist lane
@@ -747,9 +747,6 @@ export function bandForGenre(genre: string): ChartBand {
             volume: 1,
             reverb: LANE_REVERB.soloist,
         },
-        // No `harmony`: it's the old engine's lane (the band has none, #1436), and
-        // `writtenSettings` already omits it from a chart written today. A catalog chart should
-        // look exactly like one, not carry a legacy field nothing reads.
         groove: {
             enabled: true,
             voice: 'synth',

@@ -7,7 +7,8 @@ import type { CodecDecodeResult, CodecIssue } from './types.js';
 
 type RecordValue = Record<string, unknown>;
 const CONTEXT = ['key', 'isMinor', 'meter', 'grouping'];
-// `harmony` is a retired lane (#1436), kept so an old chart's section override round-trips.
+// `harmony` is a retired lane (#1436), kept so an old chart's section override round-trips —
+// on purpose: see `SECTION_INSTRUMENTS` in `codec.ts` (#1741).
 const LANES = ['groove', 'bass', 'chords', 'harmony', 'soloist'];
 const START_DIRECTIONS = [
     'repeat-start',

@@ -121,8 +121,7 @@ local browser projects and never deploys.
   has installed and never downloads by itself (#1405): startup reads the installed packs from
   the sound cache, and opening a song resolves each Follow-feel lane against them, so a device
   with nothing installed stays built-in-only until a sound-selection/install gesture. Starters
-  and new songs start on Follow feel, and a song last saved before 2026-09-25 opens its
-  built-in-pinned lanes on Follow feel (`withFollowFeel`). Existing decoding,
+  and new songs start on Follow feel. Existing decoding,
   sample playback, calibrated gain and voice effects are reused without musical changes. A host
   asset-fetch adapter maps original pack URLs into `/v2/packs/`, never root-app storage. The
   production host retains its ordinary fetch path.
