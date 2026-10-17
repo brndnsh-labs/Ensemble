@@ -136,6 +136,9 @@
     margin-left: auto;
 }
 .bar-menu-details > summary::after {
+    /* A browser without the alt-text form keeps the plain one. */
+    content: "›";
+    /* biome-ignore lint/suspicious/noDuplicateProperties: the alt-text form, after its fallback. */
     content: "›" / "";
     color: var(--muted);
     transition: transform var(--motion-fast) var(--ease-out);

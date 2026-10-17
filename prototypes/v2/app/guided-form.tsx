@@ -238,13 +238,15 @@ export function GuidedForm({
                     ) : null}
                     {blocked ? (
                         <p role="alert">
-                            {blocked} Finish them with the per-bar markers below, then the guide can
-                            read this form.
+                            {blocked}
+                            {markers &&
+                                ' Finish them with the per-bar markers below, then the guide can read this form.'}
                         </p>
                     ) : !groups ? (
                         <p role="alert">
                             This section has a nested or nonstandard form. Its notation is
-                            preserved. Use the per-bar markers below for it.
+                            preserved.
+                            {markers && ' Use the per-bar markers below for it.'}
                         </p>
                     ) : (
                         <>

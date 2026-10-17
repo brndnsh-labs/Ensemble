@@ -1,5 +1,13 @@
 import type { Locator, Page, TestInfo } from '@playwright/test';
-import { appUrl, expect, openSectionMenu, test } from './fixtures';
+import {
+    appUrl,
+    editorRevealed,
+    expect,
+    leaveBar,
+    openBar,
+    openSectionMenu,
+    test,
+} from './fixtures';
 
 /**
  * #1758 — Delete bar and Delete section take effect at once and offer Undo in a toast for a few
@@ -101,10 +109,64 @@ test('Undo after Delete section puts the section back', async ({ page }, testInf
     await expect(letters).toHaveCount(sections.length - 1);
     await expect(undoToast(page)).toContainText('Section B deleted');
 
-    await press(undoButton(page), testInfo);
+    // From the keyboard on a laptop, so the focused Undo button itself goes away under focus.
+    if (phone(testInfo)) {
+        await undoButton(page).tap();
+    } else {
+        await undoButton(page).focus();
+        await page.keyboard.press('Enter');
+    }
     await expect(letters).toHaveText(sections);
     expect(await chart(page)).toEqual(before);
     await expect(undoToast(page)).toHaveAttribute('data-empty', 'true', SOON);
+    // Focus lands on the section that came back, not on the page.
+    await expect(page.getByRole('button', { name: 'Section B', exact: true })).toBeFocused();
+});
+
+test('Undo on a new song survives its first-change keep, and puts the song back', async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
+    // The delete is the song's first change, which keeps it (#1707) after a short pause.
+    await openBar(page, 2);
+    await page.getByRole('button', { name: 'Bar menu', exact: true }).click();
+    await page.getByRole('button', { name: 'Delete bar', exact: true }).click();
+    await expect(page.locator('.bar')).toHaveCount(3);
+    await expect(page.locator('.song-subtitle')).toContainText('Unsaved changes');
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () =>
+                    new Promise<number>((resolve) => {
+                        const request = indexedDB.open('ensemble-v2-preview', 1);
+                        request.onsuccess = () => {
+                            const db = request.result;
+                            const store = db.transaction('documents').objectStore('documents');
+                            const count = store.count();
+                            count.onsuccess = () => {
+                                db.close();
+                                resolve(count.result);
+                            };
+                        };
+                    }),
+            ),
+        )
+        .toBe(1);
+    // The keep lands on the stand just after its write (a new revision on the chart).
+    await page.waitForTimeout(500);
+    // Kept is not an edit: the offer is still up.
+    await expect(undoToast(page)).toContainText('Bar 2 deleted');
+    await undoButton(page).click();
+    await expect(page.locator('.bar')).toHaveCount(4);
+    await expect(undoToast(page)).toHaveAttribute('data-empty', 'true', SOON);
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+    // Back to the song as kept: its four bars, nothing unsaved.
+    await leaveBar(page);
+    await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
+    await expect(page.locator('.song-subtitle')).not.toContainText('Unsaved changes');
 });
 
 test('Undo goes after a few seconds', async ({ page }, testInfo) => {
