@@ -925,7 +925,7 @@ export interface SyncLoop {
      * Fenced on `owner` like every write here.
      */
     replaceDraft(
-        draft: { documentId: string; writerId: string; capturedAt: string },
+        draft: { documentId: string; writerId: string; capturedAt: string; raw: string },
         next: ChartDocument,
         owner: string | null,
     ): Promise<'replaced' | 'changed' | 'live' | 'gone'>;

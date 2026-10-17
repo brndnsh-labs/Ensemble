@@ -245,7 +245,16 @@ export interface UpgradeUnreadableRow {
     writerId?: string;
     reason: string;
     stored: unknown;
-    raw: string;
+    /**
+     * For a draft row, its chart document as far as it parses (`stored` when absent): what
+     * `unreadableLooksOld` is asked about.
+     */
+    document?: unknown;
+    /**
+     * Its exact stored bytes; null when it has none to compare (a row with no document), which is
+     * never removable — no backup can hold bytes that are not there.
+     */
+    raw: string | null;
     /** An account song the server holds: removing the local row would not remove it. */
     serverHeld?: boolean;
     handle?: unknown;
@@ -293,14 +302,17 @@ export interface UpgradeLeftover {
     reasons?: UpgradeNote[];
     /** The row as stored, for the backup. */
     stored: unknown;
-    /** Its exact stored bytes, compared before a removal. */
-    raw: string;
+    /** Its exact stored bytes, compared before a removal; null: none, so never removable. */
+    raw: string | null;
     /** The account holds it on the server, so a local removal would not remove it. */
     serverHeld: boolean;
     handle: unknown;
 }
 
-/** One leftover's identity, across scans. */
+/**
+ * One leftover's identity, across scans. A draft's includes its writer: two of one song's drafts
+ * are two leftovers, each removable on its own.
+ */
 export const leftoverKey = (leftover: UpgradeLeftover) =>
     `${leftover.store}:${leftover.kind}:${leftover.id}:${leftover.writerId ?? ''}`;
 
@@ -335,7 +347,8 @@ export interface UpgradeStore {
     /**
      * Remove ONE leftover row, at the musician's own press — a local delete of exactly that row,
      * only while it still holds `leftover.raw`; never a cloud delete. `held`: the account holds
-     * it on the server, so it is not removed here.
+     * it on the server, so it is not removed here. Throws, removing nothing, for a leftover with
+     * no bytes (`raw` null).
      */
     remove(leftover: UpgradeLeftover): Promise<'removed' | 'changed' | 'gone' | 'live' | 'held'>;
 }
@@ -431,7 +444,11 @@ export async function planUpgrade(
             }
         }
         for (const row of drafts.unreadable) {
-            leftover({ ...row, kind: 'draft', title: row.id, handle: row.handle });
+            // The songs' rule: one a newer app wrote is not ours to list.
+            if (unreadableLooksOld('document' in row ? row.document : row.stored)) {
+                const { document: _document, ...rest } = row;
+                leftover({ ...rest, kind: 'draft', title: row.id, handle: row.handle });
+            }
         }
         for (const draft of drafts.drafts) {
             if (!draftNeedsUpgrade(draft.document)) {

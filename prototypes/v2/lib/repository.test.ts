@@ -16,7 +16,17 @@ import type { ChartContent } from '@engine/songbook/types';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type FakeIndexedDB, installFakeIndexedDB } from '../../../tests/utils/fake-indexeddb';
 import { homeRequest } from './home';
-import { get, home, list, recoverySlotCount, remove, rename, save } from './repository';
+import {
+    get,
+    home,
+    list,
+    recoverySlotCount,
+    remove,
+    removeRecoverySlot,
+    removeUnreadableSong,
+    rename,
+    save,
+} from './repository';
 
 const localStore = new Map<string, string>();
 Object.defineProperty(window, 'localStorage', {
@@ -326,5 +336,90 @@ describe('repository.home — the songbook home reads only what it shows (#1441)
         fake.rows.set('one', song('one', 1));
         expect((await get('one'))?.title).toBe('Song one');
         expect(await get('missing')).toBeNull();
+    });
+});
+
+describe('removing an "Upgrade old songs" leftover, guest songbook (#1738)', () => {
+    const SLOT = 'ensemble-v2-preview:recovery:writer-a:leftover-song';
+    const song = {
+        schemaVersion: 1,
+        id: 'leftover-song',
+        title: 'Saved',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-05T00:00:00.000Z',
+        revision: 0,
+        chart: chart(),
+    };
+    const slot = (capturedAt: string) => JSON.stringify({ capturedAt, document: song });
+    const OLD = '2026-01-02T00:00:00.000Z';
+    beforeEach(() => {
+        fake.reset();
+    });
+
+    it('removes a dead slot holding exactly the backed-up bytes', async () => {
+        fake.rows.set(song.id, song);
+        localStore.set(SLOT, slot(OLD));
+        expect(await removeRecoverySlot(SLOT, slot(OLD))).toBe('removed');
+        expect(localStore.has(SLOT)).toBe(false);
+        expect(await removeRecoverySlot(SLOT, slot(OLD))).toBe('gone');
+    });
+
+    it('keeps a slot whose bytes changed since the backup', async () => {
+        localStore.set(SLOT, slot(OLD));
+        expect(await removeRecoverySlot(SLOT, `${slot(OLD)} `)).toBe('changed');
+        expect(localStore.get(SLOT)).toBe(slot(OLD));
+    });
+
+    it('keeps a LIVE slot — captured at or after the readable song it sits on', async () => {
+        fake.rows.set(song.id, song);
+        localStore.set(SLOT, slot(song.updatedAt));
+        expect(await removeRecoverySlot(SLOT, slot(song.updatedAt))).toBe('live');
+        expect(localStore.get(SLOT)).toBe(slot(song.updatedAt));
+        // No capture time to tell by, on a song that reads: live too.
+        const bare = JSON.stringify({ document: song });
+        localStore.set(SLOT, bare);
+        expect(await removeRecoverySlot(SLOT, bare)).toBe('live');
+        expect(localStore.get(SLOT)).toBe(bare);
+    });
+
+    it('removes an orphan slot: no song here for it to be live on', async () => {
+        localStore.set(SLOT, slot(song.updatedAt));
+        expect(await removeRecoverySlot(SLOT, slot(song.updatedAt))).toBe('removed');
+    });
+
+    it('refuses a removal with no bytes to compare', async () => {
+        localStore.set(SLOT, 'undefined');
+        const none = undefined as unknown as string;
+        await expect(removeRecoverySlot(SLOT, none)).rejects.toThrow();
+        expect(localStore.get(SLOT)).toBe('undefined');
+    });
+
+    it('removes an unreadable song row holding exactly the backed-up bytes', async () => {
+        const broken = { schemaVersion: 1, id: 'broken', title: 42 };
+        fake.rows.set('broken', broken);
+        expect(await removeUnreadableSong('broken', JSON.stringify(broken))).toBe('removed');
+        expect(fake.rows.has('broken')).toBe(false);
+        expect(await removeUnreadableSong('broken', JSON.stringify(broken))).toBe('gone');
+    });
+
+    it('keeps an unreadable song row whose bytes changed since the backup', async () => {
+        const broken = { schemaVersion: 1, id: 'broken', title: 42 };
+        fake.rows.set('broken', broken);
+        expect(await removeUnreadableSong('broken', `${JSON.stringify(broken)} `)).toBe('changed');
+        expect(fake.rows.get('broken')).toEqual(broken);
+    });
+
+    it('keeps a row that reads now, even with the backed-up bytes', async () => {
+        fake.rows.set(song.id, song);
+        expect(await removeUnreadableSong(song.id, JSON.stringify(song))).toBe('changed');
+        expect(fake.rows.get(song.id)).toEqual(song);
+    });
+
+    it('refuses a song removal with no bytes to compare', async () => {
+        fake.rows.set('broken', { id: 'broken' });
+        await expect(
+            removeUnreadableSong('broken', undefined as unknown as string),
+        ).rejects.toThrow();
+        expect(fake.rows.has('broken')).toBe(true);
     });
 });

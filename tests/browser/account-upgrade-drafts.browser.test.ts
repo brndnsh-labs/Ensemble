@@ -78,6 +78,9 @@ function draft(writerId: string, capturedAt: string, document = accountChart('Dr
     };
 }
 
+/** `draft()`'s stored document as JSON: the bytes a backup file would hold for it. */
+const DRAFT_BYTES = JSON.stringify(accountChart('Draft'));
+
 /** A rewritten draft: the same song, its title marked so the bytes plainly changed. */
 const rewritten = (): ChartDocument => ({ ...accountChart('Draft, rewritten'), revision: 0 });
 
@@ -141,7 +144,7 @@ describe('replaceDraft', () => {
         expect(
             await book.replaceDraft(
                 scope,
-                { documentId: DOC, writerId: 'old-tab', capturedAt: OLD },
+                { documentId: DOC, writerId: 'old-tab', capturedAt: OLD, raw: DRAFT_BYTES },
                 rewritten(),
             ),
         ).toBe('replaced');
@@ -160,7 +163,12 @@ describe('replaceDraft', () => {
         expect(
             await book.replaceDraft(
                 scope,
-                { documentId: DOC, writerId: 'live-tab', capturedAt: live.capturedAt },
+                {
+                    documentId: DOC,
+                    writerId: 'live-tab',
+                    capturedAt: live.capturedAt,
+                    raw: JSON.stringify(live.document),
+                },
                 rewritten(),
             ),
         ).toBe('live');
@@ -173,7 +181,7 @@ describe('replaceDraft', () => {
         expect(
             await book.replaceDraft(
                 scope,
-                { documentId: DOC, writerId: 'tab', capturedAt: OLD },
+                { documentId: DOC, writerId: 'tab', capturedAt: OLD, raw: DRAFT_BYTES },
                 rewritten(),
             ),
         ).toBe('live');
@@ -187,7 +195,7 @@ describe('replaceDraft', () => {
         expect(
             await book.replaceDraft(
                 scope,
-                { documentId: DOC, writerId: 'tab', capturedAt: OLD },
+                { documentId: DOC, writerId: 'tab', capturedAt: OLD, raw: DRAFT_BYTES },
                 rewritten(),
             ),
         ).toBe('changed');
@@ -195,10 +203,23 @@ describe('replaceDraft', () => {
         expect(
             await book.replaceDraft(
                 scope,
-                { documentId: DOC, writerId: 'gone', capturedAt: OLD },
+                { documentId: DOC, writerId: 'gone', capturedAt: OLD, raw: DRAFT_BYTES },
                 rewritten(),
             ),
         ).toBe('gone');
+    });
+
+    it('keeps a draft whose bytes changed under the same capture time: the bytes are the check', async () => {
+        await book.save(scope, accountChart('Saved'), null);
+        await putDraft(draft('tab', OLD, accountChart('Edited, same capture')));
+        expect(
+            await book.replaceDraft(
+                scope,
+                { documentId: DOC, writerId: 'tab', capturedAt: OLD, raw: DRAFT_BYTES },
+                rewritten(),
+            ),
+        ).toBe('changed');
+        expect((await draftRow(DOC, 'tab'))?.document.title).toBe('Edited, same capture');
     });
 
     it('refuses to move a draft to another song', async () => {
@@ -206,7 +227,7 @@ describe('replaceDraft', () => {
         await expect(
             book.replaceDraft(
                 scope,
-                { documentId: DOC, writerId: 'tab', capturedAt: OLD },
+                { documentId: DOC, writerId: 'tab', capturedAt: OLD, raw: DRAFT_BYTES },
                 { ...accountChart('Elsewhere', 'other') },
             ),
         ).rejects.toThrow('another song');
@@ -370,6 +391,57 @@ describe('removing an upgrade leftover (#1738)', () => {
         });
         expect(await book.removeUnreadableSong(scope, DOC, JSON.stringify(broken))).toBe('held');
         expect(await songRow(DOC)).toBeDefined();
+    });
+});
+
+describe('a leftover with no stored document (#1738)', () => {
+    it('is never removed: no bytes is not "the same bytes" as a backup', async () => {
+        // `JSON.stringify(undefined)` is `undefined`: a guard comparing it with a row's missing
+        // document would see two `undefined`s and delete.
+        await putSong({ ownerId: OWNER, documentId: 'empty', remoteRevision: null });
+        await putDraft({ ...draft('empty-draft', OLD), document: undefined });
+        const none = undefined as unknown as string;
+        await expect(book.removeUnreadableSong(scope, 'empty', none)).rejects.toThrow();
+        await expect(
+            book.removeDraftRow(scope, { documentId: DOC, writerId: 'empty-draft' }, none),
+        ).rejects.toThrow();
+        await expect(
+            book.replaceDraft(
+                scope,
+                { documentId: DOC, writerId: 'empty-draft', capturedAt: OLD, raw: none },
+                rewritten(),
+            ),
+        ).rejects.toThrow();
+        expect(await songRow('empty')).toBeDefined();
+        expect(await draftRow(DOC, 'empty-draft')).toBeDefined();
+    });
+});
+
+describe('removing an unreadable song the account has a word pending on (#1738)', () => {
+    const broken = { schemaVersion: 1, id: 'pending', title: 42, chart: null };
+    beforeEach(async () => {
+        await putSong({
+            ownerId: OWNER,
+            documentId: 'pending',
+            document: broken,
+            remoteRevision: null,
+        });
+    });
+
+    it('refuses one with an account version waiting', async () => {
+        await putMeta({ key: candidateKey(OWNER, 'pending'), ownerId: OWNER });
+        expect(await book.removeUnreadableSong(scope, 'pending', JSON.stringify(broken))).toBe(
+            'held',
+        );
+        expect(await songRow('pending')).toBeDefined();
+    });
+
+    it('refuses one with a delete frozen', async () => {
+        await putMeta({ key: deletionKey(OWNER, 'pending'), ownerId: OWNER });
+        expect(await book.removeUnreadableSong(scope, 'pending', JSON.stringify(broken))).toBe(
+            'held',
+        );
+        expect(await songRow('pending')).toBeDefined();
     });
 });
 

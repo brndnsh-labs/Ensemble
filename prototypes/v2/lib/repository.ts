@@ -468,6 +468,19 @@ export function recoveryFor(
         : null;
 }
 
+/**
+ * A recovery key's parts: `${RECOVERY}${writer}:${id}`, where a writer id is a UUID (or
+ * `unavailable`), never a colon. A key with no writer before its first colon names the rest as
+ * its id and no writer.
+ */
+function recoveryKeyParts(key: string): { writerId?: string; documentId: string } {
+    const rest = key.slice(RECOVERY.length);
+    const split = rest.indexOf(':');
+    return split < 1
+        ? { documentId: rest }
+        : { writerId: rest.slice(0, split), documentId: rest.slice(split + 1) };
+}
+
 /** One recovery slot as stored, for "Upgrade old songs" (#1738). `raw` is its exact bytes. */
 export interface RecoverySlot {
     key: string;
@@ -485,10 +498,18 @@ export interface RecoverySlot {
  */
 export function recoverySlots(): {
     slots: RecoverySlot[];
-    unreadable: Array<{ key: string; id: string; reason: string; raw: string }>;
+    unreadable: Array<{
+        key: string;
+        id: string;
+        /** Parsed from the key; absent when the key names no writer. */
+        writerId?: string;
+        reason: string;
+        /** Its exact stored bytes; null when the key held nothing by the time it was read. */
+        raw: string | null;
+    }>;
 } {
     const slots: RecoverySlot[] = [];
-    const unreadable: Array<{ key: string; id: string; reason: string; raw: string }> = [];
+    const unreadable: ReturnType<typeof recoverySlots>['unreadable'] = [];
     const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
@@ -498,12 +519,9 @@ export function recoverySlots(): {
     }
     for (const key of keys) {
         const raw = localStorage.getItem(key);
-        // `${RECOVERY}${writer}:${id}`: a writer id is a UUID (or `unavailable`), never a colon.
-        const rest = key.slice(RECOVERY.length);
-        const split = rest.indexOf(':');
-        const documentId = split < 1 ? rest : rest.slice(split + 1);
+        const { writerId, documentId } = recoveryKeyParts(key);
         try {
-            if (!raw || raw.length > 1_100_000 || split < 1) {
+            if (!raw || raw.length > 1_100_000 || writerId === undefined) {
                 throw new Error('This draft could not be read.');
             }
             const record = JSON.parse(raw);
@@ -517,7 +535,7 @@ export function recoverySlots(): {
             }
             slots.push({
                 key,
-                writerId: rest.slice(0, split),
+                writerId,
                 documentId,
                 capturedAt: record.capturedAt,
                 document,
@@ -527,8 +545,9 @@ export function recoverySlots(): {
             unreadable.push({
                 key,
                 id: documentId,
+                ...(writerId === undefined ? {} : { writerId }),
                 reason: failure instanceof Error ? failure.message : String(failure),
-                raw: raw ?? '',
+                raw,
             });
         }
     }
@@ -571,11 +590,27 @@ export function replaceRecoverySlot(
 /**
  * Remove ONE recovery slot the musician chose to remove from "Upgrade old songs"' leftovers
  * (#1738), only if it still holds exactly the bytes the backup file holds (`raw`). A slot
- * captured again since (`'changed'`) or already gone (`'gone'`) is left alone.
+ * captured again since (`'changed'`) or already gone (`'gone'`) is left alone, and so is a LIVE
+ * one (`'live'`): a slot of a song this device reads, captured at or after that song's version
+ * (`recoveryFor`'s rule) — or with no capture time to tell — is unsaved work, which has its own way
+ * back. The account's `AccountSongbook.removeDraftRow`, with the same answers.
  */
-export function removeRecoverySlot(key: string, raw: string): 'removed' | 'changed' | 'gone' {
+export async function removeRecoverySlot(
+    key: string,
+    raw: string,
+): Promise<'removed' | 'changed' | 'gone' | 'live'> {
     if (!key.startsWith(RECOVERY)) {
         throw new Error('Not a recovery slot.');
+    }
+    if (typeof raw !== 'string') {
+        throw new Error('Nothing to compare this draft with, so it was not removed.');
+    }
+    // The song first: the slot's checks and its removal then run with no await between them.
+    let song: ChartDocument | null = null;
+    try {
+        song = await get(recoveryKeyParts(key).documentId);
+    } catch {
+        // A song row that does not read: nothing can say this draft is live on it.
     }
     const held = localStorage.getItem(key);
     if (held === null) {
@@ -583,6 +618,17 @@ export function removeRecoverySlot(key: string, raw: string): 'removed' | 'chang
     }
     if (held !== raw) {
         return 'changed';
+    }
+    if (song) {
+        let capturedAt: unknown;
+        try {
+            capturedAt = (JSON.parse(held) as { capturedAt?: unknown } | null)?.capturedAt;
+        } catch {
+            capturedAt = undefined;
+        }
+        if (typeof capturedAt !== 'string' || capturedAt >= song.updatedAt) {
+            return 'live';
+        }
     }
     localStorage.removeItem(key);
     return 'removed';
@@ -598,6 +644,9 @@ export async function removeUnreadableSong(
     id: string,
     raw: string,
 ): Promise<'removed' | 'changed' | 'gone'> {
+    if (typeof raw !== 'string') {
+        throw new Error('Nothing to compare this song with, so it was not removed.');
+    }
     const db = await open();
     return new Promise((resolve, reject) => {
         const tx = db.transaction(STORE, 'readwrite');

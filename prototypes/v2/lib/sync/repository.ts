@@ -306,6 +306,18 @@ function storedLastOpened(value: LastOpened | undefined, scope: AccountScope): s
 }
 
 /**
+ * "Upgrade old songs"' (#1738) byte guard: a row is written over or removed only while it holds
+ * exactly the bytes the caller read (and backed up). A row with no document has no bytes —
+ * `JSON.stringify(undefined)` is `undefined`, which would equal another `undefined` — so a caller
+ * without a string has nothing to compare, and is refused before anything is read.
+ */
+function backedUpBytes(raw: unknown): asserts raw is string {
+    if (typeof raw !== 'string') {
+        throw new Error('Nothing to compare this row with, so it was left as it is.');
+    }
+}
+
+/**
  * Is one stored draft row still an experiment on the version this device has committed (#1299
  * patch review P1)? The same rule `sync-loop.ts`'s `newestDraft` offers a draft under, and guest
  * recovery before it (`recoveryFor` in `lib/repository.ts`): only a row captured at or after the
@@ -2476,6 +2488,7 @@ export class AccountSongbook {
         const { documentId, writerId } = draft;
         identifier(documentId);
         identifier(writerId);
+        backedUpBytes(raw);
         return this.database.run('readwrite', scope, (tx) => {
             tx.read(tx.table('songs').get([scope.ownerId, documentId]), (song: unknown) => {
                 let saved: SavedSong | null = null;
@@ -2508,8 +2521,9 @@ export class AccountSongbook {
      * does not read. A LOCAL row delete and nothing more: no tombstone, no outbox operation, no
      * request — it is never a cloud delete (#1270). So it refuses (`'held'`) a row the account
      * holds on the server (a confirmed `remoteRevision`: the next download would only bring it
-     * back, and the musician should hear that, not see it vanish and return) or one with a Save
-     * still queued (deleting it would strand that operation).
+     * back, and the musician should hear that, not see it vanish and return), one with a Save
+     * still queued (deleting it would strand that operation), and one the account has a word
+     * pending on — a waiting version (`candidateKey`) or a frozen delete (`deletionKey`).
      */
     async removeUnreadableSong(
         scope: AccountScope,
@@ -2518,6 +2532,7 @@ export class AccountSongbook {
     ): Promise<'removed' | 'changed' | 'gone' | 'held'> {
         scope = copyScope(scope);
         identifier(documentId);
+        backedUpBytes(raw);
         return this.database.run('readwrite', scope, (tx) => {
             const key = [scope.ownerId, documentId];
             tx.read(tx.table('songs').get(key), (row: SavedSong | undefined) => {
@@ -2543,8 +2558,24 @@ export class AccountSongbook {
                         if (operations.length) {
                             return tx.finish('held');
                         }
-                        tx.table('songs').delete(key);
-                        tx.finish('removed');
+                        tx.read(
+                            tx.table('meta').get(candidateKey(scope.ownerId, documentId)),
+                            (waiting: unknown) => {
+                                if (waiting !== undefined) {
+                                    return tx.finish('held');
+                                }
+                                tx.read(
+                                    tx.table('meta').get(deletionKey(scope.ownerId, documentId)),
+                                    (deleting: unknown) => {
+                                        if (deleting !== undefined) {
+                                            return tx.finish('held');
+                                        }
+                                        tx.table('songs').delete(key);
+                                        tx.finish('removed');
+                                    },
+                                );
+                            },
+                        );
                     },
                 );
             });
@@ -2557,20 +2588,22 @@ export class AccountSongbook {
      * was, and nothing is queued or sent. There is no way to delete a draft through here.
      *
      * ONE transaction, compare-and-swapped twice. `'gone'` when the row no longer exists (its
-     * writer saved or discarded it), `'changed'` when it was captured again since the caller read
-     * it (`capturedAt` moved): that writer's newer text wins. `'live'` when it is a live draft by
+     * writer saved or discarded it), `'changed'` when it is not exactly the row the caller read —
+     * captured again since (`capturedAt` moved), or its stored `document` no longer `raw`, the
+     * bytes the backup file holds: that writer's newer text wins. `'live'` when it is a live draft by
      * `liveDraft`'s rule — including a row whose song this device does not hold, which that rule
      * counts as live: unsaved work is the musician's to Save or discard, never this method's.
      */
     async replaceDraft(
         scope: AccountScope,
-        draft: { documentId: string; writerId: string; capturedAt: string },
+        draft: { documentId: string; writerId: string; capturedAt: string; raw: string },
         next: unknown,
     ): Promise<'replaced' | 'changed' | 'live' | 'gone'> {
         scope = copyScope(scope);
-        const { documentId, writerId, capturedAt } = draft;
+        const { documentId, writerId, capturedAt, raw } = draft;
         identifier(documentId);
         identifier(writerId);
+        backedUpBytes(raw);
         const document = snapshot(next);
         if (document.id !== documentId) {
             throw new Error('A draft cannot move to another song.');
@@ -2586,7 +2619,10 @@ export class AccountSongbook {
                             if (!row) {
                                 return tx.finish('gone');
                             }
-                            if (row.capturedAt !== capturedAt) {
+                            if (
+                                row.capturedAt !== capturedAt ||
+                                JSON.stringify(row.document) !== raw
+                            ) {
                                 return tx.finish('changed');
                             }
                             if (liveDraft(row, saved)) {

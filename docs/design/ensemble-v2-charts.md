@@ -476,14 +476,16 @@ never enters analytics or error payloads.
 >   does not sweep superseded draft rows as an ordinary Save does.
 > - **Leftovers are the musician's to remove, one at a time, after a backup.** What the upgrade
 >   cannot fix — a dead draft the converter refuses, an orphan draft, a draft of a song row that
->   will not read, an old row that will not read — is listed with "Remove — it's in your backup",
->   offered only once a backup file holds that row byte for byte ("Download these first" writes
->   one after a run without a backup). Remove deletes exactly that row and only while it still
->   holds those bytes, in one transaction or check: a guest recovery slot, an account draft row,
->   an unreadable song row. It is a LOCAL delete — never a tombstone, an outbox operation or a
->   request — so an account song row the server holds (a confirmed `remoteRevision`) or with a
->   Save queued is never offered for removal. A songbook that would not read is an error with
->   "Try again", never removable.
+>   will not read, an old row or draft that will not read (one a newer app wrote is not listed) —
+>   is listed with "Remove — it's in your backup", offered only once a backup file holds that row
+>   byte for byte ("Download these first" writes one after a run without a backup); a row with no
+>   stored document has no bytes to hold and is never removable. Remove deletes exactly that row
+>   and only while it still holds those bytes, in one transaction or check: a guest recovery slot,
+>   an account draft row, an unreadable song row — never a live draft of a song that reads. It is a
+>   LOCAL delete — never a tombstone, an outbox operation or a request — so an account song row the
+>   server holds (a confirmed `remoteRevision`), with a Save queued, an account version waiting or
+>   a delete frozen is never removed. A songbook that would not read is an error with "Try
+>   again", never removable.
 > - **Interrupt-safe and idempotent.** Each document is one transaction, so a closed tab leaves
 >   every song wholly old or wholly new; the next run re-reads and finishes the rest. An upgraded
 >   document is checked to need no upgrade itself, so a second run is a no-op.

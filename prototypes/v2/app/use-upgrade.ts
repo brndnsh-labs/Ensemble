@@ -148,6 +148,17 @@ export function useUpgrade(deps: UpgradeDeps): {
         setScannedKey(latest.current.scanKey);
     };
 
+    // Only a leftover with bytes, held in a backup file as exactly those bytes. A row with none
+    // (`raw` null) is never removable: nothing on disk could say what was removed.
+    const heldInBackup = (leftover: UpgradeLeftover) => {
+        const key = leftoverKey(leftover);
+        return (
+            typeof leftover.raw === 'string' &&
+            inBackup.has(key) &&
+            inBackup.get(key) === leftover.raw
+        );
+    };
+
     const count = plan ? upgradeCount(plan) : 0;
     const offer: UpgradeOffer | null =
         phase === 'idle' && count === 0
@@ -158,9 +169,7 @@ export function useUpgrade(deps: UpgradeDeps): {
                   drafts: plan?.drafts.length ?? 0,
                   leftovers: (plan?.leftovers ?? []).map((leftover) => ({
                       leftover,
-                      removable:
-                          !leftover.serverHeld &&
-                          inBackup.get(leftoverKey(leftover)) === leftover.raw,
+                      removable: !leftover.serverHeld && heldInBackup(leftover),
                   })),
                   failures: plan?.failures ?? [],
                   account: deps.signedIn,
@@ -175,7 +184,7 @@ export function useUpgrade(deps: UpgradeDeps): {
         setInBackup((held) => {
             const next = new Map(held);
             for (const leftover of leftovers) {
-                if (!leftover.serverHeld) {
+                if (!leftover.serverHeld && typeof leftover.raw === 'string') {
                     next.set(leftoverKey(leftover), leftover.raw);
                 }
             }
@@ -255,7 +264,7 @@ export function useUpgrade(deps: UpgradeDeps): {
                 void latest.current.run(async () => {
                     // Only what a backup file holds, byte for byte — checked here, and again by
                     // the store against the row as it is now.
-                    if (inBackup.get(leftoverKey(leftover)) !== leftover.raw) {
+                    if (leftover.serverHeld || !heldInBackup(leftover)) {
                         throw new Error('Download it first: it is not in a backup file yet.');
                     }
                     const store = latest.current

@@ -11,7 +11,38 @@ import { accountSync } from './account/sync-loop';
 import * as repository from './repository';
 import { LocalRevisionError } from './sync/protocol';
 import { UpgradeSaveRefused } from './sync/repository';
-import { type UpgradePace, UpgradeRefusal, type UpgradeStore } from './upgrade';
+import {
+    type UpgradeLeftover,
+    type UpgradePace,
+    UpgradeRefusal,
+    type UpgradeStore,
+} from './upgrade';
+
+/**
+ * A stored row's exact bytes, or null when it has none: `JSON.stringify(undefined)` is
+ * `undefined`, and two `undefined`s must never compare equal as "the same bytes as the backup".
+ */
+function bytesOf(stored: unknown): string | null {
+    const json: unknown = JSON.stringify(stored);
+    return typeof json === 'string' ? json : null;
+}
+
+/** The bytes a removal is guarded on; a leftover with none is never removed. */
+function removalBytes(leftover: UpgradeLeftover): string {
+    if (typeof leftover.raw !== 'string') {
+        throw new Error('Nothing to compare it with, so it was left as it is.');
+    }
+    return leftover.raw;
+}
+
+/** A guest recovery slot's chart document, as far as its bytes parse; the bytes themselves if not. */
+function slotDocument(raw: string | null): unknown {
+    try {
+        return (JSON.parse(raw ?? 'null') as { document?: unknown } | null)?.document;
+    } catch {
+        return raw;
+    }
+}
 
 /** This device's guest songbook, signed in or not: its songs can still be added to an account. */
 export function guestUpgradeStore(pace?: UpgradePace): UpgradeStore {
@@ -26,7 +57,7 @@ export function guestUpgradeStore(pace?: UpgradePace): UpgradeStore {
                     id: row.id,
                     reason: row.reason,
                     stored: row.stored,
-                    raw: JSON.stringify(row.stored),
+                    raw: bytesOf(row.stored),
                 })),
             };
         },
@@ -44,8 +75,11 @@ export function guestUpgradeStore(pace?: UpgradePace): UpgradeStore {
                 })),
                 unreadable: unreadable.map((row) => ({
                     id: row.id,
+                    // From the slot's key: one song's slots are one leftover each.
+                    ...(row.writerId === undefined ? {} : { writerId: row.writerId }),
                     reason: row.reason,
                     stored: row.raw,
+                    document: slotDocument(row.raw),
                     raw: row.raw,
                     handle: row.key,
                 })),
@@ -75,14 +109,15 @@ export function guestUpgradeStore(pace?: UpgradePace): UpgradeStore {
         replaceDraft: async (draft, next) =>
             repository.replaceRecoverySlot(draft.handle as repository.RecoverySlot, next),
         remove: async (leftover) => {
+            const raw = removalBytes(leftover);
             if (leftover.kind === 'song') {
-                return repository.removeUnreadableSong(leftover.id, leftover.raw);
+                return repository.removeUnreadableSong(leftover.id, raw);
             }
             const key =
                 typeof leftover.handle === 'string'
                     ? leftover.handle
                     : (leftover.handle as repository.RecoverySlot).key;
-            return repository.removeRecoverySlot(key, leftover.raw);
+            return repository.removeRecoverySlot(key, raw);
         },
     };
 }
@@ -104,7 +139,7 @@ export function accountUpgradeStore(owner: string, pace?: UpgradePace): UpgradeS
                     id: row.documentId,
                     reason: row.reason,
                     stored: row.document,
-                    raw: JSON.stringify(row.document),
+                    raw: bytesOf(row.document),
                     serverHeld: row.serverHeld,
                 })),
             };
@@ -127,7 +162,7 @@ export function accountUpgradeStore(owner: string, pace?: UpgradePace): UpgradeS
                     writerId: row.writerId,
                     reason: row.reason,
                     stored: row.stored,
-                    raw: JSON.stringify(row.stored),
+                    raw: bytesOf(row.stored),
                 })),
             };
         },
@@ -145,13 +180,15 @@ export function accountUpgradeStore(owner: string, pace?: UpgradePace): UpgradeS
             }
         },
         replaceDraft: (draft, next) => accountSync.replaceDraft(draft, next, owner),
-        remove: (leftover) =>
-            leftover.kind === 'song'
-                ? accountSync.removeUnreadableSong(leftover.id, leftover.raw, owner)
+        remove: async (leftover) => {
+            const raw = removalBytes(leftover);
+            return leftover.kind === 'song'
+                ? accountSync.removeUnreadableSong(leftover.id, raw, owner)
                 : accountSync.removeDraftRow(
                       { documentId: leftover.id, writerId: leftover.writerId ?? '' },
-                      leftover.raw,
+                      raw,
                       owner,
-                  ),
+                  );
+        },
     };
 }

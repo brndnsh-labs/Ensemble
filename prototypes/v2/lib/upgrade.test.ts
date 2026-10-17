@@ -10,6 +10,7 @@ import { blankSong, type ChartDocument, FOLLOW_FEEL_SINCE, validateDocument } fr
 import { bandForGenre } from './standards';
 import {
     draftNeedsUpgrade,
+    leftoverKey,
     needsUpgrade,
     planUpgrade,
     runUpgrade,
@@ -582,6 +583,45 @@ describe('runUpgrade', () => {
         expect(outcome.draftsConverted).toBe(0);
         expect(state.drafts.size).toBe(3);
         expect(state.unreadable).toHaveLength(2);
+    });
+
+    it("lists an unreadable draft by the songs' rule, each writer's its own leftover", async () => {
+        const { store, state } = fakeStore('guest', [], []);
+        state.unreadableDrafts = [
+            // Two writers' slots for one song: two leftovers, never one key for both.
+            { id: 'x', writerId: 'w1', reason: 'r', stored: '{', document: '{', raw: '{' },
+            {
+                id: 'x',
+                writerId: 'w2',
+                reason: 'r',
+                stored: 'old',
+                document: { schemaVersion: 1, id: 'x', title: 42 },
+                raw: 'old',
+            },
+            // A newer app's draft is not ours to list, as a newer app's song is not.
+            {
+                id: 'y',
+                writerId: 'w1',
+                reason: 'r',
+                stored: 'new',
+                document: { schemaVersion: 3, id: 'y' },
+                raw: 'new',
+            },
+            // No `document`: `stored` is what is asked about.
+            { id: 'z', writerId: 'w1', reason: 'r', stored: { schemaVersion: 3 }, raw: '{}' },
+        ];
+        const plan = await planUpgrade([store]);
+        expect(plan.leftovers.map((leftover) => [leftover.id, leftover.writerId])).toEqual([
+            ['x', 'w1'],
+            ['x', 'w2'],
+        ]);
+        expect(new Set(plan.leftovers.map(leftoverKey)).size).toBe(2);
+        expect(plan.leftovers[0]).not.toHaveProperty('document');
+        const backup = JSON.parse(upgradeBackup(plan, OLD));
+        expect(backup.leftovers.map((entry: { writerId?: string }) => entry.writerId)).toEqual([
+            'w1',
+            'w2',
+        ]);
     });
 
     it('a leftover removal deletes exactly that row, only while it holds the planned bytes', async () => {
