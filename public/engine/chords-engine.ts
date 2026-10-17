@@ -733,8 +733,7 @@ export function getFormattedChordNames(
  * numeral is read literally, in any key and on any degree: `vii` is a minor triad, not the
  * key's half-diminished seventh, which is written `viim7b5`.
  *
- * `prototypes/v2/lib/legacy-band-chart.test.ts` holds every suffix a measure-less chart can
- * play to the band's own reading. A quality with no row here has no major third to lower
+ * A quality with no row here has no major third to lower
  * (`sus4`, `5`, `dim`), is minor already, or is one of the spellings such a chart cannot play
  * (`7alt`, `maj7#11`, `maj7b5`, `maj7#5`), which keep the name they had.
  */

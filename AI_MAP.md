@@ -125,7 +125,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 
 | Path | Responsibility | Key Logic |
 | :--- | :--- | :--- |
-| `public/engine/chords-engine.ts` | Chord parsing and naming for a measure-less chart's display (`arranger.progression`); no voicing. | `validateProgression`, `getChordDetails` |
+| `public/engine/chords-engine.ts` | The old chord parser. The app reads none of it since #1739; only `public/songbook/legacy-score.ts` ("Upgrade old songs") and tests use it, until #1740 deletes both. | `readLegacyChordToken` |
 | `public/engine/note-spelling.ts` | Canonical pitch-class → letter-name spelling policy (sharp/flat by key), shared by the chart render path and the chord editor. | `spellPitchClass` |
 | `public/data/note-names.ts` | Pure pitch-class name table; re-exported by config without pulling genre data into notation-only editors. | `KEY_ORDER` |
 | `public/engine/transpose.ts` | Single shared progression-text transposer for absolute transpose + relative-key switch. | `transposeChordText` |
@@ -171,7 +171,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 ## UI (the v2 app)
 
 `prototypes/v2/app/` holds every surface (songbook, chart sheet with its in-place bar, bar and
-section menus, transport, Song menu, sounds panel, a text chart's editor, account pages) and `prototypes/v2/lib/` the runtime bridge, songbook repository and
+section menus, transport, Song menu, sounds panel, account pages) and `prototypes/v2/lib/` the runtime bridge, songbook repository and
 account sync. Per-surface ownership is the navigation table in `prototypes/v2/CLAUDE.md`.
 
 ## High-Level Controllers & Integration

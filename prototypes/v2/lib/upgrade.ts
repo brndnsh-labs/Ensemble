@@ -557,13 +557,19 @@ export interface UpgradeOutcome {
     upgraded: UpgradeEntry[];
     /** Upgraded songs and drafts with the converter's lossy notes — not tone for tone. */
     changed: Array<UpgradeEntry & { draft: boolean; notes: UpgradeNote[] }>;
-    /** Refused by the converter: left exactly as they were. */
-    refused: Array<UpgradeEntry & { reasons: UpgradeNote[] }>;
+    /**
+     * Refused by the converter: left exactly as they were. `opens`: the app can open it to fix
+     * (a measure chart); a text chart cannot be opened since #1739.
+     */
+    refused: Array<UpgradeEntry & { reasons: UpgradeNote[]; opens: boolean }>;
     /** Not attempted, or a Save that was refused: left exactly as they were, with why. */
-    skipped: Array<UpgradeEntry & { reason: string }>;
+    skipped: Array<UpgradeEntry & { reason: string; opens: boolean }>;
     /** Drafts rewritten in place. */
     draftsConverted: number;
-    /** Drafts left exactly as they are, with why; `openable` when it is unsaved work on a song. */
+    /**
+     * Drafts left exactly as they are, with why; `openable` when it is unsaved work on a song the
+     * app can open (a text chart cannot be, #1739).
+     */
     draftsKept: Array<UpgradeEntry & { reason: string; openable: boolean }>;
     /** Stores that could not be read. */
     failures: Array<{ store: UpgradeStoreKind; message: string }>;
@@ -631,14 +637,16 @@ export async function runUpgrade(
         }
         for (const { document } of songs) {
             const entry = { store: store.kind, id: document.id, title: document.title };
+            // Only a measure chart can be opened to fix: a text chart is refused on open (#1739).
+            const opens = document.schemaVersion === 2;
             try {
                 if (live.has(document.id) || options.unsavedHere(store.kind, document.id)) {
-                    outcome.skipped.push({ ...entry, reason: UPGRADE_SKIPS.unsaved });
+                    outcome.skipped.push({ ...entry, reason: UPGRADE_SKIPS.unsaved, opens });
                     continue;
                 }
                 const result = upgradeDocument(document);
                 if (result.kind === 'refused') {
-                    outcome.refused.push({ ...entry, reasons: result.reasons });
+                    outcome.refused.push({ ...entry, reasons: result.reasons, opens });
                     continue;
                 }
                 if (result.kind === 'current') {
@@ -655,6 +663,7 @@ export async function runUpgrade(
                             failure instanceof UpgradeRefusal && failure.reason === 'elsewhere'
                                 ? moved
                                 : message(failure),
+                        opens,
                     });
                     continue;
                 }
@@ -687,7 +696,7 @@ export async function runUpgrade(
                 outcome.draftsKept.push({
                     ...entry,
                     reason,
-                    openable: song !== undefined && reason === UPGRADE_SKIPS.draftLive,
+                    openable: song?.schemaVersion === 2 && reason === UPGRADE_SKIPS.draftLive,
                 });
             try {
                 const held = current.get(`${draft.documentId}:${draft.writerId}`);

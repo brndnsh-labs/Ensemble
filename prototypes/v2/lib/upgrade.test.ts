@@ -447,6 +447,15 @@ describe('runUpgrade', () => {
         expect(upgradeCount(await planUpgrade([store]))).toBe(1);
     });
 
+    it('offers Open for a measure chart left as it is, never for a text chart (#1739)', async () => {
+        const { store } = fakeStore('account', [staleChart('m'), textChart('t', 'C')]);
+        const outcome = await upgrade([store], { unsavedHere: () => true });
+        expect(outcome.skipped.map((entry) => [entry.id, entry.opens])).toEqual([
+            ['m', true],
+            ['t', false],
+        ]);
+    });
+
     it('skips a song with a live draft or unsaved text in this tab, and touches neither', async () => {
         const withDraft = textChart('d', 'C', NEW);
         const live = draftOf(textChart('d', 'C | G', NEW), '2026-10-11T00:00:00.000Z');
@@ -458,8 +467,10 @@ describe('runUpgrade', () => {
         ]);
         expect(state.saves).toBe(0);
         expect(state.drafts.get('d:w1')).toEqual(live);
+        // Not openable: the song is a text chart, which the app no longer opens (#1739).
+        expect(outcome.skipped.every((entry) => !entry.opens)).toBe(true);
         expect(outcome.draftsKept).toMatchObject([
-            { id: 'd', reason: UPGRADE_SKIPS.draftLive, openable: true },
+            { id: 'd', reason: UPGRADE_SKIPS.draftLive, openable: false },
         ]);
     });
 

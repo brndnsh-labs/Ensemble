@@ -156,6 +156,12 @@ export interface RemoteUpdate {
     documentId: string;
     revision: string;
     kind: RemoteCandidateKind;
+    /**
+     * Set on a `version` whose body is a text chart (schemaVersion 1), which the app no longer
+     * opens (#1739): the stand refuses to adopt it BEFORE the transaction that would discard the
+     * local experiment. Revision-bound like the rest of the offer, so it cannot go stale.
+     */
+    oldFormat?: true;
 }
 
 const NO_UPDATES: readonly RemoteUpdate[] = [];
@@ -1411,6 +1417,9 @@ export function createSyncLoop(
                 documentId: row.documentId,
                 revision: row.revision,
                 kind: row.kind,
+                ...(row.kind === 'version' && row.document.schemaVersion === 1
+                    ? { oldFormat: true as const }
+                    : {}),
             }));
         } catch {
             // Unreadable is not "none": leaving the last published list alone is the conservative

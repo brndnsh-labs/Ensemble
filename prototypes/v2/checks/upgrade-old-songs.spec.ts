@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import type { Download, Page } from '@playwright/test';
-import { OLD_FORMAT_REFUSAL, type StoredDocument, validateStoredDocument } from '../lib/documents';
+import { type StoredDocument, validateStoredDocument } from '../lib/documents';
 import { bandForGenre } from '../lib/standards';
 import { upgradeDocument } from '../lib/upgrade';
 import { expect, seedGuestDocuments, songLink, test } from './fixtures';
@@ -12,8 +12,10 @@ import { expect, seedGuestDocuments, songLink, test } from './fixtures';
  * (a text chart it cannot convert stays as it is: the app no longer opens one, #1739), never
  * writes over or deletes a draft, and finishes an interrupted run.
  *
- * The rules themselves are `lib/upgrade.test.ts`. The account half has no product spec since
- * #1739: a text chart is no longer adopted into an account, so none can be put there to upgrade.
+ * The rules themselves are `lib/upgrade.test.ts`. The account half has had no product spec since
+ * #1739: its old spec put text charts in the account by adopting guest ones, which no longer
+ * happens. An account can still hold a text chart from before, and the upgrade still converts it;
+ * the gap is accepted until #1740 deletes the upgrade.
  */
 
 const RECOVERY = 'ensemble-v2-preview:recovery:';
@@ -215,7 +217,7 @@ test('old songs are backed up in one file, upgraded in place with their edit dat
     expect((await documents(page)).find((document) => document.id === 'old-turn')).toEqual(turned);
 });
 
-test('a refused chart is listed by bar and reason, untouched, keeps the card up, and Open says the app no longer opens it', async ({
+test('a refused chart is listed by bar and reason, untouched, keeps the card up, and offers no Open: the app no longer opens a text chart', async ({
     page,
 }) => {
     const refused = textChart('refused', 'Odd changes', [
@@ -236,16 +238,11 @@ test('a refused chart is listed by bar and reason, untouched, keeps the card up,
     await expect(listed).toContainText('bar 2, section B “Xyz7”:');
     expect(await documents(page)).toEqual([refused]);
 
-    // The text editor is gone (#1739): Open says so in plain words and changes nothing.
-    await listed.getByRole('button', { name: 'Open Odd changes' }).click();
-    await expect(page.getByText(OLD_FORMAT_REFUSAL)).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Odd changes', exact: true })).toHaveCount(0);
-    expect(await documents(page)).toEqual([refused]);
+    // The text editor is gone (#1739), so there is nothing to open it into.
+    await expect(listed.getByRole('button', { name: 'Open Odd changes' })).toHaveCount(0);
 });
 
-test('a song with unsaved edits is left alone, its draft untouched, until it is saved', async ({
-    page,
-}) => {
+test('a song with unsaved edits is left alone, and its draft untouched', async ({ page }) => {
     const edited = textChart('edited', 'Work in progress', [['A', 'C | F | G | C']]);
     const other = textChart('other', 'Other song', [['A', 'Am | Dm | E7 | Am']]);
     await seedGuestDocuments(page, [edited, other]);
@@ -283,20 +280,10 @@ test('a song with unsaved edits is left alone, its draft untouched, until it is 
     expect(stored.find((document) => document.id === 'other')?.schemaVersion).toBe(2);
     expect(await slots(page)).toEqual(before);
 
-    // Its unsaved draft is listed too, with the same way in.
-    await expect(
-        card(page)
-            .getByTestId('upgrade-drafts')
-            .getByRole('button', { name: 'Open Work in progress' }),
-    ).toBeVisible();
-    // A text chart no longer opens (#1739): Open says so, and the song and its draft stay put.
-    await card(page)
-        .getByTestId('upgrade-skipped')
-        .getByRole('button', { name: 'Open Work in progress' })
-        .click();
-    await expect(page.getByText(OLD_FORMAT_REFUSAL)).toBeVisible();
-    expect((await documents(page)).find((document) => document.id === 'edited')).toEqual(edited);
-    expect(await slots(page)).toEqual(before);
+    // Its unsaved draft is listed too. A text chart no longer opens (#1739), so neither offers
+    // Open, and the song and its draft stay put.
+    await expect(card(page).getByTestId('upgrade-drafts')).toContainText('Work in progress');
+    await expect(card(page).getByRole('button', { name: 'Open Work in progress' })).toHaveCount(0);
 });
 
 /** A recovery slot left by a tab long gone, for a song this device does not hold. */

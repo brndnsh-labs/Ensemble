@@ -129,8 +129,8 @@ let currentTimeline: { score: SemanticScore; timeline: Timeline } | null = null;
 
 // ---------------------------------------------------------------- the band engine
 // The band engine (`band/`, docs/design/band-engine.md) plays, through the shared voices,
+// buses and sound packs. The old worker/scheduler generator no longer runs in the app (#1404).
 /** One sixteenth in band ticks: the unit of `playback.startStep` (`sectionSteps`). */
-/** One sixteenth in band ticks: the old engine's step, so step maps convert exactly. */
 const STEP_TICKS = PPQ / 4;
 /** A native style with a lead picks its lead instrument's sound. */
 function bandAutoLead(genre: string | undefined): InstrumentVoice | null {

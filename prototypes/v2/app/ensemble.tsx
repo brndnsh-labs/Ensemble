@@ -4878,6 +4878,13 @@ export default function Ensemble() {
         if (!current || update === null || update.documentId !== current.id) {
             return;
         }
+        if (update.oldFormat) {
+            // The account's version is a text chart, which the app no longer opens (#1739).
+            // Refused BEFORE the transaction: adopting it would discard this device's experiment
+            // and drafts for a version the stand could not then open. Nothing changes.
+            setAdoptRemoteFailure(OLD_FORMAT_REFUSAL);
+            return;
+        }
         // Captured before the awaits, like `owner`: whether anything was at stake is what the
         // closing sentence reports, and by the time it runs `open()` has replaced the chart.
         const discarding = dirty;

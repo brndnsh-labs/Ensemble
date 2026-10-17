@@ -2418,6 +2418,27 @@ describe('the sync loop publishes the remote updates it preserved', () => {
         ]);
     });
 
+    it('marks a version whose body is a text chart, so the stand refuses it before adopting (#1739)', async () => {
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(
+            api,
+            createAccountSession(api),
+            stubSongbook({
+                remoteCandidates: async () => [
+                    { ...version('song-old', 'cloud-4'), document: { schemaVersion: 1 } },
+                    { ...version('song-new', 'cloud-5'), document: { schemaVersion: 2 } },
+                ],
+            }),
+        );
+
+        await loop.attach(OWNER);
+
+        expect(loop.getSnapshot().candidates).toEqual([
+            { documentId: 'song-old', revision: 'cloud-4', kind: 'version', oldFormat: true },
+            { documentId: 'song-new', revision: 'cloud-5', kind: 'version' },
+        ]);
+    });
+
     it('keeps the last list rather than retracting it when the store cannot be read', async () => {
         const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
         let readable = true;
