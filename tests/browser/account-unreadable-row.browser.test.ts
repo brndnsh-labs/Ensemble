@@ -86,13 +86,20 @@ function putCorruptSong(documentId: string, remoteRevision: string | null = 'r-o
 }
 
 /** A cloud that commits every Save it is handed and records which ids it saw. */
-function committing(): { transport: SaveTransport; ids: string[] } {
+function committing(): {
+    transport: SaveTransport;
+    ids: string[];
+    bodies: Array<{ expectedRevision: string | null; document: { title: string } }>;
+} {
     const ids: string[] = [];
+    const bodies: Array<{ expectedRevision: string | null; document: { title: string } }> = [];
     let next = 0;
     return {
         ids,
+        bodies,
         transport: async (request) => {
             ids.push(request.documentId);
+            bodies.push(JSON.parse(request.body));
             next += 1;
             return {
                 ownerId: request.ownerId,
@@ -224,6 +231,64 @@ describe('a mirror row that will not decode (#1769)', () => {
         expect(sky.downloads).toEqual([]);
     });
 
+    it('is not written over while a live draft holds it', async () => {
+        await putCorruptSong('song-a');
+        await put('drafts', {
+            ownerId: OWNER,
+            documentId: 'song-a',
+            writerId: 'writer-old',
+            document: accountChart('Experiment', 'song-a'),
+            baseRevision: 0,
+            capturedAt: new Date().toISOString(),
+        });
+        const result = await cloud(
+            new Map([['song-a', { revision: 'r-new', document: accountChart('Clean', 'song-a') }]]),
+        ).run();
+        expect(result.superseded).toEqual(['song-a']);
+        expect(await stored('songs', 'song-a')).toMatchObject({ document: corruptChart('song-a') });
+    });
+
+    it('is flagged, never removed, by a tombstone — once', async () => {
+        await putCorruptSong('song-a');
+        const tombstone = {
+            run: () =>
+                runLibraryDownload(
+                    book,
+                    scope,
+                    {
+                        async manifest() {
+                            return {
+                                kind: 'page',
+                                page: {
+                                    documents: [
+                                        {
+                                            documentId: 'song-a',
+                                            revision: 'r-gone',
+                                            deleted: true,
+                                            bytes: 0,
+                                        },
+                                    ],
+                                    nextAfterDocumentId: null,
+                                },
+                            };
+                        },
+                        async download() {
+                            throw new Error('A tombstone needs no body.');
+                        },
+                    },
+                    { isActive: () => false, minimumIntervalMs: 0 },
+                ),
+        };
+        const first = await tombstone.run();
+        expect(first.retainedDeleted).toEqual(['song-a']);
+        expect(await book.remoteCandidate(scope, 'song-a')).toMatchObject({ kind: 'deleted' });
+        expect(await stored('songs', 'song-a')).toMatchObject({ document: corruptChart('song-a') });
+        // Settled: the next pass commits nothing for it again.
+        const second = await tombstone.run();
+        expect(second.retainedDeleted).toEqual([]);
+        expect(second.unchanged).toEqual(['song-a']);
+    });
+
     it('as a collection, is stepped over by both passes and replaced by the account’s copy', async () => {
         await put('collections', {
             ownerId: OWNER,
@@ -232,7 +297,9 @@ describe('a mirror row that will not decode (#1769)', () => {
             remoteRevision: 'r-old',
         });
         await book.saveCollection(scope, { ...newCollection('Set B'), id: 'set-b' }, null);
-        expect((await book.collectionPage(scope)).unreadable).toEqual(['set-a']);
+        expect((await book.collectionPage(scope)).unreadable).toEqual([
+            { documentId: 'set-a', remoteRevision: 'r-old' },
+        ]);
 
         const sky = committing();
         const outbox = await runOutboxPass(book, scope, sky.transport);
@@ -271,37 +338,102 @@ describe('a queued Save that will not decode (#1769)', () => {
         return String(head.operationId);
     }
 
-    it('retires that document’s whole queue, keeps its receipts, and does not block the others', async () => {
+    it('retires the whole queue and re-queues the readable record, losing nothing and blocking no one', async () => {
         await chainedQueue();
         await book.save(scope, accountChart('A', 'song-a'), null);
         await book.save(scope, accountChart('C', 'song-c'), null);
         const receipts = (await all('receipts')).filter((row) => row.documentId === 'song-b');
         expect(receipts).toHaveLength(1);
+        const queued = (await all('operations')).filter((op) => op.documentId === 'song-b');
         const sky = committing();
 
         const result = await runOutboxPass(book, scope, sky.transport);
 
         expect(result.kind).toBe('complete');
-        expect(sky.ids).toEqual(['song-a', 'song-c']);
-        expect(result.counts).toMatchObject({ committed: 2, unreadable: 1 });
-        // The WHOLE queue went — never one operation out of its `base` chain.
-        expect((await all('operations')).filter((op) => op.documentId === 'song-b')).toEqual([]);
-        expect(await book.queued(scope, 'song-b')).toEqual([]);
+        // B2 — chained behind the head that would not read — still uploads, in the same pass,
+        // on the record's own confirmed revision.
+        expect(sky.ids).toEqual(['song-a', 'song-b', 'song-c']);
+        expect(sky.bodies[1]).toMatchObject({ expectedRevision: 'r1', document: { title: 'B2' } });
+        expect(result.counts).toMatchObject({ committed: 3, unreadable: 0 });
+        // The WHOLE old queue went — never one operation out of its `base` chain — and the
+        // re-queued Save was acknowledged like any other.
+        const left = (await all('operations')).filter((op) => op.documentId === 'song-b');
+        expect(left).toEqual([]);
+        for (const op of queued) {
+            expect((await all('receipts')).some((r) => r.operationId === op.operationId)).toBe(
+                false,
+            );
+        }
         // Receipts stay: they record Saves already acknowledged, not work.
-        expect((await all('receipts')).filter((row) => row.documentId === 'song-b')).toEqual(
-            receipts,
-        );
-        // The saved record is left as it was.
-        expect((await book.read(scope, 'song-b'))?.document.title).toBe('B2');
+        const after = (await all('receipts')).filter((row) => row.documentId === 'song-b');
+        expect(after).toEqual(expect.arrayContaining(receipts));
+        expect(after).toHaveLength(2);
+        expect(await book.read(scope, 'song-b')).toMatchObject({
+            remoteRevision: 'r2',
+            document: { title: 'B2' },
+        });
+    });
 
-        // The next pass has nothing left to retire, and B can be Saved and uploaded again.
-        const again = await runOutboxPass(book, scope, sky.transport);
-        expect(again.counts.unreadable).toBe(0);
-        const saved = (await book.read(scope, 'song-b'))!;
-        await book.save(scope, { ...saved.document, title: 'B3' }, saved.document.revision);
-        await runOutboxPass(book, scope, sky.transport);
-        expect(sky.ids.at(-1)).toBe('song-b');
-        expect(await book.queued(scope, 'song-b')).toEqual([]);
+    it('never lets the same pass’s download write over unsent music it could not read', async () => {
+        // Confirmed at r1, then edited: the record says r1 and holds the edit, as `save()`
+        // leaves it. Then both the record and the queued Save stop decoding.
+        const first = await book.save(scope, accountChart('B0', 'song-b'), null);
+        await runOutboxPass(book, scope, committing().transport);
+        await book.save(scope, { ...first.document, title: 'B1' }, first.document.revision);
+        const [op] = (await all('operations')).filter((row) => row.documentId === 'song-b');
+        await put('operations', { ...op, snapshot: corruptChart('song-b') });
+        await put('songs', {
+            ownerId: OWNER,
+            documentId: 'song-b',
+            document: corruptChart('song-b'),
+            remoteRevision: 'r1',
+        });
+
+        // One pass: the outbox first, then the download, as `pass()` runs them.
+        const outbox = await runOutboxPass(book, scope, committing().transport);
+        expect(outbox.counts.unreadable).toBe(1);
+        const sky = cloud(new Map([['song-b', { revision: 'r1', document: first.document }]]));
+        const result = await sky.run();
+
+        // Not fetched, not written: the edit is still here, for the export to hand back.
+        expect(sky.downloads).toEqual([]);
+        expect(result.advanced).toEqual([]);
+        expect(await stored('songs', 'song-b')).toMatchObject({
+            document: corruptChart('song-b'),
+            remoteRevision: null,
+        });
+        expect((await book.unreadableSongs(scope)).map((row) => row.documentId)).toEqual([
+            'song-b',
+        ]);
+        // Settled, not "still downloading".
+        expect(result.complete).toBe(true);
+        expect(result.library).toMatchObject({ unsettled: 0 });
+        // And now unconfirmed, the musician can remove it from this device.
+        expect(await book.purgeLocal(scope, ['song-b'])).toEqual({
+            purged: ['song-b'],
+            held: [],
+        });
+    });
+
+    it('steps over a queue from a newer build, never retiring it', async () => {
+        await book.save(scope, accountChart('A', 'song-a'), null);
+        const b = await book.save(scope, accountChart('B', 'song-b'), null);
+        const [op] = (await all('operations')).filter((row) => row.documentId === 'song-b');
+        // A stale tab on an older build reads what a newer one queued.
+        await put('operations', {
+            ...op,
+            snapshot: { ...b.document, schemaVersion: 99 },
+        });
+        const sky = committing();
+
+        const result = await runOutboxPass(book, scope, sky.transport);
+
+        expect(result.kind).toBe('complete');
+        expect(sky.ids).toEqual(['song-a']);
+        expect(result.counts).toMatchObject({ committed: 1, refused: 1, unreadable: 0 });
+        expect((await all('operations')).filter((row) => row.documentId === 'song-b')).toHaveLength(
+            1,
+        );
     });
 
     it('still sends a readable queue whose record will not read, and the download then heals the record', async () => {

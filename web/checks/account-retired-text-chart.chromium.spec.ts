@@ -88,6 +88,14 @@ test('sign-out and account deletion name a song this app can no longer open, and
     await page.reload();
     await expect(accountChip(page)).toBeVisible();
 
+    // All songs leaves it out and says so (#1769), rather than passing for the whole songbook.
+    await page.getByTestId('all-songs-link').click();
+    await expect(page.getByTestId('all-songs-unreadable')).toHaveText(
+        'One song on this device couldn’t be read, so it isn’t listed here.',
+    );
+    await expect(page.locator('.all-songs-count')).toHaveText('· 1');
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+
     await openSignOut(page);
     await expect(page.getByTestId('sign-out-unreadable')).toHaveText(
         'One song this app can no longer open will be removed — export it to keep the file.',

@@ -143,7 +143,7 @@ describe('a text chart left in the account mirror (#1740)', () => {
         expect(first).toEqual({
             songs: [],
             nextAfterDocumentId: 'song-a',
-            unreadable: ['song-a'],
+            unreadable: [{ documentId: 'song-a', remoteRevision: 'r-old' }],
         });
         const second = await book.list(scope, { limit: 1, afterDocumentId: 'song-a' });
         expect(second.songs.map((song) => song.documentId)).toEqual(['song-b']);

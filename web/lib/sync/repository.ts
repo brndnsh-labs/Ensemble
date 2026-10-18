@@ -1,7 +1,8 @@
-import { isRetiredSchema } from '../../../core/songbook/document-v2.js';
+import { isRetiredSchema, validateChartDocumentV2 } from '../../../core/songbook/document-v2.js';
 import {
     assertBuiltInKept,
     BuiltInCollectionError,
+    decodeCollection,
     isCollectionCandidate,
     mergeSongIds,
     resolvedSongIds,
@@ -15,7 +16,7 @@ import {
     rememberingValidator,
     settleHome,
 } from '../home';
-import { AccountDatabase, type Transaction } from './database';
+import { AccountDatabase, type Table, type Transaction } from './database';
 import {
     type AccountScope,
     type ChartDocument,
@@ -91,7 +92,26 @@ export interface SongPage {
      * good. Left stored and untouched; the outbox still visits the id (its queue may need
      * retiring) and a download can replace it with the account's copy (`reconcile`).
      */
-    unreadable: string[];
+    unreadable: UnreadableRow[];
+}
+
+/**
+ * A row a page stepped over (#1769), with the one fact the download plans by: the remote revision
+ * it is stored under, or null when the row has none a reader can trust — never confirmed, or not a
+ * valid revision at all. Only a confirmed row may be replaced by the account's copy.
+ */
+export interface UnreadableRow {
+    documentId: string;
+    remoteRevision: string | null;
+}
+
+function unreadableRow(row: { documentId: string; remoteRevision?: unknown }): UnreadableRow {
+    try {
+        remoteRevision(row.remoteRevision);
+        return { documentId: row.documentId, remoteRevision: row.remoteRevision };
+    } catch {
+        return { documentId: row.documentId, remoteRevision: null };
+    }
 }
 
 /** One bounded page of this owner's collections, in `SongPage`'s shape and cursor grammar. */
@@ -100,7 +120,7 @@ export interface CollectionPage {
     /** Null at end of list. Never a promise that the next page sees the same library. */
     nextAfterDocumentId: string | null;
     /** `SongPage.unreadable`'s collection half (#1769). */
-    unreadable: string[];
+    unreadable: UnreadableRow[];
 }
 
 /**
@@ -361,7 +381,7 @@ function queueOf<T, D extends SyncDocument>(
     id: string,
     decode: (candidate: unknown) => D,
     consume: (ops: SaveOperation<D>[]) => void,
-    unreadable?: (count: number) => void,
+    unreadable?: (ops: SaveOperation<SyncDocument>[]) => void,
 ) {
     tx.read(
         tx
@@ -383,7 +403,7 @@ function queueOf<T, D extends SyncDocument>(
                 if (!unreadable) {
                     throw error;
                 }
-                return unreadable(ops.length);
+                return unreadable(ops);
             }
             consume(queue);
         },
@@ -418,6 +438,17 @@ function readableRecord<R>(decode: () => R): R | 'unreadable' {
     } catch {
         return 'unreadable';
     }
+}
+
+/**
+ * Is this a document from a NEWER schema than this build knows (#1769)? The canonical decoders'
+ * own verdict, as the download's quarantine asks it: such bytes are presumed good, written by a
+ * newer build that may share this database, so nothing here may retire them.
+ */
+function newerSchema(document: unknown): boolean {
+    return isCollectionCandidate(document)
+        ? decodeCollection(document).kind === 'future-version'
+        : validateChartDocumentV2(document).kind === 'future-version';
 }
 
 function operations<T>(
@@ -1116,7 +1147,7 @@ export class AccountSongbook {
                     unreadable: rows
                         .slice(0, limit)
                         .filter((_, index) => page[index] === 'unreadable')
-                        .map((row) => row.documentId),
+                        .map(unreadableRow),
                 });
             });
         });
@@ -1886,7 +1917,7 @@ export class AccountSongbook {
                     unreadable: rows
                         .slice(0, limit)
                         .filter((_, index) => page[index] === 'unreadable')
-                        .map((row) => row.documentId),
+                        .map(unreadableRow),
                 });
             });
         });
@@ -2341,11 +2372,20 @@ export class AccountSongbook {
     /**
      * Freeze the head of one document's queue for sending, or say why there is nothing to send.
      *
-     * `'unreadable'` (#1769): a queued Save this build cannot read — a text chart (schema 1,
-     * retired in #1740), or a row that will not validate — can never be sent, and refusing the
-     * read stopped every later pass at this document. So the document's WHOLE queue retires in
-     * this same transaction (receipts kept; never one operation out of a `base` chain), and the
-     * pass carries on to the next document. Its saved record is left as it is.
+     * A queue this build cannot read (#1769) — a text chart (schema 1, retired in #1740), or a row
+     * that will not validate — could never be sent, and refusing the read stopped every later pass
+     * at this document. So, in this one transaction:
+     *
+     * - A queue holding a NEWER schema than this build knows is left alone and stepped over as a
+     *   refused head is (`'refused'`): a stale tab on an old build shares this database, and the
+     *   build that wrote it can still send it. A validator regression must not delete it either.
+     * - Otherwise the WHOLE queue retires (receipts kept; never one operation out of a `base`
+     *   chain) and the saved record decides what follows. A record that reads still holds the
+     *   newest local Save — `save()` writes both together — so one fresh Save of it is queued on
+     *   its own remote revision, `save()`'s refused-head precedent, and frozen to send now:
+     *   nothing is lost. A record that does not read loses its remote revision, so it is never
+     *   taken for a clean mirror a download may write over (`reconcile`); it stays for
+     *   `unreadableSongs` to export and `purgeLocal` to remove, and `'unreadable'` is answered.
      */
     async prepare(
         scope: AccountScope,
@@ -2357,55 +2397,96 @@ export class AccountSongbook {
         const operation = await this.database.run<
             SaveOperation<SyncDocument> | 'idle' | 'conflict' | 'refused' | 'unreadable'
         >('readwrite', scope, (tx) => {
-            const unreadable = () =>
-                retireQueue(tx, scope, documentId, () => tx.finish('unreadable'));
+            const send = (head: SaveOperation<SyncDocument>) => {
+                if (head.status === 'conflict') {
+                    return tx.finish('conflict');
+                }
+                if (head.status === 'refused') {
+                    return tx.finish('refused');
+                }
+                if (head.wireBody !== null) {
+                    return tx.finish(head);
+                }
+                const freeze = (revision: string | null) => {
+                    if (revision !== null) {
+                        remoteRevision(revision);
+                    }
+                    head.wireBody = JSON.stringify({
+                        protocolVersion: 1,
+                        ownerId: scope.ownerId,
+                        documentId,
+                        operationId: head.operationId,
+                        expectedRevision: revision,
+                        document: syncDocument(head.snapshot),
+                    });
+                    tx.table('operations').put(head);
+                    tx.finish(head);
+                };
+                if ('revision' in head.base) {
+                    return freeze(head.base.revision);
+                }
+                tx.read(
+                    tx.table('receipts').get([scope.ownerId, head.base.operationId]),
+                    (receipt: SaveReceipt | undefined) => {
+                        if (!receipt || receipt.documentId !== documentId) {
+                            throw new Error('The preceding Save has no confirmed receipt.');
+                        }
+                        freeze(receipt.revision);
+                    },
+                );
+            };
+            const key = [scope.ownerId, documentId];
+            const settle = (row: SavedSong | SavedCollection | undefined, store: Table) => {
+                if (!row) {
+                    return tx.finish('unreadable');
+                }
+                const record = readableRecord<SavedSong | SavedCollection>(() =>
+                    store === 'collections'
+                        ? savedCollection(row as SavedCollection, scope, documentId)
+                        : savedSong(row as SavedSong, scope, documentId),
+                );
+                if (record === 'unreadable') {
+                    if (row.remoteRevision !== null) {
+                        tx.table(store).put({ ...row, remoteRevision: null });
+                    }
+                    return tx.finish('unreadable');
+                }
+                const fresh: SaveOperation<SyncDocument> = {
+                    ownerId: scope.ownerId,
+                    documentId,
+                    operationId: crypto.randomUUID(),
+                    localRevision: record.document.revision,
+                    snapshot: record.document,
+                    base: { revision: record.remoteRevision },
+                    wireBody: null,
+                    status: 'queued',
+                };
+                tx.table('operations').add(fresh);
+                send(fresh);
+            };
+            const unreadable = (ops: SaveOperation<SyncDocument>[]) => {
+                if (ops.some((op) => newerSchema(op?.snapshot))) {
+                    return tx.finish('refused');
+                }
+                retireQueue(tx, scope, documentId, () => {
+                    tx.read(tx.table('songs').get(key), (song: SavedSong | undefined) => {
+                        if (song !== undefined) {
+                            return settle(song, 'songs');
+                        }
+                        tx.read(
+                            tx.table('collections').get(key),
+                            (collection: SavedCollection | undefined) =>
+                                settle(collection, 'collections'),
+                        );
+                    });
+                });
+            };
             queueOf(
                 tx,
                 scope,
                 documentId,
                 syncDocument,
-                (queue) => {
-                    const head = queue[0];
-                    if (!head) {
-                        return tx.finish('idle');
-                    }
-                    if (head.status === 'conflict') {
-                        return tx.finish('conflict');
-                    }
-                    if (head.status === 'refused') {
-                        return tx.finish('refused');
-                    }
-                    if (head.wireBody !== null) {
-                        return tx.finish(head);
-                    }
-                    const freeze = (revision: string | null) => {
-                        if (revision !== null) {
-                            remoteRevision(revision);
-                        }
-                        head.wireBody = JSON.stringify({
-                            protocolVersion: 1,
-                            ownerId: scope.ownerId,
-                            documentId,
-                            operationId: head.operationId,
-                            expectedRevision: revision,
-                            document: syncDocument(head.snapshot),
-                        });
-                        tx.table('operations').put(head);
-                        tx.finish(head);
-                    };
-                    if ('revision' in head.base) {
-                        return freeze(head.base.revision);
-                    }
-                    tx.read(
-                        tx.table('receipts').get([scope.ownerId, head.base.operationId]),
-                        (receipt: SaveReceipt | undefined) => {
-                            if (!receipt || receipt.documentId !== documentId) {
-                                throw new Error('The preceding Save has no confirmed receipt.');
-                            }
-                            freeze(receipt.revision);
-                        },
-                    );
-                },
+                (queue) => (queue[0] ? send(queue[0]) : tx.finish('idle')),
                 unreadable,
             );
         });
@@ -3335,51 +3416,57 @@ export class AccountSongbook {
                         : null;
                     if (stored && record === 'unreadable') {
                         // A row this build cannot read (#1769): a text chart (schema 1, retired
-                        // in #1740) or one that will not validate. `list` steps over it, so the
-                        // plan saw no record here. Nothing throws, so the pass goes on, and every
-                        // answer below settles the observation rather than leaving it to be
-                        // fetched again on every pass.
+                        // in #1740) or one that will not validate. `list` names it, and the plan
+                        // asks for the account's copy only while the row is confirmed (a remote
+                        // revision) and for a tombstone (`planLibraryDownload`). Nothing throws.
                         //
-                        // When the account confirmed this row (a remote revision) and nothing is
-                        // queued for it, the row holds nothing the account has not got, and the
-                        // account's version replaces it as it would a clean record — otherwise
-                        // the song would never appear. A row the account never confirmed, or one
-                        // with a Save queued, may be the only copy of its music: nothing is
-                        // written over it. The outbox retires a queue that will not read
-                        // (`prepare`), so a queue is only ever in the way until it has sent.
-                        tx.read(
-                            tx.table('operations').index('song').count([scope.ownerId, documentId]),
-                            (queued: number) => {
-                                if (observed.kind === 'unsupported') {
-                                    // Preserved as for a readable row, so the plan stops asking
-                                    // for a body this build has already kept and cannot read.
-                                    tx.table('meta').put(candidate());
-                                    return tx.finish('unsupported');
-                                }
-                                if (observed.kind === 'deleted') {
-                                    // Never removed: the row cannot be read, so nothing here can
-                                    // tell what it holds. The flag says the account has let it go,
-                                    // which is what lets the musician remove it (`purgeLocal`).
-                                    tx.table('meta').put(candidate());
-                                    return tx.finish('retained-deleted');
-                                }
-                                if (
-                                    active ||
-                                    queued > 0 ||
-                                    typeof stored.remoteRevision !== 'string'
-                                ) {
-                                    return tx.finish('superseded');
-                                }
-                                tx.table('songs').put({
-                                    ownerId: scope.ownerId,
-                                    documentId,
-                                    document: observed.document,
-                                    remoteRevision: observed.revision,
-                                } satisfies SavedSong);
-                                tx.table('meta').delete(key);
-                                tx.finish('advanced');
-                            },
-                        );
+                        // Confirmed, with nothing holding it — no queued Save, no live draft (a
+                        // draft on a record nothing can read counts live, `liveDraft`), not on the
+                        // stand — the row holds nothing the account has not got, and the
+                        // account's version replaces it as it would a clean record. Anything else
+                        // may be the only copy of its music: nothing is written over it, and the
+                        // answer is `'superseded'`. `prepare` clears the remote revision of a row
+                        // whose queue it retired, so unsent music is never mistaken for a mirror.
+                        liveDrafts(tx, scope, documentId, null, (drafts: number) => {
+                            tx.read(
+                                tx
+                                    .table('operations')
+                                    .index('song')
+                                    .count([scope.ownerId, documentId]),
+                                (queued: number) => {
+                                    if (observed.kind !== 'version') {
+                                        // An unsupported body is preserved as for a readable row,
+                                        // and a tombstone flags the row without removing it:
+                                        // nothing here can tell what it holds. Either candidate
+                                        // is what the plan reads to stop asking again, and a
+                                        // `deleted` one is what lets the musician remove the row
+                                        // (`purgeLocal`).
+                                        tx.table('meta').put(candidate());
+                                        return tx.finish(
+                                            observed.kind === 'unsupported'
+                                                ? 'unsupported'
+                                                : 'retained-deleted',
+                                        );
+                                    }
+                                    if (
+                                        active ||
+                                        drafts > 0 ||
+                                        queued > 0 ||
+                                        typeof stored.remoteRevision !== 'string'
+                                    ) {
+                                        return tx.finish('superseded');
+                                    }
+                                    tx.table('songs').put({
+                                        ownerId: scope.ownerId,
+                                        documentId,
+                                        document: observed.document,
+                                        remoteRevision: observed.revision,
+                                    } satisfies SavedSong);
+                                    tx.table('meta').delete(key);
+                                    tx.finish('advanced');
+                                },
+                            );
+                        });
                         return;
                     }
                     const song = record === 'unreadable' ? null : record;
@@ -3472,7 +3559,7 @@ export class AccountSongbook {
                             documentId,
                             snapshot,
                             (queue) => decided(queue.length),
-                            decided,
+                            (ops) => decided(ops.length),
                         );
                     });
                 },
@@ -3548,20 +3635,21 @@ export class AccountSongbook {
                         const held = queued > 0;
                         if (record === 'unreadable') {
                             // A collection row this build cannot read (#1769): `collectionPage`
-                            // steps over it, so the plan saw no record. The account's version
-                            // replaces it when the account confirmed the row and nothing is
-                            // queued — the row then holds nothing the account lacks; otherwise
-                            // nothing is written. Never removed by a tombstone: nothing here can
-                            // tell what it holds.
+                            // names it, and the plan asks for the account's copy only while the
+                            // row is confirmed. The account's version replaces it when the
+                            // account confirmed the row and nothing is queued — the row then
+                            // holds nothing the account lacks; otherwise nothing is written. A
+                            // tombstone writes nothing either (`'unchanged'`): nothing here can
+                            // tell what the row holds, and a collection has no candidate store.
+                            if (document === null) {
+                                return tx.finish('unchanged');
+                            }
                             if (
-                                document === null ||
                                 held ||
                                 typeof (row as { remoteRevision?: unknown }).remoteRevision !==
                                     'string'
                             ) {
-                                return tx.finish(
-                                    document === null ? 'retained-deleted' : 'superseded',
-                                );
+                                return tx.finish('superseded');
                             }
                             tx.table('collections').put({
                                 ownerId: scope.ownerId,
@@ -3611,7 +3699,7 @@ export class AccountSongbook {
                         documentId,
                         collectionSnapshot,
                         (queue) => decided(queue.length),
-                        decided,
+                        (ops) => decided(ops.length),
                     );
                 },
             );

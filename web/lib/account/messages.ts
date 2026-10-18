@@ -149,6 +149,17 @@ export const REMOTE_UPDATE_MESSAGES = {
 } as const;
 
 /**
+ * Songs stored on this device that this build cannot read (#1441, #1769), said the same way on the
+ * home and on All songs: they are left out of the list, and the count says so rather than letting
+ * the list pass for the whole songbook.
+ */
+export function unreadableSongsNotice(count: number): string {
+    return count === 1
+        ? 'One song on this device couldn’t be read, so it isn’t listed here.'
+        : `${count} songs on this device couldn’t be read, so they aren’t listed here.`;
+}
+
+/**
  * Deleting songs from this device for good (#1754) — the way out for a song a cloud delete cannot
  * remove: one the account no longer holds (`REMOTE_UPDATE_MESSAGES.deletedMarker`) or never
  * received. Nothing is sent, so nothing here says "account" except to say where the song is NOT.

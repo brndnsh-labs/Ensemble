@@ -98,7 +98,9 @@ describe('AccountSongbook.home (#1441)', () => {
         expect(slice.rows).toHaveLength(8);
         expect(slice.unreadable).toBe(0);
         // The full read steps over it too, and names it (#1769).
-        expect((await book.list(scopeA, { limit: 100 })).unreadable).toEqual(['zz-corrupt']);
+        expect((await book.list(scopeA, { limit: 100 })).unreadable).toEqual([
+            { documentId: 'zz-corrupt', remoteRevision: null },
+        ]);
     });
 
     it('counts and leaves out a corrupt record it does read', async () => {

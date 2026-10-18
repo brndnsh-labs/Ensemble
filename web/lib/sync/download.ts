@@ -185,6 +185,12 @@ export interface LocalMirror {
     quarantinedRevision: string | null;
     /** `'collection'` for a record in the `collections` store (#1474); absent for a song. */
     kind?: 'collection';
+    /**
+     * A saved row this build cannot read (#1769). Planned by its own rule
+     * (`planLibraryDownload`): fetched only when its revision is confirmed — the one case the
+     * commit may replace it — and never "mirrored", since its bytes are not the account's.
+     */
+    unreadable?: true;
 }
 
 export interface PlannedDocument {
@@ -281,8 +287,9 @@ export interface LibraryDownloadResult {
     missing: string[];
     /**
      * What this build cannot read and stepped over rather than stopping on (#1769), in the order
-     * met: a local row that will not decode (left out of the diff, so a live manifest row for it
-     * is fetched, and `reconcile` may replace the row with the account's copy), and a body in the
+     * met: a local row that will not decode (never a mirror: a live manifest row for it is
+     * fetched only while the row is confirmed, and `reconcile` may then replace the row with the
+     * account's copy — see `planLibraryDownload`), and a body in the
      * retired text format (schema 1, #1740), which no build will read again — resolved, not a
      * failure, so the run can still complete. Nothing is written for either here.
      */
@@ -479,7 +486,13 @@ export function planLibraryDownload(
             const chart = charts.get(row.documentId);
             const collection = collections.get(row.documentId);
             const mirror = chart?.saved ? chart : collection?.saved ? collection : undefined;
-            if (mirror) {
+            // A tombstone over an unreadable row (#1769) is committed once, as a flag: a song's
+            // `reconcile` stores a `deleted` candidate at this revision, which settles it here
+            // after; a collection has no candidate store, and its commit would write nothing.
+            const settled =
+                mirror?.unreadable &&
+                (mirror.kind === 'collection' || mirror.quarantinedRevision === row.revision);
+            if (mirror && !settled) {
                 plan.tombstone.push({
                     documentId: row.documentId,
                     revision: row.revision,
@@ -504,6 +517,23 @@ export function planLibraryDownload(
         const expectedRemoteRevision = mirror?.saved ? mirror.remoteRevision : undefined;
         if (!isCollection) {
             plan.documents.required += 1;
+        }
+        if (mirror?.unreadable) {
+            // A row this build cannot read (#1769) is never a mirror of anything. Only a confirmed
+            // one can take the account's copy (`reconcile`), so an unconfirmed one — never sent,
+            // or its unsendable queue retired (`prepare`) — and a revision a candidate already
+            // settled are not asked for at all.
+            if (mirror.remoteRevision === null || mirror.quarantinedRevision === row.revision) {
+                plan.unchanged.push(row.documentId);
+            } else {
+                plan.fetch.push({
+                    documentId: row.documentId,
+                    revision: row.revision,
+                    expectedRemoteRevision: mirror.remoteRevision,
+                    ...(isCollection ? { kind: 'collection' as const } : {}),
+                });
+            }
+            continue;
         }
         if (mirror?.saved && mirror.remoteRevision === row.revision) {
             if (!isCollection) {
@@ -750,10 +780,17 @@ async function libraryDownloadPass(
     // longer knows whose records it is holding must not resolve at all.
     const local: LocalMirror[] = [];
     try {
+        const candidates = await songbook.remoteCandidates(scope);
         const quarantined = new Map(
-            (await songbook.remoteCandidates(scope))
+            candidates
                 .filter((candidate) => candidate.kind === 'unsupported')
                 .map((candidate) => [candidate.documentId, candidate.revision]),
+        );
+        // For a row this build cannot read, ANY candidate settles the revision it names (#1769):
+        // `reconcile` stores one only for an observation it has answered for good — a newer-format
+        // body or a tombstone — so asking again could only answer the same.
+        const settledFor = new Map(
+            candidates.map((candidate) => [candidate.documentId, candidate.revision]),
         );
         const saved = new Set<string>();
         let cursor: string | undefined;
@@ -774,7 +811,17 @@ async function libraryDownloadPass(
                     quarantinedRevision: quarantined.get(song.documentId) ?? null,
                 });
             }
-            unreadable.push(...listing.unreadable);
+            for (const row of listing.unreadable) {
+                saved.add(row.documentId);
+                unreadable.push(row.documentId);
+                local.push({
+                    documentId: row.documentId,
+                    saved: true,
+                    remoteRevision: row.remoteRevision,
+                    quarantinedRevision: settledFor.get(row.documentId) ?? null,
+                    unreadable: true,
+                });
+            }
             if (listing.nextAfterDocumentId === null) {
                 break;
             }
@@ -815,7 +862,17 @@ async function libraryDownloadPass(
                     kind: 'collection',
                 });
             }
-            unreadable.push(...listing.unreadable);
+            for (const row of listing.unreadable) {
+                unreadable.push(row.documentId);
+                local.push({
+                    documentId: row.documentId,
+                    saved: true,
+                    remoteRevision: row.remoteRevision,
+                    quarantinedRevision: null,
+                    kind: 'collection',
+                    unreadable: true,
+                });
+            }
             if (listing.nextAfterDocumentId === null) {
                 break;
             }
@@ -1041,6 +1098,15 @@ async function libraryDownloadPass(
     );
     const settled = new Set<string>();
     for (const mirror of local) {
+        if (
+            mirror.kind !== 'collection' &&
+            mirror.unreadable &&
+            mirror.remoteRevision === null &&
+            live.has(mirror.documentId)
+        ) {
+            // Never asked for (#1769): nothing a download could change.
+            settled.add(mirror.documentId);
+        }
         if (
             mirror.kind !== 'collection' &&
             mirror.quarantinedRevision !== null &&

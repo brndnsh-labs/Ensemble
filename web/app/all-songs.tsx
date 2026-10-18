@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { PURGE_MESSAGES, REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
+import {
+    PURGE_MESSAGES,
+    REMOTE_UPDATE_MESSAGES,
+    unreadableSongsNotice,
+} from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
 import { starredOf } from '../lib/collections';
 import { composerOf, genreOf } from '../lib/documents';
@@ -41,11 +45,17 @@ interface AllSongsProps {
      */
     songs: ChartDocument[] | null;
     /**
-     * Why that read failed, when it did. A full read refuses a songbook it cannot wholly read
-     * (`lib/repository.ts`'s `list`), and that refusal is said here — the one surface that lists
-     * every song — instead of being turned into a short or empty list.
+     * Why that read failed, when it did. The guest songbook's full read refuses a songbook it
+     * cannot wholly read (`lib/repository.ts`'s `list`), and that refusal is said here — the one
+     * surface that lists every song — instead of being turned into a short or empty list.
      */
     failure: string | null;
+    /**
+     * Songs the full read stepped over because this build cannot read them (#1769): the account
+     * songbook's `listLibrary` leaves such a row out rather than refusing the rest, and this count
+     * (`unreadableSongs`) says so. Zero for the guest songbook, whose read refuses instead.
+     */
+    unreadable: number;
     accountLibrary: boolean;
     /**
      * The star set — the built-in Starred collection's songs since #1477, the same source
@@ -121,6 +131,7 @@ interface AllSongsProps {
 export function AllSongs({
     songs: library,
     failure,
+    unreadable,
     accountLibrary,
     starred,
     openedAt,
@@ -571,6 +582,15 @@ export function AllSongs({
                             >
                                 {PURGE_MESSAGES.bulk(goneIds.length)}
                             </button>
+                        </p>
+                    )}
+                    {loaded && unreadable > 0 && (
+                        <p
+                            className="library-notice"
+                            role="status"
+                            data-testid="all-songs-unreadable"
+                        >
+                            {unreadableSongsNotice(unreadable)}
                         </p>
                     )}
                     {!loaded ? (

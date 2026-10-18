@@ -223,14 +223,18 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         // Not an error, and not a silent partial library either: the page names what it left out.
         const page = await book.list(scope);
         expect(page.songs.map((s) => s.documentId)).toEqual([ids[0], ids[1], ids[3]]);
-        expect(page.unreadable).toEqual([ids[2]]);
+        expect(page.unreadable).toEqual([{ documentId: ids[2], remoteRevision: null }]);
         // Only the page's own rows are named: the look-ahead row is the next page's.
         const short = await book.list(scope, { limit: 2 });
         expect(short.unreadable).toEqual([]);
         expect(short.nextAfterDocumentId).toBe(ids[1]);
         // A page made wholly of it still moves the cursor past it.
         const alone = await book.list(scope, { limit: 1, afterDocumentId: ids[1] });
-        expect(alone).toEqual({ songs: [], nextAfterDocumentId: ids[2], unreadable: [ids[2]] });
+        expect(alone).toEqual({
+            songs: [],
+            nextAfterDocumentId: ids[2],
+            unreadable: [{ documentId: ids[2], remoteRevision: null }],
+        });
 
         await book.close();
         const after = await rawDatabase();
@@ -257,7 +261,7 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         book = connection();
         const page = await book.list(scope);
         expect(page.songs.map((s) => s.documentId)).toEqual([ids[1]]);
-        expect(page.unreadable).toEqual([ids[0]]);
+        expect(page.unreadable).toEqual([{ documentId: ids[0], remoteRevision: null }]);
     });
 
     it('rejects a stored key outside the identifier charset', async () => {

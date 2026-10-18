@@ -29,8 +29,9 @@ export interface OutboxPassResult {
      */
     resumeAfterDocumentId: string | null;
     /**
-     * `unreadable` counts the documents whose queue would not read and was retired whole this pass
-     * (#1769): each is news, a change that will never upload, so the caller says so once.
+     * `unreadable`: documents whose queue would not read, and whose record would not either, so
+     * the queue retired with nothing to re-queue (`AccountSongbook.prepare`, #1769). The row
+     * stays, unconfirmed, for the export and the "couldn't be read" count to name.
      */
     counts: {
         idle: number;
@@ -90,12 +91,12 @@ async function outboxPage(
     });
     const merged = [
         ...songs.songs.map((record) => ({ documentId: record.documentId, collection: false })),
-        ...songs.unreadable.map((documentId) => ({ documentId, collection: false })),
+        ...songs.unreadable.map(({ documentId }) => ({ documentId, collection: false })),
         ...collections.collections.map((record) => ({
             documentId: record.documentId,
             collection: true,
         })),
-        ...collections.unreadable.map((documentId) => ({ documentId, collection: true })),
+        ...collections.unreadable.map(({ documentId }) => ({ documentId, collection: true })),
     ].sort((a, b) => (a.documentId < b.documentId ? -1 : a.documentId > b.documentId ? 1 : 0));
     // Each page read up to its own cursor and no further, so the union is exact only up to the
     // nearer of the two cursors: nothing past it is visited here.
@@ -110,9 +111,10 @@ async function outboxPage(
 }
 
 /**
- * A song whose head is in conflict, permanently refused (#1298), idle with nothing queued, or
- * whose queue would not read and was retired (#1769), still counts as visited and lets the pass continue to the next song — only a transport
- * failure ends the pass early, so one stuck song can never starve every other song behind it.
+ * A song whose head is in conflict, permanently refused (#1298), idle with nothing queued,
+ * or whose queue would not read and was retired (#1769), still counts as visited and lets the
+ * pass continue to the next song — only a transport failure ends the pass early, so one stuck
+ * song can never starve every other song behind it.
  * A refused head costs no network request at all: `prepare()` answers `'refused'` without
  * sending anything, which is what stops a step-over from re-POSTing the same rejected bytes
  * on every later pass.

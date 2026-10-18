@@ -715,7 +715,7 @@ describe('account songbook on real IndexedDB', () => {
         expect((await book.drafts(scope, 'study'))[0].document.title).toBe('unsaved');
     });
 
-    it('retires a queue whose frozen bytes are corrupt, keeping the record (#1769)', async () => {
+    it('never re-sends corrupt frozen bytes: the queue retires and the record is queued afresh (#1769)', async () => {
         await book.save(scope, accountChart(), null);
         const request = await prepared();
         const raw = await new Promise<IDBDatabase>((resolve) => {
@@ -736,8 +736,15 @@ describe('account songbook on real IndexedDB', () => {
                 tx.onabort = () => reject(tx.error);
             });
             // Never re-sent from bytes it cannot trust, and never a reason to stop the pass: the
-            // queue retires whole, and the saved record stays exactly as it was.
-            expect(await book.prepare(scope, 'study')).toBe('unreadable');
+            // queue retires whole, and the record — which reads, and holds the newest Save — is
+            // queued again under a fresh operation id and sent instead. Nothing is lost.
+            const again = await prepared();
+            expect(again.operationId).not.toBe(request.operationId);
+            expect(JSON.parse(again.body)).toMatchObject({
+                ownerId: scope.ownerId,
+                expectedRevision: null,
+                document: { title: 'A' },
+            });
             expect((await book.read(scope, 'study'))?.document.title).toBe('A');
             const retained = await new Promise<unknown>((resolve, reject) => {
                 const tx = raw.transaction('operations');
@@ -748,7 +755,9 @@ describe('account songbook on real IndexedDB', () => {
                 tx.onabort = () => reject(tx.error);
             });
             expect(retained).toBeUndefined();
-            expect(await book.prepare(scope, 'study')).toBe('idle');
+            expect((await book.queued(scope, 'study')).map((op) => op.operationId)).toEqual([
+                again.operationId,
+            ]);
         } finally {
             raw.close();
         }
