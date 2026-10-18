@@ -1217,16 +1217,16 @@ function planFingers(options: FingerOption[][]): FingerOption[] {
                 if (!arrives(a, b)) {
                     return;
                 }
-                // The hand that has not moved pays nothing: `b.cost` comes off here and goes
-                // back on below, so every other sum is made in the order it always was and
-                // two plans that tie still fall the way they did.
-                const v = cost[j] + (sameFingers(a, b) ? -b.cost : fingerTransCost(a, b));
+                // The hand that has not moved pays nothing: a run of one grip under the same
+                // fingers pays that fingering's own cost once. Carried as it is, not taken off
+                // and put back, so a tie falls by order and never by float rounding (#1691).
+                const v = sameFingers(a, b) ? cost[j] : cost[j] + fingerTransCost(a, b) + b.cost;
                 if (v < bv) {
                     bv = v;
                     bi = j;
                 }
             });
-            nc.push(bv + b.cost);
+            nc.push(bv);
             nb.push(bi);
         });
         cost = nc;

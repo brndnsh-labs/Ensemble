@@ -3222,6 +3222,41 @@ describe('fingers a teacher would show (#1611)', () => {
                 expect(crowded(Fm)).toEqual([]);
                 expect(crowded(F)).toEqual([]);
             });
+            it('every shape that has them, pinned (#1691)', () => {
+                const Ebsus2 = chord('x x 3 3 4 x', '2 5 R');
+                const Esus4 = chord('0 2 2 2 0 0', 'R 5 R 4 5 R');
+                const Asus4 = chord('x 0 2 2 3 0', 'R 5 R 4 5');
+                // A finger added: a sus grip, open or closed.
+                expect(crowded(Ebsus2)).toEqual(['1-2-3', '2-3-4', '1-2-4', '1-3-4']);
+                expect(crowded(Esus4)).toEqual(['1-2-4', '1-3-4']);
+                expect(crowded(Asus4)).toEqual(['1-2-4', '1-3-4']);
+                // A finger lifted: any two-note grip with both fingers down.
+                expect(crowded(Csus4)).toEqual(['1-3', '2-4', '1-4']);
+                expect(crowded(Em)).toEqual(['1-3', '2-4', '1-4']);
+                expect(crowded(C)).toEqual(['3-1', '4-2', '4-1']);
+                // None: a barre, a reach, a grip already a fingertip each.
+                for (const c of [Am, D, Dm, chord('x x 1 3 4 x', 'R 5 R')]) {
+                    expect(crowded(c)).toEqual([]);
+                }
+                for (const c of [Ebsus2, Esus4, Asus4, Csus4, Em, C]) {
+                    for (const o of taughtOptions(c.notes, STRUM)) {
+                        if (crowded(c).includes(fingersOf(o.p))) {
+                            expect(o.hold).toBe(2);
+                        }
+                    }
+                }
+            });
+            it('and played where two fingers stay: E♭5 to E♭sus2, E to Esus4, Am to Asus4', () => {
+                const Eb5 = chord('x x 1 3 4 x', 'R 5 R');
+                const Ebsus2 = chord('x x 3 3 4 x', '2 5 R');
+                expect(run(Eb5, Ebsus2, Eb5)).toEqual(['1-3-4', '2-3-4', '1-3-4']);
+                const E = chord('0 2 2 1 0 0', 'R 5 R 3 5 R');
+                const Esus4 = chord('0 2 2 2 0 0', 'R 5 R 4 5 R');
+                expect(run(E, Esus4, E)).toEqual(['0-2-3-1-0-0', '0-2-3-4-0-0', '0-2-3-1-0-0']);
+                const openAm = chord('x 0 2 2 1 0', 'R 5 R b3 5');
+                const Asus4 = chord('x 0 2 2 3 0', 'R 5 R 4 5');
+                expect(run(openAm, Asus4)).toEqual(['0-2-3-1-0', '0-2-3-4-0']);
+            });
             it('only a suspension takes a finger added: Dm to B♭ is as it was', () => {
                 // Dm x 5 3 2 x x (4-2-1) to B♭ x 5 3 3 x x shares two notes the same way, and
                 // B♭ is the barre it is taught with, never 4-2-3 (#1617).
@@ -3718,5 +3753,23 @@ describe('rootMove', () => {
         const m = rootMove(GUITAR, a!, b!);
         expect(m.geometry).toBe('moves one string over, same fret');
         expect(m.straightAcross).toBe(true);
+    });
+});
+
+describe('a tie between two fingerings falls by order, never by float rounding (#1691)', () => {
+    it('B♭7 and A♭m7 in frets 2–7 keep the finger the plan reaches first', () => {
+        // Two plans cost exactly the same here: B♭7 6-x-6-7 as 1-2-3 then A♭m7 as 2-1-3, or
+        // 2-3-4 then 3-1-4; both keep a finger on the 4th string's 6th fret. Taking a run's own
+        // cost off and putting it back left the two a rounding error apart, which chose.
+        const chart = 'Bm Bsus2 F#maj7 Ebm Ebm Dbsus4 Dbsus4 Bb7 Abm7 Abm7 Fm7b5'
+            .split(' ')
+            .map((symbol) =>
+                voicingChord(parseChord(symbol, { tonic: 0, minor: false })!, 'C', false),
+            );
+        const voiced = voiceChart(chart, { instrument: GUITAR, home: [2, 7] });
+        const fingers = (i: number) =>
+            voiced[i].notes.map((n) => `${n.string}:${n.fret}:${n.finger}`).join(' ');
+        expect(fingers(7)).toBe('6:6:2 4:6:3 3:7:4');
+        expect(fingers(8)).toBe('4:6:3 3:4:1 2:7:4');
     });
 });
