@@ -311,7 +311,7 @@ describe('BandHost counted choruses', () => {
     /** 4/4 at 120: two seconds a bar. */
     const BAR_S = 2;
 
-    it('ends on the tonic where the last chorus ends on a turnaround (#1482)', () => {
+    it('ends on the tonic where the last chorus ends on a turnaround (#1482)', async () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);
         const host = new BandHost({ state: () => state, silence: () => {} });
@@ -334,7 +334,7 @@ describe('BandHost counted choruses', () => {
             style: 'jazz' as const,
             lanes: { drums: true, bass: true, comp: true, lead: true },
         };
-        const { events, timeline } = host.render(band);
+        const { events, timeline } = await host.render(band);
         const bassIn = (index: number) =>
             events.flatMap((e) => (e.lane === 'bass' && e.bar === index ? [e.midi % 12] : []));
         // The first chorus's ii–V leads round to the top; the last one's resolves to C.
@@ -421,7 +421,7 @@ describe('BandHost counted choruses', () => {
         host.stop();
     });
 
-    it('exports exactly the performance it plays: three choruses and the coda', () => {
+    it('exports exactly the performance it plays: three choruses and the coda', async () => {
         const audio = fakeAudioContext(10);
         const state = fakeState(audio);
         const host = new BandHost({ state: () => state, silence: () => {} });
@@ -438,7 +438,7 @@ describe('BandHost counted choruses', () => {
         run(host, audio, 10.1, 10.1 + 7 * BAR_S + 0.1);
         expect(host.playing).toBe(false);
 
-        const { events, timeline } = host.render(band);
+        const { events, timeline } = await host.render(band);
         expect(timeline.bars).toHaveLength(7); // a1 a2 three times, then c1
         // The export is the performance as one whole pass — the band's own one-shot, made
         // independently of the host's chorus-at-a-time generation — and it is what played.
@@ -636,6 +636,60 @@ describe('BandHost a long uncounted chart (#1665)', () => {
             }
         }
         expect(failures).toEqual([]);
+    });
+
+    it.each([
+        ['an A/B form', long],
+        ['a one-chord vamp', vamp],
+    ])(
+        'exports %s a chunk at a time, event for event the pass performed whole (#1802)',
+        async (_name, chart) => {
+            const timeline = compileTimeline(chart);
+            const failures: string[] = [];
+            for (const [style, comp] of [
+                ['jazz', 'piano'],
+                ['rock', 'organ'],
+                ['reggae', 'organ'],
+                ['bossa', 'nylon'],
+            ] as const) {
+                for (const lead of [true, false]) {
+                    const settings: BandSettings = {
+                        ...DEFAULT_SETTINGS,
+                        style,
+                        comp,
+                        lanes: { drums: true, bass: true, comp: true, lead },
+                    };
+                    const host = new BandHost({
+                        state: () => fakeState(fakeAudioContext(10)),
+                        silence: () => {},
+                    });
+                    host.setScore(chart);
+                    const exported = await host.render(settings);
+                    const whole = performPass(timeline, settings, { pass: 0, looping: false });
+                    // The ending bar is in it: the whole pass's last bar is the held ending.
+                    expect(exported.events.some((e) => e.bar === timeline.bars.length - 1)).toBe(
+                        true,
+                    );
+                    if (JSON.stringify(exported.events) !== JSON.stringify(whole.events)) {
+                        failures.push(`${style} lead ${lead}`);
+                    }
+                }
+            }
+            expect(failures).toEqual([]);
+        },
+    );
+
+    it('gives the page a turn while it exports (#1802)', async () => {
+        const host = new BandHost({
+            state: () => fakeState(fakeAudioContext(10)),
+            silence: () => {},
+        });
+        host.setScore(vamp);
+        const order: string[] = [];
+        setTimeout(() => order.push('timer'), 0);
+        await host.render(DEFAULT_SETTINGS);
+        order.push('rendered');
+        expect(order).toEqual(['timer', 'rendered']);
     });
 });
 

@@ -47,6 +47,11 @@ const PREPARE_S = 2;
  */
 const PASS_CHUNK_BARS = 32;
 
+/** Lets the page run its own timers and input before the next piece of a long export (#1802). */
+function givePageATurn(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
 // Today's drum voices, by the band's piece names.
 export const DRUM_NAMES: Record<DrumPiece, string> = {
     kick: 'Kick',
@@ -620,26 +625,27 @@ export class BandHost {
     /**
      * The whole song, once through with an ending, for export. A counted chart's every chorus
      * (its timeline holds them all), generated a chorus at a time exactly as it plays live, so
-     * the export is the performance that was heard.
+     * the export is the performance that was heard. An uncounted chart's one pass is generated
+     * `PASS_CHUNK_BARS` at a time, resuming its memory as live Play does, so its events are the
+     * pass performed whole. Between pieces the page gets a turn (#1802), so a long chart's
+     * export never freezes it; the events are the same either way.
      */
-    render(settings: BandSettings): { events: BandEvent[]; timeline: Timeline } {
+    async render(settings: BandSettings): Promise<{ events: BandEvent[]; timeline: Timeline }> {
         const timeline = this.timeline;
         if (!timeline) {
             throw new Error('No chart loaded.');
         }
-        if (!this.counted) {
-            const { events } = performPass(timeline, settings, { pass: 0, looping: false });
-            return { events, timeline };
-        }
         const events: BandEvent[] = [];
         let memory: PassMemory | undefined;
-        for (let plan = this.songPlan(0, 0); ; plan = this.songPlan(plan.until, 0)) {
+        // Unlike live Play the pass does not loop, so its last piece keeps the held ending.
+        for (let plan = this.exportPlan(0); ; plan = this.exportPlan(plan.until)) {
             const result = performPass(timeline, settings, { ...plan, memory });
             events.push(...result.events);
             memory = result.memory;
             if (plan.until >= timeline.bars.length) {
                 break;
             }
+            await givePageATurn();
         }
         return { events, timeline };
     }
@@ -704,6 +710,11 @@ export class BandHost {
             until,
             looping: false,
         };
+    }
+
+    /** The export's piece from `fromBar`: a counted chart's chorus, or an uncounted chunk of pass 0. */
+    private exportPlan(fromBar: number): SegmentPlan {
+        return { ...this.songPlan(fromBar, 0), looping: false };
     }
 
     /**

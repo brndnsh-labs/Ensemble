@@ -1403,13 +1403,13 @@ function exportSettings(plan: SongPlan | null): ReturnType<typeof bandSettings> 
 }
 /**
  * Downloads a multi-track `.mid` of the current arrangement (#1277): the band's own event
- * stream, the one it plays live (`BandHost.render`), written by `toMidi`. Rendered on the side,
+ * stream, the one it plays live (`BandHost.render`, which gives the page a turn between chunks), written by `toMidi`. Rendered on the side,
  * so it never touches the live band or the audio graph — safe while the band is playing.
  */
-export function exportMidi(filename: string): Promise<void> {
+export async function exportMidi(filename: string): Promise<void> {
     const host = bandHost();
     const settings = exportSettings(exportScore(host));
-    const { events, timeline } = host.render(settings);
+    const { events, timeline } = await host.render(settings);
     const bytes = toMidi(events, timeline, {
         bpm: getState().playback.bpm,
         title: filename,
@@ -1424,7 +1424,6 @@ export function exportMidi(filename: string): Promise<void> {
         filename: name,
     });
     track('midi_exported');
-    return Promise.resolve();
 }
 
 /** Cancels the in-flight {@link exportAudio} call, if any (#1278). Cooperative,
@@ -1475,7 +1474,10 @@ export async function exportAudio(
     const bpm = getState().playback.bpm;
     if (kind === 'mix') {
         progress('Rendering mix…');
-        const { events, timeline } = host.render(exportSettings(plan));
+        const { events, timeline } = await host.render(exportSettings(plan));
+        if (intent !== exportIntent) {
+            return;
+        }
         const result = await renderBandMixToWav(events, timeline, bpm, { filename });
         if (intent !== exportIntent) {
             return;
@@ -1486,10 +1488,13 @@ export async function exportAudio(
     }
     // A stem always renders its lane even if it's muted live, so force every lane on for the
     // one pass every stem below is sliced from, rather than muting/soloing per-stem state.
-    const { events, timeline } = host.render({
+    const { events, timeline } = await host.render({
         ...exportSettings(plan),
         lanes: { drums: true, bass: true, comp: true, lead: true },
     });
+    if (intent !== exportIntent) {
+        return;
+    }
     try {
         const results = await renderBandStemsToWav(events, timeline, bpm, instruments, {
             filename,
