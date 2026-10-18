@@ -365,8 +365,10 @@ export const bossa: Style = {
     // `groove`): a take that flipped hat and ride between choruses isn't the idiom (#1789). The
     // build lives in the dynamics and the comp instead, at 0.6 of the arc — a touch more than
     // reggae's, since bossa's mid-tier dynamics carry the build alone (a plain chart's climax
-    // ~0.67) — and the arc never carries a bar across the high line the chart didn't.
-    jamArc: { depth: 0.6, keepsHighLine: true },
+    // ~0.67). No lift — the arc, or a looping song's pass lift — carries a bar across the high
+    // line the chart didn't (#1794).
+    keepsHighLine: true,
+    jamArc: { depth: 0.6 },
     drums: bossaDrums,
     bass: bossaBass,
     comp: { keyboard: bossaKeys, guitar: bossaGuitar },

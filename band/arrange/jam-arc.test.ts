@@ -10,8 +10,9 @@ import { type BandSettings, DEFAULT_SETTINGS } from '../core/types.js';
 import { compileTimeline, type Timeline } from '../form/timeline.js';
 import { performPass } from '../perform.js';
 import { STYLE_IDS, STYLES } from '../styles/index.js';
+import type { Style } from '../styles/types.js';
 import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
-import { type BarPlan, energyTier, type JamArcShape, planBars } from './plan.js';
+import { type BarPlan, energyTier, planBars } from './plan.js';
 
 const A8 = 'C | Am7 | Dm7 | G7 | C | Am7 | Dm7 | G7';
 /** A plain 32-bar form whose every section sits at the default energy (0.55). */
@@ -36,17 +37,22 @@ function counted(chart: SemanticScore, choruses: number): Timeline {
     return compileTimeline({ ...chart, choruses });
 }
 
+/** What a style tells the plan about its lifts, as `perform.ts` passes it. */
+type Shape = Pick<Style, 'jamArc' | 'keepsHighLine'>;
+
 function plan(
     timeline: Timeline,
     settings: BandSettings,
     looping = false,
-    arcShape?: JamArcShape,
+    shape: Shape = {},
+    pass = 0,
 ): BarPlan[] {
     return planBars(timeline, settings, {
-        pass: 0,
+        pass,
         looping,
         window: { from: 0, to: timeline.bars.length },
-        arcShape,
+        arcShape: shape.jamArc,
+        keepsHighLine: shape.keepsHighLine,
     });
 }
 
@@ -247,6 +253,13 @@ const preChorus = score([
     { label: 'Pre', bars: 'F | G | F | G' },
     { label: 'Chorus', bars: 'F | G | Am | C | F | G | C | C' },
 ]);
+/** A solo just under the line building into a chorus: its build bar alone would cross. */
+const soloChorus = score([
+    { label: 'Verse', bars: A8 },
+    { label: 'Solo', bars: A8 },
+    { label: 'Chorus', bars: 'F | G | Am | C | F | G | C | C' },
+]);
+const loopCharts: Record<string, SemanticScore> = { ...CHARTS, preChorus, soloChorus };
 const HOLDING = { reggae: STYLES.reggae, bossa: STYLES.bossa };
 const isHigh = (plan: BarPlan) => energyTier(plan.energy) === 'high';
 
@@ -255,6 +268,7 @@ describe('a style whose high tier is another groove keeps its side of the line (
 
     it('only reggae and bossa reshape the arc', () => {
         expect(STYLE_IDS.filter((id) => STYLES[id].jamArc)).toEqual(['bossa', 'reggae']);
+        expect(STYLE_IDS.filter((id) => STYLES[id].keepsHighLine)).toEqual(['bossa', 'reggae']);
     });
 
     for (const [id, style] of Object.entries(HOLDING)) {
@@ -262,10 +276,10 @@ describe('a style whose high tier is another groove keeps its side of the line (
             for (const [name, chart] of Object.entries(charts)) {
                 for (let n = 1; n <= 16; n++) {
                     const timeline = counted(chart, n);
-                    const arced = plan(timeline, JAM, false, style.jamArc);
-                    const without = plan(timeline, { ...JAM, arc: null }, false, style.jamArc);
+                    const arced = plan(timeline, JAM, false, style);
+                    const without = plan(timeline, { ...JAM, arc: null }, false, style);
                     // The form's own energy: the arc at no depth (no pass lift either).
-                    const own = plan(timeline, JAM, false, { depth: 0, keepsHighLine: false });
+                    const own = plan(timeline, JAM, false, { jamArc: { depth: 0 } });
                     for (const bar of timeline.bars) {
                         const at = `${name} n=${n} bar ${bar.index}`;
                         if (isHigh(arced[bar.index])) {
@@ -281,7 +295,7 @@ describe('a style whose high tier is another groove keeps its side of the line (
             for (const chart of Object.values(CHARTS)) {
                 for (const n of [4, 6, 8, 10, 16]) {
                     const timeline = counted(chart, n);
-                    const means = chorusMeans(timeline, plan(timeline, JAM, false, style.jamArc));
+                    const means = chorusMeans(timeline, plan(timeline, JAM, false, style));
                     const peak = loudest(means);
                     for (let c = 1; c <= peak; c++) {
                         expect(means[c]).toBeGreaterThan(means[c - 1]);
@@ -299,7 +313,7 @@ describe('a style whose high tier is another groove keeps its side of the line (
             for (const chart of [plain, blues]) {
                 for (const n of [4, 8, 16]) {
                     const timeline = counted(chart, n);
-                    const plans = plan(timeline, JAM, false, style.jamArc);
+                    const plans = plan(timeline, JAM, false, style);
                     const peak = loudest(chorusMeans(timeline, plans));
                     for (const chorus of [peak, n - 1]) {
                         const tops = timeline.bars.filter(
@@ -316,8 +330,33 @@ describe('a style whose high tier is another groove keeps its side of the line (
             }
         });
 
-        it(`${id}: nothing but a song-mode Auto take changes`, () => {
-            for (const chart of Object.values(charts)) {
+        it(`${id}: outside song mode only the line moves: a bar the pass lift would carry over it sits just under it (#1794)`, () => {
+            const held = (a: BarPlan[], b: BarPlan[], at: string) => {
+                let crossed = 0;
+                for (const [i, mine] of a.entries()) {
+                    const plain = b[i];
+                    if (!mine) {
+                        continue;
+                    }
+                    // Everything but the energy is the plan's own.
+                    expect({ ...mine, energy: 0 }, `${at} bar ${i}`).toEqual({
+                        ...plain,
+                        energy: 0,
+                    });
+                    expect(isHigh(mine) && !isHigh(plain), `${at} bar ${i}`).toBe(false);
+                    // (A float's last digit is not a move: 0.6 + 0.09 is a hair over 0.69.)
+                    if (Math.abs(mine.energy - plain.energy) > 1e-9) {
+                        // Only a bar the lift took over the ceiling (0.69, a hair under the
+                        // line), and only down to it.
+                        expect(plain.energy, `${at} bar ${i}`).toBeGreaterThan(0.69);
+                        expect(mine.energy, `${at} bar ${i}`).toBeCloseTo(0.69, 10);
+                        crossed += isHigh(plain) ? 1 : 0;
+                    }
+                }
+                return crossed;
+            };
+            let crossed = 0;
+            for (const [name, chart] of Object.entries(charts)) {
                 const timeline = counted(chart, 5);
                 for (const settings of [
                     { ...DEFAULT_SETTINGS, arc: null },
@@ -325,13 +364,68 @@ describe('a style whose high tier is another groove keeps its side of the line (
                     { ...JAM, intensity: 0.55 },
                     { ...JAM, intensity: 0.9 },
                 ]) {
-                    expect(plan(timeline, settings, false, style.jamArc)).toEqual(
+                    crossed += held(
+                        plan(timeline, settings, false, style),
                         plan(timeline, settings),
+                        `${name} counted`,
                     );
                 }
                 const once = compileTimeline(chart);
-                expect(plan(once, JAM, true, style.jamArc)).toEqual(plan(once, JAM, true));
+                for (let pass = 0; pass <= 5; pass++) {
+                    crossed += held(
+                        plan(once, JAM, true, style, pass),
+                        plan(once, JAM, true, {}, pass),
+                        `${name} pass ${pass}`,
+                    );
+                }
             }
+            // Not vacuous: without the guard, the pass lift does take bars over the line.
+            expect(crossed).toBeGreaterThan(0);
+        });
+
+        it(`${id}: a looping song keeps every bar on its section's side of the line, every time round (#1794)`, () => {
+            // The oracle is the chart's, not the engine's: a section's own tier is its first
+            // bar's on the first pass, where nothing has lifted it yet (no pass lift on the first
+            // time round, no build but in a section's last bar).
+            let tempting = 0;
+            for (const [name, chart] of Object.entries(loopCharts)) {
+                const once = compileTimeline(chart);
+                for (const settings of [
+                    DEFAULT_SETTINGS,
+                    { ...DEFAULT_SETTINGS, intensity: 0.62 },
+                    { ...DEFAULT_SETTINGS, intensity: 0.68 },
+                ]) {
+                    const first = plan(once, settings, true, style, 0);
+                    const sectionTier = (index: number) => {
+                        const bar = once.bars[index];
+                        return energyTier(first[index - bar.barInVisit].energy);
+                    };
+                    for (let pass = 0; pass <= 5; pass++) {
+                        const held = plan(once, settings, true, style, pass);
+                        const free = plan(once, settings, true, {}, pass);
+                        for (const bar of once.bars) {
+                            const at = `${name} @${settings.intensity} pass ${pass} bar ${bar.index}`;
+                            expect(energyTier(held[bar.index].energy), at).toBe(
+                                sectionTier(bar.index),
+                            );
+                            if (energyTier(free[bar.index].energy) !== sectionTier(bar.index)) {
+                                tempting++;
+                            }
+                        }
+                    }
+                }
+            }
+            // Not vacuous: unguarded, the build and the pass lift do carry bars over the line.
+            expect(tempting).toBeGreaterThan(0);
+        });
+
+        it(`${id}: the pass lift still raises a looping song under the line`, () => {
+            const once = compileTimeline(preChorus);
+            const mean = (plans: BarPlan[]) =>
+                plans.reduce((sum, p) => sum + p.energy, 0) / plans.length;
+            expect(mean(plan(once, DEFAULT_SETTINGS, true, style, 3))).toBeGreaterThan(
+                mean(plan(once, DEFAULT_SETTINGS, true, style, 0)) + 0.03,
+            );
         });
     }
 
@@ -340,8 +434,8 @@ describe('a style whose high tier is another groove keeps its side of the line (
             for (const chart of Object.values(charts)) {
                 for (const n of [1, 3, 4, 8]) {
                     const timeline = counted(chart, n);
-                    const full = plan(timeline, JAM, false, { depth: 1, keepsHighLine: false });
-                    expect(plan(timeline, JAM, false, STYLES[id].jamArc)).toEqual(full);
+                    const full = plan(timeline, JAM, false, { jamArc: { depth: 1 } });
+                    expect(plan(timeline, JAM, false, STYLES[id])).toEqual(full);
                     expect(plan(timeline, JAM)).toEqual(full);
                 }
             }
@@ -359,5 +453,28 @@ describe('a style whose high tier is another groove keeps its side of the line (
         expect(rides(JAM)).toBe(0);
         // Not vacuous: the same take pinned in the high tier rides.
         expect(rides({ ...JAM, intensity: 0.85 })).toBeGreaterThan(0);
+    });
+
+    it('a looping bossa song rides where the chart does, however many times round (#1794)', () => {
+        // The chorus is high on its own (0.75) and rides from the first time through; the
+        // pre-chorus's build bar is just under the line and must stay on the hat.
+        const once = compileTimeline(preChorus);
+        const ridden = (pass: number) =>
+            [
+                ...new Set(
+                    performPass(
+                        once,
+                        { ...DEFAULT_SETTINGS, style: 'bossa' },
+                        { pass, looping: true },
+                    )
+                        .events.filter((event) => event.lane === 'drums' && event.piece === 'ride')
+                        .map((event) => event.bar),
+                ),
+            ].sort((a, b) => a - b);
+        const first = ridden(0);
+        expect(first.length).toBeGreaterThan(0);
+        for (let pass = 1; pass <= 5; pass++) {
+            expect(ridden(pass), `pass ${pass}`).toEqual(first);
+        }
     });
 });

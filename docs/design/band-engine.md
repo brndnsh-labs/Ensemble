@@ -219,11 +219,13 @@ expression devices take turns rather than stack; one peak note per cycle.
     pass lift gives way to an energy arc across the `n` choruses (`planBars`'s `jamArc`) — a
     mid-low head, a build to a peak about two-thirds in, one chorus of breath, a lift into the
     last chorus and the held ending — stepping at chorus seams and held per phrase. Tempo never
-    moves. A manual intensity, a pass that loops and every caller that doesn't ask plan exactly
-    as before (`arrange/jam-arc.test.ts`). A style whose high tier is a different groove, not
-    a bigger one — reggae's steppers, bossa's ride — shapes the arc for itself (`Style.jamArc`,
-    #1789): a shallower arc that never carries a bar across the high line the chart didn't, so
-    its groove is the chart's all take long and the build is in the dynamics.
+    moves. A manual intensity, a pass that loops and every caller that doesn't ask get no arc
+    (`arrange/jam-arc.test.ts`). A style whose high tier is a different groove, not a bigger
+    one — reggae's steppers, bossa's ride — shapes the arc for itself (`Style.jamArc`, #1789):
+    a shallower arc. And with or without the arc, no lift (the build into a bigger section, the
+    arc, a looping song's pass lift, #1794) carries one of its bars across the high line its
+    section sits under (`Style.keepsHighLine`), so its groove is the chart's all take long and
+    the build is in the dynamics.
   - **It ends on the out-head.** With two or more choruses the last is the head whatever the
     cycle has reached, and a trade hands back to the band for it (`leadRole`'s
     `inFinalChorus`): the last chorus of a performance is the melody restated, and a coda or
