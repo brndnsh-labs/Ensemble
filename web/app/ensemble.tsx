@@ -344,6 +344,7 @@ function feelSnapshot(): FeelSnapshot {
         metronome: playback.metronome,
         masterVolume: playback.masterVolume,
         countIn: playback.countIn,
+        songMinutes: runtime.songMode(),
     };
 }
 
@@ -1260,7 +1261,15 @@ export default function Ensemble() {
         totalBars,
         writtenBars,
         writtenSections,
-    } = useChartView(current, active);
+    } = useChartView(current, active, playing);
+    // Song mode's readout (#1784): what the band plays now, or would at Play. Stopped, reading it
+    // compiles the chart a few times, so it is read again only when the chart (its tempo
+    // included), the setting or the transport changes, and only while the Practice tab shows it.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `current`, `songMinutes` and `playing` are re-read triggers.
+    const songReadout = useMemo(
+        () => (current && bandTab === 'practice' ? runtime.songModeReadout() : null),
+        [current, feel.songMinutes, playing, bandTab],
+    );
     const neckShowing = neck && !editing;
     const neckVoicing = useNeckVoicing(followChart, neckShowing);
     // The chart reads as one page where it can (#1712); editing, it scrolls at a reading size.
@@ -2500,6 +2509,8 @@ export default function Ensemble() {
         if (runtime.state().playback.isPlaying || playbackPending) {
             runtime.stop();
             setPlaying(false);
+            // A song-mode performance's slots are not the chart's (#1784): drop the stale one now.
+            setActive(null);
             setPlaybackPending(false);
             return;
         }
@@ -6391,6 +6402,13 @@ export default function Ensemble() {
                             <PracticeTab
                                 busy={busy}
                                 feel={feel}
+                                chartChoruses={current.chart.score.choruses}
+                                songReadout={songReadout}
+                                onSongMinutes={(minutes) => {
+                                    // A device preference, not a chart change: no draft.
+                                    runtime.setSongMode(minutes);
+                                    setFeel((f) => ({ ...f, songMinutes: minutes }));
+                                }}
                                 onMetronome={(enabled) =>
                                     change(() => {
                                         runtime.setMetronome(enabled);

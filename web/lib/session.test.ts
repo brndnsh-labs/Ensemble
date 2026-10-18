@@ -14,6 +14,8 @@ import {
     rememberAllSongsSort,
     rememberCountIn,
     rememberNeckPreferences,
+    rememberSongMode,
+    songModePreference,
 } from './session';
 import type { HomeKey } from './voicings';
 
@@ -36,6 +38,27 @@ Object.defineProperty(window, 'localStorage', {
 
 beforeEach(() => {
     store.clear();
+});
+
+describe('the song mode preference (#1784)', () => {
+    it('is Off on a fresh device', () => {
+        expect(songModePreference()).toBeNull();
+    });
+    it('round-trips each offered length, and Off forgets it', () => {
+        for (const minutes of [3, 4, 5] as const) {
+            rememberSongMode(minutes);
+            expect(songModePreference()).toBe(minutes);
+        }
+        rememberSongMode(null);
+        expect(songModePreference()).toBeNull();
+        expect(store.has('ensemble-v2-preview:song-mode')).toBe(false);
+    });
+    it('reads anything but an offered length as Off', () => {
+        for (const stored of ['2', '6', '3.5', ' 3', '03', 'constructor', '']) {
+            store.set('ensemble-v2-preview:song-mode', stored);
+            expect(songModePreference()).toBeNull();
+        }
+    });
 });
 
 describe('the count-in preference (#1422)', () => {

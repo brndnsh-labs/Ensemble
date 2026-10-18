@@ -386,3 +386,35 @@ export function rememberCountIn(value: boolean): void {
         // The live toggle still applies for this session; only the memory is lost.
     }
 }
+
+const SONG_MODE = 'ensemble-v2-preview:song-mode';
+/** The lengths song mode offers, in minutes (#1784); Off is no stored value at all. */
+export const SONG_MINUTES = [3, 4, 5] as const;
+export type SongMinutes = (typeof SONG_MINUTES)[number];
+
+/**
+ * Song mode (#1784): about how long a looping chart plays before the band wraps up, in minutes,
+ * or null for Off. A practice habit of this device, like `countInPreference` above, and never
+ * written to a chart: the performance is counted at Play time (`lib/song-mode.ts`). The stored
+ * value is read strictly — only an offered length counts, anything else is Off.
+ */
+export function songModePreference(): SongMinutes | null {
+    try {
+        const stored = localStorage.getItem(SONG_MODE);
+        return SONG_MINUTES.find((minutes) => String(minutes) === stored) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export function rememberSongMode(minutes: SongMinutes | null): void {
+    try {
+        if (minutes === null) {
+            localStorage.removeItem(SONG_MODE);
+        } else {
+            localStorage.setItem(SONG_MODE, String(minutes));
+        }
+    } catch {
+        // The live setting still applies for this session; only the memory is lost.
+    }
+}

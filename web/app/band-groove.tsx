@@ -1,6 +1,7 @@
 import type { SwingSub } from '@core/types';
 import { useEffect, useState } from 'react';
-import type { ChartDocument } from '../lib/runtime';
+import type { ChartDocument, SongMinutes } from '../lib/runtime';
+import { songPlanText } from '../lib/song-mode';
 import { useRangeCommit } from './use-range-commit';
 
 /**
@@ -23,7 +24,17 @@ export interface FeelSnapshot {
     /** One bar of clicks before a fresh Play (#1422) — `preferences`-owned like
      * `masterVolume` above, not part of `ChartDocument['chart']` either. */
     countIn: boolean;
+    /** Song mode (#1784): minutes, or null for Off — a device preference like `countIn`. */
+    songMinutes: SongMinutes | null;
 }
+
+/** The song-length choices, Off first; 3 minutes is the one switched on to. */
+const SONG_LENGTHS: { value: string; label: string }[] = [
+    { value: 'off', label: 'Off' },
+    { value: '3', label: '3 min' },
+    { value: '4', label: '4 min' },
+    { value: '5', label: '5 min' },
+];
 
 interface RangeSettingProps {
     label: string;
@@ -186,23 +197,33 @@ export function GrooveTab({
 interface PracticeTabProps {
     busy: boolean;
     feel: FeelSnapshot;
+    /** The open chart's own chorus count (`SemanticScore.choruses`); undefined is Loop. */
+    chartChoruses: number | undefined;
+    /** What song mode plays (`runtime.songModeReadout()`), null when it doesn't apply. */
+    songReadout: { choruses: number; seconds: number } | null;
     onMetronome: (enabled: boolean) => void;
     onMasterVolume: (value: number) => void;
     onCountIn: (enabled: boolean) => void;
+    onSongMinutes: (minutes: SongMinutes | null) => void;
 }
 
 /**
  * The Band sheet's Practice tab (#1703): what helps the musician practise — the click, the
- * count-in and the overall level. How the chart spells its chords is the transport's Key
+ * count-in, how long a looping song plays (song mode, #1784) and the overall level. How the chart spells its chords is the transport's Key
  * popover's (#1757).
  */
 export function PracticeTab({
     busy,
     feel,
+    chartChoruses,
+    songReadout,
     onMetronome,
     onMasterVolume,
     onCountIn,
+    onSongMinutes,
 }: PracticeTabProps) {
+    // A chart that counts its own choruses already ends on its own: its count wins.
+    const counted = chartChoruses !== undefined;
     return (
         <div className="feel-groups">
             <div className="feel-group">
@@ -227,6 +248,38 @@ export function PracticeTab({
                 </label>
             </div>
             <div className="feel-group">
+                <h3>Song length</h3>
+                <label>
+                    Length
+                    <select
+                        aria-label="Song length"
+                        aria-describedby="song-length-detail"
+                        value={feel.songMinutes === null ? 'off' : String(feel.songMinutes)}
+                        disabled={busy || counted}
+                        onChange={(event) =>
+                            onSongMinutes(
+                                event.target.value === 'off'
+                                    ? null
+                                    : (Number(event.target.value) as SongMinutes),
+                            )
+                        }
+                    >
+                        {SONG_LENGTHS.map((length) => (
+                            <option key={length.value} value={length.value}>
+                                {length.label}
+                            </option>
+                        ))}
+                    </select>
+                </label>
+                <p className="feel-hint" id="song-length-detail">
+                    {counted
+                        ? `This chart plays ${chartChoruses === 1 ? 'once' : `${chartChoruses} times`}, then ends, so it sets its own length.`
+                        : songReadout
+                          ? songPlanText(songReadout)
+                          : 'The band repeats the song until you stop it.'}
+                </p>
+            </div>
+            <div className="feel-group">
                 <h3>Level</h3>
                 <RangeSetting
                     label="Master volume"
@@ -238,8 +291,9 @@ export function PracticeTab({
                 />
             </div>
             <p className="band-note">
-                The metronome lasts this session and master volume belongs to this device — neither
-                saves with the chart.
+                The metronome lasts this session; song length and master volume belong to this
+                device. None of them saves with the chart. Song length is counted when you press
+                Play, and the band ends on its last chorus.
             </p>
         </div>
     );
