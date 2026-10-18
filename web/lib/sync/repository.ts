@@ -980,7 +980,7 @@ export class AccountSongbook {
                 });
             });
         });
-        return settleHome(read, validate, request.rows);
+        return settleHome(read, validate, request);
     }
 
     async pending(scope: AccountScope, documentId: string): Promise<SaveOperation[]> {
