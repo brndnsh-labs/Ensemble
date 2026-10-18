@@ -6,7 +6,7 @@
  */
 
 import type { BandSettings, Lane } from '../core/types.js';
-import type { Bar, Timeline } from '../form/timeline.js';
+import { type Bar, chorusBars, type Timeline } from '../form/timeline.js';
 import { type LeadRole, leadRole } from './cycle.js';
 
 export type Fill = 'none' | 'phrase' | 'section';
@@ -56,6 +56,94 @@ export type EnergyTier = 'low' | 'mid' | 'high';
 /** The discrete energy an idiom plays at. Bar-stable by construction. */
 export function energyTier(energy: number): EnergyTier {
     return energy < 0.42 ? 'low' : energy < 0.7 ? 'mid' : 'high';
+}
+
+/*
+ * The jam arc (#1785): how a counted performance the band was asked to shape as a jam
+ * (`BandSettings.arc === 'jam'`, song mode) breathes across its `n` choruses. A pure function of
+ * the chorus and the bar's place in it, so it is planned once with the rest of the plan and
+ * never drifts. Energy only: tempo never moves (metronomic by default). Each value is an offset
+ * on the bar's section energy, so the form still shapes inside every chorus (a verse under its
+ * chorus, an intro under both), and the arc REPLACES `passLift`, never stacks on it.
+ *
+ * Levels are a chorus's mean, chosen by the tier each lands a plain chart (`DEFAULT_ENERGY`,
+ * 0.55, mid) in, since tiers are what idioms branch on:
+ */
+// why: the head opens mid-low (0.52 on a plain chart; an intro stays low): the band has somewhere
+// to go. No lower: a verse (0.5) must keep its opening phrase — the head's lean (`ARC_RISE`) puts
+// it ~0.04 under the chorus level, at ~0.43 — clear of the low line (0.42), not thinned out to
+// the low idioms a breakdown plays.
+const ARC_START = -0.03;
+// why: the climax, about two-thirds in, is the chorus a plain chart plays in the HIGH tier
+// (0.74 mean): it opens upper mid and is high from its second phrase on (`ARC_RISE`) — a peak
+// that stayed mid would be invisible to every idiom; a verse/chorus chart's chorus reaches
+// about 0.95 there.
+const ARC_PEAK = 0.19;
+// why: a long jam (a short form, many choruses) keeps cooking after its climax, just under it —
+// upper mid (0.67), the next soloist settling in — until the breath.
+const ARC_SETTLE = 0.12;
+// why: the breath, the chorus before the last: the band pulls back from the high tier to mid
+// (0.59 on a plain chart) so the last chorus has room to lift — a clear drop, but above the
+// head's own level, so it sounds like a breath late in the song and not "back to the top", and
+// under `ARC_SETTLE`, so a long jam still eases down into it. Held flat: holding back is not
+// building.
+const ARC_BREATH = 0.04;
+// why: the last chorus starts back up (0.64) and climbs into the held ending (0.75, high from
+// about mid-chorus): a genre-agnostic out-chorus ends at about the climax's level, above the
+// breath, with headroom over the high line (0.70) rather than grazing it.
+const ARC_LAST_FROM = 0.09;
+const ARC_END = 0.2;
+// why: inside a building chorus the band leans in, ±0.05 around its level, as a soloist builds
+// a chorus: the climax chorus opens upper mid and crosses into high by its second phrase. The
+// bigger step comes at the chorus seam, where the section fill and crash already mark it.
+const ARC_RISE = 0.1;
+
+/**
+ * The jam arc's energy offset for bar `index` of a counted performance of `n` choruses.
+ *
+ * Choruses step at their seams and lean within (`ARC_RISE`), the value held for each 4-bar
+ * phrase — taken at the phrase's middle, so a chorus's mean is its level — because a band moves
+ * its energy at phrase tops, and a jump mid-phrase (an idiom switching on bar 3 of 4) sounds
+ * mechanical. The shape:
+ * - n = 1: one build, from `ARC_START` into the ending.
+ * - n = 2: the head at `ARC_START`, then the last chorus's lift into the ending.
+ * - n ≥ 3: the head at `ARC_START`, building chorus by chorus to `ARC_PEAK` on chorus `peak`,
+ *   which ENDS about two-thirds in; `ARC_SETTLE` after it, if the jam is long; the breath on
+ *   the chorus before the last; then the last chorus's lift. At n = 3 the peak is the middle
+ *   chorus and the breath is the top of the last one (the out-head comes back in under the solo
+ *   it follows, then lifts), since a whole chorus of breath would leave no chorus to peak in.
+ *
+ * Once-only sections (#1483) sit where they play: an intro in the head (low: its role energy
+ * under `ARC_START`), an outro in the last chorus's closing phrases, on the lift but at its own
+ * lower role energy, so it lands rather than peaks.
+ */
+function jamArc(timeline: Timeline, index: number): number {
+    const { bars } = timeline;
+    const bar = bars[index];
+    const n = (bars.at(-1)?.visit.chorus ?? 0) + 1;
+    const chorus = bar.visit.chorus;
+    const { first, end } = chorusBars(timeline, index);
+    // Where the middle of this bar's phrase falls in its chorus, 0–1.
+    const middle = index - bar.phrase.bar + bar.phrase.length / 2;
+    const t = Math.min(1, (middle - first) / (end - first));
+    const last = n - 1;
+    if (chorus === last) {
+        // The lift is read at each phrase's END, so the closing phrase plays at `ARC_END`
+        // whatever the form's phrasing: the ending arrives at its level, not short of it.
+        const reached = Math.min(
+            1,
+            (index - bar.phrase.bar + bar.phrase.length - first) / (end - first),
+        );
+        const from = n === 1 ? ARC_START : ARC_LAST_FROM;
+        return from + (ARC_END - from) * reached;
+    }
+    // About two-thirds in: the peak chorus ends at round(2n/3)/n of the way, before the breath.
+    const peak = Math.max(1, Math.min(n - 3, Math.round((2 * n) / 3) - 1));
+    const lean = ARC_RISE * (t - 0.5);
+    if (chorus <= peak) {
+        return ARC_START + ((ARC_PEAK - ARC_START) * chorus) / peak + lean;
+    }
+    return chorus === last - 1 ? ARC_BREATH : ARC_SETTLE + lean;
 }
 
 /** Which bars a pass plays, in order. A pass that loops goes on to the top of the song. */
@@ -165,6 +253,11 @@ export function planBars(
     // A song that loops earns a little more each time round — capped, so the fourth chorus
     // is fuller than the first but the band never runs away from the player.
     const passLift = (index: number) => Math.min(passAt(index, pass), 3) * 0.03;
+    // A counted performance shaped as a jam (song mode) breathes across its choruses instead
+    // (`jamArc`). Only on Auto: a manual intensity pins the level as it always has. A pass that
+    // loops has no last chorus to shape towards, so it keeps the pass lift.
+    const jam = settings.arc === 'jam' && settings.intensity === null && !looping;
+    const lift = (index: number) => (jam ? jamArc(timeline, index) : passLift(index));
     const plans: BarPlan[] = [];
     for (let i = window.from; i < Math.min(planned, window.to); i++) {
         const bar = bars[i];
@@ -181,7 +274,8 @@ export function planBars(
         if (visitEnd && next && sectionEnergy(next) > section + 0.05) {
             energy += 0.06;
         }
-        energy = clamp01(energy + passLift(i));
+        // The lift is the last term, so nothing after it washes the arc out.
+        energy = clamp01(energy + lift(i));
 
         const lanes = {} as Record<Lane, boolean>;
         for (const lane of ['drums', 'bass', 'comp', 'lead'] as const) {

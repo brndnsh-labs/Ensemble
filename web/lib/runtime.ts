@@ -274,6 +274,9 @@ function bandSettings(): BandSettings {
                       bars: soloist.tradeBars,
                       choruses: soloist.tradeChoruses === 0 ? null : soloist.tradeChoruses,
                   },
+        // A song-mode performance is a jam: its energy breathes across the counted choruses
+        // (#1785). The band applies it only on Auto intensity.
+        arc: songPlan ? 'jam' : null,
     };
 }
 
@@ -887,14 +890,16 @@ function planPerformance(): void {
 /**
  * What an export renders: what Play plays (#1784). During a song-mode performance that is its
  * counted copy; stopped with song mode on, the performance Play would plan now; else the chart.
+ * Returns the song-mode plan it handed the host (null for the chart), for `exportSettings`.
  */
-function exportScore(host: BandHost): void {
+function exportScore(host: BandHost): SongPlan | null {
     const plan = songPlan ?? (host.playing ? null : planForPlay());
     if (plan) {
         host.setScore(plan.score, plan.timeline);
     } else {
         handScore(host);
     }
+    return plan;
 }
 
 /**
@@ -1387,8 +1392,14 @@ export function auditionPitches(midis: number[]): void {
  * next Play of a locked seed will give. `bandSeed` is not it: that is the last PLAYED chart's,
  * and it outlives the chart it came from.
  */
-function exportSettings(): ReturnType<typeof bandSettings> {
-    return { ...bandSettings(), seed: String(getState().arranger.seed || 'ensemble') };
+function exportSettings(plan: SongPlan | null): ReturnType<typeof bandSettings> {
+    return {
+        ...bandSettings(),
+        seed: String(getState().arranger.seed || 'ensemble'),
+        // The song-mode performance `exportScore` handed the host is shaped as Play shapes it
+        // (#1785), stopped as well as playing.
+        arc: plan ? 'jam' : null,
+    };
 }
 /**
  * Downloads a multi-track `.mid` of the current arrangement (#1277): the band's own event
@@ -1397,8 +1408,7 @@ function exportSettings(): ReturnType<typeof bandSettings> {
  */
 export function exportMidi(filename: string): Promise<void> {
     const host = bandHost();
-    exportScore(host);
-    const settings = exportSettings();
+    const settings = exportSettings(exportScore(host));
     const { events, timeline } = host.render(settings);
     const bytes = toMidi(events, timeline, {
         bpm: getState().playback.bpm,
@@ -1461,11 +1471,11 @@ export async function exportAudio(
         return;
     }
     const host = bandHost();
-    exportScore(host);
+    const plan = exportScore(host);
     const bpm = getState().playback.bpm;
     if (kind === 'mix') {
         progress('Rendering mix…');
-        const { events, timeline } = host.render(exportSettings());
+        const { events, timeline } = host.render(exportSettings(plan));
         const result = await renderBandMixToWav(events, timeline, bpm, { filename });
         if (intent !== exportIntent) {
             return;
@@ -1477,7 +1487,7 @@ export async function exportAudio(
     // A stem always renders its lane even if it's muted live, so force every lane on for the
     // one pass every stem below is sliced from, rather than muting/soloing per-stem state.
     const { events, timeline } = host.render({
-        ...exportSettings(),
+        ...exportSettings(plan),
         lanes: { drums: true, bass: true, comp: true, lead: true },
     });
     try {

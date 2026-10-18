@@ -131,6 +131,15 @@ export interface BandSettings {
      * `choruses` traded passes (`TradeSettings.choruses`); absent, the band doesn't trade.
      */
     trade?: TradeSettings | null;
+    /**
+     * How a counted performance's energy moves across its choruses. `'jam'` (song mode, #1785)
+     * shapes it as a jam session does — a mid-low head, a build to a peak about two-thirds in,
+     * one chorus of breath, then a lift into the last chorus and the held ending
+     * (`arrange/plan.ts`'s `jamArc`), in place of the small capped lift each time through.
+     * Only on Auto intensity (`intensity: null`) and only for a pass that does not loop; a
+     * manual intensity pins the level as before. Absent (or `null`), nothing changes.
+     */
+    arc?: 'jam' | null;
 }
 
 export interface TradeSettings {

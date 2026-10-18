@@ -215,6 +215,12 @@ expression devices take turns rather than stack; one peak note per cycle.
     A chart with a labelled intro or outro plays it once (#1483), so its choruses differ in
     length: each plays what a loop of the sections it includes plays on that lap, which
     `arrange/choruses.test.ts` holds it to.
+    **Song mode plays it as a jam** (#1785, `BandSettings.arc: 'jam'`): on Auto intensity the
+    pass lift gives way to an energy arc across the `n` choruses (`planBars`'s `jamArc`) — a
+    mid-low head, a build to a peak about two-thirds in, one chorus of breath, a lift into the
+    last chorus and the held ending — stepping at chorus seams and held per phrase. Tempo never
+    moves. A manual intensity, a pass that loops and every caller that doesn't ask plan exactly
+    as before (`arrange/jam-arc.test.ts`).
   - **It ends on the out-head.** With two or more choruses the last is the head whatever the
     cycle has reached, and a trade hands back to the band for it (`leadRole`'s
     `inFinalChorus`): the last chorus of a performance is the melody restated, and a coda or
