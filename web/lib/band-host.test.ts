@@ -578,10 +578,22 @@ describe('BandHost a long uncounted chart (#1665)', () => {
             ).map((symbol, m) => bar(`s${s}m${m}`, [chord(symbol, 4)])),
         })),
     );
+    /** 100 bars of one chord: an organ holds it, so the look across a chunk's end is longest. */
+    const vamp = song([
+        {
+            id: 'v',
+            label: 'A',
+            repeat: 1,
+            measures: Array.from({ length: 100 }, (_, m) => bar(`v${m}`, [chord('Dm7', 4)])),
+        },
+    ]);
     const BPM = 240;
 
-    it('plays a pass a chunk at a time, note for note the pass played whole', () => {
-        const timeline = compileTimeline(long);
+    it.each([
+        ['an A/B form', long],
+        ['a one-chord vamp', vamp],
+    ])('plays %s a chunk at a time, note for note the pass played whole', (_name, chart) => {
+        const timeline = compileTimeline(chart);
         const failures: string[] = [];
         for (const [style, comp] of [
             ['jazz', 'piano'],
@@ -598,7 +610,7 @@ describe('BandHost a long uncounted chart (#1665)', () => {
             const audio = fakeAudioContext(10);
             const state = fakeState(audio);
             const host = new BandHost({ state: () => state, silence: () => {} });
-            host.setScore(long);
+            host.setScore(chart);
             const segments = watchSegments(host) as () => (Queued & {
                 pass: number;
                 until: number;
