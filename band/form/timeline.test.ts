@@ -286,25 +286,32 @@ describe('tick lookups', () => {
             },
         ],
     });
-    // Seven sevenths of a quarter round to 69 ticks each: the bar's last span ends at 1923,
-    // past the next bar's first span at 1920.
+    // Seven sevenths of a quarter are 68.57 ticks each. Rounded one by one they took 69 and the
+    // bar's last span ended at 1923, past the next bar's first span at 1920.
     const overrun = twoBars([
         chord('C', 3, 1),
         ...Array.from({ length: 7 }, (_, i) => chord(i % 2 ? 'F' : 'Dm', 1, 7)),
     ]);
-    // The same overrun on the very first span: a chord held over 27 sevenths, ending at 1932.
+    // The same on the very first span: a chord held over 27 sevenths, which ended at 1932.
     const overrunFirst = twoBars([
         chord('C', 1, 7),
         ...Array.from({ length: 27 }, () => hold(1, 7)),
     ]);
+    // #1684: a long chord, then 63 chords of 0.6 ticks each. Rounded one by one, each took a
+    // whole tick, so the bar ran 25 ticks past the barline and its last chords started after
+    // the next bar's first: out of start order, which the binary searches assume.
+    const outOfOrder = twoBars([
+        chord('C', 3137, 800),
+        ...Array.from({ length: 63 }, (_, i) => chord(i % 2 ? 'F' : 'Dm', 1, 800)),
+    ]);
 
-    it('the overrun charts really overlap at the barline', () => {
+    it('rounding never carries a bar past its barline (#1684)', () => {
         expect(
             compileTimeline(overrun)
                 .spans.slice(7, 9)
                 .map((s) => [s.start, s.end]),
         ).toEqual([
-            [1854, 1923],
+            [1851, 1920],
             [1920, 3840],
         ]);
         expect(
@@ -312,9 +319,23 @@ describe('tick lookups', () => {
                 .spans.slice(0, 2)
                 .map((s) => [s.start, s.end]),
         ).toEqual([
-            [0, 1932],
+            [0, 1920],
             [1920, 3840],
         ]);
+        const charts = [
+            ...Object.values(FIXTURES),
+            ...Object.values(COUNTED_FIXTURES),
+            overrun,
+            overrunFirst,
+            outOfOrder,
+            { ...outOfOrder, choruses: 2 },
+        ];
+        for (const chart of charts) {
+            const t = compileTimeline(chart);
+            const gaps = t.spans.filter((s, i) => s.start !== (i ? t.spans[i - 1].end : 0));
+            expect(gaps).toEqual([]);
+            expect(t.spans.at(-1)?.end).toBe(t.ticks);
+        }
     });
 
     const charts: [string, SemanticScore][] = [
@@ -326,6 +347,8 @@ describe('tick lookups', () => {
         ['overrun', overrun],
         ['overrun x2', { ...overrun, choruses: 2 }],
         ['overrunFirst', overrunFirst],
+        ['outOfOrder', outOfOrder],
+        ['outOfOrder x2', { ...outOfOrder, choruses: 2 }],
     ];
     it.each(charts)('%s: the searches answer what the scans answer', (_name, chart) => {
         const t = compileTimeline(chart);
@@ -437,8 +460,8 @@ describe('fermata time (#1665)', () => {
     }
 
     const sixteenths = Array.from({ length: 16 }, (_, i) => chord(1, 4, i % 3 !== 1));
-    // 63 fermatas of half a tick each round up to a tick: they overrun the bar by 31 ticks, so
-    // the next bar's stretches start before these have ended, and before some have begun.
+    // 63 fermatas of half a tick each. Rounded one by one they took a tick each and overran the
+    // bar by 31 ticks, starting after the next bar's first stretches (#1684).
     const halfTicks = Array.from({ length: 63 }, () => chord(1, 960));
     const overrun = chart(
         [
@@ -457,10 +480,12 @@ describe('fermata time (#1665)', () => {
         ['no length', chart([[...noTicks, chord(799_999, 200_000)], [chord(4, 1)]], 2)],
     ];
 
-    it('the overrun chart really has stretches out of order', () => {
-        const { stretches } = compileTimeline(overrun);
-        expect(stretches.some((s, i) => i > 0 && s.start < stretches[i - 1].start)).toBe(true);
-        expect(stretches.some((s, i) => i > 0 && s.start < stretches[i - 1].end)).toBe(true);
+    it('stretches run in order and never overlap, however their bars round (#1684)', () => {
+        for (const [name, written] of charts) {
+            const { stretches } = compileTimeline(written);
+            const crossed = stretches.filter((s, i) => i > 0 && s.start < stretches[i - 1].end);
+            expect(crossed, name).toEqual([]);
+        }
     });
 
     it.each(charts)('%s: the search answers what the scan answers', (_name, written) => {

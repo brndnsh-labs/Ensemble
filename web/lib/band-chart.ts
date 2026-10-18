@@ -9,13 +9,20 @@
  * for that. A slot is a *written* event at its performed position, which is what the playhead
  * highlights: a musician reading a hold bar tracks the bar, not the chord ringing through it.
  */
-import { type ChordFacts, notePc, PPQ, parseChord, type Timeline } from '@band/index';
+import {
+    type ChordFacts,
+    eventBoundaries,
+    notePc,
+    PPQ,
+    parseChord,
+    type Timeline,
+} from '@band/index';
 import { INTERVAL_TO_NNS, INTERVAL_TO_ROMAN } from '@core/config';
 import { spellPitchClass } from '@core/engine/note-spelling';
 import { resolveScoreContext } from '@core/songbook/score-context';
 import { compileScoreForm } from '@core/songbook/score-form';
 import { resolveScoreMeasureEvents } from '@core/songbook/score-measure-events';
-import type { ScoreDuration, SemanticScore } from '@core/songbook/score-types';
+import type { SemanticScore } from '@core/songbook/score-types';
 import type { ChordNamePart, FormattedChordNames } from '@core/types';
 import { type ChartBlock, type ChartChord, type ChartMeasure, writtenBlocks } from './lead-sheet';
 
@@ -62,11 +69,6 @@ export interface BandChart {
     sections: { id: string; start: number; end: number; chorus: number }[];
 }
 
-/** The timeline's own rounding (`durationTicks` in `band/form/timeline.ts`), so slots meet its spans exactly. */
-function durationTicks([n, d]: Readonly<ScoreDuration>): number {
-    return Math.round((n * PPQ) / d);
-}
-
 export function bandChart(score: SemanticScore, timeline: Timeline): BandChart {
     const form = compileScoreForm(score);
     if (form.length !== timeline.bars.length) {
@@ -82,9 +84,11 @@ export function bandChart(score: SemanticScore, timeline: Timeline): BandChart {
             const key = { tonic: notePc(context.key), minor: context.isMinor };
             const first = chords.length;
             const offsets: number[] = [];
-            let at = 0;
-            for (const event of events[s][m]) {
-                const length = durationTicks(event.duration);
+            // The timeline's own boundaries, so slots meet its spans exactly.
+            const boundaries = eventBoundaries(events[s][m]);
+            for (const [e, event] of events[s][m].entries()) {
+                const at = boundaries[e];
+                const length = boundaries[e + 1] - at;
                 const named =
                     event.kind === 'chord'
                         ? chordNames(event.symbol, context.key, context.isMinor)
@@ -105,7 +109,6 @@ export function bandChart(score: SemanticScore, timeline: Timeline): BandChart {
                     ...named,
                 });
                 offsets.push(at);
-                at += length;
             }
             return { first, offsets };
         });

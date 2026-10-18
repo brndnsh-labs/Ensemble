@@ -109,6 +109,34 @@ describe('bandChart', () => {
         expect(view.chords[1].end - view.chords[1].start).toBeCloseTo(640 / STEP);
     });
 
+    it("meets the timeline's spans where a bar's lengths are not whole ticks (#1684)", () => {
+        // Sevenths of a quarter, and chords of 0.6 ticks: each rounds, and the slots must
+        // round where the band's spans do, ending on the barline.
+        const uneven = song([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: [
+                    bar('m1', [
+                        chord('C', 3),
+                        ...Array.from({ length: 7 }, (_, i) => chord(i % 2 ? 'F' : 'Dm', 1, 7)),
+                    ]),
+                    bar('m2', [
+                        chord('C', 3137, 800),
+                        ...Array.from({ length: 63 }, (_, i) => chord(i % 2 ? 'F' : 'Dm', 1, 800)),
+                    ]),
+                    bar('m3', [chord('G7', 4)]),
+                ],
+            },
+        ]);
+        const timeline = compileTimeline(uneven);
+        const view = bandChart(uneven, timeline);
+        expect(view.slots.map((s) => [s.from, s.to])).toEqual(
+            timeline.spans.map((s) => [s.start, s.end]),
+        );
+    });
+
     it('maps every pass of a repeat back to the written bar, and loops the whole section', () => {
         const repeated = song([
             {

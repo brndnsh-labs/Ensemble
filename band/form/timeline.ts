@@ -9,6 +9,7 @@
  */
 
 import { resolveScoreContext } from '../../core/songbook/score-context.js';
+import { addScoreDurations } from '../../core/songbook/score-duration.js';
 import { compileScoreForm } from '../../core/songbook/score-form.js';
 import { resolveScoreMeasureEvents } from '../../core/songbook/score-measure-events.js';
 import type { ScoreDuration, SemanticScore } from '../../core/songbook/score-types.js';
@@ -92,6 +93,24 @@ export interface Timeline {
 
 function durationTicks([n, d]: Readonly<ScoreDuration>): number {
     return Math.round((n * PPQ) / d);
+}
+
+/**
+ * Where a bar's events start, in ticks from the barline, and then where the last one ends:
+ * each event's exact place in the bar, rounded once (#1684). Rounding each length instead let
+ * the errors add up — 63 chords of 0.6 ticks took a tick each and ran 25 ticks past the
+ * barline. The stand's slots (`bandChart`) use the same boundaries, so they meet the spans.
+ */
+export function eventBoundaries(
+    events: readonly { duration: Readonly<ScoreDuration> }[],
+): number[] {
+    const boundaries = [0];
+    let elapsed: ScoreDuration = [0, 1];
+    for (const event of events) {
+        elapsed = addScoreDurations(elapsed, event.duration);
+        boundaries.push(durationTicks(elapsed));
+    }
+    return boundaries;
 }
 
 const SECTION_LANES: Record<string, Lane> = {
@@ -237,9 +256,11 @@ export function compileTimeline(score: SemanticScore): Timeline {
             barInVisit: visit.barCount,
             phrase: { index: 0, bar: 0, length: 0 },
         };
-        let at = tick;
-        for (const event of events[written.sectionIndex][written.measureIndex]) {
-            const length = durationTicks(event.duration);
+        const barEvents = events[written.sectionIndex][written.measureIndex];
+        const boundaries = eventBoundaries(barEvents);
+        for (const [i, event] of barEvents.entries()) {
+            const at = tick + boundaries[i];
+            const length = boundaries[i + 1] - boundaries[i];
             const fermata = event.fermata === true;
             if (event.kind === 'hold' && spans.length && !fermata) {
                 spans[spans.length - 1].end = at + length;
@@ -261,13 +282,10 @@ export function compileTimeline(score: SemanticScore): Timeline {
             if (fermata) {
                 stretches.push({ start: at, end: at + length, factor: FERMATA_STRETCH });
             }
-            at += length;
         }
-        // The codec guarantees events fill the bar; rounding (odd groupings such as sevens) is absorbed here.
+        // The codec guarantees the events fill the bar exactly, and a bar is a whole number of
+        // ticks (a sixteenth unit at the finest), so the last event ends on the barline.
         tick += meter.barTicks;
-        if (spans.length) {
-            spans[spans.length - 1].end = Math.max(spans[spans.length - 1].end, tick);
-        }
         bars.push(bar);
         visit.barCount++;
     }
@@ -461,20 +479,15 @@ export function firstSpanAfter(timeline: Timeline, tick: number): number {
 
 /**
  * The index of the first span sounding at `tick`, or -1 — what `spans.findIndex` over
- * `start <= tick < end` answers, without the scan (`firstSpanAfter`). What the searches rely
- * on: spans are sorted by start, and two spans overlap, if at all, by a few ticks at a
- * barline. That happens when a bar's durations are not whole ticks (a 1/7 of a quarter rounds
- * to 69 ticks, and seven of them overrun the bar): the last span then ends just past the next
- * bar's first span's start (the timeline absorbs the rounding there). The walk back finds that
- * earlier span first, as the scan did — on every chart in the corpus the search returns what
- * the scan returned (pinned by the property test in `timeline.test.ts`).
+ * `start <= tick < end` answers, without the scan (`firstSpanAfter`). What the search relies
+ * on: spans run end to end in order, each starting where the one before ends, because each
+ * boundary is an event's exact place in its bar rounded once (#1684). A span can be empty (a
+ * chord shorter than half a tick), so the walk forward steps over one sitting on `tick`.
+ * Pinned against the scan by the property test in `timeline.test.ts`.
  */
 export function spanIndexAt(timeline: Timeline, tick: number): number {
     const { spans } = timeline;
-    let first = firstSpanAfter(timeline, tick) - 1;
-    while (first > 0 && spans[first - 1].end > tick) {
-        first--;
-    }
+    const first = firstSpanAfter(timeline, tick) - 1;
     for (let i = Math.max(first, 0); i < spans.length && spans[i].start <= tick; i++) {
         if (tick < spans[i].end) {
             return i;
@@ -508,7 +521,7 @@ export function barAtTick(timeline: Timeline, tick: number): Bar | null {
 }
 
 interface StretchIndex {
-    /** The latest start, and the latest end, among each stretch and those before it. */
+    /** Each stretch's start and end: in order, and never overlapping (#1684). */
     starts: Float64Array;
     ends: Float64Array;
     /** The ticks of written time all the stretches before each one add, played whole. */
@@ -528,8 +541,8 @@ function stretchIndex(stretches: Timeline['stretches']): StretchIndex {
             added: new Float64Array(stretches.length + 1),
         };
         stretches.forEach((s, i) => {
-            index!.starts[i] = Math.max(s.start, i ? index!.starts[i - 1] : s.start);
-            index!.ends[i] = Math.max(s.end, i ? index!.ends[i - 1] : s.end);
+            index!.starts[i] = s.start;
+            index!.ends[i] = s.end;
             index!.added[i + 1] = index!.added[i] + (s.end - s.start) * (s.factor - 1);
         });
         STRETCH_INDEX.set(stretches, index);
@@ -555,9 +568,8 @@ function firstPast(ascending: Float64Array, limit: number, inclusive: boolean): 
 /**
  * Seconds from tick 0 to `tick` at `bpm`, honouring fermata stretches. Every scheduled event
  * asks, and a chart may write tens of thousands of fermatas, so the stretches that are over by
- * `tick` are read off a running total (`stretchIndex`) found by binary search (#1665). Only a
- * stretch `tick` falls inside is measured on its own: at most one, but for the few a barline's
- * rounding lets overlap (`spanIndexAt`).
+ * `tick` are read off a running total (`stretchIndex`) found by binary search (#1665). Only the
+ * stretch `tick` falls inside, if any, is measured on its own: stretches never overlap (#1684).
  */
 export function secondsAt(timeline: Timeline, tick: number, bpm: number): number {
     const perTick = 60 / bpm / PPQ;
