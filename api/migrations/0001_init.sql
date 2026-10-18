@@ -2,7 +2,7 @@
 -- lands in this story — these tables are the substrate #1188-#1191 build on.
 --
 -- Conventions carried from ../songsiknow (see docs/design/ensemble-v2-sync.md
--- reuse table) and web/CLAUDE.md's "Schema" section:
+-- reuse table) and prototypes/v2/CLAUDE.md's "Schema" section:
 --   * App-minted TEXT primary keys, never AUTOINCREMENT — avoids rowid reuse
 --     interacting badly with cascades and tombstones.
 --   * Epoch-millisecond INTEGER timestamps, never SQLite TEXT datetimes.
