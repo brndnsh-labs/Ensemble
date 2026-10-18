@@ -466,6 +466,8 @@ about the same for one chorus of a counted chart however long it is (7–8 ms fo
 chorus of a 64-chorus chart, whose look across the seam is one bar). Lookups by tick (`chordAt`, `spanIndexAt`) are binary searches, so a bar's cost does
 not grow with how far into the performance it is.
 
+`BandHost.render()` is async (#1802): it generates the export's pass in the same pieces live Play does (32 bars of an uncounted chart, a chorus of a counted one), non-looping so the last piece keeps the held ending, and gives the page a turn (a zero-delay timer) between pieces, so a long chart's export never freezes it. The events are those of the pass performed whole.
+
 Audio (WAV/stem) export renders `BandHost.render()`'s events offline (`lib/band-export.ts`)
 through `playBandEvent`, the same voice mapping `BandHost` schedules live with, feel offsets
 included. A stem export renders drums, bass, chords (the comp) and soloist (the lead), each lane's bus
