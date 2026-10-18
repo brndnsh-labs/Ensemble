@@ -2,9 +2,11 @@
  * The live host for the band engine. It turns `performPass` output into
  * sound through today's voices and sample packs, on the audio clock:
  *
- *   - Playback is a queue of *segments*. Each is one window of bars in performance order: a
- *     pass of the song, or the rest of the song after "play from here". Each segment knows the audio time its first bar starts, so a tempo
- *     change only re-anchors the clock; nothing is regenerated.
+ *   - Playback is a queue of *segments*. Each is one window of bars in performance order: up
+ *     to `PASS_CHUNK_BARS` of a pass of the song, or of the rest of it after "play from here",
+ *     the next resuming the same pass from the memory the last left. Each segment knows the
+ *     audio time its first bar starts, so a tempo change only re-anchors the clock; nothing is
+ *     regenerated.
  *   - A chart that counts its choruses (`SemanticScore.choruses`, #1475) does not loop: its
  *     timeline already holds every chorus, and the band plays it once, with its ending, a
  *     chorus per segment, then stops (`HostOptions.onEnd`).
@@ -39,6 +41,11 @@ const LOOKAHEAD_S = 0.15;
 const TIMER_MS = 25;
 /** Generate the next segment this long before the current one ends. */
 const PREPARE_S = 2;
+/**
+ * The most bars one segment of an uncounted pass holds (#1665): each is generated on the main
+ * thread, and a few milliseconds of it at a time keeps Play from freezing a long chart's page.
+ */
+const PASS_CHUNK_BARS = 32;
 
 // Today's drum voices, by the band's piece names.
 export const DRUM_NAMES: Record<DrumPiece, string> = {
@@ -678,10 +685,12 @@ export class BandHost {
         const bars = this.timeline!.bars;
         const from = Math.min(fromBar, bars.length - 1);
         if (!this.counted) {
+            // At most `PASS_CHUNK_BARS` at a time, resuming the same pass (#1665): a long
+            // chart's whole pass at once blocked the page for seconds on Play.
             return {
                 pass,
-                window: { from, to: bars.length },
-                until: bars.length,
+                window: { from, to: bars.length, origin: Math.min(origin, from) },
+                until: Math.min(from + PASS_CHUNK_BARS, bars.length),
                 looping: true,
             };
         }
@@ -703,8 +712,13 @@ export class BandHost {
      * not the one after it (#1500).
      */
     private followOn(last: Segment): SegmentPlan {
-        return this.counted
-            ? this.songPlan(last.until, last.window.origin ?? last.window.from)
+        const origin = last.window.origin ?? last.window.from;
+        if (this.counted) {
+            return this.songPlan(last.until, origin);
+        }
+        // The rest of this pass, a chunk at a time, then the next pass from the top.
+        return last.until < this.timeline!.bars.length
+            ? this.songPlan(last.until, origin, last.pass)
             : this.songPlan(0, 0, last.pass + 1);
     }
 

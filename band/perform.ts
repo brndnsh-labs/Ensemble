@@ -49,11 +49,13 @@ export interface PassOptions {
     window?: PassWindow;
     /**
      * Return only the window's bars before this one; the window still says where the
-     * performance goes and where it ends. A counted chart's live performance is generated a
-     * chorus at a time (`BandHost`), each chorus resuming from the memory the one before left,
-     * as a settings change resumes a pass at a barline. The bars past `until` are played and
-     * dropped — one, and on while the comp has neither struck again nor reached a rest (an N.C.
-     * or a bar it sits out), but never past the end of the next chorus — so what the whole pass
+     * performance goes and where it ends. The live performance is generated in chunks
+     * (`BandHost`): a counted chart's a chorus at a time, an uncounted pass at most 32 bars at
+     * a time (#1665), each resuming from the memory the one before left, as a settings change
+     * resumes a pass at a barline. The bars past `until` are played and dropped — one, and on
+     * while the comp has neither struck again nor reached a rest (an N.C. or a bar it sits
+     * out), but never past the end of the next chorus nor more than `LOOK_BARS` past `until` —
+     * so what the whole pass
      * does across that barline (a held organ chord, a comp voice yielding to the lead) is done
      * here too: the chunks join into the whole pass, event for event. (The organ re-presses a
      * held chord at each phrase top, so the look never needs the cap; a comp that never struck
@@ -88,12 +90,15 @@ export function performPass(
     // least one bar, and on until the comp strikes again or rests, since a sustaining comp
     // holds its last chord to its next strike, which can be bars away. Capped at the end of
     // the next chorus, so a chunk costs at most two choruses' bars: chunks are generated on
-    // the main thread inside the scheduler's 150 ms lookahead. On a real comp it never binds
-    // (a sustaining comp re-presses a held chord at each phrase top); it bounds the cost all
-    // the same.
+    // the main thread inside the scheduler's 150 ms lookahead. And never more than `LOOK_BARS`
+    // past it: an uncounted chart is one chorus, so a chunk of a long one (#1665) would plan
+    // every bar left in the song. On a real comp neither cap binds (a sustaining comp
+    // re-presses a held chord at each phrase top); they bound the cost all the same.
     let through = Math.min(until + 1, window.to);
     const lookLimit =
-        until < window.to ? Math.min(chorusBars(timeline, until).end, window.to) : window.to;
+        until < window.to
+            ? Math.min(chorusBars(timeline, until).end, until + LOOK_BARS, window.to)
+            : window.to;
     // Trading with the drummer needs a drummer who can solo in this style.
     const drumSolos = Boolean(style.drums.solos);
     // Planned only as far as the look can reach, and the bar it leads into: a chunk of a long
@@ -116,6 +121,9 @@ export function performPass(
               pass: options.pass + 1,
               looping: true,
               window: { ...window, from: 0, origin: 0 },
+              // Only its first bar is read: planning the whole next pass cost a long chart's
+              // every bar on each chunk (#1665).
+              planned: 1,
               drumSolos,
               arcShape: style.jamArc,
               keepsHighLine: style.keepsHighLine,
@@ -414,6 +422,9 @@ function sustain(
             : e;
     });
 }
+
+/** How far past a chunk's end the look across its barline may go (`PassOptions.until`). */
+const LOOK_BARS = 32;
 
 const LANE_ORDER: Record<BandEvent['lane'], number> = { drums: 0, bass: 1, comp: 2, lead: 3 };
 const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
