@@ -23,6 +23,8 @@ interface SongHeaderProps {
     neck: boolean;
     onHome: () => void;
     onToggleTheme: () => void;
+    onOpenSettings: () => void;
+    settingsOpen: boolean;
     onToggleControls: () => void;
     onShowChart: () => void;
     onShowNeck: () => void;
@@ -54,6 +56,8 @@ export function SongHeader({
     neck,
     onHome,
     onToggleTheme,
+    onOpenSettings,
+    settingsOpen,
     onToggleControls,
     onShowChart,
     onShowNeck,
@@ -123,6 +127,15 @@ export function SongHeader({
                 </div>
             </div>
             <div className="song-actions">
+                <button
+                    className="icon-button settings-btn"
+                    aria-label="Settings"
+                    aria-haspopup="dialog"
+                    aria-expanded={settingsOpen}
+                    onClick={onOpenSettings}
+                >
+                    <span aria-hidden="true">{'⚙\uFE0E'}</span>
+                </button>
                 <button
                     className="btn theme-toggle"
                     aria-pressed={stage}

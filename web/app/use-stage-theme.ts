@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { rememberTheme, type ThemeChoice, themePreference } from '../lib/session';
+import { forgetTheme, rememberTheme, type ThemeChoice, themePreference } from '../lib/session';
 
 // Day/Stage is a per-device convenience (#1208), never a document field. Null
 // follows the system; the stored choice is applied before hydration by the
@@ -23,10 +23,16 @@ export function useStageTheme() {
             delete document.documentElement.dataset.theme;
         }
     }, [theme]);
-    const toggleTheme = () => {
-        const next: ThemeChoice = stage ? 'day' : 'stage';
+    /** Null is System: the stored choice is cleared and the OS drives the theme again. */
+    const chooseTheme = (next: ThemeChoice | null) => {
         setTheme(next);
-        rememberTheme(next);
+        if (next) {
+            rememberTheme(next);
+        } else {
+            forgetTheme();
+        }
     };
-    return { stage, toggleTheme };
+    // The header's quick toggle always lands on an explicit Day or Stage.
+    const toggleTheme = () => chooseTheme(stage ? 'day' : 'stage');
+    return { theme, stage, chooseTheme, toggleTheme };
 }

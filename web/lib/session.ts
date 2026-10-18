@@ -144,6 +144,15 @@ export function rememberTheme(choice: ThemeChoice): void {
     }
 }
 
+/** System: forget the stored choice, so the OS drives the theme again. */
+export function forgetTheme(): void {
+    try {
+        localStorage.removeItem(THEME);
+    } catch {
+        // The stand still follows the system for this page; only the memory is lost.
+    }
+}
+
 const STAND_MODE = 'ensemble-v2-preview:stand-mode';
 export type StandMode = 'chart' | 'neck';
 
