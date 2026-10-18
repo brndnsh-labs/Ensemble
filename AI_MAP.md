@@ -186,7 +186,6 @@ account sync. Per-surface ownership is the navigation table in `web/CLAUDE.md`.
 | Path | Responsibility |
 | :--- | :--- |
 | `core/config.ts` | Global timing and musical constants. |
-| `core/meter.ts` | Validity check for an authored rhythmic grouping against its meter. |
 | `core/constants.ts` | Global visual and UI state constants. |
 
 ## Documentation, Parsing & Testing

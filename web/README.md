@@ -94,8 +94,7 @@ its server disconnected. WebKit checks therefore make the local test server refu
 network sockets, assert an uncached request fails, then require cache-only reload and playback.
 The test-server control endpoint exists only in the local harness, never in exported/deployed files.
 For remote verification use `V2_LIVE_TEST=1 npm run test:e2e -- --project=laptop` here; WebKit's
-network-disconnection harness is local-only. The dedicated V2 preview workflow repeats both
-local browser projects and never deploys.
+network-disconnection harness is local-only.
 
 ## Deliberate boundaries
 
@@ -104,16 +103,17 @@ local browser projects and never deploys.
   (#1404).
 - Browser-page singleton runtime (`lib/runtime.ts`), explicit authored-content projection,
   stop/load/rebuild lifecycle.
-- The preview bundles original TypeScript through `@core`. The engine's own typecheck also
-  runs before every preview build.
+- The app bundles `core/`'s TypeScript source through `@core`. The engine's own typecheck also
+  runs before every build.
 - Nothing reads or writes v1's `ensemble_*` keys: v1's load/save layer is gone (#1424) and
   the v1 import was retired (#1736). The keys are left on the device, inert and never deleted;
   `checks/foundation.spec.ts` pins a sentinel in `ensemble_currentState`.
-- IndexedDB `ensemble-v2-preview` holds explicit saves with atomic revision comparison. Local
+- IndexedDB `ensemble-v2-preview` (a frozen name from the beta: renaming it orphans every
+  device's songbook) holds explicit saves with atomic revision comparison. Local
   recovery keys are writer-scoped; older competing drafts remain accessible in the Song menu's More › Older drafts….
   Quota errors retain the current draft in memory and warn before leaving the page where the
   browser supports that prompt. Browser eviction/clearing can still remove local data: export
-  valuable charts. This preview does not promise durable cloud backup.
+  valuable charts, or sign in so the account keeps a copy.
 - The Sounds dialog offers one explicit install-all action (about 9.1 MB) that applies the
   existing genre sound map to the current draft. Per-lane Follow feel updates on genre changes;
   a manual choice pins that lane. Other saved songs are not rewritten. Save keeps the chosen
@@ -297,7 +297,3 @@ a tag, verified through the host's public `/build.json` (`sourceRevision` = the 
 The old beta path `/v2/...` is a plain 404 (#1742). CI's `v2-suite` builds and tests the
 shipped `/` build; `.github/workflows/v2-root-image.yml` smoke-tests its image on a PR and
 `web-image` after the merge.
-
-Compatibility caveat: manual-only preview builds before Follow feel support reject documents
-with `autoSound: true`. Do not roll a browser's songbook back to those builds after saving Follow
-feel setups; export first and prefer a corrective release.

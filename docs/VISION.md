@@ -59,12 +59,11 @@ Designed for laptop, tablet and phone alike. Tablet is the sweet spot: readable 
 
 ## What's next
 
-*Last updated: 2026-09-25. The GitHub tracker is the source of truth; this is the priority order.*
+*Last updated: 2026-10-18. The GitHub tracker is the source of truth; this is the priority order.*
 
-1. **Finish v2 editing.** Every score field needs a writer: major/minor (#1375), beat grouping (#1376), one section-settings surface (#1374), removing a bar or section (#1373). Milestone "V2 — parity".
-2. **Close out the cutover.** The v1 runtime (#1384) and every v1 compatibility path (the Retire v1 milestone, #1735–#1744) are gone, and analytics (#1389) and full audition links (#1382) shipped. Still open: two-device and cold-start behaviour on real phones (#1273).
-3. **Musical depth, on the band engine (#1404).** The comp answering the soloist's gaps, trading fours, ensemble kicks and idiomatic odd meters; then retiring the old engine and its tests, and the audio/synth rewrite. The old engine's parked design calls (#1148, #1149, #1161, #1162, #1164) and listening sweep (#534) are re-read against the band before any of them is built.
-4. **The live performer, last.** The band-leader gesture probe (#937) and tempo breathing (#936), both opt-in by the principle above.
+1. **Close out the cutover.** The v1 runtime (#1384) and every v1 compatibility path (the Retire v1 milestone, #1735–#1744) are gone, and analytics (#1389) and full audition links (#1382) shipped. Still open: two-device and cold-start behaviour on real phones (#1273).
+2. **Musical depth, on the band engine (#1404).** The comp answering the soloist's gaps, trading fours, ensemble kicks and idiomatic odd meters; then retiring the old engine and its tests, and the audio/synth rewrite. The old engine's parked design calls (#1148, #1149, #1161, #1162, #1164) and listening sweep (#534) are re-read against the band before any of them is built.
+3. **The live performer, last.** The band-leader gesture probe (#937) and tempo breathing (#936), both opt-in by the principle above.
 
 ## Key decisions
 
