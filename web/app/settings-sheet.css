@@ -1,0 +1,54 @@
+/* The Settings sheet (#1783) — it borrows the Band sheet's `.feel-panel` box and heading. */
+.settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 12px 0 0;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.settings-group legend {
+    padding: 0 6px;
+    font-size: 13px;
+    font-weight: 700;
+}
+.settings-choice {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 44px;
+    cursor: pointer;
+}
+.settings-choice input {
+    width: 20px;
+    height: 20px;
+    margin: 0;
+    flex: none;
+}
+.settings-hint {
+    font-size: 13px;
+}
+.settings-note {
+    margin: 12px 0 0;
+    font-size: 13px;
+}
+
+/* The gear (#1783). On the songbook it keeps the full 44px hit target; in the song header's
+   phone row it is as narrow as the ••• beside it (`.song-actions .menu-btn`), because that row
+   has no slack to spare (`checks/header-fit.spec.ts`). */
+.settings-btn {
+    font-size: 18px;
+}
+.header-right .settings-btn {
+    min-width: 44px;
+    min-height: 44px;
+}
+@media (max-width: 760px) {
+    .song-actions .settings-btn {
+        min-width: 0;
+        width: 28px;
+        height: 40px;
+        min-height: 0;
+    }
+}

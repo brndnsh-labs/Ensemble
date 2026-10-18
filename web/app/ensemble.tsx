@@ -101,6 +101,7 @@ import { FormStrip } from './form-strip';
 import { type BarMarkers, GuidedForm } from './guided-form';
 import { downloadImportSource, ImportDialog } from './import-dialog';
 import { NeckView } from './neck-view';
+import { SettingsSheet } from './settings-sheet';
 import { SongHeader } from './song-header';
 import { SongMenu, type SongMenuView } from './song-menu';
 import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
@@ -693,7 +694,17 @@ export default function Ensemble() {
     // two-chord bar is mid-bar, where `nextSoon` (the barline's) never fires. Same poll, same
     // tick; it flips twice a chord.
     const [changeSoon, setChangeSoon] = useState(false);
-    const { stage, toggleTheme } = useStageTheme();
+    const { theme, stage, chooseTheme, toggleTheme } = useStageTheme();
+    // Settings (#1783): per-device preferences, on the songbook and on a chart.
+    const [settingsOpen, setSettingsOpen] = useState(false);
+    const settingsDialog = useRef<HTMLDialogElement>(null);
+    useEffect(() => {
+        if (settingsOpen) {
+            settingsDialog.current?.showModal();
+        } else {
+            closeDialog(settingsDialog.current);
+        }
+    }, [settingsOpen]);
     const [following, setFollowing] = useState(true);
     const offline = useOfflineInstall();
     // The Song menu (•••, #1756): which of its lists or small dialogs is showing, else null.
@@ -5863,6 +5874,15 @@ export default function Ensemble() {
                     </div>
                 )}
                 <div className="header-right">
+                    <button
+                        className="icon-button settings-btn"
+                        aria-label="Settings"
+                        aria-haspopup="dialog"
+                        aria-expanded={settingsOpen}
+                        onClick={() => setSettingsOpen(true)}
+                    >
+                        <span aria-hidden="true">{'⚙\uFE0E'}</span>
+                    </button>
                     {accountsMounted && (
                         <AccountEntry
                             session={account.session}
@@ -6226,6 +6246,8 @@ export default function Ensemble() {
                         neck={neck}
                         onHome={goHome}
                         onToggleTheme={toggleTheme}
+                        onOpenSettings={() => setSettingsOpen(true)}
+                        settingsOpen={settingsOpen}
                         onToggleControls={() => setShowControls(!showControls)}
                         onShowChart={() => showStand('chart')}
                         onShowNeck={() => showStand('neck')}
@@ -6671,6 +6693,12 @@ export default function Ensemble() {
                         closeSongMenus();
                     })
                 }
+            />
+            <SettingsSheet
+                dialogRef={settingsDialog}
+                theme={theme}
+                onTheme={chooseTheme}
+                onClose={() => setSettingsOpen(false)}
             />
             {current && (
                 <ExportDialog
