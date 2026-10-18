@@ -211,7 +211,8 @@ expression devices take turns rather than stack; one peak note per cycle.
     every seed, a solo's arc, its opening breath and a looping book's recalled phrase are keyed
     by the bar's place in its chorus (`chorusBars`), so chorus k plays what lap k of a loop
     plays: the head, then solos or trades, the pass lift, trading turns counted from each
-    chorus's top.
+    chorus's top. The pass lift is Auto's alone: a manual intensity holds its level every time
+    round, on a loop and across a counted chart's choruses (#1796).
     A chart with a labelled intro or outro plays it once (#1483), so its choruses differ in
     length: each plays what a loop of the sections it includes plays on that lap, which
     `arrange/choruses.test.ts` holds it to.
