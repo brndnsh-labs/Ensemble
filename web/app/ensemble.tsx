@@ -3646,7 +3646,12 @@ export default function Ensemble() {
         const which = signedIn ? 'account' : 'guest';
         if (liveSongs === null || !libraryWanted.current[which]) {
             wantLibrary(which);
-        } else if (liveHome !== null && liveHome.count !== liveSongs.length) {
+        } else if (
+            liveHome !== null &&
+            // The store's `count()` holds the rows the account's full read steps over (#1769);
+            // they are not a sign the kept list is stale.
+            liveHome.count !== liveSongs.length + (signedIn ? accountUnreadable : 0)
+        ) {
             if (signedIn) {
                 accountSongsOwner.current = null;
                 setAccountSongs(null);
@@ -6126,6 +6131,8 @@ export default function Ensemble() {
                     // shows as loading, never as a songbook with no songs.
                     songs={songbookLoading ? null : liveSongs}
                     failure={liveLibraryFailure}
+                    // The account rows the full read stepped over (#1769), said beside the list.
+                    unreadable={signedIn ? accountUnreadable : 0}
                     accountLibrary={signedIn}
                     starred={starred}
                     openedAt={openedAt}

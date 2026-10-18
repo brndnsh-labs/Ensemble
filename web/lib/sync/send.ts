@@ -4,13 +4,17 @@ import type { AccountSongbook } from './repository';
 
 export type SaveTransport = (request: PreparedSave) => Promise<unknown>;
 
-/** One ordered step. The future authenticated host owns retries and connection lifecycle. */
+/**
+ * One ordered step. The future authenticated host owns retries and connection lifecycle.
+ * `'unreadable'` sends nothing: the document's queue would not read and has been retired
+ * (`AccountSongbook.prepare`, #1769).
+ */
 export async function sendNext(
     songbook: AccountSongbook,
     scope: AccountScope,
     documentId: string,
     transport: SaveTransport,
-): Promise<'idle' | 'conflict' | 'committed' | 'retry' | 'refused'> {
+): Promise<'idle' | 'conflict' | 'committed' | 'retry' | 'refused' | 'unreadable'> {
     scope = copyScope(scope);
     const request = await songbook.prepare(scope, documentId);
     if (typeof request === 'string') {

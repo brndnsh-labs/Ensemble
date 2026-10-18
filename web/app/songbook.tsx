@@ -1,5 +1,9 @@
 import { type RefObject, useEffect, useMemo, useRef } from 'react';
-import { ACCOUNT_SWITCH_MESSAGES, REMOTE_UPDATE_MESSAGES } from '../lib/account/messages';
+import {
+    ACCOUNT_SWITCH_MESSAGES,
+    REMOTE_UPDATE_MESSAGES,
+    unreadableSongsNotice,
+} from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
 import { composerOf, genreOf } from '../lib/documents';
 import { type HomeSlice, openedAgo } from '../lib/home';
@@ -192,9 +196,7 @@ export function Songbook(props: SongbookProps) {
             )}
             {home !== null && home.unreadable > 0 && (
                 <p className="library-notice" role="status" data-testid="home-unreadable">
-                    {home.unreadable === 1
-                        ? 'One song on this device couldn’t be read, so it isn’t listed here.'
-                        : `${home.unreadable} songs on this device couldn’t be read, so they aren’t listed here.`}
+                    {unreadableSongsNotice(home.unreadable)}
                 </p>
             )}
             {markedElsewhere > 0 && !loading && (

@@ -153,9 +153,13 @@ const stubScope: AccountScope = { ownerId: 'owner-a', generation: 1 };
 function stubSongbook(overrides: Record<string, unknown> = {}): AccountSongbook {
     return {
         remoteCandidates: async () => [],
-        list: async () => ({ songs: [], nextAfterDocumentId: null }),
+        list: async () => ({ songs: [], nextAfterDocumentId: null, unreadable: [] }),
         // The collections store the pass also diffs (#1474); empty, so these rows are all songs.
-        collectionPage: async () => ({ collections: [], nextAfterDocumentId: null }),
+        collectionPage: async () => ({
+            collections: [],
+            nextAfterDocumentId: null,
+            unreadable: [],
+        }),
         reconcile: async () => 'unchanged',
         ...overrides,
     } as unknown as AccountSongbook;
@@ -214,6 +218,7 @@ describe('runLibraryDownload — what the pass refuses before it touches anythin
                     .filter((entry) => !entry.deleted)
                     .map((entry) => ({ documentId: entry.documentId, remoteRevision: 'r1' })),
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
         });
 

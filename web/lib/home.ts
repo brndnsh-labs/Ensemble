@@ -131,10 +131,11 @@ export const HOME_FILL_SPARE = 8;
  *
  * **A document that does not validate is left out, counted, and never fatal** (#1441). The home
  * page must render even when one stored chart is corrupt — that song is still in storage, and the
- * All songs page (a full read, which refuses a library it cannot wholly read) is where the failure
- * is reported in full. So a bad Continue document means no Continue card, a bad row is one fewer
- * row, and `unreadable` lets the page say that something could not be read rather than pretend the
- * list is complete. The count is the store's own and is never reduced: an unreadable song is still
+ * All songs page is where the failure is reported in full: the guest songbook's full read refuses
+ * a library it cannot wholly read, and the account songbook's leaves the row out and counts it
+ * (`unreadableSongs`, #1769). So a bad Continue document means no Continue card, a bad row is one
+ * fewer row, and `unreadable` lets the page say that something could not be read rather than
+ * pretend the list is complete. The count is the store's own and is never reduced: an unreadable song is still
  * one of the musician's songs.
  *
  * Fill rows come after every opened row, newest save first, since they were never opened.

@@ -786,7 +786,9 @@ export interface SyncLoop {
     /** Which document `observation` describes. */
     watch(documentId: string | null): Promise<void>;
     /**
-     * Every saved song for this account, paged to the end.
+     * Every saved song for this account, paged to the end. A row this build cannot read is left
+     * out (`list`'s `unreadable`, #1769): `unreadableSongs` hands those back, and All songs and
+     * the home say how many there are.
      *
      * `owner` names the account the caller means, for the one case where the loop cannot derive it
      * — an EXPIRED session's "Sign out on this device" (#1351), which exports from a library whose

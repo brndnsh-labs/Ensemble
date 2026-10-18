@@ -326,6 +326,7 @@ describe('library download and reconcile on real IndexedDB', () => {
         expect(await book.list(elsewhere!, { limit: 100 })).toEqual({
             songs: [],
             nextAfterDocumentId: null,
+            unreadable: [],
         });
         expect(await book.remoteCandidates(elsewhere!)).toEqual([]);
         // And the stale handle stays fenced out of its own account too.
@@ -561,7 +562,8 @@ describe('library download and reconcile on real IndexedDB', () => {
         const id = songId(1);
         const clean = songId(2);
         const sky = cloud({
-            [id]: { revision: 'r1', document: { schemaVersion: 1, id, nonsense: true } },
+            // Schema 2, so it is corrupt rather than the retired text format (#1769 settles that).
+            [id]: { revision: 'r1', document: { schemaVersion: 2, id, nonsense: true } },
             [clean]: { revision: 'r1', document: remoteChart('Fine', clean, 0) },
         });
 

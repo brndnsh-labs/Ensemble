@@ -79,7 +79,7 @@ describe('AccountSongbook.home (#1441)', () => {
         expect(slice.rows.some((row) => row.id === 'song-b')).toBe(false);
     });
 
-    it('survives a corrupt record a full list refuses', async () => {
+    it('survives a corrupt record it never reads', async () => {
         for (let i = 0; i < 9; i++) {
             await book.save(scopeA, accountChart(`Song ${i}`, `song-${i}`), null);
         }
@@ -97,7 +97,10 @@ describe('AccountSongbook.home (#1441)', () => {
         expect(slice.count).toBe(10);
         expect(slice.rows).toHaveLength(8);
         expect(slice.unreadable).toBe(0);
-        await expect(book.list(scopeA, { limit: 100 })).rejects.toThrow();
+        // The full read steps over it too, and names it (#1769).
+        expect((await book.list(scopeA, { limit: 100 })).unreadable).toEqual([
+            { documentId: 'zz-corrupt', remoteRevision: null },
+        ]);
     });
 
     it('counts and leaves out a corrupt record it does read', async () => {
