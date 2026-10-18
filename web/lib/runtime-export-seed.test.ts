@@ -22,10 +22,10 @@ vi.mock('./band-export', () => ({
 
 async function freshRuntime() {
     vi.resetModules();
-    const [runtime, { buildStandardDocument, STANDARDS }] = await Promise.all([
-        import('./runtime'),
-        import('./standards'),
-    ]);
+    // One at a time: two imports at once can each reach a mocked module mid-import and get
+    // the real one (a Vitest race, #1699).
+    const runtime = await import('./runtime');
+    const { buildStandardDocument, STANDARDS } = await import('./standards');
     const chart = (seed: string): ChartDocumentV2 => {
         const document = buildStandardDocument(STANDARDS[0]);
         return {
