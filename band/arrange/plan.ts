@@ -283,12 +283,14 @@ export function planBars(
         return 'none';
     };
     // A song that loops earns a little more each time round — capped, so the fourth chorus
-    // is fuller than the first but the band never runs away from the player.
-    const passLift = (index: number) => Math.min(passAt(index, pass), 3) * 0.03;
+    // is fuller than the first but the band never runs away from the player. Only on Auto: a
+    // manual intensity is the level the player chose, and it holds every time round (#1796).
+    const pinned = settings.intensity !== null;
+    const passLift = (index: number) => (pinned ? 0 : Math.min(passAt(index, pass), 3) * 0.03);
     // A counted performance shaped as a jam (song mode) breathes across its choruses instead
     // (`jamArc`). Only on Auto: a manual intensity pins the level as it always has. A pass that
     // loops has no last chorus to shape towards, so it keeps the pass lift.
-    const jam = settings.arc === 'jam' && settings.intensity === null && !looping;
+    const jam = settings.arc === 'jam' && !pinned && !looping;
     const depth = arcShape?.depth ?? 1;
     const lift = (index: number) => (jam ? jamArc(timeline, index) * depth : passLift(index));
     const plans: BarPlan[] = [];

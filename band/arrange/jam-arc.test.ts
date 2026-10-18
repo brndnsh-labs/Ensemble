@@ -478,3 +478,50 @@ describe('a style whose high tier is another groove keeps its side of the line (
         }
     });
 });
+
+describe('a manual intensity holds its level every time round (#1796)', () => {
+    const PINS = [0.3, 0.55, 0.68];
+
+    it('a looping song plans every bar at the same energy on passes 0–5', () => {
+        for (const [name, chart] of Object.entries(CHARTS)) {
+            const timeline = compileTimeline(chart);
+            for (const intensity of PINS) {
+                const settings = { ...DEFAULT_SETTINGS, intensity };
+                const first = plan(timeline, settings, true).map((p) => p.energy);
+                for (let pass = 1; pass <= 5; pass++) {
+                    const energies = plan(timeline, settings, true, {}, pass).map((p) => p.energy);
+                    expect(energies, `${name} at ${intensity}, pass ${pass}`).toEqual(first);
+                }
+            }
+        }
+    });
+
+    it("a counted chart's choruses plan each bar of the chorus alike", () => {
+        for (const [name, chart] of Object.entries(CHARTS)) {
+            const timeline = counted(chart, 4);
+            const perChorus = timeline.bars.filter((bar) => bar.visit.chorus === 0).length;
+            for (const intensity of PINS) {
+                for (const settings of [
+                    { ...DEFAULT_SETTINGS, intensity },
+                    { ...JAM, intensity },
+                ]) {
+                    const energies = plan(timeline, settings).map((p) => p.energy);
+                    for (const bar of timeline.bars) {
+                        expect(
+                            energies[bar.index],
+                            `${name} at ${intensity}, bar ${bar.index}`,
+                        ).toBeCloseTo(energies[bar.index % perChorus], 9);
+                    }
+                }
+            }
+        }
+    });
+
+    it('Auto still lifts a looping song each time round', () => {
+        const timeline = compileTimeline(plain);
+        const mean = (pass: number) =>
+            plan(timeline, DEFAULT_SETTINGS, true, {}, pass).reduce((s, p) => s + p.energy, 0) /
+            timeline.bars.length;
+        expect(mean(3)).toBeGreaterThan(mean(0) + 0.05);
+    });
+});
