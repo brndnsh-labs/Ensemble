@@ -1,4 +1,4 @@
-import { validateChartDocumentV2 } from '../../../core/songbook/document-v2.js';
+import { isRetiredSchema, validateChartDocumentV2 } from '../../../core/songbook/document-v2.js';
 import { decodeCollection } from '../collections';
 import {
     AccountChangedError,
@@ -279,6 +279,14 @@ export interface LibraryDownloadResult {
     absent: string[];
     /** Listed live by the manifest, 404 on the download. Nothing local was touched. */
     missing: string[];
+    /**
+     * What this build cannot read and stepped over rather than stopping on (#1769), in the order
+     * met: a local row that will not decode (left out of the diff, so a live manifest row for it
+     * is fetched, and `reconcile` may replace the row with the account's copy), and a body in the
+     * retired text format (schema 1, #1740), which no build will read again — resolved, not a
+     * failure, so the run can still complete. Nothing is written for either here.
+     */
+    unreadable: string[];
     /** Only what a retry could still fix. A quarantined body is in `unsupported`, not here. */
     failures: LibraryDownloadFailure[];
     /**
@@ -410,8 +418,8 @@ function decodeBody(value: unknown, documentId: string): ChartDocument | null {
 /**
  * Classify a body this build could not use, without re-implementing any validation: the
  * canonical decoder's own verdict decides. A `schemaVersion` with no decoder here is a
- * "needs app update"; anything else is corrupt — a text chart (schema 1, retired in #1740)
- * included: this build has no reader for it, and nothing could ever be.
+ * "needs app update"; anything else is corrupt. (A text chart, schema 1, retired in #1740, is
+ * settled before this is asked: no build will ever read one, so it is reported, not failed.)
  *
  * The two verdicts get opposite treatments, and that difference is the point. A newer format is
  * a fact about THIS BUILD, not about the data: the bytes are presumed good, so they are
@@ -609,6 +617,10 @@ async function libraryDownloadPass(
 
     const failures: LibraryDownloadFailure[] = [];
     const missing: string[] = [];
+    const unreadable: string[] = [];
+    // The retired-format bodies among `unreadable`: settled for `LibraryFacts`. A local row that
+    // would not read is not, since its fetch decides it like any other row's.
+    const retiredBodies: string[] = [];
     const collectionsChanged: string[] = [];
     const buckets: Record<ReconcileOutcome, string[]> = {
         advanced: [],
@@ -663,6 +675,7 @@ async function libraryDownloadPass(
         unsupported: buckets.unsupported,
         absent,
         missing,
+        unreadable,
         failures,
         collections: collectionsChanged,
         ...(backoffUntil === undefined ? {} : { backoffUntil }),
@@ -727,13 +740,14 @@ async function libraryDownloadPass(
         return abandoned();
     }
 
-    // Pass 2: the local side of the diff. A library this device could not read is not one it may
-    // remove records from, so the whole pass is abandoned before a single record is touched — but
-    // it is REPORTED, not thrown. One corrupt row (a candidate or a saved song a validator
-    // refuses) would otherwise make every future pass reject at the same row, with no result to
-    // show and nothing in `failures` a musician could act on. The fence is the one exception: an
-    // owner switch is not a fact about the library, and a pass that no longer knows whose records
-    // it is holding must not resolve at all.
+    // Pass 2: the local side of the diff. A row this device cannot read is stepped over and
+    // reported in `unreadable` (#1769) — `list` and `collectionPage` name it rather than failing
+    // the page — so it is simply not in the diff: a live manifest row for it is fetched, and the
+    // commit decides whether the account's copy may replace it. Anything else that stops the read
+    // abandons the whole pass before a single record is touched — but it is REPORTED, not thrown,
+    // so it cannot make every future pass reject with nothing in `failures` to show. The fence is
+    // the one exception: an owner switch is not a fact about the library, and a pass that no
+    // longer knows whose records it is holding must not resolve at all.
     const local: LocalMirror[] = [];
     try {
         const quarantined = new Map(
@@ -760,6 +774,7 @@ async function libraryDownloadPass(
                     quarantinedRevision: quarantined.get(song.documentId) ?? null,
                 });
             }
+            unreadable.push(...listing.unreadable);
             if (listing.nextAfterDocumentId === null) {
                 break;
             }
@@ -800,6 +815,7 @@ async function libraryDownloadPass(
                     kind: 'collection',
                 });
             }
+            unreadable.push(...listing.unreadable);
             if (listing.nextAfterDocumentId === null) {
                 break;
             }
@@ -943,6 +959,16 @@ async function libraryDownloadPass(
                 );
                 continue;
             }
+            if (isRetiredSchema(frame.document)) {
+                // A text chart from the account (schema 1, retired in #1740; the server has
+                // refused one since). No build will read it again, so it is reported and settled
+                // rather than failed: a failure here would keep the run from ever completing.
+                // Nothing is written, so a row this device holds for the id stays as it is.
+                unreadable.push(planned.documentId);
+                retiredBodies.push(planned.documentId);
+                resolved += 1;
+                continue;
+            }
             const document = decodeBody(frame.document, planned.documentId);
             if (!document && unsupportedReason(frame.document) === 'invalid') {
                 // Content the canonical decoder rejects outright: a broken server or a corrupt
@@ -1029,6 +1055,7 @@ async function libraryDownloadPass(
         ...buckets.superseded,
         ...buckets.unsupported,
         ...missing,
+        ...retiredBodies,
         ...failures
             .filter((failure) => failure.reason === 'malformed-body')
             .map((failure) => failure.documentId),

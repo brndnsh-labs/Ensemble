@@ -51,8 +51,12 @@ function stubSongbook(overrides: Record<string, unknown> = {}): AccountSongbook 
         pending: async () => [],
         // The kind-agnostic queue read and the collections page the outbox walks (#1474).
         queued: async () => [],
-        list: async () => ({ songs: [], nextAfterDocumentId: null }),
-        collectionPage: async () => ({ collections: [], nextAfterDocumentId: null }),
+        list: async () => ({ songs: [], nextAfterDocumentId: null, unreadable: [] }),
+        collectionPage: async () => ({
+            collections: [],
+            nextAfterDocumentId: null,
+            unreadable: [],
+        }),
         // The conflict merge each sweep asks for, and the collection outbox count (#1477).
         mergeCollectionConflicts: async () => 0,
         collectionOutbox: async () => ({ unsent: 0, refused: 0 }),
@@ -78,6 +82,7 @@ function withQueuedSave(overrides: Record<string, unknown> = {}): AccountSongboo
         list: async () => ({
             songs: [{ documentId: 'song-1', remoteRevision: null }],
             nextAfterDocumentId: null,
+            unreadable: [],
         }),
         prepare: async () => (queued > 0 ? PREPARED : 'idle'),
         acknowledge: async () => {
@@ -254,6 +259,68 @@ describe('the sync loop surfaces the reason a Save could not be sent', () => {
         // The shell re-lists on this, which is how a committed Save reaches the songbook.
         expect(snapshot.libraryVersion).toBeGreaterThan(0);
     });
+
+    /**
+     * Two songs; the first one's queue will not read and `prepare` retires it (#1769), the second
+     * is an ordinary queued Save. `prepare` answers `'unreadable'` once — the queue is gone after.
+     */
+    function withUnreadableQueue(): { songbook: AccountSongbook; sent: string[] } {
+        const sent: string[] = [];
+        const retired = new Set<string>();
+        let second = 1;
+        const songbook = stubSongbook({
+            list: async () => ({
+                songs: [{ documentId: 'song-2', remoteRevision: null }],
+                nextAfterDocumentId: null,
+                unreadable: ['song-1'],
+            }),
+            prepare: async (_scope: unknown, documentId: string) => {
+                if (documentId === 'song-1') {
+                    if (retired.has(documentId)) {
+                        return 'idle';
+                    }
+                    retired.add(documentId);
+                    return 'unreadable';
+                }
+                if (second === 0) {
+                    return 'idle';
+                }
+                sent.push(documentId);
+                return { ...PREPARED, documentId: 'song-2' };
+            },
+            acknowledge: async () => {
+                second -= 1;
+                return 'committed';
+            },
+        });
+        return { songbook, sent };
+    }
+
+    it('says once, in plain words, that a change it could not read was dropped, and keeps syncing the rest (#1769)', async () => {
+        const { songbook, sent } = withUnreadableQueue();
+        const { api } = fakeApi({ ok: true, value: { kind: 'committed' }, status: 200 });
+        const loop = createSyncLoop(api, createAccountSession(api), songbook);
+        await loop.attach(OWNER);
+        await loop.run();
+
+        // The other song still uploaded in the same pass.
+        expect(sent).toEqual(['song-2']);
+        expect(loop.getSnapshot().failure).toEqual({
+            reason: 'unreadable',
+            message: SYNC_MESSAGES.unreadable,
+        });
+        expect(loop.getSnapshot().failure?.message).not.toContain('try again');
+
+        // The queue is gone, so the next pass has nothing to say about it.
+        await loop.run();
+        expect(loop.getSnapshot().failure).toBeNull();
+    });
+
+    it('lets a reason a retry could fix outrank the dropped change (#1769)', async () => {
+        const { songbook } = withUnreadableQueue();
+        const { snapshot } = await passWith({ ok: false, error: { kind: 'network' } }, songbook);
+        expect(snapshot.failure).toEqual({ reason: 'offline', message: SYNC_MESSAGES.offline });
+    });
 });
 
 describe('the sync loop empties the queue rather than leaving it one version short', () => {
@@ -302,6 +369,7 @@ describe('the sync loop empties the queue rather than leaving it one version sho
                     { documentId: 'song-2', remoteRevision: null },
                 ],
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
             prepare: async (_scope: unknown, documentId: string) => {
                 if (documentId !== 'song-1') {
@@ -361,6 +429,7 @@ describe('the sync loop empties the queue rather than leaving it one version sho
                     { documentId: 'song-2', remoteRevision: null },
                 ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
             // #1298: once `refuse()` has marked the head, real storage answers `'refused'` here
             // without a request. A fake that kept handing back a queued Save would model the
@@ -439,6 +508,7 @@ describe('the sync loop empties the queue rather than leaving it one version sho
                     { documentId: 'song-2', remoteRevision: null },
                 ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
             prepare: async (_scope: unknown, documentId: string) => {
                 if (documentId === 'song-1') {
@@ -493,6 +563,7 @@ describe('the sync loop empties the queue rather than leaving it one version sho
                     { documentId: 'song-2', remoteRevision: null },
                 ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
             prepare: async (_scope: unknown, documentId: string) => ({
                 ...PREPARED,
@@ -549,6 +620,7 @@ describe('the sync loop empties the queue rather than leaving it one version sho
                     { documentId: 'song-2', remoteRevision: null },
                 ].filter((song) => song.documentId > (options.afterDocumentId ?? '')),
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
             prepare: async (_scope: unknown, documentId: string) => {
                 if (documentId === 'song-1') {
@@ -589,6 +661,7 @@ describe('the sync loop empties the queue rather than leaving it one version sho
             list: async () => ({
                 songs: [{ documentId: 'song-1', remoteRevision: null }],
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
             prepare: async () => PREPARED,
             acknowledge: async () => 'committed',
@@ -751,6 +824,7 @@ describe('the sync loop never lets a download swap the chart on the stand', () =
             list: async () => ({
                 songs: [{ documentId: 'song-1', remoteRevision: 'r1' }],
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
         });
         const { api } = fakeApi(
@@ -823,6 +897,7 @@ describe('a local purge takes the loop’s turn like a pass (#1754)', () => {
             list: async () => ({
                 songs: [{ documentId: 'song-1', remoteRevision: null }],
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
             prepare: async () => {
                 events.push('prepare');
@@ -1474,6 +1549,7 @@ describe('signing out moves the fence before it asks the server for anything', (
                         { documentId: 'song-3', document: { updatedAt: SAVED_AT } },
                     ],
                     nextAfterDocumentId: null,
+                    unreadable: [],
                 }),
                 pending: async (_scope: unknown, documentId: string) =>
                     documentId === 'song-1' ? [{ status: 'queued' }, { status: 'queued' }] : [],
@@ -1522,6 +1598,7 @@ describe('signing out moves the fence before it asks the server for anything', (
                 list: async () => ({
                     songs: [{ documentId: 'song-1' }, { documentId: 'song-2' }],
                     nextAfterDocumentId: null,
+                    unreadable: [],
                 }),
                 pending: async (_scope: unknown, documentId: string) =>
                     documentId === 'song-1'
@@ -1551,6 +1628,7 @@ describe('signing out moves the fence before it asks the server for anything', (
                 list: async () => ({
                     songs: [{ documentId: 'song-1' }],
                     nextAfterDocumentId: null,
+                    unreadable: [],
                 }),
                 drafts: async () => [],
                 unreadableSongs: async () => [{ documentId: 'song-old', raw }],
@@ -2145,6 +2223,7 @@ describe('an expired session signs out on this device without a round trip (#135
                     { documentId: 'song-2', document: { updatedAt: SAVED_AT } },
                 ],
                 nextAfterDocumentId: null,
+                unreadable: [],
             }),
             pending: async (_scope: unknown, documentId: string) =>
                 documentId === 'song-1' ? [{ status: 'queued' }] : [],
@@ -2744,6 +2823,7 @@ describe('a rate-limited upload resumes by itself when the back-off ends (#1478)
                 return {
                     songs,
                     nextAfterDocumentId: rest.length > limit ? songs.at(-1)!.documentId : null,
+                    unreadable: [],
                 };
             },
             prepare: async (_scope: unknown, documentId: string) =>

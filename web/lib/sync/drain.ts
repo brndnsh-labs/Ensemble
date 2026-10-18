@@ -28,7 +28,18 @@ export interface OutboxPassResult {
      * only `kind === 'complete'` means that.
      */
     resumeAfterDocumentId: string | null;
-    counts: { idle: number; committed: number; conflict: number; retry: number; refused: number };
+    /**
+     * `unreadable` counts the documents whose queue would not read and was retired whole this pass
+     * (#1769): each is news, a change that will never upload, so the caller says so once.
+     */
+    counts: {
+        idle: number;
+        committed: number;
+        conflict: number;
+        retry: number;
+        refused: number;
+        unreadable: number;
+    };
     /**
      * The COLLECTION share of `counts.committed` and `counts.conflict` (#1477 review R1) — a
      * subset, never a separate pile. The sync loop tells the two kinds apart because only a SONG
@@ -45,11 +56,13 @@ export interface OutboxPassResult {
  *
  * Each store is paged to the same limit after the same cursor, and each page reports how far it
  * READ (its own cursor). The merge keeps only ids up to the nearer of the two cursors, which both
- * pages have read in full, so it is exact even when a songs page hands back fewer songs than it
- * read: `list` steps over a retired text chart (#1740), listing nothing for it, while its cursor
- * still moves past. Any other song record that does not validate still fails the pass rather than
- * being stepped over (#1769). Two transactions rather than one: pages were never a snapshot of the
- * library (`list`), and the cursor is an id, not an offset.
+ * pages have read in full, so it is exact even when a page hands back fewer records than it read.
+ *
+ * A row a page could not read (#1769: a text chart, retired in #1740, or one that will not
+ * validate) is in its `unreadable`, and still VISITED: its queue may be one that will not read
+ * either, and `prepare` retires that whole queue so the pass can go on — or a readable one, which
+ * still sends. Two transactions rather than one: pages were never a snapshot of the library
+ * (`list`), and the cursor is an id, not an offset.
  */
 async function outboxPage(
     songbook: AccountSongbook,
@@ -73,18 +86,19 @@ async function outboxPage(
         if (error instanceof AccountChangedError) {
             throw error;
         }
-        return { collections: [], nextAfterDocumentId: null };
+        return { collections: [], nextAfterDocumentId: null, unreadable: [] };
     });
     const merged = [
         ...songs.songs.map((record) => ({ documentId: record.documentId, collection: false })),
+        ...songs.unreadable.map((documentId) => ({ documentId, collection: false })),
         ...collections.collections.map((record) => ({
             documentId: record.documentId,
             collection: true,
         })),
+        ...collections.unreadable.map((documentId) => ({ documentId, collection: true })),
     ].sort((a, b) => (a.documentId < b.documentId ? -1 : a.documentId > b.documentId ? 1 : 0));
-    // Each page read up to its own cursor and no further. A songs page can hand back fewer songs
-    // than it read — `list` steps over a retired text chart (#1740) without listing it — so the
-    // union is exact only up to the nearer of the two cursors: nothing past it is visited here.
+    // Each page read up to its own cursor and no further, so the union is exact only up to the
+    // nearer of the two cursors: nothing past it is visited here.
     const bound = [songs.nextAfterDocumentId, collections.nextAfterDocumentId]
         .filter((cursor) => cursor !== null)
         .sort()[0];
@@ -96,8 +110,8 @@ async function outboxPage(
 }
 
 /**
- * A song whose head is in conflict, permanently refused (#1298), or idle with nothing queued,
- * still counts as visited and lets the pass continue to the next song — only a transport
+ * A song whose head is in conflict, permanently refused (#1298), idle with nothing queued, or
+ * whose queue would not read and was retired (#1769), still counts as visited and lets the pass continue to the next song — only a transport
  * failure ends the pass early, so one stuck song can never starve every other song behind it.
  * A refused head costs no network request at all: `prepare()` answers `'refused'` without
  * sending anything, which is what stops a step-over from re-POSTing the same rejected bytes
@@ -130,7 +144,7 @@ export async function runOutboxPass(
     scope = copyScope(scope);
     const { afterDocumentId, signal } = options;
     const incomingCursor = afterDocumentId ?? null;
-    const counts = { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0 };
+    const counts = { idle: 0, committed: 0, conflict: 0, retry: 0, refused: 0, unreadable: 0 };
     const collections = { committed: 0, conflict: 0 };
 
     if (signal?.aborted) {
@@ -172,7 +186,7 @@ export async function runOutboxPass(
                 collections,
             };
         }
-        // idle / committed / conflict / refused: this document is safely visited.
+        // idle / committed / conflict / refused / unreadable: this document is safely visited.
         cursor = song.documentId;
         if (signal?.aborted) {
             return { kind: 'aborted', resumeAfterDocumentId: cursor, counts, collections };

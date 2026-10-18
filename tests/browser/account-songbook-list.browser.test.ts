@@ -109,7 +109,11 @@ afterEach(async () => {
 
 describe('bounded owner-scoped listing on real IndexedDB', () => {
     it('an owner with no saved songs gets an empty page and an end-of-list cursor', async () => {
-        expect(await book.list(scope)).toEqual({ songs: [], nextAfterDocumentId: null });
+        expect(await book.list(scope)).toEqual({
+            songs: [],
+            nextAfterDocumentId: null,
+            unreadable: [],
+        });
     });
 
     it('pages deterministically with no duplicated or omitted ids, and terminates', async () => {
@@ -145,6 +149,7 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
             expect(await book.list(scope, { afterDocumentId: cursor })).toEqual({
                 songs: [],
                 nextAfterDocumentId: null,
+                unreadable: [],
             });
         }
     });
@@ -180,6 +185,7 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         expect(await book.list(back, { afterDocumentId: ids.at(-1)! })).toEqual({
             songs: [],
             nextAfterDocumentId: null,
+            unreadable: [],
         });
     });
 
@@ -200,7 +206,7 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         expect((await book.list(scope)).songs).toHaveLength(2);
     });
 
-    it('rejects the whole page when any record in the fetched window is unreadable', async () => {
+    it('steps over and names an unreadable record, and the pages still walk the library (#1769)', async () => {
         const ids = await seed(4);
         await book.close();
         const raw = await rawDatabase();
@@ -214,32 +220,29 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         raw.close();
 
         book = connection();
-        // Explicit failure, not an empty or partial library.
-        await expect(book.list(scope)).rejects.toThrow('Cannot sync this chart version');
-        // Even a page that would have stopped before the bad record still fetches limit + 1,
-        // so the corrupt row sits in the window and must fail rather than be skipped.
-        await expect(book.list(scope, { limit: 2 })).rejects.toThrow(
-            'Cannot sync this chart version',
-        );
-        // Pages that genuinely do not reach it still work.
-        expect((await book.list(scope, { limit: 1 })).songs.map((s) => s.documentId)).toEqual([
-            ids[0],
-        ]);
+        // Not an error, and not a silent partial library either: the page names what it left out.
+        const page = await book.list(scope);
+        expect(page.songs.map((s) => s.documentId)).toEqual([ids[0], ids[1], ids[3]]);
+        expect(page.unreadable).toEqual([ids[2]]);
+        // Only the page's own rows are named: the look-ahead row is the next page's.
+        const short = await book.list(scope, { limit: 2 });
+        expect(short.unreadable).toEqual([]);
+        expect(short.nextAfterDocumentId).toBe(ids[1]);
+        // A page made wholly of it still moves the cursor past it.
+        const alone = await book.list(scope, { limit: 1, afterDocumentId: ids[1] });
+        expect(alone).toEqual({ songs: [], nextAfterDocumentId: ids[2], unreadable: [ids[2]] });
 
         await book.close();
         const after = await rawDatabase();
         try {
-            // A failed read wrote nothing and repaired nothing.
+            // A read wrote nothing and repaired nothing.
             expect(await rawRead(after, 'songs', key)).toEqual(planted);
-            expect(await rawRead(after, 'songs', ['owner-a', ids[0]])).toEqual(
-                await rawRead(after, 'songs', ['owner-a', ids[0]]),
-            );
         } finally {
             after.close();
         }
     });
 
-    it('rejects a record whose stored identity disagrees with its key', async () => {
+    it('steps over a record whose stored identity disagrees with its key', async () => {
         const ids = await seed(2);
         await book.close();
         const raw = await rawDatabase();
@@ -252,9 +255,9 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         raw.close();
 
         book = connection();
-        await expect(book.list(scope)).rejects.toThrow(
-            'Stored chart identity does not match its record.',
-        );
+        const page = await book.list(scope);
+        expect(page.songs.map((s) => s.documentId)).toEqual([ids[1]]);
+        expect(page.unreadable).toEqual([ids[0]]);
     });
 
     it('rejects a stored key outside the identifier charset', async () => {
@@ -362,7 +365,11 @@ describe('bounded owner-scoped listing on real IndexedDB', () => {
         const stale = scope;
         const b = (await book.switchAccount('owner-b'))!;
         await expect(book.list(stale)).rejects.toBeInstanceOf(AccountChangedError);
-        expect(await book.list(b)).toEqual({ songs: [], nextAfterDocumentId: null });
+        expect(await book.list(b)).toEqual({
+            songs: [],
+            nextAfterDocumentId: null,
+            unreadable: [],
+        });
 
         const again = (await book.switchAccount('owner-a'))!;
         // Same owner, new generation: the old handle stays fenced out.

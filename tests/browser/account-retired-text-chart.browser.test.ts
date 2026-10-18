@@ -140,7 +140,11 @@ describe('a text chart left in the account mirror (#1740)', () => {
         // A page of one, so a page can be wholly a text chart: it hands back no song but still
         // names where the next page starts.
         const first = await book.list(scope, { limit: 1 });
-        expect(first).toEqual({ songs: [], nextAfterDocumentId: 'song-a' });
+        expect(first).toEqual({
+            songs: [],
+            nextAfterDocumentId: 'song-a',
+            unreadable: ['song-a'],
+        });
         const second = await book.list(scope, { limit: 1, afterDocumentId: 'song-a' });
         expect(second.songs.map((song) => song.documentId)).toEqual(['song-b']);
         expect(second.nextAfterDocumentId).toBe('song-b');
@@ -224,16 +228,18 @@ describe('a text chart left in the account mirror (#1740)', () => {
         const docs = new Map<string, { revision: string; document: unknown }>([
             ['song-a', { revision: 'r-new', document: clean }],
             ['song-b', { revision: 'r1', document: other }],
-            // A text chart the server still holds is refused like any body it cannot read.
+            // A text chart the server still holds is reported and settled, never a failure that
+            // would keep every run from completing (#1769).
             ['song-c', { revision: 'r1', document: textChart('song-c') }],
         ]);
         const result = await download(docs);
         // The old row held nothing the account had not got: it is replaced, as a clean record
         // would be, rather than fetched again on every pass and never shown.
         expect(result.advanced).toEqual(['song-a', 'song-b']);
-        expect(result.failures).toEqual([
-            expect.objectContaining({ documentId: 'song-c', reason: 'malformed-body' }),
-        ]);
+        expect(result.failures).toEqual([]);
+        expect(result.complete).toBe(true);
+        // The local row it stepped over, then the body it could not read.
+        expect(result.unreadable).toEqual(['song-a', 'song-c']);
         expect(await book.read(scope, 'song-a')).toMatchObject({
             remoteRevision: 'r-new',
             document: { title: 'Clean', revision: 4 },

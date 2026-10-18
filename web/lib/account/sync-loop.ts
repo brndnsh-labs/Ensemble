@@ -97,6 +97,10 @@ import {
  *
  * `too-large` and `refused` are also the only reasons that are facts about ONE document —
  * `drain()` steps over that song and keeps sending the rest, which no other reason permits.
+ *
+ * `unreadable` (#1769) is not a wait either, and not about the server at all: a queued Save this
+ * build could not read was retired, whole, so the pass could carry on (`AccountSongbook.prepare`).
+ * Said once, by the pass that retired it, and only when nothing more pressing is to be said.
  */
 export type SyncFailureReason =
     | 'expired'
@@ -105,6 +109,7 @@ export type SyncFailureReason =
     | 'quota'
     | 'too-large'
     | 'refused'
+    | 'unreadable'
     | 'server';
 
 export interface SyncFailure {
@@ -310,6 +315,12 @@ export const SYNC_MESSAGES = {
         'Saved on this device · your account refused this upload and retrying won’t change that. Save it as a copy to upload it.',
     expired: 'Saved on this device · sign in again to upload it.',
     server: 'Saved on this device · we couldn’t reach your account library. We’ll try again.',
+    /**
+     * Not "Saved on this device": the change that won't upload is the one this device could not
+     * read (#1769). It promises no retry, because none would help, and says the rest is fine.
+     */
+    unreadable:
+        'A change saved on this device couldn’t be read, so it won’t upload. Everything else is still syncing.',
 } as const;
 
 /**
@@ -786,7 +797,8 @@ export interface SyncLoop {
     /** Which document `observation` describes. */
     watch(documentId: string | null): Promise<void>;
     /**
-     * Every saved song for this account, paged to the end.
+     * Every saved song for this account, paged to the end. A row this build cannot read is left
+     * out (`list`'s `unreadable`, #1769); `unreadableSongs` is where those are handed back.
      *
      * `owner` names the account the caller means, for the one case where the loop cannot derive it
      * — an EXPIRED session's "Sign out on this device" (#1351), which exports from a library whose
@@ -1470,12 +1482,14 @@ export function createSyncLoop(
         current: AccountScope,
         transport: SaveTransport,
         refusedDocument: () => Promise<string | null>,
-    ): Promise<{ songs: boolean; collections: boolean }> {
+    ): Promise<{ songs: boolean; collections: boolean; unreadable: number }> {
         // Two facts, never one (#1477 review R1): a song moving re-reads the whole library, a
         // collection moving re-reads only the collections.
         let changed = false;
         let collectionsChanged = false;
-        const outcome = () => ({ songs: changed, collections: collectionsChanged });
+        // Queues retired because they would not read (#1769) — news the pass reports once.
+        let unreadable = 0;
+        const outcome = () => ({ songs: changed, collections: collectionsChanged, unreadable });
         for (let sweep = 0; sweep < MAX_PENDING_SAVES; sweep += 1) {
             let committed = 0;
             let cursor: string | undefined;
@@ -1484,6 +1498,8 @@ export function createSyncLoop(
                     ...(cursor === undefined ? {} : { afterDocumentId: cursor }),
                 });
                 committed += result.counts.committed;
+                unreadable += result.counts.unreadable;
+                changed ||= result.counts.unreadable > 0;
                 changed ||=
                     result.counts.committed > result.collections.committed ||
                     result.counts.conflict > result.collections.conflict;
@@ -1631,6 +1647,8 @@ export function createSyncLoop(
         // The TRANSITION into `'refused'`, and only the transition: a head that was already
         // refused before this pass began is a standing fact the songbook is already rendering.
         let newlyRefused = false;
+        // Queues this pass retired because they would not read (#1769), said once, at the end.
+        let retiredUnreadable = 0;
         try {
             if (!backedOff) {
                 try {
@@ -1660,6 +1678,7 @@ export function createSyncLoop(
                     });
                     changed = drained.songs;
                     collectionsChanged = drained.collections;
+                    retiredUnreadable = drained.unreadable;
                 } catch (error) {
                     if (error instanceof AccountChangedError) {
                         return;
@@ -1758,6 +1777,10 @@ export function createSyncLoop(
             }
             if (mine !== epoch) {
                 return;
+            }
+            // Last, so anything a retry could fix is still what the musician reads first.
+            if (failure === null && retiredUnreadable > 0) {
+                failure = { reason: 'unreadable', message: SYNC_MESSAGES.unreadable };
             }
             publish({
                 failure,

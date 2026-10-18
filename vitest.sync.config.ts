@@ -24,6 +24,7 @@ export const SYNC_FILES = [
     'tests/browser/account-playlist-import.browser.test.ts',
     'tests/browser/account-purge.browser.test.ts',
     'tests/browser/account-retired-text-chart.browser.test.ts',
+    'tests/browser/account-unreadable-row.browser.test.ts',
 ];
 
 // Native transaction lifetime and rollback must work in both desktop and iPhone engines.
