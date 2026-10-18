@@ -134,11 +134,19 @@ export interface Style {
      */
     ending: EndingQuality;
     /**
-     * How the song-mode jam arc (`BandSettings.arc`, #1785) moves this style. Absent, the full
-     * arc. A style whose high tier is a different groove, not just a bigger one, keeps the
-     * chart's own side of the high line through a take (#1789): see `JamArcShape`.
+     * How deep the song-mode jam arc (`BandSettings.arc`, #1785) moves this style. Absent, the
+     * full arc.
      */
     jamArc?: JamArcShape;
+    /**
+     * This style's high tier is a different groove, not just a bigger one, so no lift — the
+     * build into a bigger section, the jam arc, a looping song's pass lift — carries a bar
+     * across the high line its section sits under (#1789, #1794; `planBars`'s
+     * `keepsHighLine`). Absent, a lift may cross it. Deliberately the bar's whole tier, not
+     * just its groove: its fill length and the comp and lead idioms stay on the section's side
+     * of the line too.
+     */
+    keepsHighLine?: true;
 }
 
 /**

@@ -62,8 +62,7 @@ export function energyTier(energy: number): EnergyTier {
 }
 
 /**
- * How the jam arc moves one style (`Style.jamArc`, #1789). Absent, the full arc: every style
- * whose groove keeps its identity at every tier.
+ * How the jam arc moves one style (`Style.jamArc`, #1789). Absent, the full arc.
  */
 export interface JamArcShape {
     /**
@@ -71,16 +70,10 @@ export interface JamArcShape {
      * The dynamics keep the arc's shape, at a smaller swing.
      */
     depth: number;
-    /**
-     * The arc never moves a bar across the high-tier line (`HIGH`), either way: a bar the form
-     * puts under it stays under it (at most `HIGH_CEILING`), a bar the form puts over it stays
-     * over it. For a style whose high tier is a different groove (reggae's steppers, bossa's
-     * ride), so the riddim is the chart's, never the arc's.
-     */
-    keepsHighLine: boolean;
 }
 
-// why: the arc lifts a style that keeps its high line to the top of mid and no further — a hair
+// why: a lift (the jam arc, or the pass lift) carries a style that keeps its high line
+// (`Style.keepsHighLine`) to the top of mid and no further — a hair
 // under the line, so the raw energy (which scales the dynamics) still reaches as close to the
 // climax as the tier allows.
 const HIGH_CEILING = HIGH - 0.01;
@@ -219,6 +212,7 @@ export function planBars(
         planned = window.to,
         drumSolos = false,
         arcShape,
+        keepsHighLine = false,
     }: {
         pass: number;
         looping: boolean;
@@ -227,6 +221,13 @@ export function planBars(
         drumSolos?: boolean;
         /** The style's own shape of the jam arc (`Style.jamArc`); absent, the full arc. */
         arcShape?: JamArcShape;
+        /**
+         * The style's groove changes at the high tier (`Style.keepsHighLine`, #1789, #1794): no
+         * lift (the build into a bigger section, the jam arc, the pass lift) moves a bar across
+         * the high-tier line (`HIGH`), either way. A bar whose section sits under it stays under
+         * it (at most `HIGH_CEILING`), a bar whose section sits over it stays over it.
+         */
+        keepsHighLine?: boolean;
     },
 ): BarPlan[] {
     const { bars } = timeline;
@@ -302,15 +303,18 @@ export function planBars(
                 ? section
                 : settings.intensity + (section - DEFAULT_ENERGY) * 0.5;
         const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
+        // The section's own level, before anything lifts it: the side of the high line a
+        // style that keeps it holds (#1794).
+        const own = clamp01(energy);
         // Build into a bigger section over the last bar before it.
         if (visitEnd && next && sectionEnergy(next) > section + 0.05) {
             energy += 0.06;
         }
         // The lift is the last term, so nothing after it washes the arc out.
-        const own = clamp01(energy);
         energy = clamp01(energy + lift(i));
-        if (jam && arcShape?.keepsHighLine) {
-            // The form's own side of the high line holds: the arc moves the bar within it.
+        if (keepsHighLine) {
+            // The section's own side of the high line holds: the build into the next section,
+            // the jam arc and a looping song's pass lift all move the bar within it.
             energy = own < HIGH ? Math.min(energy, HIGH_CEILING) : Math.max(energy, HIGH);
         }
 
