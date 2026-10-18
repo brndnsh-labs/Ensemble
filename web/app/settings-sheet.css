@@ -42,7 +42,7 @@
 .palette-swatch[data-palette="warm"] {
     --paper: light-dark(#f7f5ef, #15181a);
     --ink: light-dark(#222923, #f1efe8);
-    --accent: light-dark(#b34e34, #e0785a);
+    --accent: light-dark(#a8472e, #e0785a);
 }
 .palette-swatch {
     position: relative;

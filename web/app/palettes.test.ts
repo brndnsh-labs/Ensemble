@@ -84,16 +84,6 @@ const PAIRS: [fg: string, bg: string][] = [
     ['green', 'green-light'],
 ];
 
-/**
- * Warm's tokens are today's look and #1280 does not change them; a pair of them under AA is
- * recorded here at its measured ratio instead. Remove an entry when Warm is fixed — the test
- * fails once the pair passes, so a stale exception cannot linger.
- */
-const WARM_GAPS: Record<string, number> = {
-    'day muted/paper': 4.26,
-    'day accent/accent-light': 4.21,
-};
-
 describe('colour palettes (#1280)', () => {
     it('defines a block for every palette but Warm, using only tokens :root defines', () => {
         for (const id of PALETTES) {
@@ -128,15 +118,6 @@ describe('colour palettes (#1280)', () => {
                 const t = palettes[id];
                 for (const [fg, bg] of PAIRS) {
                     const ratio = contrast(t[fg][mode], t[bg][mode]);
-                    const gap = id === 'warm' ? WARM_GAPS[`${mode} ${fg}/${bg}`] : undefined;
-                    if (gap !== undefined) {
-                        expect(
-                            ratio,
-                            `Warm ${mode} ${fg}/${bg} is fixed: drop it from WARM_GAPS`,
-                        ).toBeLessThan(4.5);
-                        expect(ratio).toBeCloseTo(gap, 2);
-                        continue;
-                    }
                     expect(ratio, `${id} ${mode}: --${fg} on --${bg}`).toBeGreaterThanOrEqual(4.5);
                 }
             });
