@@ -9,10 +9,17 @@ type StateOwnershipManifest = {
 };
 
 /**
- * Exhaustive ownership at the live slice boundary. `satisfies` is the guard: a
- * new top-level state field fails typecheck until it is deliberately classified.
- * Nested runtime aggregates (audio graphs, buffers) stay one
- * runtime-owned unit because no codec may project their internals.
+ * Exhaustive classification of every top-level state field as `document`,
+ * `preferences` or `runtime-derived`. It is a type guard: `satisfies` makes a new
+ * top-level field fail typecheck until it is deliberately classified, and the
+ * write-ownership rule (`docs/design/write-ownership.md`) reads the class.
+ *
+ * It does NOT govern persistence: nothing reads it at run time. What a chart stores
+ * is what `captureContent` (`prototypes/v2/lib/runtime.ts`) captures and the schema-2
+ * codec (`document-v2.ts`) accepts; a `preferences` field is stored by whatever
+ * device-local helper owns it (`prototypes/v2/lib/session.ts`). Keep the class
+ * honest when either of those changes. Nested runtime aggregates (audio graphs,
+ * buffers) stay one runtime-owned unit.
  */
 export const STATE_OWNERSHIP_MANIFEST = {
     arranger: {

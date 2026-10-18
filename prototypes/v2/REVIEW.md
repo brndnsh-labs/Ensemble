@@ -2,6 +2,9 @@
 
 Scope: #1170, isolated preview. No production adoption or musical acceptance implied.
 
+*A dated receipt: what it calls current was current then. The worker, the preview and schema 1
+have since gone (#1404, #1357, #1740); read `CLAUDE.md` in this folder for today.*
+
 Independent source review plus an inline correctness/security pass covered document ownership,
 worker synchronization, input validation, asynchronous UI intent, recovery, offline installation
 and TEST deployment. No new original-engine fields/messages or generators were added.

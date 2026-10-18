@@ -3,8 +3,8 @@
 Next.js/React app using Ensemble's browser engine (`../../public/`, via the `@engine` alias) and
 canonical chart codec. **Since the cutover (#1357, 2026-09-22) this is the app:**
 `https://ensemble.brndn.zip/` serves this export at the site root, with accounts on by default.
-See [the product brief](../../docs/design/ensemble-v2.md) and the rollout plan
-(`../../docs/design/ensemble-v2-rollout.md`).
+See [the product brief](../../docs/design/ensemble-v2.md) and the archived rollout plan
+(`../../docs/archive/ensemble-v2-rollout.md`).
 Fresh Claude/Codex/other-agent sessions start with [the v2 handoff](CLAUDE.md).
 
 ## Accounts and the account-local store (#1177 onward)
@@ -99,16 +99,16 @@ local browser projects and never deploys.
 
 ## Deliberate boundaries
 
-- Real existing worker/generators/synths/samples; no iframe, rewritten music engine or simulated transport.
-- Browser-page singleton runtime, explicit authored-content projection, stop/load/rebuild/full
-  worker sync/flush lifecycle. Buffer ingestion temporarily mirrors the original bootstrap;
-  extract one shared runtime before production adoption rather than maintaining two indefinitely.
+- The band engine (`../../band/`, driven by `lib/band-host.ts`) plays through the real voices
+  and sample packs in `../../public/engine/`; no iframe or simulated transport. No worker runs
+  (#1404).
+- Browser-page singleton runtime (`lib/runtime.ts`), explicit authored-content projection,
+  stop/load/rebuild lifecycle.
 - The preview bundles original TypeScript through `@engine`. The engine's own typecheck also
   runs before every preview build.
-- Persistence calls are compile-time redirected to a no-op. Neither `ensemble_currentState`
-  nor `ensemble_userPresets` is migrated or overwritten. Playwright pins a legacy sentinel.
-  There is no v1 import (retired in #1736): v1's songs were copied over while it existed, and
-  the `ensemble_*` keys are left on the device, inert and never read or deleted.
+- Nothing reads or writes v1's `ensemble_*` keys: v1's load/save layer is gone (#1424) and
+  the v1 import was retired (#1736). The keys are left on the device, inert and never deleted;
+  `checks/foundation.spec.ts` pins a sentinel in `ensemble_currentState`.
 - IndexedDB `ensemble-v2-preview` holds explicit saves with atomic revision comparison. Local
   recovery keys are writer-scoped; older competing drafts remain accessible in the Song menu's More › Older drafts….
   Quota errors retain the current draft in memory and warn before leaving the page where the
@@ -159,9 +159,10 @@ local browser projects and never deploys.
 
 ## Measure-based charts (#1171)
 
-Every chart is document v2: sections, stable measure identities and exact chord durations. A
-text chart (document v1) is no longer opened (#1739): from a store, a file or a link the app says
-so in plain words and changes nothing. "Upgrade old songs" on the songbook converts one in place.
+Every chart is document v2, the only schema (#1740): sections, stable measure identities and
+exact chord durations. A text chart (schema 1) arriving as a file or a link is refused in plain
+words and nothing changes; one still in a store is left out of the songbook. There is no
+converter: "Upgrade old songs" did that job and was deleted once every device was upgraded.
 
 In Edit chart a measure chart has no side panel (#1726): there is the chart. Press a bar and
 type its chords into it (on a phone, into the field docked on the keyboard); Tab or Enter moves on,
@@ -259,13 +260,9 @@ visible using detached display-only maps; they never enter the performed maps or
 The quick editor preserves measure references and navigation it cannot edit. Guided common-case
 repeat/ending authoring is available; physical-device usability acceptance remains outstanding.
 
-Older preview clients may reject documents with the new optional source field. Do not downgrade
-after importing; export important writing and prefer corrective preview updates. No production
-migration or old/new-client coexistence guarantee is introduced by this checkpoint.
-
-Do not downgrade this browser's mixed-version songbook to an older preview: those clients reject
-v2 documents and may fail to list the library. Original v1 data is retained, but old-client
-coexistence/production migration has not shipped. Prefer a corrective release and export first.
+The chart codec is strict, so a build older than a document's newest field refuses that
+document. Before rolling a host back to an older tag, export important writing; prefer rolling
+forward.
 
 ## Editing and returning to practice (#1175)
 

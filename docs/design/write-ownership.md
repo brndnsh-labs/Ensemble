@@ -8,9 +8,11 @@ before shipping it a fourth time.
 **Provenance:** distilled from the #1062 (soloist trade) and #1064 (conductor density/complexity)
 incident pair. `public/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST` is an exhaustive,
 `satisfies`-guarded classification of every top-level state field as `document`, `preferences`, or
-`runtime-derived` — but it governs **persistence** only (what gets saved, shared, and round-tripped
-through a share URL). Until now nothing constrained who may **write** a field, and the manifest's
-classification was silently trusted to imply a write rule it never actually stated.
+`runtime-derived` — written, in 2026-08, to say what v1's save and share codecs persisted. Until
+now nothing constrained who may **write** a field, and the manifest's classification was silently
+trusted to imply a write rule it never actually stated. *(Amended 2026-10-17, #1744: nothing reads
+the manifest at run time any more. It is a type guard and a classification; what a chart stores is
+`captureContent` plus the schema-2 codec, so keep the two in agreement by review.)*
 
 **Amended 2026-09-26 (#1424):** v1's load/save layer (`saveCurrentState`, `debounceSaveState`,
 `hydrateState`, `loadFromUrl`) is deleted, and with it the old engine's settings it alone still
@@ -68,9 +70,9 @@ setting a runtime system needed to move: dispatch the same action a user-facing 
 dispatch, straight onto the field the slider/toggle also writes. That shape has two failure modes,
 both real, both shipped:
 
-- **Persistence corruption.** `document` fields flow through `debounceSaveState`
-  (`state-effects.ts`) by default (deny-listed only for known-transient actions) and are encoded
-  into share URLs. A runtime overwrite that lands between two user actions gets saved and shared
+- **Persistence corruption.** `document` fields flowed through `debounceSaveState`
+  (`state-effects.ts`) by default (deny-listed only for known-transient actions) and were encoded
+  into share URLs (both v1's, both gone; today the same hazard is a chart's Save, `captureContent`). A runtime overwrite that lands between two user actions gets saved and shared
   as if the user had chosen it — the user's own setting is gone the next time they reload or a
   friend opens their share link.
 - **Read-modify-write races with the user's own dispatch.** A runtime system ticking every step
@@ -79,8 +81,8 @@ both real, both shipped:
   can be silently undone by the next conductor tick.
 
 A paired `runtime-derived` field structurally cannot cause either failure: it is never saved
-(`runtime-derived` fields are excluded from every persistence/share codec by the ownership
-manifest), and it is a different memory cell than the one the user's dispatch writes, so there is
+(`captureContent` captures no `runtime-derived` field, and the schema-2 codec has nowhere to put
+one), and it is a different memory cell than the one the user's dispatch writes, so there is
 no race to lose.
 
 ## 3. Inventory — correct precedent
@@ -176,7 +178,8 @@ class up.
 **Fixed pattern:** two new `runtime-derived` fields, `playback.conductorDensity` and
 `playback.conductorHarmonyComplexity` (`state-ownership.ts`, `state/playback.ts`), that
 `applyConductor` publishes instead — mirroring the already-shipped `conductorVelocity`
-precedent (§3) exactly. The generation readers (`chords-engine.ts`, `harmonies.ts`) compose the
+precedent (§3) exactly. The generation readers (`chords-engine.ts`, `harmonies.ts`, both since
+deleted) composed the
 two at read time via `?? ` fallback to the document field: the conductor's opinion wins while
 present, the user's authored value is what's left when it isn't. The instrument reducer no longer
 writes `chords.density` for `UPDATE_CONDUCTOR_DECISION`, and `UPDATE_HB`'s generic pass-through
@@ -218,11 +221,7 @@ playback:
    (`enabled && !tradeSilenced`), or a multiplier, depending on the field's shape. Every other
    reader keeps calling the same function/reading the same composed value; nothing upstream needs
    to know the field is layered.
-4. **If the field is worker-relevant, wire the new field through the worker-sync manifest** like
-   any other synced scalar (see `public/CLAUDE.md` § Worker sync) — a runtime-derived field the
-   worker needs to gate its own generation on is exactly as real a sync requirement as the
-   document field it composes with.
-5. **Grep `STATE_OWNERSHIP_MANIFEST` before adding a new dispatch site that touches an existing
+4. **Grep `STATE_OWNERSHIP_MANIFEST` before adding a new dispatch site that touches an existing
    field** — if the target field is already `document`/`preferences` and the writer isn't a UI
    component, that's the smell this document exists to catch.
 

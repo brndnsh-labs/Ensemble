@@ -2728,7 +2728,7 @@ export default function Ensemble() {
     function draft(next: ChartDocument, baseline = savedNow.current) {
         setCurrent(next);
         currentNow.current = next;
-        // A shared draft — a standard or a #chart=/v1 link (`landDraftOnStand`) — belongs to no
+        // A shared draft — a standard or a #chart= link (`landDraftOnStand`) — belongs to no
         // songbook yet and has no `saved` baseline to recover FROM if the tab closes; "Keep a
         // copy"/Save is what turns it into a library entry, and `open()` clears the flag the
         // moment that happens. Writing recovery storage for it here would key a slot under

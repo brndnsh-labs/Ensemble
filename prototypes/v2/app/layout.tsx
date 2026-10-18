@@ -5,21 +5,20 @@ import './motion.css';
 export const metadata: Metadata = {
     title: 'Ensemble music stand',
     description: 'A chart-first music stand and local songbook for the Ensemble band.',
-    // The stand IS the site: installable, indexable, and wearing v1's name, colours and icons on
-    // purpose, so a browser that installed v1 updates that entry rather than growing a second
-    // one (#1355). `scripts/offline.mjs` emits the manifest and copies the icons.
+    // The stand IS the site: installable, indexable, and keeping the name, colours and icons an
+    // installed copy already carries (#1355), so the browser updates that home-screen entry
+    // rather than growing a second one. `scripts/offline.mjs` emits the manifest and copies the
+    // icons.
     manifest: '/manifest.json',
-    // Both of v1's links, not just the Apple one: v1's `public/index.html` (deleted) also carried
-    // `<link rel="icon" type="image/svg+xml" href="icon.svg">`, and a tab that lost its favicon
-    // at the cutover would be a visible regression nobody asked for.
+    // Both icon links, not just the Apple one: the SVG favicon too, or a tab loses its icon.
     icons: { icon: '/icon.svg', apple: '/icon-maskable-512.png' },
 };
 
 /**
  * Next emits `width=device-width, initial-scale=1` by default; both are restated here because
  * exporting `viewport` at all replaces that default, and losing it would be a silent mobile
- * regression in the one build nobody is watching. `themeColor` matches v1's `<meta
- * name="theme-color">` so the installed app's chrome does not change colour at the cutover.
+ * regression in the one build nobody is watching. `themeColor` is the colour installed copies
+ * already wear, so the installed app's chrome does not change colour on an update.
  */
 export const viewport: Viewport = {
     width: 'device-width',

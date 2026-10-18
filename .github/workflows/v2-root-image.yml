@@ -1,5 +1,5 @@
 # PR-time proof that the `ensemble-web` image, serving the v2 export (built at `/`, the only base),
-# honours its edge contract (#1356) — see docs/design/ensemble-v2-rollout.md
+# honours its edge contract (#1356) — see docs/archive/ensemble-v2-rollout.md
 # decision 1 and hosting/README.md. ci.yml's `web-image`
 # builds the same image only after a merge; this proves it on the pull request that changes it.
 #

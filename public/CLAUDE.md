@@ -11,8 +11,10 @@ that don't fit either. (The old engine's logic worker and its sync contract are 
 `docs/archive/WORKER_CONTRACT.md` keeps them for history.)
 
 **Write ownership:** `songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST` classifies every
-top-level field as `document`/`preferences`/`runtime-derived` for persistence — and, per
-`docs/design/write-ownership.md`, that classification doubles as a write rule: a `document`/
+top-level field as `document`/`preferences`/`runtime-derived`. It is a type guard (a new field fails
+typecheck until classified), not a persistence switch: nothing reads it at run time, and a chart
+stores what `captureContent` captures and the schema-2 codec accepts. Per
+`docs/design/write-ownership.md`, the classification is a write rule: a `document`/
 `preferences` field is written only by UI dispatch or hydration, never by a runtime system
 (the old engine's conductor, trade block and worker did exactly this; they are gone, #1404, and the next runtime system sets the precedent). See that doc's read-time composition precedent
 (`isInstrumentActiveAtStep`, deleted in #1637; the example stands) and its retired violations (§5) before adding a new dispatch site

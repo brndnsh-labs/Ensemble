@@ -46,7 +46,7 @@ export interface DocumentSummary {
 }
 
 /**
- * One row of the S1 manifest (#1259; `docs/design/ensemble-v2-rollout.md` decision 9): the
+ * One row of the S1 manifest (#1259; `docs/archive/ensemble-v2-rollout.md` decision 9): the
  * client pages this and diffs it against its local records. Identity, the current revision, and
  * — for a deleted id — the tombstone that tells the client to drop its clean mirror. `bytes` is
  * what the body costs against the owner's budget, so the client can show a library's size

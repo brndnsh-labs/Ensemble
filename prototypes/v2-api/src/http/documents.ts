@@ -48,7 +48,7 @@ import { sendError } from './errors.js';
  * ---
  *
  * `GET /api/documents` and `GET /api/documents/:id` — the owner-bound library read routes
- * (#1259, stage 3). Together they are the whole of S1 in `docs/design/ensemble-v2-rollout.md`
+ * (#1259, stage 3). Together they are the whole of S1 in `docs/archive/ensemble-v2-rollout.md`
  * decision 9: the client pages a manifest and diffs it against its local records, then
  * downloads the ids whose revision moved. There is deliberately no change feed, watermark or
  * cursor expiry to build — see `listManifest` in `db/documents.ts` for why an id-ordered keyset

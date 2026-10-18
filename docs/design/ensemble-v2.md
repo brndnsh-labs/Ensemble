@@ -5,6 +5,14 @@ choices remain subject to a working prototype and measured evidence. This docume
 intent; GitHub milestones/issues own delivery status. The earlier Songbook milestone (#12)
 retains the completed foundation and codec work (#1029, #1044).
 
+*Amended 2026-10-17 (#1744).* This brief was written while v2 was a preview beside v1, and its
+checkpoints below read that way. Today v2 is the whole site at `/` (#1357), v1 and its UI are
+deleted (#1358), and the Retire v1 milestone removed every compatibility path: one chart schema
+(2), a schema-1 text chart refused rather than converted (#1740), old `?s=` links ignored
+(#1735), and `/v2/...` a plain 404 (#1742). For the live contract read
+[`prototypes/v2/CLAUDE.md`](../../prototypes/v2/CLAUDE.md) and
+[the chart contract](ensemble-v2-charts.md#compatibility).
+
 ## Product promise
 
 Ensemble supplies the musicians you are missing so you can play. It remains a dependable
@@ -84,8 +92,8 @@ The #1174 follow-on connects existing sound packs, explicit install-all, Follow 
 offline verification and focused playback. Whole-library cloud sync remains later work.
 The #1175 usability slice makes typed chords part of Save/copy/export, preserves section buffers,
 reveals editing on compact screens, and separates tempo typing and last-opened preference from
-document commits. In a text chart's editor, Update chart is an optional preview; unsupported text is
-retained for correction. (A measure chart is typed on the chart itself since #1723/#1726: leaving a
+document commits. In a text chart's editor (deleted with text charts in #1739), Update chart was an
+optional preview; unsupported text was retained for correction. (A measure chart is typed on the chart itself since #1723/#1726: leaving a
 bar applies it, Save commits every pending bar.)
 Unchecked text is tab-only, with an unload warning, rather than a new durable recovery format.
 Checkpoint 2: explicit rhythmic chart representation, measure editing and bounded form/import
@@ -118,12 +126,12 @@ The accepted September 8 direction and fixture evidence are in
 [`ensemble-v2-charts.md`](ensemble-v2-charts.md). Brandon approved a new semantic document
 format targeting full iReal chart compatibility, with quick text entry and Ensemble's
 additional features. The preview now supports additive v2 documents, measure-based editing,
-bounded form execution and conservative iReal import under #1171. Existing v1 songs keep
-their editor; conversion creates a separate copy. The compatibility ledger in that chart
+bounded form execution and conservative iReal import under #1171. v1 text charts are no longer
+read or converted (#1740); schema 2 is the only format. The compatibility ledger in that chart
 design remains authoritative about unsupported playback semantics, not a claim of full parity.
 
-Legacy section text is separated by barlines and divides each bar equally among chord tokens.
-It cannot naturally express C for two beats, Dm for one and G7 for one. The v2 measure editor
+v1's section text was separated by barlines and divided each bar equally among chord tokens.
+It could not naturally express C for two beats, Dm for one and G7 for one. The v2 measure editor
 now supports explicit durations such as `C:2 Dm:1 G7:1`, separating semantic measures and
 musical directions from page geometry and generated voicings. Preserve the defined text
 round trip; graphical and text representations must not become competing authorities.
@@ -157,7 +165,5 @@ milestone 15 owns task status; design parents explain contracts, not a parallel 
 The [next batch](ensemble-v2-next-batch.md) shapes bounded child work with independent acceptance.
 The 2026-09-10 branch-only decision is retired: `feat/ensemble-v2-foundation` merged to `main`
 on 2026-09-12 via PR #1173, and v2 stories now use the normal cycle end to end. Since #1207
-(2026-09-15) a merge **is** a release of the guest music stand at `ensemble.brndn.zip/v2/`,
-beside v1 — Brandon's call, with few users and no accounts involved. The remaining acceptance
-items above still gate accounts, sync, the API and any v1→v2 cutover; none of them gates the
-guest stand.
+(2026-09-15) a merge **is** a release; since the cutover (#1357, 2026-09-22) that release is
+the whole site at `ensemble.brndn.zip/`, with accounts on.

@@ -21,8 +21,7 @@ merge, asserting each host's public `/build.json` names the commit. It is gated 
 a v2 story as live production work: it reaches users, and a red v2 build or E2E blocks the
 merge. `../v2-api/` is released by the same job, behind `/api/*` on the same origin.
 
-The cutover was a **hard cut**: there is no v1 at `/` any more and no `/v1/` grace path, and
-the old beta path `/v2/...` is a plain 404 (its redirect and tombstone worker went in #1742). v1's browser data is not read at all
+Nothing of v1 is served or read: `/v1/` and the old beta path `/v2/...` are plain 404s (its redirect and tombstone worker went in #1742). v1's browser data is not read at all
 (the v1 import was retired in #1736; the `ensemble_*` keys stay on a device, inert), and an old
 `?s=` link is ignored (#1735). Accounts are on for
 every device (#1357); the beta's `?accounts=off` opt-out was retired in #1743, and a device's
@@ -31,7 +30,10 @@ stored `ensemble-v2-preview:accounts` key is left in place, inert.
 read, and so not the account database either (`deviceMayHoldAccount` in `lib/account/held-account.ts`,
 which records why: on WebKit that one request, failing during an offline load, took the GUEST
 songbook with it). Prod registration is an on-box policy value, not a repository one. The v1 source, its build
-and its CI jobs were deleted in #1358; `public/` remains as the engine library this app imports. The plan is [the rollout](../../docs/design/ensemble-v2-rollout.md).
+and its CI jobs were deleted in #1358; `public/` remains as the engine library this app imports. A chart is one schema, 2;
+a schema-1 text chart is refused in plain words and never converted (#1740, the Retired text
+charts row below). The plan that got here is [the rollout](../../docs/archive/ensemble-v2-rollout.md),
+archived.
 
 Human gates are unchanged: a device or listening gate is still a hard stop, and a merged commit
 does not clear one. Record the commit SHA, checks and remaining gate so another agent does not
@@ -53,7 +55,7 @@ executing. Generated skill copies are renderer-managed, not task-local files to 
    [product](../../docs/design/ensemble-v2.md),
    [chart/import](../../docs/design/ensemble-v2-charts.md), or
    [accounts/sync](../../docs/design/ensemble-v2-sync.md) — read with
-   [rollout](../../docs/design/ensemble-v2-rollout.md) decision 9, which removes the change
+   [rollout](../../docs/archive/ensemble-v2-rollout.md) decision 9, which removes the change
    feed, the offline logout barrier and account switching. Do not build those.
 4. Target code and its tests. Read applicable nested guides before changing `public/` or
    `tests/`. Fetch current library documentation when implementing library-specific APIs.
@@ -67,14 +69,14 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
   Accounts enhance those paths; they must not gate guest startup or require a server to play.
 - Explicit Save commits a version. Automatic recovery retains a writer's unsaved experiment;
   it never silently uploads it. A later cloud acknowledgement cannot overwrite newer editing.
-- Portable v1/v2 charts contain musical intent, not account/session/retry metadata. Preserve
-  originals on conversion/import; unknown or corrupt data is not an empty-library success.
+- Portable charts contain musical intent, not account/session/retry metadata. Preserve
+  originals on import (`importSource`); unknown or corrupt data is not an empty-library success.
 - The account-local database/outbox (`lib/sync/`) is wired to passkey sign-in and the UI
   (#1261 onward). Account code goes in `app/account/` and `lib/account/`; plain `fetch`, and
   `@simplewebauthn/browser` is the only new client dependency.
   `AccountScope` is a local fence, **not authentication**. Production authorization must come
   from a verified server session. Fake transports are contract tests, not cloud support.
-- Never migrate/delete guest or legacy stores incidentally. Do not cache private API/auth
+- Never migrate/delete guest stores, or the inert keys v1 and the beta left on a device, incidentally. Do not cache private API/auth
   responses or personalized HTML in the anonymous app shell. No credentials or chart contents
   in telemetry. Keep local safety, cloud confirmation and verified offline sounds distinct.
 - The band engine (`../../band/`, `lib/band-host.ts`) plays; the old generators and the

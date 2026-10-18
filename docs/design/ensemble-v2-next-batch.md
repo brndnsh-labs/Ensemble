@@ -10,9 +10,10 @@ file boundaries, model labels, review requirements, prerequisites and verificati
 Read current GitHub state before picking work; do not infer readiness from this index.
 
 Stage 1 and stage 2's implemented modules merged to `main` on 2026-09-12 via PR #1173; later
-children use the normal branch/PR/auto-merge cycle. Since #1207 a merge releases the guest
-music stand (`prototypes/v2/`) to production at `/v2/`; `prototypes/v2-api/` still has no
-deploy target, so the stage gates and human gates on accounts/sync still bind.
+children use the normal branch/PR/auto-merge cycle. Since #1207 a merge releases the music
+stand (`prototypes/v2/`) to production; it was at `/v2/` beside v1 until the cutover (#1357), and
+is the whole site at `/` since. `prototypes/v2-api/` is released by the same job now; the human
+gates on accounts/sync still bind.
 Shared tests/configs require one integration owner even when feature modules are disjoint.
 
 ## Stage 1 — local foundations (filed 2026-09-10, implemented)

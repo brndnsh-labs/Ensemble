@@ -4,9 +4,9 @@ Status: **direction accepted; iReal import and navigation checkpoint under verif
 Brandon explicitly approved changing the document format and targeting full iReal chart
 compatibility, while retaining quick text entry and Ensemble's additional capabilities.
 This supersedes the earlier proposal's permanently limited compatibility boundary.
-There is a conservative iReal importer, but no in-place migration. The isolated preview can
-read both document versions; production remains unchanged. Test deployment and human audition
-are separate from the implementation described here.
+There is a conservative iReal importer. The app reads one document version, schema 2 (see
+[Compatibility](#compatibility)). Test deployment and human audition are separate from the
+implementation described here.
 
 ## Current playable checkpoint
 
@@ -17,7 +17,7 @@ are separate from the implementation described here.
 - The measure editor accepts chord text and optional length pickers. Save, export, key/feel
   transforms, playback and Home check every pending bar first. Failed validation retains raw
   buffers; successful adoption retires them before a subsequent transpose. Revert clears them
-  explicitly. Checked edits use the same writer-scoped recovery and revision-aware saves as v1.
+  explicitly. Checked edits use writer-scoped recovery and revision-aware saves.
 - Linear sections, whole-section repeats, nested repeat barlines and alternate endings,
   unequal exact-grid chord lengths, and sticky bar key/mode/meter/grouping contexts compile
   (`compileScoreForm`, `resolveScoreContext`) to the band's timeline, which the band performs
@@ -27,10 +27,6 @@ are separate from the implementation described here.
   16,384 measures by `compileScoreForm` and to 65,536 chord events by `compileTimeline`
   (`MAX_PERFORMED_SPANS`, #1632); the wider authored codec remains separate, and
   ambiguous navigation fails visibly before adoption.
-- Older preview clients reject v2 records and may fail to enumerate a mixed-version library.
-  Keeping a v1 source protects its data, **not** cross-version simultaneous editing. Export
-  valuable work and prefer a corrective preview release; production migration/coexistence
-  remains a separate stage.
 
 ## Import/navigation foundation and remaining scope
 
@@ -97,8 +93,7 @@ Without lengths, the authored model retains exact equal division, including thir
 initial engine bridge must separately require that timing maps exactly to its grid. For
 an off-grid new bar, show a visual choice of lengths instead of rounding. For
 example, `C Dm G7` in 4/4 offers 2+1+1, 1+2+1 and 1+1+2, with no default silently chosen.
-The authored score remains representable even when the engine cannot yet play it. This
-playback restriction must not retroactively invalidate untouched legacy songs.
+The authored score remains representable even when the engine cannot yet play it.
 
 ### Editor direction (some controls remain follow-on work)
 
@@ -107,8 +102,8 @@ playback restriction must not retroactively invalidate untouched legacy songs.
   Desktop uses a side panel; phone places it directly above the selected measure.
 - Replacing a chord retains its duration. Adding a chord asks how to divide the available
   counts. Removing a chord requires an explicit choice for the resulting space.
-- Plain-text section editing remains available. The graphical editor and text editor
-  operate on the same validated candidate, never independent saved representations.
+- The section text editor went with text charts (#1739): a bar's chords are typed in the bar
+  itself (#1723), and there is one saved representation, the score.
 - Save includes pending text, as it does now. Invalid text is retained with a measure-specific
   explanation. Switching editing modes must not discard invalid buffers or silently fix them.
 - Section names, repeat counts and key/mode/meter overrides get one section settings surface
@@ -139,8 +134,8 @@ A local diagnostic invoking the real `validateProgression` on a detached state r
 The middle row is an existing timing defect, **not desired behavior to pin as correct**.
 The last row is not a proposed workaround: duplicating a token introduces extra chord
 events and can change generation. A migration must not silently reinterpret the middle
-row as 2+1+1 or claim a lossless conversion. The v1 path remains unchanged; the new exact-duration
-path avoids this defect without silently reinterpreting a saved legacy chart.
+row as 2+1+1 or claim a lossless conversion. The v1 path stayed unchanged; the new exact-duration
+path avoided this defect without silently reinterpreting a saved text chart.
 
 ## Accepted semantic boundary and first implementation
 
@@ -148,12 +143,10 @@ Use a versioned chart representation with sections containing ordered measures;
 measures contain ordered chord events and exact durations. Page geometry, line breaks,
 generated voicings, playback cursors and unfolded repeats are derived, not musical authority.
 
-The additive `ChartDocumentV2` codec retains the document envelope, performance and band
-settings, replacing `chart.arrangement` with `chart.score`. The isolated preview now reads
-both versions; older readers reject v2 as a future version. The earlier codec-only checkpoint
-changed no browser records or runtime contracts. The playable checkpoint adds the derived
-adapter described above, without rewriting existing records or changing share payloads.
-The new types live in `public/songbook/score-types.ts`.
+The `ChartDocumentV2` codec (`public/songbook/document-v2.ts`) holds the document envelope,
+performance and band settings, and the music as `chart.score` (it replaced v1's
+`chart.arrangement`). It is the only chart codec since #1740. The types live in
+`public/songbook/score-types.ts`.
 
 ```text
 section: identity, label, key/mode and meter overrides, repeat count, measures
@@ -172,7 +165,7 @@ continues to follow Ensemble's existing quarter-note convention.
 Authored chord spelling stays separate from voice-leading output. Resolve/validate the
 whole chord token, including bass and quality, before voicing. Transposition changes chord
 identity and key context without changing duration or form. Resolve relative notation
-against the owning section's key/mode. Do not run new syntax through the tolerant v1 parser.
+against the owning section's key/mode.
 
 The authored form model retains section repeats, repeat barlines, ending passes, D.C./D.S.,
 coda/Fine destinations and explicit repeat-policy-after-jump. Playback executes section counts
@@ -325,6 +318,10 @@ old-vs-new differential. For it the vocabulary gained `7#9b13`, `9b13` and `13b9
 
 ### Engine bridge and gates
 
+*Historical: the plan for the first score bridge, written while the old engine, its worker and
+the v1 path still ran. All three are gone (#1404, #1740); the band compiles the score itself
+(`compileScoreForm`, `compileTimeline`).*
+
 1. Validate the complete detached candidate, including event lengths and bounded expansion.
 2. Separate chord resolution/voicing from text tokenization. Preserve existing v1 behavior
    through a legacy adapter; add the semantic input as a separately tested path.
@@ -424,22 +421,32 @@ Use byte/node/measure/expanded-event ceilings and bounded form traversal. Protot
 keys, markup-bearing metadata and malformed nesting need negative fixtures. Source text
 never enters analytics or error payloads.
 
-## Compatibility and rollout
+## Compatibility
 
-- Do not append new duration syntax to a version-1 `value` field and call it compatible.
-  An old client could accept the envelope and misplay the text.
-- The new schema version is approved and implemented as an additive codec. Keep v1
-  decoding/playback available. Unknown versions remain downloadable, never empty data.
-- Convert only a detached copy. Retain the exact original record and a migration report;
-  validate and persist the new record before advancing any pointer. Repeated migration is
-  idempotent; interruption/quota/conflict tests must prove the original survives.
-- Exact-grid, fully understood v1 charts may convert after equivalence checks. Charts
-  affected by timing rounding, unsupported spellings or ambiguous form remain legacy until
-  the musician explicitly resolves them. No automatic 3-chord timing correction.
-- Old shares remain on their compatibility route. New-format charts never emit old share
-  payloads unless a lossless conversion is proven. Snapshot sharing remains detached.
-- No boot-time bulk rewrite. A production rollback must retain access to v1 records and
-  preserve newer records for re-upgrade/export; it must not overwrite them through an old app.
+There is one chart schema, 2. Every reader and writer uses `ChartDocumentV2`
+(`public/songbook/document-v2.ts`), strict: an unknown field is refused, the old engine's band
+and performance fields included (#1741).
+
+- **Schema 1 is refused, with a plain message.** A v1 text chart arriving as a file or a
+  `#chart=` link is not opened; the app says why in words (`isRetiredSchema`,
+  `OLD_FORMAT_REFUSAL` in `prototypes/v2/lib/documents.ts`, `RETIRED_CHART_LINK` in
+  `public/songbook/chart-link.ts`) and changes nothing. The API refuses a schema-1 Save body.
+- **There is no converter.** The v1 codec, the text-to-score converter
+  (`proposeLegacyScoreConversion`) and "Upgrade old songs" were deleted in #1740, once every
+  device was upgraded and `/admin` showed no schema-1 chart.
+- **One still sitting in a store is stepped over, never thrown on**, so it cannot crash the app
+  or stop sync. `prototypes/v2/CLAUDE.md`'s "Retired text charts" row lists where.
+- **Old v1 share links (`?s=`, `?prog=`) are not read at all (#1735).** The page opens as the
+  songbook.
+- A future schema change needs its own decision: a new version, its reader, and what happens to
+  stored charts. Nothing here pre-approves one.
+
+### History: how schema 1 was retired
+
+The rules this section used to hold (additive codec, keep v1 decoding, convert only a detached
+copy, no boot-time rewrite, old shares on their compatibility route) governed the move from
+schema 1 to 2. The decision below overrode them for one explicit action, and #1740 then removed
+schema 1 altogether.
 
 *Done and retired: #1740 deleted the card below, its converter and every v1 reader once every
 device was upgraded and `/admin` showed no schema-1 chart. The decision is kept as the record.*
@@ -512,6 +519,9 @@ usable at 1300x940, phone portrait/landscape and tablet sizes. Manual scrolling 
 following; Resume following is explicit. Repeated passes retain a stable source measure ID.
 
 Delivery slices after the accepted format decision:
+
+*The slices as planned; slice 4 was overtaken by the Retire v1 milestone (#1740: one schema, no
+converter).*
 
 1. Exact-duration semantic codec + conservative source-preserving conversion proposals
    (implemented foundation); no automatic migration or audible-equivalence claim.

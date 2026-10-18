@@ -57,7 +57,7 @@ route/socket identity is not built or verified. See the explicit receipt in that
 | `src/http/cookies.ts` | Ceremony/session cookie transport — names, `__Host-` prefixing, and attributes, all derived from `config.origin`. |
 | `src/http/headers.ts` | `securityHeaders()` — `Cache-Control`, CSP, `X-Content-Type-Options`, `Referrer-Policy` on every `/api/*` response, including 404/413/415/403/500. |
 | `src/http/errors.ts` | `sendError` / `ceremonyFailureResponse` / `revokePasskeyFailureResponse` / `recoveryActionFailureResponse` (#1191) — the collapsed `{ error: <code> }` taxonomy. `malformed_request` is 400; `fresh_auth_required` (add-passkey, and #1191's enroll/confirm) is 403; every other ceremony failure reason, including #1190's `session_mismatch` and #1191's `recovery_session_invalid`/`account_not_found`/`recovery_code_not_found`, is `401 authentication_failed`. `revokePasskey`'s own reasons map separately: `fresh_auth_required` 403, `not_found` 404, `last_credential` 409. `recoveryActionFailureResponse` (enroll/confirm): `fresh_auth_required` 403, `not_found` 404. `rate_limited` (#1191, the recovery-claim limiter) is 429. |
-| `src/db/admin-overview.ts` | `readAdminOverview` (#1717) — the operator's read-only counts (accounts against the cap, new and signed-in, documents and bytes, charts by `schemaVersion` and how many carry legacy fields (#1731), auth failures) and the newest-first account list. SELECTs only; never returns a full account id, a credential id or a document body. |
+| `src/db/admin-overview.ts` | `readAdminOverview` (#1717) — the operator's read-only counts (accounts against the cap, new and signed-in, documents and bytes, charts by `schemaVersion` (#1731), auth failures) and the newest-first account list. SELECTs only; never returns a full account id, a credential id or a document body. |
 | `src/http/admin.ts` | `adminRoutes` / `ADMIN_POLICIES` (#1717) — `GET /api/admin/overview`: the allowlist gate (every refusal is the unknown-route 404), then a no-query-string check and the route's own budget, both reached only by a listed account. |
 | `src/server.ts` | The only file that reads `process.env`. Builds config, opens the database, runs migrations, starts `@hono/node-server`, and closes the database on `SIGTERM`/`SIGINT`. |
 | `test/helpers/test-db.ts` | `createTestDatabase()` — a fresh on-disk (never `:memory:`, which can't hold WAL mode) SQLite file per test, migrated for real. |
@@ -388,7 +388,7 @@ them).
 ## Library read routes (#1259, stage 3)
 
 `GET /api/documents` and `GET /api/documents/:id` are the whole of **S1** in
-[`ensemble-v2-rollout.md`](../../docs/design/ensemble-v2-rollout.md) decision 9: the client
+[`ensemble-v2-rollout.md`](../../docs/archive/ensemble-v2-rollout.md) decision 9: the client
 pages an `(id, revision, deleted)` manifest, diffs it against its local records, and downloads
 the ids whose revision moved. There is deliberately **no** change feed, watermark or
 cursor-expiry machinery — do not add one. The manifest query is `listManifest` in
@@ -753,7 +753,7 @@ CI publishes this Dockerfile on every merge to `main` as
 `sha-` tag back and asserts `/healthz` answers `ok` with that exact revision before the job
 passes. The package is public, so docker04 pulls it without a credential. Nothing runs the image
 yet; the docker04 stacks (#1217) and the forced-command release step (#1219) consume it. See
-[`docs/design/ensemble-v2-rollout.md`](../../docs/design/ensemble-v2-rollout.md).
+[`docs/archive/ensemble-v2-rollout.md`](../../docs/archive/ensemble-v2-rollout.md).
 
 **Registration is closed by deployment policy.** `ENSEMBLE_REGISTRATION` must be exactly `open`
 or `closed`; unset means closed, so a fresh environment never accepts accounts by omission. Closed
