@@ -27,10 +27,10 @@ const chord = (symbol: string, quarters: number): ScoreEvent => ({
 /** The runtime with `document` open and its timeline on the band host. */
 async function opened(build: (standard: ChartDocumentV2) => ChartDocumentV2) {
     vi.resetModules();
-    const [runtime, { buildStandardDocument, STANDARDS }] = await Promise.all([
-        import('./runtime'),
-        import('./standards'),
-    ]);
+    // One at a time: two imports at once can each reach a mocked module mid-import and get
+    // the real one (a Vitest race, #1699).
+    const runtime = await import('./runtime');
+    const { buildStandardDocument, STANDARDS } = await import('./standards');
     runtime.load(build(buildStandardDocument(STANDARDS[0])));
     await runtime.exportMidi('cue');
     /** The neck's cue and the chart's, as the stand reads them in one paint at `tick`. */

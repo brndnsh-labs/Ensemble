@@ -18,11 +18,11 @@ vi.mock('./band-export', () => ({
 
 async function arcExported(minutes: 3 | null): Promise<unknown> {
     vi.resetModules();
-    const [runtime, { buildStandardDocument, STANDARDS }, { BandHost }] = await Promise.all([
-        import('./runtime'),
-        import('./standards'),
-        import('./band-host'),
-    ]);
+    // One at a time: two imports at once can each reach a mocked module mid-import and get
+    // the real one (a Vitest race, #1699).
+    const runtime = await import('./runtime');
+    const { buildStandardDocument, STANDARDS } = await import('./standards');
+    const { BandHost } = await import('./band-host');
     const render = vi.spyOn(BandHost.prototype, 'render');
     runtime.setSongMode(minutes);
     runtime.load(buildStandardDocument(STANDARDS[0]));
