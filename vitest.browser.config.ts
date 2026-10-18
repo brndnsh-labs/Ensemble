@@ -15,13 +15,12 @@ import { SYNC_FILES } from './vitest.sync.config.js';
 // node-mode `npm test`) so the common unit run stays fast and doesn't launch a
 // browser. The main config excludes `tests/browser/**` to match.
 export default defineConfig({
-    // Our source lives in `public/`, which Vite would otherwise treat as a
-    // static-assets dir and emit "served at the root path" noise for every
-    // engine module. We serve no static assets here, so disable it.
+    // Vite treats a `public/` dir as static assets. Our source lived in one until
+    // #1745 renamed it `core/`; we serve no static assets here, so keep it off.
     publicDir: false,
     // A browser test that reaches the preview's modules needs its engine alias.
     resolve: {
-        alias: { '@engine': fileURLToPath(new URL('./public', import.meta.url)) },
+        alias: { '@core': fileURLToPath(new URL('./core', import.meta.url)) },
     },
     test: {
         include: ['tests/browser/**/*.test.ts'],

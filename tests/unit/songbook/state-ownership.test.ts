@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { STATE_OWNERSHIP_MANIFEST } from '../../../public/songbook/state-ownership.js';
+import { STATE_OWNERSHIP_MANIFEST } from '../../../core/songbook/state-ownership.js';
 
 // The manifest's completeness is a compile-time guard (`satisfies` in state-ownership.ts); this
 // suite pins the classification decisions themselves. Its other half — classifying every field

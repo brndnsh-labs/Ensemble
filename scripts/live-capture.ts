@@ -15,7 +15,7 @@
  *   npm run live:capture -- --scene=funk-pocket --bars=8
  *   npm run live:capture -- --scene=jazz-ride --bars=4 --build        # (re)build the bridge export first
  *
- * Needs a bridge build (`prototypes/v2/out` made with NEXT_PUBLIC_RENDER_BRIDGE=1); the live
+ * Needs a bridge build (`web/out` made with NEXT_PUBLIC_RENDER_BRIDGE=1); the live
  * transport lives on `window.ensemble.transport` / `.capture` only in that build. Playback is real
  * time: eight bars at 104 bpm is eighteen seconds of wall clock.
  */
@@ -26,7 +26,7 @@ import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import playwright from '@playwright/test';
 import { compileTimeline, performPass } from '../band/index.js';
-import { encodeWav } from '../public/engine/wav-encoder.js';
+import { encodeWav } from '../core/engine/wav-encoder.js';
 import { buildAuditionLink } from './audition-link.js';
 import { laneEvents, performSceneForReport, sceneSettings, sceneVoices } from './band-scene.js';
 import {
@@ -49,7 +49,7 @@ const { chromium } = playwright as unknown as {
 };
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..');
-const V2_DIR = path.join(REPO_ROOT, 'prototypes', 'v2');
+const V2_DIR = path.join(REPO_ROOT, 'web');
 const DIST_DIR = path.join(V2_DIR, 'out');
 const RELEASE_TAIL_S = 2.0;
 
@@ -209,7 +209,7 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
     if (options.build || !bridgeBuildPresent()) {
         if (!options.build) {
             throw new Error(
-                'prototypes/v2/out has no render bridge — pass --build, or run `npm run mix:report -- --engine=chromium --scene=funk-pocket` first',
+                'web/out has no render bridge — pass --build, or run `npm run mix:report -- --engine=chromium --scene=funk-pocket` first',
             );
         }
         log.write('Building the bridge export...\n');

@@ -7,9 +7,9 @@ import {
     deletionKey,
     type PreparedDelete,
     type PreparedSave,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import { sendNext } from '../../prototypes/v2/lib/sync/send.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import { sendNext } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**
@@ -23,7 +23,7 @@ import { accountChart } from '../utils/account-songbook-fixture.js';
  * beside the other account suites rather than under happy-dom.
  *
  * The transport is a fake throughout: `tests/unit/songbook/account-sync-loop.test.ts` proves the
- * loop's half, and `prototypes/v2/checks/account-conflict.chromium.spec.ts` proves the product
+ * loop's half, and `web/checks/account-conflict.chromium.spec.ts` proves the product
  * moment against the real API on two browser contexts.
  */
 

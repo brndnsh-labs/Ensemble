@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     deviceMayHoldAccount,
     rememberAccountHeld,
-} from '../../../prototypes/v2/lib/account/held-account.js';
+} from '../../../web/lib/account/held-account.js';
 
 /**
  * Node/happy-dom has no `localStorage` or `indexedDB`, which is what makes this a useful place to

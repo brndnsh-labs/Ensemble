@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { autoVoiceForGenre, GENRE_SOUND_MAP } from '../../../public/data/genre-sound-map.js';
-import { GENRE_NAMES } from '../../../public/data/smart-genres.js';
-import { SOUND_PACKS } from '../../../public/data/sound-packs.js';
-import { packIdFromVoice } from '../../../public/engine/instrument-registry.js';
-import type { InstrumentVoice } from '../../../public/types.js';
+import { autoVoiceForGenre, GENRE_SOUND_MAP } from '../../../core/data/genre-sound-map.js';
+import { GENRE_NAMES } from '../../../core/data/smart-genres.js';
+import { SOUND_PACKS } from '../../../core/data/sound-packs.js';
+import { packIdFromVoice } from '../../../core/engine/instrument-registry.js';
+import type { InstrumentVoice } from '../../../core/types.js';
 
 const allInstalled = () => true;
 const noneInstalled = () => false;

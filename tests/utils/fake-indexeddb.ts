@@ -1,5 +1,5 @@
 /**
- * The smallest IndexedDB `prototypes/v2/lib/repository.ts` actually drives, for node/happy-dom
+ * The smallest IndexedDB `web/lib/repository.ts` actually drives, for node/happy-dom
  * tests that need the REAL repository rather than a stand-in for it (#1274).
  *
  * Node and happy-dom ship no IndexedDB. Rather than pull in a new dependency, this implements

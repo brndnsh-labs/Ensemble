@@ -19,18 +19,18 @@ If any guide drifts from live code/config, prefer live and update the docs.
 The 2026-09-10 branch-only exception is **retired**. `feat/ensemble-v2-foundation` merged to
 `main` on 2026-09-12; v2 work now follows the normal work-loop delivery defaults in DOCTRINE
 §5/§6 — branch, PR, auto-merge on green. For v2 work, including its shared-engine and test
-companions, first read [`prototypes/v2/CLAUDE.md`](prototypes/v2/CLAUDE.md). This is the common
+companions, first read [`web/CLAUDE.md`](web/CLAUDE.md). This is the common
 handoff for Claude, Codex and other agents; no previous conversation or private agent memory
 is required.
 
 **The v2 music stand IS the site (cutover #1357).** `ensemble.brndn.zip/` serves the
-`prototypes/v2/` Next static export built at `/`, inside the `ensemble-web`
+`web/` Next static export built at `/`, inside the `ensemble-web`
 image; the old beta path `/v2/...` is a plain 404 (#1742). A merge to `main`
 releases it: the CI `deploy` job publishes no files at all any more — it releases this commit's
 `ensemble-web` and `ensemble-api` tags to prod and then test, and asserts each host's public
 `/build.json` names the commit. So:
 
-- A story touching **`prototypes/v2/**`** is live at `ensemble.brndn.zip/` on merge, gated by
+- A story touching **`web/**`** is live at `ensemble.brndn.zip/` on merge, gated by
   the required `v2-checks` context (v2 build + its Playwright suite) alongside `checks` and
   `e2e-tests`. There is no other app beside it; it is the release.
 - A PR that **cannot reach the app** skips the Playwright legs, and `v2-checks` reports green
@@ -38,9 +38,9 @@ releases it: the CI `deploy` job publishes no files at all any more — it relea
   `*.md` or a `band/**/*.test.ts` (the `changes` job in `ci.yml` holds the list). Anything else
   runs the suite, and so does every push to `main`. Don't widen that list without proving the
   path reaches neither the export nor the suite.
-- A story touching **`public/**`** is live production code on that same merge — the shared
+- A story touching **`core/**`** is live production code on that same merge — the shared
   songbook codecs, engine hooks and state slices very much included, since the v2 export
-  compiles `public/`, so `v2-checks` must stay green.
+  compiles `core/`, so `v2-checks` must stay green.
 - **Nothing of v1 is read or served.** One chart schema, 2: a schema-1 text chart is refused in
   plain words, never converted (#1740; [the chart contract's Compatibility
   section](docs/design/ensemble-v2-charts.md#compatibility)). v1's browser data is never read
@@ -49,17 +49,17 @@ releases it: the CI `deploy` job publishes no files at all any more — it relea
   got here is archived at [`docs/archive/ensemble-v2-rollout.md`](docs/archive/ensemble-v2-rollout.md);
   its numbered decisions are still cited where they bind.
 
-**One app.** Since #1358 `public/` is not an app: it is the engine/state/songbook library that
-`prototypes/v2` imports through the `@engine/*` alias (`prototypes/v2/next.config.mjs`). The only
-UI is `prototypes/v2/app/` (React, Next static export); don't add UI to `public/`. The
-engine/state rules below are about `public/` and bind every caller of it.
+**One app.** Since #1358 `core/` is not an app: it is the engine/state/songbook library that
+`web` imports through the `@core/*` alias (`web/next.config.mjs`). The only
+UI is `web/app/` (React, Next static export); don't add UI to `core/`. The
+engine/state rules below are about `core/` and bind every caller of it.
 
 ## Mandatory Checklist (before any change)
 
-1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code). A `document`/`preferences`-classified field (`public/songbook/state-ownership.ts`, a type-checked classification, not a persistence switch) is written **only** by user intent — a UI dispatch or hydration; a runtime system's modulation of it lives in a paired `runtime-derived` sibling field, composed at read time — see `docs/design/write-ownership.md`.
-2. **UI updates** belong in `prototypes/v2/app/`. A component never calls `dispatch`/`getState` itself: the engine is reached through `prototypes/v2/lib/runtime.ts`, which is the only v2 file that does.
-3. **Tests:** `npm test` (unit/integration) AND the v2 suite (`npm run build --prefix prototypes/v2`, then `npm run test:e2e --prefix prototypes/v2`) before concluding — for a `public/` change too, since the v2 export compiles it.
-4. **Refactors:** grep the whole repo (`public/`, `prototypes/`, `tests/`, `scripts/`, `docs/`, `.github/`) for usages before renaming or moving anything. Update all imports in the same pass.
+1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code). A `document`/`preferences`-classified field (`core/songbook/state-ownership.ts`, a type-checked classification, not a persistence switch) is written **only** by user intent — a UI dispatch or hydration; a runtime system's modulation of it lives in a paired `runtime-derived` sibling field, composed at read time — see `docs/design/write-ownership.md`.
+2. **UI updates** belong in `web/app/`. A component never calls `dispatch`/`getState` itself: the engine is reached through `web/lib/runtime.ts`, which is the only v2 file that does.
+3. **Tests:** `npm test` (unit/integration) AND the v2 suite (`npm run build --prefix web`, then `npm run test:e2e --prefix web`) before concluding — for a `core/` change too, since the v2 export compiles it.
+4. **Refactors:** grep the whole repo (`core/`, `web/`, `api/`, `tests/`, `scripts/`, `docs/`, `.github/`) for usages before renaming or moving anything. Update all imports in the same pass.
 5. **Typecheck** is green at the end of every task (`npm run typecheck`).
 
 ## Strictly npm-based
@@ -72,7 +72,7 @@ engine/state rules below are about `public/` and bind every caller of it.
 npm run lint             # Biome lint + format check
 npm run format           # Biome write fixes
 npm run lint:docs        # repo-specific docs validation
-npm run typecheck        # tsc over public/ and scripts/
+npm run typecheck        # tsc over core/ and scripts/
 npm run typecheck:tests  # tsc over tests/ (its own CI gate — typecheck skips tests/)
 npm test                 # mutation check + Biome + docs lint + Vitest (node/happy-dom)
 npm run test:vitest      # Vitest only — fast targeted iteration, not the full gate
@@ -82,10 +82,10 @@ npm run golden           # golden-render check: do fixed notes still sound the s
 npm run validate         # format + jscpd + `npm run ci` (typecheck, typecheck:tests, knip, npm test)
 npm run depcheck         # circular-import gate (Biome noImportCycles) — RUNTIME cycles only
 
-# The app (prototypes/v2), from the repo root:
-npm run dev --prefix prototypes/v2       # Next dev server on http://localhost:3100/
-npm run build --prefix prototypes/v2     # root + v2 typecheck, next build, offline.mjs → prototypes/v2/out
-npm run test:e2e --prefix prototypes/v2  # v2 Playwright suite against the BUILT export (build first)
+# The app (web), from the repo root:
+npm run dev --prefix web       # Next dev server on http://localhost:3100/
+npm run build --prefix web     # root + v2 typecheck, next build, offline.mjs → web/out
+npm run test:e2e --prefix web  # v2 Playwright suite against the BUILT export (build first)
 ```
 
 `npm run depcheck` is the focused circular-import check (`biome lint --only=suspicious/noImportCycles`). The same configured rule runs as part of `npm run lint` and therefore `npm test`; CI does not run the focused command a second time. It catches **runtime cycles only** — `import type` edges are invisible to it, and that is a deliberate 2026-07-24 call (#1234), not an oversight. A type-only cycle erases at compile time and cannot cause the load-order bug this gate exists to prevent. (Verified by mutation test in #1191: a planted runtime cycle exits 1 with 3 diagnostics; a planted type-only cycle exits 0, uncaught.) Biome has no config surface to include type edges, and every TS-aware alternative (madge, dpdm, skott, dependency-cruiser) routes through the TypeScript compiler API and hits the TS7 wall. Don't assume type cycles are covered; don't hand-roll a resolver to catch them.
@@ -99,13 +99,13 @@ npm run test:vitest -- band-chart                   # Vitest filename/name filte
 npm run test:vitest -- band/test/critique.test.ts   # the band's critique claims
 npx vitest run band/perform.test.ts -t "specific test name"
 
-# v2 Playwright — from prototypes/v2, after a build; projects are `laptop` and `webkit-phone`
-(cd prototypes/v2 && npx playwright test checks/band-engine.spec.ts --project=laptop)
+# v2 Playwright — from web, after a build; projects are `laptop` and `webkit-phone`
+(cd web && npx playwright test checks/band-engine.spec.ts --project=laptop)
 ```
 
 Local-dev note: the v2 dev server serves at `http://localhost:3100/`, the same base as
 production. Offline install and sound-pack downloads only work against the built
-export, served by `node scripts/serve.mjs` in `prototypes/v2/` — see `prototypes/v2/README.md`.
+export, served by `node scripts/serve.mjs` in `web/` — see `web/README.md`.
 There is no local deploy script: a merge to `main` is the release (see above).
 
 Agent-environment note: hosted agent sessions are headless unless audio/display access has been
@@ -115,44 +115,44 @@ deterministic evidence, not a substitute for the `Needs-ear` gate.
 
 ## Architecture
 
-Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `prototypes/v2/` (React, Next static export — the only UI) and the library it compiles from `public/` — deep-signal state slices, the Web Audio engine and voices, and the songbook codecs. The band that plays is `band/` (below).
+Ensemble is a browser-based "virtual band" PWA. One app, two layers: the music stand in `web/` (React, Next static export — the only UI) and the library it compiles from `core/` — deep-signal state slices, the Web Audio engine and voices, and the songbook codecs. The band that plays is `band/` (below).
 
-### Runtime bootstrap (`prototypes/v2/lib/runtime.ts`)
+### Runtime bootstrap (`web/lib/runtime.ts`)
 
-One runtime per page, independent of React mounts. `initialize()` seeds the installed sounds, subscribes to dispatches so `handleEffects()` and `syncBand()` (the band host's settings) run on every one, then `rebuild()`s: `flushBuffers()`, gains and reverb sends. No logic worker runs. Play, stop and the exports go through the band host (`lib/band-host.ts`). The React shell (`prototypes/v2/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v2 opens charts from its own songbook and saves one only when the musician asks; v1's load/save layer (`hydrateState`, `loadFromUrl`, `saveCurrentState`) was deleted in #1424.
+One runtime per page, independent of React mounts. `initialize()` seeds the installed sounds, subscribes to dispatches so `handleEffects()` and `syncBand()` (the band host's settings) run on every one, then `rebuild()`s: `flushBuffers()`, gains and reverb sends. No logic worker runs. Play, stop and the exports go through the band host (`lib/band-host.ts`). The React shell (`web/app/ensemble.tsx`) owns documents and hands the runtime authored content; it never writes engine state. v2 opens charts from its own songbook and saves one only when the musician asks; v1's load/save layer (`hydrateState`, `loadFromUrl`, `saveCurrentState`) was deleted in #1424.
 
-### State (`public/state.ts`, `public/state/`)
+### State (`core/state.ts`, `core/state/`)
 
 - Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — each a `deepSignal`. A field nothing reads gets removed, not kept as a leftover: the old engine's `conductor` and `vizState` slices, its toast/flash state and its scheduler scratch fields went that way on 2026-10-11. The soloist's per-phrase `session` went the same way. So did the fields live code read but nothing ever set to a new value, together with the branches that waited on them: `playback.step`, `sustainActive`, `heldNotes`, `debugSoloist`, `nextNoteTime` and `unswungNextNoteTime`, the lane `buffer` Maps, and `lastFreq`/`lastPlayedFreq` on bass and soloist. So did the arranger's step maps (`progression`, `totalSteps`, `stepMap`, `sectionMap`) and `ACTIONS.PROG_VALIDATED`, with the old chord parser that wrote them (#1740); `arranger.sections` stays, because the runtime mirrors the score's sections into it for `isInstrumentEverActive`. The tree holds no field that nothing sets. Don't assume a field is live because it is declared: check for a writer.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
-- Hosts read with `getState()` and listen with `subscribe()` (`public/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
-- `public/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
-- **Write-ownership invariant** (`docs/design/write-ownership.md`): a `document`- or `preferences`-owned field (per `public/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST`: a `satisfies`-checked classification that makes a new state field fail typecheck until it is classified. Nothing reads it at run time, so it does not decide what is saved: a chart stores what `captureContent` captures and the schema-2 codec accepts) is written only by user intent, never by a runtime system (conductor, trade block, worker). Runtime modulation of one lands on a paired `runtime-derived` sibling field and is composed at the read site. No such field is live today: the last, `playback.conductorVelocity`, went with the old engine's conductor (#1437), so the next runtime system to modulate a setting sets the precedent. This is the ownership-domain analogue of `docs/design/timing-model.md`'s one-authority-per-domain law for timing.
+- Hosts read with `getState()` and listen with `subscribe()` (`core/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
+- `core/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
+- **Write-ownership invariant** (`docs/design/write-ownership.md`): a `document`- or `preferences`-owned field (per `core/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST`: a `satisfies`-checked classification that makes a new state field fail typecheck until it is classified. Nothing reads it at run time, so it does not decide what is saved: a chart stores what `captureContent` captures and the schema-2 codec accepts) is written only by user intent, never by a runtime system (conductor, trade block, worker). Runtime modulation of one lands on a paired `runtime-derived` sibling field and is composed at the read site. No such field is live today: the last, `playback.conductorVelocity`, went with the old engine's conductor (#1437), so the next runtime system to modulate a setting sets the precedent. This is the ownership-domain analogue of `docs/design/timing-model.md`'s one-authority-per-domain law for timing.
 #### `@direct-mutation` policy
 
 `// @direct-mutation` is a sanctioned escape hatch. Use it only in these categories:
 
 - **Sanctioned (real-time hot paths):** the `synth-*.ts` family — direct audio param writes for synthesis. No site outside the engine dir is sanctioned today: the BPM reschedule in `app-controller.ts` and `flushBuffer()`'s voice-continuity writes were deleted with the state they wrote.
-- **Sanctioned exception (init-only):** `public/engine/engine.ts` `initAudio()`, `public/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
-- **Sanctioned exception (detached render clone):** the clone `prototypes/v2/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export.
+- **Sanctioned exception (init-only):** `core/engine/engine.ts` `initAudio()`, `core/engine/audio-recovery.ts` — one-shot audio-graph setup that runs before any dispatch subscriber exists.
+- **Sanctioned exception (detached render clone):** the clone `web/lib/band-export.ts`'s `renderBandPasses` renders from (written by it and by the render bridge's `prepare` hook). These write a throwaway copy of the state tree for an offline render — dispatching would write the *live* slices and corrupt the running app mid-export.
 - **Everything else routes through reducers.** Any site not in the three categories above must dispatch.
 
-Enforced by `npm run check-mutations` over `public/**/*.{ts,tsx}` — it catches the bare, cast (`(slice as Mutable<…>).f =`), and aliased-handle assignment idioms, treating a `@direct-mutation` marker anywhere in the statement as the exemption. The skip list is **content-based, not path-based**: a file is exempt only if it *declares* a slice (contains `deepSignal<`), plus `*reducer*` by name. That deliberately keeps the non-slice plumbing that lives alongside the slices (`state/state-effects.ts`) inside the guard — a blanket `state/` path skip would exempt them the moment they moved into that directory. Two known limits: **`scripts/` is not in scope** (it has its own unmigrated sites), and **array-method mutation is invisible** to an assignment-based guard (`arr.push/shift/pop` on a slice field is unmarked and unenforced; `state/history.ts`, the one known site, was deleted).
+Enforced by `npm run check-mutations` over `core/**/*.{ts,tsx}` — it catches the bare, cast (`(slice as Mutable<…>).f =`), and aliased-handle assignment idioms, treating a `@direct-mutation` marker anywhere in the statement as the exemption. The skip list is **content-based, not path-based**: a file is exempt only if it *declares* a slice (contains `deepSignal<`), plus `*reducer*` by name. That deliberately keeps the non-slice plumbing that lives alongside the slices (`state/state-effects.ts`) inside the guard — a blanket `state/` path skip would exempt them the moment they moved into that directory. Two known limits: **`scripts/` is not in scope** (it has its own unmigrated sites), and **array-method mutation is invisible** to an assignment-based guard (`arr.push/shift/pop` on a slice field is unmarked and unenforced; `state/history.ts`, the one known site, was deleted).
 
 `// @worker-mutation` was the sibling marker for the old engine's worker copy of the tree. No worker runs any more (#1404), and the check no longer accepts it.
 
 ### The band engine (`band/`) — the only engine since 2026-09-26
 
 Every page plays the ground-up band engine: `band/` is a pure, deterministic `performPass` over the
-score's timeline, driven live by `prototypes/v2/lib/band-host.ts` and exported through the same
+score's timeline, driven live by `web/lib/band-host.ts` and exported through the same
 event stream (`.mid`, WAV). Read `band/CLAUDE.md` and `docs/design/band-engine.md` before touching
-it. The old worker-based generator is gone (#1404): `public/engine` now holds the voices, sample
+it. The old worker-based generator is gone (#1404): `core/engine` now holds the voices, sample
 packs and audio graph the band plays through. A chart is one schema, 2
-(`public/songbook/document-v2.ts`), its music a score; the old text-chart parser is gone (#1740).
+(`core/songbook/document-v2.ts`), its music a score; the old text-chart parser is gone (#1740).
 
 The listening-gate tools (`npm run mix:report` and `mix:ab`/`mix:verify`/`mix:spectro`/`mix:plant`
 built on it) render the band engine: `scripts/band-scene.ts` composes each scene in node
-(`compileTimeline` → `performPass`), and `prototypes/v2/lib/render-bridge.ts`'s `renderBand`
+(`compileTimeline` → `performPass`), and `web/lib/render-bridge.ts`'s `renderBand`
 renders the events through `renderBandPasses` (`lib/band-export.ts`, the export's own offline
 render). By default (`--engine=node`, since 2026-10-09) that runs in node on `node-web-audio-api`
 with `scripts/node-webaudio.ts` standing in for the browser — no build, no browser.
@@ -170,16 +170,16 @@ is evidence for the `Needs-ear` stop, never a substitute for it.
 
 There is no visualizer, and no state for one.
 
-### UI (`prototypes/v2/app/`)
+### UI (`web/app/`)
 
-The music stand: songbook home, chart sheet (edited in place: bars typed on the chart with their bar menu, a section from its letter, the whole song from the Song menu — #1726), transport and sounds panel. Ownership and boundaries per surface are in `prototypes/v2/CLAUDE.md`'s navigation table — read it before a UI story.
+The music stand: songbook home, chart sheet (edited in place: bars typed on the chart with their bar menu, a section from its letter, the whole song from the Song menu — #1726), transport and sounds panel. Ownership and boundaries per surface are in `web/CLAUDE.md`'s navigation table — read it before a UI story.
 
 ### Data / Config split
 
 - Musical behavior: the band engine's styles, `band/styles/` (one file per genre)
-- Styles live beside the components in `prototypes/v2/app/` (`style.css` plus per-surface `.css` files). `public/` holds no CSS.
+- Styles live beside the components in `web/app/` (`style.css` plus per-surface `.css` files). `core/` holds no CSS.
 
-**Layering (documented, deliberately not gated).** The UI should reach the engine through `prototypes/v2/lib/runtime.ts`, data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Both were once `dependency-cruiser` rules, but at `severity: 'warn'` they never failed a build, and a 2026-07-24 measurement found only 8 sites — 7 of which are legitimate registry/policy lookups that merely live under `engine/` (`instrument-registry`, `soloist-mode-policy`, `pack-runtime`, `sample-voice`, `arc`, `note-spelling`) plus the old scheduler's sanctioned real-time state import (both since deleted with the old engine). Enforcing the rule as written would flag mostly-correct code, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
+**Layering (documented, deliberately not gated).** The UI should reach the engine through `web/lib/runtime.ts`, data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Both were once `dependency-cruiser` rules, but at `severity: 'warn'` they never failed a build, and a 2026-07-24 measurement found only 8 sites — 7 of which are legitimate registry/policy lookups that merely live under `engine/` (`instrument-registry`, `soloist-mode-policy`, `pack-runtime`, `sample-voice`, `arc`, `note-spelling`) plus the old scheduler's sanctioned real-time state import (both since deleted with the old engine). Enforcing the rule as written would flag mostly-correct code, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
 
 ## Musical Logic & Generative Standards
 
@@ -201,17 +201,17 @@ Each band lane keeps to its register slot — bass 23–57, keyboard comp 52–8
 
 ### Naming / Canonicalization
 
-- **Supported-genre canon (the 13):** `Rock`, `Jazz`, `Funk`, `Disco`, `Hip Hop`, `Blues`, `Neo-Soul`, `Reggae`, `Acoustic`, `Bossa`, `Country`, `Metal`, `Ska-Punk`. This is the matrix's column axis and the **exact set the UI exposes** — the genre picker (`prototypes/v2/app/transport-bar.tsx`, via `lib/runtime.ts`'s re-export) renders straight over `GENRE_NAMES` (= `Object.keys(GENRE_OVERRIDES)` in `public/data/smart-genres.ts`), so there's no config-vs-UI drift. Pinned by `tests/standards/genre-canon-guard.test.ts`. **Don't add a 14th genre or resurrect a retired one without updating the canon + that guard.** The phantom routing keys (`Shred`, `Latin`, `Afrobeat`, `Soul`) that once lingered in the old engine's routing maps are retired. Don't reintroduce them.
+- **Supported-genre canon (the 13):** `Rock`, `Jazz`, `Funk`, `Disco`, `Hip Hop`, `Blues`, `Neo-Soul`, `Reggae`, `Acoustic`, `Bossa`, `Country`, `Metal`, `Ska-Punk`. This is the matrix's column axis and the **exact set the UI exposes** — the genre picker (`web/app/transport-bar.tsx`, via `lib/runtime.ts`'s re-export) renders straight over `GENRE_NAMES` (= `Object.keys(GENRE_OVERRIDES)` in `core/data/smart-genres.ts`), so there's no config-vs-UI drift. Pinned by `tests/standards/genre-canon-guard.test.ts`. **Don't add a 14th genre or resurrect a retired one without updating the canon + that guard.** The phantom routing keys (`Shred`, `Latin`, `Afrobeat`, `Soul`) that once lingered in the old engine's routing maps are retired. Don't reintroduce them.
 - One canonical internal name per concept. UI labels can be friendlier, but state keys, config keys, persisted payloads, and code paths normalize to the canonical form.
 - Aliases live near the data/config that owns the concept — don't scatter alias checks across components, tests, docs, and controllers.
-- Before any rename: grep the entire repo (`public/`, `prototypes/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
+- Before any rename: grep the entire repo (`core/`, `web/`, `api/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
 - A rename that touches a field saved charts or `#chart=` links carry needs a decision on stored data: the chart codec is strict, so a chart still holding the old name stops opening.
 - Split labels from logic: display labels in UI/data layer, behavior keys in engine/config layer. A pretty label should not silently become a runtime enum unless that is the intended canonical key.
-- Known alias family: `Neo-Soul`/`Neo` — the live pairing, in `GENRE_OVERRIDES` (`public/data/smart-genres.ts`). Add new aliases to that same map instead of creating one-off fixes. **`Rock`/`Shred` is NOT a live alias** — `Shred` is a retired phantom key (see the canon bullet above) with no alias map anywhere in `public/`; don't resurrect the pairing.
+- Known alias family: `Neo-Soul`/`Neo` — the live pairing, in `GENRE_OVERRIDES` (`core/data/smart-genres.ts`). Add new aliases to that same map instead of creating one-off fixes. **`Rock`/`Shred` is NOT a live alias** — `Shred` is a retired phantom key (see the canon bullet above) with no alias map anywhere in `core/`; don't resurrect the pairing.
 
 ### TypeScript
 
-All `public/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.json` has `strict: true` and `moduleResolution: "Bundler"` — import specifiers can keep `.js`/`.jsx` suffixes; the resolver finds the `.ts`/`.tsx` source. Use global interfaces in `public/types.ts` (`EnsembleState`, `ArrangerState`, etc.). Run `npm run typecheck` before concluding any task.
+All `core/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.json` has `strict: true` and `moduleResolution: "Bundler"` — import specifiers can keep `.js`/`.jsx` suffixes; the resolver finds the `.ts`/`.tsx` source. Use global interfaces in `core/types.ts` (`EnsembleState`, `ArrangerState`, etc.). Run `npm run typecheck` before concluding any task.
 
 ## Testing Standards
 
@@ -225,7 +225,7 @@ The **Definition of Done** for musicality. Each style's claims (`band/test/claim
 
 ### Playwright (e2e) — the v2 suite
 
-The only Playwright suite is the app's: `prototypes/v2/checks/`, config in `prototypes/v2/playwright.config.ts`, run by the required `v2-checks` CI context. Two projects: **`laptop`** (Desktop Chrome) and **`webkit-phone`** (iPhone 13, WebKit); `*.chromium.spec.ts` specs (passkeys via a CDP virtual authenticator) are Chromium-only. It runs against the **built static export** (`checks/fixtures.ts` starts a preview server per worker), not the dev server — build first, or it tests a stale export. Functional checks, no pixel snapshots. `prototypes/v2/CLAUDE.md` § Verification has the full gate list.
+The only Playwright suite is the app's: `web/checks/`, config in `web/playwright.config.ts`, run by the required `v2-checks` CI context. Two projects: **`laptop`** (Desktop Chrome) and **`webkit-phone`** (iPhone 13, WebKit); `*.chromium.spec.ts` specs (passkeys via a CDP virtual authenticator) are Chromium-only. It runs against the **built static export** (`checks/fixtures.ts` starts a preview server per worker), not the dev server — build first, or it tests a stale export. Functional checks, no pixel snapshots. `web/CLAUDE.md` § Verification has the full gate list.
 
 ### Vitest browser mode (`tests/browser/`)
 

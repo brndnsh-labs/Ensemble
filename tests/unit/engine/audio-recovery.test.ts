@@ -4,14 +4,9 @@
  * @vitest-environment happy-dom
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { audioWatchdog } from '../../../public/engine/audio-recovery.js';
-import {
-    activateWakeLock,
-    initPlatform,
-    lockAudio,
-    unlockAudio,
-} from '../../../public/platform.js';
-import { getState } from '../../../public/state.js';
+import { audioWatchdog } from '../../../core/engine/audio-recovery.js';
+import { activateWakeLock, initPlatform, lockAudio, unlockAudio } from '../../../core/platform.js';
+import { getState } from '../../../core/state.js';
 
 describe('Audio Recovery & Platform Integrity', () => {
     let mockAudioContext, mockAnalyser, mockMasterGain, playback;

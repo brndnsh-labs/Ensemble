@@ -26,9 +26,9 @@ import { STYLE_IDS, STYLES } from '../../band/styles/index.js';
 import { score } from '../../band/test/scores.js';
 import { type ChordFacts, KNOWN_QUALITIES, parseChord } from '../../band/theory/chord.js';
 import { mod12 } from '../../band/theory/pitch.js';
-import { STYLE_FOR_GENRE } from '../../prototypes/v2/lib/band-voices.js';
-import { buildStandardDocument, STANDARDS } from '../../prototypes/v2/lib/standards.js';
-import { SCORE_CHORD_QUALITIES } from '../../public/songbook/score-text.js';
+import { SCORE_CHORD_QUALITIES } from '../../core/songbook/score-text.js';
+import { STYLE_FOR_GENRE } from '../../web/lib/band-voices.js';
+import { buildStandardDocument, STANDARDS } from '../../web/lib/standards.js';
 import { clashNotes } from './chord-clash.js';
 import {
     ALIASES,

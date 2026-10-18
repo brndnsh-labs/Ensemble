@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { groove } from '../../../public/state/groove.js';
-import { soloist } from '../../../public/state/instruments.js';
-import { writeDeclaredParam } from '../../../public/state/set-param.js';
+import { groove } from '../../../core/state/groove.js';
+import { soloist } from '../../../core/state/instruments.js';
+import { writeDeclaredParam } from '../../../core/state/set-param.js';
 
 describe('writeDeclaredParam (#1633)', () => {
     it('sees a deepSignal slice field as an own key, including one that starts null', () => {

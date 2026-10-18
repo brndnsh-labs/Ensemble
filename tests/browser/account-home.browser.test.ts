@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { homeRequest } from '../../prototypes/v2/lib/home.js';
-import type { AccountScope } from '../../prototypes/v2/lib/sync/protocol.js';
-import { ACCOUNT_DATABASE } from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
+import { homeRequest } from '../../web/lib/home.js';
+import type { AccountScope } from '../../web/lib/sync/protocol.js';
+import { ACCOUNT_DATABASE } from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

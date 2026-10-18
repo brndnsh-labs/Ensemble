@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
+import { clampFreq, createSoftClipCurve } from '../../../core/engine/audio-graph-utils.js';
 
 describe('DSP & Signal Safety', () => {
     it('should generate a valid soft-clip curve for the saturator', () => {

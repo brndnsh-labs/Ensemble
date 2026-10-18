@@ -8,14 +8,14 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { importedDocument } from '../../../prototypes/v2/lib/import-document.js';
 import {
     decodeChartDocumentV2,
     encodeChartDocumentV2,
-} from '../../../public/songbook/document-v2.js';
-import { parseIRealImport } from '../../../public/songbook/ireal-import.js';
-import { compileScoreForm } from '../../../public/songbook/score-form.js';
-import type { ChartDocumentV2 } from '../../../public/songbook/score-types.js';
+} from '../../../core/songbook/document-v2.js';
+import { parseIRealImport } from '../../../core/songbook/ireal-import.js';
+import { compileScoreForm } from '../../../core/songbook/score-form.js';
+import type { ChartDocumentV2 } from '../../../core/songbook/score-types.js';
+import { importedDocument } from '../../../web/lib/import-document.js';
 import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 /**

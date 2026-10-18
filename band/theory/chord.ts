@@ -3,7 +3,7 @@
  * reads those facts; no lane re-derives a quality from the symbol text. (The old engine
  * read a quality in four lanes that could disagree, and needed a matrix test to guard it.)
  *
- * The vocabulary is closed: `SCORE_CHORD_QUALITIES` in `public/songbook/score-text.ts` is
+ * The vocabulary is closed: `SCORE_CHORD_QUALITIES` in `core/songbook/score-text.ts` is
  * what the chart codec accepts, and `chord.test.ts` proves every one of them parses here —
  * so "valid notation, unsupported voicing" cannot happen.
  */

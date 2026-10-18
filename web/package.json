@@ -1,0 +1,26 @@
+{
+    "name": "ensemble-v2-foundation",
+    "private": true,
+    "version": "0.0.0",
+    "scripts": {
+        "dev": "next dev --webpack -p 3100",
+        "build": "npm run typecheck && next build --webpack && node scripts/offline.mjs",
+        "typecheck": "npm --prefix .. run typecheck && tsc --noEmit",
+        "test:e2e": "playwright test",
+        "check:bundle": "node scripts/bundle-tripwire.mjs",
+        "shard:weights": "node scripts/shard-weights.mjs"
+    },
+    "dependencies": {
+        "@simplewebauthn/browser": "14.0.0",
+        "next": "16.4.0",
+        "react": "19.3.0",
+        "react-dom": "19.3.0"
+    },
+    "devDependencies": {
+        "@playwright/test": "1.63.0",
+        "@types/node": "^26.0.1",
+        "@types/react": "^19.2.0",
+        "@types/react-dom": "^19.2.0",
+        "typescript": "^7.0.2"
+    }
+}

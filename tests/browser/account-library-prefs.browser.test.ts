@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AccountScope, ChartDocument } from '../../prototypes/v2/lib/sync/protocol.js';
-import { ACCOUNT_DATABASE } from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
+import type { AccountScope, ChartDocument } from '../../web/lib/sync/protocol.js';
+import { ACCOUNT_DATABASE } from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

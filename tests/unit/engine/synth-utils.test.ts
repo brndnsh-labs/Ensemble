@@ -6,7 +6,7 @@ import {
     rampGain,
     updateDensityDucking,
     velocityTimbre,
-} from '../../../public/engine/synth-utils.js';
+} from '../../../core/engine/synth-utils.js';
 
 describe('Synthesis Utilities', () => {
     let mockParam;

@@ -5,7 +5,7 @@
 // (the by-ear *feel* is Brandon's listen pass; this only pins the numbers so a
 // future refactor can't silently revert nylon to the default).
 import { describe, expect, it } from 'vitest';
-import { leadVibrato } from '../../../public/engine/synth-soloist.js';
+import { leadVibrato } from '../../../core/engine/synth-soloist.js';
 
 const SEED = 12345;
 

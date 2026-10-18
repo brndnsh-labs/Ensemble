@@ -20,7 +20,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/ensemble-v2-charts.md`](design/ensemble-v2-charts.md) — semantic-chart/full iReal compatibility direction, the one chart schema (2) and how schema 1 was retired, live measure editor/conservative import, and remaining iReal boundaries.
 - [`docs/design/ensemble-v2-sync.md`](design/ensemble-v2-sync.md) — approved recovery direction, implemented account-local outbox, staged cloud/offline acceptance and hosting decisions (#1172).
 - [`hosting/README.md`](../hosting/README.md) — the shared test/production stack on docker04: the `ensemble-web` and `ensemble-api` images, release-by-tag from CI, and the edge config.
-- [`prototypes/v2/CLAUDE.md`](../prototypes/v2/CLAUDE.md) — cross-provider v2 handoff, delivery rules, test gates and ownership boundaries.
+- [`web/CLAUDE.md`](../web/CLAUDE.md) — cross-provider v2 handoff, delivery rules, test gates and ownership boundaries.
 - [`docs/design/ensemble-v2-next-batch.md`](design/ensemble-v2-next-batch.md) — next bounded cycle batch; approval/filing state is explicit in the document.
 - [`docs/design/ensemble-v2-guided-form.md`](design/ensemble-v2-guided-form.md) — guided repeat/ending authoring, compiler-derived previews and advanced-form preservation (#1176).
 

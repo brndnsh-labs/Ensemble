@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import type { AccountApi } from '../../prototypes/v2/lib/account/api.js';
-import { createAccountSession } from '../../prototypes/v2/lib/account/session.js';
-import { AccountMismatchError, createSyncLoop } from '../../prototypes/v2/lib/account/sync-loop.js';
+import type { AccountApi } from '../../web/lib/account/api.js';
+import { createAccountSession } from '../../web/lib/account/session.js';
+import { AccountMismatchError, createSyncLoop } from '../../web/lib/account/sync-loop.js';
 import {
     ACCOUNT_DATABASE,
     AccountChangedError,
@@ -11,8 +11,8 @@ import {
     deletionKey,
     retiredStarPrefix,
     retiredStarsMarkerKey,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**
@@ -32,7 +32,7 @@ import { accountChart } from '../utils/account-songbook-fixture.js';
  * unsaved experiment is a row in this database's `drafts` store, so `clearAccount` reaching it is
  * what keeps that text off a shared device. What is NOT proven here is the shell's half of the
  * preflight — the in-tab drafts no store holds — which needs a real browser driving the app
- * (`prototypes/v2/checks/account-sign-out.chromium.spec.ts`).
+ * (`web/checks/account-sign-out.chromium.spec.ts`).
  */
 
 const A = 'owner-a';

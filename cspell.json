@@ -486,7 +486,7 @@
         "scripts/*.mjs",
         "tests/**/fixtures/**",
         "tests/**/__snapshots__/**",
-        "public/*.svg",
+        "core/*.svg",
         "scripts/calibration/*.json",
         "scripts/calibration/*.jsonl"
     ]

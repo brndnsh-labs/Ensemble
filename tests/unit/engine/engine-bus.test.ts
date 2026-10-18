@@ -2,7 +2,7 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { reverbSendForPack } from '../../../public/data/sound-packs.js';
+import { reverbSendForPack } from '../../../core/data/sound-packs.js';
 import {
     killAllNotes,
     killBassBus,
@@ -12,27 +12,27 @@ import {
     restoreGains,
     syncBusReverbSend,
     syncBusVolume,
-} from '../../../public/engine/engine.js';
+} from '../../../core/engine/engine.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
 );
 
 // Mock synthesis functions
-vi.mock('../../../public/engine/synth-bass.js', () => ({
+vi.mock('../../../core/engine/synth-bass.js', () => ({
     killBassNote: vi.fn(),
     playBassNote: vi.fn(),
 }));
-vi.mock('../../../public/engine/synth-chords.js', () => ({
+vi.mock('../../../core/engine/synth-chords.js', () => ({
     killAllPianoNotes: vi.fn(),
     INSTRUMENT_PRESETS: {},
     playNote: vi.fn(),
 }));
-vi.mock('../../../public/engine/synth-drums.js', () => ({
+vi.mock('../../../core/engine/synth-drums.js', () => ({
     killDrumNote: vi.fn(),
     playDrumSound: vi.fn(),
 }));
-vi.mock('../../../public/engine/synth-soloist.js', () => ({
+vi.mock('../../../core/engine/synth-soloist.js', () => ({
     killSoloistNote: vi.fn(),
     playSoloNote: vi.fn(),
 }));
@@ -106,9 +106,9 @@ describe('Engine Bus Management', () => {
         it('should trigger all synth and bus killers', async () => {
             await killAllNotes(state);
             // Verify a few key ones
-            const { killAllPianoNotes } = await import('../../../public/engine/synth-chords.js');
+            const { killAllPianoNotes } = await import('../../../core/engine/synth-chords.js');
             expect(killAllPianoNotes).toHaveBeenCalled();
-            // In public/engine/engine.js, killAllNotes only calls synth killers, not bus killers
+            // In core/engine/engine.js, killAllNotes only calls synth killers, not bus killers
             // expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledTimes(5);
         });
     });

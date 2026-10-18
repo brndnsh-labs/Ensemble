@@ -3,14 +3,14 @@ import {
     __resetPackCacheForTest,
     getPackBuffer,
     isPackLoaded,
-} from '../../../public/engine/instrument-registry.js';
+} from '../../../core/engine/instrument-registry.js';
 import {
     __resetLoaderForTest,
     fetchPackAsset,
     loadPack,
     type PackManifest,
     setPackAssetFetcher,
-} from '../../../public/engine/sample-loader.js';
+} from '../../../core/engine/sample-loader.js';
 
 // A decoded-buffer stand-in (the loader/registry never inspect contents).
 const fakeBuffer = (tag: string): AudioBuffer => ({ tag }) as unknown as AudioBuffer;

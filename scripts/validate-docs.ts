@@ -15,14 +15,14 @@ import path from 'node:path';
 // path here misleads at exactly the point it is most trusted — and until #1303
 // none of them were scanned at all. That gap cost a real pointer: the
 // impulse-response bisection harness moved to `tests/browser/` in #1097 while
-// `public/engine/CLAUDE.md` kept sending readers to the old `tests/e2e/` tree
+// `core/engine/CLAUDE.md` kept sending readers to the old `tests/e2e/` tree
 // (itself deleted with v1 in #1358).
 //
 // Both sets are DISCOVERED, not listed. A hand-maintained list is the exact
 // failure this gate just suffered — `DOCS_TO_SCAN` was never extended when
 // #1153 added the dir-scoped docs, and nobody noticed for months. Enumerating
 // them here would only move that staleness one file over.
-const AGENT_DOC_ROOTS = ['public', 'tests'];
+const AGENT_DOC_ROOTS = ['core', 'tests'];
 const AGENT_DEFINITIONS_ROOT = '.claude/agents';
 const SKILLS_ROOT = '.claude/skills';
 
@@ -99,18 +99,18 @@ const DOCS_TO_SCAN = [
 // directory missing from this list is a directory where new files can land
 // without ever being flagged as absent from AI_MAP.md.
 //
-// #1178 is moving `public/` root files into family directories. EVERY new family
+// #1178 is moving `core/` root files into family directories. EVERY new family
 // dir must be added here in the phase that creates it — otherwise the reorg
 // quietly retires this guard for exactly the files it just relocated.
 const CORE_DIRECTORIES = [
-    'public',
-    'public/engine',
-    'public/state',
-    'public/data',
-    'public/song', // #1178 phase 1
-    'public/export', // #1178 phase 1
-    'public/controllers', // #1178 phase 2
-    'public/songbook',
+    'core',
+    'core/engine',
+    'core/state',
+    'core/data',
+    'core/song', // #1178 phase 1
+    'core/export', // #1178 phase 1
+    'core/controllers', // #1178 phase 2
+    'core/songbook',
 ];
 
 const IGNORE_EXTENSIONS = ['.png', '.svg', '.jpg', '.jpeg', '.webp'];
@@ -132,7 +132,7 @@ const VALID_LINK_PREFIXES = [
     'docs/',
     'guides/',
     'archive/',
-    'public/',
+    'core/',
     'tests/',
     'scripts/',
 ];
@@ -160,7 +160,7 @@ function resolveDocLink(rawPath) {
  * for root-level docs — widening it there would start checking incidental spans
  * like `dist/assets/index.js`. The dir-scoped agent docs (#1153) additionally
  * cite paths relative to their OWN directory (`state/state-effects.ts` in
- * `public/CLAUDE.md`, `../docs/design/band-engine.md` in `band/CLAUDE.md`), so for
+ * `core/CLAUDE.md`, `../docs/design/band-engine.md` in `band/CLAUDE.md`), so for
  * those a second, self-limiting test applies: an explicit `./`/`../`, or a first
  * segment that is a real subdirectory of the doc. A span that matches neither
  * isn't treated as a path — that's a skip, not a pass.
@@ -195,7 +195,7 @@ function isCheckablePath(cleanPath, docDir) {
 
 /**
  * Doc-relative resolution is for docs that live INSIDE the source tree and
- * describe their siblings — `public/**`, `tests/`. The pipeline skill tree
+ * describe their siblings — `core/**`, `tests/`. The pipeline skill tree
  * cites every repo path root-relative (`scripts/deploy-test.sh`,
  * `tests/standards/…`), and its only relative spans point outside the repo
  * entirely (the `../archived-memory/` memory tree in `/wrap-up`). Reading those
@@ -257,7 +257,7 @@ function validateDocs() {
                 cleanPath.startsWith('http') ||
                 cleanPath.startsWith('{{') ||
                 // A glob/template is a deliberate reference to a FAMILY of files
-                // (`synth-*.ts`, `public/state/<slice>.ts`, `synth-{bass,drums}.ts`) —
+                // (`synth-*.ts`, `core/state/<slice>.ts`, `synth-{bass,drums}.ts`) —
                 // real, and not resolvable by `existsSync`. Skipping is the correct read.
                 cleanPath.includes('*') ||
                 /<[^<>]+>|\{[^{}]+\}/.test(cleanPath) ||
@@ -285,9 +285,9 @@ function validateDocs() {
 
     /**
      * Files directly inside `dir`, plus (when `recurse`) files nested inside its
-     * subdirectories. `public` itself stays shallow — its subdirectories are each
+     * subdirectories. `core` itself stays shallow — its subdirectories are each
      * already their own CORE_DIRECTORIES entry, so recursing it too would just
-     * re-walk them (and pull in non-code dirs like `public/packs`).
+     * re-walk them (and pull in non-code dirs like `core/packs`).
      * @param {string} dir
      * @param {boolean} recurse
      * @returns {string[]}
@@ -312,7 +312,7 @@ function validateDocs() {
             continue;
         }
 
-        for (const fullPath of collectFiles(dir, dir !== 'public')) {
+        for (const fullPath of collectFiles(dir, dir !== 'core')) {
             const file = path.basename(fullPath);
 
             if (IGNORE_FILES.includes(file) || IGNORE_EXTENSIONS.includes(path.extname(file))) {
@@ -324,7 +324,7 @@ function validateDocs() {
 
             if (!isMapped) {
                 console.warn(`⚠️  Shadow File: \`${fullPath}\` is not mapped in AI_MAP.md`);
-                if (fullPath.startsWith('public/engine/') && !fullPath.includes('grooves/')) {
+                if (fullPath.startsWith('core/engine/') && !fullPath.includes('grooves/')) {
                     console.error(
                         `❌ Error: Core engine file \`${fullPath}\` MUST be mapped in AI_MAP.md`,
                     );

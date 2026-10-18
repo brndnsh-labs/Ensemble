@@ -1,5 +1,5 @@
 /** `scripts/live-capture.ts`: the argument parser and the link it opens the stand on. */
-import { decodeChartLink } from '../../public/songbook/chart-link.js';
+import { decodeChartLink } from '../../core/songbook/chart-link.js';
 import { parseLiveCaptureArgs, sceneUrl } from '../../scripts/live-capture.js';
 import { DEFAULT_MIX_REPORT_SCENES } from '../../scripts/mix-report-utils.js';
 

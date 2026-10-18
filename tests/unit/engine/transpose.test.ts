@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { transposeChordText } from '../../../public/engine/transpose.js';
+import { transposeChordText } from '../../../core/engine/transpose.js';
 
 // #777: the single shared chord-text transposer. Covers the slash-bass bug and round-trip
 // pitch stability (the relative-key rewrite went with the text chart, #1740).

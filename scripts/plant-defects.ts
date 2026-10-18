@@ -25,7 +25,7 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } fro
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { encodeWav } from '../public/engine/wav-encoder.js';
+import { encodeWav } from '../core/engine/wav-encoder.js';
 import type { RenderMeta } from './audio-verify.js';
 import { requireSingleScene } from './mix-spectro.js';
 import { decodeWav } from './mix-verify.js';

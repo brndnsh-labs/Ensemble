@@ -3,8 +3,8 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Lane } from '../band/index.js';
-import { renderBand } from '../prototypes/v2/lib/render-bridge.js';
-import { encodeWav } from '../public/engine/wav-encoder.js';
+import { encodeWav } from '../core/engine/wav-encoder.js';
+import { renderBand } from '../web/lib/render-bridge.js';
 import { laneEvents, performSceneForReport, sceneVoices } from './band-scene.js';
 import { DEFAULT_MIX_REPORT_SCENES, MIX_REPORT_STEMS } from './mix-report-utils.js';
 import { installDiskPackFetcher } from './node-webaudio.js';

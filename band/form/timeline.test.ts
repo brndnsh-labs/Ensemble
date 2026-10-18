@@ -1,5 +1,5 @@
-import { resolveScoreMeasureEvents } from '../../public/songbook/score-measure-events.js';
-import type { ScoreEvent, SemanticScore } from '../../public/songbook/score-types.js';
+import { resolveScoreMeasureEvents } from '../../core/songbook/score-measure-events.js';
+import type { ScoreEvent, SemanticScore } from '../../core/songbook/score-types.js';
 import { PPQ } from '../core/types.js';
 import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
 import { buildMeter } from './meter.js';
@@ -15,8 +15,8 @@ import {
 } from './timeline.js';
 
 // The real resolver, wrapped only so the ceiling test can see that it never ran.
-vi.mock('../../public/songbook/score-measure-events.js', async (original) => {
-    const real = await original<typeof import('../../public/songbook/score-measure-events.js')>();
+vi.mock('../../core/songbook/score-measure-events.js', async (original) => {
+    const real = await original<typeof import('../../core/songbook/score-measure-events.js')>();
     return { ...real, resolveScoreMeasureEvents: vi.fn(real.resolveScoreMeasureEvents) };
 });
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AccountApi, ApiResult } from '../../../prototypes/v2/lib/account/api.js';
-import { createAccountSession } from '../../../prototypes/v2/lib/account/session.js';
+import type { AccountApi, ApiResult } from '../../../web/lib/account/api.js';
+import { createAccountSession } from '../../../web/lib/account/session.js';
 import {
     AccountMismatchError,
     belongsToAnotherAccount,
@@ -12,10 +12,10 @@ import {
     resumeDelay,
     SIGN_OUT_MESSAGES,
     SYNC_MESSAGES,
-} from '../../../prototypes/v2/lib/account/sync-loop.js';
-import { backoffWait, type LibraryFacts } from '../../../prototypes/v2/lib/sync/download.js';
-import { MAX_PENDING_SAVES, type PreparedSave } from '../../../prototypes/v2/lib/sync/protocol.js';
-import { type AccountSongbook, heldByAccount } from '../../../prototypes/v2/lib/sync/repository.js';
+} from '../../../web/lib/account/sync-loop.js';
+import { backoffWait, type LibraryFacts } from '../../../web/lib/sync/download.js';
+import { MAX_PENDING_SAVES, type PreparedSave } from '../../../web/lib/sync/protocol.js';
+import { type AccountSongbook, heldByAccount } from '../../../web/lib/sync/repository.js';
 import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 /**
@@ -1452,7 +1452,7 @@ describe('signing out moves the fence before it asks the server for anything', (
      * The `drafts` half of this plan is the ACCOUNT DATABASE's, which since #1299 is where an
      * account chart's unsaved text actually sits. What it cannot see is a draft whose storage
      * write was refused; the SHELL adds that (`withLocalDrafts` in `app/ensemble.tsx`), and that composition is proven end to
-     * end in `prototypes/v2/checks/account-sign-out.chromium.spec.ts`.
+     * end in `web/checks/account-sign-out.chromium.spec.ts`.
      */
     it('counts unsent Saves and unsaved drafts as two separate facts', async () => {
         /** What every song below has committed; the draft rows are placed either side of it. */

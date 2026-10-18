@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DRUM_NAMES } from '../../../prototypes/v2/lib/band-host.js';
+import { DRUM_NAMES } from '../../../web/lib/band-host.js';
 
 /**
  * Guard for `playDrumSound`'s dispatch: for every name the band can send (and a name it
@@ -21,7 +21,7 @@ import { DRUM_NAMES } from '../../../prototypes/v2/lib/band-host.js';
 
 const SNAPSHOT = './__snapshots__/drum-dispatch.txt';
 
-// Every name `prototypes/v2/lib/band-host.ts`'s DRUM_NAMES sends, an unknown name, and the
+// Every name `web/lib/band-host.ts`'s DRUM_NAMES sends, an unknown name, and the
 // two degenerate inputs the dispatcher has always tolerated.
 const BAND_NAMES = [
     'Kick',
@@ -237,8 +237,8 @@ type Scenario = {
 async function record(scenario: Scenario): Promise<string[]> {
     vi.resetModules();
     const rec = makeRecorder();
-    const registry = await import('../../../public/engine/instrument-registry.js');
-    const { playDrumSound } = await import('../../../public/engine/synth-drums.js');
+    const registry = await import('../../../core/engine/instrument-registry.js');
+    const { playDrumSound } = await import('../../../core/engine/synth-drums.js');
 
     const packId = 'dispatch-test-kit';
     for (const key of scenario.packKeys ?? []) {

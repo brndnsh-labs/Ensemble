@@ -1,14 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { playSoloNote } from '../../../public/engine/synth-soloist.js';
-import { getState } from '../../../public/state.js';
-import type { Mutable, SoloistState } from '../../../public/types.js';
+import { playSoloNote } from '../../../core/engine/synth-soloist.js';
+import { getState } from '../../../core/state.js';
+import type { Mutable, SoloistState } from '../../../core/types.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
 );
 
 // Mock State
-vi.mock('../../../public/state.js', () => {
+vi.mock('../../../core/state.js', () => {
     const mockAudioContext = {
         createGain: () => ({
             gain: {

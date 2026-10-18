@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { writtenSettings } from '../../../public/songbook/codec.js';
+import { writtenSettings } from '../../../core/songbook/codec.js';
 import {
     decodeChartDocumentV2 as decodeChartDocument,
     encodeChartDocumentV2 as encodeChartDocument,
     isRetiredSchema,
     validateChartDocumentV2 as validateChartDocument,
-} from '../../../public/songbook/document-v2.js';
-import type { ChartDocumentV2 as ChartDocument } from '../../../public/songbook/score-types.js';
+} from '../../../core/songbook/document-v2.js';
+import type { ChartDocumentV2 as ChartDocument } from '../../../core/songbook/score-types.js';
 
 /**
  * The chart document's own validator (#1740): one schema (2), its envelope, performance and band
@@ -337,7 +337,7 @@ describe('Songbook codecs (#1044)', () => {
         expect(decoded.kind).toBe('ok');
         if (decoded.kind === 'ok') {
             // Absent reads as undefined here too — the default of 2 is applied by the state
-            // layer (`public/state/instruments.ts`), not the codec.
+            // layer (`core/state/instruments.ts`), not the codec.
             expect(decoded.value.chart.band.soloist.tradeChoruses).toBeUndefined();
         }
 

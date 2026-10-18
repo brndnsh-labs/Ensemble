@@ -87,7 +87,7 @@ Local IDB changes later need blocked-upgrade, crash, quota and rollback tests.
 
 ### Collections: a second synced document kind (#1474, decided on #1443)
 
-A collection is a named, ordered list of song ids (`prototypes/v2/lib/collections.ts`) and a
+A collection is a named, ordered list of song ids (`web/lib/collections.ts`) and a
 document of its own, not a field on each song: adding 1,339 songs to a playlist is one Save, not
 1,339 song revisions. It travels the Explicit Save protocol below unchanged — the same outbox,
 operations, receipts, frozen request bytes, conflicts and refusals; the same server `documents`
@@ -218,7 +218,7 @@ commitment. Measured first, on a representative 32-bar standard serialized as a
 
 Storage is therefore **not a design constraint**: a 2,000-chart hoarder costs ~13 MB, and even
 retaining fifty revisions per song for that user stays under a gigabyte. For scale, the shared
-`public/packs/` sound corpus is ~9 MB and is public, content-addressed and per-account free.
+`core/packs/` sound corpus is ~9 MB and is public, content-addressed and per-account free.
 
 Decisions that follow:
 
@@ -368,7 +368,7 @@ and do not advertise instant erasure from retained backups.
 **Superseded 2026-09-10.** This section originally recommended one Next.js Node service and one
 SQLite database on persistent local disk. The *Ratified topology* decision below supersedes the
 service-shape half of that: the API is a **separate standalone Node service** at
-`prototypes/v2-api/`, not Next.js route handlers, so it stays out of the Next app's compilation
+`api/`, not Next.js route handlers, so it stays out of the Next app's compilation
 and static-export config entirely. The database technology and storage-hygiene guidance were
 right and remain current — one SQLite database (`node:sqlite`, not `better-sqlite3`; see
 *Ratified topology*), a least-privilege service identity, data outside release directories,
@@ -405,7 +405,7 @@ Evidence collected locally on 2026-09-09 at application revision `f2c28fa8`:
 
 - Existing exported preview occupies approximately 11 MiB on disk, including about 9 MiB
   of pack assets (`du -sh`, rounded allocated sizes; not compressed transfer measurements).
-- `time npm run build --prefix prototypes/v2` passed in 12.389 seconds wall time, including
+- `time npm run build --prefix web` passed in 12.389 seconds wall time, including
   root/preview typechecks, Next build and offline artifact assembly. This is one warm-cache
   local observation with installed dependencies, not a cold build or deployment comparison.
   The sandbox initially blocked Next's `git` subprocess; the unchanged command passed with
@@ -481,7 +481,7 @@ transactional explicit-Save outbox, frozen retries, guarded acknowledgements and
 conflicts. It has native Chromium/WebKit storage tests with injected transports, not a live
 account service or UI. Keep its review/delivery receipt distinct from deployment and user
 acceptance. The [next batch](ensemble-v2-next-batch.md) breaks the immediate work into bounded
-handoffs; the [v2 guide](../../prototypes/v2/CLAUDE.md) defines the common cycle and spells out
+handoffs; the [v2 guide](../../web/CLAUDE.md) defines the common cycle and spells out
 why a merged v2 story still releases nothing to users.
 
 Later stages below are **acceptance contracts, not ready-to-cycle tickets**. Shape each into
@@ -495,7 +495,7 @@ small implementation children with exact files, prerequisites and tests before s
    cross-account ceremonies, expired/replayed challenges, missing user verification and concurrent
    recovery claims; interruption cannot consume the sole recovery route. No real account launch
    until implementation choices and threat-model review are complete. Shaped and filed on
-   2026-09-10 as #1187-#1192 against a separate Node service at `prototypes/v2-api/`; the
+   2026-09-10 as #1187-#1192 against a separate Node service at `api/`; the
    [batch index](ensemble-v2-next-batch.md) records the chain, the review requirements and what
    the sibling codebase does and does not actually supply.
 3. **Owner-bound revision API:** authenticated owner predicates on every read/write/receipt,
@@ -537,8 +537,8 @@ exclude foreign-owner data, and avoid falsely reporting cloud-save or offline-re
 
 ## Reference evidence
 
-- Existing Ensemble seams: `prototypes/v2/lib/repository.ts`, `lib/session.ts`,
-  `scripts/offline.mjs`, `next.config.mjs`, and `public/songbook/` codecs.
+- Existing Ensemble seams: `web/lib/repository.ts`, `lib/session.ts`,
+  `scripts/offline.mjs`, `next.config.mjs`, and `core/songbook/` codecs.
 - [Next.js static-export backend boundary](https://github.com/vercel/next.js/blob/canary/docs/01-app/02-guides/backend-for-frontend.mdx)
   and [standalone output/tracing](https://github.com/vercel/next.js/blob/canary/docs/01-app/03-api-reference/05-config/01-next-config-js/output.mdx),
   retrieved through Context7 on 2026-09-09. These establish framework options, not deployment proof.

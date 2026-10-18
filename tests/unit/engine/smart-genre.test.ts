@@ -1,17 +1,17 @@
 // @ts-nocheck
 /* eslint-disable */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dispatch, getState } from '../../../public/state.js';
-import { ACTIONS } from '../../../public/types.js';
+import { dispatch, getState } from '../../../core/state.js';
+import { ACTIONS } from '../../../core/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 // Mock dependencies that are dynamically imported to prevent floating promises
-vi.mock('../../../public/state.js', async (importOriginal) => {
+vi.mock('../../../core/state.js', async (importOriginal) => {
     const actual = await importOriginal();
-    const { playback, playbackReducer } = await import('../../../public/state/playback.js');
-    const { arrangerReducer } = await import('../../../public/state/arranger.js');
-    const { instrumentReducer } = await import('../../../public/state/instruments.js');
-    const { grooveReducer } = await import('../../../public/state/groove.js');
+    const { playback, playbackReducer } = await import('../../../core/state/playback.js');
+    const { arrangerReducer } = await import('../../../core/state/arranger.js');
+    const { instrumentReducer } = await import('../../../core/state/instruments.js');
+    const { grooveReducer } = await import('../../../core/state/groove.js');
     return {
         ...actual,
         // Wrap dispatch to avoid handleEffects during tests
@@ -26,7 +26,7 @@ vi.mock('../../../public/state.js', async (importOriginal) => {
     };
 });
 
-vi.mock('../../../public/controllers/instrument-controller.js', () => ({
+vi.mock('../../../core/controllers/instrument-controller.js', () => ({
     togglePower: vi.fn(),
 }));
 

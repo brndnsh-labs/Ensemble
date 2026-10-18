@@ -17,25 +17,25 @@ worker engine no longer runs in the app.
   `compileTimeline`, then `performPass` once per `--loops` chorus, each pass remembering the
   one before and the last one playing the ending — the stand looping the song, then stopping.
 - **The audio is rendered through the render bridge's `renderBand`**
-  (`prototypes/v2/lib/render-bridge.ts`), which hands the events to `renderBandPasses`
+  (`web/lib/render-bridge.ts`), which hands the events to `renderBandPasses`
   (`lib/band-export.ts`) — the same offline render, through the same `playBandEvent` voice
   mapping, as the app's WAV/stem export — and returns raw channels plus a dispatch tap (every
   event with the time, length and level its voice was handed). Two engines run it:
   - **`--engine=node`, the default (since 2026-10-09).** `scripts/mix-render-node.ts` calls
     `renderBand` in node on `node-web-audio-api`, with `scripts/node-webaudio.ts` standing in
-    for the browser (the Web Audio globals, the sample packs read from `public/packs/`, and
+    for the browser (the Web Audio globals, the sample packs read from `core/packs/`, and
     a shim for the library's differences — see *Rendering in node* below). No build, no
     browser; metrics are measured with `scripts/audio-analysis.ts`.
-  - **`--engine=chromium`.** Unless `--no-build` (a no-op on the node engine), `mix:report` builds `prototypes/v2` with
+  - **`--engine=chromium`.** Unless `--no-build` (a no-op on the node engine), `mix:report` builds `web` with
     `NEXT_PUBLIC_RENDER_BRIDGE=1` (`next build --webpack` +
-    `scripts/offline.mjs`, which copies the sample packs), serves `prototypes/v2/out`, and
+    `scripts/offline.mjs`, which copies the sample packs), serves `web/out`, and
     drives Chromium; the bridge is on `window.ensemble` and the metrics are measured in the
     page. This is the render the app itself makes — use it for the final check of a change
     whose point is how Chromium's nodes behave, and for a bit-level A/B against an app export.
   The report is built in node either way (`mix-report-utils.ts`). `mix:verify`, `mix:ab` and
   `mix:spectro` pass `--engine=` through to the `mix:report` they drive.
 - **A Chromium build overwrites the same `out/` the v2 Playwright suite serves**, so rebuild
-  (`npm run build --prefix prototypes/v2`) before trusting that suite after a Chromium mix
+  (`npm run build --prefix web`) before trusting that suite after a Chromium mix
   report. A normal build compiles the bridge out: grep `out/` for
   `ensemble-band-render-bridge` — it appears only in a bridge build.
 
@@ -77,7 +77,7 @@ ids keep their old names so reports, `mix:diff` baselines and `--stems=` filters
 ## Rendering in node (`--engine=node`, `npm run render:node`)
 
 `scripts/node-webaudio.ts` is what lets the engine run in node: it installs `node-web-audio-api`'s
-classes as the Web Audio globals, serves `/packs/` from `public/packs/` on disk (each `.m4a`
+classes as the Web Audio globals, serves `/packs/` from `core/packs/` on disk (each `.m4a`
 decoded once through ffmpeg into `tmp/node-webaudio/`, because the node decoder refuses the
 packs' non-faststart layout and does not trim AAC priming, which put every sampled note ~23 ms
 late), and corrects three library differences found with a node-vs-Chromium parity probe over
@@ -143,7 +143,7 @@ Stop, keeps recording through the release, and writes `tmp/live/<scene>-<seed>.w
 markers file (the audio-clock time of `play`, `scheduled` and `stop`, and where each lands in
 the samples). The transport and the tap exist only in a bridge build
 (`NEXT_PUBLIC_RENDER_BRIDGE=1`); a production build compiles them out with the rest of the
-bridge, and `grep ensemble-band-render-bridge prototypes/v2/out` stays empty.
+bridge, and `grep ensemble-band-render-bridge web/out` stays empty.
 
 ```bash
 npm run live:capture -- --scene=funk-pocket --bars=8          # needs a bridge build (mix:report --engine=chromium leaves one)
@@ -224,7 +224,7 @@ ended), `steals` (a note landing with the stem's `voiceLimit` already sounding).
 
 Renders the pack's lane twice per scene and seed — once on the synth, once on the pack — and
 prints the RMS difference and the gain that sets the pack's RMS to the synth's, against the
-catalog `gain` in `public/data/sound-packs.ts`. Modules: `groove` (drums stem), `bass`,
+catalog `gain` in `core/data/sound-packs.ts`. Modules: `groove` (drums stem), `bass`,
 `chords` (the comp), `soloist` (the lead); anything else is refused before the build.
 
 ```bash
@@ -378,7 +378,7 @@ npm run --silent audition-link -- --scene=jazz-ride --seed=ALPHA
 # → http://localhost:3100/?autoplay=1#chart=eJx...
 ```
 
-The default base is the v2 dev server (`npm run dev --prefix prototypes/v2`)
+The default base is the v2 dev server (`npm run dev --prefix web`)
 at the site root; for the site use `--base-url=https://ensemble.brndn.zip/`.
 Available scenes are the same four shipped with `mix:report`:
 `rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pocket`.
@@ -386,7 +386,7 @@ Available scenes are the same four shipped with `mix:report`:
 **What the app reads (#1732).** The link is a schema-2 chart in a `#chart=` fragment, the
 same envelope the stand's "Copy link" writes, so it opens as an unsaved draft through the
 shell's ordinary shared-link path. The script builds the chart with the standards catalog's
-own `buildStandardDocument` (`prototypes/v2/lib/standards.ts`): each `|`-separated bar goes
+own `buildStandardDocument` (`web/lib/standards.ts`): each `|`-separated bar goes
 through `parseChordBar`, and the band is the genre's catalog band. On top of that the link pins
 `--key` (a trailing `m` makes it minor), `--ts`, `--bpm` (default 120 when omitted),
 `--int` as `performance.energy` (a fixed level, clamped 0-1, instead of `'auto'`), and the
@@ -417,7 +417,7 @@ Flags the link carries: `--genre` (one of the 13, validated), `--key`,
 `bass` or `chords`. Ignored, with a note: `--density`, `--seed`, `--on=`/`--off=harmony`.
 `tests/scripts/audition-link.test.ts` decodes generated links with the app's own
 `decodeChartLink` and checks every field; the v2 Playwright suite
-(`prototypes/v2/checks/audition-link-fields.spec.ts`) opens them in the browser and checks
+(`web/checks/audition-link-fields.spec.ts`) opens them in the browser and checks
 the chart on the stand per field, plus `autoplay`.
 
 ## `npm run mix:analyze -- <file> [<file> ...]`
@@ -471,7 +471,7 @@ checks in `scripts/audio-verify.ts` over each stem:
 | PITCH | what the rate is made of: `36/36 held notes, 8/8 short notes, 36/36 chord voicings confirmed` |
 | PITCH NOT CONFIRMED | each held note that failed, with the reason (a semitone or more away; a lower note under it; odd partials missing; another note louder). A bend or a slide lands here honestly |
 | TUNING | median \|cents\| from the written pitch over the confirmed held notes, and the worst note |
-| OFF-PITCH | written pitches whose notes read more than 10 cents out (median, at least two notes): the mis-rooted sample zone of `public/engine/CLAUDE.md` rule 24. A smooth ramp across the register is a piano's stretch tuning, not a bug |
+| OFF-PITCH | written pitches whose notes read more than 10 cents out (median, at least two notes): the mis-rooted sample zone of `core/engine/CLAUDE.md` rule 24. A smooth ramp across the register is a piano's stretch tuning, not a bug |
 | QUIET (intended) | attacks whose events are all deliberately attenuated (`levelScale ≤ 0.2` — the old engine's 0.15 palm-mute floor plus margin, kept tight so a half-muted dropped note still reads MISSED; the band's muted bass note carries 0.2775, `muteGain(0.85)`, so it is *not* excluded — see the blind spots) and show no rise — excluded from the match-rate denominator, printed so the exclusion is never silent |
 
 **No intent → dispatch stage on the band engine.** The old engine generated notes into
@@ -870,8 +870,8 @@ This is the workflow path for handing a clip to another model
 (Gemini, GPT, etc.) for a second-opinion listen — no API integration
 required, just drag the file into another chat.
 
-Implementation: `prototypes/v2/lib/band-export.ts` + the shared
-`public/engine/wav-encoder.ts`.
+Implementation: `web/lib/band-export.ts` + the shared
+`core/engine/wav-encoder.ts`.
 
 The encoder quantizes with a **round** against a symmetric `0x8000` scale (clamped at
 `+0x7fff`), which makes `int16 → float → int16` the exact identity for all 65 536

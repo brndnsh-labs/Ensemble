@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveScoreContext } from '../../../public/songbook/score-context.js';
+import { resolveScoreContext } from '../../../core/songbook/score-context.js';
 
 describe('resolveScoreContext', () => {
     const score = { key: 'C', isMinor: false, meter: '4/4', grouping: [2, 2] };

@@ -72,7 +72,7 @@ and the per-style critique claims in `band/test/claims/`.
 
 > **Old engine, deleted (#1404).** Before the band engine, tier 2 was `getBandPocket` in
 > `coordination-engine.ts`, scaled per section by energy (#1064) and summed by each lane; tier 3
-> was `public/engine/humanize.ts` (`humanizePlacement`, `PLACEMENT_WEIGHTS`) plus per-voice drum
+> was `core/engine/humanize.ts` (`humanizePlacement`, `PLACEMENT_WEIGHTS`) plus per-voice drum
 > offsets inside each `grooves/*.ts` strategy (the Neo-Soul snare drag and hat push); and the
 > grid was the scheduler's `calculateStepDuration`. None of that exists. In particular the
 > energy-scaled lean and the per-drum-piece offsets were not carried over: the band's lean is a

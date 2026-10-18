@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AccountApi, ApiResult } from '../../../prototypes/v2/lib/account/api.js';
-import { createAccountSession } from '../../../prototypes/v2/lib/account/session.js';
+import type { AccountApi, ApiResult } from '../../../web/lib/account/api.js';
+import { createAccountSession } from '../../../web/lib/account/session.js';
 
 function apiReturning(...results: Array<ApiResult<unknown>>): AccountApi {
     let index = 0;

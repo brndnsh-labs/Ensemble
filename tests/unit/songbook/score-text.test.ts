@@ -5,9 +5,9 @@ import {
     durationToSteps,
     scoreDuration,
     scoreMeter,
-} from '../../../public/songbook/score-duration.js';
-import { parseChordBar, printChordBar } from '../../../public/songbook/score-text.js';
-import type { ScoreEvent } from '../../../public/songbook/score-types.js';
+} from '../../../core/songbook/score-duration.js';
+import { parseChordBar, printChordBar } from '../../../core/songbook/score-text.js';
+import type { ScoreEvent } from '../../../core/songbook/score-types.js';
 
 function expectBar(text: string, meter: string, expected: ScoreEvent[]): void {
     expect(parseChordBar(text, meter)).toEqual({ kind: 'ok', value: expected });

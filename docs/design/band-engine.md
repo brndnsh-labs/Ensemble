@@ -2,7 +2,7 @@
 
 **Status:** the default engine since the cutover (DECISION 2026-09-25, Brandon), after all 13
 genres' rhythm sections and leads passed his ear on `feat/band-engine` (DECISION 2026-09-23).
-**Replaces:** the generative engine in `public/engine/` (worker, scheduler, conductor, per-lane
+**Replaces:** the generative engine in `core/engine/` (worker, scheduler, conductor, per-lane
 generators) and its critique suite. The app no longer runs the old engine (`?engine=old` was
 removed); its code is deleted next (#1404).
 
@@ -31,7 +31,7 @@ ports the old engine's *lessons*, not its code.
   change at a time.
 - **Gate per genre:** Brandon's ear, on a `/deploy-test` build. Tests prove rules; they do not
   prove taste.
-- At cutover, VISION.md's "the engine is kept, not rewritten" is updated. `public/engine`'s
+- At cutover, VISION.md's "the engine is kept, not rewritten" is updated. `core/engine`'s
   generators and their tests are deleted once the band has held as the default.
 
 ## Shape: one pure function, one event stream
@@ -391,7 +391,7 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   same evidence as a C tune opening on its V, so it ends on C; a tune ending on a V triad
   (Canon's `A`, the Andalusian `E`), a dorian IV7 (`Em7 | A7`) or a borrowed iv on C (`G | B |
   C | Cm`) keeps its written last chord (#1521, options B and C: record whether the key was
-  set, or weigh the whole chart). `prototypes/v2/lib/standards-ending.test.ts` pins every
+  set, or weigh the whole chart). `web/lib/standards-ending.test.ts` pins every
   standard whose ending moves when its key is forced to C.
 - **Only the ending bar's harmony changes.** The bar before it hears the resolved bar as its
   next, so its approach notes walk into the tonic (a walking bass's line toward its next
@@ -407,7 +407,7 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   `arrange/ending.test.ts` holds every style to the tonic on turnaround endings, and to the
   written chord on the endings above.
 
-## The live host (`prototypes/v2/lib/band-host.ts`)
+## The live host (`web/lib/band-host.ts`)
 
 The runtime's play, stop and resume paths go through `startBand`/`stopBand`; the old worker
 never starts. The host keeps a queue of *segments*, one pass of the song each, and
@@ -465,7 +465,7 @@ it) render through the same function, `renderBandPasses`: they compose a scene i
 (transport mute chips, the Sounds panel); the old harmony lane is gone from state too (#1436). The `.mid` export is the same stream through `band/sinks/midi.ts`:
 the song once through with its ending, a lead track only when the lead played.
 
-**The chart sheet** draws a score from the score and its timeline (`prototypes/v2/lib/band-chart.ts`),
+**The chart sheet** draws a score from the score and its timeline (`web/lib/band-chart.ts`),
 not from the old engine's plan, so any chart the timeline compiles opens, edits and plays:
 holds show as `/`, N.C. as `N.C.`, a fermata sits over its chord, and off-grid lengths keep
 their exact widths. Every path that lets a chart onto the stand (open, edit,

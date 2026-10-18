@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { GENRE_NAMES, SMART_GENRES } from '../../public/data/smart-genres.js';
-import { SOUND_PACKS } from '../../public/data/sound-packs.js';
+import { GENRE_NAMES, SMART_GENRES } from '../../core/data/smart-genres.js';
+import { SOUND_PACKS } from '../../core/data/sound-packs.js';
 import {
     __resetPackCacheForTest,
     markPackInstalled,
-} from '../../public/engine/instrument-registry.js';
-import { resolveAutoVoices } from '../../public/state/state-effects.js';
-import { dispatch, getState } from '../../public/state.js';
-import { ACTIONS, type InstrumentModule } from '../../public/types.js';
+} from '../../core/engine/instrument-registry.js';
+import { resolveAutoVoices } from '../../core/state/state-effects.js';
+import { dispatch, getState } from '../../core/state.js';
+import { ACTIONS, type InstrumentModule } from '../../core/types.js';
 import { enterGenre } from '../utils/genre-entry.js';
 
 // Approved defaults, independent of the tables under test. In particular, the

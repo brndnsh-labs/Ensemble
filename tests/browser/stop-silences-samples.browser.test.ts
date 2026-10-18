@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { playSampledNote, releaseSampledVoices } from '../../public/engine/sample-voice.js';
+import { playSampledNote, releaseSampledVoices } from '../../core/engine/sample-voice.js';
 
 /**
  * Stop, heard (#1530): a real `OfflineAudioContext` renders a held sampled note, the render is

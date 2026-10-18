@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { revForPack } from '../../../public/data/sound-packs.js';
-import { __resetPackCacheForTest } from '../../../public/engine/instrument-registry.js';
+import { revForPack } from '../../../core/data/sound-packs.js';
+import { __resetPackCacheForTest } from '../../../core/engine/instrument-registry.js';
 import {
     __resetLoaderForTest,
     loadPack,
     type PackManifest,
     withRevToken,
-} from '../../../public/engine/sample-loader.js';
+} from '../../../core/engine/sample-loader.js';
 
 /**
  * #752 — catalog `rev` cache-bust. Re-encoding a pack in place must produce new

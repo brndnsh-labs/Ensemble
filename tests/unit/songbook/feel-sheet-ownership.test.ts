@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { STATE_OWNERSHIP_MANIFEST } from '../../../public/songbook/state-ownership.js';
+import { STATE_OWNERSHIP_MANIFEST } from '../../../core/songbook/state-ownership.js';
 
 /**
- * #1276 — the v2 Feel sheet (`prototypes/v2/app/band-groove.tsx`, the Band sheet's Groove and Practice tabs since #1703) assumes each of its
+ * #1276 — the v2 Feel sheet (`web/app/band-groove.tsx`, the Band sheet's Groove and Practice tabs since #1703) assumes each of its
  * controls belongs to exactly the ownership domain named below: a `document`-owned
  * field saves with the chart (`captureContent()`'s `performance`/
- * `band.groove` projection in `prototypes/v2/lib/runtime.ts` carries every one of these —
+ * `band.groove` projection in `web/lib/runtime.ts` carries every one of these —
  * band intensity and auto intensity as `performance.energy` since the chart-format decision
  * of 2026-09-26), a `preferences`-owned field goes to
- * `prototypes/v2/lib/session.ts`'s own device-local key (`masterVolumePreference`/
+ * `web/lib/session.ts`'s own device-local key (`masterVolumePreference`/
  * `rememberMasterVolume`), and a `runtime-derived` field is session-only and never
  * persisted anywhere (`docs/design/write-ownership.md` §3 — deliberate, not a gap).
  * This pins the sheet's assumption against the live manifest so a future manifest

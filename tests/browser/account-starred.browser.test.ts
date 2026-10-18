@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AccountApi, ApiResult } from '../../prototypes/v2/lib/account/api.js';
-import { createAccountSession } from '../../prototypes/v2/lib/account/session.js';
-import { COLLECTION_MESSAGES, createSyncLoop } from '../../prototypes/v2/lib/account/sync-loop.js';
+import type { AccountApi, ApiResult } from '../../web/lib/account/api.js';
+import { createAccountSession } from '../../web/lib/account/session.js';
+import { COLLECTION_MESSAGES, createSyncLoop } from '../../web/lib/account/sync-loop.js';
 import {
     BuiltInCollectionError,
     type CollectionDocument,
@@ -9,19 +9,15 @@ import {
     newStarred,
     STARRED_COLLECTION_ID,
     withSong,
-} from '../../prototypes/v2/lib/collections.js';
-import { runOutboxPass } from '../../prototypes/v2/lib/sync/drain.js';
-import {
-    ACCOUNT_DATABASE,
-    type AccountScope,
-    digest,
-} from '../../prototypes/v2/lib/sync/protocol.js';
+} from '../../web/lib/collections.js';
+import { runOutboxPass } from '../../web/lib/sync/drain.js';
+import { ACCOUNT_DATABASE, type AccountScope, digest } from '../../web/lib/sync/protocol.js';
 import {
     AccountSongbook,
     CollectionCapError,
     MAX_REMOTE_CANDIDATES,
-} from '../../prototypes/v2/lib/sync/repository.js';
-import type { SaveTransport } from '../../prototypes/v2/lib/sync/send.js';
+} from '../../web/lib/sync/repository.js';
+import type { SaveTransport } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

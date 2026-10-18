@@ -30,11 +30,11 @@ the exact commit, PR, CI, and merge commands governed by §6/§8.
    with every gate in it reading PASS, **stands as this confirmation** — don't re-run. A stale
    fingerprint, a missing receipt, or any gate reading FAIL: run them here as usual:
    ```
-   npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)
+   npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)
    npm run lint          # Biome lint + format check
    npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
    npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-   npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export
+   npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export
    ```
 3. **Confirm review freshness and finding closure** (§5). If nothing changed after the latest clean
    normal review, proceed. If `/patch` changed the tree, require a clean finding-closure review from

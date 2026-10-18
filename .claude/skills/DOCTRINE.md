@@ -110,7 +110,7 @@ of Done and the reviewer set:
 | --- | --- | --- | --- |
 | **musical** | the style's critique claims in `band/test/claims/<style>.ts`, measured by `band/test/critique.test.ts` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `status:needs-ear` hard stop |
 | **synth** | a human listen on the deployed test build — `/done` deploys the branch to test and runs the verdict check-in right there, no automated oracle | `synth-graph-reviewer` (graph hygiene only, not "does it sound good") | **always `status:needs-ear`** at the merge gate — "Works" merges immediately, "Haven't checked" parks it |
-| **bundle** | a measured KB delta (the v2 export, `prototypes/v2/out/_next/static/`) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
+| **bundle** | a measured KB delta (the v2 export, `web/out/_next/static/`) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
 | **ui** | the v2 suite + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
 
 **Executors** (`agent/*`, sanity-checked against what the issue touches):
@@ -121,10 +121,10 @@ of Done and the reviewer set:
   (not a one-line threshold bump an engine implementer can do inline).
 - `orchestrator-inline` — default for frontier/small/taste stories, for audio-DSP/synthesis
   voices (`synth-*.ts`, `initAudio()`, `reverb.ts`, `synth-utils.ts`, the band host's
-  scheduling in `prototypes/v2/lib/band-host.ts`), and for finicky infra (state-slice schema,
+  scheduling in `web/lib/band-host.ts`), and for finicky infra (state-slice schema,
   hydration, the account/sync contract) —
   anywhere a cold agent re-derives brittle detail and ships latent bugs.
-- `claude` — general UI, non-engine `public/**`, mechanical work.
+- `claude` — general UI, non-engine `core/**`, mechanical work.
 
 **Reviewers**, additive (union what fires):
 `music-theory-reviewer` (`band/**` and its claims, Track musical) ·
@@ -146,25 +146,25 @@ gates **yourself** before trusting it — a spawned "all green" has failed in a 
 Local, before handing to `/review` or `/done` (never proceed over a red gate):
 
 ```
-npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)
+npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)
 npm run lint          # Biome lint + format check
 npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
 npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export
+npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export
 ```
 
 `npm test`, `npm run test:browser` and the v2 suite (`npm run test:e2e --prefix
-prototypes/v2`) are three separate runners (node · browser-audio · the app's Playwright);
+web`) are three separate runners (node · browser-audio · the app's Playwright);
 `npm run ci` covers only the first. `npm run validate` (format + jscpd + `npm run ci`:
 typecheck, typecheck:tests, knip, `npm test`) is the full sweep — run it before a `/done`
 that touches more than one file. CI runs `checks`, `e2e-tests` (browser-mode audio guards +
 `test:sync`) and `v2-checks` in parallel; all three must be green to merge.
 
 **The CI gate `validate` does NOT cover — run it locally before `/done`:**
-- **The v2 suite, for any diff under `public/`** (not just `prototypes/v2/`): the v2 export
-  compiles `public/` and its checks drive the shared controllers, codecs and engine, and
-  `v2-checks` is a required context. `npm run build --prefix prototypes/v2` then
-  `(cd prototypes/v2 && npx playwright test)` — build FIRST, or the suite runs a stale export.
+- **The v2 suite, for any diff under `core/`** (not just `web/`): the v2 export
+  compiles `core/` and its checks drive the shared controllers, codecs and engine, and
+  `v2-checks` is a required context. `npm run build --prefix web` then
+  `(cd web && npx playwright test)` — build FIRST, or the suite runs a stale export.
 
 Run the gates **sequentially from the repo root** and log an exit code per gate. The shell is
 zsh: an unquoted `$cmd` holding a command string never word-splits, so a loop over gate strings
@@ -179,7 +179,7 @@ exits 127 on every one — "never ran", which a piped `tail` reports as a pass.
 - **bundle** → a measured KB delta **and** the full suite green.
 
 **Repo-specific gotchas the gates enforce:**
-- A new `public/engine/*.ts` file must be registered in `AI_MAP.md` or the pre-commit
+- A new `core/engine/*.ts` file must be registered in `AI_MAP.md` or the pre-commit
   docs-lint hook blocks the commit — add the row during `/done` staging.
 - `// @direct-mutation` is only sanctioned in the three categories in `CLAUDE.md`
   (real-time hot paths, init-only, detached render clone). Everywhere else
@@ -252,11 +252,11 @@ emits a **verification receipt** instead of a separate narrative report:
 **Files:** <changed files, exhaustive>
 **Diff fingerprint:** <first 12 hex chars of sha256(`git diff -- <files>`)>
 **Gates:**
-- `npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)` — <PASS/FAIL>
+- `npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)` — <PASS/FAIL>
 - `npm run lint          # Biome lint + format check` — <PASS/FAIL>
 - `npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)` — <PASS/FAIL>
 - `npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)` — <PASS/FAIL>
-- `npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export` — <PASS/FAIL>
+- `npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export` — <PASS/FAIL>
 ```
 
 `/review` and `/done` may **consume** that receipt — skipping the reads and re-derivations it

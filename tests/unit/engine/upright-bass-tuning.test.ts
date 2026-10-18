@@ -14,7 +14,7 @@ import { describe, expect, it } from 'vitest';
 // #1575 re-measured zones 34, 38, 42 and 45 over the first 400 ms after the pluck, with
 // `mix:verify`'s TUNING readout; that readout on a walking-bass scene is the real check.
 
-const manifestUrl = new URL('../../../public/packs/upright-bass/manifest.json', import.meta.url);
+const manifestUrl = new URL('../../../core/packs/upright-bass/manifest.json', import.meta.url);
 const manifest = JSON.parse(readFileSync(fileURLToPath(manifestUrl), 'utf8')) as {
     samples: { key: string; rootMidi: number }[];
 };

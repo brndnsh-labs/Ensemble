@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { validateSemanticScore } from '../../../public/songbook/score-codec.js';
-import { compileScoreForm } from '../../../public/songbook/score-form.js';
+import { validateSemanticScore } from '../../../core/songbook/score-codec.js';
+import { compileScoreForm } from '../../../core/songbook/score-form.js';
 import type {
     ScoreDirection,
     ScoreMeasure,
     SemanticScore,
-} from '../../../public/songbook/score-types.js';
+} from '../../../core/songbook/score-types.js';
 
 function bar(id: string, start: ScoreDirection[] = [], end: ScoreDirection[] = []): ScoreMeasure {
     return {

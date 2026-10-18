@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encodeWav } from '../../public/engine/wav-encoder.js';
+import { encodeWav } from '../../core/engine/wav-encoder.js';
 
 function readAscii(view: DataView, offset: number, length: number): string {
     let out = '';

@@ -32,9 +32,9 @@ export default defineConfig({
     publicDir: false,
     resolve: {
         alias: {
-            // The guest repository (`prototypes/v2/lib/repository.ts`) reaches the engine through
+            // The guest repository (`web/lib/repository.ts`) reaches the engine through
             // the preview's alias, as in `vitest.config.ts`; the account modules do not need it.
-            '@engine': fileURLToPath(new URL('./public', import.meta.url)),
+            '@core': fileURLToPath(new URL('./core', import.meta.url)),
         },
     },
     test: {

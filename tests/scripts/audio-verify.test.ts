@@ -935,7 +935,7 @@ describe('audio-verify — tuning and voicing over a held note (#1568)', () => {
 
     it('names a pitch whose notes all read sharp, the mis-rooted sample zone', () => {
         // A bass line on two pitches; every MIDI 47 sounds 14 cents sharp, as a pack zone
-        // with an integer-rounded root does (public/engine/CLAUDE.md rule 24).
+        // with an integer-rounded root does (core/engine/CLAUDE.md rule 24).
         const pitches = [45, 47, 45, 47, 45, 47];
         const lineEvents: ScheduledEvent[] = pitches.map((midi, index) => ({
             track: 'bass',

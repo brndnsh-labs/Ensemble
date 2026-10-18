@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { STYLES } from '../../band/index.js';
-import { compForChordsLane } from '../../prototypes/v2/lib/band-voices.js';
-import { GENRE_NAMES } from '../../public/data/smart-genres.js';
+import { GENRE_NAMES } from '../../core/data/smart-genres.js';
 import {
     analyzeSchedule,
     buildEventDump,
@@ -17,6 +16,7 @@ import {
     sceneVoices,
 } from '../../scripts/band-scene.js';
 import { DEFAULT_MIX_REPORT_SCENES } from '../../scripts/mix-report-utils.js';
+import { compForChordsLane } from '../../web/lib/band-voices.js';
 
 function scene(overrides: Partial<MixScene> = {}): MixScene {
     return {

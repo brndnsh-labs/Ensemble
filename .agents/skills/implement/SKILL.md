@@ -57,11 +57,11 @@ below is just the ordering.
    - Run the §4 gates either way.
 10. **Independently re-verify** when an agent was spawned (§3) — re-run the gates **yourself**:
     ```
-    npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)
+    npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)
     npm run lint          # Biome lint + format check
     npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
     npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-    npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export
+    npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export
     ```
     The agent's "green" is a claim, not proof; a spawned "all green" has failed in a clean shell.
     A subagent reporting "completed" is likewise evidence of *intent*, not that its writes landed —
@@ -78,11 +78,11 @@ below is just the ordering.
       **Files:** <changed files, exhaustive>
       **Diff fingerprint:** <first 12 hex chars of sha256(`git diff -- <files>`)>
       **Gates:**
-      - `npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)` — <PASS/FAIL>
+      - `npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)` — <PASS/FAIL>
       - `npm run lint          # Biome lint + format check` — <PASS/FAIL>
       - `npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)` — <PASS/FAIL>
       - `npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)` — <PASS/FAIL>
-      - `npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export` — <PASS/FAIL>
+      - `npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export` — <PASS/FAIL>
       ```
       A gate that read FAIL drops the story out of the fast path — fall through to the normal
       report below instead, and don't hand off a receipt that isn't all-PASS.
@@ -105,7 +105,7 @@ below is just the ordering.
 Before building, read the `CLAUDE.md` section matching the story's Track/area (always
 § Musical Logic & Generative Standards for a musical story; § State for state writes) and the
 nested guide for the directory you touch — `band/CLAUDE.md` for a musical story,
-`public/engine/CLAUDE.md` for a synth story.
+`core/engine/CLAUDE.md` for a synth story.
 
-A new `public/engine/*.ts` file needs an `AI_MAP.md` row — remind a spawned agent; the
+A new `core/engine/*.ts` file needs an `AI_MAP.md` row — remind a spawned agent; the
 pre-commit docs-lint hook blocks the commit without it.

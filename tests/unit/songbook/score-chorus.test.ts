@@ -3,13 +3,13 @@
  */
 import { describe, expect, it } from 'vitest';
 import { compileTimeline } from '../../../band/form/timeline.js';
-import { compileScoreForm } from '../../../public/songbook/score-form.js';
+import { compileScoreForm } from '../../../core/songbook/score-form.js';
 import type {
     ScoreDestination,
     ScoreDirection,
     ScoreMeasure,
     SemanticScore,
-} from '../../../public/songbook/score-types.js';
+} from '../../../core/songbook/score-types.js';
 
 function bar(id: string, start: ScoreDirection[] = [], end: ScoreDirection[] = []): ScoreMeasure {
     return {

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { newCollection } from '../../prototypes/v2/lib/collections.js';
+import { newCollection } from '../../web/lib/collections.js';
 import {
     ACCOUNT_DATABASE,
     type AccountScope,
@@ -8,9 +8,9 @@ import {
     deletionKey,
     openedKey,
     type PreparedSave,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import { sendNext } from '../../prototypes/v2/lib/sync/send.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import { sendNext } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

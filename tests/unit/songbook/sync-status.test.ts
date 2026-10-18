@@ -3,7 +3,7 @@ import {
     type Progress,
     projectSyncStatus,
     type StatusFacts,
-} from '../../../prototypes/v2/lib/sync/status.js';
+} from '../../../web/lib/sync/status.js';
 
 /**
  * The projection is the account UI's eventual contract, so these tests pin the ordered state

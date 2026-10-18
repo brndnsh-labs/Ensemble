@@ -10,7 +10,7 @@ const { makeSoloistMock } = await vi.hoisted(
 );
 
 // Mock state and global modules
-vi.mock('../../../public/state.js', () => {
+vi.mock('../../../core/state.js', () => {
     const mockPlayback = {
         audio: null,
         audioGraph: null,
@@ -41,7 +41,7 @@ vi.mock('../../../public/state.js', () => {
 });
 
 // Mock Config
-vi.mock('../../../public/config.js', () => ({
+vi.mock('../../../core/config.js', () => ({
     MIXER_GAIN_MULTIPLIERS: {
         master: 0.85,
         chords: 0.13,
@@ -53,14 +53,14 @@ vi.mock('../../../public/config.js', () => ({
 }));
 
 // Mock the audio-graph helpers (they moved to engine/audio-graph-utils.js in #1176)
-vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) => ({
+vi.mock('../../../core/engine/audio-graph-utils.js', async (importOriginal) => ({
     ...(await importOriginal<any>()),
     safeDisconnect: vi.fn(),
     createSoftClipCurve: vi.fn(() => new Float32Array(1024)),
 }));
 
-import { initAudio, restoreGains } from '../../../public/engine/engine.js';
-import { getState } from '../../../public/state.js';
+import { initAudio, restoreGains } from '../../../core/engine/engine.js';
+import { getState } from '../../../core/state.js';
 
 const { playback } = getState();
 

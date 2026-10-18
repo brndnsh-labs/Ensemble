@@ -3,12 +3,12 @@ import {
     ACCOUNT_DATABASE,
     AccountChangedError,
     type AccountScope,
-} from '../../prototypes/v2/lib/sync/protocol.js';
+} from '../../web/lib/sync/protocol.js';
 import {
     AccountSongbook,
     DEFAULT_LIST_LIMIT,
     MAX_LIST_LIMIT,
-} from '../../prototypes/v2/lib/sync/repository.js';
+} from '../../web/lib/sync/repository.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

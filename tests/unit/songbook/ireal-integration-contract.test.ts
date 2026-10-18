@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { parseIRealImport } from '../../../public/songbook/ireal-import.js';
-import { compileScoreForm } from '../../../public/songbook/score-form.js';
-import { resolveScoreMeasureEvents } from '../../../public/songbook/score-measure-events.js';
-import { parseChordBar } from '../../../public/songbook/score-text.js';
-import type { ScoreMeasure, SemanticScore } from '../../../public/songbook/score-types.js';
+import { parseIRealImport } from '../../../core/songbook/ireal-import.js';
+import { compileScoreForm } from '../../../core/songbook/score-form.js';
+import { resolveScoreMeasureEvents } from '../../../core/songbook/score-measure-events.js';
+import { parseChordBar } from '../../../core/songbook/score-text.js';
+import type { ScoreMeasure, SemanticScore } from '../../../core/songbook/score-types.js';
 
 function bar(id: string, text: string, context: Partial<ScoreMeasure> = {}): ScoreMeasure {
     const parsed = parseChordBar(text, context.meter ?? '4/4');

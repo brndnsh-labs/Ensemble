@@ -17,23 +17,23 @@ const mocks = vi.hoisted(() => ({
     toneTiltForPack: vi.fn(() => 0),
 }));
 
-vi.mock('../../../public/engine/instrument-registry.js', () => ({
+vi.mock('../../../core/engine/instrument-registry.js', () => ({
     resolveInstrumentSource: mocks.resolveInstrumentSource,
 }));
-vi.mock('../../../public/engine/pack-runtime.js', () => ({
+vi.mock('../../../core/engine/pack-runtime.js', () => ({
     getPackZones: mocks.getPackZones,
 }));
-vi.mock('../../../public/engine/sample-voice.js', () => ({
+vi.mock('../../../core/engine/sample-voice.js', () => ({
     pickZone: mocks.pickZone,
     foldToSampledCeiling: mocks.foldToSampledCeiling,
     playSampledNote: mocks.playSampledNote,
 }));
-vi.mock('../../../public/data/sound-packs.js', () => ({
+vi.mock('../../../core/data/sound-packs.js', () => ({
     gainForPack: mocks.gainForPack,
     toneTiltForPack: mocks.toneTiltForPack,
 }));
 
-import { playBassNote } from '../../../public/engine/synth-bass.js';
+import { playBassNote } from '../../../core/engine/synth-bass.js';
 
 const busGain = { connect: vi.fn() };
 

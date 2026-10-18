@@ -6,7 +6,7 @@
  * The genre is the pocket: D'Angelo's *Voodoo*, Dilla's MPC, the Soulquarians. The drums are
  * a loop — one or two bars, soft, the kick lazily syncopated — and the bass and the Rhodes
  * sit well behind them, the bass deepest. Harvested from the old engine's by-ear lessons
- * (`public/engine/grooves/neo-soul.ts`, the `neo` bass style, the `neo-soul-rhodes` comp and
+ * (`core/engine/grooves/neo-soul.ts`, the `neo` bass style, the `neo-soul-rhodes` comp and
  * `GENRE_POCKET`), not its code.
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';

@@ -6,7 +6,7 @@
  * The genre is the **boom-chick**: the bass booms on 1 and 3 (root, then fifth), and the
  * snare, the piano and the rhythm guitar answer "chick" on 2 and 4. Energy turns the
  * two-step into a train beat. Harvested from the old engine's by-ear lessons
- * (`public/engine/grooves/country.ts`, the `country` bass style, `strum-country`), not its code.
+ * (`core/engine/grooves/country.ts`, the `country` bass style, `strum-country`), not its code.
  */
 import { energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';

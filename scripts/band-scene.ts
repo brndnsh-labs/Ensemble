@@ -1,6 +1,6 @@
 /**
  * The listening-gate tools' band adapter: a `mix:report` scene in, the band engine's
- * performance of it out. Pure and node-side — the page (`prototypes/v2/lib/render-bridge.ts`)
+ * performance of it out. Pure and node-side — the page (`web/lib/render-bridge.ts`)
  * only turns these events into audio — so what a render plays is decided here, under test, by
  * the same `compileTimeline` → `performPass` the app runs.
  *
@@ -26,13 +26,9 @@ import {
     type StyleId,
     type Timeline,
 } from '../band/index.js';
-import {
-    COMP_FOR_VOICE,
-    LEAD_FOR_VOICE,
-    STYLE_FOR_GENRE,
-} from '../prototypes/v2/lib/band-voices.js';
-import { parseChordBar } from '../public/songbook/score-text.js';
-import type { ScoreMeasure, ScoreSection, SemanticScore } from '../public/songbook/score-types.js';
+import { parseChordBar } from '../core/songbook/score-text.js';
+import type { ScoreMeasure, ScoreSection, SemanticScore } from '../core/songbook/score-types.js';
+import { COMP_FOR_VOICE, LEAD_FOR_VOICE, STYLE_FOR_GENRE } from '../web/lib/band-voices.js';
 
 /** A sixteenth in ticks: the step grid the report's per-step analysis and event meta use. */
 const STEP_TICKS = PPQ / 4;

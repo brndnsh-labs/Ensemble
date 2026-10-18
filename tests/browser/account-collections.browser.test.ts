@@ -5,7 +5,7 @@ import {
     newCollection,
     newStarred,
     STARRED_COLLECTION_ID,
-} from '../../prototypes/v2/lib/collections.js';
+} from '../../web/lib/collections.js';
 import {
     deleteCollection as deleteGuestCollection,
     editCollection as editGuestCollection,
@@ -13,19 +13,19 @@ import {
     listCollections as listGuestCollections,
     list as listGuestSongs,
     saveCollection as saveGuestCollection,
-} from '../../prototypes/v2/lib/repository.js';
-import { ACCOUNT_DATABASE_VERSION } from '../../prototypes/v2/lib/sync/database.js';
-import { runLibraryDownload } from '../../prototypes/v2/lib/sync/download.js';
-import { runOutboxPass } from '../../prototypes/v2/lib/sync/drain.js';
+} from '../../web/lib/repository.js';
+import { ACCOUNT_DATABASE_VERSION } from '../../web/lib/sync/database.js';
+import { runLibraryDownload } from '../../web/lib/sync/download.js';
+import { runOutboxPass } from '../../web/lib/sync/drain.js';
 import {
     ACCOUNT_DATABASE,
     type AccountScope,
     type PreparedDelete,
     type PreparedSave,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import { decodeSaveRequest } from '../../prototypes/v2/lib/sync/request.js';
-import type { SaveTransport } from '../../prototypes/v2/lib/sync/send.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import { decodeSaveRequest } from '../../web/lib/sync/request.js';
+import type { SaveTransport } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
-import { cloneStateForDetachedGeneration } from '../../../public/export/detached-generation-state.js';
-import { getState } from '../../../public/state.js';
-import type { EnsembleState } from '../../../public/types.js';
+import { cloneStateForDetachedGeneration } from '../../../core/export/detached-generation-state.js';
+import { getState } from '../../../core/state.js';
+import type { EnsembleState } from '../../../core/types.js';
 
 describe('detached generation state', () => {
     it('preserves generation inputs while stripping live handles and runtime buffers', () => {

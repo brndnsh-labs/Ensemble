@@ -1,8 +1,8 @@
 node_modules
 dist
 coverage
-public/icon-*.png
-public/icon.svg
+core/icon-*.png
+core/icon.svg
 report
 # the-cycle's managed shims and bindings — generated/repo-tool-owned, not local style
 scripts/*.mjs

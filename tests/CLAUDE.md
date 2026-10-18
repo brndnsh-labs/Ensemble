@@ -2,9 +2,9 @@
 
 Load-bearing traps for writing/reviewing tests in this repo. There is no Playwright suite here
 any more (#1358 deleted v1's e2e suite): functional UI testing is the v2 suite in
-`prototypes/v2/checks/`, run with `npm run build --prefix prototypes/v2` then
-`npm run test:e2e --prefix prototypes/v2` and gated in CI by `v2-checks` — see
-`prototypes/v2/CLAUDE.md` § Verification. For the 5 canonical critique-test
+`web/checks/`, run with `npm run build --prefix web` then
+`npm run test:e2e --prefix web` and gated in CI by `v2-checks` — see
+`web/CLAUDE.md` § Verification. For the 5 canonical critique-test
 smells (tautology, sub-baseline threshold, mislabel, log-vs-assert mismatch, harness-silencing)
 and proven patterns (loop-awareness, final-stage multiplier, seeded mulberry32), see
 `docs/guides/musical-engine-patterns.md` — this file is sharper traps not covered there.
@@ -112,7 +112,7 @@ quality, and the notes each symbol rules out (`chord-clash.ts`).
 
 - **`@playwright/test` is CommonJS; under this repo's `"type": "module"`, only the default import
   survives Node's loader at runtime.** Today that means the root-package scripts that drive a
-  browser (`scripts/mix-report.ts` under `tsx`); `prototypes/v2` is a separate package without
+  browser (`scripts/mix-report.ts` under `tsx`); `web` is a separate package without
   `"type": "module"`, and its specs import by name. In a root script,
   `import { chromium } from '@playwright/test'` throws `SyntaxError: Named export 'chromium' not
   found` at load time and `import * as pkg` leaves `pkg.chromium` undefined; the working form is

@@ -8,10 +8,10 @@
  * codec accepts gets a pulse skeleton. The one refusal is for size (`MAX_PERFORMED_SPANS`).
  */
 
-import { resolveScoreContext } from '../../public/songbook/score-context.js';
-import { compileScoreForm } from '../../public/songbook/score-form.js';
-import { resolveScoreMeasureEvents } from '../../public/songbook/score-measure-events.js';
-import type { ScoreDuration, SemanticScore } from '../../public/songbook/score-types.js';
+import { resolveScoreContext } from '../../core/songbook/score-context.js';
+import { compileScoreForm } from '../../core/songbook/score-form.js';
+import { resolveScoreMeasureEvents } from '../../core/songbook/score-measure-events.js';
+import type { ScoreDuration, SemanticScore } from '../../core/songbook/score-types.js';
 import { type Lane, PPQ } from '../core/types.js';
 import { type ChordFacts, parseChord } from '../theory/chord.js';
 import { type KeyContext, notePc } from '../theory/pitch.js';

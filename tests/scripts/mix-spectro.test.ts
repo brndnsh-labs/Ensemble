@@ -15,7 +15,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { encodeWav } from '../../public/engine/wav-encoder.js';
+import { encodeWav } from '../../core/engine/wav-encoder.js';
 import {
     buildCaption,
     compositeFilter,

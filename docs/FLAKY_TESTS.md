@@ -16,7 +16,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 |---|---|---|---|
 | **Unseeded-statistical** | Passes alone, passes in suite, fails ~1-in-N on an unlucky roll. A critique test asserts a bound the engine's raw `Math.random` occasionally crosses. | `tests/standards/*-critique.test.ts` | Seed the RNG with `installSeededRandom()` (`tests/utils/seeded-random.ts`) at the `describe` level — the house pattern. Makes the multi-bar sample reproducible while still asserting a real range. Widening the bound is the band-aid; seeding is the fix. |
 | **Ordering-dependent** | Passes alone, fails only inside a multi-file run (`vitest related`, full suite). A prior file leaked global state (an un-restored `Math.random` spy, a live `deepSignal`, a `vi.mock` that didn't reset). | anywhere | Find the leaking file's missing `vi.restoreAllMocks()` / `afterEach` cleanup. `installSeededRandom` already restores in `before`+`after`, so converting both files to it usually fixes the leak too. |
-| **e2e-timing** | Playwright waits timing out under parallel workers, or a whole-run crash from a bad import. | `prototypes/v2/checks/*.spec.ts` (the v1 suite in `tests/e2e/` was deleted with the v1 app, #1358 — the 🟢 entries below that cite it are history) | Run against the built export, never a dev server; rebuild `prototypes/v2/out` after anything that overwrote it (`mix:report` builds it with the render bridge). Import crashes in a root-package script → `@playwright/test` is CJS; use the default import only (`import pkg; const { chromium } = pkg`). |
+| **e2e-timing** | Playwright waits timing out under parallel workers, or a whole-run crash from a bad import. | `web/checks/*.spec.ts` (the v1 suite in `tests/e2e/` was deleted with the v1 app, #1358 — the 🟢 entries below that cite it are history) | Run against the built export, never a dev server; rebuild `web/out` after anything that overwrote it (`mix:report` builds it with the render bridge). Import crashes in a root-package script → `@playwright/test` is CJS; use the default import only (`import pkg; const { chromium } = pkg`). |
 | **slow-legitimate** | Passes alone on an idle box, reddens a full/CI run under load. Fails with vitest's *"test timed out"*, **not** a failed assertion — and the reported duration sits just over `testTimeout`. The work is real (a production-faithful multi-seed engine sweep), not a hang. | `tests/standards/*-critique.test.ts` | Raise the timeout at the **tightest scope that covers it** — per-test `it('...', { timeout: 60_000 }, () => {...})`, or per-file if several tests are near the line. **Never raise the global `testTimeout` in `vitest.config.ts`** (masks genuine hangs everywhere) and **never trim the sample or loosen an assertion** to buy speed — that's harness-silencing, the #1 critique-test smell. Mutation-test the knob (set it to `100`, confirm red) so you know it's honored and correctly scoped. |
 
 ## How to read the registry
@@ -26,7 +26,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 ## Registry
 
-### 🟢 `prototypes/v2/checks/songbook-home.spec.ts` — "one search returns your songs and the standards, grouped"
+### 🟢 `web/checks/songbook-home.spec.ts` — "one search returns your songs and the standards, grouped"
 
 - **Class:** e2e-timing, but the race is in the **app** (the home's search box), not the test.
 - **Symptom:** `v2-suite (n, webkit-phone)`, three times on 2026-10-11 on unrelated branches (`feat/shell-voicings` run 38100585677, `chore/remove-unread-state` #1629 run 38181830420, #1658 run 38195335315): after `search.fill('blu')`, `expect(songs.getByRole('heading', { name: 'Your songs' })).toBeVisible()` timed out at 15s (element not found). The failure's page snapshot shows the search box EMPTY and the plain home on screen: the typing was lost, not the results.
@@ -37,7 +37,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Not fixed here:** other controlled text boxes in the shell share the exposure; none has been seen failing.
 - **Last seen:** 2026-10-11 (#1658, run 38195335315).
 
-### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4" (second shape)
+### 🟢 `web/checks/following-lookahead.spec.ts` — "a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4" (second shape)
 
 - **Class:** e2e-timing, but the race is in the **app** (the stand's paint), not the test.
 - **Symptom:** `v2-suite (2, webkit-phone)` on `main` (`c0670ddb`, #1489): lap 2's recorded cue sequence had one extra trailing entry, `R1 next R2:soon` then `R1 next R2:true`, with `data-active` still on R1. A different shape from the #1485 entry below.
@@ -46,7 +46,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **After:** 40/40 under contention (2 pinned cores, 3 spinners on them, 2 workers): 20/20 for the original test and 20/20 for the new check.
 - **Last seen:** 2026-10-02 (`main`, `c0670ddb`).
 
-### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "data-next wraps inside an active practice loop, keeping both bars visible since they fit together"
+### 🟢 `web/checks/following-lookahead.spec.ts` — "data-next wraps inside an active practice loop, keeping both bars visible since they fit together"
 
 - **Retired (2026-10-08, #1528):** the section practice loop, its hold gesture and this test were removed, with `semantic-playback.spec.ts` and the #1496 check in `section-menu.spec.ts`. Kept as a record of the hold-versus-timer race.
 - **Class:** e2e-timing — the race CI hit is in the **app** (the section letter's long-press); two test races in the same spec turned up while proving the fix.
@@ -57,7 +57,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **After:** 20/20 under contention (2 pinned cores, 3 spinners on them, 2 workers).
 - **Last seen:** 2026-10-02 (`main`, run 37007832319).
 
-### 🟢 `prototypes/v2/checks/foundation.spec.ts` — "responsive chart and editor fit laptop, phone and tablet"
+### 🟢 `web/checks/foundation.spec.ts` — "responsive chart and editor fit laptop, phone and tablet"
 
 - **Class:** slow-legitimate.
 - **Symptom:** `v2-suite (1, webkit-phone)` on `main` (run 37005422292, `0d6560c4`): `Test timeout of 45000ms exceeded`, no failed assertion. The trace has it on the last screen's last steps when the budget ran out.
@@ -65,7 +65,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix (2026-10-02, #1496):** split into one test per screen, "responsive chart and editor fit <w>x<h>", each opening the song and resizing as before. The loop's last step only returned to the chart for the next screen, so it is gone. No budget changed. The unsplit test is the revert, red 10/10 above. After: 80/80 under contention (each screen 20/20; longest 28.9s at 1300x940, 24.3s at 820x1180, under 18s on the phone sizes).
 - **Last seen:** 2026-10-02 (`main`, run 37005422292).
 
-### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "data-next skips both chords of a two-chord bar, resolves across the repeat, then moves on"
+### 🟢 `web/checks/following-lookahead.spec.ts` — "data-next skips both chords of a two-chord bar, resolves across the repeat, then moves on"
 
 - **Class:** e2e-timing — but the race is in the **app**, not the test.
 - **Symptom:** `v2-suite (2, webkit-phone)` on PR #1480: `buildLookaheadChart`'s `expect(tempo).toHaveValue('240')` read `"100"` for the whole 15s, so the setup never got past the tempo field. The CI trace shows the field still read `100` in the snapshot taken right after `fill('240')` returned, about 25ms after the imported chart first painted.
@@ -73,7 +73,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix (2026-10-02, #1485):** `TempoControl`'s effect resets the text only when `value` differs from the last committed tempo, so the mount no longer rewrites the text it was initialised with. The spec is unchanged. New deterministic regression check in `usability.spec.ts`, "a tempo typed the moment a song opens is not overwritten by the field mounting", which types in that microtask. Mutation-tested: with the guard reverted it fails 6/6 (`Expected "137"`, `Received "110"`), and with it passes 6/6. Separately, under contention one run hit the test's 30s budget at its last step, still on track. The setup took 13s and the band's clock ran at a third of real time, so that is slow-legitimate, and the budget is now 45s, the suite default. After: 20/20 under contention (2 pinned cores, 3 spinners on them, 2 workers).
 - **Last seen:** 2026-10-01 (PR #1480).
 
-### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4"
+### 🟢 `web/checks/following-lookahead.spec.ts` — "a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4"
 
 - **Class:** e2e-timing (wall-clock sampling).
 - **Symptom:** `v2-suite (2, webkit-phone)` on PR #1479: `pass 3 of 4 should point at the SAME one-bar repeat`, expected `R1`, received `R2`.
@@ -81,7 +81,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix (2026-10-02, #1485):** the page records every state the next-bar cue takes (a `MutationObserver` on `data-active`/`data-next`), the test waits on state until the second lap's R2 is active, then asserts the second lap's recorded sequence. Each pass shows in the record as the cue going `soon` in its last beat and back to `true` on the next downbeat, so it reads `R1:true, R1:soon` three times, then `R2:true, R2:soon`. No wall-clock offsets remain. Lap 2, not lap 1: a first attempt that asserted lap 1 failed 3/20 under contention because the stand stays unpainted while WebKit's audio comes up, so pass 1 (once pass 2 as well) never showed. The budget is now 75s: two laps on a starved WebKit run at a third of real time. Mutation-tested: keying `displayNext`'s walk on the written bar (`slot.display`, the P2-1 bug) fails it. After: 20/20 under the same contention.
 - **Last seen:** 2026-10-01 (PR #1479).
 
-### 🟢 `prototypes/v2/checks/chart-pointer.spec.ts` — "a sixteenth-note chord at 240 bpm is painted"
+### 🟢 `web/checks/chart-pointer.spec.ts` — "a sixteenth-note chord at 240 bpm is painted"
 
 - **Class:** e2e-timing (the assertion demanded a frame cadence the runner doesn't guarantee).
 - **Symptom:** `v2-suite (2, webkit-phone)` on PRs #1480 and #1481: the second lap's painted steps read `0, 2, 3, …`, missing step 1, the sixteenth right after the wrap.
@@ -95,7 +95,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix (#1693):** the loop commits its state inside the frame (`flushSync`). Same probe, same contention: 0 lost slots in 12 of 12 runs. The spec itself is unchanged, 20/20 under that contention, and all 30 playback specs pass on both projects.
 - **Last seen:** 2026-10-13 (`main`, `2560325a`).
 
-### 🟢 `prototypes/v2/checks/following-lookahead.spec.ts` — "the jump-ahead fires in the last felt beat (not the downbeat), and fires again on the next lap"
+### 🟢 `web/checks/following-lookahead.spec.ts` — "the jump-ahead fires in the last felt beat (not the downbeat), and fires again on the next lap"
 
 - **Class:** e2e-timing (the measurement's reference point, not the app).
 - **Symptom:** `v2-suite (webkit-phone)` on CI, 3 workers sharing the runner: `the jump should fire again on lap 2, not stay spent after lap 1`, expected `>= 200`, received `199`. Re-run passed. Not reproduced unloaded: 30 local WebKit runs and 16 more at `--workers=4` logged 322-407ms, no outliers.
@@ -103,20 +103,20 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Fix (2026-09-28):** the floor is measured from the tightest bound the two paints give on C3's real barline, `min(C3 paint, next bar's paint - one bar)`. Each paint is at or after its barline, so the bound is at or after the true one and the delay from it can only under-read, and both paints must stall for it to read low. The 200ms floor is unchanged. The 900ms ceiling stays paint-relative (a paint lag can only tighten it). Mutation-tested: an `inLastPulse` that is always true (jump in the new bar's own render) reads 12ms and fails the floor, with or without the injected stall.
 - **Last seen:** 2026-09-28 (CI, WebKit `webkit-phone`).
 
-### 🟢 `prototypes/v2/checks/ireal-import.spec.ts` — "multi-chord repeated bars imports and highlights exact performed visits on the compact stand"
+### 🟢 `web/checks/ireal-import.spec.ts` — "multi-chord repeated bars imports and highlights exact performed visits on the compact stand"
 
 - **Class:** e2e-timing (DOM sampling, not the band).
 - **Symptom:** `v2-suite (rest, webkit-phone)` on PR #1415: the recorded visits ended `…F@32-48, Dm@8-12` where the wrap back to `C@0-8` was expected. The band played the C; the stand never painted it.
 - **Root cause:** the painted pointer is a sample. The runtime publishes the sounding chord off a 50ms interval and React paints it, so a main-thread stall at the lap wrap (the busiest moment) can skip a short chord entirely, here a half-bar C at 240 BPM. The check demanded an exact sequence. It is the same flake class the old engine's semantic-playback check had solved with a drop-tolerant matcher, deleted with it in #1413.
-- **Fix (2026-09-26):** that matcher, `expectVisitsFollowForm`, now lives in `prototypes/v2/checks/chart-visits.ts`, with its own self-test (`chart-visits.spec.ts`). It forgives at most two dropped samples, and still fails a wrong chord, a wrong span, an out-of-order visit, a missed wrap, or a chord no lap reaches. The iReal check waits for two whole laps and asserts through it.
+- **Fix (2026-09-26):** that matcher, `expectVisitsFollowForm`, now lives in `web/checks/chart-visits.ts`, with its own self-test (`chart-visits.spec.ts`). It forgives at most two dropped samples, and still fails a wrong chord, a wrong span, an out-of-order visit, a missed wrap, or a chord no lap reaches. The iReal check waits for two whole laps and asserts through it.
 - **Last seen:** 2026-09-26 (PR #1415).
 
-### 🟢 `prototypes/v2/checks/semantic-chart.spec.ts` — "semantic revision conflicts keep both takes, and unsupported imports never create a partial song"
+### 🟢 `web/checks/semantic-chart.spec.ts` — "semantic revision conflicts keep both takes, and unsupported imports never create a partial song"
 
 - **Class:** e2e-timing — but the race is in the **app**, not the test.
 - **Symptom:** `v2-suite (rest, laptop)` on PR #1401 (a CI-only diff): `exportCurrent` clicks "Song actions" right after "Save a copy", the click succeeds, and "Export file" never becomes visible (`page.waitForEvent('download')` → 45s timeout). Reproduced locally 1 in 60 with `--repeat-each=60 --workers=10`.
 - **Root cause:** `dialog.close()` *queues* its `close` event rather than firing it. Save a copy's `setMenu(false)` closes the song menu; the "Song actions" click reopens it (`setMenu(true)` → `showModal()`) before that queued task runs; the stale event then reaches the OPEN dialog, whose `onClose={() => setMenu(false)}` shuts it again. The trace shows exactly that: menu open at the click, closed after the save, open again after "Song actions", then closed. Every shell dialog wired `onClose` the same way, so a fast musician could hit it too.
-- **Fix (2026-09-23, #1402):** `whenClosed()` (`prototypes/v2/app/dialog-close.ts`) wraps every `<dialog onClose>`, so a `close` event counts only when the dialog is actually closed. Deterministic regression test in `usability.spec.ts` (a synthetic `close` at the open menu; fails without the guard). 240/240 clean on the stress repro afterwards.
+- **Fix (2026-09-23, #1402):** `whenClosed()` (`web/app/dialog-close.ts`) wraps every `<dialog onClose>`, so a `close` event counts only when the dialog is actually closed. Deterministic regression test in `usability.spec.ts` (a synthetic `close` at the open menu; fails without the guard). 240/240 clean on the stress repro afterwards.
 - **Suspected same cause:** the webkit-phone `foundation-sounds.spec.ts` (then `foundation.spec.ts`) "manual sounds save, revert, export/import and play sampled audio after offline reload" failures on #1394/#1397 (Revert to saved closes the menu, then "Song actions" → Export). Not reproduced locally; confirm on their next CI runs.
 - **Last seen:** 2026-09-23 (PR #1401).
 
@@ -200,11 +200,11 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 - **Class:** e2e-timing
 - **Symptom:** `expect(overlay).toHaveCount(0)` failed after pressing Escape (`Received: 1`). Failed 3/5 standalone at `--retries=0`; the flake is real and reproduces readily.
-- **Root cause:** `useModalA11y` (`public/components/use-modal-a11y.ts`) attaches its `document.addEventListener('keydown', ...)` inside a mount `useEffect`, which can still be pending when `.viz-overlay` first paints and passes `toBeVisible()`. The test pressed Escape immediately, occasionally beating the listener attach. The identical race was already solved elsewhere in the same file (`section settings popover › opens via kebab and closes on Escape`, #1082) by waiting for `role="dialog"` — set inside that same effect, right before the listener — before sending Escape; this test never adopted that pattern when #1082 wired `useModalA11y` onto the visualizer overlay.
+- **Root cause:** `useModalA11y` (`core/components/use-modal-a11y.ts`) attaches its `document.addEventListener('keydown', ...)` inside a mount `useEffect`, which can still be pending when `.viz-overlay` first paints and passes `toBeVisible()`. The test pressed Escape immediately, occasionally beating the listener attach. The identical race was already solved elsewhere in the same file (`section settings popover › opens via kebab and closes on Escape`, #1082) by waiting for `role="dialog"` — set inside that same effect, right before the listener — before sending Escape; this test never adopted that pattern when #1082 wired `useModalA11y` onto the visualizer overlay.
 - **Fix:** `await expect(overlay).toHaveAttribute('role', 'dialog')` after the visibility check and before `Escape` (2026-07-14, #1101).
 - **Last seen:** 2026-07-14 (measured during #1101; 5/5 clean after the fix).
 
-### 🟢 `public/components/editor/ChordPicker.tsx` Escape-to-close (2 e2e sites)
+### 🟢 `core/components/editor/ChordPicker.tsx` Escape-to-close (2 e2e sites)
 
 - **Class:** e2e-timing
 - **Symptom:** `tests/e2e/section-practice.spec.ts:94` ("during playback the section label stays live but chord cards go inert") intermittently failed at `expect(page.locator('.chord-picker')).toHaveCount(0)` after Escape (`Received: 1`). ~3/15-20 standalone at `--retries=0` once isolated to this assertion (a separate, unrelated state-transition race in the same test was fixed first — see note below — before this one surfaced as the residual failure).
@@ -213,7 +213,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 - **Note:** the same test also had a second, independent race fixed in this pass — clicking `.chord-card` immediately after "Start from here" could beat the batched re-render that detaches `onPick` (`ChordVisualizer.tsx`, gated on `playback.isPlaying`). Fixed by waiting for `.measure-box[role="button"]` to hit count 0 (same re-render, same `isPlaying` read) before that click. Not registered as its own entry — same test, same investigation, same commit.
 - **Last seen:** 2026-07-14 (measured during #1101; 20/20 clean after both fixes).
 
-### 🟢 `prototypes/v2/checks/account-sign-out.chromium.spec.ts` — "sign-out names the work it would destroy, then leaves nothing of that account behind"
+### 🟢 `web/checks/account-sign-out.chromium.spec.ts` — "sign-out names the work it would destroy, then leaves nothing of that account behind"
 
 - **Class:** e2e-timing
 - **Symptom:** the required `v2-suite (rest)` context failed on PR #1325 — a chord-voicing diff that touches nothing in v2 — and passed on rerun. The closing `expect(await songTitles(page).allInnerTexts()).toEqual(guestSongs)` reported `- Array [] / + Array [ "After hours", "Minor swing sketch", "Blue pocket" ]`: the three real starter songs measured against an empty expectation.
@@ -233,7 +233,7 @@ flake (measure its fail-rate, classify it, and append an entry here).
 
 Entries whose test was deleted. Kept as a record of the race, not as live flakes.
 
-### 🟢 `prototypes/v2/checks/root-handover.chromium.spec.ts` — "a v1 worker hands the site root over, keeping downloaded sounds and v1 local data"
+### 🟢 `web/checks/root-handover.chromium.spec.ts` — "a v1 worker hands the site root over, keeping downloaded sounds and v1 local data"
 
 - **Class:** e2e-timing, in the test.
 - **Symptom:** `v2-suite (2, laptop)` on `main` at `ebbe6a7f` (#1656, run 38195051461, 2026-10-11): `Error: page.reload: Protocol error (Page.reload): Not attached to an active page`, at the reload before `expect(page.locator('body[data-standin="v1"]')).toBeVisible()`. The same commit's PR run was green, and the change (the drum dispatcher) cannot reach this spec.
@@ -268,7 +268,7 @@ tracing **which engines still contain a live (non-comment, non-audio,
 non-test-fixture) `Math.random()` call reachable from a critique test** —
 because a critique test's statistical assertion can only be unseeded-flaky
 if the engine path it drives actually rolls unseeded dice. `grep -rn
-"Math\.random(" public/engine/ public/engine/grooves/` and a symbol-by-symbol
+"Math\.random(" core/engine/ core/engine/grooves/` and a symbol-by-symbol
 trace of every hit found the surface is now **narrow**: prior epics (#790,
 #792, #841, #1083, #1256, #1271, #1277, #1295, #1300, the
 deterministic-phrasing epic, Epic 12 S4) have already migrated the large
@@ -278,11 +278,11 @@ left:
 | Engine | Live `Math.random()` sites | Reachable from a critique-tested statistical assertion? |
 |---|---|---|
 | `synth-drums/chords/harmonies/soloist/utils.ts`, `scheduler-core.ts`, `engine.ts` | Real-time audio-graph jitter, DSP buffers | No — `tests/standards/` never touches audio synthesis; covered by `tests/browser/` instead |
-| `public/engine/grooves/utils.ts` (`roll`/`humanizeDraw`/`placementSkew`) | Legacy fallback, gated on `context.rollBaseSeed === undefined` | No — `rollBaseSeed` is computed **internally** by `applyGrooveOverrides` (`groove-engine.ts:506`) from `(sectionId, barIndex, loopStep, inst.name)`, not supplied by the caller. Every one of the ~40 drum critique tests that calls `applyGrooveOverrides` (confirmed by grep: zero files set `rollBaseSeed` directly, because none need to) gets the seeded path automatically. The legacy fallback is dead from `tests/standards/`'s perspective. |
-| `public/engine/comping-cells.ts`, `accompaniment.ts`, `groove-engine.ts`, `grooves/latin.ts`, `grooves/jazz.ts`, `hash-utils.ts`, `bass-pump.ts`, `conductor.ts` | 0 live — every hit in these files is a `why:`-comment documenting a **past** migration off `Math.random()` | N/A |
-| `public/engine/resolution.ts` (`getStagger`, timing jitter ±15ms) | Live, drives final-cadence note stagger | No — the two cadence critique files (`final-bar-cadence.test.ts`, `ending-cadence-tonic-critique.test.ts`) assert pitch/duration/register, never raw `timingOffset`; the latter's own comment explicitly notes this ("a timing stagger, never a pitch — so these are pinned" on pitch only). |
-| `public/engine/midi-worker-logic.ts` (velocity humanize jitter) | Live, MIDI-export-only | No critique test asserts a velocity range on MIDI-export output. |
-| `public/engine/bass-styles.ts`, `bass-engine.ts` | Live — the one genuinely exercised surface (see below) | **Yes, on 4 genre bass styles** — measured below |
+| `core/engine/grooves/utils.ts` (`roll`/`humanizeDraw`/`placementSkew`) | Legacy fallback, gated on `context.rollBaseSeed === undefined` | No — `rollBaseSeed` is computed **internally** by `applyGrooveOverrides` (`groove-engine.ts:506`) from `(sectionId, barIndex, loopStep, inst.name)`, not supplied by the caller. Every one of the ~40 drum critique tests that calls `applyGrooveOverrides` (confirmed by grep: zero files set `rollBaseSeed` directly, because none need to) gets the seeded path automatically. The legacy fallback is dead from `tests/standards/`'s perspective. |
+| `core/engine/comping-cells.ts`, `accompaniment.ts`, `groove-engine.ts`, `grooves/latin.ts`, `grooves/jazz.ts`, `hash-utils.ts`, `bass-pump.ts`, `conductor.ts` | 0 live — every hit in these files is a `why:`-comment documenting a **past** migration off `Math.random()` | N/A |
+| `core/engine/resolution.ts` (`getStagger`, timing jitter ±15ms) | Live, drives final-cadence note stagger | No — the two cadence critique files (`final-bar-cadence.test.ts`, `ending-cadence-tonic-critique.test.ts`) assert pitch/duration/register, never raw `timingOffset`; the latter's own comment explicitly notes this ("a timing stagger, never a pitch — so these are pinned" on pitch only). |
+| `core/engine/midi-worker-logic.ts` (velocity humanize jitter) | Live, MIDI-export-only | No critique test asserts a velocity range on MIDI-export output. |
+| `core/engine/bass-styles.ts`, `bass-engine.ts` | Live — the one genuinely exercised surface (see below) | **Yes, on 4 genre bass styles** — measured below |
 
 **The bass-engine surface, measured.** Six genre bass styles (Acoustic,
 Metal, Ska-Punk, Jazz, Blues, Funk) still route pitch decisions through raw

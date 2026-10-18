@@ -3,11 +3,11 @@ import {
     decodeChartDocumentV2,
     encodeChartDocumentV2,
     validateChartDocumentV2,
-} from '../../../public/songbook/document-v2.js';
-import { validateSemanticScore } from '../../../public/songbook/score-codec.js';
-import { resolveScoreContext } from '../../../public/songbook/score-context.js';
-import type { ChartDocumentV2, SemanticScore } from '../../../public/songbook/score-types.js';
-import type { ChartBand, ChartLaneMix } from '../../../public/songbook/types.js';
+} from '../../../core/songbook/document-v2.js';
+import { validateSemanticScore } from '../../../core/songbook/score-codec.js';
+import { resolveScoreContext } from '../../../core/songbook/score-context.js';
+import type { ChartDocumentV2, SemanticScore } from '../../../core/songbook/score-types.js';
+import type { ChartBand, ChartLaneMix } from '../../../core/songbook/types.js';
 
 function scoreFixture(): SemanticScore {
     return {

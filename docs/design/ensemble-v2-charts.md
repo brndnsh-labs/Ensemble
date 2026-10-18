@@ -114,11 +114,11 @@ The authored score remains representable even when the engine cannot yet play it
 ## Legacy-code evidence (historical: the v1 path was deleted in #1740)
 
 What follows describes the v1 code as it stood when this contract was written; none of it is in
-the tree any more. `ChartSection.value` in `public/songbook/types.ts` was authored text. Its codec allows
+the tree any more. `ChartSection.value` in `core/songbook/types.ts` was authored text. Its codec allows
 1,000 characters per section, 500 sections, and repeat counts from 1 to 64. There is no
 canonical measure/event field. Codec validation is not proof the music is playable.
 
-`parseProgressionPart` in `public/engine/chords-engine.ts` divided a bar's meter counts
+`parseProgressionPart` in `core/engine/chords-engine.ts` divided a bar's meter counts
 equally between tokens, resolves chord identity and generates voicings in the same pass.
 `updateProgressionCache` independently rounds each chord to sixteenth-note steps. The
 lead-sheet model uses those generated chords, not an authored measure model.
@@ -143,10 +143,10 @@ Use a versioned chart representation with sections containing ordered measures;
 measures contain ordered chord events and exact durations. Page geometry, line breaks,
 generated voicings, playback cursors and unfolded repeats are derived, not musical authority.
 
-The `ChartDocumentV2` codec (`public/songbook/document-v2.ts`) holds the document envelope,
+The `ChartDocumentV2` codec (`core/songbook/document-v2.ts`) holds the document envelope,
 performance and band settings, and the music as `chart.score` (it replaced v1's
 `chart.arrangement`). It is the only chart codec since #1740. The types live in
-`public/songbook/score-types.ts`.
+`core/songbook/score-types.ts`.
 
 ```text
 section: identity, label, key/mode and meter overrides, repeat count, measures
@@ -300,7 +300,7 @@ Sections, annotations, navigation and unsupported editing buffers must remain ow
 chart editor. No claim of a full-score text serialization is made yet.
 
 Historical (deleted with the v1 codec in #1740): the pure `proposeLegacyScoreConversion` API
-(`public/songbook/legacy-score.ts`) returned either a detached candidate or a blocked
+(`core/songbook/legacy-score.ts`) returned either a detached candidate or a blocked
 report, always alongside the exact original JSON string. It does not persist anything or
 certify audible equivalence. Since #1737 it converts everything the old parser
 (`validateProgression`) read and played: each token as written when the chart vocabulary holds
@@ -424,18 +424,18 @@ never enters analytics or error payloads.
 ## Compatibility
 
 There is one chart schema, 2. Every reader and writer uses `ChartDocumentV2`
-(`public/songbook/document-v2.ts`), strict: an unknown field is refused, the old engine's band
+(`core/songbook/document-v2.ts`), strict: an unknown field is refused, the old engine's band
 and performance fields included (#1741).
 
 - **Schema 1 is refused, with a plain message.** A v1 text chart arriving as a file or a
   `#chart=` link is not opened; the app says why in words (`isRetiredSchema`,
-  `OLD_FORMAT_REFUSAL` in `prototypes/v2/lib/documents.ts`, `RETIRED_CHART_LINK` in
-  `public/songbook/chart-link.ts`) and changes nothing. The API refuses a schema-1 Save body.
+  `OLD_FORMAT_REFUSAL` in `web/lib/documents.ts`, `RETIRED_CHART_LINK` in
+  `core/songbook/chart-link.ts`) and changes nothing. The API refuses a schema-1 Save body.
 - **There is no converter.** The v1 codec, the text-to-score converter
   (`proposeLegacyScoreConversion`) and "Upgrade old songs" were deleted in #1740, once every
   device was upgraded and `/admin` showed no schema-1 chart.
 - **One still sitting in a store is stepped over, never thrown on**, so it cannot crash the app
-  or stop sync. `prototypes/v2/CLAUDE.md`'s "Retired text charts" row lists where.
+  or stop sync. `web/CLAUDE.md`'s "Retired text charts" row lists where.
 - **Old v1 share links (`?s=`, `?prog=`) are not read at all (#1735).** The page opens as the
   songbook.
 - A future schema change needs its own decision: a new version, its reader, and what happens to
@@ -461,7 +461,7 @@ device was upgraded and `/admin` showed no schema-1 chart. The decision is kept 
 >   groove `genre`, an old built-in sound pin); a retained draft that is schema 1 or carries legacy
 >   fields; and an old-format row that will not read. Never a collection. Both songbooks on the
 >   device — the guest one always, the account one once its library has downloaded
->   (`needsUpgrade`, `draftNeedsUpgrade`, `planUpgrade` in `prototypes/v2/lib/upgrade.ts`). The
+>   (`needsUpgrade`, `draftNeedsUpgrade`, `planUpgrade` in `web/lib/upgrade.ts`). The
 >   card stays on the home while ANY of that remains, so its absence means nothing old is stored
 >   on this device.
 > - **Backup first: one file, and exactly what the run changes.** A single human-readable JSON
@@ -536,7 +536,7 @@ they need not wait for every import symbol. The document-format approval has bee
 production adoption, real-device acceptance and listening remain separate gates. This
 foundation and its fixtures do not close #1171.
 
-For new sessions, use [the v2 handoff](../../prototypes/v2/CLAUDE.md) and pick a bounded child,
+For new sessions, use [the v2 handoff](../../web/CLAUDE.md) and pick a bounded child,
 not a cycle across this whole compatibility target. Source preservation and rejection tests
 can be mechanical; unresolved N.C./break/hold/alternate playback meaning cannot. Record the
 musical decision and exact fixtures before labeling such implementation ready. #1176 remains

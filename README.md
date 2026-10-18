@@ -22,19 +22,19 @@ It is built for practice first: mute the part you play and play along with a ban
 
 ## I want to host it myself
 
-The app is a Next.js static export in [`prototypes/v2/`](prototypes/v2/README.md) that compiles the engine from `public/`. Build it once and serve the output from any static file server.
+The app is a Next.js static export in [`web/`](web/README.md) that compiles the engine from `core/`. Build it once and serve the output from any static file server.
 
 **Prerequisites:** Node.js 26+ and npm. This project is **npm-only** — don't use `pnpm`, `yarn`, or `bun`.
 
 ```bash
 npm ci
-npm ci --prefix prototypes/v2
-npm run build --prefix prototypes/v2
+npm ci --prefix web
+npm run build --prefix web
 ```
 
-This writes the site to `prototypes/v2/out/`, including its service worker, the sound packs and a `build.json` naming the commit. For development, `npm run dev --prefix prototypes/v2` serves it at `http://localhost:3100/`.
+This writes the site to `web/out/`, including its service worker, the sound packs and a `build.json` naming the commit. For development, `npm run dev --prefix web` serves it at `http://localhost:3100/`.
 
-Accounts need the separate API service in [`prototypes/v2-api/`](prototypes/v2-api/README.md) behind `/api/*` on the same origin; without it the app still plays and saves on the device. The production stack — container images, release by tag, cache headers — is described in [`hosting/README.md`](hosting/README.md).
+Accounts need the separate API service in [`api/`](api/README.md) behind `/api/*` on the same origin; without it the app still plays and saves on the device. The production stack — container images, release by tag, cache headers — is described in [`hosting/README.md`](hosting/README.md).
 
 ---
 
@@ -42,10 +42,10 @@ Accounts need the separate API service in [`prototypes/v2-api/`](prototypes/v2-a
 
 ```bash
 npm test                                  # mutation check + lint + docs lint + Vitest
-npm run typecheck                         # tsc over public/ and scripts/
+npm run typecheck                         # tsc over core/ and scripts/
 npm run validate                          # format + jscpd + typecheck (+ tests/) + knip + npm test
-npm run build --prefix prototypes/v2      # build the app
-npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (build first)
+npm run build --prefix web      # build the app
+npm run test:e2e --prefix web   # the app's Playwright suite (build first)
 ```
 
 Run `npm run validate` and the app suite before opening a PR. Musical changes should also pass the relevant **critique test** in `tests/standards/` — see [`tests/README.md`](tests/README.md).
@@ -65,9 +65,9 @@ Run `npm run validate` and the app suite before opening a PR. Musical changes sh
 
 **Repository layout:**
 
-- `prototypes/v2/` — the app: React UI, runtime bridge, songbook storage, account client, Playwright checks
-- `prototypes/v2-api/` — the account API (standalone Node service)
-- `public/` — the engine library: state slices, worker, synthesis, musical engines, songbook codecs
+- `web/` — the app: React UI, runtime bridge, songbook storage, account client, Playwright checks
+- `api/` — the account API (standalone Node service)
+- `core/` — the engine library: state slices, worker, synthesis, musical engines, songbook codecs
 - `tests/` — unit, integration, standards (critique), bench and browser-mode coverage
 - `docs/` — docs index, living guides, roadmap, and archived reports
 - `scripts/` — analysis, listening-gate and validation tooling

@@ -29,14 +29,12 @@ describe('Security Ledger Verification: DOM Injection', () => {
     // This explicitly prevents XSS via dynamic musical input (chords, labels).
 
     const projectRoot = path.resolve(__dirname, '../../');
-    const publicDir = path.join(projectRoot, 'public');
+    const coreDir = path.join(projectRoot, 'core');
 
-    const sourceFiles = getFiles(publicDir).filter((f) => {
+    const sourceFiles = getFiles(coreDir).filter((f) => {
         // Ignore bundled code and parsers that may need to look at raw HTML/XML
         return (
-            !f.includes('public/dist/') &&
-            !f.includes('test-dist/') &&
-            !f.includes('ManualModal.tsx')
+            !f.includes('core/dist/') && !f.includes('test-dist/') && !f.includes('ManualModal.tsx')
         );
     });
 

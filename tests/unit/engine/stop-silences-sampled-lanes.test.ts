@@ -8,18 +8,18 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ zones: [] as unknown[] }));
-vi.mock('../../../public/engine/pack-runtime.js', () => ({
+vi.mock('../../../core/engine/pack-runtime.js', () => ({
     getPackZones: () => mocks.zones,
 }));
 
 import {
     __resetPackCacheForTest,
     registerPackBuffer,
-} from '../../../public/engine/instrument-registry.js';
-import { killBassNote, playBassNote } from '../../../public/engine/synth-bass.js';
-import { killAllPianoNotes, playNote } from '../../../public/engine/synth-chords.js';
-import { killDrumNote, playDrumSound } from '../../../public/engine/synth-drums.js';
-import { killSoloistNote, playSoloNote } from '../../../public/engine/synth-soloist.js';
+} from '../../../core/engine/instrument-registry.js';
+import { killBassNote, playBassNote } from '../../../core/engine/synth-bass.js';
+import { killAllPianoNotes, playNote } from '../../../core/engine/synth-chords.js';
+import { killDrumNote, playDrumSound } from '../../../core/engine/synth-drums.js';
+import { killSoloistNote, playSoloNote } from '../../../core/engine/synth-soloist.js';
 
 const param = () => ({
     value: 0,

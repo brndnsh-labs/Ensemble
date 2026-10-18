@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { __resetPackCacheForTest } from '../../../public/engine/instrument-registry.js';
+import { __resetPackCacheForTest } from '../../../core/engine/instrument-registry.js';
 import {
     __resetPackRuntimeForTest,
     ensurePackLoaded,
     ensurePacksForVoices,
     getPackZones,
-} from '../../../public/engine/pack-runtime.js';
+} from '../../../core/engine/pack-runtime.js';
 
 const fakeBuffer = (): AudioBuffer => ({}) as AudioBuffer;
 

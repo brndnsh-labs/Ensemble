@@ -5,14 +5,14 @@ This directory contains the automated tests for the Ensemble application, powere
 ## Structure
 
 *   **`unit/`**: Tests for individual modules, functions, and logic.
-    *   *Examples:* Chord parsing in `band/theory/chord.ts`, synthesis logic in `public/engine/synth-*.ts`, or isolated component logic.
+    *   *Examples:* Chord parsing in `band/theory/chord.ts`, synthesis logic in `core/engine/synth-*.ts`, or isolated component logic.
     *   *Environment:* `happy-dom` (simulates browser APIs like `window` and `document`).
 *   **`integration/`**: Tests that verify the interaction between multiple modules.
 *   **`standards/`**: Genre and routing guards (the 13-genre canon), plus the
     [Critique Guidelines](./standards/CRITIQUE_GUIDELINES.md) the band's claims follow.
 *   **`browser/`**: Vitest browser mode (real Chromium, and WebKit for the sync suite) for what
     needs a real `OfflineAudioContext` or IndexedDB — `npm run test:browser`, `npm run test:sync`.
-*   **End-to-end UI tests** live with the app: `prototypes/v2/checks/` (Playwright), gated in CI
+*   **End-to-end UI tests** live with the app: `web/checks/` (Playwright), gated in CI
     by `v2-checks`. We avoid pixel-perfect visual regression (snapshots) to prevent CI flakiness
     across different OS environments.
 
@@ -25,8 +25,8 @@ npm test
 
 ### Run the app's end-to-end suite (Playwright)
 ```bash
-npm run build --prefix prototypes/v2
-npm run test:e2e --prefix prototypes/v2
+npm run build --prefix web
+npm run test:e2e --prefix web
 ```
 
 ### Run Specific Tests

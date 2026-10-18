@@ -1,7 +1,7 @@
-import { SMART_GENRES } from '../../public/data/smart-genres.js';
-import { resolveAutoVoices } from '../../public/state/state-effects.js';
-import { dispatch, getState } from '../../public/state.js';
-import { ACTIONS } from '../../public/types.js';
+import { SMART_GENRES } from '../../core/data/smart-genres.js';
+import { resolveAutoVoices } from '../../core/state/state-effects.js';
+import { dispatch, getState } from '../../core/state.js';
+import { ACTIONS } from '../../core/types.js';
 import { resetAllStateForTest } from './reset-state.js';
 
 /** Picker payload plus the auto-voice effect, as `setGenre` runs them: real presets. */

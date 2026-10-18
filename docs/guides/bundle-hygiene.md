@@ -10,11 +10,11 @@ If you're picking up bundle work (audit, ad-hoc shrink, suspicious chunk growth,
 - `.claude/skills/cycle/SKILL.md` — per-story workflow (implement → review → patch → done); Track `bundle` gates it on the measured KB delta.
 - `.claude/agents/bundle-hygiene-reviewer.md` — reviewer subagent that polices each diff.
 - `npm run knip` — unused exports.
-- The shipped bundle is the v2 static export: `npm run build --prefix prototypes/v2`, then measure `prototypes/v2/out/_next/static/` before and after (`npm run check:bundle --prefix prototypes/v2` prints the JavaScript total). v1's `.size-limit.js` budgets, `npm run build:size` and the Vite `stats.html` went with v1 in #1358; the tripwire below replaces the budget, and nothing replaces the analyzer yet.
+- The shipped bundle is the v2 static export: `npm run build --prefix web`, then measure `web/out/_next/static/` before and after (`npm run check:bundle --prefix web` prints the JavaScript total). v1's `.size-limit.js` budgets, `npm run build:size` and the Vite `stats.html` went with v1 in #1358; the tripwire below replaces the budget, and nothing replaces the analyzer yet.
 
 ## Budgets are baselines, not targets
 
-The v2 export has one size check, a **tripwire** (#1388): `prototypes/v2/scripts/bundle-tripwire.mjs`, run by the `v2-suite` CI job after the build (and locally as `npm run check:bundle --prefix prototypes/v2`). It sums the JavaScript under `out/_next/static/` and fails only when the total passes `ceilingBytes` in `prototypes/v2/bundle-tripwire.json`, about 25% over the measured `baselineBytes` (1,717,881 bytes in 28 files on 2026-09-23). There are no per-chunk budgets and no per-PR report on purpose: a loose total stays quiet through ordinary work and trips on the accident it exists for, an eager import or a heavy dependency. When it trips, its message lists the five largest files — **find what grew before raising the ceiling**, and raise it deliberately, in its own commit, with the baseline re-measured the same way. Treat it as v1's `size-limit` budgets were treated: a regression tripwire (*"this used to fit; what just changed?"*), **not** a finish line.
+The v2 export has one size check, a **tripwire** (#1388): `web/scripts/bundle-tripwire.mjs`, run by the `v2-suite` CI job after the build (and locally as `npm run check:bundle --prefix web`). It sums the JavaScript under `out/_next/static/` and fails only when the total passes `ceilingBytes` in `web/bundle-tripwire.json`, about 25% over the measured `baselineBytes` (1,717,881 bytes in 28 files on 2026-09-23). There are no per-chunk budgets and no per-PR report on purpose: a loose total stays quiet through ordinary work and trips on the accident it exists for, an eager import or a heavy dependency. When it trips, its message lists the five largest files — **find what grew before raising the ceiling**, and raise it deliberately, in its own commit, with the baseline re-measured the same way. Treat it as v1's `size-limit` budgets were treated: a regression tripwire (*"this used to fit; what just changed?"*), **not** a finish line.
 
 The operative goal is **smaller is better when behavior is unchanged**, not "must hit budget." Don't promote risky structural changes just to close a budget gap. A speculative refactor that breaks audio-graph timing to save 8 KB is a bad trade.
 
@@ -42,7 +42,7 @@ If a story whose Actions list reads like "delete dead code" produces ~0 KB delta
 
 ## The pre-flight grep tripwire
 
-Before any "delete X" story, grep the entire repo (`public/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every symbol the story will remove. Surviving runtime callers are P0 — stop.
+Before any "delete X" story, grep the entire repo (`core/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every symbol the story will remove. Surviving runtime callers are P0 — stop.
 
 ### Project-specific tripwire for musical-content deletions
 
@@ -58,7 +58,7 @@ A story that proposes deleting a state field, instrument lane, drum voice, percu
 
 `npm run knip` is the primary static-analysis lever for unused-export sweeps, but it has known blind spots. Treat findings as hypotheses, not orders.
 
-- **`vi.mock` dynamic consumption.** When a test does `vi.mock('public/state.js', async (importOriginal) => { const actual = await importOriginal(); return { ...actual.<X> } })`, knip sees `<X>` as unused. It is not — the mock factory is a live consumer. S7 caught this with five test files referencing dead-looking re-exports. Fix the mock to import the canonical slice module directly so the test's dependency on the symbol is statically visible.
+- **`vi.mock` dynamic consumption.** When a test does `vi.mock('core/state.js', async (importOriginal) => { const actual = await importOriginal(); return { ...actual.<X> } })`, knip sees `<X>` as unused. It is not — the mock factory is a live consumer. S7 caught this with five test files referencing dead-looking re-exports. Fix the mock to import the canonical slice module directly so the test's dependency on the symbol is statically visible.
 - **Namespace dispatch.** `import * as <ns>` followed by a lookup by name defeats knip's per-symbol analysis. (The old engine's `grooves/*.ts` were the case that taught this; that directory is gone.) Check `knip.json` for what is ignored on purpose before re-including it.
 - **Test entry points.** Knip considers test files live consumers, which is correct but creates a class of "test-only-production-dead" symbols — the production code never calls them, only the test does. The test pinning a wrapper alive is a separate cleanup question; surface it as a followup, not a delete.
 

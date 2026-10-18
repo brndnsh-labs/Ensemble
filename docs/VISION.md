@@ -51,7 +51,7 @@ Ensemble is not AI-generated audio. The codebase is AI-assisted and agents are f
 
 ## UI direction
 
-One app, the music stand (`prototypes/v2/app/`): a songbook home (recent songs, the standards catalog, new/import), the chart sheet, the transport, a sounds panel, and editing on the chart itself (#1726: a bar typed in place with its bar menu, a section from its letter, the whole song from the Song menu). Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
+One app, the music stand (`web/app/`): a songbook home (recent songs, the standards catalog, new/import), the chart sheet, the transport, a sounds panel, and editing on the chart itself (#1726: a bar typed in place with its bar menu, a section from its letter, the whole song from the Song menu). Tempo, genre, instrument mutes and the transport are primary; key is one obvious action away; loop and start-from belong at the section they act on. Editing keeps the chart's spatial structure, and editing controls step aside during playback.
 
 The stand has three modes — Chart, Neck and Edit chart. Neck (#1587) puts a guitar or ukulele fretboard in place of the chart: the grip for the chord sounding now (a shell voicing for a 7th chord, a closed triad or a power chord otherwise), a preview of the next grip on the last beat before the change, and one line saying how the hand gets there.
 
@@ -73,7 +73,7 @@ Designed for laptop, tablet and phone alike. Tablet is the sweet spot: readable 
 - **Offline-first static app plus one small API**, released as container images; `main` is continuously deployed.
 - **Semantic charts with an honest import boundary** (#1171): imports preview what they keep and explain what they can't represent.
 - Chart-first single surface; the chart is a music stand during playback.
-- **The band engine replaces the old one (2026-09-25, #1404).** `band/` is a ground-up, deterministic rewrite that carries the old engine's by-ear lessons over as design laws, not code. It reverses the earlier "kept, not rewritten" decision; see `docs/design/band-engine.md`. v2 still compiles `public/` for the songbook, state and voices.
+- **The band engine replaces the old one (2026-09-25, #1404).** `band/` is a ground-up, deterministic rewrite that carries the old engine's by-ear lessons over as design laws, not code. It reverses the earlier "kept, not rewritten" decision; see `docs/design/band-engine.md`. v2 still compiles `core/` for the songbook, state and voices.
 - Metronomic by default; expressive timing and live-performance control are **opt-in, off by default** (the #936 ruling), protecting the practicing musician.
 - The live-performer / "instrument" identity is parked behind a probe-first plan (#937), not built speculatively.
 - Sharing is a marquee feature, not a hidden one.

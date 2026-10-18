@@ -5,7 +5,7 @@ import {
     packsForInstrument,
     reverbSendForPack,
     SOUND_PACKS,
-} from '../../../public/data/sound-packs.js';
+} from '../../../core/data/sound-packs.js';
 
 describe('sound-packs catalog', () => {
     it('every pack has a non-empty id, name, attribution, and ≥1 instrument', () => {
