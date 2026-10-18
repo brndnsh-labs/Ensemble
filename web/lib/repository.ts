@@ -177,7 +177,7 @@ export async function home(request: HomeRequest): Promise<HomeSlice> {
         tx.onerror = () => reject(new Error('Unable to read your local songbook.'));
         tx.onabort = () => reject(new Error('Unable to read your local songbook.'));
     });
-    return settleHome(read, validate, request.rows);
+    return settleHome(read, validate, request);
 }
 
 /**

@@ -138,31 +138,39 @@ export const HOME_FILL_SPARE = 8;
  * one of the musician's songs.
  *
  * Fill rows come after every opened row, newest save first, since they were never opened.
+ *
+ * The Continue song is usually one of the opened rows too, read twice in the same transaction:
+ * unreadable, it is one song and counted once, from its row.
  */
 export function settleHome<R>(
     read: HomeRead<R>,
     validate: (raw: R) => ChartDocument,
-    rows: number,
+    request: HomeRequest,
 ): HomeSlice {
     let unreadable = 0;
-    const attempt = (raw: R): ChartDocument | null => {
+    const attempt = (raw: R, counted = true): ChartDocument | null => {
         try {
             return validate(raw);
         } catch {
-            unreadable += 1;
+            if (counted) {
+                unreadable += 1;
+            }
             return null;
         }
     };
-    const continued = read.continued === undefined ? null : attempt(read.continued);
-    const opened = read.recent.map(attempt).filter((document) => document !== null);
+    const continueListed =
+        request.continueId !== null && request.recentIds.includes(request.continueId);
+    const continued =
+        read.continued === undefined ? null : attempt(read.continued, !continueListed);
+    const opened = read.recent.map((raw) => attempt(raw)).filter((document) => document !== null);
     const filled = read.fill
-        .map(attempt)
+        .map((raw) => attempt(raw))
         .filter((document) => document !== null)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     const seen = new Set<string>();
     const listed: ChartDocument[] = [];
     for (const document of [...opened, ...filled]) {
-        if (listed.length >= rows) {
+        if (listed.length >= request.rows) {
             break;
         }
         if (!seen.has(document.id)) {

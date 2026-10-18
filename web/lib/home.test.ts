@@ -37,7 +37,7 @@ describe('settleHome (#1441)', () => {
                 fill: [doc('c', '3'), doc('a', '1'), doc('d', '9')],
             },
             pass,
-            3,
+            { continueId: 'a', recentIds: ['a', 'b'], rows: 3 },
         );
         expect(slice.rows.map((row) => row.id)).toEqual(['a', 'b', 'd']);
         expect(slice.continued?.id).toBe('a');
@@ -48,9 +48,25 @@ describe('settleHome (#1441)', () => {
         const slice = settleHome(
             { count: 2, continued: { bad: true }, recent: [{ bad: true }], fill: [] },
             pass,
-            8,
+            { continueId: 'a', recentIds: ['b'], rows: 8 },
         );
         expect(slice).toEqual({ count: 2, gone: 0, continued: null, rows: [], unreadable: 2 });
+    });
+
+    it('counts an unreadable Continue song once when it is also an opened row', () => {
+        const slice = settleHome(
+            {
+                count: 2,
+                continued: { bad: true },
+                recent: [{ bad: true }, doc('b', '2')],
+                fill: [],
+            },
+            pass,
+            { continueId: 'a', recentIds: ['a', 'b'], rows: 8 },
+        );
+        expect(slice.unreadable).toBe(1);
+        expect(slice.continued).toBeNull();
+        expect(slice.rows.map((row) => row.id)).toEqual(['b']);
     });
 });
 

@@ -241,7 +241,8 @@ describe('repository.home — the songbook home reads only what it shows (#1441)
         const slice = await home(homeRequest(opened, 'bad'));
         expect(slice.continued).toBeNull();
         expect(slice.rows.map((row) => row.id)).toEqual(['good']);
-        expect(slice.unreadable).toBe(2);
+        // One bad song, read as Continue and as an opened row: counted once.
+        expect(slice.unreadable).toBe(1);
         expect(slice.count).toBe(2);
     });
 
