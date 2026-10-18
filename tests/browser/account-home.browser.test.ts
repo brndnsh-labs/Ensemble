@@ -114,7 +114,8 @@ describe('AccountSongbook.home (#1441)', () => {
         );
         expect(slice.continued).toBeNull();
         expect(slice.rows.map((row) => row.id)).toEqual(['good']);
-        expect(slice.unreadable).toBe(2);
+        // One bad song, read as Continue and as an opened row: counted once.
+        expect(slice.unreadable).toBe(1);
     });
 
     it('leaves a text chart out and counts it: no reader is left for one (#1740)', async () => {
