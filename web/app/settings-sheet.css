@@ -34,6 +34,41 @@
     font-size: 13px;
 }
 
+/* A palette's swatch (#1280): a scrap of chart in that palette's own paper, ink and accent. The
+   palette blocks in `style.css` match any `[data-palette]`, so the swatch carries its palette's
+   tokens and resolves them in the current Day or Stage, which it inherits from <html>. Warm has
+   no block (it is `:root`), so its swatch restates the three tokens it draws with, or the
+   page's own palette would show through it. `palettes.test.ts` holds them equal to `:root`. */
+.palette-swatch[data-palette="warm"] {
+    --paper: light-dark(#f7f5ef, #15181a);
+    --ink: light-dark(#222923, #f1efe8);
+    --accent: light-dark(#b34e34, #e0785a);
+}
+.palette-swatch {
+    position: relative;
+    display: grid;
+    place-content: center;
+    width: 40px;
+    height: 30px;
+    flex: none;
+    border: 1px solid color-mix(in srgb, var(--ink) 22%, transparent);
+    border-radius: 6px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 19px;
+    line-height: 1;
+}
+.palette-swatch-accent {
+    position: absolute;
+    left: 8px;
+    right: 8px;
+    bottom: 4px;
+    height: 3px;
+    border-radius: 2px;
+    background: var(--accent);
+}
+
 /* The gear (#1783). On the songbook it keeps the full 44px hit target; in the song header's
    phone row it is as narrow as the ••• beside it (`.song-actions .menu-btn`), because that row
    has no slack to spare (`checks/header-fit.spec.ts`). */

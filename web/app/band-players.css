@@ -104,7 +104,6 @@
     flex: 1 1 auto;
     min-width: 0;
     min-height: 32px;
-    accent-color: var(--green);
 }
 .sound-range-value {
     flex: 0 0 auto;

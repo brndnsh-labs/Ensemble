@@ -26,11 +26,13 @@ export const viewport: Viewport = {
     themeColor: '#14110d',
 };
 
-// Apply a stored Day/Stage choice before first paint so a stage-mode user never
-// sees a white flash. Mirrors themePreference() in lib/session.ts; the React
-// effect in use-stage-theme.ts owns the attribute after hydration, hence
-// suppressHydrationWarning on <html>.
-const applyStoredTheme = `try{var t=localStorage.getItem('ensemble-v2-preview:theme');if(t==='day'||t==='stage')document.documentElement.dataset.theme=t}catch(e){}`;
+// Apply a stored Day/Stage choice and colour palette (#1280) before first paint so a
+// stage-mode user never sees a white flash, nor anyone a frame of Warm. Mirrors
+// themePreference() and palettePreference() in lib/session.ts (the same strict reads:
+// anything else stored is System / Warm); the React effects in use-stage-theme.ts and
+// use-palette.ts own the attributes after hydration, hence suppressHydrationWarning on
+// <html>. The build hashes this script into the CSP (`scripts/offline.mjs`).
+const applyStoredTheme = `try{var d=document.documentElement,t=localStorage.getItem('ensemble-v2-preview:theme');if(t==='day'||t==='stage')d.dataset.theme=t;var p=localStorage.getItem('ensemble-v2-preview:palette');if(p==='cool'||p==='contrast'||p==='forest'||p==='plum')d.dataset.palette=p}catch(e){}`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
     return (

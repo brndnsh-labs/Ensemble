@@ -125,6 +125,7 @@ import { useChartView } from './use-chart-view';
 import { useCollections } from './use-collections';
 import { useNeckVoicing } from './use-neck-view';
 import { useOfflineInstall } from './use-offline-install';
+import { usePalette } from './use-palette';
 import { useStageTheme } from './use-stage-theme';
 
 /**
@@ -696,6 +697,7 @@ export default function Ensemble() {
     // tick; it flips twice a chord.
     const [changeSoon, setChangeSoon] = useState(false);
     const { theme, stage, chooseTheme, toggleTheme } = useStageTheme();
+    const { palette, choosePalette } = usePalette();
     // Settings (#1783): per-device preferences, on the songbook and on a chart.
     const [settingsOpen, setSettingsOpen] = useState(false);
     const settingsDialog = useRef<HTMLDialogElement>(null);
@@ -6716,6 +6718,8 @@ export default function Ensemble() {
                 dialogRef={settingsDialog}
                 theme={theme}
                 onTheme={chooseTheme}
+                palette={palette}
+                onPalette={choosePalette}
                 onClose={() => setSettingsOpen(false)}
             />
             {current && (

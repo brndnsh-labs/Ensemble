@@ -9,6 +9,11 @@
     --surface: light-dark(#fffefa, #1d2124);
     --ink: light-dark(#222923, #f1efe8);
     --on-ink: light-dark(#fffefa, #15181a);
+    /* Filled main controls (#1280): Play, a primary button, a pressed toggle. The ink in Warm and
+       High contrast; a deep shade of the palette's own hue in the others, so a palette reaches
+       the controls and not only the paper. Never the accent: that is text and the edit ring. */
+    --primary: light-dark(#222923, #f1efe8);
+    --on-primary: light-dark(#fffefa, #15181a);
     --muted: light-dark(#72766c, #a3a79c);
     --muted-soft: light-dark(#777a70, #8a9087);
     --line: light-dark(#e3e3d9, #33393b);
@@ -62,6 +67,146 @@
     color: var(--ink);
     background: var(--paper);
     font-synthesis: none;
+    /* Native checkboxes, radios and sliders: one colour, set once, so none falls back to the
+       browser's blue (#1280). */
+    accent-color: var(--green);
+}
+/* Colour palettes (#1280), chosen in Settings and stored per device. Warm is `:root` above and
+   has no attribute, so a device that never picks one renders exactly these tokens. Each palette
+   redefines the page's neutrals and accent — paper, ink, lines, the bar highlights — as
+   light-dark() pairs, so Day / Stage still only picks the side. Meaning stays fixed across them:
+   the degree colours (`--d-*`), danger, the neck's wood, and green as "playing" (re-tuned per
+   palette, never swapped for another hue). `web/app/palettes.test.ts` reads these blocks and
+   holds every palette × mode to WCAG AA. */
+/* Cool: blue-grey slate. Cold paper and a slate ink; an indigo accent, so the edit ring never
+   reads as the playing teal or the next-bar cue, which turns cyan here for the same reason. */
+[data-palette="cool"] {
+    --paper: light-dark(#e9eef4, #11161c);
+    --surface: light-dark(#f6f8fb, #182029);
+    --ink: light-dark(#1a2430, #e9eef4);
+    --on-ink: light-dark(#f6f8fb, #11161c);
+    --primary: light-dark(#2a336e, #c3c8f2);
+    --on-primary: light-dark(#f6f8fb, #11161c);
+    --muted: light-dark(#5b6676, #9aa6b5);
+    --muted-soft: light-dark(#6a7484, #808c9b);
+    --line: light-dark(#ccd5e0, #2c3642);
+    --hover: light-dark(#d8dfe8, #232d38);
+    --chip: light-dark(#dfe5ed, #1d2630);
+    --paper-raised: light-dark(#e1e7ef, #141b22);
+    --accent: light-dark(#4a4fc4, #9da3ff);
+    --accent-light: light-dark(#dfe0f6, #262a4d);
+    --green: light-dark(#2c6150, #86cdb3);
+    --green-light: light-dark(#d8e8e2, #17302a);
+    --bar-line: light-dark(#8794a55c, #5a677780);
+    --bar-line-strong: light-dark(#7a8596, #7d8a9a);
+    --bar-number: light-dark(#677283, #8592a2);
+    --bar-current: light-dark(#d5e5df, #1d3a33);
+    --bar-repeat-ink: light-dark(#4c5a6b, #b3c0cf);
+    --bar-next: light-dark(#3f97b4a0, #4fb0d09c);
+    --bar-next-soon: light-dark(#1f7f9e, #6cc6e4);
+    --bar-hover: light-dark(#e1e7ee, #222b35);
+    --chord-hover: light-dark(#d2dbe6, #2c3746);
+    --backdrop: light-dark(#1a243066, #000000a0);
+    --shadow: 0 16px 60px light-dark(#1a243014, #00000080);
+    --focus-ring: light-dark(#4a4fc490, #9da3ffb0);
+}
+/* High contrast: near-black on white and white on near-black, every text token at AAA (7:1).
+   Lines and bar numbers are drawn dark enough to read as structure, not hairlines; the accent
+   is a plain strong blue and the next-bar cue orange, so the edit ring, the cue and the green
+   playing bar are three colours that never meet. */
+[data-palette="contrast"] {
+    --paper: light-dark(#ffffff, #0a0a0a);
+    --surface: light-dark(#ffffff, #161616);
+    --ink: light-dark(#111111, #ffffff);
+    --on-ink: light-dark(#ffffff, #0a0a0a);
+    --primary: light-dark(#111111, #ffffff);
+    --on-primary: light-dark(#ffffff, #0a0a0a);
+    --muted: light-dark(#3f3f3f, #cfcfcf);
+    --muted-soft: light-dark(#555555, #ababab);
+    --line: light-dark(#8c8c8c, #6b6b6b);
+    --hover: light-dark(#e4e4e4, #262626);
+    --chip: light-dark(#f0f0f0, #1c1c1c);
+    --paper-raised: light-dark(#f2f2f2, #121212);
+    --accent: light-dark(#0a3fa8, #8cb6ff);
+    --accent-light: light-dark(#e0e9fb, #14264a);
+    --green: light-dark(#005426, #6ee59a);
+    --green-light: light-dark(#dcf3e2, #0f3320);
+    --bar-line: light-dark(#5c5c5c80, #8a8a8a80);
+    --bar-line-strong: light-dark(#333333, #c8c8c8);
+    --bar-number: light-dark(#3f3f3f, #cfcfcf);
+    --bar-current: light-dark(#fff1a8, #3d3510);
+    --bar-repeat-ink: light-dark(#2e2e2e, #e0e0e0);
+    --bar-next: light-dark(#b34700b0, #ffb35cb0);
+    --bar-next-soon: light-dark(#b34700, #ffb35c);
+    --bar-hover: light-dark(#f2f2f2, #1f1f1f);
+    --chord-hover: light-dark(#e6e6e6, #2e2e2e);
+    --backdrop: light-dark(#00000080, #000000b8);
+    --shadow: 0 16px 60px light-dark(#00000026, #000000a0);
+    --focus-ring: light-dark(#0a3fa8, #8cb6ff);
+}
+/* Forest: sage paper and a pine ink, deep pine-night for Stage. The accent is amber, like late
+   light through leaves, because a green accent would be lost against the green playing bar. */
+[data-palette="forest"] {
+    --paper: light-dark(#eef3ec, #0e1a13);
+    --surface: light-dark(#f8fbf6, #15241b);
+    --ink: light-dark(#14261b, #e7efe4);
+    --on-ink: light-dark(#f8fbf6, #0e1a13);
+    --primary: light-dark(#21402d, #cfe2d0);
+    --on-primary: light-dark(#f8fbf6, #0e1a13);
+    --muted: light-dark(#536657, #9db4a2);
+    --muted-soft: light-dark(#617364, #82998a);
+    --line: light-dark(#d6e0d3, #263a2d);
+    --hover: light-dark(#dce6d8, #203428);
+    --chip: light-dark(#e3ebe0, #1a2c21);
+    --paper-raised: light-dark(#e5ece2, #12201a);
+    --accent: light-dark(#93520f, #e6ab55);
+    --accent-light: light-dark(#f3e6d2, #3a2c16);
+    --green: light-dark(#1d6a3c, #8edba6);
+    --green-light: light-dark(#dcebd6, #1b3825);
+    --bar-line: light-dark(#7e957f5c, #4f6b5780);
+    --bar-line-strong: light-dark(#6f8473, #7f9787);
+    --bar-number: light-dark(#5e7062, #8aa08f);
+    --bar-current: light-dark(#d3e7c7, #24452f);
+    --bar-repeat-ink: light-dark(#3f5a45, #b6cbb9);
+    --bar-next: light-dark(#7591b3a0, #6f8bad9c);
+    --bar-next-soon: light-dark(#3b6ea5, #8ab4e8);
+    --bar-hover: light-dark(#e4ece0, #1c2e23);
+    --chord-hover: light-dark(#d9e3d3, #2a3f30);
+    --backdrop: light-dark(#14261b66, #000000a0);
+    --shadow: 0 16px 60px light-dark(#14261b14, #00000080);
+    --focus-ring: light-dark(#93520f90, #e6ab55b0);
+}
+/* Plum: a lilac-white page with aubergine ink, a dusk-violet Stage. The accent is the plum
+   itself; the playing bar stays sage, the one green on the page, so it reads at a glance. */
+[data-palette="plum"] {
+    --paper: light-dark(#f4ecf3, #19121c);
+    --surface: light-dark(#fcf8fb, #221926);
+    --ink: light-dark(#2a1a2c, #f3eaf2);
+    --on-ink: light-dark(#fcf8fb, #19121c);
+    --primary: light-dark(#4b2448, #ead0e5);
+    --on-primary: light-dark(#fcf8fb, #19121c);
+    --muted: light-dark(#6d5a6f, #b3a2b5);
+    --muted-soft: light-dark(#76657a, #968699);
+    --line: light-dark(#e2d4df, #3a2d3e);
+    --hover: light-dark(#e5d8e3, #312535);
+    --chip: light-dark(#ece2eb, #2a1f2e);
+    --paper-raised: light-dark(#ece2ea, #1d1520);
+    --accent: light-dark(#8b2f7f, #e49ad8);
+    --accent-light: light-dark(#f2e0ee, #432540);
+    --green: light-dark(#2f6146, #93cfa9);
+    --green-light: light-dark(#e3ece2, #1f3328);
+    --bar-line: light-dark(#9a879a5c, #66556a80);
+    --bar-line-strong: light-dark(#86738a, #94839a);
+    --bar-number: light-dark(#75647a, #9a899d);
+    --bar-current: light-dark(#e2ebdd, #253a2d);
+    --bar-repeat-ink: light-dark(#5e4862, #cfbcd0);
+    --bar-next: light-dark(#7591b3a0, #6f8bad9c);
+    --bar-next-soon: light-dark(#3b6ea5, #8ab4e8);
+    --bar-hover: light-dark(#ece1ea, #2b2030);
+    --chord-hover: light-dark(#e4d3e0, #3a2c3d);
+    --backdrop: light-dark(#2a1a2c66, #000000a0);
+    --shadow: 0 16px 60px light-dark(#2a1a2c14, #00000080);
+    --focus-ring: light-dark(#8b2f7f90, #e49ad8b0);
 }
 * {
     box-sizing: border-box;
@@ -174,9 +319,9 @@ html [hidden] {
     background: var(--surface);
 }
 .btn.primary {
-    background: var(--ink);
-    color: var(--on-ink);
-    border-color: var(--ink);
+    background: var(--primary);
+    color: var(--on-primary);
+    border-color: var(--primary);
 }
 .btn.soft {
     background: var(--green-light);
@@ -348,9 +493,9 @@ html [hidden] {
     cursor: pointer;
 }
 .shelf-chip[aria-pressed="true"] {
-    background: var(--ink);
-    color: var(--on-ink);
-    border-color: var(--ink);
+    background: var(--primary);
+    color: var(--on-primary);
+    border-color: var(--primary);
 }
 .standards-preview {
     font-family: Georgia, "Times New Roman", serif;
@@ -402,14 +547,6 @@ html [hidden] {
     background: var(--accent-light);
     color: var(--accent);
     flex-shrink: 0;
-}
-.song-glyph.green {
-    background: #e4e9df;
-    color: #536447;
-}
-.song-glyph.blue {
-    background: #e5e9ed;
-    color: #536773;
 }
 .song-name {
     display: block;
@@ -538,7 +675,7 @@ html [hidden] {
 .mode-switch button[aria-pressed="true"] {
     background: var(--surface);
     box-shadow: 0 1px 3px #0001;
-    color: var(--ink);
+    color: var(--primary);
     font-weight: 650;
 }
 .transport-bar {
@@ -553,8 +690,8 @@ html [hidden] {
 .play-button {
     height: 43px;
     width: 48px;
-    background: var(--ink);
-    color: var(--on-ink);
+    background: var(--primary);
+    color: var(--on-primary);
     border-radius: 9px;
     display: grid;
     place-content: center;
@@ -2131,7 +2268,6 @@ dialog textarea {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 32px;
-    accent-color: var(--green);
 }
 .feel-range-value {
     flex: 0 0 auto;
@@ -2179,7 +2315,7 @@ dialog textarea {
 .band-tabs [role="tab"][aria-selected="true"] {
     background: var(--surface);
     box-shadow: 0 1px 3px #0001;
-    color: var(--ink);
+    color: var(--primary);
     font-weight: 650;
 }
 .band-tab-panel {
@@ -2367,7 +2503,8 @@ dialog textarea {
     }
 }
 /* Explicit Day/Stage choice (#1208) overrides the system preference by picking
-   the light-dark() side; no token is redefined anywhere else. */
+   the light-dark() side; tokens are defined only on `:root` and the palette blocks after it
+   (#1280), which are light-dark() pairs too, so the two choices combine. */
 html[data-theme="day"] {
     color-scheme: light;
 }
@@ -2393,9 +2530,9 @@ html[data-theme="stage"] {
     }
 }
 .theme-toggle[aria-pressed="true"] {
-    background: var(--ink);
-    color: var(--on-ink);
-    border-color: var(--ink);
+    background: var(--primary);
+    color: var(--on-primary);
+    border-color: var(--primary);
 }
 /* Account entry point and sign-in dialog (#1262). Rendered for every device since the
    cutover (#1357).
@@ -2469,7 +2606,6 @@ html[data-theme="stage"] {
     flex-shrink: 0;
     margin: 2px 0 0;
     padding: 0;
-    accent-color: var(--ink);
 }
 /* Recovery entry and code entry (#1263). */
 .recovery-link {

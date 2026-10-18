@@ -89,3 +89,106 @@ test('System hands the theme back to the OS, live and across a reload; the heade
     sheet = await openSettings(page);
     await expect(sheet.getByRole('radio', { name: /^System/ })).toBeChecked();
 });
+
+/**
+ * #1280 — Palette: five choices under Appearance, each a per-device token set on
+ * `html[data-palette]` (none for Warm, the default), combined with Day/Stage.
+ */
+const PALETTE_KEY = 'ensemble-v2-preview:palette';
+const dataPalette = (page: Page) =>
+    page.evaluate(() => document.documentElement.dataset.palette ?? null);
+const storedPalette = (page: Page) =>
+    page.evaluate((key) => localStorage.getItem(key), PALETTE_KEY);
+
+test('each palette repaints the page, combines with Day and Stage, and keeps across a reload with no flash', async ({
+    page,
+}) => {
+    // Every `data-palette` value <html> holds from the moment <body> is parsed: the
+    // pre-hydration script must have set it by then, and hydration must never take it away.
+    await page.addInitScript(() => {
+        const w = window as unknown as { __palettes: (string | null)[] };
+        w.__palettes = [];
+        // The script runs before <html> exists, so it watches the document for <body>.
+        new MutationObserver((_, observer) => {
+            if (!document.body) {
+                return;
+            }
+            observer.disconnect();
+            const html = document.documentElement;
+            // Only changes: the app re-writing the value it already holds is no flash.
+            const record = () => {
+                const now = html.dataset.palette ?? null;
+                if (w.__palettes.length === 0 || w.__palettes.at(-1) !== now) {
+                    w.__palettes.push(now);
+                }
+            };
+            record();
+            new MutationObserver(record).observe(html, {
+                attributes: true,
+                attributeFilter: ['data-palette'],
+            });
+        }).observe(document, { childList: true, subtree: true });
+    });
+    await page.emulateMedia({ colorScheme: 'light' });
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await page.waitForSelector('.bar');
+
+    const sheet = await openSettings(page);
+    const choice = (name: string) => sheet.getByRole('radio', { name, exact: true });
+    await expect(choice('Warm')).toBeChecked();
+    expect(await dataPalette(page)).toBeNull();
+    const warmDay = await paper(page);
+
+    // Each palette sets its attribute and its own paper; Warm takes both away again.
+    const dayPapers = new Set([warmDay]);
+    for (const [name, id] of [
+        ['Cool', 'cool'],
+        ['High contrast', 'contrast'],
+        ['Forest', 'forest'],
+        ['Plum', 'plum'],
+    ] as const) {
+        await choice(name).check();
+        await expect(choice(name)).toBeChecked();
+        expect(await dataPalette(page)).toBe(id);
+        expect(await storedPalette(page)).toBe(id);
+        const day = await paper(page);
+        expect(lightness(day)).toBeGreaterThan(200);
+        dayPapers.add(day);
+    }
+    expect(dayPapers.size).toBe(5);
+    await choice('Warm').check();
+    expect(await dataPalette(page)).toBeNull();
+    expect(await storedPalette(page)).toBeNull();
+    expect(await paper(page)).toBe(warmDay);
+
+    // Stage and a palette combine: Plum's Stage is dark and not Warm's Stage.
+    await sheet.getByRole('radio', { name: /^Stage/ }).check();
+    const warmStage = await paper(page);
+    await choice('Plum').check();
+    const plumStage = await paper(page);
+    expect(lightness(plumStage)).toBeLessThan(40);
+    expect(plumStage).not.toBe(warmStage);
+    expect(await dataTheme(page)).toBe('stage');
+
+    // A reload keeps both, and <html> carried Plum before the body was parsed and was never
+    // dropped through hydration — read once the sheet shows the stored choice, so the app's
+    // own effects have run.
+    await page.reload();
+    await expect(
+        (await openSettings(page)).getByRole('radio', { name: 'Plum', exact: true }),
+    ).toBeChecked();
+    expect(
+        await page.evaluate(() => (window as unknown as { __palettes: unknown }).__palettes),
+    ).toEqual(['plum']);
+    expect(await dataTheme(page)).toBe('stage');
+    expect(await paper(page)).toBe(plumStage);
+
+    // Storage is untrusted: anything but a palette id is Warm, with no attribute.
+    await page.evaluate((key) => localStorage.setItem(key, 'constructor'), PALETTE_KEY);
+    await page.reload();
+    expect(await dataPalette(page)).toBeNull();
+    await expect(
+        (await openSettings(page)).getByRole('radio', { name: 'Warm', exact: true }),
+    ).toBeChecked();
+});

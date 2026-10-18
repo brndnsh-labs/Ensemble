@@ -38,9 +38,9 @@
 .bar-dock-done {
     padding: 0 12px;
     font-size: 14px;
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--on-ink);
+    background: var(--primary);
+    border-color: var(--primary);
+    color: var(--on-primary);
 }
 .bar-dock-field {
     flex: 1;
