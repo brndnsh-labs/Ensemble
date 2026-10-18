@@ -153,6 +153,37 @@ export function forgetTheme(): void {
     }
 }
 
+const PALETTE = 'ensemble-v2-preview:palette';
+/** The colour palettes (#1280); `warm` is the default look and is never stored. */
+export const PALETTES = ['warm', 'cool', 'contrast', 'forest', 'plum'] as const;
+export type Palette = (typeof PALETTES)[number];
+
+/**
+ * The stored palette, read strictly: storage is untrusted, so anything but one of the other four
+ * ids is Warm. Mirrored by the pre-hydration script in `app/layout.tsx`.
+ */
+export function palettePreference(): Palette {
+    try {
+        const stored = localStorage.getItem(PALETTE);
+        return PALETTES.find((id) => id !== 'warm' && id === stored) ?? 'warm';
+    } catch {
+        return 'warm';
+    }
+}
+
+/** Warm is stored as no key at all, so the default device carries nothing. */
+export function rememberPalette(palette: Palette): void {
+    try {
+        if (palette === 'warm') {
+            localStorage.removeItem(PALETTE);
+        } else {
+            localStorage.setItem(PALETTE, palette);
+        }
+    } catch {
+        // The palette still applies for this page; only the memory is lost.
+    }
+}
+
 const STAND_MODE = 'ensemble-v2-preview:stand-mode';
 export type StandMode = 'chart' | 'neck';
 
