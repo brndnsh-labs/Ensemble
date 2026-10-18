@@ -103,6 +103,7 @@ export function performPass(
         window,
         planned: lookLimit + 1,
         drumSolos,
+        arcShape: style.jamArc,
     });
     // Where the pass wraps, the next bar belongs to the next pass, whose lanes can differ (the
     // fours may open with the drummer alone): what it plays is taken from that pass's plan.
@@ -115,6 +116,7 @@ export function performPass(
               looping: true,
               window: { ...window, from: 0, origin: 0 },
               drumSolos,
+              arcShape: style.jamArc,
           })[0]
         : undefined;
     const memory: PassMemory = options.memory

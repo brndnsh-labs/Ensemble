@@ -53,10 +53,37 @@ const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
 
 export type EnergyTier = 'low' | 'mid' | 'high';
 
+/** Where the high tier starts (`energyTier`). */
+const HIGH = 0.7;
+
 /** The discrete energy an idiom plays at. Bar-stable by construction. */
 export function energyTier(energy: number): EnergyTier {
-    return energy < 0.42 ? 'low' : energy < 0.7 ? 'mid' : 'high';
+    return energy < 0.42 ? 'low' : energy < HIGH ? 'mid' : 'high';
 }
+
+/**
+ * How the jam arc moves one style (`Style.jamArc`, #1789). Absent, the full arc: every style
+ * whose groove keeps its identity at every tier.
+ */
+export interface JamArcShape {
+    /**
+     * Scales the arc's offset (`jamArc`), before the clamp: 1 is the full arc, 0.5 half of it.
+     * The dynamics keep the arc's shape, at a smaller swing.
+     */
+    depth: number;
+    /**
+     * The arc never moves a bar across the high-tier line (`HIGH`), either way: a bar the form
+     * puts under it stays under it (at most `HIGH_CEILING`), a bar the form puts over it stays
+     * over it. For a style whose high tier is a different groove (reggae's steppers, bossa's
+     * ride), so the riddim is the chart's, never the arc's.
+     */
+    keepsHighLine: boolean;
+}
+
+// why: the arc lifts a style that keeps its high line to the top of mid and no further — a hair
+// under the line, so the raw energy (which scales the dynamics) still reaches as close to the
+// climax as the tier allows.
+const HIGH_CEILING = HIGH - 0.01;
 
 /*
  * The jam arc (#1785): how a counted performance the band was asked to shape as a jam
@@ -64,7 +91,8 @@ export function energyTier(energy: number): EnergyTier {
  * the chorus and the bar's place in it, so it is planned once with the rest of the plan and
  * never drifts. Energy only: tempo never moves (metronomic by default). Each value is an offset
  * on the bar's section energy, so the form still shapes inside every chorus (a verse under its
- * chorus, an intro under both), and the arc REPLACES `passLift`, never stacks on it.
+ * chorus, an intro under both), and the arc REPLACES `passLift`, never stacks on it. A style
+ * may shape it for itself (`JamArcShape`, #1789): the levels below are the full arc's.
  *
  * Levels are a chorus's mean, chosen by the tier each lands a plain chart (`DEFAULT_ENERGY`,
  * 0.55, mid) in, since tiers are what idioms branch on:
@@ -190,12 +218,15 @@ export function planBars(
         window,
         planned = window.to,
         drumSolos = false,
+        arcShape,
     }: {
         pass: number;
         looping: boolean;
         window: PassWindow;
         planned?: number;
         drumSolos?: boolean;
+        /** The style's own shape of the jam arc (`Style.jamArc`); absent, the full arc. */
+        arcShape?: JamArcShape;
     },
 ): BarPlan[] {
     const { bars } = timeline;
@@ -257,7 +288,8 @@ export function planBars(
     // (`jamArc`). Only on Auto: a manual intensity pins the level as it always has. A pass that
     // loops has no last chorus to shape towards, so it keeps the pass lift.
     const jam = settings.arc === 'jam' && settings.intensity === null && !looping;
-    const lift = (index: number) => (jam ? jamArc(timeline, index) : passLift(index));
+    const depth = arcShape?.depth ?? 1;
+    const lift = (index: number) => (jam ? jamArc(timeline, index) * depth : passLift(index));
     const plans: BarPlan[] = [];
     for (let i = window.from; i < Math.min(planned, window.to); i++) {
         const bar = bars[i];
@@ -275,7 +307,12 @@ export function planBars(
             energy += 0.06;
         }
         // The lift is the last term, so nothing after it washes the arc out.
+        const own = clamp01(energy);
         energy = clamp01(energy + lift(i));
+        if (jam && arcShape?.keepsHighLine) {
+            // The form's own side of the high line holds: the arc moves the bar within it.
+            energy = own < HIGH ? Math.min(energy, HIGH_CEILING) : Math.max(energy, HIGH);
+        }
 
         const lanes = {} as Record<Lane, boolean>;
         for (const lane of ['drums', 'bass', 'comp', 'lead'] as const) {

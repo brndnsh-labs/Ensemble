@@ -516,6 +516,11 @@ export const reggae: Style = {
     // The horn lays back furthest of all, well behind the drums: roots horn lines drag, and
     // the lazier the melody the deeper the pocket feels.
     feel: { swing: 20, swingGrid: 16, lean: { bass: 8, comp: 5, lead: 12 }, humanize: 30 },
+    // why: a roots band commits to one riddim for the whole take (the drums' `groove`), so the
+    // song-mode arc never flips one drop to steppers chorus to chorus (#1789): it breathes in
+    // the dynamics at half depth (a plain chart's climax ~0.65, upper mid, its build and breath
+    // still heard), and it never carries a bar across the high line the chart didn't.
+    jamArc: { depth: 0.5, keepsHighLine: true },
     drums: reggaeDrums,
     bass: reggaeBass,
     comp: { keyboard: reggaeKeys, guitar: reggaeGuitar },
