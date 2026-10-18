@@ -8,8 +8,10 @@
 import type { SemanticScore } from '../../core/songbook/score-types.js';
 import { type BandSettings, DEFAULT_SETTINGS } from '../core/types.js';
 import { compileTimeline, type Timeline } from '../form/timeline.js';
+import { performPass } from '../perform.js';
+import { STYLE_IDS, STYLES } from '../styles/index.js';
 import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
-import { type BarPlan, energyTier, planBars } from './plan.js';
+import { type BarPlan, energyTier, type JamArcShape, planBars } from './plan.js';
 
 const A8 = 'C | Am7 | Dm7 | G7 | C | Am7 | Dm7 | G7';
 /** A plain 32-bar form whose every section sits at the default energy (0.55). */
@@ -34,11 +36,17 @@ function counted(chart: SemanticScore, choruses: number): Timeline {
     return compileTimeline({ ...chart, choruses });
 }
 
-function plan(timeline: Timeline, settings: BandSettings, looping = false): BarPlan[] {
+function plan(
+    timeline: Timeline,
+    settings: BandSettings,
+    looping = false,
+    arcShape?: JamArcShape,
+): BarPlan[] {
     return planBars(timeline, settings, {
         pass: 0,
         looping,
         window: { from: 0, to: timeline.bars.length },
+        arcShape,
     });
 }
 
@@ -230,5 +238,126 @@ describe('the jam arc changes nothing it was not asked to', () => {
     it('the arc moves energy on an Auto counted performance', () => {
         const timeline = counted(plain, 6);
         expect(plan(timeline, JAM)).not.toEqual(plan(timeline, DEFAULT_SETTINGS));
+    });
+});
+
+/** A verse, a pre-chorus building into the chorus, a chorus: the pre sits just under the line. */
+const preChorus = score([
+    { label: 'Verse', bars: A8 },
+    { label: 'Pre', bars: 'F | G | F | G' },
+    { label: 'Chorus', bars: 'F | G | Am | C | F | G | C | C' },
+]);
+const HOLDING = { reggae: STYLES.reggae, bossa: STYLES.bossa };
+const isHigh = (plan: BarPlan) => energyTier(plan.energy) === 'high';
+
+describe('a style whose high tier is another groove keeps its side of the line (#1789)', () => {
+    const charts = { ...CHARTS, preChorus };
+
+    it('only reggae and bossa reshape the arc', () => {
+        expect(STYLE_IDS.filter((id) => STYLES[id].jamArc)).toEqual(['bossa', 'reggae']);
+    });
+
+    for (const [id, style] of Object.entries(HOLDING)) {
+        it(`${id}: the arc never carries a bar across the high line`, () => {
+            for (const [name, chart] of Object.entries(charts)) {
+                for (let n = 1; n <= 16; n++) {
+                    const timeline = counted(chart, n);
+                    const arced = plan(timeline, JAM, false, style.jamArc);
+                    const without = plan(timeline, { ...JAM, arc: null }, false, style.jamArc);
+                    // The form's own energy: the arc at no depth (no pass lift either).
+                    const own = plan(timeline, JAM, false, { depth: 0, keepsHighLine: false });
+                    for (const bar of timeline.bars) {
+                        const at = `${name} n=${n} bar ${bar.index}`;
+                        if (isHigh(arced[bar.index])) {
+                            expect(isHigh(without[bar.index]), at).toBe(true);
+                        }
+                        expect(isHigh(arced[bar.index]), at).toBe(isHigh(own[bar.index]));
+                    }
+                }
+            }
+        });
+
+        it(`${id}: the arc's shape still holds in the chorus means`, () => {
+            for (const chart of Object.values(CHARTS)) {
+                for (const n of [4, 6, 8, 10, 16]) {
+                    const timeline = counted(chart, n);
+                    const means = chorusMeans(timeline, plan(timeline, JAM, false, style.jamArc));
+                    const peak = loudest(means);
+                    for (let c = 1; c <= peak; c++) {
+                        expect(means[c]).toBeGreaterThan(means[c - 1]);
+                    }
+                    expect(means[0]).toBeLessThan(means[peak]);
+                    expect(means[n - 2]).toBeLessThan(means[peak]);
+                    expect(means[n - 1]).toBeGreaterThan(means[n - 2]);
+                }
+            }
+        });
+
+        it(`${id}: the climax and the last chorus lean in phrase on phrase, not flat on the line`, () => {
+            // The depth's job: the arc moves under the line at its own scale, so the ceiling
+            // stays a guard. A full arc would press the climax flat against it.
+            for (const chart of [plain, blues]) {
+                for (const n of [4, 8, 16]) {
+                    const timeline = counted(chart, n);
+                    const plans = plan(timeline, JAM, false, style.jamArc);
+                    const peak = loudest(chorusMeans(timeline, plans));
+                    for (const chorus of [peak, n - 1]) {
+                        const tops = timeline.bars.filter(
+                            (bar) => bar.visit.chorus === chorus && bar.phrase.bar === 0,
+                        );
+                        for (let k = 1; k < tops.length; k++) {
+                            expect(
+                                plans[tops[k].index].energy,
+                                `n=${n} chorus ${chorus} phrase ${k}`,
+                            ).toBeGreaterThan(plans[tops[k - 1].index].energy);
+                        }
+                    }
+                }
+            }
+        });
+
+        it(`${id}: nothing but a song-mode Auto take changes`, () => {
+            for (const chart of Object.values(charts)) {
+                const timeline = counted(chart, 5);
+                for (const settings of [
+                    { ...DEFAULT_SETTINGS, arc: null },
+                    DEFAULT_SETTINGS,
+                    { ...JAM, intensity: 0.55 },
+                    { ...JAM, intensity: 0.9 },
+                ]) {
+                    expect(plan(timeline, settings, false, style.jamArc)).toEqual(
+                        plan(timeline, settings),
+                    );
+                }
+                const once = compileTimeline(chart);
+                expect(plan(once, JAM, true, style.jamArc)).toEqual(plan(once, JAM, true));
+            }
+        });
+    }
+
+    it('every other style plans a song-mode take exactly as the full arc does', () => {
+        for (const id of STYLE_IDS.filter((id) => !(id in HOLDING))) {
+            for (const chart of Object.values(charts)) {
+                for (const n of [1, 3, 4, 8]) {
+                    const timeline = counted(chart, n);
+                    const full = plan(timeline, JAM, false, { depth: 1, keepsHighLine: false });
+                    expect(plan(timeline, JAM, false, STYLES[id].jamArc)).toEqual(full);
+                    expect(plan(timeline, JAM)).toEqual(full);
+                }
+            }
+        }
+    });
+
+    it('the performance reads the style: a song-mode bossa take never reaches for the ride', () => {
+        const timeline = counted(plain, 8);
+        const rides = (settings: BandSettings) =>
+            performPass(
+                timeline,
+                { ...settings, style: 'bossa' },
+                { pass: 0, looping: false },
+            ).events.filter((event) => event.lane === 'drums' && event.piece === 'ride').length;
+        expect(rides(JAM)).toBe(0);
+        // Not vacuous: the same take pinned in the high tier rides.
+        expect(rides({ ...JAM, intensity: 0.85 })).toBeGreaterThan(0);
     });
 });

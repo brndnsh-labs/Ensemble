@@ -361,6 +361,12 @@ export const bossa: Style = {
     // Straight, light, slightly forward: bossa floats, it never drags.
     // The horn floats a hair behind the guitar, as Getz did over João Gilberto.
     feel: { swing: 0, swingGrid: 16, lean: { bass: -3, comp: -3, lead: 5 }, humanize: 30 },
+    // why: bossa is understated, and its high tier trades the hat for the ride (the drums'
+    // `groove`): a take that flipped hat and ride between choruses isn't the idiom (#1789). The
+    // build lives in the dynamics and the comp instead, at 0.6 of the arc — a touch more than
+    // reggae's, since bossa's mid-tier dynamics carry the build alone (a plain chart's climax
+    // ~0.67) — and the arc never carries a bar across the high line the chart didn't.
+    jamArc: { depth: 0.6, keepsHighLine: true },
     drums: bossaDrums,
     bass: bossaBass,
     comp: { keyboard: bossaKeys, guitar: bossaGuitar },

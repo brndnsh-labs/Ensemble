@@ -5,7 +5,7 @@
  * Idioms are shared vocabulary, so a new style is usually a new combination, and an
  * "influence" (rock with a Motown bass) is a style that borrows another family's idiom.
  */
-import type { BarPlan } from '../arrange/plan.js';
+import type { BarPlan, JamArcShape } from '../arrange/plan.js';
 import type { Rng } from '../core/random.js';
 import type {
     CompInstrument,
@@ -133,6 +133,12 @@ export interface Style {
      * a minor one. See `arrange/ending.ts`.
      */
     ending: EndingQuality;
+    /**
+     * How the song-mode jam arc (`BandSettings.arc`, #1785) moves this style. Absent, the full
+     * arc. A style whose high tier is a different groove, not just a bigger one, keeps the
+     * chart's own side of the high line through a take (#1789): see `JamArcShape`.
+     */
+    jamArc?: JamArcShape;
 }
 
 /**
