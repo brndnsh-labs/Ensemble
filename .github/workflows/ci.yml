@@ -75,8 +75,8 @@ jobs:
         run: npm run ci
 
       # The v2 account API (#1187) is a standalone sibling package under
-      # api/ with its own package-lock.json — same --prefix
-      # pattern v2-preview.yml uses for web. Kept HERE, not in
+      # api/ with its own package-lock.json, installed with --prefix
+      # like web/. Kept HERE, not in
       # e2e-tests: this suite is node-environment-only (node:sqlite, no DOM),
       # so it doesn't need that job's browser install.
       - name: Install v2 account API dependencies
