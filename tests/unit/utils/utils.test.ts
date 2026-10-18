@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { describe, expect, it } from 'vitest';
-import { clampFreq, createSoftClipCurve } from '../../../public/engine/audio-graph-utils.js';
+import { clampFreq, createSoftClipCurve } from '../../../core/engine/audio-graph-utils.js';
 
 import {
     getFrequency,
@@ -8,7 +8,7 @@ import {
     keyDistance,
     normalizeKey,
     transposeKeyName,
-} from '../../../public/utils.js';
+} from '../../../core/utils.js';
 
 describe('Utility Functions', () => {
     describe('DSP Utility Functions', () => {

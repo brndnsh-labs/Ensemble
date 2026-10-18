@@ -5,7 +5,7 @@ import {
     type PreparedSave,
     reply,
     snapshot,
-} from '../../../prototypes/v2/lib/sync/protocol.js';
+} from '../../../web/lib/sync/protocol.js';
 import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 describe('Save protocol document boundary', () => {

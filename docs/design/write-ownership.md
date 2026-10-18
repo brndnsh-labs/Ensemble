@@ -6,7 +6,7 @@ those fixes already used a name, so the next contributor recognizes the shape of
 before shipping it a fourth time.
 
 **Provenance:** distilled from the #1062 (soloist trade) and #1064 (conductor density/complexity)
-incident pair. `public/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST` is an exhaustive,
+incident pair. `core/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST` is an exhaustive,
 `satisfies`-guarded classification of every top-level state field as `document`, `preferences`, or
 `runtime-derived` — written, in 2026-08, to say what v1's save and share codecs persisted. Until
 now nothing constrained who may **write** a field, and the manifest's classification was silently
@@ -18,7 +18,7 @@ the manifest at run time any more. It is a type guard and a classification; what
 `hydrateState`, `loadFromUrl`) is deleted, and with it the old engine's settings it alone still
 carried — among them `chords.density`, `soloist.tradeMode` and `soloist.tradeSilenced`, and the
 conductor's `playback.conductorDensity`. So the persistence hazard in §2 now applies to a chart's
-Save (`prototypes/v2/lib/runtime.ts`'s `captureContent`), and two of the precedents below (the
+Save (`web/lib/runtime.ts`'s `captureContent`), and two of the precedents below (the
 trade layer, the density mirror) survive only as history in §5. The law itself is unchanged.
 
 **Amended 2026-10-11:** the remaining v1 scratch state nothing read is gone from the tree — the
@@ -233,7 +233,7 @@ violation is a code-review discipline: ask "is the field being written here `doc
 new write onto an existing state field from an engine/conductor/worker path.
 
 One compile-time gate does back this up for the generic write: `SET_PARAM`'s payload is typed per
-slice (`ActionPayloadSetParam` in `public/types.ts`), so a dispatch naming a field a slice does
+slice (`ActionPayloadSetParam` in `core/types.ts`), so a dispatch naming a field a slice does
 not declare fails typecheck, and each reducer drops (and warns about) one that gets past the
-compiler (`writeDeclaredParam`, `public/state/set-param.ts`). That keeps a deleted field from
+compiler (`writeDeclaredParam`, `core/state/set-param.ts`). That keeps a deleted field from
 being re-created by a stale dispatch; it does not say who may write a field that exists.

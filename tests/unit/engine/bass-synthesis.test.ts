@@ -11,11 +11,11 @@ const { makeSoloistMock } = await vi.hoisted(
 // This suite tests the reworked ("New") synth bass voice — the only bass voice
 // since #649 retired the Current/New A/B and deleted `playBassNoteCurrent`.
 // `playBassNote` now always routes to `playBassNoteNew` in
-// `public/engine/synth-bass.ts`. The mock node graph below mirrors exactly what
+// `core/engine/synth-bass.ts`. The mock node graph below mirrors exactly what
 // that voice creates (3 oscillators, the saw + sub low-passes, the saturator
 // wave-shaper, the body/saw/sub/drive/amp gains) plus the buffer-source +
 // band-pass filter that `playPercussiveStrike` allocates for the impact click.
-vi.mock('../../../public/state.js', () => {
+vi.mock('../../../core/state.js', () => {
     const mockPlayback = {
         audio: {
             currentTime: 0,
@@ -91,19 +91,19 @@ vi.mock('../../../public/state.js', () => {
 });
 
 // Mock the audio-graph helpers (they moved to engine/audio-graph-utils.js in #1176)
-vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) => ({
+vi.mock('../../../core/engine/audio-graph-utils.js', async (importOriginal) => ({
     ...(await importOriginal<any>()),
     safeDisconnect: vi.fn(),
     createSoftClipCurve: vi.fn(() => new Float32Array(1024)),
 }));
 
-import { playBassNote } from '../../../public/engine/synth-bass.js';
-import { getState } from '../../../public/state.js';
+import { playBassNote } from '../../../core/engine/synth-bass.js';
+import { getState } from '../../../core/state.js';
 
 const { playback, bass } = getState();
 
 // All values asserted below are derived from `playBassNoteNew` in
-// `public/engine/synth-bass.ts` for the given inputs (verified by hand). The
+// `core/engine/synth-bass.ts` for the given inputs (verified by hand). The
 // canonical test note is open low E (41.2 Hz) at full velocity.
 describe('Reworked Synth Bass Voice', () => {
     beforeEach(() => {

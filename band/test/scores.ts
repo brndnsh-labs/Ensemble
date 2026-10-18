@@ -2,13 +2,13 @@
  * Compact score builders and the fixture charts every table-driven band test runs over.
  * Bars use the chart editor's own bar syntax (`parseChordBar`): `C F:2 G:2 | N.C. | / |`.
  */
-import { parseChordBar } from '../../public/songbook/score-text.js';
+import { parseChordBar } from '../../core/songbook/score-text.js';
 import type {
     ScoreDirection,
     ScoreMeasure,
     ScoreSection,
     SemanticScore,
-} from '../../public/songbook/score-types.js';
+} from '../../core/songbook/score-types.js';
 
 export interface SectionSpec {
     label: string;

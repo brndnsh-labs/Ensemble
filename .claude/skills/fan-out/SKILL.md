@@ -62,11 +62,11 @@ non-mechanical work, run `/burndown` instead — serial, and it stops properly.
    *not* the same as each agent's green. Individually-correct changes can combine into a broken
    tree, and that's exactly what this step catches:
    ```
-   npm run typecheck     # tsc over public/ and scripts/ (npm run typecheck:tests covers tests/)
+   npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)
    npm run lint          # Biome lint + format check
    npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
    npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-   npm run build --prefix prototypes/v2 && npm run test:e2e --prefix prototypes/v2   # the app's Playwright suite (laptop + webkit-phone) against the built export
+   npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export
    ```
 9. **Confirm the writes actually landed.** A subagent reporting "completed" is evidence of intent,
    not of a successful write. Check the files changed — by modification time or content, not by

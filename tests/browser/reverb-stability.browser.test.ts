@@ -1,8 +1,8 @@
 import { expect, test } from 'vitest';
-import { createAlgorithmicReverb, REVERB_PRESETS } from '../../public/engine/reverb.js';
+import { createAlgorithmicReverb, REVERB_PRESETS } from '../../core/engine/reverb.js';
 
 /**
- * Stability guard for the algorithmic reverb (`public/engine/reverb.ts`).
+ * Stability guard for the algorithmic reverb (`core/engine/reverb.ts`).
  *
  * Builds the real reverb in an `OfflineAudioContext`, fires a single-sample
  * impulse, renders 8 s, and checks the windowed peak envelope. A reverb MUST

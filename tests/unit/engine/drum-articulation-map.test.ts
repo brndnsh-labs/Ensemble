@@ -6,7 +6,7 @@ import {
     isHatName,
     isRingingHat,
     KNOWN_SOUND_NAMES,
-} from '../../../public/engine/synth-drums.js';
+} from '../../../core/engine/synth-drums.js';
 
 // The acoustic-kit seam (#662) maps a groove-engine drum `name` to a pack
 // manifest key. The contract that must not silently drift: every key the mapper
@@ -15,7 +15,7 @@ import {
 // `null` so they fall back to the synth voice. This guards both sides at once.
 
 const manifestPath = fileURLToPath(
-    new URL('../../../public/packs/acoustic-kit/manifest.json', import.meta.url),
+    new URL('../../../core/packs/acoustic-kit/manifest.json', import.meta.url),
 );
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
     samples: Array<{ key: string }>;

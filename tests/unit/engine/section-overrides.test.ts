@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { isInstrumentEverActive } from '../../../public/engine/section-overrides.js';
-import type { EnsembleState } from '../../../public/types.js';
+import { isInstrumentEverActive } from '../../../core/engine/section-overrides.js';
+import type { EnsembleState } from '../../../core/types.js';
 
 describe('section instrument overrides', () => {
     it('keeps chart-wide resources alive for a globally muted lane forced on later', () => {

@@ -6,9 +6,9 @@ import {
     candidateKey,
     type Draft,
     type PreparedSave,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import { sendNext } from '../../prototypes/v2/lib/sync/send.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import { sendNext } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**
@@ -22,7 +22,7 @@ import { accountChart } from '../utils/account-songbook-fixture.js';
  *
  * The loop's half (which owner may ask, what it publishes) is
  * `tests/unit/songbook/account-sync-loop.test.ts`; the product moment across two real devices is
- * `prototypes/v2/checks/account-remote-update.chromium.spec.ts`.
+ * `web/checks/account-remote-update.chromium.spec.ts`.
  */
 
 const OWNER = 'owner-a';

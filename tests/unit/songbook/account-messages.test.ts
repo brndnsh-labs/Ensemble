@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { ApiError, ApiErrorCode } from '../../../prototypes/v2/lib/account/api.js';
+import type { ApiError, ApiErrorCode } from '../../../web/lib/account/api.js';
 import {
     ACCOUNT_MESSAGES,
     failureFromApi,
     failureFromClaim,
     heldAccountBanner,
-} from '../../../prototypes/v2/lib/account/messages.js';
+} from '../../../web/lib/account/messages.js';
 
 /**
  * The account error → copy mapping (#1262). The property that matters most is the LAST case: no

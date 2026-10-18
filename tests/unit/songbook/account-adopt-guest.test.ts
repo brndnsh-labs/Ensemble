@@ -9,15 +9,15 @@ import {
     libraryDownloaded,
     pendingGuestCollections,
     rememberAdoptionDecision,
-} from '../../../prototypes/v2/lib/account/adopt-guest.js';
+} from '../../../web/lib/account/adopt-guest.js';
 import {
     type CollectionDocument,
     newCollection,
     newStarred,
     STARRED_COLLECTION_ID,
-} from '../../../prototypes/v2/lib/collections.js';
-import { LocalRevisionError } from '../../../prototypes/v2/lib/sync/protocol.js';
-import { MAX_REMOTE_CANDIDATES } from '../../../prototypes/v2/lib/sync/repository.js';
+} from '../../../web/lib/collections.js';
+import { LocalRevisionError } from '../../../web/lib/sync/protocol.js';
+import { MAX_REMOTE_CANDIDATES } from '../../../web/lib/sync/repository.js';
 
 /**
  * Copying guest songs into the account (#1268), tested at the level this file can reach without
@@ -40,7 +40,7 @@ const { listLibrary, save, run, list, listCollections, accountCollections, editC
         editCollection: vi.fn(),
     }));
 
-vi.mock('../../../prototypes/v2/lib/account/sync-loop.js', () => ({
+vi.mock('../../../web/lib/account/sync-loop.js', () => ({
     accountSync: {
         listLibrary,
         save,
@@ -50,7 +50,7 @@ vi.mock('../../../prototypes/v2/lib/account/sync-loop.js', () => ({
     },
 }));
 
-vi.mock('../../../prototypes/v2/lib/repository.js', () => ({ list, listCollections }));
+vi.mock('../../../web/lib/repository.js', () => ({ list, listCollections }));
 
 function guestSong(id: string) {
     return {

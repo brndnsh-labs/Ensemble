@@ -10,11 +10,11 @@
 # holding node_modules, .next and the whole app is a thing to get wrong, not a thing to
 # maintain:
 #
-#   npm run build --prefix prototypes/v2
-#   docker build hosting/web --build-context site=prototypes/v2/out \
+#   npm run build --prefix web
+#   docker build hosting/web --build-context site=web/out \
 #       --build-arg REVISION="$(git rev-parse HEAD)" --tag ensemble-web:local
 #
-# Same prebuilt-artifact shape as prototypes/v2-api/Dockerfile: CI builds the export first,
+# Same prebuilt-artifact shape as api/Dockerfile: CI builds the export first,
 # then builds the image. There is no compile step in here on purpose — the bytes served are
 # the bytes the v2 gates already ran against.
 FROM nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6

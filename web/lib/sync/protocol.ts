@@ -1,0 +1,459 @@
+import { validateChartDocumentV2 } from '../../../core/songbook/document-v2.js';
+import type { ChartDocumentV2 } from '../../../core/songbook/score-types.js';
+import { type CollectionDocument, decodeCollection, isCollectionCandidate } from '../collections';
+
+/** A chart the account syncs: schema 2, the only one since #1740 (a text chart is refused). */
+export type ChartDocument = ChartDocumentV2;
+/**
+ * Every document kind the account syncs (#1474): a chart, or a collection (`lib/collections.ts`).
+ * A chart carries no `kind`, so every chart path below is unchanged; only the paths that move
+ * any document — the outbox, the Save request and its reply — dispatch on it.
+ */
+export type SyncDocument = ChartDocument | CollectionDocument;
+export type { CollectionDocument };
+
+export const ACCOUNT_DATABASE = 'ensemble-v2-account-songbook';
+export const MAX_PENDING_SAVES = 64;
+
+/** Local routing context, NOT authentication. The eventual server must check the owner. */
+export interface AccountScope {
+    ownerId: string;
+    generation: number;
+}
+
+export interface SavedSong {
+    ownerId: string;
+    documentId: string;
+    document: ChartDocument;
+    remoteRevision: string | null;
+}
+
+export interface Draft {
+    ownerId: string;
+    documentId: string;
+    writerId: string;
+    document: ChartDocument;
+    baseRevision: number | null;
+    capturedAt: string;
+}
+
+export interface RemoteVersion<D extends SyncDocument = ChartDocument> {
+    revision: string;
+    document: D;
+}
+
+/**
+ * One saved collection in the account's `collections` store (#1474) — the collection half of
+ * `SavedSong`, with the same two revisions: the document's own local commit counter and the
+ * opaque server revision the cloud last confirmed (null until it has).
+ */
+export interface SavedCollection {
+    ownerId: string;
+    documentId: string;
+    document: CollectionDocument;
+    remoteRevision: string | null;
+}
+
+export type UnsupportedReason = 'needs-app-update' | 'invalid';
+
+/**
+ * What a library download learned about one document and was NOT allowed to apply to the saved
+ * record. Exactly one record per (owner, document), because the three kinds are mutually
+ * exclusive outcomes of the same question — "the cloud moved, can this device adopt it?":
+ *
+ * - `version`: the remote body is valid but local work would be lost by adopting it (a draft, a
+ *   queued Save, or the chart currently on the stand). Kept beside the untouched saved record
+ *   so a later Keep-both/adopt decision has both sides to show.
+ * - `deleted`: the cloud tombstoned a document this device still has divergent local work for.
+ *   The local work stays; this is the flag that explains why the cloud copy is gone.
+ * - `unsupported`: the body could not be validated — a newer `schemaVersion` this build has no
+ *   decoder for, or a corrupt record. `body` is the observed value, preserved and NEVER passed
+ *   through `snapshot()`, migrated or coerced; it is untrusted data for display and export only.
+ */
+export type RemoteOutcome = {
+    documentId: string;
+    revision: string;
+} & (
+    | ({ kind: 'version' } & Pick<RemoteVersion, 'document'>)
+    | { kind: 'deleted' }
+    | { kind: 'unsupported'; body: unknown; reason: UnsupportedReason }
+);
+
+/** The stored form: the same observation, bound to an owner and its `meta` key. */
+export type RemoteCandidate = RemoteOutcome & { key: string; ownerId: string };
+
+/**
+ * Remote candidates live in the `meta` store rather than a store of their own: adding one would
+ * need an IndexedDB version bump on a database that already exists wherever this app has run,
+ * and a schema upgrade is a destructive-data decision that a download feature does not get to
+ * make on its own. `meta` is a generic keyed store (keyPath `'key'`), is already inside every
+ * transaction's scope in `AccountDatabase.run` — so a candidate and a saved record still commit
+ * together — and its only other key is `'active'`.
+ *
+ * The identifier grammar excludes `':'`, so this composition is unambiguous: no owner or
+ * document ID can be spelled to collide with another's key or with `'active'`.
+ */
+export function candidatePrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `remote:${ownerId}:`;
+}
+
+export function candidateKey(ownerId: string, documentId: string): string {
+    identifier(documentId);
+    return `${candidatePrefix(ownerId)}${documentId}`;
+}
+
+/**
+ * The frozen half of an explicit cloud deletion (#1270), keyed into the SAME generic `meta` store
+ * the remote candidates live in — and for the same reason: a store of its own would need an
+ * IndexedDB version bump on a database that already exists wherever this app has run, and a schema
+ * upgrade is a destructive-data decision a delete feature does not get to make on its own.
+ *
+ * `'delete:'` sorts strictly below `'remote:'`, so `remoteCandidates`' prefix range cannot see one,
+ * and the `'active'` pointer sorts below both. The identifier grammar excludes `':'`, so no owner
+ * or document ID can be spelled to collide across the two namespaces.
+ *
+ * It is persisted BEFORE the request leaves, and that is the whole point: a lost response (the tab
+ * closed, the network died mid-flight) leaves the server's receipt written and this device unsure.
+ * Retrying with the SAME operation id is what makes the second attempt a replay the server answers
+ * from its receipt rather than a second delete — so the id has to outlive a reload, which a
+ * module-level variable would not.
+ */
+export function deletionPrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `delete:${ownerId}:`;
+}
+
+export function deletionKey(ownerId: string, documentId: string): string {
+    identifier(documentId);
+    return `${deletionPrefix(ownerId)}${documentId}`;
+}
+
+/**
+ * Which chart this account last had on the stand (#1299), in the SAME generic `meta` store as the
+ * remote candidates and frozen deletions above — and for the same reason: a store of its own would
+ * need an IndexedDB version bump on a database that already exists wherever this app has run.
+ *
+ * One key per owner, because it is one fact per account. `'last-opened:'` sorts strictly between
+ * `'delete:'` and `'remote:'`, so neither prefix range can see it, and the `'active'` pointer sorts
+ * below all three. The identifier grammar excludes `':'`, so no owner ID can collide across them.
+ *
+ * It is a convenience preference and never a document edit — the guest half is `lib/session.ts`'s
+ * `last-opened` key. An account chart's belongs in the account database so that it is removed by
+ * the same sign-out that removes the songs it names, rather than outliving them in guest storage.
+ */
+export function lastOpenedKey(ownerId: string): string {
+    identifier(ownerId);
+    return `last-opened:${ownerId}`;
+}
+
+/** The stored form. An absent record means this account has not opened a chart on this device. */
+export interface LastOpened {
+    key: string;
+    ownerId: string;
+    documentId: string;
+}
+
+/**
+ * Per-song "opened at" (#1440), one row per document rather than `lastOpenedKey`'s one row per
+ * owner — the All songs page's Recently-opened sort and filter need every song's own timestamp,
+ * not only the single most-recent one `lastOpenedKey` already answers for the Continue card.
+ * Same `meta` store, same reasoning as the candidate/deletion/last-opened namespaces above: no
+ * IndexedDB version bump, no new destructive-data decision. `'opened:'` sorts strictly between
+ * `'last-opened:'` and `'remote:'`, so no existing prefix range can see it and it cannot see one.
+ *
+ * A device-local preference, never a document field: opening a chart never bumps its
+ * `updatedAt`/`revision` and never queues a Save, and this row does not either.
+ */
+export function openedPrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `opened:${ownerId}:`;
+}
+
+export function openedKey(ownerId: string, documentId: string): string {
+    identifier(documentId);
+    return `${openedPrefix(ownerId)}${documentId}`;
+}
+
+export interface OpenedAt {
+    key: string;
+    ownerId: string;
+    documentId: string;
+    openedAt: string;
+}
+
+/**
+ * The retired per-device stars (#1440): one `star:` row per starred song, copied into the built-in
+ * Starred collection by a one-time migration (#1477) that #1743 retired. Nothing reads or writes
+ * these rows any more. They are still this account's data on this device, so `clearAccount`
+ * removes them with the rest; that is the only thing that names them. `'star:'` sorts after every
+ * other prefix here, so no other range can reach it.
+ */
+export function retiredStarPrefix(ownerId: string): string {
+    identifier(ownerId);
+    return `star:${ownerId}:`;
+}
+
+/**
+ * The marker #1477's star migration wrote, one per owner (retired in #1743). `'stars-migrated:'`
+ * sorts after every `'star:'` key (`':'` < `'s'`), so the star range above never reaches it: it is
+ * removed on its own, by `clearAccount`.
+ */
+export function retiredStarsMarkerKey(ownerId: string): string {
+    identifier(ownerId);
+    return `stars-migrated:${ownerId}`;
+}
+
+/** The stored frozen delete. Four scalars: everything the canonical request bytes are made of. */
+export interface PendingDeletion {
+    key: string;
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    /** The confirmed remote revision this delete was aimed at. Never null: see `DeleteCommand`. */
+    expectedRevision: string;
+}
+
+export interface PreparedDelete {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    expectedRevision: string;
+    body: string;
+    digest: string;
+}
+
+/**
+ * The canonical delete envelope, in the exact key set and ORDER the server's decoder pins
+ * (`api/src/http/document-delete-request.ts`, which rebuilds this string and refuses
+ * a body that differs by so much as a space).
+ *
+ * Unlike a Save, this is DERIVED at send time rather than frozen as bytes. A Save freezes its
+ * `wireBody` because the document inside it is a whole chart that keeps being edited; a delete is
+ * four scalars that `PendingDeletion` already holds immutably, so re-deriving them is byte-identical
+ * by construction and there is no second copy to keep in agreement with the first.
+ */
+export function deleteBody(request: Omit<PendingDeletion, 'key'>): string {
+    identifier(request.ownerId);
+    identifier(request.documentId);
+    identifier(request.operationId);
+    remoteRevision(request.expectedRevision);
+    return JSON.stringify({
+        ownerId: request.ownerId,
+        documentId: request.documentId,
+        operationId: request.operationId,
+        expectedRevision: request.expectedRevision,
+    });
+}
+
+export type DeleteReply = {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    digest: string;
+    revision: string;
+} & ({ kind: 'deleted' } | { kind: 'conflict' });
+
+/**
+ * Validate a delete reply before starting an IDB write, exactly as `reply()` does for a Save.
+ *
+ * The 409 conflict body carries a `remote` version too, and it is deliberately NOT read here: a
+ * delete conflict is reported, never resolved — the id is still live at a revision this request did
+ * not expect, and the next library download is what brings that version in under the ordinary
+ * preservation rules. Decoding it here would put a second adoption path beside `reconcile`'s.
+ */
+export function deleteReply(candidate: unknown, request: PreparedDelete): DeleteReply {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        throw new Error('Invalid delete response. Nothing was removed from this device.');
+    }
+    const value = candidate as Record<string, unknown>;
+    if (
+        value.ownerId !== request.ownerId ||
+        value.documentId !== request.documentId ||
+        value.operationId !== request.operationId ||
+        value.digest !== request.digest ||
+        (value.kind !== 'deleted' && value.kind !== 'conflict')
+    ) {
+        throw new Error('Delete response does not match the request.');
+    }
+    remoteRevision(value.revision);
+    return {
+        ownerId: request.ownerId,
+        documentId: request.documentId,
+        operationId: request.operationId,
+        digest: request.digest,
+        revision: value.revision,
+        kind: value.kind,
+    };
+}
+
+/**
+ * Why the account will never accept the exact bytes at the head of a document's outbox (#1298),
+ * distinct from a `'conflict'`: a conflict is a two-sided version disagreement `acknowledge`
+ * resolves from a structured `SaveReply`; a refusal is a transport-level verdict about the
+ * REQUEST itself (`sync-loop.ts`'s `STEP_OVER_CODES`) that no retry of the same bytes can change.
+ * `'too-large'` is its own member rather than a second spelling of `'refused'` for the same
+ * reason `SyncFailureReason` keeps them apart: a payload the server will not accept is fixed by
+ * shrinking the chart and saving again, never by anything to do with the operation/document id.
+ */
+export type SaveRefusalReason = 'too-large' | 'refused';
+
+/**
+ * One queued Save. The `operations` store holds both kinds (#1474) under one `song` index keyed by
+ * document id — ids are unique per owner across kinds, as the server's one `documents` table makes
+ * them — so `D` says which kind a reader has proved it holds. Chart paths read the default.
+ */
+export interface SaveOperation<D extends SyncDocument = ChartDocument> {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    localRevision: number;
+    snapshot: D;
+    base: { revision: string | null } | { operationId: string };
+    wireBody: string | null;
+    status: 'queued' | 'conflict' | 'refused';
+    // null is an explicit missing/deleted remote song; undefined means no conflict.
+    remote?: RemoteVersion<D> | null;
+    /** Present only when `status === 'refused'` (#1298). Never set for `'queued'`/`'conflict'`. */
+    reason?: SaveRefusalReason;
+}
+
+export interface PreparedSave {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    body: string;
+    digest: string;
+}
+
+export interface SaveReceipt {
+    ownerId: string;
+    documentId: string;
+    operationId: string;
+    digest: string;
+    revision: string;
+}
+
+/**
+ * `remote` is any kind here: `reply()` validates the reply before it knows which store the
+ * operation belongs to, and `acknowledge` is what proves the remote is the operation's own kind.
+ */
+export type SaveReply = SaveReceipt &
+    ({ kind: 'committed' } | { kind: 'conflict'; remote: RemoteVersion<SyncDocument> | null });
+
+export class AccountChangedError extends Error {
+    constructor() {
+        super('The active account changed. This work remains with its original account.');
+    }
+}
+
+export class LocalRevisionError extends Error {
+    constructor() {
+        super('This song was saved elsewhere. Your draft is preserved; reopen it or duplicate it.');
+    }
+}
+
+export function identifier(value: unknown): asserts value is string {
+    if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(value)) {
+        throw new Error('Invalid sync identifier.');
+    }
+}
+
+export function localRevision(value: unknown): asserts value is number | null {
+    if (value !== null && (!Number.isSafeInteger(value) || (value as number) < 0)) {
+        throw new Error('Invalid local revision.');
+    }
+}
+
+export function remoteRevision(value: unknown): asserts value is string {
+    if (typeof value !== 'string' || !/^[A-Za-z0-9._:-]{1,200}$/.test(value)) {
+        throw new Error('Invalid remote revision.');
+    }
+}
+
+export function snapshot(candidate: unknown): ChartDocument {
+    const decoded = validateChartDocumentV2(candidate);
+    if (decoded.kind !== 'ok') {
+        throw new Error('Cannot sync this chart version or content. The source is unchanged.');
+    }
+    identifier(decoded.value.id);
+    return decoded.value;
+}
+
+/** A collection the account will sync: valid, and every id inside it a sync identifier. */
+export function collectionSnapshot(candidate: unknown): CollectionDocument {
+    const decoded = decodeCollection(candidate);
+    if (decoded.kind !== 'ok') {
+        throw new Error('Cannot sync this collection version or content. The source is unchanged.');
+    }
+    identifier(decoded.value.id);
+    // An account collection names account documents, and every one of those is a sync identifier.
+    // A guest id outside that grammar could never resolve here, so it is refused rather than
+    // stored as a dead reference the server would have to hold forever.
+    for (const songId of decoded.value.songIds) {
+        identifier(songId);
+    }
+    return decoded.value;
+}
+
+/**
+ * Either kind, dispatched on `kind` — the one decoder the outbox, the Save request and its reply
+ * share. A candidate with no `kind` is a chart and goes through `snapshot()` exactly as it always
+ * did, so a chart's bytes and verdicts are unchanged by this function existing.
+ */
+export function syncDocument(candidate: unknown): SyncDocument {
+    return isCollectionCandidate(candidate) ? collectionSnapshot(candidate) : snapshot(candidate);
+}
+
+/** Which kind a validated document is. A chart has no `kind` field at all. */
+export function documentKind(document: SyncDocument): 'chart' | 'collection' {
+    return (document as { kind?: unknown }).kind === 'collection' ? 'collection' : 'chart';
+}
+
+export async function digest(body: string): Promise<string> {
+    const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(body));
+    return Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+/** Validate the reply before starting an IDB write; never store arbitrary transport objects. */
+export function reply(candidate: unknown, request: PreparedSave): SaveReply {
+    if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+        throw new Error('Invalid Save response. The queued snapshot is unchanged.');
+    }
+    const value = candidate as Record<string, unknown>;
+    if (
+        value.ownerId !== request.ownerId ||
+        value.documentId !== request.documentId ||
+        value.operationId !== request.operationId ||
+        value.digest !== request.digest ||
+        (value.kind !== 'committed' && value.kind !== 'conflict')
+    ) {
+        throw new Error('Save response does not match the queued request.');
+    }
+    remoteRevision(value.revision);
+    const receipt: SaveReceipt = {
+        ownerId: request.ownerId,
+        documentId: request.documentId,
+        operationId: request.operationId,
+        digest: request.digest,
+        revision: value.revision,
+    };
+    if (value.kind === 'committed') {
+        return { ...receipt, kind: 'committed' };
+    }
+    if (value.remote === null) {
+        return { ...receipt, kind: 'conflict', remote: null };
+    }
+    if (!value.remote || typeof value.remote !== 'object' || Array.isArray(value.remote)) {
+        throw new Error('Invalid remote conflict version.');
+    }
+    const remote = value.remote as Record<string, unknown>;
+    remoteRevision(remote.revision);
+    // Either kind: whether it is the SAME kind as the queued Save is `acknowledge`'s check, which
+    // holds the stored operation this reply answers.
+    const document = syncDocument(remote.document);
+    if (document.id !== request.documentId || remote.revision !== value.revision) {
+        throw new Error('Remote conflict version does not match this song.');
+    }
+    return { ...receipt, kind: 'conflict', remote: { revision: remote.revision, document } };
+}

@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { playSampledNote } from '../../public/engine/sample-voice.js';
+import { playSampledNote } from '../../core/engine/sample-voice.js';
 
 /**
  * A sustaining pack's note outlasts its recording (#1532).

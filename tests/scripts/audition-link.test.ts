@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { decodeChartLink } from '../../public/songbook/chart-link.js';
-import type { ChartDocumentV2 } from '../../public/songbook/score-types.js';
+import { decodeChartLink } from '../../core/songbook/chart-link.js';
+import type { ChartDocumentV2 } from '../../core/songbook/score-types.js';
 import { buildAuditionLink, runAuditionLink } from '../../scripts/audition-link.js';
 
 const scene = {

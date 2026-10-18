@@ -10,13 +10,13 @@
                 "tests/scripts/**/*.ts",
                 "tests/utils/seeded-random.ts"
             ],
-            "project": ["public/**/*.ts", "band/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+            "project": ["core/**/*.ts", "band/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
         },
-        "prototypes/v2": {
+        "web": {
             "entry": ["app/**/*.{ts,tsx}", "lib/**/*.ts", "scripts/*.mjs", "checks/**/*.ts"],
             "project": ["app/**/*.{ts,tsx}", "lib/**/*.ts", "scripts/*.mjs", "checks/**/*.ts"]
         },
-        "prototypes/v2-api": {
+        "api": {
             "entry": ["src/db/index.ts", "src/auth/index.ts", "test/**/*.test.ts"],
             "project": ["src/**/*.ts", "test/**/*.ts"]
         }

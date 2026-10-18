@@ -1,14 +1,14 @@
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import fixtures from '../../../docs/design/fixtures/ensemble-v2-charts.json';
 import {
     decodeChartLink,
     encodeChartLink,
     RETIRED_CHART_LINK,
-} from '../../../public/songbook/chart-link.js';
-import { parseIRealImport } from '../../../public/songbook/ireal-import.js';
-import type { ChartDocumentV2, SemanticScore } from '../../../public/songbook/score-types.js';
-import type { ChartBand, ChartLaneMix } from '../../../public/songbook/types.js';
+} from '../../../core/songbook/chart-link.js';
+import { parseIRealImport } from '../../../core/songbook/ireal-import.js';
+import type { ChartDocumentV2, SemanticScore } from '../../../core/songbook/score-types.js';
+import type { ChartBand, ChartLaneMix } from '../../../core/songbook/types.js';
+import fixtures from '../../../docs/design/fixtures/ensemble-v2-charts.json';
 
 function mix(overrides: Partial<ChartLaneMix> = {}): ChartLaneMix {
     return {

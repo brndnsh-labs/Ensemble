@@ -1,16 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AccountApi, ApiError, ApiResult } from '../../../prototypes/v2/lib/account/api.js';
-import { createLibraryTransport } from '../../../prototypes/v2/lib/account/library-transport.js';
-import { createAccountSession } from '../../../prototypes/v2/lib/account/session.js';
+import type { AccountApi, ApiError, ApiResult } from '../../../web/lib/account/api.js';
+import { createLibraryTransport } from '../../../web/lib/account/library-transport.js';
+import { createAccountSession } from '../../../web/lib/account/session.js';
 import {
     type LibraryTransport,
     type LocalMirror,
     type ManifestRow,
     planLibraryDownload,
     runLibraryDownload,
-} from '../../../prototypes/v2/lib/sync/download.js';
-import type { AccountScope } from '../../../prototypes/v2/lib/sync/protocol.js';
-import type { AccountSongbook } from '../../../prototypes/v2/lib/sync/repository.js';
+} from '../../../web/lib/sync/download.js';
+import type { AccountScope } from '../../../web/lib/sync/protocol.js';
+import type { AccountSongbook } from '../../../web/lib/sync/repository.js';
 
 /**
  * The two halves of #1265 that need neither IndexedDB nor a browser: the pure manifest diff, and

@@ -1,7 +1,7 @@
-import { isValidTimeSignatureGrouping } from '../../../public/meter.js';
+import { isValidTimeSignatureGrouping } from '../../../core/meter.js';
 
 // The songbook codec trusts this to decide whether a saved custom grouping is kept
-// (`public/songbook/codec.ts`).
+// (`core/songbook/codec.ts`).
 describe('isValidTimeSignatureGrouping', () => {
     it('accepts a partition of the meter into positive whole beats', () => {
         expect(isValidTimeSignatureGrouping([2, 3], '5/4')).toBe(true);

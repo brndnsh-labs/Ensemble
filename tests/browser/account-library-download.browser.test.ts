@@ -3,16 +3,16 @@ import type {
     DownloadOutcome,
     LibraryTransport,
     ManifestOutcome,
-} from '../../prototypes/v2/lib/sync/download.js';
-import { runLibraryDownload } from '../../prototypes/v2/lib/sync/download.js';
+} from '../../web/lib/sync/download.js';
+import { runLibraryDownload } from '../../web/lib/sync/download.js';
 import {
     ACCOUNT_DATABASE,
     AccountChangedError,
     type AccountScope,
     type ChartDocument,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import { type SaveTransport, sendNext } from '../../prototypes/v2/lib/sync/send.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import { type SaveTransport, sendNext } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

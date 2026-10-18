@@ -17,15 +17,15 @@ import { describe, expect, it } from 'vitest';
  * the band engine's trading never touches `enabled` either).
  *
  * This test statically scans every dispatch of `ACTIONS.SET_PARAM` under
- * `public/` for a payload that would write `enabled` on a literal
+ * `core/` for a payload that would write `enabled` on a literal
  * `soloist`/`sb` module target, and fails if any new one shows up outside the
  * sanctioned manual-toggle site, which writes through a variable and never matches.
  * (`ACTIONS.UPDATE_SB`, the old multi-key batch form this test also used to scan,
  * was deleted in #1381 — nothing dispatched it, so that half of the guard was
- * permanently vacuous.) Limit: it sees literal module names under `public/` only.
+ * permanently vacuous.) Limit: it sees literal module names under `core/` only.
  */
 
-const PUBLIC_DIR = path.resolve(__dirname, '../../../public');
+const CORE_DIR = path.resolve(__dirname, '../../../core');
 
 function getFiles(dir: string, files: string[] = []): string[] {
     for (const entry of fs.readdirSync(dir)) {
@@ -41,7 +41,7 @@ function getFiles(dir: string, files: string[] = []): string[] {
 
 describe('#1062 — soloist.enabled ownership guard', () => {
     it('no SET_PARAM dispatch targets a literal soloist/sb module with param "enabled"', () => {
-        const files = getFiles(PUBLIC_DIR).filter((f) => !f.endsWith('types.ts'));
+        const files = getFiles(CORE_DIR).filter((f) => !f.endsWith('types.ts'));
         const violations: string[] = [];
         // Matches `{ ...module: 'soloist'|'sb'... param: 'enabled'... }` in either
         // key order, scoped to one object literal (`[^{}]*` won't cross braces).
@@ -53,7 +53,7 @@ describe('#1062 — soloist.enabled ownership guard', () => {
         for (const file of files) {
             const content = fs.readFileSync(file, 'utf8');
             if (moduleThenParam.test(content) || paramThenModule.test(content)) {
-                violations.push(path.relative(PUBLIC_DIR, file));
+                violations.push(path.relative(CORE_DIR, file));
             }
             moduleThenParam.lastIndex = 0;
             paramThenModule.lastIndex = 0;

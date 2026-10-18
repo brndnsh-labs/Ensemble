@@ -9,11 +9,11 @@ import {
     MUTE_ATTENUATION,
     muteGain,
     normalizeMuteAmount,
-} from '../../../public/engine/mute-contract.js';
+} from '../../../core/engine/mute-contract.js';
 import {
     BASS_VELOCITY_DOMAIN_MAX,
     bassVelocityToAmplitude,
-} from '../../../public/engine/velocity-shaping.js';
+} from '../../../core/engine/velocity-shaping.js';
 
 describe('mute contract', () => {
     it('reads a boolean as its extremes and clamps a number to 0..1', () => {

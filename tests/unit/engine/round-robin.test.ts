@@ -3,9 +3,9 @@ import {
     __resetPackCacheForTest,
     getPackBuffer,
     getPackBufferVariants,
-} from '../../../public/engine/instrument-registry.js';
-import { __resetLoaderForTest, loadPack } from '../../../public/engine/sample-loader.js';
-import { pickRoundRobin } from '../../../public/engine/sample-voice.js';
+} from '../../../core/engine/instrument-registry.js';
+import { __resetLoaderForTest, loadPack } from '../../../core/engine/sample-loader.js';
+import { pickRoundRobin } from '../../../core/engine/sample-voice.js';
 
 /**
  * #657 — deterministic round-robin support for the drum pack runtime.

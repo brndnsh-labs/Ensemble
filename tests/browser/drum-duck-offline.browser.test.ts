@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { playDrumSound } from '../../public/engine/synth-drums.js';
-import type { EnsembleState } from '../../public/types.js';
+import { playDrumSound } from '../../core/engine/synth-drums.js';
+import type { EnsembleState } from '../../core/types.js';
 
 /**
  * The drum density duck in an offline render (#1531).

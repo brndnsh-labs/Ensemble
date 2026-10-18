@@ -6,7 +6,7 @@
  * the last chorus: a counted performance ends on the out-head, the melody restated.
  */
 
-import { isIntroLabel, isOutroLabel } from '../../public/songbook/score-form.js';
+import { isIntroLabel, isOutroLabel } from '../../core/songbook/score-form.js';
 import {
     type BandEvent,
     type BandSettings,

@@ -191,7 +191,7 @@ export interface PitchSummary {
     worst: PitchReading | null;
     /**
      * Written pitches whose median reading is more than `OFF_PITCH_CENTS` out, from at least
-     * two notes: the mis-rooted sample zone class (public/engine/CLAUDE.md rule 24).
+     * two notes: the mis-rooted sample zone class (core/engine/CLAUDE.md rule 24).
      */
     offPitch: Array<{ midi: number; medianCents: number; count: number }>;
 }

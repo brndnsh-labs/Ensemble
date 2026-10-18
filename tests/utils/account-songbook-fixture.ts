@@ -1,4 +1,4 @@
-import type { ChartDocumentV2 } from '../../public/songbook/score-types.js';
+import type { ChartDocumentV2 } from '../../core/songbook/score-types.js';
 
 /** Original synthetic chart; no user library or imported repertoire in sync fixtures. */
 export function accountChart(title = 'A', id = 'study'): ChartDocumentV2 {

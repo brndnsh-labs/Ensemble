@@ -6,7 +6,7 @@ This document tracks specific reference recordings used to calibrate the Ensembl
 > change log at the end is a record of the old worker-based engine (deleted in #1404): the
 > files it names (`accompaniment.ts`, the groove strategies, `playback.bandIntensity`) are gone,
 > and the `npm run test:e2e` it cites then ran the v1 app's suite. Today the same check is
-> `npm run test:e2e --prefix prototypes/v2`, and the band's per-style numbers live in
+> `npm run test:e2e --prefix web`, and the band's per-style numbers live in
 > `band/styles/<id>.ts` and `band/test/claims/<id>.ts`.
 
 ## Jazz-Funk

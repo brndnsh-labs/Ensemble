@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { OUTBOX_PAGE_LIMIT, runOutboxPass } from '../../prototypes/v2/lib/sync/drain.js';
+import { OUTBOX_PAGE_LIMIT, runOutboxPass } from '../../web/lib/sync/drain.js';
 import {
     ACCOUNT_DATABASE,
     AccountChangedError,
     type AccountScope,
     type PreparedSave,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import type { SaveTransport } from '../../prototypes/v2/lib/sync/send.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import type { SaveTransport } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

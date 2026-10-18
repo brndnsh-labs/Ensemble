@@ -1,0 +1,269 @@
+import { fileURLToPath } from 'node:url';
+import { serve } from '@hono/node-server';
+import { createWebAuthnConfig } from './auth/config.js';
+import { DEFAULT_REGISTRATION_CAP } from './auth/registration.js';
+import { openDatabase } from './db/connection.js';
+import { runMigrations } from './db/migrate.js';
+import { createApp } from './http/app.js';
+import { type ClientIdentityOptions, createClientIdentity } from './http/client-identity.js';
+import { registerHealthCheck } from './http/health.js';
+
+/**
+ * The one file in this service that reads `process.env` (#1189 decision 7). Every other module
+ * takes its configuration and database handle as arguments — see `src/http/app.ts`'s
+ * `createApp({ db, config })` and `src/auth/config.ts`'s `createWebAuthnConfig`.
+ *
+ * `createWebAuthnConfig` fails loudly (throws synchronously) on a non-canonical origin, a
+ * mismatched `rpId`, or a non-`https:`/non-`http://localhost` origin — this file does not catch
+ * that throw, so a misconfigured deployment refuses to start rather than serving broken
+ * ceremonies with no hint at the cause. Every other env var this file reads gets the same
+ * fail-loud treatment below — an empty or malformed value must throw before `openDatabase` or
+ * `serve` ever run, not silently fall back to a value nobody chose (an empty `PORT` binding a
+ * random port, an empty `HOST` binding nothing, an empty or `:memory:` `ENSEMBLE_DB_PATH`
+ * silently discarding every session on restart).
+ *
+ * **Every env value is read and validated as a plain value FIRST** — `config`, `dbPath`, `port`,
+ * `host`, all before `openDatabase` is ever called (P2-1 review finding: the earlier version
+ * opened and migrated the database, THEN validated `PORT`/`HOST`, so a bad `PORT` still left a
+ * migrated `db.sqlite` — plus its `-wal`/`-shm` siblings — on disk before the process crashed).
+ * Reordering so every read-and-throw happens before the first filesystem write is what makes a
+ * failed startup leave nothing behind.
+ *
+ * Migrate-on-start is acceptable only because no persistent database exists yet for this service
+ * (decision 7) — a later stage adds a backup-before-migrate step ahead of a real deployment.
+ */
+
+function readRequiredEnv(name: string): string {
+    const value = process.env[name];
+    if (value === undefined || value.trim().length === 0) {
+        throw new Error(`${name} must be set`);
+    }
+    return value;
+}
+
+function readPort(): number {
+    const raw = process.env.PORT;
+    if (raw === undefined) {
+        return 8080;
+    }
+    // Exactly one or more ASCII digits, nothing else — no leading/trailing whitespace, sign,
+    // decimal point, exponent or hex/octal prefix. `Number()` alone would accept all of those
+    // (`Number('0x50')` is 80, `Number('1e3')` is 1000, `Number(' 18312 ')` is 18312), silently
+    // reinterpreting a typo'd PORT as some other valid-looking number instead of rejecting it.
+    if (!/^\d+$/.test(raw)) {
+        throw new Error(
+            `PORT must consist only of decimal digits (no sign, decimal point, exponent, hex ` +
+                `prefix, or surrounding whitespace), got ${JSON.stringify(raw)}`,
+        );
+    }
+    const port = Number(raw);
+    if (port < 1 || port > 65535) {
+        throw new Error(`PORT must be an integer in [1, 65535], got ${JSON.stringify(raw)}`);
+    }
+    return port;
+}
+
+function readHost(): string {
+    const raw = process.env.HOST;
+    if (raw === undefined) {
+        return '0.0.0.0';
+    }
+    if (raw.trim().length === 0) {
+        throw new Error('HOST must not be empty when set');
+    }
+    return raw;
+}
+
+/**
+ * Finding 2 (#1196 independent review): `createClientIdentity` (`http/client-identity.ts`)
+ * already refuses a HALF-configured proxy setup (one of `ENSEMBLE_AUTH_IP_HEADER` /
+ * `ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES` set, not the other) — but with NEITHER set, it silently
+ * falls back to keying every rate limiter (authPolicy's per-route ones, and
+ * `rate-limit-guard.ts`'s shared one) on the raw socket peer address. Behind Caddy in production
+ * that address is constant for every real caller, collapsing every per-caller bucket into one
+ * shared global bucket for the entire internet — silently, with no error and a plausible-looking
+ * "it's rate limiting something" behavior.
+ *
+ * Neither-set is legitimate ONLY for local dev/tests with no reverse proxy in front, so it
+ * requires this separate, differently-named opt-in (never the same header/addresses vars a
+ * forgotten proxy config would leave half-set) — mirroring the fail-loud style of the
+ * half-configured check it sits next to, but living here rather than in `client-identity.ts`
+ * because it is a deployment-topology decision read from `process.env`, and this file is the only
+ * one that reads `process.env` at all.
+ */
+function readIpMode(): 'proxy' | 'socket-only' {
+    const raw = process.env.ENSEMBLE_AUTH_IP_MODE;
+    if (raw === undefined) {
+        return 'proxy';
+    }
+    if (raw !== 'socket-only') {
+        throw new Error(
+            `ENSEMBLE_AUTH_IP_MODE must be exactly "socket-only" when set (or unset entirely for ` +
+                `the normal trusted-proxy configuration), got ${JSON.stringify(raw)}`,
+        );
+    }
+    return 'socket-only';
+}
+
+function readDbPath(): string {
+    const path = readRequiredEnv('ENSEMBLE_DB_PATH');
+    // `node:sqlite` honors SQLite's URI-filename syntax, so `:memory:` is not the only way to
+    // get an in-memory (never-persisted, WAL-mode-has-no-effect-on) database: `file::memory:`
+    // and `file:x.db?mode=memory` (any `file:`-prefixed URI, really — the `mode=memory` query
+    // param is just one of several ways a `file:` URI can end up in-memory or otherwise not a
+    // plain path) both open one too. Rejecting the whole `file:` prefix, not just those two
+    // specific spellings, is what actually closes this off rather than playing whack-a-mole with
+    // SQLite's URI syntax.
+    if (path === ':memory:' || /^file:/i.test(path)) {
+        throw new Error(
+            `ENSEMBLE_DB_PATH must be a plain filesystem path, not ":memory:" or a "file:" URI ` +
+                `(node:sqlite honors SQLite's URI filenames, and several of those spellings are ` +
+                `in-memory databases too) — got ${JSON.stringify(path)}. WAL mode has no effect ` +
+                'on an in-memory database, and every session/credential would vanish on restart.',
+        );
+    }
+    return path;
+}
+
+const config = createWebAuthnConfig({
+    rpId: readRequiredEnv('ENSEMBLE_RP_ID'),
+    rpName: readRequiredEnv('ENSEMBLE_RP_NAME'),
+    origin: readRequiredEnv('ENSEMBLE_ORIGIN'),
+});
+const dbPath = readDbPath();
+const port = readPort();
+const host = readHost();
+const revision = process.env.ENSEMBLE_BUILD_REVISION ?? 'development';
+if (revision !== 'development' && !/^[0-9a-f]{40}$/.test(revision)) {
+    throw new Error('ENSEMBLE_BUILD_REVISION must be a full lowercase Git SHA or development');
+}
+const ipMode = readIpMode();
+// Anonymous registration is CLOSED unless the deployment says `open` in so many words. Unset
+// is closed on purpose: a fresh environment must never accept accounts by omission.
+function readRegistrationOpen(): boolean {
+    const raw = process.env.ENSEMBLE_REGISTRATION;
+    if (raw === undefined || raw === 'closed') {
+        return false;
+    }
+    if (raw === 'open') {
+        return true;
+    }
+    throw new Error(
+        'ENSEMBLE_REGISTRATION must be exactly "open" or "closed" (unset means closed)',
+    );
+}
+const registrationOpen = readRegistrationOpen();
+/**
+ * Service-wide registration ceiling (#1272 — DECISION 2026-09-17 on #1256): the per-owner
+ * storage caps (`MAX_BYTES_PER_OWNER` in db/save.ts) bound one account's footprint, but nothing
+ * bounded how many accounts could exist — an unbounded account count has no disk ceiling at all.
+ * Same fail-loud digits-only validation as `readPort` above, and the same reasoning: an
+ * unrecognized value must refuse to start, not silently resolve to some other cap nobody chose.
+ * `DEFAULT_REGISTRATION_CAP` (`auth/registration.ts`) is 25, worst case 6.4 GiB against the
+ * 256 MiB per-owner cap.
+ */
+function readRegistrationCap(): number {
+    const raw = process.env.ENSEMBLE_REGISTRATION_CAP;
+    if (raw === undefined) {
+        return DEFAULT_REGISTRATION_CAP;
+    }
+    if (!/^\d+$/.test(raw)) {
+        throw new Error(
+            `ENSEMBLE_REGISTRATION_CAP must consist only of decimal digits (no sign, decimal ` +
+                `point, exponent, hex prefix, or surrounding whitespace), got ${JSON.stringify(raw)}`,
+        );
+    }
+    const cap = Number(raw);
+    // Bounded above as well as below, like `readPort`. A long enough digit string passes the
+    // regex and becomes `Infinity` (`Number('9'.repeat(400))`), and `count >= Infinity` is never
+    // true — a fat-fingered value would silently REMOVE the cap this variable exists to set.
+    if (cap < 1 || !Number.isSafeInteger(cap)) {
+        throw new Error(
+            `ENSEMBLE_REGISTRATION_CAP must be a positive safe integer, got ${JSON.stringify(raw)}`,
+        );
+    }
+    return cap;
+}
+const registrationCap = readRegistrationCap();
+/**
+ * #1717: who may read `/api/admin/overview` — comma-separated account ids (base64url, as
+ * `GET /api/auth/session` returns them). Unset or empty refuses everyone, which is the safe
+ * default and the state of any deployment nobody has configured. An entry that is not a
+ * base64url id refuses to start, like every other value here: a typo must not quietly lock the
+ * operator out, nor (with a stray space) look configured while matching nobody.
+ */
+function readAdminAccountIds(): string[] {
+    const raw = process.env.ENSEMBLE_ADMIN_ACCOUNT_IDS ?? '';
+    if (raw === '') {
+        return [];
+    }
+    const ids = raw.split(',');
+    for (const id of ids) {
+        if (!/^[A-Za-z0-9_-]+$/.test(id)) {
+            throw new Error(
+                `ENSEMBLE_ADMIN_ACCOUNT_IDS must be comma-separated account ids with no spaces, got ${JSON.stringify(raw)}`,
+            );
+        }
+    }
+    return ids;
+}
+const adminAccountIds = readAdminAccountIds();
+const clientIdentity: ClientIdentityOptions = {
+    secret: readRequiredEnv('ENSEMBLE_AUTH_IP_SECRET'),
+    header: process.env.ENSEMBLE_AUTH_IP_HEADER,
+    trustedProxyAddresses: process.env.ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES?.split(','),
+};
+// Finding 2 (#1196 review): neither proxy-trust var set is only ever correct for local dev/tests
+// with no reverse proxy in front — refuse to start unless that has been explicitly opted into,
+// rather than silently keying every rate limiter off the constant Caddy-fronted socket peer.
+if (
+    clientIdentity.header === undefined &&
+    (clientIdentity.trustedProxyAddresses?.length ?? 0) === 0 &&
+    ipMode !== 'socket-only'
+) {
+    throw new Error(
+        'Neither ENSEMBLE_AUTH_IP_HEADER nor ENSEMBLE_AUTH_TRUSTED_PROXY_ADDRESSES is set. ' +
+            'Behind a reverse proxy this collapses every caller onto one raw-socket-peer rate ' +
+            'limit bucket. Configure both proxy-trust vars, or set ENSEMBLE_AUTH_IP_MODE=socket-only ' +
+            'to explicitly opt into running with no reverse proxy in front (local dev only).',
+    );
+}
+// Fail before database creation. No default Cloudflare/XFF choice: the current static route
+// does NOT sanitize direct-origin spoofing; see the #1192 threat-model evidence.
+createClientIdentity(clientIdentity);
+
+// Nothing above this line touches the filesystem or the network — every env value is validated
+// first. Only past this point does the process open (and, on failure, potentially leave behind)
+// a database file.
+const db = openDatabase(dbPath);
+// fileURLToPath, not `.pathname`: a raw URL pathname percent-encodes characters like spaces
+// (`%20`), which readdirSync/readFileSync would then try to open literally rather than decoding.
+runMigrations(db, fileURLToPath(new URL('../migrations', import.meta.url)));
+
+const app = createApp({
+    db,
+    config,
+    clientIdentity,
+    registrationOpen,
+    registrationCap,
+    adminAccountIds,
+});
+registerHealthCheck(app, db, revision);
+
+// This service's one intended startup log line. `noConsole` (biome.json) is scoped to
+// `core/**` only, so it does not apply here.
+const server = serve({ fetch: app.fetch, port, hostname: host }, (info) => {
+    console.log(
+        `ensemble-v2-api listening on http://${host}:${info.port} (origin: ${config.origin}, registration: ${registrationOpen ? 'open' : 'closed'}, cap: ${registrationCap})`,
+    );
+});
+
+function shutdown(): void {
+    server.close(() => {
+        db.close();
+        process.exit(0);
+    });
+}
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);

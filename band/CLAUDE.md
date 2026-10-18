@@ -4,7 +4,7 @@ Read [`docs/design/band-engine.md`](../docs/design/band-engine.md) first: its de
 shape and its laws. Rules that bind every change here:
 
 - **Pure and deterministic.** No `Math.random`, no clocks, no global state, no imports from
-  `public/engine`, `public/state` or the DOM. `public/songbook/` (the chart codecs) is the only
+  `core/engine`, `core/state` or the DOM. `core/songbook/` (the chart codecs) is the only
   outside dependency. Randomness goes through `ctx.rng(purpose, scope)`.
 - **Timing moves only in `feel/feel.ts`.** Players write on the straight sixteenth grid.
 - **Chord meaning comes only from `theory/chord.ts`.** Never parse a symbol in a player. A new

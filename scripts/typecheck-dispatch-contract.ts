@@ -1,5 +1,5 @@
-import { dispatch } from '../public/state.js';
-import { ACTIONS } from '../public/types.js';
+import { dispatch } from '../core/state.js';
+import { ACTIONS } from '../core/types.js';
 
 /**
  * Compile-only contract fixture. `npm run typecheck` includes scripts, so an

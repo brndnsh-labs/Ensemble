@@ -1,10 +1,10 @@
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { buildStandardDocument } from '../prototypes/v2/lib/standards.js';
-import { TIME_SIGNATURES } from '../public/config.js';
-import { GENRE_NAMES } from '../public/data/smart-genres.js';
-import { encodeChartLink } from '../public/songbook/chart-link.js';
-import type { ChartDocumentV2 } from '../public/songbook/score-types.js';
+import { TIME_SIGNATURES } from '../core/config.js';
+import { GENRE_NAMES } from '../core/data/smart-genres.js';
+import { encodeChartLink } from '../core/songbook/chart-link.js';
+import type { ChartDocumentV2 } from '../core/songbook/score-types.js';
+import { buildStandardDocument } from '../web/lib/standards.js';
 import { DEFAULT_MIX_REPORT_SCENES } from './mix-report-utils.js';
 
 interface SceneShape {
@@ -52,7 +52,7 @@ interface CliArgs {
     retiredPart?: boolean;
 }
 
-// The v2 stand's dev server (`npm --prefix prototypes/v2 run dev`) at the site root.
+// The v2 stand's dev server (`npm --prefix web run dev`) at the site root.
 // The link is a schema-2 chart in a `#chart=` fragment (#1732), the same envelope the stand's
 // "Copy link" writes, so it opens as an unsaved draft through the shell's ordinary shared-link
 // path; `?autoplay=1` arms playback on the first gesture. `?seed=` is not carried: the chart's

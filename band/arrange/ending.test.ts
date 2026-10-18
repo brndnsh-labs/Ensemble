@@ -5,7 +5,7 @@
  * Every case is a real chart through `compileTimeline` and `performPass`, as the host and the
  * export play it.
  */
-import type { ScoreDirection, SemanticScore } from '../../public/songbook/score-types.js';
+import type { ScoreDirection, SemanticScore } from '../../core/songbook/score-types.js';
 import {
     type BandEvent,
     type BandSettings,

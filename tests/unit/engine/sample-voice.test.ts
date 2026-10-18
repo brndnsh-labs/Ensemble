@@ -8,7 +8,7 @@ import {
     playSampledStrike,
     releaseSampledVoices,
     type SampleZone,
-} from '../../../public/engine/sample-voice.js';
+} from '../../../core/engine/sample-voice.js';
 
 // A param that records its scheduled (value, time) points.
 function fakeParam() {

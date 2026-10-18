@@ -4,14 +4,14 @@
         ".": {
             "entry": ["scripts/**/*.ts!"],
             "project": [
-                "public/**/*.{ts,tsx}!",
+                "core/**/*.{ts,tsx}!",
                 "band/**/*.ts!",
                 "scripts/**/*.ts!",
                 "!band/**/*.test.ts!",
                 "!band/test/**!"
             ]
         },
-        "prototypes/v2": {
+        "web": {
             "entry": ["app/**/{page,layout,not-found,error,manifest}.{ts,tsx}!", "scripts/*.mjs!"],
             "project": [
                 "app/**/*.{ts,tsx}!",
@@ -21,7 +21,7 @@
                 "!lib/**/test/**!"
             ]
         },
-        "prototypes/v2-api": {
+        "api": {
             "entry": ["src/server.ts!", "build.mjs!"],
             "project": ["src/**/*.ts!"]
         }

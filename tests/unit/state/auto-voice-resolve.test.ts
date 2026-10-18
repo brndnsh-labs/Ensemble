@@ -1,15 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { SMART_GENRES } from '../../../public/data/smart-genres.js';
+import { SMART_GENRES } from '../../../core/data/smart-genres.js';
 import {
     __resetPackCacheForTest,
     markPackInstalled,
-} from '../../../public/engine/instrument-registry.js';
+} from '../../../core/engine/instrument-registry.js';
 import {
     deriveSoloistMode,
     isGuitarSoloistVoice,
-} from '../../../public/engine/soloist-mode-policy.js';
-import { resolveAutoVoices } from '../../../public/state/state-effects.js';
-import { ACTIONS, type EnsembleState } from '../../../public/types.js';
+} from '../../../core/engine/soloist-mode-policy.js';
+import { resolveAutoVoices } from '../../../core/state/state-effects.js';
+import { ACTIONS, type EnsembleState } from '../../../core/types.js';
 
 // #683 — installing a pack must upgrade the *current* genre's Auto lanes right
 // away (the install path calls resolveAutoVoices against groove.lastSmartGenre),

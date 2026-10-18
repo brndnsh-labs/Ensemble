@@ -2,7 +2,7 @@
 
 Issue [#1192](https://github.com/brndnsh-labs/Ensemble/issues/1192), stage 2 of the
 [account/sync contract](ensemble-v2-sync.md). This document describes the standalone
-`prototypes/v2-api/` implementation on disposable data. It did not authorize deployment while the
+`api/` implementation on disposable data. It did not authorize deployment while the
 exit gate was open; since 2026-09-15 the service runs on docker04 behind Caddy's `/api/*` split
 (#1217, #1218) with **anonymous registration closed by deployment policy** (#1226). It still does
 not authorize production migration or a real account launch.
@@ -255,7 +255,7 @@ previously had no storage destination. It runs only on disposable databases in t
 Rows contain an event, time, verified account/credential IDs where available, and failure name,
 code, short description and cause **from a fixed allowlist**. Arbitrary thrown Error messages,
 causes and stacks can contain secrets even after truncation, so none are serialized. No payload,
-WebAuthn response, public/private key, recovery code, session/ceremony token, IP, URL/query or
+WebAuthn response, core/private key, recovery code, session/ceremony token, IP, URL/query or
 chart contents are recorded. Failed requests are not attributed to unverified owner/body IDs.
 Credential IDs are identifying metadata, not key material, and are stored only for verified
 events. Passkey-added, passkey-revoked, credential-related session revocation, logout/rotation,

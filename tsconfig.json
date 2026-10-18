@@ -10,15 +10,15 @@
         "skipLibCheck": true,
         "esModuleInterop": true,
         "paths": {
-            "*": ["./node_modules/*", "./public/*"],
+            "*": ["./node_modules/*", "./core/*"],
             // The v2 aliases, so a script run with `tsx` (which reads this file's paths at run
             // time) can import a v2 `lib/` module that reaches back into the engine —
             // `scripts/node-webaudio.ts` and the node render path of `scripts/mix-report.ts`.
             // `tsconfig.scripts.json` and `tsconfig.tests.json` carry the same mapping for tsc.
-            "@engine/*": ["./public/*"],
+            "@core/*": ["./core/*"],
             "@band/*": ["./band/*"]
         }
     },
-    "include": ["public/**/*.ts", "band/**/*.ts", "env.d.ts"],
+    "include": ["core/**/*.ts", "band/**/*.ts", "env.d.ts"],
     "exclude": ["node_modules", "dist", "tests", "scripts", "band/**/*.test.ts", "band/test"]
 }

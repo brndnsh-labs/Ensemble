@@ -51,13 +51,13 @@ The Docker build context is `hosting/web`: three small files, of which the Docke
 (`smoke.mjs` lives there because it belongs beside what it tests, and never enters the image).
 The export itself arrives as a *named* build context, so the repository never becomes the
 context and there is no `.dockerignore` to keep correct against a tree holding `node_modules`
-and `.next`. Same prebuilt-artifact shape as `prototypes/v2-api/Dockerfile`; the bytes served
+and `.next`. Same prebuilt-artifact shape as `api/Dockerfile`; the bytes served
 are the bytes the v2 gates ran against — and only those, since the Dockerfile empties the
 document root first, which is what retires the base image's own `50x.html`.
 
 ```sh
-npm run build --prefix prototypes/v2
-docker build hosting/web --build-context site=prototypes/v2/out \
+npm run build --prefix web
+docker build hosting/web --build-context site=web/out \
     --build-arg REVISION="$(git rev-parse HEAD)" --tag ensemble-web:local
 node hosting/web/smoke.mjs ensemble-web:local "$(git rev-parse HEAD)"
 ```
@@ -165,7 +165,7 @@ merge's `deploy` puts the test host back on `main`.
 
 ## API is a separate service and a separate release
 
-`prototypes/v2-api/Dockerfile` packages the prebuilt esbuild bundle (`npm run build` in that
+`api/Dockerfile` packages the prebuilt esbuild bundle (`npm run build` in that
 directory, run by CI before the image build — #1202), production dependencies and
 migrations. No tsx, source/test tree, database or secret is baked into the runtime. The process
 runs non-root. `/healthz` performs a read-only schema query and returns bounded readiness and

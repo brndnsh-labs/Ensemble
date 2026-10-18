@@ -105,7 +105,7 @@
             "linter": { "enabled": false }
         },
         {
-            "includes": ["public/**"],
+            "includes": ["core/**"],
             "linter": {
                 "rules": {
                     "suspicious": {

@@ -7,7 +7,7 @@ const { makeSoloistMock } = await vi.hoisted(
 );
 
 // Mock state and global modules
-vi.mock('../../../public/state.js', () => {
+vi.mock('../../../core/state.js', () => {
     const mockPlayback = {
         audio: {
             currentTime: 0,
@@ -86,12 +86,12 @@ vi.mock('../../../public/state.js', () => {
 });
 
 // Mock the audio-graph helpers (they moved to engine/audio-graph-utils.js in #1176)
-vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) => ({
+vi.mock('../../../core/engine/audio-graph-utils.js', async (importOriginal) => ({
     ...(await importOriginal<any>()),
     safeDisconnect: vi.fn(),
 }));
 
-import { registerPackBuffer } from '../../../public/engine/instrument-registry.js';
+import { registerPackBuffer } from '../../../core/engine/instrument-registry.js';
 import {
     enabledLayerCount,
     getCymbalMixScale,
@@ -104,8 +104,8 @@ import {
     getTomVoiceConfig,
     playDrumSound,
     warmDrumBuffers,
-} from '../../../public/engine/synth-drums.js';
-import { getState } from '../../../public/state.js';
+} from '../../../core/engine/synth-drums.js';
+import { getState } from '../../../core/state.js';
 
 const { playback, groove } = getState();
 

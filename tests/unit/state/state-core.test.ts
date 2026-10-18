@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { dispatch, getState, subscribe } from '../../../public/state.js';
-import { ACTIONS } from '../../../public/types.js';
+import { dispatch, getState, subscribe } from '../../../core/state.js';
+import { ACTIONS } from '../../../core/types.js';
 
 describe('State Core Manager', () => {
     beforeEach(() => {

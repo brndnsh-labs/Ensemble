@@ -48,7 +48,7 @@ import {
 import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { encodeWav } from '../public/engine/wav-encoder.js';
+import { encodeWav } from '../core/engine/wav-encoder.js';
 import type { RenderMeta } from './audio-verify.js';
 import { decodeWav } from './mix-verify.js';
 import { barRangeToWindow, musicEndSec, STEPS_PER_BAR, STEPS_PER_BEAT } from './spectro-grid.js';
@@ -874,7 +874,7 @@ function restoreRef(original: RefDescriptor): void {
  * Drive one headless render at whatever ref is currently checked out.
  *
  * `--no-build` is deliberately NOT passed. `mix:report` renders the bundle it builds
- * (`prototypes/v2/out` since #1358, v1's `dist/` before it), so reusing a bundle built at
+ * (`web/out` since #1358, v1's `dist/` before it), so reusing a bundle built at
  * the other ref would render ref A's code and label it ref B — the exact error the whole
  * tool exists to rule out. A ref from before #1358 builds v1 with Vite, whose plugins
  * this tree's lockfile no longer installs: comparing across that boundary needs the older

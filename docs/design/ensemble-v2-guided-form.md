@@ -52,7 +52,7 @@ transport renders cannot reset an in-progress selection.
 
 - `tests/unit/songbook/guided-form.test.ts`: exact visit order, immutable source/content,
   invalid ranges/counts, group overlap, complex notation preservation and global navigation.
-- `prototypes/v2/checks/guided-form.spec.ts`: keyboard/tap interaction, draft cancellation,
+- `web/checks/guided-form.spec.ts`: keyboard/tap interaction, draft cancellation,
   create/edit/remove, preview failures, layouts and saved/offline round trips.
 - Existing `semantic-form-editor.spec.ts` continues to exercise per-bar marker pending forms,
   saved documents, import rejection, transpose and offline reopening.

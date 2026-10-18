@@ -58,10 +58,10 @@ story stays `status:in-progress` through review and patch.
    | If the diff touches... | Run | It is responsible for |
    | :- | :- | :- |
    | The band engine — `band/**` (styles, players, arrange, feel, theory) — or its claims, `band/test/claims/**` | **`music-theory-reviewer`** | Whether the musical intent is actually *expressed* by the code. Catches "programmer's math": statistically clean, musically wrong. |
-   | `public/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, the band host's scheduling in `prototypes/v2/lib/band-host.ts` | **`synth-graph-reviewer`** | Web Audio graph hygiene only — NaN/0 into an `AudioParam`, nodes created but never disconnected, `exponentialRamp` from/to zero, feedback stability, per-note allocation in a hot path. **Not** "does it sound good" — that's the `status:needs-ear` gate. |
-   | `public/state/**`, `prototypes/v2/lib/runtime.ts`, a new `ACTIONS.*`, a new `// @direct-mutation` marker, or any `signal.x = y` outside a reducer | **`state-discipline-reviewer`** | Dispatch discipline; `@direct-mutation` used outside the three sanctioned categories in CLAUDE.md; non-atomic dispatch chains; v2 UI reaching engine state outside `lib/runtime.ts`. |
-   | Any diff whose *claim* is fewer bytes or "dead code removal / no behavior change", whatever the path | **`bundle-hygiene-reviewer`** | Reachable code deleted under a "dead" claim; behavior change disguised as cleanup; tree-shaking defeated. It does **not** measure — the orchestrator measures the v2 export (`prototypes/v2/out/_next/static/`). |
-   | `prototypes/v2/app/**` (UI and CSS) | the **inline pass**, against `prototypes/v2/CLAUDE.md` | The per-surface boundaries in its navigation table (the shell owns the `<dialog>` refs and all state; surfaces are presentational), dialog a11y, CSS. The `webkit-phone` Playwright project is emulated WebKit, not a phone — say when a finding needs `verify-on-device`. |
+   | `core/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, the band host's scheduling in `web/lib/band-host.ts` | **`synth-graph-reviewer`** | Web Audio graph hygiene only — NaN/0 into an `AudioParam`, nodes created but never disconnected, `exponentialRamp` from/to zero, feedback stability, per-note allocation in a hot path. **Not** "does it sound good" — that's the `status:needs-ear` gate. |
+   | `core/state/**`, `web/lib/runtime.ts`, a new `ACTIONS.*`, a new `// @direct-mutation` marker, or any `signal.x = y` outside a reducer | **`state-discipline-reviewer`** | Dispatch discipline; `@direct-mutation` used outside the three sanctioned categories in CLAUDE.md; non-atomic dispatch chains; v2 UI reaching engine state outside `lib/runtime.ts`. |
+   | Any diff whose *claim* is fewer bytes or "dead code removal / no behavior change", whatever the path | **`bundle-hygiene-reviewer`** | Reachable code deleted under a "dead" claim; behavior change disguised as cleanup; tree-shaking defeated. It does **not** measure — the orchestrator measures the v2 export (`web/out/_next/static/`). |
+   | `web/app/**` (UI and CSS) | the **inline pass**, against `web/CLAUDE.md` | The per-surface boundaries in its navigation table (the shell owns the `<dialog>` refs and all state; surfaces are presentational), dialog a11y, CSS. The `webkit-phone` Playwright project is emulated WebKit, not a phone — say when a finding needs `verify-on-device`. |
    | A `band/test/**` claim or critique that *is* the deliverable | the **test-quality lens**, sharpened to the **five critique smells** below | — |
    | Anything else | the inline correctness pass alone | — |
 
@@ -84,12 +84,12 @@ story stays `status:in-progress` through review and patch.
    that directory — **read them rather than reasoning from memory**, and if a finding contradicts
    one, the file wins:
 
-   - `prototypes/v2/CLAUDE.md` — the app: delivery, trust boundaries, per-surface ownership,
+   - `web/CLAUDE.md` — the app: delivery, trust boundaries, per-surface ownership,
      verification gates.
    - `band/CLAUDE.md` — the band engine: its design laws, claims and critique harness.
-   - `public/CLAUDE.md` — effects/reactivity, offline-render clones, build identity and
+   - `core/CLAUDE.md` — effects/reactivity, offline-render clones, build identity and
      build-time flags, the metronome product constraint, config-semantics migrations.
-   - `public/engine/CLAUDE.md` — the voices, sample packs and the audio graph.
+   - `core/engine/CLAUDE.md` — the voices, sample packs and the audio graph.
    - `tests/CLAUDE.md` — statistical-claim traps, determinism/seeding, mocking, Playwright imports.
 
    ### Weighing a finding from these reviewers

@@ -6,8 +6,8 @@ import {
     packIdFromVoice,
     registerPackBuffer,
     resolveInstrumentSource,
-} from '../../../public/engine/instrument-registry.js';
-import type { InstrumentVoice } from '../../../public/types.js';
+} from '../../../core/engine/instrument-registry.js';
+import type { InstrumentVoice } from '../../../core/types.js';
 
 // The registry never inspects the buffer's contents — a sentinel object is a
 // sufficient stand-in for a decoded AudioBuffer in this environment.

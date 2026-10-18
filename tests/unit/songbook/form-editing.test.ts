@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import type { ScoreDirection, ScoreMeasure } from '../../../core/songbook/score-types.js';
 import {
     applyMeasureForm,
     type FormDraft,
     readMeasureForm,
-} from '../../../prototypes/v2/lib/form-editing.js';
-import type { ScoreDirection, ScoreMeasure } from '../../../public/songbook/score-types.js';
+} from '../../../web/lib/form-editing.js';
 
 const emptyDraft: FormDraft = {
     repeatStart: false,

@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { groove } from '../../../public/state/groove.js';
-import { bass, chords, instrumentReducer, soloist } from '../../../public/state/instruments.js';
+import { groove } from '../../../core/state/groove.js';
+import { bass, chords, instrumentReducer, soloist } from '../../../core/state/instruments.js';
 import {
     ACTIONS,
     type BassState,
     type ChordState,
     type Mutable,
     type SoloistState,
-} from '../../../public/types.js';
+} from '../../../core/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 const mutableChords = chords as Mutable<typeof chords>;

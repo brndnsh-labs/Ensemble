@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ChartDocumentV2 } from '../../../core/songbook/score-types.js';
+import { SONGBOOK_MAX_INPUT_BYTES } from '../../../core/songbook/structural-limits.js';
 import {
     type ChartDocument,
     documentKind,
     type SyncDocument,
     snapshot,
-} from '../../../prototypes/v2/lib/sync/protocol.js';
+} from '../../../web/lib/sync/protocol.js';
 import {
     decodeSaveRequest,
     MAX_SAVE_REQUEST_BYTES,
     SaveRequestError,
-} from '../../../prototypes/v2/lib/sync/request.js';
-import type { ChartDocumentV2 } from '../../../public/songbook/score-types.js';
-import { SONGBOOK_MAX_INPUT_BYTES } from '../../../public/songbook/structural-limits.js';
+} from '../../../web/lib/sync/request.js';
 import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 /**

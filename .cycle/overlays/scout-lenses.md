@@ -5,7 +5,7 @@ A music tool used **hands-on-instrument, eyes-on-a-chart** — a11y is core UX, 
   non-keyboard-operable controls, tab-order ≠ visual order, insufficient contrast, missing
   `:focus-visible`, motion ignoring `prefers-reduced-motion`, form controls (key, meter, tempo,
   genre) with no label.
-- **Where:** `prototypes/v2/app/**` — the transport bar, chart sheet, edit panel, sounds panel
+- **Where:** `web/app/**` — the transport bar, chart sheet, edit panel, sounds panel
   and song menu.
 - **Class 1 — deterministic (the burndown subset):** an unambiguously-right native fix — a missing
   `aria-label` on an icon button, `<span role="button">`→`<button>`, a missing `type="button"`, a
@@ -20,7 +20,7 @@ A music tool used **hands-on-instrument, eyes-on-a-chart** — a11y is core UX, 
   `status:needs-decision` fix-pre-drafted, Model `frontier` when the interaction itself needs design.
 
 ### `security` — hardening (the *least* burndown-able lens; deliberately small here)
-A static PWA plus a small account API (`prototypes/v2-api/`: passkeys, sessions, recovery codes,
+A static PWA plus a small account API (`api/`: passkeys, sessions, recovery codes,
 chart sync); no payments. The surface is **untrusted input** (share links, imported files,
 synced chart bodies), **the account boundary**, and **dependency CVEs**.
 - **Look for:** `npm audit` CVEs (run it); share-link / import / chart-codec parsing that trusts
@@ -28,9 +28,9 @@ synced chart bodies), **the account boundary**, and **dependency CVEs**.
   DOM); the service worker caching a private API/auth response or personalized HTML; session,
   step-up or recovery-code checks the server skips; any unsanitized user-derived string reaching
   the DOM.
-- **Where:** `public/songbook/` codecs,
-  `lib/account/`, `lib/sync/`, `prototypes/v2-api/src/`, the generated service worker
-  (`prototypes/v2/scripts/offline.mjs`).
+- **Where:** `core/songbook/` codecs,
+  `lib/account/`, `lib/sync/`, `api/src/`, the generated service worker
+  (`web/scripts/offline.mjs`).
 - **Landmines:** a **CVE bump with green gates** is `burndown` (it's `/dep-update`-shaped). A
   **code-level input-parsing change** is a judgment call — file it, route to a human `/cycle` with a
   `/security-review`, **never `burndown`-tag it** (a wrong hardening change is worse than the gap).
@@ -43,7 +43,7 @@ synced chart bodies), **the account boundary**, and **dependency CVEs**.
 ### `perf` — performance, *floor-aware*
 Speedups must keep playback glitch-free on weak hardware — a synthetic bench can't hear an audio
 dropout. **The split that decides everything — which side of the audio path is it on?**
-- **Real-time audio path** (the band host's scheduling in `prototypes/v2/lib/band-host.ts`, the
+- **Real-time audio path** (the band host's scheduling in `web/lib/band-host.ts`, the
   `synth-*.ts` voices) → **hard brake, never `burndown`.** A regression here is an audible glitch
   or a dropped buffer. File **with the by-ear / weak-device caveat written in**, route to
   `orchestrator-inline` / `musical-engine-implementer` + the matching reviewer, leave off
@@ -52,7 +52,7 @@ dropout. **The split that decides everything — which side of the audio path is
 - **Off-audio-path + build-measurable** → **`burndown`-eligible**, and this is exactly the **bundle
   Track** — file it `track:bundle`, `lens:bundle-hygiene`. Drop an unused dep, lazy-load a
   route/overlay, code-split a heavy component, memoize a *verified*-hot render. The measured v2
-  export (`prototypes/v2/out/_next/static/`) **is** the proof and it never touches the audio
+  export (`web/out/_next/static/`) **is** the proof and it never touches the audio
   floor. Pure ones (drop a dep) →
   `burndown`; tradeoff ones (a lazy-load adds a loading state) → `status:needs-decision`-with-fix.
 - **Classify:** audio-path → `track:synth`/`musical`, Model `frontier` for synth/audio lifecycle
@@ -92,7 +92,7 @@ cost. Two faces of one failure: **doc↔code drift** and **undocumented load-bea
   `// why` comment — CLAUDE.md requires the intent be documented) → propose encoding the rationale;
   the canonical-genre-key / alias family (Neo-Soul/Neo) drifting from `smart-genres.ts`, or a retired
   phantom key (`Shred`, `Latin`, `Afrobeat`, `Soul`) reappearing.
-- **Where:** the doc tree (`*.md`, `.claude/skills/**`, AI_MAP.md), plus `public/**` comments and the
+- **Where:** the doc tree (`*.md`, `.claude/skills/**`, AI_MAP.md), plus `core/**` comments and the
   band engine (`band/**`).
 - **The split:** **factual sync** (a renamed-file reference, a missing AI_MAP row, a missing
   musical-intent comment) → `burndown` (build/lint-verifiable or doc-only + directionally

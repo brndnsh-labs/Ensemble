@@ -8,7 +8,7 @@
  * it's alone, broken chords over a bassist) and the drummer barely plays: a shaker, or a
  * cross-stick on 2 and 4. Louder, the guitar strums open-position chords (D-DU-UDU), the
  * bass walks root to fifth on 1 and 3, and the backbeat fills out to a full snare. Harvested
- * from the old engine's by-ear lessons (`public/engine/grooves/acoustic.ts`, the `acoustic`
+ * from the old engine's by-ear lessons (`core/engine/grooves/acoustic.ts`, the `acoustic`
  * bass style, `guitar-player.ts`'s strum, the `arp` piano and the add9 colour rule), not its
  * code.
  */

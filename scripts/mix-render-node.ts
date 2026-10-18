@@ -1,6 +1,6 @@
 /**
  * The node render backend of `mix:report`: the same `renderBand` the page's render bridge runs
- * (`prototypes/v2/lib/render-bridge.ts`), on node Web Audio (`./node-webaudio.ts`), measured
+ * (`web/lib/render-bridge.ts`), on node Web Audio (`./node-webaudio.ts`), measured
  * here with `./audio-analysis.ts` — the functions the page's `renderAndMeasureInPage` mirrors,
  * because channel data could not cross into node from a browser. Here it does not have to.
  *
@@ -23,7 +23,7 @@ import { installDiskPackFetcher } from './node-webaudio.js';
 export interface NodeRenderer {
     /** The page's `renderAndMeasureInPage` result shape, from a node render. */
     renderAndMeasure(
-        request: Parameters<typeof import('../prototypes/v2/lib/render-bridge.js').renderBand>[0],
+        request: Parameters<typeof import('../web/lib/render-bridge.js').renderBand>[0],
         loopCount: number,
     ): Promise<MeasuredRender>;
     loadPack(packId: string): Promise<{ zones: number; loaded: boolean }>;
@@ -44,7 +44,7 @@ export interface MeasuredRender {
     };
     channels: Float32Array[];
     dispatched: Awaited<
-        ReturnType<typeof import('../prototypes/v2/lib/render-bridge.js').renderBand>
+        ReturnType<typeof import('../web/lib/render-bridge.js').renderBand>
     >['dispatched'];
     leadInSeconds: number;
     passSeconds: number;
@@ -52,7 +52,7 @@ export interface MeasuredRender {
 }
 
 export async function createNodeRenderer(): Promise<NodeRenderer> {
-    const bridge = await import('../prototypes/v2/lib/render-bridge.js');
+    const bridge = await import('../web/lib/render-bridge.js');
     // After the bridge's import graph has loaded: the app's `lib/sounds.ts` installs its own
     // fetcher as it loads, and this one has to win.
     installDiskPackFetcher();

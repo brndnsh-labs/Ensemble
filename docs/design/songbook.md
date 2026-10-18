@@ -6,12 +6,12 @@ design targets and must ship as separately reviewed stories.
 **Amended 2026-09-26 (#1424):** v1's session writer and reader that §1 and §10 describe
 (`saveCurrentState()`, `hydrateState()`) are deleted; a chart document is the only save.
 **Amended 2026-10-17 (#1740, #1744, Retire v1):** there is one chart schema, 2
-(`public/songbook/document-v2.ts`). The version-1 `ChartDocument` codec, its converter and every
+(`core/songbook/document-v2.ts`). The version-1 `ChartDocument` codec, its converter and every
 v1 reader are deleted; a schema-1 chart is refused with a plain message (see
 [the chart contract's Compatibility section](ensemble-v2-charts.md#compatibility)). So the
 version-1 shapes in §2, the `ensemble_currentState` migration and coexistence window in §6, and
 the legacy-session steps in §3 and §9 are history: the design they record shipped and was then
-retired. `public/songbook/codec.ts` survives only as the codecs' shared plumbing (the bounded
+retired. `core/songbook/codec.ts` survives only as the codecs' shared plumbing (the bounded
 structural walk, the version gate, JSON decode/encode).
 **Goal:** Let a musician keep, reopen, share, and back up multiple songs without making the live
 arranger state, browser storage, or share URL into accidental document formats.
@@ -87,11 +87,11 @@ Settings that should follow the musician rather than the song: palette/mode, vis
 count-in and practice defaults, the output master volume, MIDI device IDs and latency, local
 audio muting, and similar browser/device choices. Preferences have their own versioned record.
 
-The canonical ownership table is enforced by `public/songbook/state-ownership.ts`. It is typed
+The canonical ownership table is enforced by `core/songbook/state-ownership.ts`. It is typed
 against every top-level live-state field, so adding a state field without choosing exactly one
 owner fails typecheck. Nothing reads the table at run time: it is a classification and a
 type guard, not the thing that decides what a chart stores. What a chart stores is decided by its
-capture (`prototypes/v2/lib/runtime.ts`'s `captureContent`) and the schema-2 codec.
+capture (`web/lib/runtime.ts`'s `captureContent`) and the schema-2 codec.
 
 | Owner | Canonical fields |
 | :--- | :--- |
@@ -101,14 +101,14 @@ capture (`prototypes/v2/lib/runtime.ts`'s `captureContent`) and the schema-2 cod
 
 **Amended 2026-09-26 (#1381).** The `WorkspacePreferences` codec (`validate`/`decode`/`encode` and
 its `WorkspaceAppearancePreferences`/`WorkspacePracticePreferences`/`WorkspaceMidiPreferences`
-sub-shapes) never had a reader anywhere in `public/` or `prototypes/v2` — the row above describes
+sub-shapes) never had a reader anywhere in `core/` or `web` — the row above describes
 a device-preferences record that was never actually persisted through this codec — and was
 deleted outright, along with `playback.palette`/`.mode` themselves (v2's Day/Stage theme is its
 own device preference, `app/use-stage-theme.ts`, outside `state-ownership.ts` entirely). The
 `preferences` ownership *classification* in `state-ownership.ts` survives for the fields that are
 still live (master volume, count-in, MIDI settings, etc.) — only this section's specific codec and
 palette/mode are gone. If workspace preferences ever need their own persisted record again, it
-needs a live reader in hand first (`public/CLAUDE.md`'s retired-key pattern), not a resurrection
+needs a live reader in hand first (`core/CLAUDE.md`'s retired-key pattern), not a resurrection
 of this shape from history.
 
 **Amended 2026-10-11.** `playback.sessionTimer` and `playback.songMode` (listed above as
@@ -138,7 +138,7 @@ with `withFollowFeel` applied) and rewrote them, and Brandon ran it on every dev
 left pending. A chart like that which never went through the upgrade, or a recovered copy of a
 draft captured before then, now keeps its built-in lanes pinned instead of following the feel.
 
-`public/songbook/types.ts` owns the chart's settings types and `document-v2.ts` validates
+`core/songbook/types.ts` owns the chart's settings types and `document-v2.ts` validates
 the complete untrusted candidate (through `codec.ts`'s shared walk) before returning a detached
 typed value; a schema-1 chart is refused as a historical version, and an unknown future version
 comes back as `future-version` with its source kept, never coerced into defaults. Structural limits run first: 1 MiB serialized input, depth

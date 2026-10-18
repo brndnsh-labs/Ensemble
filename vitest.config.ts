@@ -4,10 +4,10 @@ import { configDefaults, defineConfig } from 'vitest/config';
 export default defineConfig({
     resolve: {
         alias: {
-            // The same alias `prototypes/v2/tsconfig.json` and `next.config.mjs` give the preview,
+            // The same alias `web/tsconfig.json` and `next.config.mjs` give the preview,
             // so a unit test can import a v2 `lib/` module whose own imports reach back into the
-            // shared engine. Inert for `public/` and `tests/`, which never spell it.
-            '@engine': fileURLToPath(new URL('./public', import.meta.url)),
+            // shared engine. Inert for `core/` and `tests/`, which never spell it.
+            '@core': fileURLToPath(new URL('./core', import.meta.url)),
             '@band': fileURLToPath(new URL('./band', import.meta.url)),
         },
     },
@@ -22,18 +22,18 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'json', 'html'],
-            include: ['public/**/*.ts'],
-            exclude: ['public/data/**'],
+            include: ['core/**/*.ts'],
+            exclude: ['core/data/**'],
         },
         exclude: [
             ...configDefaults.exclude,
             'tests/browser/**',
             // The isolated Next preview owns a separate Playwright runner.
-            'prototypes/v2/checks/**',
+            'web/checks/**',
             // The standalone account API has its own package, tsconfig, Vitest config and CI
             // step (npm run test:api). Collected here it would run twice, under a root config it
             // was not written for, and knip would resolve its imports against the root manifest.
-            'prototypes/v2-api/**',
+            'api/**',
             // Agent-tool worktrees are full checkouts under the repo root — without
             // this, every vitest run (and any filename filter) also discovers and
             // runs their copies of the whole suite.

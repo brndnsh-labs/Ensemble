@@ -7,7 +7,7 @@
  * Stop releases the registry.
  */
 import { describe, expect, it, vi } from 'vitest';
-import { killAllPianoNotes, playNote } from '../../../public/engine/synth-chords.js';
+import { killAllPianoNotes, playNote } from '../../../core/engine/synth-chords.js';
 
 const param = () => ({
     value: 0,

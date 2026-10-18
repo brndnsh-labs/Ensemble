@@ -1,16 +1,16 @@
-import fixtures from '../../../docs/design/fixtures/ensemble-v2-charts.json';
 import {
     decodeIRealInput,
     decodeIRealMusic,
     MAX_IREAL_SONGS,
     songSourceLink,
-} from '../../../public/songbook/ireal-decode.js';
+} from '../../../core/songbook/ireal-decode.js';
 import {
     MAX_IMPORT_MEASURES,
     parseIRealImport,
     parseIRealImportInSteps,
-} from '../../../public/songbook/ireal-import.js';
-import { compileScoreForm } from '../../../public/songbook/score-form.js';
+} from '../../../core/songbook/ireal-import.js';
+import { compileScoreForm } from '../../../core/songbook/score-form.js';
+import fixtures from '../../../docs/design/fixtures/ensemble-v2-charts.json';
 
 function open(body: string, title = 'Original fixture', key = 'C'): string {
     return `irealbook://${encodeURIComponent([title, 'Ensemble', 'Swing', key, 'n', body].join('='))}`;

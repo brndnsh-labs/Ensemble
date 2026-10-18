@@ -1,11 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { AccountApi, ApiResult } from '../../../prototypes/v2/lib/account/api.js';
-import { createAccountSession } from '../../../prototypes/v2/lib/account/session.js';
-import {
-    createSaveTransport,
-    SaveTransportError,
-} from '../../../prototypes/v2/lib/account/transport.js';
-import type { PreparedSave } from '../../../prototypes/v2/lib/sync/protocol.js';
+import type { AccountApi, ApiResult } from '../../../web/lib/account/api.js';
+import { createAccountSession } from '../../../web/lib/account/session.js';
+import { createSaveTransport, SaveTransportError } from '../../../web/lib/account/transport.js';
+import type { PreparedSave } from '../../../web/lib/sync/protocol.js';
 
 /**
  * `lib/sync/send.ts`'s `sendNext` has exactly two outcomes for a `SaveTransport`: a REJECTED

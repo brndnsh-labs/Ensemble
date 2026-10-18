@@ -29,7 +29,7 @@
  * chorus before that would itself be the third, wind-down chorus, it holds the build as the
  * second instead (…, S2, S2, S3, H), so the solos peak and come down just once into the head.
  */
-import { isIntroLabel } from '../../public/songbook/score-form.js';
+import { isIntroLabel } from '../../core/songbook/score-form.js';
 import type { TradeSettings } from '../core/types.js';
 import { type Bar, beforeFinalChorus, inFinalChorus, type Timeline } from '../form/timeline.js';
 

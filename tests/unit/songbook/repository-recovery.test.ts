@@ -5,7 +5,7 @@ import {
     recover,
     recoveriesFor,
     recoverySlotCount,
-} from '../../../prototypes/v2/lib/repository.js';
+} from '../../../web/lib/repository.js';
 import { accountChart } from '../../utils/account-songbook-fixture.js';
 
 /**
@@ -21,7 +21,7 @@ import { accountChart } from '../../utils/account-songbook-fixture.js';
  *   and a slot an earlier load left behind holds that chart's text in plaintext just the same.
  *
  * The prefix is spelled out rather than imported because the module does not export it — the same
- * reading `prototypes/v2/checks/account-sign-out.chromium.spec.ts` takes from outside. If it ever
+ * reading `web/checks/account-sign-out.chromium.spec.ts` takes from outside. If it ever
  * changes, these failing is the intended outcome.
  */
 

@@ -82,8 +82,8 @@ describe('agent definition documentation validation', () => {
                 temporaryAgent,
                 [
                     '`tests/CLAUDE.md`',
-                    '`public/state/<slice>.ts`',
-                    '`public/engine/synth-{bass,chords}.ts`',
+                    '`core/state/<slice>.ts`',
+                    '`core/engine/synth-{bass,chords}.ts`',
                     '',
                 ].join('\n'),
             );

@@ -7,7 +7,7 @@
  * chords, the bass under them on the same root, and the kick drum under both, all three on
  * the same sixteenths. Energy turns a half-time sway into driving eighths and then into the
  * double kick, where the guitar and bass gallop and chug with the feet. Harvested from the old
- * engine's lessons (`public/engine/grooves/metal.ts`, the `metal` bass style, `power-metal`
+ * engine's lessons (`core/engine/grooves/metal.ts`, the `metal` bass style, `power-metal`
  * comping, the crunch guitar sound), not its code.
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';

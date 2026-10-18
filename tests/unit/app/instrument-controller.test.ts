@@ -3,16 +3,16 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import * as InstrumentController from '../../../public/controllers/instrument-controller.js';
-import * as Engine from '../../../public/engine/engine.js';
-import { dispatch, getState } from '../../../public/state.js';
-import { ACTIONS } from '../../../public/types.js';
+import * as InstrumentController from '../../../core/controllers/instrument-controller.js';
+import * as Engine from '../../../core/engine/engine.js';
+import { dispatch, getState } from '../../../core/state.js';
+import { ACTIONS } from '../../../core/types.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
 );
 
-vi.mock('../../../public/engine/engine.js', () => ({
+vi.mock('../../../core/engine/engine.js', () => ({
     killAllPianoNotes: vi.fn(),
     killBassBus: vi.fn(),
     killBassNote: vi.fn(),
@@ -24,11 +24,11 @@ vi.mock('../../../public/engine/engine.js', () => ({
     restoreGains: vi.fn(),
 }));
 
-vi.mock('../../../public/engine/synth-drums.js', () => ({
+vi.mock('../../../core/engine/synth-drums.js', () => ({
     loadDrumKit: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock('../../../public/state.js', () => {
+vi.mock('../../../core/state.js', () => {
     const mockState = {
         playback: { bpm: 120, bandIntensity: 0.5, complexity: 0.5, autoIntensity: false },
         groove: {

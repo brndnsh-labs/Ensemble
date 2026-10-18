@@ -1,4 +1,4 @@
-import { isScoreChord, SCORE_CHORD_QUALITIES } from '../../public/songbook/score-text.js';
+import { isScoreChord, SCORE_CHORD_QUALITIES } from '../../core/songbook/score-text.js';
 import { type CompInstrument, DEFAULT_SETTINGS } from '../core/types.js';
 import { compileTimeline } from '../form/timeline.js';
 import { performPass } from '../perform.js';

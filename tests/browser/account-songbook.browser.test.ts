@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { runOutboxPass } from '../../prototypes/v2/lib/sync/drain.js';
+import type { ChartDocumentV2 } from '../../core/songbook/score-types.js';
+import { runOutboxPass } from '../../web/lib/sync/drain.js';
 import {
     ACCOUNT_DATABASE,
     AccountChangedError,
@@ -9,11 +10,10 @@ import {
     lastOpenedKey,
     MAX_PENDING_SAVES,
     type PreparedSave,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import { decodeSaveRequest } from '../../prototypes/v2/lib/sync/request.js';
-import { sendNext } from '../../prototypes/v2/lib/sync/send.js';
-import type { ChartDocumentV2 } from '../../public/songbook/score-types.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import { decodeSaveRequest } from '../../web/lib/sync/request.js';
+import { sendNext } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 let name: string;

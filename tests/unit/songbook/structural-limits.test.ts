@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { decodeChartDocumentV2 as decodeChartDocument } from '../../../public/songbook/document-v2.js';
+import { decodeChartDocumentV2 as decodeChartDocument } from '../../../core/songbook/document-v2.js';
 import {
     inspectSongbookStructure,
     SONGBOOK_MAX_DEPTH,
     SONGBOOK_MAX_INPUT_BYTES,
     SONGBOOK_MAX_VISITED_NODES,
-} from '../../../public/songbook/structural-limits.js';
+} from '../../../core/songbook/structural-limits.js';
 
 function nestedValue(depth: number): unknown {
     let value: unknown = 0;

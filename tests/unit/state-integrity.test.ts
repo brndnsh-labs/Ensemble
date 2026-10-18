@@ -4,12 +4,12 @@ import { describe, expect, it } from 'vitest';
 
 /**
  * State Integrity Audit:
- * This test ensures that every ACTION defined in public/types.ts
+ * This test ensures that every ACTION defined in core/types.ts
  * is both dispatched (by a component or controller) and handled (by a state slice).
  */
 
-const PUBLIC_DIR = path.resolve(__dirname, '../../public');
-const TYPES_FILE = path.resolve(PUBLIC_DIR, 'types.ts');
+const CORE_DIR = path.resolve(__dirname, '../../core');
+const TYPES_FILE = path.resolve(CORE_DIR, 'types.ts');
 
 // Helper to get all files in a directory recursively
 function getFiles(dir: string, files: string[] = []): string[] {
@@ -31,8 +31,8 @@ function getFiles(dir: string, files: string[] = []): string[] {
 }
 
 // The v2 music stand is the only UI host (#1358), so it is where most dispatches live.
-const V2_DIRS = ['app', 'lib'].map((dir) => path.resolve(__dirname, '../../prototypes/v2', dir));
-const allFiles = [PUBLIC_DIR, ...V2_DIRS]
+const V2_DIRS = ['app', 'lib'].map((dir) => path.resolve(__dirname, '../../web', dir));
+const allFiles = [CORE_DIR, ...V2_DIRS]
     .flatMap((dir) => getFiles(dir))
     .filter((f) => !/\.(test|spec)\.tsx?$/.test(f));
 interface SourceFile {
@@ -44,7 +44,7 @@ const fileContents: SourceFile[] = allFiles.map((f) => ({
     content: fs.readFileSync(f, 'utf8'),
 }));
 
-// "Is this a state slice?" is a CONTENT question, not a directory one: `public/state/`
+// "Is this a state slice?" is a CONTENT question, not a directory one: `core/state/`
 // also holds non-slice plumbing (`state-effects`, `history`)
 // that dispatches like any other consumer. Keying on the
 // `deepSignal<` declaration keeps the dispatch/handler split honest as files move in and
@@ -56,11 +56,11 @@ const HANDLER_FILES = ['state-effects.ts'];
 const isHandlerFile = (f: SourceFile) =>
     isSlice(f) || HANDLER_FILES.some((h) => f.path.endsWith(h));
 
-// Extract ACTIONS keys from public/types.js
+// Extract ACTIONS keys from core/types.js
 const typesContent = fs.readFileSync(TYPES_FILE, 'utf8');
 const actionKeysMatch = typesContent.match(/ACTIONS = {([\s\S]*?)} as const/);
 if (!actionKeysMatch) {
-    throw new Error('ACTIONS table not found in public/types.ts');
+    throw new Error('ACTIONS table not found in core/types.ts');
 }
 const actionKeys = actionKeysMatch[1]
     .split('\n')

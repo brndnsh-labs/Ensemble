@@ -11,7 +11,7 @@ const SLICES = 'playback|chords|bass|soloist|groove|arranger';
 
 // Three write idioms reach a slice. The guard has to see all three, because the
 // slices are `readonly` in `types.ts` — a bare `slice.field = x` doesn't even
-// typecheck in `public/`, so every REAL write in the tree uses a cast and the
+// typecheck in `core/`, so every REAL write in the tree uses a cast and the
 // bare-only regex fired on nothing.
 //
 // 1. bare        `playback.bpm = 90`  (still possible through a loosely-typed handle)

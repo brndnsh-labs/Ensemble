@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { compileScoreForm } from '../../../core/songbook/score-form';
+import type { SemanticScore } from '../../../core/songbook/score-types';
 import {
     changeGuidedForm,
     type GuidedGroup,
     guidedGroups,
     guidedRoute,
-} from '../../../prototypes/v2/lib/guided-form';
-import { compileScoreForm } from '../../../public/songbook/score-form';
-import type { SemanticScore } from '../../../public/songbook/score-types';
+} from '../../../web/lib/guided-form';
 
 function score(): SemanticScore {
     return {

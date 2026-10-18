@@ -1,11 +1,11 @@
 // @ts-nocheck
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { syncBusReverbSend, syncBusVolume } from '../../../public/engine/engine.js';
-import { handleEffects } from '../../../public/state/state-effects.js';
-import { ACTIONS } from '../../../public/types.js';
+import { syncBusReverbSend, syncBusVolume } from '../../../core/engine/engine.js';
+import { handleEffects } from '../../../core/state/state-effects.js';
+import { ACTIONS } from '../../../core/types.js';
 
 // Mock all the imported functions
-vi.mock('../../../public/engine/engine.js', () => ({
+vi.mock('../../../core/engine/engine.js', () => ({
     restoreGains: vi.fn(),
     syncBusReverbSend: vi.fn(),
     syncBusVolume: vi.fn(),

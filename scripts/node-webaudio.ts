@@ -1,7 +1,7 @@
 /**
  * Web Audio in node, for rendering the band without a browser. Installs `node-web-audio-api`'s
  * classes as the globals the engine reaches for (`new OfflineAudioContext(...)` in
- * `renderBandPasses`) and points the sample loader at `public/packs/` on disk.
+ * `renderBandPasses`) and points the sample loader at `core/packs/` on disk.
  *
  * The globals are read when a render runs, not when the engine's modules load, so import order
  * does not matter; `installDiskPackFetcher()` is called explicitly, after every import, because
@@ -14,12 +14,12 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { setPackAssetFetcher } from '@engine/engine/sample-loader';
+import { setPackAssetFetcher } from '@core/engine/sample-loader';
 import * as webaudio from 'node-web-audio-api';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const PUBLIC_DIR = path.join(REPO_ROOT, 'public');
-const PACKS_DIR = path.join(PUBLIC_DIR, 'packs');
+const CORE_DIR = path.join(REPO_ROOT, 'core');
+const PACKS_DIR = path.join(CORE_DIR, 'packs');
 const DECODE_CACHE = path.join(REPO_ROOT, 'tmp', 'node-webaudio', 'decoded');
 
 /**
@@ -357,7 +357,7 @@ function decodedWav(source: string, relative: string): string {
 }
 
 /**
- * Serve `/packs/<id>/<file>` (rev token stripped) from `public/packs/` on disk. Installed on
+ * Serve `/packs/<id>/<file>` (rev token stripped) from `core/packs/` on disk. Installed on
  * `globalThis.fetch`, not only through `setPackAssetFetcher`: the app's `lib/sounds.ts` installs
  * its own fetcher as the bridge's import graph loads, and `tsx` can hold the sample loader as two
  * module instances, so the one place every pack request is guaranteed to end up is `fetch`.
@@ -365,9 +365,9 @@ function decodedWav(source: string, relative: string): string {
 export function installDiskPackFetcher(): void {
     const servePack = async (url: string): Promise<Response> => {
         // The URL parser has already collapsed `..` segments; the resolved path must still sit
-        // inside `public/packs/` and name a regular file.
+        // inside `core/packs/` and name a regular file.
         const relative = new URL(url, 'http://localhost/').pathname.replace(/^\//, '');
-        const file = path.join(PUBLIC_DIR, relative);
+        const file = path.join(CORE_DIR, relative);
         if (
             !file.startsWith(PACKS_DIR + path.sep) ||
             !existsSync(file) ||

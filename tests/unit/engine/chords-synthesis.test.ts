@@ -7,7 +7,7 @@ const { makeSoloistMock } = await vi.hoisted(
 );
 
 // Mock state and global modules
-vi.mock('../../../public/state.js', () => {
+vi.mock('../../../core/state.js', () => {
     const mockPlayback = {
         audio: {
             currentTime: 0,
@@ -85,13 +85,13 @@ vi.mock('../../../public/state.js', () => {
 });
 
 // Mock the audio-graph helpers (they moved to engine/audio-graph-utils.js in #1176)
-vi.mock('../../../public/engine/audio-graph-utils.js', async (importOriginal) => ({
+vi.mock('../../../core/engine/audio-graph-utils.js', async (importOriginal) => ({
     ...(await importOriginal<any>()),
     safeDisconnect: vi.fn(),
 }));
 
-import { playNote } from '../../../public/engine/synth-chords.js';
-import { getState } from '../../../public/state.js';
+import { playNote } from '../../../core/engine/synth-chords.js';
+import { getState } from '../../../core/state.js';
 
 const { playback } = getState();
 

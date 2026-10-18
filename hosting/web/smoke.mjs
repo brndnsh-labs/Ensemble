@@ -197,7 +197,7 @@ try {
 
     // --- The web manifest keeps the installed app's identity --------------------------------
     // `id: '/'` is what every installed copy of the app is keyed by; a different one is a
-    // second app on the home screen. See `prototypes/v2/scripts/offline.mjs`.
+    // second app on the home screen. See `web/scripts/offline.mjs`.
     const manifest = await text('/manifest.json');
     check(manifest.status === 200, 'GET /manifest.json', '200', manifest.status);
     check(

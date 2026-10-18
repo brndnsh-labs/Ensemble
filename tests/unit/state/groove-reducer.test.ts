@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { groove, grooveReducer as grooveReducerImpl } from '../../../public/state/groove.js';
-import { ACTIONS } from '../../../public/types.js';
+import { groove, grooveReducer as grooveReducerImpl } from '../../../core/state/groove.js';
+import { ACTIONS } from '../../../core/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 // Tests call grooveReducer with 1-2 args; production signature requires 2 (action object + optional playback).
@@ -150,7 +150,7 @@ describe('Groove Reducer', () => {
         });
 
         it('instrumentReducer declines the groove lane instead of double-writing it', async () => {
-            const { instrumentReducer } = await import('../../../public/state/instruments.js');
+            const { instrumentReducer } = await import('../../../core/state/instruments.js');
 
             for (const module of ['groove'] as const) {
                 expect(
@@ -181,7 +181,7 @@ describe('Groove Reducer', () => {
 
         it('still routes non-groove modules to instrumentReducer', async () => {
             const { instrumentReducer, chords } = await import(
-                '../../../public/state/instruments.js'
+                '../../../core/state/instruments.js'
             );
             expect(
                 instrumentReducer({

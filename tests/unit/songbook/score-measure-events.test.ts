@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { validateSemanticScore } from '../../../public/songbook/score-codec.js';
-import { resolveScoreMeasureEvents } from '../../../public/songbook/score-measure-events.js';
+import { validateSemanticScore } from '../../../core/songbook/score-codec.js';
+import { resolveScoreMeasureEvents } from '../../../core/songbook/score-measure-events.js';
 import type {
     ScoreDuration,
     ScoreEvent,
     ScoreMeasure,
     SemanticScore,
-} from '../../../public/songbook/score-types.js';
+} from '../../../core/songbook/score-types.js';
 
 function chord(symbol: string, duration: ScoreDuration = [4, 1]): ScoreEvent {
     return { kind: 'chord', symbol, duration };

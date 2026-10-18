@@ -4,9 +4,9 @@ import {
     type AccountScope,
     type ChartDocument,
     type PreparedDelete,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import { sendNext } from '../../prototypes/v2/lib/sync/send.js';
+} from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import { sendNext } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**
@@ -19,7 +19,7 @@ import { accountChart } from '../utils/account-songbook-fixture.js';
  *
  * The transport is a fake throughout: `tests/unit/songbook/account-sync-loop.test.ts` proves the
  * real adapter's classification separately, and the SERVER's own decision table has its own tests
- * in `prototypes/v2-api`. What is proven here is the client's half of retry-safety — that the
+ * in `api`. What is proven here is the client's half of retry-safety — that the
  * operation id is frozen before anything leaves, survives a reconnection to the same database, and
  * is forgotten only when the server answered definitively about those exact bytes.
  */

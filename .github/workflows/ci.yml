@@ -41,7 +41,7 @@ permissions:
 
 jobs:
   # The full non-browser gate. `npm run ci` is the single source of truth for
-  # what "green" means — typecheck (public/ + tests/), depcheck, knip,
+  # what "green" means — typecheck (core/ + tests/), depcheck, knip,
   # mutation/lint/docs checks and unit tests — so `npm run ci` locally predicts
   # this job exactly. It builds nothing: the one build is the v2 export, which
   # `v2-suite` and `web-image` own. Keep this
@@ -60,27 +60,27 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
-            prototypes/v2/package-lock.json
-            prototypes/v2-api/package-lock.json
+            web/package-lock.json
+            api/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
-      # knip analyses `prototypes/v2` as a workspace (#1358): without its node_modules the Next
+      # knip analyses `web` as a workspace (#1358): without its node_modules the Next
       # plugin can't load, so `react-dom` reads as unused and `next` as an unlisted binary.
       - name: Install v2 dependencies
-        run: npm ci --prefix prototypes/v2
+        run: npm ci --prefix web
 
       - name: Run the full gate (npm run ci)
         run: npm run ci
 
       # The v2 account API (#1187) is a standalone sibling package under
-      # prototypes/v2-api/ with its own package-lock.json — same --prefix
-      # pattern v2-preview.yml uses for prototypes/v2. Kept HERE, not in
+      # api/ with its own package-lock.json — same --prefix
+      # pattern v2-preview.yml uses for web. Kept HERE, not in
       # e2e-tests: this suite is node-environment-only (node:sqlite, no DOM),
       # so it doesn't need that job's browser install.
       - name: Install v2 account API dependencies
-        run: npm ci --prefix prototypes/v2-api
+        run: npm ci --prefix api
 
       - name: Run v2 account API tests
         run: npm run test:api
@@ -154,9 +154,9 @@ jobs:
         run: npm run golden
 
 
-  # The v2 music stand (prototypes/v2, Next static export): build + its own Playwright
+  # The v2 music stand (web, Next static export): build + its own Playwright
   # suite, and the required gate for this app. Runs on every PR, not only v2-touching
-  # ones — the export compiles public/ through webpack, so any engine change can
+  # ones — the export compiles core/ through webpack, so any engine change can
   # break it. Starts alongside `checks`, not after it (#1223).
   #
   # It builds at `/`, the only base there is (#1734), and `v2-root-image.yml` keeps only the
@@ -169,7 +169,7 @@ jobs:
   # enough to drop a chord from the chart (#1240) — so more runners, not more workers.
   #
   # The legs split each project's spec FILES by their measured seconds
-  # (`prototypes/v2/shard-weights.json`), dealt out in playwright.config.ts — not by
+  # (`web/shard-weights.json`), dealt out in playwright.config.ts — not by
   # Playwright's count-based `--shard`, which ran 1.5m against 4.0m here. A hand-kept
   # `heavy`/`rest` list drifted twice: every new spec landed on `rest`, until it held 80%
   # of the seconds (#1400, #1463). The computed deal puts a new spec on the lighter leg by
@@ -205,13 +205,13 @@ jobs:
           #   tests/        the root Vitest suites and their fixtures (`checks`, `e2e-tests`)
           #   band/test/, band/**/*.test.ts   the band's own tests; nothing shipped imports them
           #   .claude/      agent skills and settings
-          # NOT on it, on purpose: anything under prototypes/v2/ but its prose (a unit test
+          # NOT on it, on purpose: anything under web/ or api/ but its prose (a unit test
           # there is typechecked only by the v2 build), scripts/, the workflows, and every
           # manifest and config.
           cannot_reach_app() {
             case "$1" in
-              prototypes/v2/*.md | prototypes/v2-api/*.md) return 0 ;;
-              prototypes/* | .github/* | scripts/* | public/*.ts | public/*.tsx) return 1 ;;
+              web/*.md | api/*.md) return 0 ;;
+              web/* | api/* | .github/* | scripts/* | core/*.ts | core/*.tsx) return 1 ;;
               docs/* | tests/* | band/test/* | .claude/* | *.md) return 0 ;;
               band/*.test.ts) return 0 ;;
               *) return 1 ;;
@@ -268,24 +268,24 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
-            prototypes/v2/package-lock.json
-            prototypes/v2-api/package-lock.json
+            web/package-lock.json
+            api/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Install v2 dependencies
-        run: npm ci --prefix prototypes/v2
+        run: npm ci --prefix web
 
       # The account specs run the real API behind the preview server (#1258); the suite's
       # global setup bundles it from these dependencies.
       - name: Install v2 API dependencies
-        run: npm ci --prefix prototypes/v2-api
+        run: npm ci --prefix api
 
       - name: Get Playwright version
         id: playwright-version
         run: echo "PLAYWRIGHT_VERSION=$(npx playwright --version | cut -d' ' -f2)" >> $GITHUB_ENV
-        working-directory: prototypes/v2
+        working-directory: web
 
       # One cache per browser: a leg that installed only Chromium must not save a cache
       # that a WebKit leg then restores as a hit.
@@ -299,17 +299,17 @@ jobs:
       - name: Install Playwright browser + system deps
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps ${{ matrix.browser }}
-        working-directory: prototypes/v2
+        working-directory: web
 
       - name: Install Playwright system deps (browser came from cache)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps ${{ matrix.browser }}
-        working-directory: prototypes/v2
+        working-directory: web
 
-      # Typechecks public/ again, exports the app, then scripts/offline.mjs copies
+      # Typechecks core/ again, exports the app, then scripts/offline.mjs copies
       # the sound packs beside it and writes build.json (fingerprint + HEAD).
       - name: Build the v2 static export at basePath /
-        run: npm run build --prefix prototypes/v2
+        run: npm run build --prefix web
 
       # A failed build leaves whatever `out/` held before it, and the suite would happily pass
       # against that — so the build's exit code is the gate, and this proves the artifact on
@@ -318,19 +318,19 @@ jobs:
         run: |
           # `set -e` ignores a command inverted with `!`, so each negative is an explicit `if`.
           set -euo pipefail
-          test -f prototypes/v2/out/index.html
-          grep -q '"/_next/static/' prototypes/v2/out/index.html
-          if grep -q '/v2/_next/' prototypes/v2/out/index.html; then
+          test -f web/out/index.html
+          grep -q '"/_next/static/' web/out/index.html
+          if grep -q '/v2/_next/' web/out/index.html; then
             echo '::error::index.html still references /v2/_next'; exit 1
           fi
-          if grep -q '"/v2/' prototypes/v2/out/build.json; then
+          if grep -q '"/v2/' web/out/build.json; then
             echo '::error::build.json is still keyed under /v2/'; exit 1
           fi
-          grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
+          grep -q 'const SCOPE = "/";' web/out/sw.js
           # The web manifest the installed app updates through, and no `/v2/` tree: the old
           # beta path is a plain 404 since #1742, so nothing may be exported under it.
-          test -f prototypes/v2/out/manifest.json
-          if [ -e prototypes/v2/out/v2 ]; then
+          test -f web/out/manifest.json
+          if [ -e web/out/v2 ]; then
             echo '::error::the export still has a /v2/ tree'; exit 1
           fi
 
@@ -339,10 +339,10 @@ jobs:
       # One leg is enough; every leg builds the same export.
       - name: Check the export's JavaScript against its ceiling
         if: matrix.shard == 1 && matrix.project == 'laptop'
-        run: npm run check:bundle --prefix prototypes/v2
+        run: npm run check:bundle --prefix web
 
       - name: Run the v2 Playwright suite
-        run: npm run test:e2e --prefix prototypes/v2 -- --project=${{ matrix.project }} --reporter=dot,json
+        run: npm run test:e2e --prefix web -- --project=${{ matrix.project }} --reporter=dot,json
         env:
           V2_SHARD: ${{ matrix.shard }}/${{ matrix.of }}
           PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ runner.temp }}/v2-shard-report.json
@@ -359,7 +359,7 @@ jobs:
         if: failure()
         with:
           name: v2-playwright-failures-${{ matrix.shard }}-${{ matrix.project }}
-          path: prototypes/v2/test-results/
+          path: web/test-results/
           retention-days: 7
 
   # The required status context. It exists so the shard count is an internal
@@ -415,9 +415,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # The image copies a PREBUILT bundle (prototypes/v2-api/build.mjs, #1202): esbuild
-      # inlines the shared songbook codecs from public/ via prototypes/v2/lib/sync, which
-      # the Docker build context (prototypes/v2-api only) cannot see. Same bundle the
+      # The image copies a PREBUILT bundle (api/build.mjs, #1202): esbuild
+      # inlines the shared songbook codecs from core/ via web/lib/sync, which
+      # the Docker build context (api only) cannot see. Same bundle the
       # `checks` job already built and tested; rebuilt here because it is a 30-second
       # step and needs no artifact hand-off.
       - name: Use Node.js
@@ -425,12 +425,12 @@ jobs:
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
-          cache-dependency-path: prototypes/v2-api/package-lock.json
+          cache-dependency-path: api/package-lock.json
 
       - name: Bundle the API
         run: |
-          npm ci --prefix prototypes/v2-api
-          npm run build --prefix prototypes/v2-api
+          npm ci --prefix api
+          npm run build --prefix api
 
       - uses: docker/setup-buildx-action@v4
 
@@ -443,7 +443,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v7
         with:
-          context: prototypes/v2-api
+          context: api
           push: true
           provenance: false
           build-args: REVISION=${{ github.sha }}
@@ -541,33 +541,33 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
-            prototypes/v2/package-lock.json
+            web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Install v2 dependencies
-        run: npm ci --prefix prototypes/v2
+        run: npm ci --prefix web
 
       # Built here rather than downloaded: `v2-suite` builds the same `/` export on every leg
       # but uploads no export (only failure traces and shard timings). The image COPYs this
       # prebuilt output through a named build context, so the Docker context stays hosting/web
       # — same prebuilt-bundle shape as `api-image`.
       - name: Build the v2 static export at basePath /
-        run: npm run build --prefix prototypes/v2
+        run: npm run build --prefix web
 
       - name: Assert the artifact is the root build
         run: |
           # `set -e` ignores a command inverted with `!`, so each negative is an explicit `if`.
           set -euo pipefail
-          grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
+          grep -q 'const SCOPE = "/";' web/out/sw.js
           # The web manifest the installed app updates through, and no `/v2/` tree: the old
           # beta path is a plain 404 since #1742, so nothing may be exported under it.
-          test -f prototypes/v2/out/manifest.json
-          if [ -e prototypes/v2/out/v2 ]; then
+          test -f web/out/manifest.json
+          if [ -e web/out/v2 ]; then
             echo '::error::the export still has a /v2/ tree'; exit 1
           fi
-          if grep -q '/v2/_next/' prototypes/v2/out/index.html; then
+          if grep -q '/v2/_next/' web/out/index.html; then
             echo '::error::index.html still references /v2/_next'; exit 1
           fi
 
@@ -599,7 +599,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: hosting/web
-          build-contexts: site=prototypes/v2/out
+          build-contexts: site=web/out
           push: true
           provenance: false
           build-args: REVISION=${{ github.sha }}

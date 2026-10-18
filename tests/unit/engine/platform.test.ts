@@ -9,7 +9,7 @@ import {
     initPlatform,
     lockAudio,
     unlockAudio,
-} from '../../../public/platform.js';
+} from '../../../core/platform.js';
 
 describe('Platform Utilities', () => {
     beforeEach(() => {
@@ -39,7 +39,7 @@ describe('Platform Utilities', () => {
     it('unlocks with a silent track even when nothing initialized the platform', async () => {
         vi.resetModules();
         const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
-        const fresh = await import('../../../public/platform.js');
+        const fresh = await import('../../../core/platform.js');
         fresh.unlockAudio();
         expect(playSpy).toHaveBeenCalledTimes(1);
         playSpy.mockRestore();

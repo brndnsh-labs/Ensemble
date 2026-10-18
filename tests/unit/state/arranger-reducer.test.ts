@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { arranger, arrangerReducer } from '../../../public/state/arranger.js';
-import { ACTIONS, type ArrangerState, type Mutable } from '../../../public/types.js';
+import { arranger, arrangerReducer } from '../../../core/state/arranger.js';
+import { ACTIONS, type ArrangerState, type Mutable } from '../../../core/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 const mutableArranger = arranger as Mutable<typeof arranger>;

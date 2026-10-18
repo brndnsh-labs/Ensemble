@@ -9,8 +9,8 @@ import playwright from '@playwright/test';
 
 const { chromium } = playwright;
 
-import { gainForPack } from '../public/data/sound-packs.js';
-import { encodeWav } from '../public/engine/wav-encoder.js';
+import { gainForPack } from '../core/data/sound-packs.js';
+import { encodeWav } from '../core/engine/wav-encoder.js';
 import {
     analyzeSchedule,
     buildEventDump,
@@ -38,7 +38,7 @@ import {
 //
 // The music is composed here in node (`band-scene.ts`: each scene's chart → `compileTimeline`
 // → `performPass`); the audio is rendered through the render bridge's `renderBand`
-// (`prototypes/v2/lib/render-bridge.ts`) — the offline render the app's WAV export uses, on
+// (`web/lib/render-bridge.ts`) — the offline render the app's WAV export uses, on
 // today's voices and sample packs — by one of two backends: `--engine=node` (the default,
 // `mix-render-node.ts`: node Web Audio, no build, no browser, measured here) or
 // `--engine=chromium` (the v2 app built with the bridge, driven headless, measured in the page).
@@ -49,7 +49,7 @@ const SAMPLE_RATE = 44100;
 // The v2 music stand's static export, built with the render bridge (see the build step
 // in `main`). It is the same `out/` the v2 suite serves, so run the suite's own build again
 // before trusting it after a mix report.
-const V2_DIR = path.join(REPO_ROOT, 'prototypes', 'v2');
+const V2_DIR = path.join(REPO_ROOT, 'web');
 const DIST_DIR = path.join(V2_DIR, 'out');
 const HOST = '127.0.0.1';
 const REQUESTED_PORT = Number(process.env.MIX_REPORT_PORT || 0);
@@ -317,7 +317,7 @@ function printHumanMixReport(report) {
 
 /**
  * Runs IN THE PAGE (passed to `page.evaluate`, so it must be self-contained): renders one stem
- * through the render bridge (`prototypes/v2/lib/render-bridge.ts`) and measures it there, so
+ * through the render bridge (`web/lib/render-bridge.ts`) and measures it there, so
  * the channel data never has to cross into node — only the metrics and the dispatch tap do.
  * With `wavName` set, the channels also go to node's `__writeWav` for encoding.
  */
@@ -810,7 +810,7 @@ async function renderSceneReports({
                 calibration = {
                     module,
                     packId,
-                    error: `pack "${packId}" failed to load (prototypes/v2/out/packs/${packId} present? built?)`,
+                    error: `pack "${packId}" failed to load (web/out/packs/${packId} present? built?)`,
                 };
             } else {
                 const target = { module, voice: `pack:${packId}` };
@@ -938,7 +938,7 @@ export async function generateMixReport(argv = process.argv.slice(2)) {
 
     if (cliOptions.engine === 'chromium' && !cliOptions.noBuild) {
         log.write('Building the v2 stand for mix analysis...\n');
-        // The offline render drives `window.ensemble` (`prototypes/v2/lib/render-bridge.ts`),
+        // The offline render drives `window.ensemble` (`web/lib/render-bridge.ts`),
         // which the v2 runtime installs only in a build made with NEXT_PUBLIC_RENDER_BRIDGE=1 —
         // real prod builds never set it (#656, #1358). The page and `/packs/` serve from `/`;
         // `offline.mjs` is what copies the sample packs into the export.

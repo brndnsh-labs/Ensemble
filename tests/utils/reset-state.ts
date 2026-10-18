@@ -1,17 +1,8 @@
-import { type ArrangerState, arranger } from '../../public/state/arranger.js';
-import { type GrooveState, groove } from '../../public/state/groove.js';
-import {
-    bass,
-    chords,
-    INSTRUMENT_REVERB_DEFAULTS,
-    soloist,
-} from '../../public/state/instruments.js';
-import {
-    DEFAULT_BAND_INTENSITY,
-    type GlobalContext,
-    playback,
-} from '../../public/state/playback.js';
-import type { Mutable } from '../../public/types.js';
+import { type ArrangerState, arranger } from '../../core/state/arranger.js';
+import { type GrooveState, groove } from '../../core/state/groove.js';
+import { bass, chords, INSTRUMENT_REVERB_DEFAULTS, soloist } from '../../core/state/instruments.js';
+import { DEFAULT_BAND_INTENSITY, type GlobalContext, playback } from '../../core/state/playback.js';
+import type { Mutable } from '../../core/types.js';
 
 /**
  * Test-only full-state reset (#1381). `ACTIONS.RESET_STATE` was v1's

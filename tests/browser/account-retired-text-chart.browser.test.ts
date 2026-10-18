@@ -1,14 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { newCollection } from '../../prototypes/v2/lib/collections.js';
-import { runLibraryDownload } from '../../prototypes/v2/lib/sync/download.js';
-import { OUTBOX_PAGE_LIMIT, runOutboxPass } from '../../prototypes/v2/lib/sync/drain.js';
-import {
-    ACCOUNT_DATABASE,
-    type AccountScope,
-    candidateKey,
-} from '../../prototypes/v2/lib/sync/protocol.js';
-import { AccountSongbook } from '../../prototypes/v2/lib/sync/repository.js';
-import type { SaveTransport } from '../../prototypes/v2/lib/sync/send.js';
+import { newCollection } from '../../web/lib/collections.js';
+import { runLibraryDownload } from '../../web/lib/sync/download.js';
+import { OUTBOX_PAGE_LIMIT, runOutboxPass } from '../../web/lib/sync/drain.js';
+import { ACCOUNT_DATABASE, type AccountScope, candidateKey } from '../../web/lib/sync/protocol.js';
+import { AccountSongbook } from '../../web/lib/sync/repository.js';
+import type { SaveTransport } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

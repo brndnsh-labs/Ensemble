@@ -10,7 +10,7 @@ checkpoints below read that way. Today v2 is the whole site at `/` (#1357), v1 a
 deleted (#1358), and the Retire v1 milestone removed every compatibility path: one chart schema
 (2), a schema-1 text chart refused rather than converted (#1740), old `?s=` links ignored
 (#1735), and `/v2/...` a plain 404 (#1742). For the live contract read
-[`prototypes/v2/CLAUDE.md`](../../prototypes/v2/CLAUDE.md) and
+[`web/CLAUDE.md`](../../web/CLAUDE.md) and
 [the chart contract](ensemble-v2-charts.md#compatibility).
 
 ## Product promise
@@ -160,7 +160,7 @@ explicit dispositions. These are decisions to test with a chart corpus, not gues
 
 ## Cross-provider continuation
 
-The [v2 handoff](../../prototypes/v2/CLAUDE.md) is the common Claude/Codex entrypoint. GitHub
+The [v2 handoff](../../web/CLAUDE.md) is the common Claude/Codex entrypoint. GitHub
 milestone 15 owns task status; design parents explain contracts, not a parallel task queue.
 The [next batch](ensemble-v2-next-batch.md) shapes bounded child work with independent acceptance.
 The 2026-09-10 branch-only decision is retired: `feat/ensemble-v2-foundation` merged to `main`

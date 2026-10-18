@@ -15,10 +15,10 @@ on:
   pull_request:
     branches: [main]
     paths:
-      - 'prototypes/v2/**'
-      # The export compiles the shared engine and songbook code through webpack, so a `public/`
+      - 'web/**'
+      # The export compiles the shared engine and songbook code through webpack, so a `core/`
       # change can break the root build the image serves.
-      - 'public/**'
+      - 'core/**'
       # The image that serves that root build, and the edge config it carries (#1356).
       - 'hosting/web/**'
       - '.github/workflows/v2-root-image.yml'
@@ -49,16 +49,16 @@ jobs:
           cache: 'npm'
           cache-dependency-path: |
             package-lock.json
-            prototypes/v2/package-lock.json
+            web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
 
       - name: Install v2 dependencies
-        run: npm ci --prefix prototypes/v2
+        run: npm ci --prefix web
 
       - name: Build the v2 static export at basePath /
-        run: npm run build --prefix prototypes/v2
+        run: npm run build --prefix web
 
       # `scripts/offline.mjs` stamps build.json with `git rev-parse HEAD`, and the smoke test
       # asserts the image reports exactly that. Read it from git rather than `github.sha` so
@@ -71,12 +71,12 @@ jobs:
         run: |
           # `set -e` ignores a command inverted with `!`, so each negative is an explicit `if`.
           set -euo pipefail
-          grep -q 'const SCOPE = "/";' prototypes/v2/out/sw.js
-          test -f prototypes/v2/out/manifest.json
-          if [ -e prototypes/v2/out/v2 ]; then
+          grep -q 'const SCOPE = "/";' web/out/sw.js
+          test -f web/out/manifest.json
+          if [ -e web/out/v2 ]; then
             echo '::error::the export still has a /v2/ tree'; exit 1
           fi
-          if grep -q '/v2/_next/' prototypes/v2/out/index.html; then
+          if grep -q '/v2/_next/' web/out/index.html; then
             echo '::error::index.html still references /v2/_next'; exit 1
           fi
 
@@ -88,7 +88,7 @@ jobs:
         uses: docker/build-push-action@v7
         with:
           context: hosting/web
-          build-contexts: site=prototypes/v2/out
+          build-contexts: site=web/out
           push: false
           load: true
           provenance: false

@@ -4,15 +4,15 @@
  * @vitest-environment happy-dom
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { audioWatchdog } from '../../../public/engine/audio-recovery.js';
-import { initAudio } from '../../../public/engine/engine.js';
+import { audioWatchdog } from '../../../core/engine/audio-recovery.js';
+import { initAudio } from '../../../core/engine/engine.js';
 
 const { makeSoloistMock } = await vi.hoisted(
     async () => await import('../../utils/mock-soloist.js'),
 );
 
 // Mock state.js
-vi.mock('../../../public/state.js', () => {
+vi.mock('../../../core/state.js', () => {
     const mockState = {
         playback: {
             audio: { currentTime: 10.0 },
@@ -30,7 +30,7 @@ vi.mock('../../../public/state.js', () => {
     };
 });
 
-import { getState } from '../../../public/state.js';
+import { getState } from '../../../core/state.js';
 
 const { playback } = getState();
 

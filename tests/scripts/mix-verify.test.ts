@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { encodeWav } from '../../public/engine/wav-encoder.js';
+import { encodeWav } from '../../core/engine/wav-encoder.js';
 import { decodeWav, parseMixVerifyArgs } from '../../scripts/mix-verify.js';
 
 describe('mix-verify — CLI parsing', () => {

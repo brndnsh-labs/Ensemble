@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createAccountApi } from '../../../prototypes/v2/lib/account/api.js';
+import { createAccountApi } from '../../../web/lib/account/api.js';
 
 interface FakeCall {
     path: string;

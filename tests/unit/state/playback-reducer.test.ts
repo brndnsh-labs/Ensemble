@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { playback, playbackReducer } from '../../../public/state/playback.js';
-import { ACTIONS, type GlobalContext } from '../../../public/types.js';
+import { playback, playbackReducer } from '../../../core/state/playback.js';
+import { ACTIONS, type GlobalContext } from '../../../core/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 describe('Playback Reducer', () => {
