@@ -15,6 +15,7 @@ import {
     type BandSettings,
     compileTimeline,
     DEFAULT_SETTINGS,
+    type PassMemory,
     PPQ,
     performPass,
     secondsAt,
@@ -557,6 +558,68 @@ describe('BandHost looping laps', () => {
                     ) {
                         failures.push(`${style}/${seed} lap ${lap.pass}`);
                     }
+                }
+            }
+        }
+        expect(failures).toEqual([]);
+    });
+});
+
+describe('BandHost a long uncounted chart (#1665)', () => {
+    /** 80 bars, A and B eight bars each, five times: two and a half chunks a pass. */
+    const long = song(
+        (['A', 'B', 'A', 'B', 'A', 'B', 'A', 'B', 'A', 'B'] as const).map((label, s) => ({
+            id: `s${s}`,
+            label,
+            repeat: 1,
+            measures: (label === 'A'
+                ? ['C', 'Am7', 'Dm7', 'G7', 'C', 'Am7', 'Dm7', 'G7']
+                : ['F', 'F', 'C', 'C', 'D7', 'D7', 'Dm7', 'G7']
+            ).map((symbol, m) => bar(`s${s}m${m}`, [chord(symbol, 4)])),
+        })),
+    );
+    const BPM = 240;
+
+    it('plays a pass a chunk at a time, note for note the pass played whole', () => {
+        const timeline = compileTimeline(long);
+        const failures: string[] = [];
+        for (const [style, comp] of [
+            ['jazz', 'piano'],
+            ['rock', 'organ'],
+            ['reggae', 'organ'],
+            ['bossa', 'nylon'],
+        ] as const) {
+            const settings: BandSettings = {
+                ...DEFAULT_SETTINGS,
+                style,
+                comp,
+                lanes: { drums: true, bass: true, comp: true, lead: true },
+            };
+            const audio = fakeAudioContext(10);
+            const state = fakeState(audio);
+            const host = new BandHost({ state: () => state, silence: () => {} });
+            host.setScore(long);
+            const segments = watchSegments(host) as () => (Queued & {
+                pass: number;
+                until: number;
+            })[];
+            host.start(settings, BPM, 0);
+            // One bar a second: the first pass, and the second's first two chunks.
+            run(host, audio, 10.1, 10.1 + timeline.bars.length + 40);
+            host.stop();
+            const queued = segments();
+            expect(queued.every((s) => s.until - s.window.from <= 32)).toBe(true);
+            let memory: PassMemory | undefined;
+            for (const pass of [0, 1]) {
+                const whole = performPass(timeline, settings, { pass, looping: true, memory });
+                memory = whole.memory;
+                const chunks = queued.filter((s) => s.pass === pass);
+                const played = chunks.flatMap((s) => s.events);
+                const upTo = chunks.at(-1)!.until;
+                const expected = whole.events.filter((e) => e.bar < upTo);
+                expect(chunks.length, `${style} pass ${pass}`).toBeGreaterThan(1);
+                if (JSON.stringify(played) !== JSON.stringify(expected)) {
+                    failures.push(`${style} pass ${pass}`);
                 }
             }
         }

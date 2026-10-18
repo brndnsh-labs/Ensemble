@@ -88,12 +88,15 @@ export function performPass(
     // least one bar, and on until the comp strikes again or rests, since a sustaining comp
     // holds its last chord to its next strike, which can be bars away. Capped at the end of
     // the next chorus, so a chunk costs at most two choruses' bars: chunks are generated on
-    // the main thread inside the scheduler's 150 ms lookahead. On a real comp it never binds
-    // (a sustaining comp re-presses a held chord at each phrase top); it bounds the cost all
-    // the same.
+    // the main thread inside the scheduler's 150 ms lookahead. And never more than `LOOK_BARS`
+    // past it: an uncounted chart is one chorus, so a chunk of a long one (#1665) would plan
+    // every bar left in the song. On a real comp neither cap binds (a sustaining comp
+    // re-presses a held chord at each phrase top); they bound the cost all the same.
     let through = Math.min(until + 1, window.to);
     const lookLimit =
-        until < window.to ? Math.min(chorusBars(timeline, until).end, window.to) : window.to;
+        until < window.to
+            ? Math.min(chorusBars(timeline, until).end, until + LOOK_BARS, window.to)
+            : window.to;
     // Trading with the drummer needs a drummer who can solo in this style.
     const drumSolos = Boolean(style.drums.solos);
     // Planned only as far as the look can reach, and the bar it leads into: a chunk of a long
@@ -116,6 +119,9 @@ export function performPass(
               pass: options.pass + 1,
               looping: true,
               window: { ...window, from: 0, origin: 0 },
+              // Only its first bar is read: planning the whole next pass cost a long chart's
+              // every bar on each chunk (#1665).
+              planned: 1,
               drumSolos,
               arcShape: style.jamArc,
               keepsHighLine: style.keepsHighLine,
@@ -414,6 +420,9 @@ function sustain(
             : e;
     });
 }
+
+/** How far past a chunk's end the look across its barline may go (`PassOptions.until`). */
+const LOOK_BARS = 32;
 
 const LANE_ORDER: Record<BandEvent['lane'], number> = { drums: 0, bass: 1, comp: 2, lead: 3 };
 const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
