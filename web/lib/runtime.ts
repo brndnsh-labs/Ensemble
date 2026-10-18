@@ -82,7 +82,11 @@ import {
     masterVolumePreference,
     rememberCountIn,
     rememberMasterVolume,
+    rememberSongMode,
+    type SongMinutes,
+    songModePreference,
 } from './session';
+import { planSong, type SongPlan } from './song-mode';
 import {
     initializeSounds,
     prepareSound,
@@ -92,7 +96,7 @@ import {
 } from './sounds';
 import { track } from './telemetry';
 
-export type { ChartDocument, StemInstrument };
+export type { ChartDocument, SongMinutes, StemInstrument };
 export { GENRE_NAMES };
 
 let boot: Promise<void> | undefined;
@@ -168,6 +172,41 @@ let drumWarmup: ReturnType<typeof setTimeout> | null = null;
  */
 let bandView: BandChart | null = null;
 
+/**
+ * Song mode (#1784): about how long a looping chart plays, in minutes, or null for Off. A device
+ * preference (`songModePreference`), never part of a chart.
+ */
+let songMinutes: SongMinutes | null = null;
+/**
+ * The performance song mode planned for the band now playing: the open score counted to the
+ * chosen number of choruses, its timeline, and the chart sheet's view of it. Null while stopped,
+ * and while the band plays the chart as written.
+ *
+ * Planned when the band starts from stopped (`startBand`), which covers a fresh Play and every
+ * restart from the top — an edit, transpose or mode change while playing stops the band first.
+ * Cleared when it stops (`stopBand`). A tempo change while playing does NOT plan again: that
+ * would restart the song from the top for a tempo nudge, so the performance simply runs a little
+ * long or short. Nor does changing the setting itself: it takes effect at the next Play.
+ *
+ * While it is set, the band plays this copy and the stand draws it (`bandChartView`,
+ * `playheadSlot`), so the playhead follows every chorus; `currentScore` — what Save, the chart
+ * footer and `captureContent` see — stays the document, which still loops.
+ */
+let songPlan: (SongPlan & { view: BandChart; minutes: SongMinutes }) | null = null;
+
+/** The chart view of what the band plays: the song-mode performance, else the open chart. */
+function playedView(): BandChart | null {
+    return songPlan?.view ?? bandView;
+}
+
+/** What song mode would play if Play were pressed now, or null when it would not apply. */
+function planForPlay(): SongPlan | null {
+    if (!songMinutes || !currentScore) {
+        return null;
+    }
+    return planSong(currentScore, getState().playback.bpm, songMinutes * 60);
+}
+
 function bandHost(): BandHost {
     band ??= new BandHost({
         state: getState,
@@ -177,8 +216,17 @@ function bandHost(): BandHost {
     return band;
 }
 
-/** Hand the host the chart to play, and its timeline when the open chart already compiled it. */
+/**
+ * Hand the host the chart to play, and its timeline when the open chart already compiled it.
+ * During a song-mode performance that is its counted copy: handing the host anything else would
+ * restart the band (`BandHost.setScore`), and an export taken while it plays renders what is
+ * heard.
+ */
 function handScore(host: BandHost): void {
+    if (songPlan) {
+        host.setScore(songPlan.score, songPlan.timeline);
+        return;
+    }
     const score = scoreForBand();
     host.setScore(score, currentTimeline?.score === score ? currentTimeline.timeline : undefined);
 }
@@ -241,6 +289,9 @@ function startBand(freshPlay = false): void {
     const host = bandHost();
     const state = getState();
     const { arranger, playback } = state;
+    if (!host.playing && !songPlan) {
+        planPerformance();
+    }
     handScore(host);
     // The same take-to-take rule as the old engine: a fresh seed per play unless locked —
     // and the fresh one is recorded, so locking it later reproduces the take you heard.
@@ -259,12 +310,20 @@ function startBand(freshPlay = false): void {
     }
     restoreGains(state);
     startPlatformAudioAndWakeLock();
-    host.start(
-        bandSettings(),
-        playback.bpm,
-        (playback.startStep || 0) * STEP_TICKS,
-        freshPlay && playback.countIn,
-    );
+    try {
+        host.start(
+            bandSettings(),
+            playback.bpm,
+            (playback.startStep || 0) * STEP_TICKS,
+            freshPlay && playback.countIn,
+        );
+    } catch (error) {
+        // A band that never started plays no planned performance.
+        if (!host.playing) {
+            songPlan = null;
+        }
+        throw error;
+    }
     param('playback', 'isPlaying', true);
     track('play_started');
     warmDrums();
@@ -298,6 +357,7 @@ const DRUM_WARM_SLICE_MS = 4;
  */
 function stopBand(ringOut = false): void {
     band?.stop();
+    songPlan = null;
     if (getState().playback.isPlaying) {
         param('playback', 'isPlaying', false);
     }
@@ -326,7 +386,8 @@ export function songTick(): number | null {
  * a sample, and a chord shorter than the two periods together could go unpainted.
  */
 export function playheadSlot(tick: number | null): number {
-    return tick == null || !bandView ? -1 : slotAt(bandView, tick);
+    const view = playedView();
+    return tick == null || !view ? -1 : slotAt(view, tick);
 }
 
 /** The count-in beat sounding now (0 is "1"), or null when no count-in is. */
@@ -513,6 +574,9 @@ export function initialize(): Promise<void> {
             if (storedCountIn !== null) {
                 param('playback', 'countIn', storedCountIn);
             }
+            // Song mode (#1784) is a device preference too, but no state field: the runtime
+            // holds it, since only a Play reads it.
+            songMinutes = songModePreference();
             rebuild();
             document.addEventListener('visibilitychange', () => {
                 const { playback } = getState();
@@ -606,7 +670,8 @@ export async function startSection(
     sectionId: string,
     progress: (text: string) => void = () => {},
 ): Promise<boolean> {
-    const bounds = bandView && sectionSteps(bandView, sectionId);
+    const view = playedView();
+    const bounds = view && sectionSteps(view, sectionId);
     if (!bounds) {
         return false;
     }
@@ -621,7 +686,11 @@ export async function startSection(
     if (intent !== playIntent) {
         return true;
     }
-    dispatch(ACTIONS.SET_START_STEP, bounds.start);
+    // From stopped, song mode plans the performance first, so the section's first bar is found
+    // in the timeline the band is about to play (a counted chart's once-only intro moves it).
+    planPerformance();
+    const start = (songPlan && sectionSteps(songPlan.view, sectionId)) || bounds;
+    dispatch(ACTIONS.SET_START_STEP, start.start);
     startBand(true);
     return true;
 }
@@ -800,6 +869,60 @@ export function setMasterVolume(value: number): void {
 export function setCountIn(enabled: boolean): void {
     dispatch(ACTIONS.SET_PARAM, { module: 'playback', param: 'countIn', value: enabled });
     rememberCountIn(enabled);
+}
+
+/** Plan song mode's performance for a start from stopped (`songPlan`), or clear it. */
+function planPerformance(): void {
+    const plan = planForPlay();
+    if (!plan || !songMinutes || !bandView) {
+        songPlan = null;
+        return;
+    }
+    const view = bandChart(plan.score, plan.timeline);
+    // The written blocks are the same chart either way; keeping the open chart's array keeps the
+    // stand's fit (`useChartFit`, keyed on it) from re-choosing its step at Play and Stop.
+    songPlan = { ...plan, minutes: songMinutes, view: { ...view, blocks: bandView.blocks } };
+}
+
+/**
+ * What an export renders: what Play plays (#1784). During a song-mode performance that is its
+ * counted copy; stopped with song mode on, the performance Play would plan now; else the chart.
+ */
+function exportScore(host: BandHost): void {
+    const plan = songPlan ?? (host.playing ? null : planForPlay());
+    if (plan) {
+        host.setScore(plan.score, plan.timeline);
+    } else {
+        handScore(host);
+    }
+}
+
+/**
+ * Song mode (#1784): Off (null), or about how many minutes a looping chart plays before the band
+ * wraps up on its held ending. A device preference, remembered here and never written to the
+ * chart. A band already playing keeps the performance it started with; the next Play counts the
+ * new length.
+ */
+export function setSongMode(minutes: SongMinutes | null): void {
+    songMinutes = minutes;
+    rememberSongMode(minutes);
+}
+
+export function songMode(): SongMinutes | null {
+    return songMinutes;
+}
+
+/**
+ * Song mode's readout (`≈3:12 · 4 choruses`): the performance playing now, else what Play would
+ * plan at the current tempo. Null when song mode is off or the chart counts its own choruses.
+ * Stopped, this compiles the chart a few times over, so a caller reads it when the chart, tempo,
+ * setting or transport change — not every frame.
+ */
+export function songModeReadout(): { choruses: number; seconds: number } | null {
+    // The running performance only while it is what the setting asks for; changed mid-play, the
+    // readout shows what the next Play will count.
+    const plan = songPlan && songPlan.minutes === songMinutes ? songPlan : planForPlay();
+    return plan && { choruses: plan.choruses, seconds: plan.seconds };
 }
 
 /**
@@ -1274,7 +1397,7 @@ function exportSettings(): ReturnType<typeof bandSettings> {
  */
 export function exportMidi(filename: string): Promise<void> {
     const host = bandHost();
-    handScore(host);
+    exportScore(host);
     const settings = exportSettings();
     const { events, timeline } = host.render(settings);
     const bytes = toMidi(events, timeline, {
@@ -1338,7 +1461,7 @@ export async function exportAudio(
         return;
     }
     const host = bandHost();
-    handScore(host);
+    exportScore(host);
     const bpm = getState().playback.bpm;
     if (kind === 'mix') {
         progress('Rendering mix…');
@@ -1384,9 +1507,13 @@ export function state(): EnsembleState {
     return getState();
 }
 
-/** The band's view of the open score, or null before a chart is open. */
+/**
+ * The band's view of what it plays: the open score, or during a song-mode performance its
+ * counted copy (`songPlan`) — so a reader must read it again when playback starts and stops.
+ * Null before a chart is open.
+ */
 export function bandChartView(): BandChart | null {
-    return bandView;
+    return playedView();
 }
 
 /**
@@ -1424,6 +1551,6 @@ export function inLastBeatOfSlot(tick: number | null, slot: number): boolean {
     if (tick == null || slot < 0 || !band) {
         return false;
     }
-    const end = bandView?.slots[slot]?.to;
+    const end = playedView()?.slots[slot]?.to;
     return end !== undefined && band.inLastPulseBefore(tick, end);
 }

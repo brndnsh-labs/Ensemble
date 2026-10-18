@@ -41,11 +41,18 @@ export function nextBarIndex<T extends { start: number }>(
  * (`lib/band-chart.ts`), the written bars/sections behind them, and where playback is right now —
  * `active` is a slot of that timeline, null while stopped.
  */
-export function useChartView(current: ChartDocument | null, active: number | null) {
-    // Read again whenever the open document changes: `runtime.load`/`editScore` rebuild the view.
+export function useChartView(
+    current: ChartDocument | null,
+    active: number | null,
+    playing: boolean,
+) {
+    // Read again whenever the open document changes (`runtime.load`/`editScore` rebuild the
+    // view), and when playback starts or stops: a song-mode performance (#1784) is drawn from its
+    // own counted timeline, so `active` indexes that view's slots only while it plays.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `playing` is a re-read trigger.
     const band = useMemo(
         (): BandChart | null => (current ? runtime.bandChartView() : null),
-        [current],
+        [current, playing],
     );
     const blocks = band?.blocks ?? NO_BLOCKS;
     const displayActive = active === null ? null : (band?.slots[active]?.display ?? active);
