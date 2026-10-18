@@ -9,6 +9,11 @@
     --surface: light-dark(#fffefa, #1d2124);
     --ink: light-dark(#222923, #f1efe8);
     --on-ink: light-dark(#fffefa, #15181a);
+    /* Filled main controls (#1280): Play, a primary button, a pressed toggle. The ink in Warm and
+       High contrast; a deep shade of the palette's own hue in the others, so a palette reaches
+       the controls and not only the paper. Never the accent: that is text and the edit ring. */
+    --primary: light-dark(#222923, #f1efe8);
+    --on-primary: light-dark(#fffefa, #15181a);
     --muted: light-dark(#72766c, #a3a79c);
     --muted-soft: light-dark(#777a70, #8a9087);
     --line: light-dark(#e3e3d9, #33393b);
@@ -62,6 +67,9 @@
     color: var(--ink);
     background: var(--paper);
     font-synthesis: none;
+    /* Native checkboxes, radios and sliders: one colour, set once, so none falls back to the
+       browser's blue (#1280). */
+    accent-color: var(--green);
 }
 /* Colour palettes (#1280), chosen in Settings and stored per device. Warm is `:root` above and
    has no attribute, so a device that never picks one renders exactly these tokens. Each palette
@@ -77,6 +85,8 @@
     --surface: light-dark(#f6f8fb, #182029);
     --ink: light-dark(#1a2430, #e9eef4);
     --on-ink: light-dark(#f6f8fb, #11161c);
+    --primary: light-dark(#2a336e, #c3c8f2);
+    --on-primary: light-dark(#f6f8fb, #11161c);
     --muted: light-dark(#5b6676, #9aa6b5);
     --muted-soft: light-dark(#6a7484, #808c9b);
     --line: light-dark(#ccd5e0, #2c3642);
@@ -109,6 +119,8 @@
     --surface: light-dark(#ffffff, #161616);
     --ink: light-dark(#111111, #ffffff);
     --on-ink: light-dark(#ffffff, #0a0a0a);
+    --primary: light-dark(#111111, #ffffff);
+    --on-primary: light-dark(#ffffff, #0a0a0a);
     --muted: light-dark(#3f3f3f, #cfcfcf);
     --muted-soft: light-dark(#555555, #ababab);
     --line: light-dark(#8c8c8c, #6b6b6b);
@@ -139,6 +151,8 @@
     --surface: light-dark(#f8fbf6, #15241b);
     --ink: light-dark(#14261b, #e7efe4);
     --on-ink: light-dark(#f8fbf6, #0e1a13);
+    --primary: light-dark(#21402d, #cfe2d0);
+    --on-primary: light-dark(#f8fbf6, #0e1a13);
     --muted: light-dark(#536657, #9db4a2);
     --muted-soft: light-dark(#617364, #82998a);
     --line: light-dark(#d6e0d3, #263a2d);
@@ -169,6 +183,8 @@
     --surface: light-dark(#fcf8fb, #221926);
     --ink: light-dark(#2a1a2c, #f3eaf2);
     --on-ink: light-dark(#fcf8fb, #19121c);
+    --primary: light-dark(#4b2448, #ead0e5);
+    --on-primary: light-dark(#fcf8fb, #19121c);
     --muted: light-dark(#6d5a6f, #b3a2b5);
     --muted-soft: light-dark(#76657a, #968699);
     --line: light-dark(#e2d4df, #3a2d3e);
@@ -303,9 +319,9 @@ html [hidden] {
     background: var(--surface);
 }
 .btn.primary {
-    background: var(--ink);
-    color: var(--on-ink);
-    border-color: var(--ink);
+    background: var(--primary);
+    color: var(--on-primary);
+    border-color: var(--primary);
 }
 .btn.soft {
     background: var(--green-light);
@@ -477,9 +493,9 @@ html [hidden] {
     cursor: pointer;
 }
 .shelf-chip[aria-pressed="true"] {
-    background: var(--ink);
-    color: var(--on-ink);
-    border-color: var(--ink);
+    background: var(--primary);
+    color: var(--on-primary);
+    border-color: var(--primary);
 }
 .standards-preview {
     font-family: Georgia, "Times New Roman", serif;
@@ -531,14 +547,6 @@ html [hidden] {
     background: var(--accent-light);
     color: var(--accent);
     flex-shrink: 0;
-}
-.song-glyph.green {
-    background: #e4e9df;
-    color: #536447;
-}
-.song-glyph.blue {
-    background: #e5e9ed;
-    color: #536773;
 }
 .song-name {
     display: block;
@@ -667,7 +675,7 @@ html [hidden] {
 .mode-switch button[aria-pressed="true"] {
     background: var(--surface);
     box-shadow: 0 1px 3px #0001;
-    color: var(--ink);
+    color: var(--primary);
     font-weight: 650;
 }
 .transport-bar {
@@ -682,8 +690,8 @@ html [hidden] {
 .play-button {
     height: 43px;
     width: 48px;
-    background: var(--ink);
-    color: var(--on-ink);
+    background: var(--primary);
+    color: var(--on-primary);
     border-radius: 9px;
     display: grid;
     place-content: center;
@@ -2260,7 +2268,6 @@ dialog textarea {
     flex: 1 1 auto;
     min-width: 0;
     min-height: 32px;
-    accent-color: var(--green);
 }
 .feel-range-value {
     flex: 0 0 auto;
@@ -2308,7 +2315,7 @@ dialog textarea {
 .band-tabs [role="tab"][aria-selected="true"] {
     background: var(--surface);
     box-shadow: 0 1px 3px #0001;
-    color: var(--ink);
+    color: var(--primary);
     font-weight: 650;
 }
 .band-tab-panel {
@@ -2523,9 +2530,9 @@ html[data-theme="stage"] {
     }
 }
 .theme-toggle[aria-pressed="true"] {
-    background: var(--ink);
-    color: var(--on-ink);
-    border-color: var(--ink);
+    background: var(--primary);
+    color: var(--on-primary);
+    border-color: var(--primary);
 }
 /* Account entry point and sign-in dialog (#1262). Rendered for every device since the
    cutover (#1357).
@@ -2599,7 +2606,6 @@ html[data-theme="stage"] {
     flex-shrink: 0;
     margin: 2px 0 0;
     padding: 0;
-    accent-color: var(--ink);
 }
 /* Recovery entry and code entry (#1263). */
 .recovery-link {

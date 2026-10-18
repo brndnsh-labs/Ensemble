@@ -25,8 +25,6 @@
     height: 20px;
     margin: 0;
     flex: none;
-    /* The app's own control colour, as the Band sheet's and the neck's inputs use. */
-    accent-color: var(--green);
 }
 .settings-hint {
     font-size: 13px;

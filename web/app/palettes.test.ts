@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { PALETTES, type Palette } from '../lib/session';
 
 /**
@@ -65,6 +65,8 @@ function contrast(a: string, b: string): number {
  * The playing bar is `.bar.active`: `--green-light` under the chord's `--ink`, with a `--green`
  * underline; the same two greens are an "on" chip's text and fill, so `--green` is held as text
  * on it. The accent is text on its own tint as well (the conflict banner, the toasts' actions).
+ * `--primary` fills the main controls under `--on-primary`, and is a selected tab's label on
+ * `--surface`.
  * (`--bar-current` is not checked: its one rule, `.bar.current`, is set by no component.)
  */
 const PAIRS: [fg: string, bg: string][] = [
@@ -73,6 +75,8 @@ const PAIRS: [fg: string, bg: string][] = [
     ['muted', 'paper'],
     ['muted', 'surface'],
     ['on-ink', 'ink'],
+    ['on-primary', 'primary'],
+    ['primary', 'surface'],
     ['accent', 'paper'],
     ['accent', 'surface'],
     ['accent', 'accent-light'],
@@ -138,6 +142,56 @@ describe('colour palettes (#1280)', () => {
             });
         }
     }
+
+    it('a filled main control stands off the page it sits on (3:1, WCAG non-text)', () => {
+        for (const id of PALETTES) {
+            for (const mode of ['day', 'stage'] as const) {
+                const t = palettes[id];
+                for (const bg of ['paper', 'surface']) {
+                    expect(
+                        contrast(t.primary[mode], t[bg][mode]),
+                        `${id} ${mode}: --primary on --${bg}`,
+                    ).toBeGreaterThanOrEqual(3);
+                }
+            }
+        }
+    });
+
+    it('every palette sets its own --primary: Warm and High contrast fill with their ink, the rest with their hue', () => {
+        for (const id of PALETTES) {
+            const own = id === 'warm' ? root : tokens(block(css, `[data-palette="${id}"]`));
+            expect(own, id).toHaveProperty('primary');
+            expect(own, id).toHaveProperty('on-primary');
+        }
+        expect(palettes.warm.primary).toEqual(palettes.warm.ink);
+        expect(palettes.contrast.primary).toEqual(palettes.contrast.ink);
+    });
+
+    it('colours live in the token blocks: no rule outside them names a raw colour', () => {
+        // A raw colour outside `:root` and the palette blocks follows no palette (the songbook's
+        // old glyph tints, the menu's dim, a checkbox left on the browser's blue). Faint black
+        // shadows are the one exception: they read the same on every paper.
+        const shadowBlack = /^#000(?:[0-9a-f]|000[0-9a-f]{2})$/i;
+        const found: string[] = [];
+        for (const name of readdirSync(new URL('.', import.meta.url)).filter((n) =>
+            n.endsWith('.css'),
+        )) {
+            const source = readFileSync(new URL(`./${name}`, import.meta.url), 'utf8')
+                .replace(/\/\*[\s\S]*?\*\//g, '')
+                .replace(
+                    /(?::root|\[data-palette="[a-z]+"\]|\.palette-swatch\[data-palette="warm"\])\s*\{[^}]*\}/g,
+                    '',
+                );
+            for (const [match] of source.matchAll(
+                /#[0-9a-f]{3,8}\b|\b(?:rgba?|hsla?)\(|\b(?:white|black)\b(?!-)/gi,
+            )) {
+                if (!shadowBlack.test(match)) {
+                    found.push(`${name}: ${match}`);
+                }
+            }
+        }
+        expect(found).toEqual([]);
+    });
 
     it('High contrast holds body and muted text to AAA (7:1)', () => {
         const t = palettes.contrast;

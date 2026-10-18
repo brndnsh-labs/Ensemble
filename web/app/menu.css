@@ -57,7 +57,8 @@
     position: fixed;
     inset: 0;
     z-index: 59;
-    background: light-dark(#20272026, #00000059);
+    /* The dialogs' own dim, lighter: a menu is a glance, not a stop. In the palette's own shade. */
+    background: color-mix(in srgb, var(--backdrop) 45%, transparent);
     animation: menu-fade var(--motion-base) var(--ease-out);
 }
 @keyframes menu-fade {
