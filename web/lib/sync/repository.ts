@@ -429,6 +429,84 @@ function retireQueue<T>(tx: Transaction<T>, scope: AccountScope, id: string, the
 }
 
 /**
+ * Take one song off this device (#1754, #1805): its `songs` row, every writer's draft, and its
+ * `remote:`, `delete:` and `opened:` meta rows. Never its outbox queue — the caller has either
+ * retired the WHOLE queue already (`purgeLocal`) or refused to touch a song that has one
+ * (`removeUnreadable`) — and never its receipts, which record Saves already acknowledged.
+ */
+function forgetSong<T>(tx: Transaction<T>, scope: AccountScope, documentId: string) {
+    const key = [scope.ownerId, documentId];
+    tx.table('songs').delete(key);
+    tx.table('drafts').delete(IDBKeyRange.bound(key, [scope.ownerId, documentId, []], false, true));
+    tx.table('meta').delete(candidateKey(scope.ownerId, documentId));
+    tx.table('meta').delete(deletionKey(scope.ownerId, documentId));
+    tx.table('meta').delete(openedKey(scope.ownerId, documentId));
+}
+
+/**
+ * Is this stored song row one this build cannot read (#1769) — a text chart (schema 1, retired in
+ * #1740), or a row that will not validate? The one predicate `unreadableSongs` lists by and
+ * `removeUnreadable` removes by, so the notice's count and its Remove never disagree.
+ */
+function unreadableSong(row: SavedSong | undefined, scope: AccountScope): boolean {
+    try {
+        identifier(row?.documentId);
+        if (!isRetiredSchema(row!.document)) {
+            savedSong(row!, scope, row!.documentId);
+            return false;
+        }
+    } catch {
+        // Unreadable.
+    }
+    return true;
+}
+
+/**
+ * Does this draft hold an unreadable song against its Remove (#1805)? A draft on a record nothing
+ * here can read counts live (`liveDraft` against a null record), so it may be the only copy of
+ * that music: a newer build's unsaved edits (`newerSchema`), or a draft this build reads
+ * (`savedDraft`). A text-chart draft (schema 1, retired in #1740) holds nothing any build can
+ * open, and a draft that is neither is corrupt; both go with the song, or no text-chart row could
+ * ever be removed.
+ */
+function draftHoldsRemoval(row: Draft, scope: AccountScope, documentId: string): boolean {
+    if (isRetiredSchema(row?.document)) {
+        return false;
+    }
+    try {
+        if (newerSchema(row?.document)) {
+            return true;
+        }
+    } catch {
+        // Not a document either decoder recognises: asked again below.
+    }
+    return readableRecord(() => savedDraft(row, scope, documentId)) !== 'unreadable';
+}
+
+/**
+ * Is anything holding this unreadable song on the device (#1805)? Read in the caller's
+ * transaction: ANY operation queued for it (the queue is the only marker of music that has not
+ * reached the account), or a draft `draftHoldsRemoval` keeps. The ONE check `removeUnreadable`
+ * acts on and `unreadableRemoval` reports ahead of the confirm, so the two cannot drift.
+ */
+function removalHeld<T>(
+    tx: Transaction<T>,
+    scope: AccountScope,
+    documentId: string,
+    consume: (held: boolean) => void,
+) {
+    const key = [scope.ownerId, documentId];
+    tx.read(tx.table('operations').index('song').count(key), (queued: number) => {
+        if (queued > 0) {
+            return consume(true);
+        }
+        tx.read(tx.table('drafts').index('song').getAll(key), (drafts: Draft[]) =>
+            consume(drafts.some((row) => draftHoldsRemoval(row, scope, documentId))),
+        );
+    });
+}
+
+/**
  * One stored record that may not read (#1769): the decoded record, or `'unreadable'` for a row this
  * build cannot use — one its decoder refuses, a text chart (schema 1, retired in #1740) included.
  */
@@ -2248,24 +2326,7 @@ export class AccountSongbook {
                                         for (const operationKey of operationKeys) {
                                             tx.table('operations').delete(operationKey);
                                         }
-                                        tx.table('songs').delete(key);
-                                        tx.table('drafts').delete(
-                                            IDBKeyRange.bound(
-                                                key,
-                                                [scope.ownerId, documentId, []],
-                                                false,
-                                                true,
-                                            ),
-                                        );
-                                        tx.table('meta').delete(
-                                            candidateKey(scope.ownerId, documentId),
-                                        );
-                                        tx.table('meta').delete(
-                                            deletionKey(scope.ownerId, documentId),
-                                        );
-                                        tx.table('meta').delete(
-                                            openedKey(scope.ownerId, documentId),
-                                        );
+                                        forgetSong(tx, scope, documentId);
                                         result.purged.push(documentId);
                                         next();
                                     },
@@ -2276,6 +2337,118 @@ export class AccountSongbook {
                 });
             };
             step(0);
+        });
+    }
+
+    /**
+     * Remove songs this build cannot read from THIS DEVICE (#1805) — the home's and All songs'
+     * "couldn't be read" notices' Remove, after their Export as stored. ONE owner-fenced
+     * transaction over every id. Each id that is still an unreadable song row (`unreadableSong`,
+     * the predicate `unreadableSongs` lists by) is:
+     *
+     * - `waiting` when something holds it (`removalHeld`, the check `unreadableRemoval` reports
+     *   before the confirm, made again here because either may change in between):
+     *   - ANY operation queued for it — a Save stepped over until a build can read the account's
+     *     copy (`acknowledge`'s `'unreadable-remote'`, #1782), a queue from a newer build, or one
+     *     a pass has not visited yet. The queue is the only marker of music that has not reached
+     *     the account, so nothing is removed: not the row, and never one operation of the queue
+     *     (the whole queue or nothing, and here nothing).
+     *   - or a draft that may be the only copy of its music (`draftHoldsRemoval`): a newer build's
+     *     unsaved edits, or a draft this build reads. Export as stored writes only `songs` rows,
+     *     so the confirm's "unless you exported it" would not cover it.
+     * - otherwise `removed`: its row, every writer's draft (only text-chart and corrupt ones are
+     *   left by then) and its `remote:`/`delete:`/`opened:` rows go (`forgetSong`) — a frozen
+     *   `delete:` row included, as in `purgeLocal`; receipts stay.
+     *
+     * An id whose row is gone or now reads (a newer copy landed since the notice was drawn) is
+     * neither, and is left alone. An id that is not an identifier cannot be addressed and is left
+     * out the same way.
+     *
+     * LOCAL only, as `purgeLocal` is: nothing queued, frozen or sent. Unlike `purgeLocal`, a row
+     * the account confirmed is removed too. With nothing queued, a confirmed row holds nothing the
+     * account lacks (the download replaces it with the account's copy as soon as that copy reads,
+     * `reconcile`), and a cloud delete would be exactly wrong: it would destroy, on every device, a
+     * version a newer build can read. If the account's copy ever reads, a later download brings it
+     * back as an ordinary song. An UNCONFIRMED row with nothing queued may be the only copy of its
+     * music — `prepare` retired a queue no build could send and cleared its remote revision — so
+     * the shell's confirm says it cannot be recovered unless exported, as `purgeLocal`'s does for
+     * a never-confirmed song.
+     */
+    async removeUnreadable(
+        scope: AccountScope,
+        documentIds: readonly string[],
+    ): Promise<{ removed: string[]; waiting: string[] }> {
+        scope = copyScope(scope);
+        const ids = [...new Set(documentIds)].filter((documentId) => {
+            try {
+                identifier(documentId);
+                return true;
+            } catch {
+                return false;
+            }
+        });
+        return this.database.run('readwrite', scope, (tx) => {
+            const result = { removed: [] as string[], waiting: [] as string[] };
+            tx.finish(result);
+            const step = (index: number) => {
+                const documentId = ids[index];
+                if (documentId === undefined) {
+                    return;
+                }
+                const key = [scope.ownerId, documentId];
+                const next = () => step(index + 1);
+                tx.read(tx.table('songs').get(key), (song: SavedSong | undefined) => {
+                    if (song === undefined || !unreadableSong(song, scope)) {
+                        return next();
+                    }
+                    removalHeld(tx, scope, documentId, (held) => {
+                        if (held) {
+                            result.waiting.push(documentId);
+                        } else {
+                            forgetSong(tx, scope, documentId);
+                            result.removed.push(documentId);
+                        }
+                        next();
+                    });
+                });
+            };
+            step(0);
+        });
+    }
+
+    /**
+     * What `removeUnreadable` would do now (#1805), read-only, for the confirm to say BEFORE the
+     * musician agrees: every song row `unreadableSongs` lists, split by `removalHeld` — the one
+     * check the removal itself makes — into the ones that would go and the ones kept. A snapshot:
+     * the removal checks again in its own transaction.
+     */
+    async unreadableRemoval(
+        scope: AccountScope,
+    ): Promise<{ removable: string[]; waiting: string[] }> {
+        scope = copyScope(scope);
+        const owned = IDBKeyRange.bound([scope.ownerId], [scope.ownerId, []], false, true);
+        return this.database.run('readonly', scope, (tx) => {
+            const result = { removable: [] as string[], waiting: [] as string[] };
+            tx.finish(result);
+            tx.read(tx.table('songs').getAll(owned), (rows: SavedSong[]) => {
+                const ids: string[] = [];
+                for (const row of rows) {
+                    if (!unreadableSong(row, scope)) {
+                        continue;
+                    }
+                    try {
+                        identifier(row?.documentId);
+                        ids.push(row.documentId);
+                    } catch {
+                        // Not addressable, so not removable either (`removeUnreadable`).
+                    }
+                }
+                for (const documentId of ids) {
+                    removalHeld(tx, scope, documentId, (held) => {
+                        (held ? result.waiting : result.removable).push(documentId);
+                    });
+                }
+            });
         });
     }
 
@@ -2378,14 +2551,8 @@ export class AccountSongbook {
             tx.read(tx.table('songs').getAll(owned), (rows: SavedSong[]) => {
                 const unreadable: Array<{ documentId: string; raw: string }> = [];
                 for (const row of rows) {
-                    try {
-                        identifier(row?.documentId);
-                        if (!isRetiredSchema(row.document)) {
-                            savedSong(row, scope, row.documentId);
-                            continue;
-                        }
-                    } catch {
-                        // Unreadable: recorded below.
+                    if (!unreadableSong(row, scope)) {
+                        continue;
                     }
                     unreadable.push({
                         documentId: String(row?.documentId ?? '(no id)'),

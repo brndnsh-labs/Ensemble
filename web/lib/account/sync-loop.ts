@@ -803,6 +803,13 @@ export interface SyncLoop {
      */
     unreadableSongs(owner?: string | null): Promise<Array<{ documentId: string; raw: string }>>;
     /**
+     * What the notices' Remove would do now (#1805, `AccountSongbook.unreadableRemoval`): the
+     * unreadable songs that would go, and the ones something keeps (a queued Save, or a draft that
+     * may be the only copy of its music). Read-only, for the confirm to say before it asks;
+     * `removeUnreadable` checks again. Scoped like `unreadableSongs`.
+     */
+    unreadableRemoval(owner?: string | null): Promise<{ removable: string[]; waiting: string[] }>;
+    /**
      * What the songbook home shows (#1441): the Continue song, the most recently opened ones by
      * id and the library's count — never the whole library. The account's own opened-at map and
      * last-opened pointer decide which ids; see `AccountSongbook.home`. Scoped exactly like
@@ -1003,6 +1010,19 @@ export interface SyncLoop {
         documentIds: readonly string[],
         owner: string | null,
     ): Promise<{ purged: string[]; held: string[] }>;
+    /**
+     * Remove songs this build cannot read from THIS DEVICE (#1805), the home's and All songs'
+     * "couldn't be read" notices' Remove (`AccountSongbook.removeUnreadable`, ONE transaction). An
+     * id with anything queued in the outbox, or a draft that may be the only copy of its music,
+     * comes back in `waiting`, untouched: the queue is the only marker of music that has not
+     * reached the account, and it is never cut. Local only, and
+     * serialized like `purgeLocal`: it takes the loop's one slot, so no pass of this tab is sending
+     * while it decides. Publishes the library and re-reads the observation when anything went.
+     */
+    removeUnreadable(
+        documentIds: readonly string[],
+        owner: string | null,
+    ): Promise<{ removed: string[]; waiting: string[] }>;
     /**
      * Resolve this document's refused Save by keeping both (#1267) — the one way out of a
      * conflicted outbox head, which is otherwise terminal and parks every later Save of that song
@@ -1782,6 +1802,56 @@ export function createSyncLoop(
         }
     }
 
+    /**
+     * A local removal (`purgeLocal`, `removeUnreadable`) in the loop's ONE serialization slot, as a
+     * pass takes it. Waiting for a pass once is not enough: `run()`'s `finally` starts a coalesced
+     * re-run the moment it clears `inFlight`, and any trigger (online, a Save) could start one
+     * while the scope below resolves. A pass sending a frozen Save of an id deleted under it would
+     * meet a missing operation at `acknowledge` (a storage error for the whole drain) and the song
+     * would come back on the download; a pass mid-send while `removeUnreadable` decides could
+     * change what is queued under it. So: wait until no pass holds the slot, take it
+     * synchronously, and let every `run()` meanwhile coalesce behind the removal. When `changed`,
+     * the library and the collections (whose resolved songs shrink) are published and the
+     * observation re-read, so the candidates and counts follow.
+     */
+    async function exclusively<T>(
+        owner: string | null,
+        work: (scope: AccountScope) => Promise<T>,
+        changed: (result: T) => boolean,
+    ): Promise<T> {
+        while (inFlight) {
+            await inFlight.catch(() => {});
+        }
+        let release = () => {};
+        const slot = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        inFlight = slot;
+        try {
+            const current = await ownedScope(owner);
+            const mine = epoch;
+            const result = await work(current);
+            if (mine === epoch && changed(result)) {
+                publish({
+                    libraryVersion: state.libraryVersion + 1,
+                    collectionsVersion: state.collectionsVersion + 1,
+                });
+                await observe();
+            }
+            return result;
+        } finally {
+            if (inFlight === slot) {
+                inFlight = null;
+            }
+            release();
+            if (rerun) {
+                // A pass asked for while the removal held the slot, dispatched the way `run()`
+                // dispatches its own coalesced re-run.
+                rerun = false;
+                void loop.run().catch(() => {});
+            }
+        }
+    }
     const loop: SyncLoop = {
         getSnapshot: () => state,
         subscribe(listener) {
@@ -1889,6 +1959,9 @@ export function createSyncLoop(
         },
         async unreadableSongs(owner = null) {
             return songbook.unreadableSongs(await heldScope(owner));
+        },
+        async unreadableRemoval(owner = null) {
+            return songbook.unreadableRemoval(await heldScope(owner));
         },
         async homeLibrary(owner = null) {
             const current = await heldScope(owner);
@@ -2128,46 +2201,19 @@ export function createSyncLoop(
                 message: retained ? DELETE_MESSAGES.retained : DELETE_MESSAGES.deleted,
             };
         },
-        async purgeLocal(documentIds, owner) {
-            // The purge takes the loop's ONE serialization slot, as a pass does. Waiting for a
-            // pass once is not enough: `run()`'s `finally` starts a coalesced re-run the moment it
-            // clears `inFlight`, and any trigger (online, a Save) could start one while the scope
-            // below resolves. A pass sending a frozen Save of an id deleted under it would meet a
-            // missing operation at `acknowledge` (a storage error for the whole drain) and the
-            // song would come back on the download. So: wait until no pass holds the slot, take
-            // it synchronously, and let every `run()` meanwhile coalesce behind the purge.
-            while (inFlight) {
-                await inFlight.catch(() => {});
-            }
-            let release = () => {};
-            const slot = new Promise<void>((resolve) => {
-                release = resolve;
-            });
-            inFlight = slot;
-            try {
-                const current = await ownedScope(owner);
-                const mine = epoch;
-                const result = await songbook.purgeLocal(current, documentIds);
-                if (mine === epoch && result.purged.length > 0) {
-                    publish({
-                        libraryVersion: state.libraryVersion + 1,
-                        collectionsVersion: state.collectionsVersion + 1,
-                    });
-                    await observe();
-                }
-                return result;
-            } finally {
-                if (inFlight === slot) {
-                    inFlight = null;
-                }
-                release();
-                if (rerun) {
-                    // A pass asked for while the purge held the slot, dispatched the way
-                    // `run()` dispatches its own coalesced re-run.
-                    rerun = false;
-                    void loop.run().catch(() => {});
-                }
-            }
+        purgeLocal(documentIds, owner) {
+            return exclusively(
+                owner,
+                (current) => songbook.purgeLocal(current, documentIds),
+                (result) => result.purged.length > 0,
+            );
+        },
+        removeUnreadable(documentIds, owner) {
+            return exclusively(
+                owner,
+                (current) => songbook.removeUnreadable(current, documentIds),
+                (result) => result.removed.length > 0,
+            );
         },
         async keepBoth(documentId, owner) {
             // #1311: before the transaction opens. Keeping both CREATES a local line for the

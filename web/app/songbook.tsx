@@ -2,6 +2,7 @@ import { type RefObject, useEffect, useMemo, useRef } from 'react';
 import {
     ACCOUNT_SWITCH_MESSAGES,
     REMOTE_UPDATE_MESSAGES,
+    REMOVE_UNREADABLE_MESSAGES,
     UNREADABLE_EXPORT_LABEL,
     unreadableSongsNotice,
 } from '../lib/account/messages';
@@ -51,6 +52,8 @@ interface SongbookProps {
     libraryUnreadable: number | null;
     /** Writes out the songs this build cannot read, as stored; account only (#1782). */
     onExportUnreadable?: () => void;
+    /** Asks to remove those songs from this device, behind a confirm; account only (#1805). */
+    onRemoveUnreadable?: () => void;
     /**
      * True when this is the signed-in account library rather than the guest one (#1266).
      * There is no switcher — guest signed out, account signed in (rollout decision 9 S3) — so
@@ -153,7 +156,7 @@ export function Songbook(props: SongbookProps) {
         offline,
     } = props;
     const rows = home?.rows ?? [];
-    const { libraryUnreadable, onExportUnreadable } = props;
+    const { libraryUnreadable, onExportUnreadable, onRemoveUnreadable } = props;
     const unreadable = home === null ? 0 : Math.max(home.unreadable, libraryUnreadable ?? 0);
     const query = search.trim().toLowerCase();
     const firstVisit = !loading && home !== null && home.count === 0 && featured === null;
@@ -215,6 +218,16 @@ export function Songbook(props: SongbookProps) {
                             onClick={onExportUnreadable}
                         >
                             {UNREADABLE_EXPORT_LABEL}
+                        </button>
+                    )}
+                    {onRemoveUnreadable && (
+                        <button
+                            className="account-btn"
+                            data-testid="home-unreadable-remove"
+                            disabled={busy}
+                            onClick={onRemoveUnreadable}
+                        >
+                            {REMOVE_UNREADABLE_MESSAGES.label}
                         </button>
                     )}
                 </p>

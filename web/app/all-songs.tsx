@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     PURGE_MESSAGES,
     REMOTE_UPDATE_MESSAGES,
+    REMOVE_UNREADABLE_MESSAGES,
     UNREADABLE_EXPORT_LABEL,
     unreadableSongsNotice,
 } from '../lib/account/messages';
@@ -59,6 +60,8 @@ interface AllSongsProps {
     unreadable: number;
     /** Writes out those songs as stored (#1782); account only. */
     onExportUnreadable?: () => void;
+    /** Asks to remove those songs from this device, behind a confirm (#1805); account only. */
+    onRemoveUnreadable?: () => void;
     accountLibrary: boolean;
     /**
      * The star set — the built-in Starred collection's songs since #1477, the same source
@@ -155,6 +158,7 @@ export function AllSongs({
     removedCollectionId,
     onRemoveGone,
     onExportUnreadable,
+    onRemoveUnreadable,
 }: AllSongsProps) {
     const [view, setViewState] = useState<LibraryView>(
         initialCollectionId === null ? 'all' : `collection:${initialCollectionId}`,
@@ -602,6 +606,16 @@ export function AllSongs({
                                     onClick={onExportUnreadable}
                                 >
                                     {UNREADABLE_EXPORT_LABEL}
+                                </button>
+                            )}
+                            {onRemoveUnreadable && (
+                                <button
+                                    className="account-btn"
+                                    data-testid="all-songs-unreadable-remove"
+                                    disabled={busy}
+                                    onClick={onRemoveUnreadable}
+                                >
+                                    {REMOVE_UNREADABLE_MESSAGES.label}
                                 </button>
                             )}
                         </p>

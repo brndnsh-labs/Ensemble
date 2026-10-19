@@ -89,6 +89,27 @@ function putCorruptSong(documentId: string, remoteRevision: string | null = 'r-o
     });
 }
 
+/** A chart in the retired text format (schema 1, #1740), as an older build stored it. */
+function textChart(id: string, title = 'Old') {
+    const { chart, ...envelope } = accountChart(title, id);
+    return {
+        ...envelope,
+        schemaVersion: 1,
+        chart: {
+            arrangement: {
+                sections: [{ id: 'a', label: 'A', value: 'C7 | F7', repeat: 1 }],
+                key: 'C',
+                timeSignature: '4/4',
+                grouping: null,
+                isMinor: false,
+                notation: 'name',
+            },
+            performance: chart.performance,
+            band: chart.band,
+        },
+    };
+}
+
 /** A cloud that commits every Save it is handed and records which ids it saw. */
 function committing(): {
     transport: SaveTransport;
@@ -677,5 +698,178 @@ describe('a queued Save that will not decode (#1769)', () => {
         });
         expect((await book.read(scope, kept.documentId))?.document.title).toMatch(/^B2\b/);
         expect(await book.queued(scope, 'song-b')).toEqual([]);
+    });
+
+    describe('the notices’ Remove (#1805)', () => {
+        it('keeps a song whose Save is waiting on a version this build cannot read, queue and all', async () => {
+            // The #1782 step-over: B2 is queued and frozen over an unreadable record, waiting
+            // for a build that can read the account's r2.
+            await chainedQueue();
+            await put('songs', {
+                ownerId: OWNER,
+                documentId: 'song-b',
+                document: corruptChart('song-b'),
+                remoteRevision: 'r1',
+            });
+            const sky = conflictingOn({ revision: 'r2', document: corruptChart('song-b') });
+            await runOutboxPass(book, scope, sky.transport);
+            const queued = (await all('operations')).filter((op) => op.documentId === 'song-b');
+            expect(queued).toMatchObject([{ status: 'queued', snapshot: { title: 'B2' } }]);
+            expect(await book.unreadableSongs(scope)).toMatchObject([{ documentId: 'song-b' }]);
+
+            const result = await book.removeUnreadable(scope, ['song-b']);
+
+            expect(result).toEqual({ removed: [], waiting: ['song-b'] });
+            // Nothing moved: the same queue, operation for operation, and the record as it was.
+            expect((await all('operations')).filter((op) => op.documentId === 'song-b')).toEqual(
+                queued,
+            );
+            expect(await stored('songs', 'song-b')).toMatchObject({
+                document: corruptChart('song-b'),
+                remoteRevision: 'r1',
+            });
+            // And the next pass still sends it, as before.
+            const again = await runOutboxPass(book, scope, sky.transport);
+            expect(again.counts).toMatchObject({ refused: 1 });
+        });
+
+        it('keeps a song with a queue from a newer build', async () => {
+            const b = await book.save(scope, accountChart('B', 'song-b'), null);
+            const [op] = (await all('operations')).filter((row) => row.documentId === 'song-b');
+            const newer = { ...b.document, schemaVersion: 99 };
+            await put('operations', { ...op, snapshot: newer });
+            await put('songs', {
+                ownerId: OWNER,
+                documentId: 'song-b',
+                document: newer,
+                remoteRevision: null,
+            });
+
+            expect(await book.removeUnreadable(scope, ['song-b'])).toEqual({
+                removed: [],
+                waiting: ['song-b'],
+            });
+            expect(
+                (await all('operations')).filter((row) => row.documentId === 'song-b'),
+            ).toHaveLength(1);
+            expect(await book.unreadableSongs(scope)).toHaveLength(1);
+        });
+
+        it('removes unreadable songs with nothing queued, confirmed or not, and leaves readable ones', async () => {
+            await book.save(scope, accountChart('A', 'song-a'), null);
+            await runOutboxPass(book, scope, committing().transport);
+            const receipts = await all('receipts');
+            // Confirmed by the account, and never confirmed (a queue `prepare` retired).
+            await putCorruptSong('song-b', 'r-old');
+            await putCorruptSong('song-c', null);
+            await book.recordOpened(scope, 'song-b');
+            await put('drafts', {
+                ownerId: OWNER,
+                documentId: 'song-c',
+                writerId: 'tab-1',
+                document: corruptChart('song-c'),
+            });
+
+            const result = await book.removeUnreadable(scope, [
+                'song-a',
+                'song-b',
+                'song-c',
+                'gone',
+            ]);
+
+            expect(result).toEqual({ removed: ['song-b', 'song-c'], waiting: [] });
+            expect(await book.unreadableSongs(scope)).toEqual([]);
+            expect((await all('songs')).map((row) => row.documentId)).toEqual(['song-a']);
+            expect((await all('drafts')).filter((row) => row.documentId === 'song-c')).toEqual([]);
+            expect((await book.openedAtMap(scope)).has('song-b')).toBe(false);
+            // Local only: nothing queued, and the receipts stay.
+            expect(await all('operations')).toEqual([]);
+            expect(await all('receipts')).toEqual(receipts);
+        });
+
+        it('keeps a song whose draft may be the only copy of its music, and says so before the confirm', async () => {
+            // A newer build's tab has song-b open with unsaved edits: its row (confirmed, nothing
+            // queued) and its recovery draft are both a schema this build does not know.
+            const newer = { ...accountChart('B', 'song-b'), schemaVersion: 99 };
+            await put('songs', {
+                ownerId: OWNER,
+                documentId: 'song-b',
+                document: newer,
+                remoteRevision: 'r1',
+            });
+            const newerDraft = {
+                ownerId: OWNER,
+                documentId: 'song-b',
+                writerId: 'tab-newer',
+                document: { ...newer, title: 'B, unsaved' },
+                baseRevision: 0,
+                capturedAt: new Date().toISOString(),
+            };
+            await put('drafts', newerDraft);
+            // And song-c, unreadable, holds a draft this build reads.
+            await putCorruptSong('song-c', 'r1');
+            const readableDraft = {
+                ownerId: OWNER,
+                documentId: 'song-c',
+                writerId: 'tab-2',
+                document: accountChart('C, unsaved', 'song-c'),
+                baseRevision: 0,
+                capturedAt: new Date().toISOString(),
+            };
+            await put('drafts', readableDraft);
+            // song-d, unreadable with nothing holding it, is the one that goes.
+            await putCorruptSong('song-d', 'r1');
+            expect(await all('operations')).toEqual([]);
+
+            expect(await book.unreadableRemoval(scope)).toEqual({
+                removable: ['song-d'],
+                waiting: ['song-b', 'song-c'],
+            });
+            const result = await book.removeUnreadable(scope, ['song-b', 'song-c', 'song-d']);
+
+            expect(result).toEqual({ removed: ['song-d'], waiting: ['song-b', 'song-c'] });
+            expect(await stored('songs', 'song-b')).toMatchObject({
+                document: newer,
+                remoteRevision: 'r1',
+            });
+            expect((await all('drafts')).filter((row) => row.documentId === 'song-b')).toEqual([
+                newerDraft,
+            ]);
+            expect(await stored('songs', 'song-c')).toMatchObject({
+                document: corruptChart('song-c'),
+            });
+            expect((await all('drafts')).filter((row) => row.documentId === 'song-c')).toEqual([
+                readableDraft,
+            ]);
+            expect((await all('songs')).map((row) => row.documentId)).toEqual(['song-b', 'song-c']);
+        });
+
+        it('still removes a text chart whose only draft is a text chart too', async () => {
+            await put('songs', {
+                ownerId: OWNER,
+                documentId: 'song-old',
+                document: textChart('song-old'),
+                remoteRevision: 'r1',
+            });
+            await put('drafts', {
+                ownerId: OWNER,
+                documentId: 'song-old',
+                writerId: 'tab-old',
+                document: textChart('song-old', 'Old, unsaved'),
+                baseRevision: 0,
+                capturedAt: new Date().toISOString(),
+            });
+
+            expect(await book.unreadableRemoval(scope)).toEqual({
+                removable: ['song-old'],
+                waiting: [],
+            });
+            expect(await book.removeUnreadable(scope, ['song-old'])).toEqual({
+                removed: ['song-old'],
+                waiting: [],
+            });
+            expect(await all('songs')).toEqual([]);
+            expect(await all('drafts')).toEqual([]);
+        });
     });
 });

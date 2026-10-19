@@ -1,7 +1,11 @@
 'use client';
 
 import type { RefObject } from 'react';
-import { PURGE_MESSAGES } from '../../lib/account/messages';
+import {
+    PURGE_MESSAGES,
+    REMOVE_UNREADABLE_MESSAGES,
+    UNREADABLE_EXPORT_LABEL,
+} from '../../lib/account/messages';
 import { dialogRule } from '../dialog-close';
 
 /**
@@ -92,6 +96,77 @@ export function PurgeSongsDialog({
                     onClick={onConfirm}
                 >
                     {title === null ? 'Remove' : 'Delete'}
+                </button>
+            </div>
+        </dialog>
+    );
+}
+
+/**
+ * The confirm step for the "couldn't be read" notices' Remove (#1805): the songs this device holds
+ * but this build cannot read, removed from this device (`accountSync.removeUnreadable`). Purely
+ * local, like the step above. `count` is only the songs that will go (`unreadableRemoval`, read
+ * when the musician asked), and `kept` the ones something holds — a change still waiting to reach
+ * the account, or unsaved changes from another tab — said here, before the confirm. The shell
+ * opens no confirm when every song is kept. It says plainly that the music is gone once removed
+ * unless it was exported, and offers that export first.
+ */
+export interface RemoveUnreadableDialogProps {
+    dialogRef: RefObject<HTMLDialogElement | null>;
+    count: number;
+    kept: number;
+    busy: boolean;
+    onExport: () => void;
+    onConfirm: () => void;
+    onClose: () => void;
+}
+
+export function RemoveUnreadableDialog({
+    dialogRef,
+    count,
+    kept,
+    busy,
+    onExport,
+    onConfirm,
+    onClose,
+}: RemoveUnreadableDialogProps) {
+    return (
+        <dialog
+            ref={dialogRef}
+            className="modal-box"
+            aria-labelledby="remove-unreadable-title"
+            data-testid="remove-unreadable"
+            {...dialogRule({ onClose, busy })}
+        >
+            <h2 id="remove-unreadable-title">{REMOVE_UNREADABLE_MESSAGES.question(count)}</h2>
+            <p>{REMOVE_UNREADABLE_MESSAGES.detail(count)}</p>
+            {kept > 0 && (
+                <p data-testid="remove-unreadable-kept">{REMOVE_UNREADABLE_MESSAGES.kept(kept)}</p>
+            )}
+            <div className="dialog-actions">
+                <button
+                    className="btn"
+                    data-testid="remove-unreadable-export"
+                    disabled={busy}
+                    onClick={onExport}
+                >
+                    {UNREADABLE_EXPORT_LABEL}
+                </button>
+                <button
+                    className="btn"
+                    data-testid="remove-unreadable-cancel"
+                    disabled={busy}
+                    onClick={onClose}
+                >
+                    Cancel
+                </button>
+                <button
+                    className="btn danger"
+                    data-testid="remove-unreadable-confirm"
+                    disabled={busy}
+                    onClick={onConfirm}
+                >
+                    Remove
                 </button>
             </div>
         </dialog>
