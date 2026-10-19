@@ -320,8 +320,11 @@ describe('a mirror row that will not decode (#1769)', () => {
 });
 
 describe('a queued Save that will not decode (#1769)', () => {
-    /** Song B: one Save acknowledged (a receipt), then two more queued, chained by `base`. */
-    async function chainedQueue(): Promise<string> {
+    /**
+     * Song B: one Save acknowledged (a receipt), then two more queued, chained by `base`. The one
+     * at `corrupt` (local revision 1, the head, by default; 2 is the newest) stops decoding.
+     */
+    async function chainedQueue(corrupt: 1 | 2 = 1): Promise<string> {
         const first = await book.save(scope, accountChart('B0', 'song-b'), null);
         await runOutboxPass(book, scope, committing().transport);
         const second = await book.save(
@@ -332,8 +335,8 @@ describe('a queued Save that will not decode (#1769)', () => {
         await book.save(scope, { ...second.document, title: 'B2' }, second.document.revision);
         const queue = (await all('operations')).filter((op) => op.documentId === 'song-b');
         expect(queue).toHaveLength(2);
-        // Only the HEAD will not decode; the op chained behind it is perfectly readable.
-        const head = queue.find((op) => op.localRevision === 1)!;
+        // Only this one will not decode; the other is perfectly readable.
+        const head = queue.find((op) => op.localRevision === corrupt)!;
         await put('operations', { ...head, snapshot: corruptChart('song-b') });
         return String(head.operationId);
     }
@@ -464,5 +467,125 @@ describe('a queued Save that will not decode (#1769)', () => {
         ).run();
         expect(download.advanced).toEqual(['song-d']);
         expect((await book.read(scope, 'song-d'))?.document.title).toBe('D');
+    });
+
+    it('re-queues the newest Save that still reads when the record will not (#1782)', async () => {
+        await chainedQueue();
+        await book.save(scope, accountChart('A', 'song-a'), null);
+        // The record stops reading too. B2, the newest Save, is the only copy of it that reads.
+        await put('songs', {
+            ownerId: OWNER,
+            documentId: 'song-b',
+            document: corruptChart('song-b'),
+            remoteRevision: 'r1',
+        });
+        const sky = committing();
+
+        const result = await runOutboxPass(book, scope, sky.transport);
+
+        expect(result.kind).toBe('complete');
+        expect(result.counts).toMatchObject({ committed: 2, unreadable: 0 });
+        expect(sky.ids).toEqual(['song-a', 'song-b']);
+        // On the record's own confirmed revision, as a readable record's re-queue is.
+        expect(sky.bodies[1]).toMatchObject({ expectedRevision: 'r1', document: { title: 'B2' } });
+        expect(await book.queued(scope, 'song-b')).toEqual([]);
+        expect(await stored('songs', 'song-b')).toMatchObject({
+            document: corruptChart('song-b'),
+            remoteRevision: 'r2',
+        });
+        // And the account's copy, B2, then takes the unreadable bytes' place.
+        const download = await cloud(
+            new Map([
+                ['song-a', { revision: 'r1', document: accountChart('A', 'song-a') }],
+                [
+                    'song-b',
+                    { revision: 'r2', document: { ...accountChart('B2', 'song-b'), revision: 2 } },
+                ],
+            ]),
+        ).run();
+        expect(download.advanced).toContain('song-b');
+        expect((await book.read(scope, 'song-b'))?.document.title).toBe('B2');
+    });
+
+    it('does not send an older Save in place of a newer one it cannot read (#1782)', async () => {
+        // B2, the newest Save, stops decoding, and so does the record that holds it. B1 still
+        // reads, but sending it would roll the song back once the account's copy came down.
+        await chainedQueue(2);
+        await put('songs', {
+            ownerId: OWNER,
+            documentId: 'song-b',
+            document: corruptChart('song-b'),
+            remoteRevision: 'r1',
+        });
+        const sky = committing();
+
+        const result = await runOutboxPass(book, scope, sky.transport);
+
+        expect(sky.ids).toEqual([]);
+        expect(result.counts).toMatchObject({ committed: 0, unreadable: 1 });
+        expect((await all('operations')).filter((op) => op.documentId === 'song-b')).toEqual([]);
+        // Kept for the export, and never taken for a clean mirror.
+        expect(await stored('songs', 'song-b')).toMatchObject({
+            document: corruptChart('song-b'),
+            remoteRevision: null,
+        });
+    });
+
+    it('after a lost acknowledgement, Keep both settles the conflict and loses nothing (#1782)', async () => {
+        // Confirmed at r1. Then B1 is sent and the account commits it as r2, but the reply never
+        // arrives; B2 is saved behind it. A newer build then cannot read B1's queued Save.
+        const first = await book.save(scope, accountChart('B0', 'song-b'), null);
+        await runOutboxPass(book, scope, committing().transport);
+        const second = await book.save(
+            scope,
+            { ...first.document, title: 'B1' },
+            first.document.revision,
+        );
+        let account: { revision: string; document: unknown } = {
+            revision: 'r1',
+            document: first.document,
+        };
+        const lost = await runOutboxPass(book, scope, async (request) => {
+            account = { revision: 'r2', document: JSON.parse(request.body).document };
+            throw new Error('The reply was lost.');
+        });
+        expect(lost.kind).toBe('retry');
+        await book.save(scope, { ...second.document, title: 'B2' }, second.document.revision);
+        const sent = (await all('operations')).find(
+            (op) => op.documentId === 'song-b' && op.localRevision === 1,
+        )!;
+        expect(sent.wireBody).not.toBeNull();
+        await put('operations', { ...sent, snapshot: corruptChart('song-b') });
+
+        // The re-queued B2 goes on r1, the record's revision, and the account refuses it: r2 is
+        // the musician's own B1, but nothing here can tell that it is.
+        const bodies: unknown[] = [];
+        const result = await runOutboxPass(book, scope, async (request) => {
+            bodies.push(JSON.parse(request.body));
+            return {
+                ownerId: request.ownerId,
+                documentId: request.documentId,
+                operationId: request.operationId,
+                digest: request.digest,
+                kind: 'conflict',
+                revision: account.revision,
+                remote: account,
+            };
+        });
+        expect(bodies).toMatchObject([{ expectedRevision: 'r1', document: { title: 'B2' } }]);
+        expect(result.counts).toMatchObject({ conflict: 1, unreadable: 0 });
+
+        // Keep both: B2 goes on as its own song, and the original keeps the account's B1.
+        const kept = await book.keepBoth(scope, 'song-b');
+        if (kept === 'none') {
+            throw new Error('Keep both found nothing to settle.');
+        }
+        expect(kept).toMatchObject({ conflict: 'version', adopted: { title: 'B1' } });
+        expect(await book.read(scope, 'song-b')).toMatchObject({
+            remoteRevision: 'r2',
+            document: { title: 'B1' },
+        });
+        expect((await book.read(scope, kept.documentId))?.document.title).toMatch(/^B2\b/);
+        expect(await book.queued(scope, 'song-b')).toEqual([]);
     });
 });

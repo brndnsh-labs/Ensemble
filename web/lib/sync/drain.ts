@@ -29,8 +29,9 @@ export interface OutboxPassResult {
      */
     resumeAfterDocumentId: string | null;
     /**
-     * `unreadable`: documents whose queue would not read, and whose record would not either, so
-     * the queue retired with nothing to re-queue (`AccountSongbook.prepare`, #1769). The row
+     * `unreadable`: documents whose queue would not read, and whose record and newest Save would
+     * not either, so the queue retired with nothing to re-queue (`AccountSongbook.prepare`,
+     * #1769, #1782). The row
      * stays, unconfirmed, for the export and the "couldn't be read" count to name.
      */
     counts: {

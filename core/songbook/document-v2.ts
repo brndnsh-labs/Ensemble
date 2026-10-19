@@ -30,6 +30,10 @@ import {
  * The chart document's schema (2, the only one since #1740): its envelope, performance and band,
  * with the score checked by `score-codec.ts`. A schema-1 document (the retired text chart) is
  * refused as an unsupported historical version; a newer one is preserved as `future-version`.
+ *
+ * Bump it for any change here that an older build would reject (#1782, the chart contract's
+ * Compatibility section): it is all an older tab sharing the account database can tell a newer
+ * chart by, and without it that tab reads the chart as invalid and retires its queued Save.
  */
 const CHART_DOCUMENT_SCHEMA_VERSION = 2;
 

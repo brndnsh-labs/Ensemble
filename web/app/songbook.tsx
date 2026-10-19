@@ -2,6 +2,7 @@ import { type RefObject, useEffect, useMemo, useRef } from 'react';
 import {
     ACCOUNT_SWITCH_MESSAGES,
     REMOTE_UPDATE_MESSAGES,
+    UNREADABLE_EXPORT_LABEL,
     unreadableSongsNotice,
 } from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
@@ -42,6 +43,14 @@ interface SongbookProps {
      * `library` for the one surface here that needs that. Null while it has not been read.
      */
     home: HomeSlice | null;
+    /**
+     * How many songs the FULL read stepped over (#1769), once one is held, else null. The home's
+     * own count is only what its window read, so the notice says the larger of the two and never
+     * less than All songs does (#1782).
+     */
+    libraryUnreadable: number | null;
+    /** Writes out the songs this build cannot read, as stored; account only (#1782). */
+    onExportUnreadable?: () => void;
     /**
      * True when this is the signed-in account library rather than the guest one (#1266).
      * There is no switcher — guest signed out, account signed in (rollout decision 9 S3) — so
@@ -144,6 +153,8 @@ export function Songbook(props: SongbookProps) {
         offline,
     } = props;
     const rows = home?.rows ?? [];
+    const { libraryUnreadable, onExportUnreadable } = props;
+    const unreadable = home === null ? 0 : Math.max(home.unreadable, libraryUnreadable ?? 0);
     const query = search.trim().toLowerCase();
     const firstVisit = !loading && home !== null && home.count === 0 && featured === null;
     const shown = new Set(rows.map((row) => row.id));
@@ -194,9 +205,18 @@ export function Songbook(props: SongbookProps) {
                     {ACCOUNT_SWITCH_MESSAGES.fallback}
                 </p>
             )}
-            {home !== null && home.unreadable > 0 && (
+            {unreadable > 0 && (
                 <p className="library-notice" role="status" data-testid="home-unreadable">
-                    {unreadableSongsNotice(home.unreadable)}
+                    <span>{unreadableSongsNotice(unreadable)}</span>
+                    {onExportUnreadable && (
+                        <button
+                            className="account-btn"
+                            data-testid="home-unreadable-export"
+                            onClick={onExportUnreadable}
+                        >
+                            {UNREADABLE_EXPORT_LABEL}
+                        </button>
+                    )}
                 </p>
             )}
             {markedElsewhere > 0 && !loading && (

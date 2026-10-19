@@ -160,6 +160,12 @@ export function unreadableSongsNotice(count: number): string {
 }
 
 /**
+ * The notice's one action (#1782): each such song written out as it is stored, the file the
+ * sign-out step already offers (`exportUnreadable` in `app/ensemble.tsx`).
+ */
+export const UNREADABLE_EXPORT_LABEL = 'Export as stored';
+
+/**
  * Deleting songs from this device for good (#1754) — the way out for a song a cloud delete cannot
  * remove: one the account no longer holds (`REMOTE_UPDATE_MESSAGES.deletedMarker`) or never
  * received. Nothing is sent, so nothing here says "account" except to say where the song is NOT.

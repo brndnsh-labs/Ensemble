@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     PURGE_MESSAGES,
     REMOTE_UPDATE_MESSAGES,
+    UNREADABLE_EXPORT_LABEL,
     unreadableSongsNotice,
 } from '../lib/account/messages';
 import type { RemoteCandidateKind } from '../lib/account/sync-loop';
@@ -56,6 +57,8 @@ interface AllSongsProps {
      * (`unreadableSongs`) says so. Zero for the guest songbook, whose read refuses instead.
      */
     unreadable: number;
+    /** Writes out those songs as stored (#1782); account only. */
+    onExportUnreadable?: () => void;
     accountLibrary: boolean;
     /**
      * The star set — the built-in Starred collection's songs since #1477, the same source
@@ -151,6 +154,7 @@ export function AllSongs({
     onDeleteCollection,
     removedCollectionId,
     onRemoveGone,
+    onExportUnreadable,
 }: AllSongsProps) {
     const [view, setViewState] = useState<LibraryView>(
         initialCollectionId === null ? 'all' : `collection:${initialCollectionId}`,
@@ -590,7 +594,16 @@ export function AllSongs({
                             role="status"
                             data-testid="all-songs-unreadable"
                         >
-                            {unreadableSongsNotice(unreadable)}
+                            <span>{unreadableSongsNotice(unreadable)}</span>
+                            {onExportUnreadable && (
+                                <button
+                                    className="account-btn"
+                                    data-testid="all-songs-unreadable-export"
+                                    onClick={onExportUnreadable}
+                                >
+                                    {UNREADABLE_EXPORT_LABEL}
+                                </button>
+                            )}
                         </p>
                     )}
                     {!loaded ? (

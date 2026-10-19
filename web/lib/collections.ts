@@ -23,6 +23,11 @@ import type { ChartDocumentV2 } from '../../core/songbook/score-types.js';
  * the loss.
  */
 
+/**
+ * Bumped for any change to this codec an older build would reject, as the chart's is (#1782, the
+ * chart contract's Compatibility section): an older tab reads a newer collection as
+ * `future-version` and leaves its queued Save alone only when this says it is newer.
+ */
 export const COLLECTION_SCHEMA_VERSION = 1;
 /** The account's whole document cap (`MAX_DOCUMENTS_PER_OWNER`): no list can be longer. */
 export const MAX_COLLECTION_SONGS = 2_000;

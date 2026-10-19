@@ -451,6 +451,54 @@ function newerSchema(document: unknown): boolean {
         : validateChartDocumentV2(document).kind === 'future-version';
 }
 
+/**
+ * What a queue `prepare` is about to retire still holds that reads (#1782): its newest readable
+ * Save, and whether that is the newest Save of the whole queue. Only then does it hold what the
+ * record held (`save()` writes both together); an older one is music a later Save replaced, and
+ * sending it would roll the song back once the account's copy came down over the record.
+ */
+interface Retired {
+    newest: SaveOperation<SyncDocument> | null;
+    newestOfAll: boolean;
+}
+
+function newestReadable(
+    ops: SaveOperation<SyncDocument>[],
+    scope: AccountScope,
+    documentId: string,
+): Retired {
+    let newest: SaveOperation<SyncDocument> | null = null;
+    for (const op of ops) {
+        const read = readableRecord(() => savedOperation(op, scope, documentId, syncDocument));
+        if (
+            read !== 'unreadable' &&
+            (newest === null || read.localRevision > newest.localRevision)
+        ) {
+            newest = read;
+        }
+    }
+    // An op that will not read counts as newer unless its own local revision says otherwise.
+    const newestOfAll =
+        newest !== null &&
+        ops.every(
+            (op) =>
+                op?.operationId === newest.operationId ||
+                (Number.isSafeInteger(op?.localRevision) &&
+                    op.localRevision < newest.localRevision),
+        );
+    return { newest, newestOfAll };
+}
+
+/** A stored row's remote revision, or null when it does not read as one. */
+function confirmedRevision(row: { remoteRevision?: unknown }): string | null {
+    try {
+        remoteRevision(row.remoteRevision);
+        return row.remoteRevision;
+    } catch {
+        return null;
+    }
+}
+
 function operations<T>(
     tx: Transaction<T>,
     scope: AccountScope,
@@ -2383,9 +2431,20 @@ export class AccountSongbook {
      *   chain) and the saved record decides what follows. A record that reads still holds the
      *   newest local Save — `save()` writes both together — so one fresh Save of it is queued on
      *   its own remote revision, `save()`'s refused-head precedent, and frozen to send now:
-     *   nothing is lost. A record that does not read loses its remote revision, so it is never
-     *   taken for a clean mirror a download may write over (`reconcile`); it stays for
-     *   `unreadableSongs` to export and `purgeLocal` to remove, and `'unreadable'` is answered.
+     *   nothing is lost. A record that does not read falls back on the queue (#1782): its newest
+     *   readable Save is re-queued the same way, on the record's confirmed revision, as long as
+     *   it is the queue's newest Save (an older one is music a later Save replaced, which the
+     *   unreadable record still holds). Otherwise the record
+     *   loses its remote revision, so it is never taken for a clean mirror a download may write
+     *   over (`reconcile`); it stays for `unreadableSongs` to export and `purgeLocal` to remove,
+     *   and `'unreadable'` is answered.
+     *
+     * A lost acknowledgement (#1782): when a retired Save had been sent and the account committed
+     * it, the re-queued one is still based on the record's older revision, so the account refuses
+     * it as a conflict against the musician's own revision. Nothing here can tell that commit was
+     * this device's: the receipt never arrived, and the account replays only the retired Save's
+     * exact bytes, which this build cannot read. Keep both is the way out, and it loses nothing:
+     * the newest music goes on as its own song and the original keeps the account's copy.
      */
     async prepare(
         scope: AccountScope,
@@ -2436,8 +2495,29 @@ export class AccountSongbook {
                 );
             };
             const key = [scope.ownerId, documentId];
-            const settle = (row: SavedSong | SavedCollection | undefined, store: Table) => {
+            /** One fresh Save of `document`, queued on `revision` and frozen to send now. */
+            const requeue = (document: SyncDocument, revision: string | null) => {
+                const fresh: SaveOperation<SyncDocument> = {
+                    ownerId: scope.ownerId,
+                    documentId,
+                    operationId: crypto.randomUUID(),
+                    localRevision: document.revision,
+                    snapshot: document,
+                    base: { revision },
+                    wireBody: null,
+                    status: 'queued',
+                };
+                tx.table('operations').add(fresh);
+                send(fresh);
+            };
+            const settle = (
+                row: SavedSong | SavedCollection | undefined,
+                store: Table,
+                retired: Retired,
+            ) => {
                 if (!row) {
+                    // Not reached from a pass: the outbox visits only documents that have a
+                    // record (`outboxPage`), so it never retires a queue that has none.
                     return tx.finish('unreadable');
                 }
                 const record = readableRecord<SavedSong | SavedCollection>(() =>
@@ -2446,37 +2526,33 @@ export class AccountSongbook {
                         : savedSong(row as SavedSong, scope, documentId),
                 );
                 if (record === 'unreadable') {
+                    if (retired.newest !== null && retired.newestOfAll) {
+                        // The newest Save still reads (#1782): it is what the record held, so
+                        // it is sent on the record's confirmed revision, as a readable record's
+                        // is, and the record's bytes stay for `acknowledge` to label.
+                        return requeue(retired.newest.snapshot, confirmedRevision(row));
+                    }
                     if (row.remoteRevision !== null) {
                         tx.table(store).put({ ...row, remoteRevision: null });
                     }
                     return tx.finish('unreadable');
                 }
-                const fresh: SaveOperation<SyncDocument> = {
-                    ownerId: scope.ownerId,
-                    documentId,
-                    operationId: crypto.randomUUID(),
-                    localRevision: record.document.revision,
-                    snapshot: record.document,
-                    base: { revision: record.remoteRevision },
-                    wireBody: null,
-                    status: 'queued',
-                };
-                tx.table('operations').add(fresh);
-                send(fresh);
+                requeue(record.document, record.remoteRevision);
             };
             const unreadable = (ops: SaveOperation<SyncDocument>[]) => {
                 if (ops.some((op) => newerSchema(op?.snapshot))) {
                     return tx.finish('refused');
                 }
+                const retired = newestReadable(ops, scope, documentId);
                 retireQueue(tx, scope, documentId, () => {
                     tx.read(tx.table('songs').get(key), (song: SavedSong | undefined) => {
                         if (song !== undefined) {
-                            return settle(song, 'songs');
+                            return settle(song, 'songs', retired);
                         }
                         tx.read(
                             tx.table('collections').get(key),
                             (collection: SavedCollection | undefined) =>
-                                settle(collection, 'collections'),
+                                settle(collection, 'collections', retired),
                         );
                     });
                 });

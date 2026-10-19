@@ -69,6 +69,58 @@ function seedTextChart(page: Page, documentId: string): Promise<void> {
     );
 }
 
+/**
+ * Readable copies of the 'Set list' song under ids that sort before the text chart's, so the
+ * home's fill (eight rows, read in key order) is full before it reaches the text chart. With
+ * `remove`, takes them out again.
+ */
+function seedCopies(page: Page, count: number, remove = false): Promise<void> {
+    return page.evaluate(
+        async ([name, count, remove]) => {
+            const db = await new Promise<IDBDatabase>((resolve, reject) => {
+                const request = indexedDB.open(name);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+            await new Promise<void>((resolve, reject) => {
+                const tx = db.transaction('songs', 'readwrite');
+                const store = tx.objectStore('songs');
+                const read = store.getAll();
+                read.onsuccess = () => {
+                    const rows = read.result as Array<{
+                        ownerId: string;
+                        documentId: string;
+                        document: { title?: unknown };
+                    }>;
+                    const source = rows.find((row) => row.document?.title === 'Set list');
+                    if (!source) {
+                        tx.abort();
+                        return;
+                    }
+                    for (let index = 0; index < count; index += 1) {
+                        const id = `0-copy-${index}`;
+                        if (remove) {
+                            store.delete([source.ownerId, id]);
+                        } else {
+                            store.put({
+                                ownerId: source.ownerId,
+                                documentId: id,
+                                remoteRevision: null,
+                                document: { ...source.document, id, title: `Copy ${index}` },
+                            });
+                        }
+                    }
+                };
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error ?? new Error('No Set list row to copy.'));
+                tx.onabort = () => reject(tx.error ?? new Error('No Set list row to copy.'));
+            });
+            db.close();
+        },
+        [ACCOUNT_DATABASE, count, remove] as const,
+    );
+}
+
 test('sign-out and account deletion name a song this app can no longer open, and export it as stored', async ({
     page,
 }) => {
@@ -84,17 +136,35 @@ test('sign-out and account deletion name a song this app can no longer open, and
     await backToSongbook(page);
 
     await seedTextChart(page, 'old-text-chart');
+    // Enough readable songs ahead of it that the home's own window never reads it (#1782).
+    await seedCopies(page, 8);
     // A fresh page load, so nothing the shell read before the row existed stands in for it.
     await page.reload();
     await expect(accountChip(page)).toBeVisible();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await expect(page.getByTestId('home-unreadable')).toHaveCount(0);
 
     // All songs leaves it out and says so (#1769), rather than passing for the whole songbook.
     await page.getByTestId('all-songs-link').click();
-    await expect(page.getByTestId('all-songs-unreadable')).toHaveText(
+    await expect(page.getByTestId('all-songs-unreadable').locator('span')).toHaveText(
         'One song on this device couldn’t be read, so it isn’t listed here.',
     );
-    await expect(page.locator('.all-songs-count')).toHaveText('· 1');
+    await expect(page.locator('.all-songs-count')).toHaveText('· 9');
+    // And offers it as a file, as stored (#1782).
+    await page.getByTestId('all-songs-unreadable-export').click();
+    await expect.poll(() => downloads.length).toBe(1);
+    expect(downloads[0].suggestedFilename()).toBe('old-text-chart (unreadable).json');
     await page.getByRole('button', { name: 'Back to songbook' }).click();
+    // Back on the home, which now says what All songs said (#1782), with the same offer.
+    await expect(page.getByTestId('home-unreadable')).toContainText(
+        'One song on this device couldn’t be read',
+    );
+    await expect(page.getByTestId('home-unreadable-export')).toBeVisible();
+
+    // The copies go again, so the rest is about the one real song and the text chart.
+    await seedCopies(page, 8, true);
+    await page.reload();
+    await expect(accountChip(page)).toBeVisible();
 
     await openSignOut(page);
     await expect(page.getByTestId('sign-out-unreadable')).toHaveText(
@@ -103,10 +173,10 @@ test('sign-out and account deletion name a song this app can no longer open, and
     await expect(page.getByTestId('sign-out-clear')).toHaveCount(0);
     await expect(page.getByTestId('sign-out-confirm')).toHaveText('Sign out anyway');
     await page.getByTestId('sign-out-export').click();
-    await expect.poll(() => downloads.length).toBe(1);
-    expect(downloads[0].suggestedFilename()).toBe('old-text-chart (unreadable).json');
+    await expect.poll(() => downloads.length).toBe(2);
+    expect(downloads[1].suggestedFilename()).toBe('old-text-chart (unreadable).json');
     // The file is the row's stored bytes, exactly.
-    const stored = JSON.parse(await streamText(downloads[0]));
+    const stored = JSON.parse(await streamText(downloads[1]));
     expect(stored).toMatchObject({ schemaVersion: 1, id: 'old-text-chart' });
     await page.getByTestId('sign-out-cancel').click();
 
@@ -119,10 +189,10 @@ test('sign-out and account deletion name a song this app can no longer open, and
         'One of them is a song this app can no longer open',
     );
     await page.getByTestId('delete-account-export').click();
-    await expect.poll(() => downloads.length).toBe(3);
+    await expect.poll(() => downloads.length).toBe(4);
     expect(
         downloads
-            .slice(1)
+            .slice(2)
             .map((file) => file.suggestedFilename())
             .sort(),
     ).toEqual(['Set list.ensemble', 'old-text-chart (unreadable).json']);

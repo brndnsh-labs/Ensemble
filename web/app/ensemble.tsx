@@ -5446,6 +5446,21 @@ export default function Ensemble() {
     function exportUnreadable(row: { documentId: string; raw: string }) {
         downloadFile(row.raw, `${row.documentId.slice(0, 80)} (unreadable).json`);
     }
+    /**
+     * The home's and All songs' "couldn't be read" notices' Export (#1782): every account row this
+     * build cannot read, read fresh and written out as stored, the file the sign-out step offers.
+     */
+    function exportUnreadableSongs() {
+        const owner = sessionOwner;
+        if (owner === null) {
+            return;
+        }
+        void run(async () => {
+            for (const row of await accountSync.unreadableSongs(owner)) {
+                exportUnreadable(row);
+            }
+        });
+    }
     function downloadFile(contents: string, name: string) {
         const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
         const anchor = document.createElement('a');
@@ -6166,6 +6181,7 @@ export default function Ensemble() {
                     failure={liveLibraryFailure}
                     // The account rows the full read stepped over (#1769), said beside the list.
                     unreadable={signedIn ? accountUnreadable : 0}
+                    onExportUnreadable={signedIn ? exportUnreadableSongs : undefined}
                     accountLibrary={signedIn}
                     starred={starred}
                     openedAt={openedAt}
@@ -6193,6 +6209,10 @@ export default function Ensemble() {
                     // What the home shows and nothing more (#1441): the home slice, never the whole
                     // library — `library` is only for search, and only once it has been asked for.
                     home={songbookLoading ? null : liveHome}
+                    // The full read's count once one is held (#1782), so the home's notice never
+                    // says less than All songs'; the guest full read refuses instead.
+                    libraryUnreadable={signedIn && accountSongs !== null ? accountUnreadable : null}
+                    onExportUnreadable={signedIn ? exportUnreadableSongs : undefined}
                     // Gated like `home`: until the session settles this may be the WRONG songbook's
                     // list (a guest list standing in for an account one), so search says it is
                     // still looking rather than listing guest songs as "Your songs".
