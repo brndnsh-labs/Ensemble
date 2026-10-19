@@ -2443,8 +2443,11 @@ export class AccountSongbook {
      * it, the re-queued one is still based on the record's older revision, so the account refuses
      * it as a conflict against the musician's own revision. Nothing here can tell that commit was
      * this device's: the receipt never arrived, and the account replays only the retired Save's
-     * exact bytes, which this build cannot read. Keep both is the way out, and it loses nothing:
-     * the newest music goes on as its own song and the original keeps the account's copy.
+     * exact bytes, which this build cannot read. When the account's version reads, Keep both is
+     * the way out and loses nothing: the newest music goes on as its own song and the original
+     * keeps the account's copy. When it does not (it holds the very bytes this build could not
+     * read), `acknowledge` steps over it with nothing written, and the Save waits, queued, for a
+     * build that can read it.
      */
     async prepare(
         scope: AccountScope,
@@ -2586,7 +2589,7 @@ export class AccountSongbook {
         scope: AccountScope,
         request: PreparedSave,
         candidate: unknown,
-    ): Promise<'committed' | 'conflict'> {
+    ): Promise<'committed' | 'conflict' | 'refused'> {
         scope = copyScope(scope);
         request = { ...request };
         if (request.ownerId !== scope.ownerId || (await digest(request.body)) !== request.digest) {
@@ -2629,6 +2632,16 @@ export class AccountSongbook {
                         operation.documentId !== request.documentId
                     ) {
                         throw new Error('Save acknowledgement does not match stored bytes.');
+                    }
+                    if (response.kind === 'unreadable-remote') {
+                        // The account holds a version this build cannot read (#1782): a newer
+                        // schema from another device, or a body this build no longer decodes.
+                        // Stepped over as a queue from a newer build is (`newerSchema`), with
+                        // nothing written: the Save stays queued and frozen, the record as it
+                        // is. Parking a conflict would offer Keep both a remote it cannot
+                        // adopt, and `remote: null` would read as a deleted song. Once the app
+                        // can read that version, the next pass resolves it as any conflict.
+                        return tx.finish('refused');
                     }
                     if (operation.status === 'conflict') {
                         if (response.kind !== 'conflict') {

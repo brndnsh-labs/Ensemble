@@ -7,7 +7,8 @@ export type SaveTransport = (request: PreparedSave) => Promise<unknown>;
 /**
  * One ordered step. The future authenticated host owns retries and connection lifecycle.
  * `'unreadable'` sends nothing: the document's queue would not read and has been retired
- * (`AccountSongbook.prepare`, #1769).
+ * (`AccountSongbook.prepare`, #1769). `'refused'` also answers a conflict whose account version
+ * this build cannot read (`acknowledge`, #1782): stepped over, the Save still queued.
  */
 export async function sendNext(
     songbook: AccountSongbook,

@@ -339,7 +339,15 @@ export interface SaveReceipt {
  * operation belongs to, and `acknowledge` is what proves the remote is the operation's own kind.
  */
 export type SaveReply = SaveReceipt &
-    ({ kind: 'committed' } | { kind: 'conflict'; remote: RemoteVersion<SyncDocument> | null });
+    (
+        | { kind: 'committed' }
+        | { kind: 'conflict'; remote: RemoteVersion<SyncDocument> | null }
+        /**
+         * A conflict whose remote body this build cannot decode (#1782): the account holds a
+         * version only another build can read. Nothing is parked or written for it.
+         */
+        | { kind: 'unreadable-remote' }
+    );
 
 export class AccountChangedError extends Error {
     constructor() {
@@ -449,10 +457,20 @@ export function reply(candidate: unknown, request: PreparedSave): SaveReply {
     }
     const remote = value.remote as Record<string, unknown>;
     remoteRevision(remote.revision);
+    if (remote.revision !== value.revision) {
+        throw new Error('Remote conflict version does not match this song.');
+    }
     // Either kind: whether it is the SAME kind as the queued Save is `acknowledge`'s check, which
-    // holds the stored operation this reply answers.
-    const document = syncDocument(remote.document);
-    if (document.id !== request.documentId || remote.revision !== value.revision) {
+    // holds the stored operation this reply answers. A body this build cannot decode — a newer
+    // schema from another device, or a version written by an older build that this one no longer
+    // reads — is not a broken reply (#1782): throwing here stopped every pass at this song.
+    let document: SyncDocument;
+    try {
+        document = syncDocument(remote.document);
+    } catch {
+        return { ...receipt, kind: 'unreadable-remote' };
+    }
+    if (document.id !== request.documentId) {
         throw new Error('Remote conflict version does not match this song.');
     }
     return { ...receipt, kind: 'conflict', remote: { revision: remote.revision, document } };
