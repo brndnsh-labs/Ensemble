@@ -8,8 +8,14 @@ export { barres, fingerMap } from './fingering';
 export type { HomeKey } from './home-window';
 export { HOME_FRETS, keyHomeWindow } from './home-window';
 export { GUITAR, UKULELE } from './instruments';
-export type { SharedNote } from './motion';
-export { fingerMoves, rootMove, sharedNotes, spokenDegree } from './motion';
+export type { FingerMove, SharedNote } from './motion';
+export {
+    COUNT_WORDS,
+    fingerMoves,
+    rootMove,
+    sharedNotes,
+    spokenDegree,
+} from './motion';
 export { DEGREES, spellDegree } from './theory';
 export type { Degree, HomeWindow, InstrumentDef, Note, Voicing } from './types';
 export type { NeckPrefs, VoicedBandChord } from './voice-chart';

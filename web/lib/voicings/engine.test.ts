@@ -2284,8 +2284,10 @@ describe('fingers a teacher would show (#1611)', () => {
             // Root position, first and second inversion on the top three strings.
             expect(strummed('x x x 5 5 3')).toEqual(['3-3-1', '3-4-1']); // C, the A shape
             expect(strummed('x x x 9 8 8')).toEqual(['2-1-1']); // C/E, the F shape
-            expect(strummed('x x x 2 3 2')).toEqual(['1-3-2', '2-4-3']); // D, a finger each
-            expect(strummed('x x x 7 8 7')).toEqual(['1-2-1', '1-3-2', '2-4-3']);
+            // D, a finger each. Never 2-4-3, the little finger tucked inside over an idle
+            // index (#1691).
+            expect(strummed('x x x 2 3 2')).toEqual(['1-3-2']);
+            expect(strummed('x x x 7 8 7')).toEqual(['1-2-1', '1-3-2']);
             expect(strummed('x x x 12 13 12')).toEqual(['1-2-1']); // C/G, the index barre
             // The minors on the same strings.
             expect(strummed('x x x 4 3 2')).toEqual(['3-2-1', '4-3-2']); // Bm
@@ -3173,7 +3175,8 @@ describe('fingers a teacher would show (#1611)', () => {
             });
             it('a sus chord with no such neighbour keeps its default', () => {
                 expect(run(Dsus4)).toEqual(['1-2-3']);
-                expect(run(Dsus2)).toEqual(['2-3-0']);
+                // The open D with the middle finger lifted, 1-3 (#1691; it was 2-3).
+                expect(run(Dsus2)).toEqual(['1-3-0']);
                 expect(run(Csus4)).toEqual(['3-4-0']);
                 expect(run(Fsus4)).toEqual(['1-1-1']);
                 // And the default is still first, unmarked, on every one.
@@ -3207,7 +3210,8 @@ describe('fingers a teacher would show (#1611)', () => {
         describe('what the crowded hand is held to', () => {
             it('it is on offer only as a second fingering that needs two fingers to stay', () => {
                 expect(crowded(Dsus4)).toEqual(['1-2-4', '1-3-4']);
-                expect(crowded(Dsus2)).toEqual(['1-3', '2-4', '1-4']);
+                // 1-3 is Dsus2's own fingering now (#1691), so not a crowded one.
+                expect(crowded(Dsus2)).toEqual(['2-4', '1-4']);
                 expect(crowded(Fsus4)).toContain('2-3-4');
                 for (const c of [Dsus4, Dsus2, Fsus4]) {
                     for (const o of taughtOptions(c.notes, STRUM)) {
@@ -3227,7 +3231,8 @@ describe('fingers a teacher would show (#1611)', () => {
                 const Esus4 = chord('0 2 2 2 0 0', 'R 5 R 4 5 R');
                 const Asus4 = chord('x 0 2 2 3 0', 'R 5 R 4 5');
                 // A finger added: a sus grip, open or closed.
-                expect(crowded(Ebsus2)).toEqual(['1-2-3', '2-3-4', '1-2-4', '1-3-4']);
+                // And the index laid flat, as beside E♭m (#1691).
+                expect(crowded(Ebsus2)).toEqual(['1-2-3', '1-1-3', '2-3-4', '1-2-4', '1-3-4']);
                 expect(crowded(Esus4)).toEqual(['1-2-4', '1-3-4']);
                 expect(crowded(Asus4)).toEqual(['1-2-4', '1-3-4']);
                 // A finger lifted: any two-note grip with both fingers down.
@@ -3280,8 +3285,9 @@ describe('fingers a teacher would show (#1611)', () => {
                 const dm = chord('x x 3 2 3 x', 'b3 5 R');
                 const d5 = chord('x x 0 2 3 x', 'R 5 R');
                 expect(run(dm, d5, dm)).toEqual(['2-1-3', '0-1-3', '2-1-3']);
-                // One finger that stays is not two: D5 after A x x x 2 2 0 is 2-3.
-                expect(run(chord('x x x 2 2 0', '5 R 3'), d5)[1]).toBe('0-2-3');
+                // One finger that stays is not two: D5 after A x x x 2 2 0 is its own 1-3
+                // (#1691), never the crowded 1-2.
+                expect(run(chord('x x x 2 2 0', '5 R 3'), d5)[1]).toBe('0-1-3');
             });
         });
 
@@ -3400,6 +3406,128 @@ describe('fingers a teacher would show (#1611)', () => {
                     }
                 }
                 expect(compared).toBeGreaterThan(400);
+            });
+        });
+
+        describe('the leftovers of #1683, from a guitar teacher’s review (#1691)', () => {
+            const any = (...c: [string, Quality][]) => played(GUITAR, null, undefined, ...c);
+            it('item 1: D5 and Dsus2 at the nut are the open D minus a finger, 1-3', () => {
+                const d5 = chord('x x 0 2 3 x', 'R 5 R');
+                const dsus2 = chord('x x x 2 3 0', '5 R 2');
+                expect(run(d5)).toEqual(['0-1-3']);
+                expect(run(dsus2)).toEqual(['1-3-0']);
+                expect(run(chord('x x 0 2 3 0', 'R 5 R 2'))).toEqual(['0-1-3-0']);
+                // A5 into D5 keeps the index on A.
+                expect(any(['A', 'five'], ['D', 'five'])).toEqual([
+                    'x 0 2 2 x x [0-1-1]',
+                    'x x 0 2 3 x [0-1-3]',
+                ]);
+                // Beside B°, D5's ring finger is where D has it, and B° is never 2-4-3 for it.
+                expect(any(['D', 'five'], ['B', 'dim'])[1]).toBe('x x 3 4 3 x [1-3-2]');
+                // Dsus2 to Bm and back: the ring finger stays on D, and the index lifts.
+                expect(any(['B', 'min'], ['D', 'sus2'], ['B', 'min'])).toEqual([
+                    'x x x 4 3 2 [4-3-2]',
+                    'x x x 2 3 0 [1-3-0]',
+                    'x x x 4 3 2 [4-3-2]',
+                ]);
+                // 2-3 stays a second fingering: Dm minus a finger, both fingers kept.
+                expect(run(chord('x x 0 2 3 1', 'R 5 R b3'), d5)).toEqual(['0-2-3-1', '0-2-3']);
+            });
+            it('item 2: C5 Csus4 C5 keeps the index in 3rd position; E E° E keeps the ring finger', () => {
+                expect(any(['C', 'five'], ['C', 'sus4'], ['C', 'five'])).toEqual([
+                    'x 3 5 5 x x [1-3-3]',
+                    'x 3 3 0 x x [1-2-0]',
+                    'x 3 5 5 x x [1-3-3]',
+                ]);
+                // The middle finger slides from B to B♭ along its string.
+                expect(any(['E', 'maj'], ['E', 'dim'], ['E', 'maj'])).toEqual([
+                    'x 2 2 1 x x [2-3-1]',
+                    'x 1 2 0 x x [2-3-0]',
+                    'x 2 2 1 x x [2-3-1]',
+                ]);
+                // An open chord a method drills keeps #1683's count: Am F C G, F to C is a
+                // full change, C at 3-2, and C beside F is never 2-1.
+                expect(any(['A', 'min'], ['F', 'maj'], ['C', 'maj'], ['G', 'maj'])).toEqual([
+                    'x 3 2 2 x x [2-1-1]',
+                    'x 3 3 2 x x [2-3-1]',
+                    'x 3 2 0 x x [3-2-0]',
+                    'x 2 0 0 x x [2-0-0]',
+                ]);
+                // Even where the index would only slide a fret along its string: C beside Cm7
+                // x 3 1 3 x x stays 3-2, the ring finger kept, not 2-1 into Cm7's 2-1-3.
+                const cm7 = { notes: chord('x 3 1 3 x x', 'R b3 b7').notes, rootBarre: true };
+                expect(run(chord('x 3 2 0 x x', 'R 3 5'), cm7)).toEqual(['3-2-0', '3-1-4']);
+            });
+            it('item 3: no D-shape triad as 2-4-3, the little finger tucked over an idle index', () => {
+                // G x x x 7 8 7 before Gmaj7 x x 5 x 7 7 kept the ring finger on B as 2-4-3.
+                expect(played(GUITAR, [5, 10], undefined, ['G', 'maj'], ['G', 'maj7'])).toEqual([
+                    'x x x 7 8 7 [1-2-1]',
+                    'x x 5 x 7 7 [1-3-4]',
+                ]);
+                for (const tabs of ['x x x 2 3 2', 'x x x 5 6 5', 'x x 3 4 3 x', 'x x x 7 8 7']) {
+                    const n = chord(tabs, '5 R 3');
+                    expect(
+                        taughtOptions(n.notes, STRUM).map((o) => fingersOf(o.p)),
+                        tabs,
+                    ).not.toContain('2-4-3');
+                }
+                // A little finger on the outside string is no knot: C♯+ x 4 3 2 x x keeps
+                // D♭'s ring and little finger as 4-3-2.
+                expect(run(chord('x 4 3 1 x x', 'R 3 5'), chord('x 4 3 2 x x', 'R 3 #5'))).toEqual([
+                    '4-3-1',
+                    '4-3-2',
+                ]);
+            });
+            it('item 4: Dm Dsus2 Dm lays the index flat and keeps the ring finger, 1-1-3', () => {
+                expect(any(['D', 'min'], ['D', 'sus2'], ['D', 'min'])).toEqual([
+                    'x x 3 2 3 x [2-1-3]',
+                    'x x 2 2 3 x [1-1-3]',
+                    'x x 3 2 3 x [2-1-3]',
+                ]);
+                // Em Esus4 Em Esus2 in frets 2-7: the same shape two frets up.
+                expect(
+                    played(
+                        GUITAR,
+                        [2, 7],
+                        undefined,
+                        ['E', 'min'],
+                        ['E', 'sus4'],
+                        ['E', 'min'],
+                        ['E', 'sus2'],
+                    ),
+                ).toEqual([
+                    'x x 5 4 5 x [2-1-3]',
+                    'x x 7 4 5 x [4-1-3]',
+                    'x x 5 4 5 x [2-1-3]',
+                    'x x 4 4 5 x [1-1-3]',
+                ]);
+                // Known limit: with no window it re-fingers both notes, since keeping them
+                // needs the index two frets from the middle finger, a stretch no held note buys.
+                expect(
+                    any(['E', 'min'], ['E', 'sus4'], ['E', 'min'], ['E', 'sus2']).slice(2),
+                ).toEqual(['x x x 4 5 3 [2-3-1]', 'x x x 4 5 2 [3-4-1]']);
+                // Only the index lies flat, with no finger pulled two frets back: not 1-1-4.
+                const crowdedDsus2 = crowded(chord('x x 2 2 3 x', '2 5 R'));
+                expect(crowdedDsus2).toContain('1-1-3');
+                expect(crowdedDsus2).not.toContain('1-1-4');
+            });
+            it('item 9: on a tie the held note is re-fingered late: Csus4 Csus2 A♭maj7', () => {
+                expect(
+                    played(
+                        GUITAR,
+                        [1, 6],
+                        [6, 5],
+                        ['C', 'sus4'],
+                        ['C', 'sus2'],
+                        ['A♭', 'maj7'],
+                        ['A♭', 'maj7'],
+                    ),
+                ).toEqual([
+                    'x 3 3 0 x x [3-4-0]',
+                    'x 3 0 0 x x [3-0-0]',
+                    '4 3 5 x x x [2-1-3]',
+                    '4 3 5 x x x [2-1-3]',
+                ]);
             });
         });
     });

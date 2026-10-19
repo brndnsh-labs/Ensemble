@@ -61,9 +61,16 @@ export interface FingerMove {
     to?: Note;
     /** The barre this finger lays across in b (#1594); `to` is its note on the lowest-pitched string. */
     barre?: Barre;
+    /**
+     * Set on a hold where a barre stays down on only some of its strings and comes off others
+     * that must then ring open or lower (#1691): the strings it stays on, [lowest, highest].
+     * Such a hold says where (`text`), since "stays down" alone would leave the barre flat.
+     */
+    on?: [number, number];
 }
 
-const COUNT = ['', 'one', 'two', 'three', 'four', 'five', 'six'];
+/** Numbers as words, for "the top two strings" and "the two D♭s". */
+export const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five', 'six'];
 
 /**
  * A barre's strings in words: "the top two strings" when the strings run in pitch order (so
@@ -73,14 +80,14 @@ const COUNT = ['', 'one', 'two', 'three', 'four', 'five', 'six'];
 export function barreStrings(inst: InstrumentDef, [lo, hi]: [number, number]): string {
     const n = hi - lo + 1;
     if (n === inst.strings) {
-        return `all ${COUNT[n] ?? n} strings`;
+        return `all ${COUNT_WORDS[n] ?? n} strings`;
     }
     let ordered = true;
     for (let s = 1; s < inst.strings; s++) {
         ordered &&= inst.open[s] > inst.open[s + 1];
     }
     if (ordered && lo === 1) {
-        return `the top ${COUNT[n] ?? n} strings`;
+        return `the top ${COUNT_WORDS[n] ?? n} strings`;
     }
     const names = Array.from({ length: n }, (_, i) => inst.strShort(hi - i));
     return `the ${names.slice(0, -1).join(', ')} and ${names.at(-1)} strings`;
@@ -89,13 +96,29 @@ export function barreStrings(inst: InstrumentDef, [lo, hi]: [number, number]): s
 const sameRun = (x: Barre | undefined, y: Barre | undefined): boolean =>
     !x || !y ? x === y : x.strings[0] === y.strings[0] && x.strings[1] === y.strings[1];
 
+/** Whether barre `y` lies at `x`'s fret on strings `x` already covered. */
+const within = (x: Barre, y: Barre): boolean =>
+    x.fret === y.fret && y.strings[0] >= x.strings[0] && y.strings[1] <= x.strings[1];
+
 /**
  * What each finger does going from a to b ("stays down", "slides up 1 fret", "lifts off"...). A
  * barre is one finger (#1594): it stays down, slides as a whole, or "bars fret 8 on the top two
- * strings" when it is laid down or changes its strings. A barre that gives way to ONE of the
- * notes it was already on has not moved (#1683): G x-x-x-4-3-3 (2-1-1) to Em x-x-x-4-5-3
- * (2-3-1) leaves the index on the 1st string, where it was read as moving there from the 2nd,
- * the string a barre is named by (`fingerMap`).
+ * strings" when it is laid down or changes its strings. A barre that gives way to strings it
+ * already lay across, at its own fret, has not moved: the finger stays down and comes off the
+ * rest. That is a fingertip on ONE of them (#1683: G x-x-x-4-3-3, 2-1-1, to Em x-x-x-4-5-3,
+ * 2-3-1, leaves the index on the 1st string), even one another finger was fretting higher
+ * (#1691: the ukulele's B♭7 1-2-1-1 to A7 0-1-0-0 leaves the index on the C string, under the
+ * middle finger until then), or a shorter barre inside it (#1691: Esus4 x-2-2-2-x-x to A5
+ * x-0-2-2-x-x keeps the index across the 4th and 3rd strings). Read off the barre's strings, it
+ * was a move to that string or a new barre.
+ *
+ * Plain "stays down" is true only where every string the barre leaves is fretted by another
+ * finger at its fret or higher (Dsus2 x-x-2-2-3-x, 1-1-3, to Dm x-x-3-2-3-x, the 4th string
+ * now under the middle finger), or, on a guitar, left out of b, which the flat finger mutes.
+ * A ukulele strums every string, so there a string left out rings like an open one. Where one must ring open or lower, the finger comes off
+ * it, and the hold says where it stays (`FingerMove.on`): Esus4 to A5 is "stays down on the
+ * 4th and 3rd strings", the A string open; the ukulele's B♭7 to A7 "stays down on the C
+ * string", the other three open.
  */
 export function fingerMoves(
     inst: InstrumentDef,
@@ -116,20 +139,51 @@ export function fingerMoves(
         const bx = barA.find((r) => r.finger === f),
             by = barB.find((r) => r.finger === f);
         // A barre that stays a barre on the same strings moves like one finger; a new or
-        // reshaped one is named. A barre giving way to one note is that finger's note.
-        const sameShape = !by || sameRun(bx, by);
-        // The note of a's barre that b keeps under the same finger, when b keeps just one.
-        const under =
-            bx && y && !by
-                ? a.notes.find((n) => n.finger === f && n.string === y.string && n.fret === y.fret)
-                : undefined;
-        const was = under ?? x;
-        if (was && y && was.string === y.string && was.fret === y.fret && sameShape) {
+        // reshaped one is named. A barre that gives way to strings it lay across stays.
+        const covered =
+            bx !== undefined &&
+            y !== undefined &&
+            (by
+                ? within(bx, by)
+                : bx.fret === y.fret && y.string >= bx.strings[0] && y.string <= bx.strings[1]);
+        const sameShape = !by || sameRun(bx, by) || covered;
+        // Where a narrowing barre stays, and whether a string it comes off must sound open or
+        // lower in b: then the finger has to lift off it, and the line says where it stays.
+        // A string b frets at the barre's fret or higher with another finger is no matter: it
+        // sounds the same with the flat finger still under it. A string b leaves out is none
+        // on a guitar, where a flat finger lying across an unplayed string is how it is muted;
+        // on a ukulele every string is strummed, so one left flat would ring (#1691).
+        const stays: [number, number] | undefined =
+            covered && bx && y ? (by ? by.strings : [y.string, y.string]) : undefined;
+        let lifts = false;
+        if (stays && bx) {
+            for (let s = bx.strings[0]; s <= bx.strings[1]; s++) {
+                if (s >= stays[0] && s <= stays[1]) {
+                    continue;
+                }
+                const n = b.notes.find((m) => m.string === s);
+                lifts ||= n ? n.fret < bx.fret : inst.id === 'uke';
+            }
+        }
+        if (y && sameShape && (covered || (x?.string === y.string && x.fret === y.fret))) {
             moves.push({
                 finger: f,
                 kind: 'hold',
-                text: 'stays down',
-                from: was,
+                text:
+                    lifts && stays
+                        ? `stays down on ${
+                              stays[0] === stays[1]
+                                  ? `the ${inst.strName(stays[0])}`
+                                  : barreStrings(inst, stays)
+                          }`
+                        : 'stays down',
+                ...(lifts ? { on: stays } : {}),
+                // The note a held under this finger there, or the barre's own where it lay
+                // across that string under another finger.
+                from:
+                    a.notes.find(
+                        (n) => n.finger === f && n.string === y.string && n.fret === y.fret,
+                    ) ?? x,
                 to: y,
                 barre: by,
             });
