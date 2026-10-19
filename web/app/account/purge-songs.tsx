@@ -103,15 +103,18 @@ export function PurgeSongsDialog({
 }
 
 /**
- * The confirm step for the "couldn't be read" notices' Remove (#1805): every song this device holds
+ * The confirm step for the "couldn't be read" notices' Remove (#1805): the songs this device holds
  * but this build cannot read, removed from this device (`accountSync.removeUnreadable`). Purely
- * local, like the step above. It says plainly that the music is gone once removed unless it was
- * exported, and offers that export first. A song with a change still waiting to reach the account
- * is kept by the removal itself, and the shell says so afterwards.
+ * local, like the step above. `count` is only the songs that will go (`unreadableRemoval`, read
+ * when the musician asked), and `kept` the ones something holds — a change still waiting to reach
+ * the account, or unsaved changes from another tab — said here, before the confirm. The shell
+ * opens no confirm when every song is kept. It says plainly that the music is gone once removed
+ * unless it was exported, and offers that export first.
  */
 export interface RemoveUnreadableDialogProps {
     dialogRef: RefObject<HTMLDialogElement | null>;
     count: number;
+    kept: number;
     busy: boolean;
     onExport: () => void;
     onConfirm: () => void;
@@ -121,6 +124,7 @@ export interface RemoveUnreadableDialogProps {
 export function RemoveUnreadableDialog({
     dialogRef,
     count,
+    kept,
     busy,
     onExport,
     onConfirm,
@@ -136,6 +140,9 @@ export function RemoveUnreadableDialog({
         >
             <h2 id="remove-unreadable-title">{REMOVE_UNREADABLE_MESSAGES.question(count)}</h2>
             <p>{REMOVE_UNREADABLE_MESSAGES.detail(count)}</p>
+            {kept > 0 && (
+                <p data-testid="remove-unreadable-kept">{REMOVE_UNREADABLE_MESSAGES.kept(kept)}</p>
+            )}
             <div className="dialog-actions">
                 <button
                     className="btn"

@@ -803,6 +803,13 @@ export interface SyncLoop {
      */
     unreadableSongs(owner?: string | null): Promise<Array<{ documentId: string; raw: string }>>;
     /**
+     * What the notices' Remove would do now (#1805, `AccountSongbook.unreadableRemoval`): the
+     * unreadable songs that would go, and the ones something keeps (a queued Save, or a draft that
+     * may be the only copy of its music). Read-only, for the confirm to say before it asks;
+     * `removeUnreadable` checks again. Scoped like `unreadableSongs`.
+     */
+    unreadableRemoval(owner?: string | null): Promise<{ removable: string[]; waiting: string[] }>;
+    /**
      * What the songbook home shows (#1441): the Continue song, the most recently opened ones by
      * id and the library's count — never the whole library. The account's own opened-at map and
      * last-opened pointer decide which ids; see `AccountSongbook.home`. Scoped exactly like
@@ -1006,8 +1013,9 @@ export interface SyncLoop {
     /**
      * Remove songs this build cannot read from THIS DEVICE (#1805), the home's and All songs'
      * "couldn't be read" notices' Remove (`AccountSongbook.removeUnreadable`, ONE transaction). An
-     * id with anything queued in the outbox comes back in `waiting`, untouched: the queue is the
-     * only marker of music that has not reached the account, and it is never cut. Local only, and
+     * id with anything queued in the outbox, or a draft that may be the only copy of its music,
+     * comes back in `waiting`, untouched: the queue is the only marker of music that has not
+     * reached the account, and it is never cut. Local only, and
      * serialized like `purgeLocal`: it takes the loop's one slot, so no pass of this tab is sending
      * while it decides. Publishes the library and re-reads the observation when anything went.
      */
@@ -1951,6 +1959,9 @@ export function createSyncLoop(
         },
         async unreadableSongs(owner = null) {
             return songbook.unreadableSongs(await heldScope(owner));
+        },
+        async unreadableRemoval(owner = null) {
+            return songbook.unreadableRemoval(await heldScope(owner));
         },
         async homeLibrary(owner = null) {
             const current = await heldScope(owner);

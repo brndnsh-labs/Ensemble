@@ -18,6 +18,7 @@ import {
 import {
     heldAccountBanner,
     PURGE_MESSAGES,
+    REMOVE_UNREADABLE_MESSAGES,
     removeUnreadableOutcome,
 } from '../lib/account/messages';
 import {
@@ -866,9 +867,13 @@ export default function Ensemble() {
         onStand?: boolean;
     } | null>(null);
     const purgeDialogRef = useRef<HTMLDialogElement>(null);
-    // The "couldn't be read" notices' Remove (#1805): the ids of the songs this build cannot read,
-    // read fresh when the musician asked, so the confirm counts what it will act on.
-    const [unreadableRemoval, setUnreadableRemoval] = useState<string[] | null>(null);
+    // The "couldn't be read" notices' Remove (#1805): the songs this build cannot read that would
+    // go, and how many something keeps, read fresh when the musician asked, so the confirm counts
+    // what it will act on and says first what it will keep.
+    const [unreadableRemoval, setUnreadableRemoval] = useState<{
+        ids: string[];
+        kept: number;
+    } | null>(null);
     const unreadableRemovalRef = useRef<HTMLDialogElement>(null);
     // The songbook's own status line (#1440 review P2) — set only by row actions (renamed,
     // duplicated, deleted, "hasn't reached your account yet"), NEVER the stand's `message`
@@ -5477,8 +5482,10 @@ export default function Ensemble() {
         });
     }
     /**
-     * The notices' Remove (#1805): the songs this build cannot read, read fresh so the confirm
-     * counts exactly what it will act on. Nothing to remove (another tab got there first) only
+     * The notices' Remove (#1805): what the removal would do now (`unreadableRemoval`, the same
+     * check it makes), read fresh so the confirm counts exactly the songs that will go and says
+     * first which are kept. When every song is kept there is no confirm, only the reason, in the
+     * songbook's status line. Nothing unreadable at all (another tab got there first) only
      * refreshes the notice.
      */
     function requestRemoveUnreadable() {
@@ -5487,29 +5494,43 @@ export default function Ensemble() {
             return;
         }
         void run(async () => {
-            const ids = (await accountSync.unreadableSongs(owner)).map((row) => row.documentId);
-            if (ids.length === 0) {
+            const { removable, waiting } = await accountSync.unreadableRemoval(owner);
+            if (removable.length === 0) {
                 await refreshSongs();
+                if (waiting.length > 0) {
+                    setHomeNoticeState(REMOVE_UNREADABLE_MESSAGES.allKept(waiting.length));
+                }
                 return;
             }
-            setUnreadableRemoval(ids);
+            setUnreadableRemoval({ ids: removable, kept: waiting.length });
         });
     }
     /**
      * Remove them from this device (#1805) — `accountSync.removeUnreadable`, one transaction,
-     * local only. A song with anything still queued for the account is kept, and the songbook's
-     * status line says why. This tab's opened-at entries for the removed ids go too; such a song
-     * was never openable here, so there is no draft or stand to clear.
+     * local only, checking again what holds each song (a queued Save, or a draft that may be the
+     * only copy of its music): one held since the confirm opened is kept, and the songbook's status
+     * line says why. This tab's in-memory drafts, its recovery slot and opened-at entries for the
+     * removed ids go too, as `purgeConfirmed` clears them: the song may have been openable here
+     * before a newer build overwrote its row.
      */
     function removeUnreadableConfirmed() {
-        const ids = unreadableRemoval;
-        if (ids === null) {
+        const ids = unreadableRemoval?.ids;
+        if (ids === undefined) {
             return;
         }
         const owner = sync.owner;
         void run(async () => {
             const result = await accountSync.removeUnreadable(ids, owner);
             const removed = new Set(result.removed);
+            for (const id of removed) {
+                volatileDrafts.current.delete(id);
+                accountDrafts.current.delete(id);
+                try {
+                    repository.clearOwnRecovery(id);
+                } catch {
+                    /* Recovery is a convenience; a stale slot is not worth failing the removal. */
+                }
+            }
             setOpenedAtState((previous) => {
                 if (![...removed].some((id) => previous.has(id))) {
                     return previous;
@@ -7088,7 +7109,8 @@ export default function Ensemble() {
             {unreadableRemoval && (
                 <RemoveUnreadableDialog
                     dialogRef={unreadableRemovalRef}
-                    count={unreadableRemoval.length}
+                    count={unreadableRemoval.ids.length}
+                    kept={unreadableRemoval.kept}
                     busy={busy}
                     onExport={exportUnreadableSongs}
                     onConfirm={removeUnreadableConfirmed}

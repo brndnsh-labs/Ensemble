@@ -166,10 +166,21 @@ export function unreadableSongsNotice(count: number): string {
 export const UNREADABLE_EXPORT_LABEL = 'Export as stored';
 
 /**
+ * Why a song is kept (#1805): a change still waiting to reach the account, or unsaved changes
+ * (from another tab, likely a newer version of the app) that may be the only copy of its music.
+ * The wait is the reason, not a fault to fix.
+ */
+const KEPT_ONE =
+    'it has a change that hasn’t reached your account yet, or unsaved changes from another tab';
+const KEPT_MANY =
+    'they have changes that haven’t reached your account yet, or unsaved changes from another tab';
+
+/**
  * The notice's second action (#1805): removing those songs from this device, behind its own
- * confirm (`RemoveUnreadableDialog`). The confirm says plainly that removed music is gone unless it
- * was exported. A song with a change still waiting to reach the account is kept, and `waiting`
- * says why — the wait is the reason, not a fault to fix.
+ * confirm (`RemoveUnreadableDialog`). The confirm counts only the songs that will go
+ * (`AccountSongbook.unreadableRemoval`), says plainly that removed music is gone unless it was
+ * exported, and says first which are kept and why (`kept`); when every one is kept there is no
+ * confirm, only `allKept`. The removal checks again, so `waiting` says afterwards what it kept.
  */
 export const REMOVE_UNREADABLE_MESSAGES = {
     label: 'Remove…',
@@ -181,15 +192,28 @@ export const REMOVE_UNREADABLE_MESSAGES = {
         count === 1
             ? 'Once it’s gone it can’t be recovered, unless you exported it first.'
             : 'Once they’re gone they can’t be recovered, unless you exported them first.',
+    kept: (count: number) =>
+        count === 1
+            ? `One other song will be kept: ${KEPT_ONE}.`
+            : `${count} other songs will be kept: ${KEPT_MANY}.`,
+    allKept: (count: number) =>
+        count === 1
+            ? `The song this device couldn’t read can’t be removed yet: ${KEPT_ONE}.`
+            : `The ${count} songs this device couldn’t read can’t be removed yet: ${KEPT_MANY}.`,
     removed: (count: number) => (count === 1 ? 'Removed 1 song.' : `Removed ${count} songs.`),
     waiting: (count: number) =>
-        count === 1
-            ? 'One song was kept: it has a change that hasn’t reached your account yet, and removing it would lose that change.'
-            : `${count} songs were kept: they have changes that haven’t reached your account yet, and removing them would lose those changes.`,
+        count === 1 ? `One song was kept: ${KEPT_ONE}.` : `${count} songs were kept: ${KEPT_MANY}.`,
+    nothing: 'Nothing could be removed.',
 } as const;
 
-/** What the Remove said it did: the removed count, then why any song was kept. */
+/**
+ * What the Remove said it did: the removed count, then why any song was kept — or, when neither
+ * (another tab got there first, or a song now reads), that nothing was removed.
+ */
 export function removeUnreadableOutcome(removed: number, waiting: number): string {
+    if (removed === 0 && waiting === 0) {
+        return REMOVE_UNREADABLE_MESSAGES.nothing;
+    }
     return [
         removed > 0 ? REMOVE_UNREADABLE_MESSAGES.removed(removed) : '',
         waiting > 0 ? REMOVE_UNREADABLE_MESSAGES.waiting(waiting) : '',

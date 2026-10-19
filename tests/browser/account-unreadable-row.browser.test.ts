@@ -89,6 +89,27 @@ function putCorruptSong(documentId: string, remoteRevision: string | null = 'r-o
     });
 }
 
+/** A chart in the retired text format (schema 1, #1740), as an older build stored it. */
+function textChart(id: string, title = 'Old') {
+    const { chart, ...envelope } = accountChart(title, id);
+    return {
+        ...envelope,
+        schemaVersion: 1,
+        chart: {
+            arrangement: {
+                sections: [{ id: 'a', label: 'A', value: 'C7 | F7', repeat: 1 }],
+                key: 'C',
+                timeSignature: '4/4',
+                grouping: null,
+                isMinor: false,
+                notation: 'name',
+            },
+            performance: chart.performance,
+            band: chart.band,
+        },
+    };
+}
+
 /** A cloud that commits every Save it is handed and records which ids it saw. */
 function committing(): {
     transport: SaveTransport;
@@ -764,6 +785,91 @@ describe('a queued Save that will not decode (#1769)', () => {
             // Local only: nothing queued, and the receipts stay.
             expect(await all('operations')).toEqual([]);
             expect(await all('receipts')).toEqual(receipts);
+        });
+
+        it('keeps a song whose draft may be the only copy of its music, and says so before the confirm', async () => {
+            // A newer build's tab has song-b open with unsaved edits: its row (confirmed, nothing
+            // queued) and its recovery draft are both a schema this build does not know.
+            const newer = { ...accountChart('B', 'song-b'), schemaVersion: 99 };
+            await put('songs', {
+                ownerId: OWNER,
+                documentId: 'song-b',
+                document: newer,
+                remoteRevision: 'r1',
+            });
+            const newerDraft = {
+                ownerId: OWNER,
+                documentId: 'song-b',
+                writerId: 'tab-newer',
+                document: { ...newer, title: 'B, unsaved' },
+                baseRevision: 0,
+                capturedAt: new Date().toISOString(),
+            };
+            await put('drafts', newerDraft);
+            // And song-c, unreadable, holds a draft this build reads.
+            await putCorruptSong('song-c', 'r1');
+            const readableDraft = {
+                ownerId: OWNER,
+                documentId: 'song-c',
+                writerId: 'tab-2',
+                document: accountChart('C, unsaved', 'song-c'),
+                baseRevision: 0,
+                capturedAt: new Date().toISOString(),
+            };
+            await put('drafts', readableDraft);
+            // song-d, unreadable with nothing holding it, is the one that goes.
+            await putCorruptSong('song-d', 'r1');
+            expect(await all('operations')).toEqual([]);
+
+            expect(await book.unreadableRemoval(scope)).toEqual({
+                removable: ['song-d'],
+                waiting: ['song-b', 'song-c'],
+            });
+            const result = await book.removeUnreadable(scope, ['song-b', 'song-c', 'song-d']);
+
+            expect(result).toEqual({ removed: ['song-d'], waiting: ['song-b', 'song-c'] });
+            expect(await stored('songs', 'song-b')).toMatchObject({
+                document: newer,
+                remoteRevision: 'r1',
+            });
+            expect((await all('drafts')).filter((row) => row.documentId === 'song-b')).toEqual([
+                newerDraft,
+            ]);
+            expect(await stored('songs', 'song-c')).toMatchObject({
+                document: corruptChart('song-c'),
+            });
+            expect((await all('drafts')).filter((row) => row.documentId === 'song-c')).toEqual([
+                readableDraft,
+            ]);
+            expect((await all('songs')).map((row) => row.documentId)).toEqual(['song-b', 'song-c']);
+        });
+
+        it('still removes a text chart whose only draft is a text chart too', async () => {
+            await put('songs', {
+                ownerId: OWNER,
+                documentId: 'song-old',
+                document: textChart('song-old'),
+                remoteRevision: 'r1',
+            });
+            await put('drafts', {
+                ownerId: OWNER,
+                documentId: 'song-old',
+                writerId: 'tab-old',
+                document: textChart('song-old', 'Old, unsaved'),
+                baseRevision: 0,
+                capturedAt: new Date().toISOString(),
+            });
+
+            expect(await book.unreadableRemoval(scope)).toEqual({
+                removable: ['song-old'],
+                waiting: [],
+            });
+            expect(await book.removeUnreadable(scope, ['song-old'])).toEqual({
+                removed: ['song-old'],
+                waiting: [],
+            });
+            expect(await all('songs')).toEqual([]);
+            expect(await all('drafts')).toEqual([]);
         });
     });
 });
