@@ -440,6 +440,17 @@ and performance fields included (#1741).
   songbook.
 - A future schema change needs its own decision: a new version, its reader, and what happens to
   stored charts. Nothing here pre-approves one.
+- **The bump rule (DECISION 2026-10-18, #1782).** Any change to the chart codec that an older
+  build would reject — a new field, a new value, a wider range — bumps `schemaVersion`. There is
+  no separate codec-version stamp. A tab still on the older build shares the account database
+  with the newer one, and `schemaVersion` is the only thing it can tell a newer chart by: bumped,
+  it reads the chart as `future-version` and leaves it alone (a queued Save is stepped over,
+  `newerSchema` in `web/lib/sync/repository.ts`; a downloaded body is kept as a candidate). Not
+  bumped, it reads the chart as `invalid`, retires the queue that holds it and drops the song's
+  remote revision, so the newer tab shows the song as not uploaded with nothing queued.
+  A bump cannot help the other direction: a *narrowing*, where a newer build refuses what an
+  older one wrote (#1741's kind), leaves charts the newer build cannot read, and needs its own
+  decision or a reader for the old shape.
 
 ### History: how schema 1 was retired
 
