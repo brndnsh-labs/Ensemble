@@ -11,8 +11,9 @@
  * costed and held to one grip as the ukulele triads are (`byHand`, #1609), a change to
  * `triadUnaryCost`, `triadTransCost`, `handFree` or `unifyGrips` does too; so does a change to
  * which grips a chord is offered (`allPositions`, a quality's `required` tones, where `buildAt`
- * puts one, what `candidates` puts first — a ukulele chord's `bookGrip` — or holds back as a
- * last resort, and how far past the window it looks, `inReach`), to which barre a shell may take
+ * puts one, what `candidates` puts first — a ukulele chord's `bookGrip`, else its
+ * `firstPosition` grips — or holds back as a last resort, and how far past the window it looks,
+ * `inReach`), to which barre a shell may take
  * (`fingerRules`), to which fingerings the chart plan may give a shell and what a change of
  * fingering costs it (`fingering.ts`'s `taughtAmong`, #1611, and `fingerTransCost`, #1617:
  * fingers only), and so does letting a newer rule reach a shell, which is
@@ -202,8 +203,17 @@ export function buildAt(
     if (!notes.every((n) => n.fret >= 0 && n.fret <= inst.maxFret)) {
         return null;
     }
-    // A first-position form exists only on its open string (`ShapeDef.openOnly`, #1613).
-    if (shape.openOnly && !notes.some((n) => n.fret === 0)) {
+    // A first-position form exists only on its open string (`ShapeDef.openOnly`, #1613), with
+    // one exception (#1688): as a sus2 it may move while it stays inside the 4th fret
+    // (`FIRST_POSITION_TOP`). That is D♭sus2 1-3-4-4, the open Csus2 0-2-3-3 a fret up and the
+    // book's grip (the same notes as A♭sus4, also 1-3-4-4). Without it D♭sus2 was 6-3-4-4 and
+    // `D♭ D♭sus2 D♭` jumped five frets each way. Further up it is the Em7-shaped stretch a
+    // teacher does not show (Esus2 4-6-7-7 for 4-4-2-2), so it moves no further.
+    if (
+        shape.openOnly &&
+        !notes.some((n) => n.fret === 0) &&
+        !(quality === 'sus2' && notes.every((n) => n.fret <= FIRST_POSITION_TOP))
+    ) {
         return null;
     }
 
@@ -737,9 +747,30 @@ export const inReach = (v: Voicing, home: HomeWindow | null): boolean => {
  * one-off (`openShapeOneOff`).
  */
 const bookGrip = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
+    firstPosition(v, home, inst) && v.notes.some((n) => n.fret === 0);
+
+/**
+ * A strummed ukulele grip in first position (#1688): at the nut, nothing fretted past the 4th
+ * fret (`FIRST_POSITION_TOP`), the hand where a teacher puts it for the first chords. A chord
+ * with no open grip (`bookGrip`) is printed there all the same, closed: B♭ 3-2-1-1, D♭ 1-1-1-4,
+ * B♭7 1-2-1-1, C♯7 1-1-1-2, B♭m7 1-1-1-1, D♭maj7 1-1-1-3, Bm7♭5 2-2-1-2, the dim7 1-2-1-2.
+ * Where a chord has such a grip it is voiced from those alone (`candidates`), for the reason a
+ * book grip is: the costs count finger travel, and one neighbour up the neck pulled the chord
+ * up after it. Beside Fdim 4-5-4-2, which has no grip inside the 4th fret, the dim7 went to
+ * 4-5-4-5, Bm7♭5 to 4-5-5-5, D♭maj7 to 5-5-4-4 and Dm7♭5 to 5-5-4-5; beside a power chord
+ * (F♯5 6-6-9-9, B♭5 3-5-6-x) F♯ went to 6-6-6-4 and B♭ to 3-5-6-5. A player stays in first
+ * position and moves the hand only for a chord that has no grip there.
+ *
+ * Which is still a jump beside a power chord: `F♯ F♯5 F♯` is 3-1-2-1 / 6-6-9-9 / 3-1-2-1. That is
+ * not intended. It is the shapes' limit: the books' two- and three-string power grips near the
+ * nut (F♯5 x-1-2-x, B♭5 3-x-1-1, B5 x-x-2-2) are not on offer, and adding them is the fix.
+ *
+ * Not a guitar grip (`strumsEveryString`), and not up the neck (`atTheNut`), as for `bookGrip`.
+ * A chord with no grip inside the 4th fret (Fdim, Ddim, D5) is left to the steps below.
+ */
+const firstPosition = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
     atTheNut(home) &&
     strumsEveryString(v, inst) &&
-    v.notes.some((n) => n.fret === 0) &&
     v.notes.every((n) => n.fret <= FIRST_POSITION_TOP);
 
 /**
@@ -806,7 +837,9 @@ const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): bo
  * The grips a chord is voiced from: the first of these that holds any.
  *
  * 1. A ukulele chord's book grips in first position (`bookGrip`, #1675): where it has one, it
- *    is the chord, whatever stands beside it.
+ *    is the chord, whatever stands beside it. Else, its closed grips there (`firstPosition`,
+ *    #1688). Nothing step 2 holds back is among either: no strummed grip has a buried root or
+ *    is an open shell's one-off, and none inside the 4th fret is five frets wide.
  * 2. Grips inside the hand window that a player would take: every one but those with a buried
  *    root (`rootBuried`), the open-string one-offs of a fretted shape (`openShapeOneOff`) and
  *    a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
@@ -852,6 +885,7 @@ function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
     const inside = all.filter((v) => inHome(v, home));
     const tiers = [
         () => inside.filter((v) => bookGrip(v, home, inst)),
+        () => inside.filter((v) => firstPosition(v, home, inst)),
         () => clear(inside),
         () => clear(all.filter((v) => inReach(v, home) || aFretPast(v, home, inst))),
         () => inside,
@@ -927,7 +961,9 @@ interface Plan {
  * Which grip is the cheapest hold's business alone. From #1613 to #1675 a ukulele symbol in
  * first position took the hold with an open string over a cheaper closed one; a chord that has
  * such a grip is now offered nothing else (`bookGrip`, in `candidates`), so every hold of it is
- * one and there is nothing left to prefer.
+ * one and there is nothing left to prefer. Since #1688 a chord with a closed grip inside the 4th
+ * fret is held to those too (`firstPosition`), so at the nut this rarely has a ukulele shell to
+ * settle: it does its work for them up the neck (a blues in G in frets 5–10 plays one C7).
  */
 function unifyGrips(
     chart: ChartChord[],
