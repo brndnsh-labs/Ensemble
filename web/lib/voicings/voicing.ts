@@ -216,6 +216,16 @@ export function buildAt(
     ) {
         return null;
     }
+    // A two-string power chord is the nut's (`ShapeDef.nutOnly`, #1809), built inside the 4th
+    // fret only: with no window E♭5 x-x-6-6 took `B♭5 F5 E♭5 F5` off x-x-1-1 / x-0-1-x up to
+    // x-5-6-x / 5-5-8-8. A5 x-x-0-0 is two open strings, not a grip. A window up the neck
+    // never offers one at all (`candidates`).
+    if (
+        shape.nutOnly &&
+        (notes.some((n) => n.fret > FIRST_POSITION_TOP) || notes.every((n) => n.fret === 0))
+    ) {
+        return null;
+    }
 
     // A required tone (the ♭5 of an m7♭5 or a °7) goes on a free string — unless a helper (F)
     // note already plays it. One that fits nowhere within reach is reported in `missing`;
@@ -426,19 +436,23 @@ function viterbi<T>(states: T[][], unary: (s: T) => number, trans: (a: T, b: T) 
  *
  * The target is the middle of the hand window, pulled lightly (0.15 a fret: the window already
  * keeps the hand close), or with no window the instrument's own home (`defaultTarget`), pulled
- * at 0.45 a fret. One case is neither (#1609): a grip that strums every string
- * (`strumsEveryString`: a ukulele's shells, its triads and its four-string power chord, C5
- * 0-0-3-3; not the three-string one, G5 0-2-3-x, nor any guitar grip) in a window that starts
- * at the nut. That window is first position plus two frets of reach, not a place to sit in the
+ * at 0.45 a fret. One case is neither (#1609): a ukulele grip in a window that starts at
+ * the nut. That window is first position plus two frets of reach, not a place to sit in the
  * middle of: every ukulele method teaches G7 0-2-1-2, C7 0-0-0-1, D7 2-2-2-3, A7 0-1-0-0 and
  * B♭7 1-2-1-1, and a pull to the 3rd-and-a-half fret voiced a blues in G as 4-5-3-5 / 3-4-3-3
  * and Am F C G as 2-4-5-3 / 2-5-5-3 instead. So there the grip is aimed exactly as it is with
  * no window — `defaultTarget`, at 0.45 — and the window only says how far the hand may reach.
  * A window that starts higher keeps its own middle: the musician put the hand there.
+ *
+ * Every ukulele grip since #1809; until then only one that strums every string
+ * (`strumsEveryString`), so a two- or three-string power chord in frets 1–6 was still aimed
+ * at the window's middle, and B♭5 alone took 3-5-6-x for the book's x-x-1-1 (F5 and F♯5,
+ * with no grip inside the window then, took 10-12-13-x and 11-13-14-x). No guitar grip is
+ * aimed this way.
  */
 function unaryCost(v: Voicing, opts: VoiceOptions): number {
     const home = opts.home ?? null;
-    const windowed = home !== null && !(atTheNut(home) && strumsEveryString(v, opts.instrument));
+    const windowed = home !== null && !(atTheNut(home) && opts.instrument.id === 'uke');
     const target = windowed ? (home[0] + home[1]) / 2 : opts.instrument.defaultTarget;
     const pull = windowed ? 0.15 : 0.45;
     if (byHand(v, opts.instrument)) {
@@ -482,7 +496,8 @@ const strumsEveryString = (v: { notes: Note[] }, inst: InstrumentDef): boolean =
  * per symbol (`unifyGrips`): every triad and power grip, and a shell that strums every string
  * (#1609). The other costs — the hand mid-window, the root's path from string to string — are a
  * jazz comper's, for a shell whose root sits on a bass string under muted ones. A ukulele has
- * no bass string and mutes nothing: its 7th chord is a strummed four-string chord exactly like
+ * no bass string and mutes nothing under its chords (it leaves a string out only for a power
+ * chord, by not strumming it): its 7th chord is a strummed four-string chord exactly like
  * its triad, taught on the same page, so the two are costed alike. That also leaves no seam in
  * a chart that mixes them: C to Am7 is 0-0-0-3 to 0-0-0-0 by the same reckoning either way,
  * where a shell read by `center` took the pair up the neck (5-4-3-3 to 2-4-3-3).
@@ -582,8 +597,11 @@ const lowString = (v: Voicing): number => Math.min(...v.notes.map((n) => n.strin
  *
  * - **Stay on the set.** The sets are compared by their lowest string, which is how a player
  *   names one ("the 4-3-2 set") and stays well-defined between a two-note power chord and a
- *   three-note triad, where an overlap count would read a smaller grip as a move. Every uke grip
- *   rings all four strings, so this never fires there.
+ *   three-note triad, where an overlap count would read a smaller grip as a move. On a ukulele
+ *   it fires only beside a power chord that leaves the A string out (G5 0-2-3-x, F♯5 x-1-2-x),
+ *   which is no set a strummer moves between, only strings not played. Dropped for the
+ *   ukulele it moved 37–43 charts in each window from fret 2 up, outside #1809's reach, so
+ *   it is left as it is.
  * - **Move by step.** Each note of the new grip is costed on its own string: a common tone (same
  *   string, same fret) is free, a slide costs by its fret distance (an open string is fret 0), a
  *   string that was silent before is a fresh placement. A note on an open string costs nothing in
@@ -606,10 +624,27 @@ function triadTransCost(
     const setCost = sets === 0 ? 0 : 1.2 + (sets - 1) * 1.5;
     const was = new Map(a.notes.map((n) => [n.string, n.fret]));
     const lifts = atTheNut(home);
+    // On one root (D to Dsus4, E♭ to E♭sus4) the chord stays under the hand and only what
+    // changes moves (#1809): D 2-2-2-0 to Dsus4 2-2-3-0 is one finger up a fret. Lifting a finger
+    // off a tone both chords hold, to sound a different open string, gives up that held note,
+    // so it is priced as the move it is rather than as a free lift. Free, it priced Dsus4
+    // 0-2-3-0 as half a round trip from D, and which Dsus4 a chart got hung on its order
+    // (`Dsus4 D Dsus4` 0-2-3-0, `D Dsus4 D` 2-2-3-0; `E♭sus4 E♭` 3-3-4-1 for 1-3-4-1, the 3rds
+    // of E♭ 0-3-3-1 each up a fret). Between roots a lift stays free: C 0-0-0-3 to Am 2-0-0-0.
+    // A ukulele's only: on a guitar it moved 18–25 triad charts per nut setup nobody reviewed,
+    // and the guitar's open-string grips are one inversion among three, not the book's one grip.
+    const pitchOf = (s: number, f: number) => mod(inst.open[s] + f, 12);
+    const bTones = new Set(b.notes.map((n) => pitchOf(n.string, n.fret)));
+    const holds = (s: number, before: number | undefined) =>
+        inst.id === 'uke' &&
+        a.root.pc === b.root.pc &&
+        before !== undefined &&
+        before > 0 &&
+        bTones.has(pitchOf(s, before));
     let stepCost = 0;
     for (const n of b.notes) {
         const before = was.get(n.string);
-        if (n.fret === 0 && lifts) {
+        if (n.fret === 0 && lifts && !holds(n.string, before)) {
             continue;
         }
         // 0.15 a fret: a one-fret slide is near free, a five-fret leap (0.75) is not.
@@ -761,9 +796,11 @@ const bookGrip = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boo
  * (F♯5 6-6-9-9, B♭5 3-5-6-x) F♯ went to 6-6-6-4 and B♭ to 3-5-6-5. A player stays in first
  * position and moves the hand only for a chord that has no grip there.
  *
- * Which is still a jump beside a power chord: `F♯ F♯5 F♯` is 3-1-2-1 / 6-6-9-9 / 3-1-2-1. That is
- * not intended. It is the shapes' limit: the books' two- and three-string power grips near the
- * nut (F♯5 x-1-2-x, B♭5 3-x-1-1, B5 x-x-2-2) are not on offer, and adding them is the fix.
+ * Beside a power chord that left the hand jumping to it and back (`F♯ F♯5 F♯` was 3-1-2-1 /
+ * 6-6-9-9 / 3-1-2-1) until the books' two-string power grips came in (#1809,
+ * `UKE_TWO_STRING_POWER`): it is 3-1-2-1 / x-1-2-x / 3-1-2-1. Power chords stay under this rule
+ * on purpose: D♭5's four-string 1-1-4-4 is the one it holds, and left to the costs it became
+ * x-x-4-4 and took B♭5 beside it to 3-5-6-x (3 charts of 2,982, all worse).
  *
  * Not a guitar grip (`strumsEveryString`), and not up the neck (`atTheNut`), as for `bookGrip`.
  * A chord with no grip inside the 4th fret (Fdim, Ddim, D5) is left to the steps below.
@@ -873,7 +910,17 @@ const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): bo
 function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
     const home = opts.home ?? null;
     const inst = opts.instrument;
-    const all = allPositions(inst, c.root, c.quality, { rootStrings: opts.rootStrings });
+    const every = allPositions(inst, c.root, c.quality, { rootStrings: opts.rootStrings });
+    // A two-string power grip (`ShapeDef.nutOnly`, #1809) is what the books print for a power
+    // chord that has nothing else near the nut (F5 x-0-1-x, F♯5 x-1-2-x, B♭5 x-x-1-1, B5
+    // x-x-2-2), so it is offered only there: at the nut, and only to a chord with no other grip
+    // inside the 4th fret. A muted string costs the plan nothing, so offered beside G5 0-2-3-x
+    // or A♭5 1-3-4-x it took G5 Bsus4 to x-2-3-x and E♭5 A♭5 to x-3-4-x; up the neck it took
+    // `C C5 C` in frets 2–7 off 0-0-0-3 / 0-0-3-3 to 5-4-3-3 / x-x-3-3.
+    const nearTheNut = every.some(
+        (v) => !v.shape.nutOnly && v.notes.every((n) => n.fret <= FIRST_POSITION_TOP),
+    );
+    const all = every.filter((v) => !v.shape.nutOnly || (atTheNut(home) && !nearTheNut));
     const reachStays = leavesTheNut(all, home, inst);
     const clear = (grips: Voicing[]) =>
         grips.filter(

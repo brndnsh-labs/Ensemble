@@ -1307,14 +1307,14 @@ describe('a ukulele chart stays in first position (#1609)', () => {
                 }
             }
         });
-        it('nor does a power chord with no first-position grip', () => {
-            // F♯ was 6 6 6 4 beside F♯5 6 6 9 9, B♭ 3 5 6 5 beside B♭5 3 5 6 x. The jump to the
-            // power chord and back is NOT intended: it is a missing-grip limit. The books'
-            // power grips near the nut (F♯5 x 1 2 x, B♭5 3 x 1 1, B5 x x 2 2) are not shapes
-            // here yet; when they are, these power chords come down to first position too.
+        it('nor does a power chord, which plays its two-string grip at the nut (#1809)', () => {
+            // F♯ was 6 6 6 4 beside F♯5 6 6 9 9, B♭ 3 5 6 5 beside B♭5 3 5 6 x. After #1688
+            // they stayed and the hand jumped to the power chord and back; with the books'
+            // two-string grips at the nut (`UKE_TWO_STRING_POWER`) nothing jumps.
             for (const home of NUT) {
-                expect(tabs(UKULELE, 'F♯ F♯5 F♯', home)).toEqual(['3 1 2 1', '6 6 9 9', '3 1 2 1']);
-                expect(tabs(UKULELE, 'B♭ B♭5 B♭', home)).toEqual(['3 2 1 1', '3 5 6 x', '3 2 1 1']);
+                expect(tabs(UKULELE, 'F♯ F♯5 F♯', home)).toEqual(['3 1 2 1', 'x 1 2 x', '3 1 2 1']);
+                expect(tabs(UKULELE, 'B♭ B♭5 B♭', home)).toEqual(['3 2 1 1', 'x x 1 1', '3 2 1 1']);
+                expect(tabs(UKULELE, 'B B5 B', home)).toEqual(['4 3 2 2', 'x x 2 2', '4 3 2 2']);
             }
         });
         it('every chord with a grip inside the 4th fret plays one, in twelve keys', () => {
@@ -1376,6 +1376,99 @@ describe('a ukulele chart stays in first position (#1609)', () => {
             // In frets 2–7 B 4 3 2 2 is inside the window and under the 4th fret, but the hand
             // sits at the window and B stays with the E beside it, as before.
             expect(tabs(UKULELE, 'B E B F♯', [2, 7]).slice(0, 2)).toEqual(['4 6 7 6', '4 4 4 7']);
+        });
+    });
+    describe('power chords at the nut, and a sus4 beside its own chord (#1809)', () => {
+        it('the books’ two-string power grips: F5, F♯5, B♭5 and B5 alone', () => {
+            // ukutabs.com prints each as the simplest grip. Before, in frets 1–6 F5 and F♯5 were
+            // 10 12 13 x and 11 13 14 x, B♭5 3 5 6 x; with no window F♯5 was 6 6 9 9.
+            for (const home of NUT) {
+                for (const inst of [UKULELE, UKULELE_LOW_G]) {
+                    expect(tabs(inst, 'F5', home)).toEqual(['x 0 1 x']);
+                    expect(tabs(inst, 'F♯5', home)).toEqual(['x 1 2 x']);
+                    expect(tabs(inst, 'B♭5', home)).toEqual(['x x 1 1']);
+                    expect(tabs(inst, 'B5', home)).toEqual(['x x 2 2']);
+                }
+            }
+        });
+        it('a power-chord riff stays at the nut, D♭5 on its four-string 1 1 4 4', () => {
+            // It went 1 1 4 4 / 4 6 7 x / 6 6 9 9 / 1 1 4 4. Power chords stay under
+            // `firstPosition`: exempted, D♭5 became x x 4 4 and B♭5 beside it 3 5 6 x.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'D♭5 B5 F♯5 D♭5', home)).toEqual([
+                    '1 1 4 4',
+                    'x x 2 2',
+                    'x 1 2 x',
+                    '1 1 4 4',
+                ]);
+            }
+        });
+        it('a four-string grip in first position still wins: C5, G5, A5, E5, D♭5, D5', () => {
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'C5', home)).toEqual(['0 0 3 3']);
+                expect(tabs(UKULELE, 'G5', home)).toEqual(['0 2 3 x']);
+                expect(tabs(UKULELE, 'A5', home)).toEqual(['2 4 0 0']);
+                expect(tabs(UKULELE, 'E5', home)).toEqual(['4 4 0 2']);
+                expect(tabs(UKULELE, 'D♭5', home)).toEqual(['1 1 4 4']);
+                expect(tabs(UKULELE, 'D5', home)).toEqual(['2 2 5 5']);
+            }
+        });
+        it('a two-string grip is built only inside the 4th fret (`nutOnly`)', () => {
+            // Built anywhere, E♭5 x x 6 6 took this chart up the neck with no window:
+            // x 5 6 x / 5 5 8 8 / x x 6 6 / 5 5 8 8.
+            expect(tabs(UKULELE, 'B♭5 F5 E♭5 F5', null)).toEqual([
+                'x x 1 1',
+                'x 0 1 x',
+                '3 3 6 6',
+                'x 0 1 x',
+            ]);
+        });
+        it('nor beside a chord whose power grip is near the nut: G5 0 2 3 x, A♭5 1 3 4 x', () => {
+            // A muted string costs the plan nothing, so offered to every root the two-string
+            // grips took G5 to x 2 3 x beside Bsus4 and A♭5 to x 3 4 x beside E♭5. They are for
+            // a power chord with no other grip inside the 4th fret.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'G5 Bsus4', home)).toEqual(['0 2 3 x', '4 4 2 2']);
+                expect(tabs(UKULELE, 'E♭5 A♭5', home)).toEqual(['3 3 6 6', '1 3 4 x']);
+            }
+        });
+        it('up the neck the two-string grips are not offered (`nutOnly`)', () => {
+            // In frets 2–7 x x 3 3 took C C5 C to 5 4 3 3 / x x 3 3.
+            expect(tabs(UKULELE, 'C C5 C', [2, 7])).toEqual(['0 0 0 3', '0 0 3 3', '0 0 0 3']);
+            expect(tabs(UKULELE, 'A5 D5 E5', [5, 10])).toEqual([
+                '9 9 12 12',
+                '7 9 10 x',
+                '4 4 7 7',
+            ]);
+        });
+        it('Dsus4 beside D is 2 2 3 0 in either order; alone it is 0 2 3 0', () => {
+            // `Dsus4 D Dsus4` was 0 2 3 0 throughout, `D Dsus4` ended on it: lifting D's A off
+            // the G string was a free move, so a chart's order chose the grip.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'D Dsus4 D', home)).toEqual(['2 2 2 0', '2 2 3 0', '2 2 2 0']);
+                expect(tabs(UKULELE, 'Dsus4 D Dsus4', home)).toEqual([
+                    '2 2 3 0',
+                    '2 2 2 0',
+                    '2 2 3 0',
+                ]);
+                expect(tabs(UKULELE, 'D Dsus4', home)).toEqual(['2 2 2 0', '2 2 3 0']);
+                expect(tabs(UKULELE, 'Dsus4', home)).toEqual(['0 2 3 0']);
+            }
+        });
+        it('E♭sus4 beside E♭ 0 3 3 1 is 1 3 4 1 in either order: each 3rd up a fret', () => {
+            // `E♭sus4 E♭` was 3 3 4 1, the G string's 3rd going to the 5th, not the 4th.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'E♭sus4 E♭', home)).toEqual(['1 3 4 1', '0 3 3 1']);
+                expect(tabs(UKULELE, 'E♭ E♭sus4', home)).toEqual(['0 3 3 1', '1 3 4 1']);
+                expect(tabs(UKULELE, 'E♭sus4', home)).toEqual(['3 3 4 1']);
+            }
+        });
+        it('between roots a finger lifted to an open string is still free: C to Am', () => {
+            // Held on every root, the rule took Gsus2 beside A off the book's 0 2 3 0 to 2 2 3 0.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'C Am', home)).toEqual(['0 0 0 3', '2 0 0 0']);
+                expect(tabs(UKULELE, 'A Gsus2', home)).toEqual(['2 1 0 0', '0 2 3 0']);
+            }
         });
     });
     describe('a five-fret reach is the last resort (#1675)', () => {
@@ -2886,6 +2979,15 @@ describe('fingers a teacher would show (#1611)', () => {
             expect(alone('0 2 2 2')).toBe('0-1-1-1');
             expect(alone('0 3 3 3')).toBe('0-1-1-1'); // Cm
             expect(alone('0 1 1 1')).toBe('0-1-1-1'); // Gm7♭5
+        });
+        it('B5 x x 2 2 and B♭5 x x 1 1 are index and middle, as the book prints them (#1809)', () => {
+            expect(uke(['B', 'five'])).toEqual(['x x 2 2 [1-2]']);
+            expect(uke(['B♭', 'five'])).toEqual(['x x 1 1 [1-2]']);
+            // Beside a chord that bars those strings the index stays across them.
+            expect(uke(['B', 'maj'], ['B', 'five'])).toEqual([
+                '4 3 2 2 [3-2-1-1]',
+                'x x 2 2 [1-1]',
+            ]);
         });
         it('Dsus4 2 2 3 0 follows from D: two fingers stay and the ring finger moves up a fret', () => {
             const v = voiced(UKULELE, [1, 6], undefined, ['D', 'maj'], ['D', 'sus4'], ['D', 'maj']);

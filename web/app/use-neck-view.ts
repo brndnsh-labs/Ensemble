@@ -373,11 +373,66 @@ export function fingersLine(
             parts.push(`finger ${m.finger} ${m.text}`);
         }
     }
+    const skip = skippedStrings(instrument, from, to);
+    if (skip) {
+        parts.push(skip);
+    }
     if (!parts.length) {
         return '';
     }
     const sentence = parts.join('; ');
     return `${sentence[0].toUpperCase()}${sentence.slice(1)}.`;
+}
+
+/** The strings of a ukulele grip it leaves out, by name from the G string: `['G', 'A']`. */
+function leftOut(instrument: InstrumentDef, v: VoicedBandChord): string[] {
+    return Array.from({ length: instrument.strings }, (_, i) => instrument.strings - i)
+        .filter((s) => !v.notes.some((n) => n.string === s))
+        .map((s) => instrument.strShort(s));
+}
+
+/** "skip the G and A strings", "skip the A string". */
+const skipPhrase = (strings: string[]): string =>
+    `skip the ${list(strings)} string${strings.length > 1 ? 's' : ''}`;
+
+/**
+ * What a ukulele player strums, said where it changes (#1809), as the line's last clause. A
+ * ukulele strums all four strings, so the power chords that sound two or three of them (F♯5
+ * x-1-2-x, B5 x-x-2-2, G5 0-2-3-x) are played by not strumming the others, as the chord charts
+ * say ("skip the g and A strings"); left to ring, the open C over B5 is a ♭9. When the strings
+ * left out change, every one the next grip leaves out is named ("skip the G and A strings",
+ * B♭5 x-x-1-1 to F5 x-0-1-x, the C string back in), and a grip on all four after one that left
+ * some out says so ("strum all four strings"). The same strings left out (B5 to B♭5) is no
+ * change, and nothing is said. Not on a guitar, whose grips leave strings out all the time and
+ * are muted by the fretting hand, never said in this line.
+ */
+function skippedStrings(
+    instrument: InstrumentDef,
+    from: VoicedBandChord,
+    to: VoicedBandChord,
+): string {
+    if (instrument.id !== 'uke') {
+        return '';
+    }
+    const was = leftOut(instrument, from);
+    const now = leftOut(instrument, to);
+    if (was.join() === now.join()) {
+        return '';
+    }
+    return now.length
+        ? skipPhrase(now)
+        : `strum all ${COUNT_WORDS[instrument.strings] ?? instrument.strings} strings`;
+}
+
+/**
+ * The opening grip's own strings (#1809): a chart that starts on B5 x-x-2-2 has no change into
+ * it to say "skip the G and C strings", so the line shown before Play says it first ("On B5,
+ * skip the G and C strings."). A ukulele grip on all four strings, and every guitar grip, says
+ * nothing.
+ */
+function openingSkip(instrument: InstrumentDef, grip: VoicedBandChord, name: string): string {
+    const now = instrument.id === 'uke' ? leftOut(instrument, grip) : [];
+    return now.length ? `On ${name}, ${skipPhrase(now)}.` : '';
 }
 
 export interface NeckModel {
@@ -437,7 +492,10 @@ export function neckModel(
     } else if (ahead) {
         headline = `Next: ${ahead}${change && ` · ${change}`}`;
     }
-    const fingers = grip && next ? fingersLine(instrument, grip, next) : '';
+    const moving = grip && next ? fingersLine(instrument, grip, next) : '';
+    // Before Play, the opening grip's own strings come first: no change leads into it.
+    const opening = active === null && grip ? openingSkip(instrument, grip, name) : '';
+    const fingers = [opening, moving].filter(Boolean).join(' ');
     return {
         grip,
         next,

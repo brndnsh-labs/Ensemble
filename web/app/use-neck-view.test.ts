@@ -613,6 +613,58 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         );
     });
 
+    it('a chart that starts on a two-string grip says so before Play (#1809)', () => {
+        const band = view([
+            {
+                id: 'a',
+                label: 'A',
+                repeat: 1,
+                measures: [bar('m1', [chord('B5', 4)]), bar('m2', [chord('E', 4)])],
+            },
+        ]);
+        const prefs: NeckPrefs = { instrument: 'uke', home: [1, 6], rootStrings: 'all' };
+        const voiced = new Map(voiceBandChart(band, prefs).map((v) => [v.globalIndex, v] as const));
+        const opening = neckModel(band, voiced, null, UKULELE)!;
+        expect(opening.fingers.startsWith('On B5, skip the G and C strings. ')).toBe(true);
+        // Once a slot is shown (playing, or stepped to), the line is the change's alone.
+        expect(neckModel(band, voiced, 0, UKULELE)!.fingers).not.toContain('On B5');
+        // A grip on all four strings, or a guitar's, opens with nothing extra.
+        const guitar = new Map(
+            voiceBandChart(band, { ...prefs, instrument: 'guitar' }).map(
+                (v) => [v.globalIndex, v] as const,
+            ),
+        );
+        expect(neckModel(band, guitar, null, GUITAR)!.fingers).not.toContain('skip');
+    });
+
+    it('a ukulele grip that leaves strings out says to skip them (#1809)', () => {
+        // B 4 3 2 2 to B5 x x 2 2: the open G and C would ring, and C over B5 is a ♭9.
+        expect(lines(['B', 'B5'], uke)[0]).toBe('Finger 1 stays down; skip the G and C strings.');
+        // F♯ 3 1 2 1 to F♯5 x 1 2 x: the index comes off the A string, which is not strummed.
+        expect(lines(['F#', 'F#5'], uke)[0]).toBe(
+            'Finger 1 stays down on C♯; finger 2 stays down; skip the G and A strings.',
+        );
+        // G5 0 2 3 x leaves out one string.
+        expect(lines(['C', 'G5'], uke)[0]).toBe(
+            'Finger 1 goes down on the C string, fret 2; finger 2 goes down on the E string, ' +
+                'fret 3; skip the A string.',
+        );
+        // When the strings left out change, all of them are named: B♭5 x x 1 1 to F5 x 0 1 x
+        // brings the C string back and leaves the A string out.
+        expect(lines(['Bb5', 'F5'], uke)[0]).toContain('skip the G and A strings.');
+        // Back on all four after a grip that left some out.
+        expect(lines(['F#5', 'F#'], uke)[0]).toContain('strum all four strings.');
+        // The same strings left out is no change: B5 x x 2 2 to B♭5.
+        expect(lines(['B5', 'Bb5'], uke)).toEqual([
+            'Finger 1 slides down 1 fret; finger 2 slides down 1 fret.',
+            'Finger 1 slides up 1 fret; finger 2 slides up 1 fret.',
+        ]);
+        // A guitar grip leaves strings out all the time, muted by the hand: never said.
+        for (const line of lines(['C', 'A5', 'E5'], guitar(null))) {
+            expect(line).not.toContain('skip');
+        }
+    });
+
     it('one note name on two strings: "the other C", "the two D♭s", and which one (#1691)', () => {
         const uke5 = { ...uke, home: [5, 10] as [number, number] };
         const uke2 = { ...uke, home: [2, 7] as [number, number] };
@@ -691,11 +743,11 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
             'Finger 1 stays down; finger 2 moves to the 2nd string, fret 7; ' +
                 'finger 3 moves to the 1st string, fret 7.',
         );
-        // On a ukulele every string is strummed, so a string left out would ring under the flat
-        // index: Dsus2 7 9 10 7 to D5 7 9 10 x, the index comes off the A string. Holds are said
-        // from finger 1 up.
+        // A ukulele string is kept quiet by not strumming it, not by a flat finger: Dsus2
+        // 7 9 10 7 to D5 7 9 10 x, the index comes off the A string and the line says to skip
+        // it (#1809). Holds are said from finger 1 up.
         expect(lines(['Dsus2', 'D5'], { ...uke, home: [5, 10] })[0]).toBe(
-            'Finger 1 stays down on D; fingers 3 and 4 stay down.',
+            'Finger 1 stays down on D; fingers 3 and 4 stay down; skip the A string.',
         );
     });
 });

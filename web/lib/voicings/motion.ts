@@ -115,7 +115,9 @@ const within = (x: Barre, y: Barre): boolean =>
  * Plain "stays down" is true only where every string the barre leaves is fretted by another
  * finger at its fret or higher (Dsus2 x-x-2-2-3-x, 1-1-3, to Dm x-x-3-2-3-x, the 4th string
  * now under the middle finger), or, on a guitar, left out of b, which the flat finger mutes.
- * A ukulele strums every string, so there a string left out rings like an open one. Where one must ring open or lower, the finger comes off
+ * A ukulele string is kept quiet by not strumming it (B5 x-x-2-2, #1809, where the line says
+ * to skip it), never by a flat finger, so there a string left out counts as one that rings.
+ * Where one must ring open or lower, the finger comes off
  * it, and the hold says where it stays (`FingerMove.on`): Esus4 to A5 is "stays down on the
  * 4th and 3rd strings", the A string open; the ukulele's B♭7 to A7 "stays down on the C
  * string", the other three open.
@@ -152,7 +154,9 @@ export function fingerMoves(
         // A string b frets at the barre's fret or higher with another finger is no matter: it
         // sounds the same with the flat finger still under it. A string b leaves out is none
         // on a guitar, where a flat finger lying across an unplayed string is how it is muted;
-        // on a ukulele every string is strummed, so one left flat would ring (#1691).
+        // on a ukulele a string is quieted by not strumming it, never by a flat finger, so
+        // the finger comes off it as off one that rings (#1691; the line says to skip it,
+        // #1809).
         const stays: [number, number] | undefined =
             covered && bx && y ? (by ? by.strings : [y.string, y.string]) : undefined;
         let lifts = false;

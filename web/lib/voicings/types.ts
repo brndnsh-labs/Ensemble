@@ -71,6 +71,12 @@ export interface ShapeDef {
      * which gives the Cm form one closed grip, D♭sus2 1-3-4-4 (see `buildAt`).
      */
     openOnly?: boolean;
+    /**
+     * A grip printed in first position only (#1809): built only where every fret is inside the
+     * 4th fret and one is fretted (`buildAt`). The ukulele's two-string power chords, which the
+     * charts give at the nut and nowhere else (F♯5 x-1-2-x, B5 x-x-2-2).
+     */
+    nutOnly?: boolean;
 }
 
 export interface InstrumentDef {
