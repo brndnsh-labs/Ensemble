@@ -150,6 +150,10 @@ export const GUITAR: InstrumentDef = {
  * 2402 is a form of its own: the same four frets as Esus4 and the same three notes, with A
  * named as the root. Without it Asus2 was 2452 or 4452, a barre at the 2nd or 4th fret beside
  * the open A 2100.
+ *
+ * The one form that leaves its open string is the Cm form's sus2, and only inside the 4th fret
+ * (#1688, `buildAt`): a fret up from Csus2 it is D♭sus2 1344, the book's grip. Any further up
+ * it would be a moving shape the costs take over the book's (Esus2 4677 for 4422).
  */
 const UKE_OPEN_FORMS: ShapeDef[] = [
     // Fm 1013: A♭ C F C — the 3rd, the open C string's 5th, the root, the 5th again on top.

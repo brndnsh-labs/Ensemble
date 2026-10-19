@@ -166,7 +166,9 @@ describe('triad grips (#1588)', () => {
             // one finger away (#1675).
             expect(offeredTo('UTFm')).toEqual(['Fm 1 0 1 3']);
             expect(offeredTo('UTEo')).toEqual(['E 1 4 0 2', 'Esus4 2 4 0 2']);
-            expect(offeredTo('UTCm')).toEqual(['Cm 0 3 3 3', 'Csus2 0 2 3 3']);
+            // As a sus2 the Cm form also moves inside the 4th fret (#1688): D♭sus2 1 3 4 4,
+            // the book's grip a fret up from Csus2. Every other root would leave it.
+            expect(offeredTo('UTCm')).toEqual(['Cm 0 3 3 3', 'Csus2 0 2 3 3', 'D♭sus2 1 3 4 4']);
             expect(offeredTo('UTAs')).toEqual(['Asus2 2 4 0 2']);
             expect(offeredTo('UPA')).toEqual(['A5 2 4 0 0']);
             expect(offeredTo('UPE')).toEqual(['E5 4 4 0 2']);
@@ -945,21 +947,22 @@ describe('a ukulele chart stays in first position (#1609)', () => {
             const triads = 'B♭ F Gm Dm E♭ B♭ E♭ F';
             expect(gripsOf(UKULELE, triads, 'E♭', [1, 6])).toEqual(new Set(['0 3 3 1']));
         });
-        it('a chord with no open grip is left to the costs: C♯7 stays 4 5 4 4', () => {
-            // C♯7's book grip 1 1 1 2 has no open string, so nothing puts it first.
-            expect(tabs(UKULELE, 'F♯maj7 C♯7 D♯m7 Bmaj7', [1, 6])[1]).toBe('4 5 4 4');
+        it('a chord with no open grip stays in first position: C♯7 1 1 1 2 (#1688)', () => {
+            // C♯7's book grip 1 1 1 2 has no open string. Until #1688 the costs placed it, and
+            // beside F♯maj7 3 5 2 4 it went up to 4 5 4 4 (`firstPosition`).
+            expect(tabs(UKULELE, 'F♯maj7 C♯7 D♯m7 Bmaj7', [1, 6])[1]).toBe('1 1 1 2');
             // C♯m7 in that canon in A has one, 1 1 0 2, and plays it (#1675). It was
             // 4 4 4 4: the plan voiced it one way, so the rule for a split symbol never saw it.
             expect(
                 gripsOf(UKULELE, 'Amaj7 E7 F♯m7 C♯m7 Dmaj7 Amaj7 Dmaj7 E7', 'C♯m7', [1, 6]),
             ).toEqual(new Set(['1 1 0 2']));
         });
-        it('past the tolerance the two grips stay: B♭maj7 in a canon in B♭', () => {
-            // One B♭maj7 would cost 2.275, over a position shift; neither grip is open.
+        it('B♭maj7 in a canon in B♭ is 2 2 1 1 throughout (#1688)', () => {
+            // It was 2 2 1 1 and 3 5 5 5: one B♭maj7 cost 2.275, past the tolerance, and
+            // neither grip is open. 3 5 5 5 has left first position, so it is no longer on offer
+            // beside 2 2 1 1 (`firstPosition`). The tolerance itself is pinned on the guitar.
             const canon = 'B♭maj7 F7 Gm7 Dm7 E♭maj7 B♭maj7 E♭maj7 F7';
-            expect(gripsOf(UKULELE, canon, 'B♭maj7', [1, 6])).toEqual(
-                new Set(['2 2 1 1', '3 5 5 5']),
-            );
+            expect(gripsOf(UKULELE, canon, 'B♭maj7', [1, 6])).toEqual(new Set(['2 2 1 1']));
         });
         it('only in first position: in frets 2–7 the cheaper hold wins, D 2 2 2 5', () => {
             // D 2 2 2 0 is on offer there (an open string is inside every window) and is
@@ -1255,19 +1258,124 @@ describe('a ukulele chart stays in first position (#1609)', () => {
             // Not vacuous: about half the chords of these charts have such a grip.
             expect(seen).toBeGreaterThan(300);
         });
-        it('a chord with no open grip is still the costs’ to place: D♭ beside D♭sus2', () => {
-            // D♭ 1 1 1 4 is in every book and has no open string, so the rule does not
-            // speak: beside D♭sus2 6 3 4 4 it is the same shape, 6 5 4 4, one finger away.
-            expect(tabs(UKULELE, 'D♭ D♭sus2 D♭', [1, 6])).toEqual([
-                '6 5 4 4',
-                '6 3 4 4',
-                '6 5 4 4',
-            ]);
+        it('a chord with no open grip stays in first position: D♭ 1 1 1 4 beside D♭sus2 (#1688)', () => {
+            // D♭ 1 1 1 4 is in every book and has no open string. Until #1688 the costs placed
+            // it, and beside D♭sus2 6 3 4 4 it was 6 5 4 4, one finger away. Now both stay in
+            // first position (`firstPosition`): D♭sus2 is the book's 1 3 4 4, the open Csus2
+            // 0 2 3 3 a fret up (the Cm form, which as a sus2 may move inside the 4th fret).
+            for (const home of NUT) {
+                for (const inst of [UKULELE, UKULELE_LOW_G]) {
+                    expect(tabs(inst, 'D♭ D♭sus2 D♭', home)).toEqual([
+                        '1 1 1 4',
+                        '1 3 4 4',
+                        '1 1 1 4',
+                    ]);
+                    // A♭ was 5 3 4 3 beside D♭sus2 6 3 4 4; now its first-position default.
+                    expect(tabs(inst, 'A♭ D♭sus2 A♭', home)).toEqual([
+                        '1 3 4 3',
+                        '1 3 4 4',
+                        '1 3 4 3',
+                    ]);
+                }
+            }
+            // The Cm form moves no further: up the neck Esus2 keeps its own grip, not 4 6 7 7.
+            expect(allPositions(UKULELE, R('E'), 'sus2').map((v) => tab(UKULELE, v))).not.toContain(
+                '4 6 7 7',
+            );
         });
         it('only in first position: in frets 2–7 A beside Asus2 stays the closed pair', () => {
             // An open string there is the hand gone back to the nut (`atTheNut`).
             expect(tabs(UKULELE, 'A Asus2 A', [2, 7])).toEqual(['2 4 5 4', '2 4 5 2', '2 4 5 4']);
             expect(tabs(UKULELE, 'Cm F Cm', [2, 7])).toEqual(['5 3 3 3', '5 5 5 3', '5 3 3 3']);
+        });
+    });
+    describe('a chord with no open grip stays in first position (#1688)', () => {
+        it('Fdim 4 5 4 2 does not pull its neighbours up the neck', () => {
+            // Fdim has no grip inside the 4th fret, and beside it these went up to share its
+            // frets: the dim7 4 5 4 5, Bm7♭5 4 5 5 5, D♭maj7 5 5 4 4, Dm7♭5 5 5 4 5.
+            for (const home of NUT) {
+                for (const inst of [UKULELE, UKULELE_LOW_G]) {
+                    expect(tabs(inst, 'Fdim B°7', home)).toEqual(['4 5 4 2', '1 2 1 2']);
+                    expect(tabs(inst, 'F°7 Fdim A♭°7', home)).toEqual([
+                        '1 2 1 2',
+                        '4 5 4 2',
+                        '1 2 1 2',
+                    ]);
+                    expect(tabs(inst, 'Bm7♭5 Fdim', home)).toEqual(['2 2 1 2', '4 5 4 2']);
+                    expect(tabs(inst, 'D♭maj7 Fdim', home)).toEqual(['1 1 1 3', '4 5 4 2']);
+                    expect(tabs(inst, 'Dm7♭5 Fdim', home)).toEqual(['1 2 1 3', '4 5 4 2']);
+                }
+            }
+        });
+        it('nor does a power chord with no first-position grip', () => {
+            // F♯ was 6 6 6 4 beside F♯5 6 6 9 9, B♭ 3 5 6 5 beside B♭5 3 5 6 x. The jump to the
+            // power chord and back is NOT intended: it is a missing-grip limit. The books'
+            // power grips near the nut (F♯5 x 1 2 x, B♭5 3 x 1 1, B5 x x 2 2) are not shapes
+            // here yet; when they are, these power chords come down to first position too.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'F♯ F♯5 F♯', home)).toEqual(['3 1 2 1', '6 6 9 9', '3 1 2 1']);
+                expect(tabs(UKULELE, 'B♭ B♭5 B♭', home)).toEqual(['3 2 1 1', '3 5 6 x', '3 2 1 1']);
+            }
+        });
+        it('every chord with a grip inside the 4th fret plays one, in twelve keys', () => {
+            // The neighbours that used to move them: Fdim, a power chord, a closed 7th.
+            const inFirst = (v: Voicing) =>
+                v.notes.length === UKULELE.strings && v.notes.every((n) => n.fret <= 4);
+            const PROGRESSIONS: [number, Quality][][] = [
+                [
+                    [0, 'maj'],
+                    [0, 'five'],
+                    [0, 'maj'],
+                ],
+                [
+                    [0, 'dim7'],
+                    [4, 'dim'],
+                    [0, 'm7b5'],
+                ],
+                [
+                    [0, 'maj7'],
+                    [7, 'dom7'],
+                    [9, 'm7'],
+                    [5, 'maj7'],
+                ],
+                [
+                    [0, 'sus2'],
+                    [0, 'maj'],
+                    [0, 'sus4'],
+                    [0, 'aug'],
+                ],
+            ];
+            const left: string[] = [];
+            let seen = 0;
+            for (const home of NUT) {
+                for (let tonic = 0; tonic < 12; tonic++) {
+                    for (const bars of PROGRESSIONS) {
+                        const voiced = voiceChart(
+                            bars.map(([interval, quality]) => ({
+                                root: ROOTS[(tonic + interval) % 12],
+                                quality,
+                            })),
+                            { instrument: UKULELE, home },
+                        );
+                        for (const v of voiced) {
+                            if (allPositions(UKULELE, v.root, v.quality).some(inFirst)) {
+                                seen++;
+                                if (!inFirst(v)) {
+                                    left.push(`${v.symbol} ${tab(UKULELE, v)}`);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            expect(left).toEqual([]);
+            // Not vacuous: most chords of these charts have such a grip.
+            expect(seen).toBeGreaterThan(200);
+        });
+        it('only in first position: up the neck the window decides', () => {
+            // In frets 2–7 B 4 3 2 2 is inside the window and under the 4th fret, but the hand
+            // sits at the window and B stays with the E beside it, as before.
+            expect(tabs(UKULELE, 'B E B F♯', [2, 7]).slice(0, 2)).toEqual(['4 6 7 6', '4 4 4 7']);
         });
     });
     describe('a five-fret reach is the last resort (#1675)', () => {
@@ -1500,20 +1608,20 @@ describe('a ukulele chart stays in first position (#1609)', () => {
     });
 
     describe('one grip per symbol', () => {
-        it('holds a ukulele shell: B♭7 E♭7 B♭7 F7 plays one B♭7, 1 2 1 1', () => {
+        it('B♭7 E♭7 B♭7 F7 plays one B♭7, 1 2 1 1', () => {
             expect(tabs(UKULELE, 'B♭7 E♭7 B♭7 F7', [1, 6])).toEqual([
                 '1 2 1 1',
                 '3 3 3 4',
                 '1 2 1 1',
                 '2 3 1 3',
             ]);
-            // The plan alone starts on 3 5 4 5, level with the E♭7, and comes down for the F7.
-            expect(tabs(UKULELE, 'B♭7 E♭7 B♭7 F7', [1, 6], 0)).toEqual([
-                '3 5 4 5',
-                '3 3 3 4',
-                '1 2 1 1',
-                '2 3 1 3',
-            ]);
+            // The plan alone started on 3 5 4 5, level with the E♭7, and came down for the F7.
+            // Since #1688 B♭7 has only its first-position grip on offer at the nut
+            // (`firstPosition`), so the plan alone plays it too; up the neck the rule still
+            // holds a shell (the blues in G below).
+            expect(tabs(UKULELE, 'B♭7 E♭7 B♭7 F7', [1, 6], 0)).toEqual(
+                tabs(UKULELE, 'B♭7 E♭7 B♭7 F7', [1, 6]),
+            );
             // Gm7 Cm7 D7 Gm7 was this test's chart, opening on 3 5 3 5 with the rule off. Gm7
             // has an open grip, so it is 0 2 1 1 both times before the rule is asked (#1675).
             expect(tabs(UKULELE, 'Gm7 Cm7 D7 Gm7', [1, 6], 0)).toEqual([

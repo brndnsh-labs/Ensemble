@@ -66,7 +66,9 @@ export interface ShapeDef {
     qualities?: Quality[];
     /**
      * A first-position form, not a shape that moves (#1613): built only where one of its
-     * strings rings open (`buildAt`), which is the one root it is the book grip for.
+     * strings rings open (`buildAt`), which is the one root it is the book grip for. One
+     * exception (#1688): a sus2 may leave its open string while it stays inside the 4th fret,
+     * which gives the Cm form one closed grip, D♭sus2 1-3-4-4 (see `buildAt`).
      */
     openOnly?: boolean;
 }
@@ -129,7 +131,11 @@ export type HomeWindow = [number, number];
 
 export interface VoiceOptions {
     instrument: InstrumentDef;
-    /** Keep every grip inside this fret window (open strings always allowed). null = anywhere. */
+    /**
+     * The fret window the hand sits in (open strings always count as inside). null = anywhere.
+     * Not a hard limit: a chord whose window holds no grip a player would take reaches a fret
+     * past it, or leaves it (`candidates` in `voicing.ts`).
+     */
     home?: HomeWindow | null;
     /**
      * Limit which strings can hold a shell's root, e.g. [6, 5] for classic guitar shells.
