@@ -196,8 +196,51 @@ const UKE_TRIADS: ShapeDef[] = [
 ];
 
 /**
+ * The ukulele's two-string power chords (#1809): a root and its 5th on two neighbouring strings,
+ * the others left silent. A ukulele has no first-position power grip on four strings for most
+ * roots (F♯5 is 6-6-9-9, B5 4-6-7-x on the shapes above), and these are what the chord charts
+ * print at the nut instead (ukutabs.com: F5 x-0-1-x, F♯5/G♭5 x-1-2-x, B♭5 x-x-1-1, B5 x-x-2-2,
+ * each "the simplest playable grip"; read 2026-10-19). Two shapes, each moving with its root:
+ *
+ * - 5th on the C string, root on the E string a fret or two up: G5 0-2-3-x less its open G.
+ * - 5th on the E string, root on the A string at the same fret: C5 0-0-3-3 less its two low
+ *   strings.
+ *
+ * Both are `nutOnly`, and `candidates` in `voicing.ts` offers them only to a chord with no
+ * other grip inside the 4th fret: four strings (C5 0-0-3-3, A5 2-4-0-0, D♭5 1-1-4-4) or three
+ * (G5 0-2-3-x, A♭5 1-3-4-x). A muted string costs the plan nothing, so offered beside those
+ * they took G5 to x-2-3-x and A♭5 to x-3-4-x, grips no chart gives instead. So these four are
+ * all they ever play.
+ */
+const UKE_TWO_STRING_POWER: ShapeDef[] = [
+    {
+        id: 'UP2C',
+        kind: 'power',
+        rootString: 2,
+        name: 'C–E strings',
+        nutOnly: true,
+        voices: [
+            [3, 'F'],
+            [2, 'R'],
+        ],
+    },
+    {
+        id: 'UP2E',
+        kind: 'power',
+        rootString: 1,
+        name: 'E–A strings',
+        nutOnly: true,
+        voices: [
+            [2, 'F'],
+            [1, 'R'],
+        ],
+    },
+];
+
+/**
  * Ukulele power chords: root and 5th, the root doubled. C5 0033 strums all four strings; G5 023x
- * leaves the A string out (its 5th up there would be a five-fret stretch).
+ * leaves the A string out (its 5th up there would be a five-fret stretch). The two-string grips
+ * at the nut (F5 x01x, F♯5 x12x, B♭5 xx11, B5 xx22) are `UKE_TWO_STRING_POWER`'s.
  *
  * Two more are first-position forms like `UKE_OPEN_FORMS` (#1675), each for the one root whose
  * open strings make it: A5 2400 and E5 4402. The two shapes above gave A5 as 245x, a string
@@ -221,6 +264,7 @@ const UKE_POWER: ShapeDef[] = [
     { ...openForm('UPA', 'A5 form', 4, ['R', 'F', 'F2', 'R2'], ['five']), kind: 'power' },
     // E5 4402: B E E B — the 5th, the root, the open E string's root, the 5th on top.
     { ...openForm('UPE', 'E5 form', 3, ['F', 'R', 'R2', 'F2'], ['five']), kind: 'power' },
+    ...UKE_TWO_STRING_POWER,
 ];
 
 /** A four-string uke triad shape: `roles` run from the G string (4) to the A string (1). */

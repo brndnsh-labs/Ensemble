@@ -633,8 +633,9 @@ const fingeredFromTheNut = (notes: Note[], fr: Note[], ukulele: boolean): boolea
 
 /**
  * The ukulele chords whose method-book fingering the rules do not reach. Keyed by the frets
- * from the G string to the A string, `o` an open string; each lists the book fingerings, the
- * first the one a chord chart prints. Only a four-string ukulele grip is looked up.
+ * from the G string to the A string, `o` an open string and `x` one the grip leaves out; each
+ * lists the book fingerings (for the strings it sounds), the first the one a chord chart
+ * prints. Only a ukulele grip is looked up.
  *
  * - Fm 1-0-1-3 is index, middle and little finger (Fender Play, Ukulele Tricks, Kytary).
  * - E♭ 0-3-3-1 is printed three ways: middle and ring on the 3rd fret (Ukulele Tricks, and
@@ -645,6 +646,11 @@ const fingeredFromTheNut = (notes: Note[], fr: Note[], ukulele: boolean): boolea
  *   there through C, Cm, C. No cost reaches that one: three fingertips on one fret read as
  *   two frets of stretch.
  *
+ * - The two-string power chords on the E and A strings (#1809), B5 x-x-2-2 and B♭5 x-x-1-1,
+ *   are index and middle, a fingertip each (UkuTabs). The rules lay the index across both;
+ *   that stays only as fingers left down, beside a chord that already bars those strings
+ *   (B 4-3-2-2 to B5).
+ *
  * C 0-0-0-3 under the ring finger and Am 2-0-0-0 under the middle were rows here; they are
  * `aheadOfItsFret`'s rule now.
  */
@@ -652,6 +658,8 @@ const UKE_BOOK: Record<string, string[]> = {
     '1 o 1 3': ['1-0-2-4'],
     'o 3 3 1': ['0-2-3-1', '0-3-3-1', '0-3-4-1'],
     'o 3 3 3': ['0-1-1-1', '0-1-2-3'],
+    'x x 2 2': ['1-2'],
+    'x x 1 1': ['1-2'],
 };
 
 /**
@@ -662,20 +670,20 @@ const UKE_BOOK: Record<string, string[]> = {
  */
 const UKE_F_SHAPE = { frets: '2 0 1 0', fingers: ['3-1-2-1'] };
 
-/** A four-string grip's book fingerings, as `UKE_BOOK` spells them, or null. */
+/** A ukulele grip's book fingerings, as `UKE_BOOK` spells them, or null. */
 function bookFingerings(notes: Note[]): string[] | null {
-    if (notes.length !== 4 || notes.some((n) => n.string < 1 || n.string > 4)) {
+    if (notes.some((n) => n.string < 1 || n.string > 4)) {
         return null;
     }
     const byString = [4, 3, 2, 1].map((s) => notes.find((n) => n.string === s));
+    const book = UKE_BOOK[byString.map((n) => (n ? n.fret || 'o' : 'x')).join(' ')];
+    if (book) {
+        return book;
+    }
     if (byString.includes(undefined)) {
         return null;
     }
     const frets = byString.map((n) => (n as Note).fret);
-    const book = UKE_BOOK[frets.map((f) => f || 'o').join(' ')];
-    if (book) {
-        return book;
-    }
     const low = Math.min(...frets);
     return low > 0 && frets.map((f) => f - low).join(' ') === UKE_F_SHAPE.frets
         ? UKE_F_SHAPE.fingers
