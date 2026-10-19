@@ -166,6 +166,39 @@ export function unreadableSongsNotice(count: number): string {
 export const UNREADABLE_EXPORT_LABEL = 'Export as stored';
 
 /**
+ * The notice's second action (#1805): removing those songs from this device, behind its own
+ * confirm (`RemoveUnreadableDialog`). The confirm says plainly that removed music is gone unless it
+ * was exported. A song with a change still waiting to reach the account is kept, and `waiting`
+ * says why — the wait is the reason, not a fault to fix.
+ */
+export const REMOVE_UNREADABLE_MESSAGES = {
+    label: 'Remove…',
+    question: (count: number) =>
+        count === 1
+            ? 'Remove the song this device couldn’t read?'
+            : `Remove the ${count} songs this device couldn’t read?`,
+    detail: (count: number) =>
+        count === 1
+            ? 'Once it’s gone it can’t be recovered, unless you exported it first.'
+            : 'Once they’re gone they can’t be recovered, unless you exported them first.',
+    removed: (count: number) => (count === 1 ? 'Removed 1 song.' : `Removed ${count} songs.`),
+    waiting: (count: number) =>
+        count === 1
+            ? 'One song was kept: it has a change that hasn’t reached your account yet, and removing it would lose that change.'
+            : `${count} songs were kept: they have changes that haven’t reached your account yet, and removing them would lose those changes.`,
+} as const;
+
+/** What the Remove said it did: the removed count, then why any song was kept. */
+export function removeUnreadableOutcome(removed: number, waiting: number): string {
+    return [
+        removed > 0 ? REMOVE_UNREADABLE_MESSAGES.removed(removed) : '',
+        waiting > 0 ? REMOVE_UNREADABLE_MESSAGES.waiting(waiting) : '',
+    ]
+        .filter(Boolean)
+        .join(' ');
+}
+
+/**
  * Deleting songs from this device for good (#1754) — the way out for a song a cloud delete cannot
  * remove: one the account no longer holds (`REMOTE_UPDATE_MESSAGES.deletedMarker`) or never
  * received. Nothing is sent, so nothing here says "account" except to say where the song is NOT.

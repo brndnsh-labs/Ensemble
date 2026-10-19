@@ -121,6 +121,54 @@ function seedCopies(page: Page, count: number, remove = false): Promise<void> {
     );
 }
 
+/**
+ * Queues a Save for `documentId` as a NEWER build would have (#1805): a chart schema this build
+ * does not know, which every pass steps over and never retires. With `remove`, takes the queue out
+ * again, as that newer build sending it would.
+ */
+function seedNewerQueue(page: Page, documentId: string, remove = false): Promise<void> {
+    return page.evaluate(
+        async ([name, id, remove]) => {
+            const db = await new Promise<IDBDatabase>((resolve, reject) => {
+                const request = indexedDB.open(name);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+            await new Promise<void>((resolve, reject) => {
+                const tx = db.transaction(['meta', 'operations'], 'readwrite');
+                const active = tx.objectStore('meta').get('active');
+                active.onsuccess = () => {
+                    const ownerId = (active.result as { ownerId: string }).ownerId;
+                    const operations = tx.objectStore('operations');
+                    if (remove) {
+                        const keys = operations.index('song').getAllKeys([ownerId, id]);
+                        keys.onsuccess = () => {
+                            for (const key of keys.result) {
+                                operations.delete(key);
+                            }
+                        };
+                        return;
+                    }
+                    operations.put({
+                        ownerId,
+                        documentId: id,
+                        operationId: 'newer-build-save',
+                        localRevision: 1,
+                        snapshot: { schemaVersion: 99, id, title: 'From a newer build' },
+                        base: { revision: null },
+                        wireBody: null,
+                        status: 'queued',
+                    });
+                };
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+            db.close();
+        },
+        [ACCOUNT_DATABASE, documentId, remove] as const,
+    );
+}
+
 test('sign-out and account deletion name a song this app can no longer open, and export it as stored', async ({
     page,
 }) => {
@@ -196,6 +244,43 @@ test('sign-out and account deletion name a song this app can no longer open, and
             .map((file) => file.suggestedFilename())
             .sort(),
     ).toEqual(['Set list.ensemble', 'old-text-chart (unreadable).json']);
+
+    // The notices' Remove (#1805). First, held: a Save for it is still queued, so nothing goes.
+    await page.reload();
+    await expect(accountChip(page)).toBeVisible();
+    await expect(page.getByTestId('home-unreadable')).toContainText(
+        'One song on this device couldn’t be read',
+    );
+    await seedNewerQueue(page, 'old-text-chart');
+    await page.getByTestId('home-unreadable-remove').click();
+    const confirm = page.getByTestId('remove-unreadable');
+    await expect(confirm.locator('h2')).toHaveText('Remove the song this device couldn’t read?');
+    await expect(confirm).toContainText(
+        'Once it’s gone it can’t be recovered, unless you exported it first.',
+    );
+    // Its own Export, before anything goes.
+    await confirm.getByTestId('remove-unreadable-export').click();
+    await expect.poll(() => downloads.length).toBe(5);
+    expect(downloads[4].suggestedFilename()).toBe('old-text-chart (unreadable).json');
+    await confirm.getByTestId('remove-unreadable-confirm').click();
+    await expect(confirm).toHaveCount(0);
+    await expect(page.getByTestId('shell-message')).toHaveText(
+        'One song was kept: it has a change that hasn’t reached your account yet, and removing it would lose that change.',
+    );
+    await expect(page.getByTestId('home-unreadable')).toBeVisible();
+
+    // Once nothing is queued for it, Remove from All songs takes it off both surfaces.
+    await seedNewerQueue(page, 'old-text-chart', true);
+    await page.getByTestId('all-songs-link').click();
+    await expect(page.getByTestId('all-songs-unreadable')).toBeVisible();
+    await page.getByTestId('all-songs-unreadable-remove').click();
+    await page.getByTestId('remove-unreadable-confirm').click();
+    await expect(page.getByTestId('shell-message')).toHaveText('Removed 1 song.');
+    await expect(page.getByTestId('all-songs-unreadable')).toHaveCount(0);
+    await expect(page.locator('.all-songs-count')).toHaveText('· 1');
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(page.getByTestId('library-heading')).toBeVisible();
+    await expect(page.getByTestId('home-unreadable')).toHaveCount(0);
 });
 
 async function streamText(download: Download): Promise<string> {

@@ -678,4 +678,92 @@ describe('a queued Save that will not decode (#1769)', () => {
         expect((await book.read(scope, kept.documentId))?.document.title).toMatch(/^B2\b/);
         expect(await book.queued(scope, 'song-b')).toEqual([]);
     });
+
+    describe('the notices’ Remove (#1805)', () => {
+        it('keeps a song whose Save is waiting on a version this build cannot read, queue and all', async () => {
+            // The #1782 step-over: B2 is queued and frozen over an unreadable record, waiting
+            // for a build that can read the account's r2.
+            await chainedQueue();
+            await put('songs', {
+                ownerId: OWNER,
+                documentId: 'song-b',
+                document: corruptChart('song-b'),
+                remoteRevision: 'r1',
+            });
+            const sky = conflictingOn({ revision: 'r2', document: corruptChart('song-b') });
+            await runOutboxPass(book, scope, sky.transport);
+            const queued = (await all('operations')).filter((op) => op.documentId === 'song-b');
+            expect(queued).toMatchObject([{ status: 'queued', snapshot: { title: 'B2' } }]);
+            expect(await book.unreadableSongs(scope)).toMatchObject([{ documentId: 'song-b' }]);
+
+            const result = await book.removeUnreadable(scope, ['song-b']);
+
+            expect(result).toEqual({ removed: [], waiting: ['song-b'] });
+            // Nothing moved: the same queue, operation for operation, and the record as it was.
+            expect((await all('operations')).filter((op) => op.documentId === 'song-b')).toEqual(
+                queued,
+            );
+            expect(await stored('songs', 'song-b')).toMatchObject({
+                document: corruptChart('song-b'),
+                remoteRevision: 'r1',
+            });
+            // And the next pass still sends it, as before.
+            const again = await runOutboxPass(book, scope, sky.transport);
+            expect(again.counts).toMatchObject({ refused: 1 });
+        });
+
+        it('keeps a song with a queue from a newer build', async () => {
+            const b = await book.save(scope, accountChart('B', 'song-b'), null);
+            const [op] = (await all('operations')).filter((row) => row.documentId === 'song-b');
+            const newer = { ...b.document, schemaVersion: 99 };
+            await put('operations', { ...op, snapshot: newer });
+            await put('songs', {
+                ownerId: OWNER,
+                documentId: 'song-b',
+                document: newer,
+                remoteRevision: null,
+            });
+
+            expect(await book.removeUnreadable(scope, ['song-b'])).toEqual({
+                removed: [],
+                waiting: ['song-b'],
+            });
+            expect(
+                (await all('operations')).filter((row) => row.documentId === 'song-b'),
+            ).toHaveLength(1);
+            expect(await book.unreadableSongs(scope)).toHaveLength(1);
+        });
+
+        it('removes unreadable songs with nothing queued, confirmed or not, and leaves readable ones', async () => {
+            await book.save(scope, accountChart('A', 'song-a'), null);
+            await runOutboxPass(book, scope, committing().transport);
+            const receipts = await all('receipts');
+            // Confirmed by the account, and never confirmed (a queue `prepare` retired).
+            await putCorruptSong('song-b', 'r-old');
+            await putCorruptSong('song-c', null);
+            await book.recordOpened(scope, 'song-b');
+            await put('drafts', {
+                ownerId: OWNER,
+                documentId: 'song-c',
+                writerId: 'tab-1',
+                document: corruptChart('song-c'),
+            });
+
+            const result = await book.removeUnreadable(scope, [
+                'song-a',
+                'song-b',
+                'song-c',
+                'gone',
+            ]);
+
+            expect(result).toEqual({ removed: ['song-b', 'song-c'], waiting: [] });
+            expect(await book.unreadableSongs(scope)).toEqual([]);
+            expect((await all('songs')).map((row) => row.documentId)).toEqual(['song-a']);
+            expect((await all('drafts')).filter((row) => row.documentId === 'song-c')).toEqual([]);
+            expect((await book.openedAtMap(scope)).has('song-b')).toBe(false);
+            // Local only: nothing queued, and the receipts stay.
+            expect(await all('operations')).toEqual([]);
+            expect(await all('receipts')).toEqual(receipts);
+        });
+    });
 });

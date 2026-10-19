@@ -1,7 +1,11 @@
 'use client';
 
 import type { RefObject } from 'react';
-import { PURGE_MESSAGES } from '../../lib/account/messages';
+import {
+    PURGE_MESSAGES,
+    REMOVE_UNREADABLE_MESSAGES,
+    UNREADABLE_EXPORT_LABEL,
+} from '../../lib/account/messages';
 import { dialogRule } from '../dialog-close';
 
 /**
@@ -92,6 +96,70 @@ export function PurgeSongsDialog({
                     onClick={onConfirm}
                 >
                     {title === null ? 'Remove' : 'Delete'}
+                </button>
+            </div>
+        </dialog>
+    );
+}
+
+/**
+ * The confirm step for the "couldn't be read" notices' Remove (#1805): every song this device holds
+ * but this build cannot read, removed from this device (`accountSync.removeUnreadable`). Purely
+ * local, like the step above. It says plainly that the music is gone once removed unless it was
+ * exported, and offers that export first. A song with a change still waiting to reach the account
+ * is kept by the removal itself, and the shell says so afterwards.
+ */
+export interface RemoveUnreadableDialogProps {
+    dialogRef: RefObject<HTMLDialogElement | null>;
+    count: number;
+    busy: boolean;
+    onExport: () => void;
+    onConfirm: () => void;
+    onClose: () => void;
+}
+
+export function RemoveUnreadableDialog({
+    dialogRef,
+    count,
+    busy,
+    onExport,
+    onConfirm,
+    onClose,
+}: RemoveUnreadableDialogProps) {
+    return (
+        <dialog
+            ref={dialogRef}
+            className="modal-box"
+            aria-labelledby="remove-unreadable-title"
+            data-testid="remove-unreadable"
+            {...dialogRule({ onClose, busy })}
+        >
+            <h2 id="remove-unreadable-title">{REMOVE_UNREADABLE_MESSAGES.question(count)}</h2>
+            <p>{REMOVE_UNREADABLE_MESSAGES.detail(count)}</p>
+            <div className="dialog-actions">
+                <button
+                    className="btn"
+                    data-testid="remove-unreadable-export"
+                    disabled={busy}
+                    onClick={onExport}
+                >
+                    {UNREADABLE_EXPORT_LABEL}
+                </button>
+                <button
+                    className="btn"
+                    data-testid="remove-unreadable-cancel"
+                    disabled={busy}
+                    onClick={onClose}
+                >
+                    Cancel
+                </button>
+                <button
+                    className="btn danger"
+                    data-testid="remove-unreadable-confirm"
+                    disabled={busy}
+                    onClick={onConfirm}
+                >
+                    Remove
                 </button>
             </div>
         </dialog>

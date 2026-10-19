@@ -15,7 +15,11 @@ import {
     libraryDownloaded,
     pendingGuestCollections,
 } from '../lib/account/adopt-guest';
-import { heldAccountBanner, PURGE_MESSAGES } from '../lib/account/messages';
+import {
+    heldAccountBanner,
+    PURGE_MESSAGES,
+    removeUnreadableOutcome,
+} from '../lib/account/messages';
 import {
     AccountMismatchError,
     accountSync,
@@ -77,7 +81,7 @@ import {
     syncFailureNotice,
     useAccountLibrary,
 } from './account/library';
-import { PurgeSongsDialog } from './account/purge-songs';
+import { PurgeSongsDialog, RemoveUnreadableDialog } from './account/purge-songs';
 import { type AccountDialogMode, SignInDialog } from './account/sign-in';
 import { SignOutDialog, type SignOutMode } from './account/sign-out';
 import { useAccountSession } from './account/use-account-session';
@@ -862,6 +866,10 @@ export default function Ensemble() {
         onStand?: boolean;
     } | null>(null);
     const purgeDialogRef = useRef<HTMLDialogElement>(null);
+    // The "couldn't be read" notices' Remove (#1805): the ids of the songs this build cannot read,
+    // read fresh when the musician asked, so the confirm counts what it will act on.
+    const [unreadableRemoval, setUnreadableRemoval] = useState<string[] | null>(null);
+    const unreadableRemovalRef = useRef<HTMLDialogElement>(null);
     // The songbook's own status line (#1440 review P2) — set only by row actions (renamed,
     // duplicated, deleted, "hasn't reached your account yet"), NEVER the stand's `message`
     // (`open()` always sets one, and reusing it here showed a stale stand status on every visit
@@ -1951,6 +1959,13 @@ export default function Ensemble() {
             closeDialog(purgeDialogRef.current);
         }
     }, [purgeTarget]);
+    useEffect(() => {
+        if (unreadableRemoval) {
+            unreadableRemovalRef.current?.showModal();
+        } else {
+            closeDialog(unreadableRemovalRef.current);
+        }
+    }, [unreadableRemoval]);
     // Closes itself if `rowInAccount` goes false while open (the same posture the stand's own
     // `deleteOpen` effect takes) — a queued Save landing mid-confirm, or the account detaching,
     // must not leave a confirm button pointed at a state that no longer supports it. Releases the
@@ -5461,6 +5476,55 @@ export default function Ensemble() {
             }
         });
     }
+    /**
+     * The notices' Remove (#1805): the songs this build cannot read, read fresh so the confirm
+     * counts exactly what it will act on. Nothing to remove (another tab got there first) only
+     * refreshes the notice.
+     */
+    function requestRemoveUnreadable() {
+        const owner = sessionOwner;
+        if (owner === null) {
+            return;
+        }
+        void run(async () => {
+            const ids = (await accountSync.unreadableSongs(owner)).map((row) => row.documentId);
+            if (ids.length === 0) {
+                await refreshSongs();
+                return;
+            }
+            setUnreadableRemoval(ids);
+        });
+    }
+    /**
+     * Remove them from this device (#1805) — `accountSync.removeUnreadable`, one transaction,
+     * local only. A song with anything still queued for the account is kept, and the songbook's
+     * status line says why. This tab's opened-at entries for the removed ids go too; such a song
+     * was never openable here, so there is no draft or stand to clear.
+     */
+    function removeUnreadableConfirmed() {
+        const ids = unreadableRemoval;
+        if (ids === null) {
+            return;
+        }
+        const owner = sync.owner;
+        void run(async () => {
+            const result = await accountSync.removeUnreadable(ids, owner);
+            const removed = new Set(result.removed);
+            setOpenedAtState((previous) => {
+                if (![...removed].some((id) => previous.has(id))) {
+                    return previous;
+                }
+                const updated = new Map(previous);
+                for (const id of removed) {
+                    updated.delete(id);
+                }
+                return updated;
+            });
+            setUnreadableRemoval(null);
+            await refreshSongs();
+            setHomeNoticeState(removeUnreadableOutcome(removed.size, result.waiting.length));
+        });
+    }
     function downloadFile(contents: string, name: string) {
         const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
         const anchor = document.createElement('a');
@@ -6182,6 +6246,7 @@ export default function Ensemble() {
                     // The account rows the full read stepped over (#1769), said beside the list.
                     unreadable={signedIn ? accountUnreadable : 0}
                     onExportUnreadable={signedIn ? exportUnreadableSongs : undefined}
+                    onRemoveUnreadable={signedIn ? requestRemoveUnreadable : undefined}
                     accountLibrary={signedIn}
                     starred={starred}
                     openedAt={openedAt}
@@ -6213,6 +6278,7 @@ export default function Ensemble() {
                     // says less than All songs'; the guest full read refuses instead.
                     libraryUnreadable={signedIn && accountSongs !== null ? accountUnreadable : null}
                     onExportUnreadable={signedIn ? exportUnreadableSongs : undefined}
+                    onRemoveUnreadable={signedIn ? requestRemoveUnreadable : undefined}
                     // Gated like `home`: until the session settles this may be the WRONG songbook's
                     // list (a guest list standing in for an account one), so search says it is
                     // still looking rather than listing guest songs as "Your songs".
@@ -7017,6 +7083,16 @@ export default function Ensemble() {
                     onExport={purgeTarget.title === null ? null : exportPurgeTarget}
                     onConfirm={purgeConfirmed}
                     onClose={() => setPurgeTarget(null)}
+                />
+            )}
+            {unreadableRemoval && (
+                <RemoveUnreadableDialog
+                    dialogRef={unreadableRemovalRef}
+                    count={unreadableRemoval.length}
+                    busy={busy}
+                    onExport={exportUnreadableSongs}
+                    onConfirm={removeUnreadableConfirmed}
+                    onClose={() => setUnreadableRemoval(null)}
                 />
             )}
             {rowDeleteTarget && rowInAccount && (
