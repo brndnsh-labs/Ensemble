@@ -38,6 +38,12 @@ export interface FingerOption {
      */
     hold?: number;
     /**
+     * Set with `hold` on a guitar grip fingered from the nut (`offItsFret`): the hold is
+     * counted against the chord beside it (`nutHoldKept`), which may already have the hand
+     * where this fingering puts it (#1691).
+     */
+    nut?: boolean;
+    /**
      * Set with `needs` on a crowded fingering that places a finger (`crowdedOptions`, #1683):
      * it is taken only beside a chord on the same root, every note the two share the same
      * degree in both (`onOneRoot`).
@@ -384,6 +390,31 @@ const idleIndexStretches = (o: FingerOption): boolean =>
         ),
     );
 
+/**
+ * An idle index under a little finger tucked inside the grip: nothing under finger 1 while
+ * the little finger frets a note with a fingered string on either side of it, a fret above
+ * the ring finger on the thinner side (#1691). It is the D shape x-x-x-2-3-2 (1-3-2) moved up
+ * a finger, 2-4-3, and B° x-x-3-4-3-x the same. `handCost` reads it as a choice of fingers,
+ * 0.6 dearer, but no teacher shows it: the ring finger reaching over the middle is the D
+ * shape, the shorter little finger reaching over the ring a knot, and the index that would
+ * undo it is free. A little finger on the outside string is no knot (C♯+ x-4-3-2-x-x as 4-3-2
+ * keeps D♭'s ring and little finger, a plain diagonal), and with the index down the reach is
+ * taught (the ukulele's G shape 1-2-4-3), so only these are ruled out. A guitar's only: the
+ * ukulele's frets are close enough that its G 0-2-3-2 as 0-2-4-3 stays a second fingering for
+ * two fingers kept (#1681), and its teacher's review left it there.
+ */
+const idleIndexTucked = (o: FingerOption): boolean => {
+    const little = o.p.indexOf(4);
+    if (little < 0 || o.p.includes(1)) {
+        return false;
+    }
+    const { string, fret } = o.fr[little];
+    return (
+        o.fr.some((n, i) => o.p[i] !== null && n.string > string) &&
+        o.fr.some((n, i) => o.p[i] === 3 && n.string < string && n.fret < fret)
+    );
+};
+
 /** Which note of a fingering its lowest-numbered finger holds (-1 for none fingered). */
 const lowestFinger = (o: FingerOption): number => {
     let lowest = -1;
@@ -515,7 +546,10 @@ const taughtAmong = (all: FingerOption[], fromTheNut: boolean): FingerOption[] =
                 cost: o === best ? first.cost : o.cost,
                 own: own(o),
                 ...(behindTheNut(o)
-                    ? { needs: 'left' as const, ...(fromTheNut ? { hold: offItsFret(o) } : {}) }
+                    ? {
+                          needs: 'left' as const,
+                          ...(fromTheNut ? { hold: offItsFret(o), nut: true } : {}),
+                      }
                     : {}),
             });
         } else if (inPosition(o)) {
@@ -648,6 +682,34 @@ function bookFingerings(notes: Note[]): string[] | null {
         : null;
 }
 
+/**
+ * The guitar's open grips whose method-book fingering the nut rule (`aheadOfItsFret`) does not
+ * reach (#1691). Keyed by the fretted notes as `string/fret`, highest-numbered string first,
+ * and looked up only for a grip fingered from the nut (`fingeredFromTheNut`); each value is
+ * the fingers in that order.
+ *
+ * - The open D's top two fretted notes, x-x-x-2-3-x with an open string beside them: D5
+ *   x-x-0-2-3-x and Dsus2 x-x-x-2-3-0 (and x-x-0-2-3-0). They are D x-x-0-2-3-2 (1-3-2) with
+ *   the middle finger lifted, and every method prints them 1-3: index on the 3rd string, ring
+ *   on the 2nd. The nut rule, a finger to the fret of its number, made them 2-3, which a
+ *   teacher shows only as Dm x-x-0-2-3-1 (2-3-1) minus a finger, so 2-3 stays a second
+ *   fingering for a chord that keeps one of those fingers. With the ring finger where D has
+ *   it, B°'s x-x-3-4-3-x is not pulled to 2-4-3 beside D5 to keep it.
+ */
+const GUITAR_BOOK: Record<string, number[]> = {
+    '3/2 2/3': [1, 3],
+};
+
+/** A guitar grip's book fingering as `GUITAR_BOOK` lists it, among `every`, or null. */
+function guitarBookFingering(fr: Note[], every: FingerOption[]): FingerOption | null {
+    const order = fr.map((_, i) => i).sort((i, j) => fr[j].string - fr[i].string);
+    const book = GUITAR_BOOK[order.map((i) => `${fr[i].string}/${fr[i].fret}`).join(' ')];
+    return book
+        ? (every.find((o) => order.every((i, k) => o.p[i] === book[k]) && !barringFinger(o)) ??
+              null)
+        : null;
+}
+
 /** An option's fingers from the highest-numbered string down, an open string 0: '0-2-3-1'. */
 const spelled = (notes: Note[], o: FingerOption): string =>
     [...notes]
@@ -732,9 +794,25 @@ const ukuleleDefault = (notes: Note[], free: FingerOption[]): FingerOption => {
  * A fingering with one fingertip off its fret still takes one finger that stays: Em
  * x-2-2-0-x-x as 1-2 into C (the middle finger is on its own fret and stays there), A as 1-2
  * into D.
+ *
+ * That count is from the nut. For a grip no method drills (`drilledChord`: a sus, dim, aug
+ * or power grip, an open shell) it is checked against the chord beside it (#1691,
+ * `nutHoldKept`), which may already hold the hand where the fingering puts it.
  */
 const offItsFret = (o: FingerOption): number =>
     Math.min(2, new Set(o.p.filter((f, i) => f !== null && f !== o.fr[i].fret)).size);
+
+/**
+ * The index laid flat with every other finger on its own fret or one back from it, counted
+ * from the barre's fret: the index barre a crowded fingering may use (`crowdedOptions`).
+ */
+const indexBarreInPlace = (o: FingerOption): boolean => {
+    if (barringFinger(o) !== 1) {
+        return false;
+    }
+    const first = o.fr[o.p.indexOf(1)].fret;
+    return o.p.every((f, i) => f === null || f === 1 || o.fr[i].fret >= first + f - 2);
+};
 
 /**
  * The fingerings that crowd the hand to leave fingers where they are (#1683): a fingertip
@@ -745,7 +823,8 @@ const offItsFret = (o: FingerOption): number =>
  * its own major re-fingered the whole grip where a teacher moves one finger:
  *
  * - D x-x-x-2-3-2 (1-3-2) to Dsus4 x-x-x-2-3-3 adds the little finger: 1-3-4, not 1-2-3.
- * - D to Dsus2 x-x-x-2-3-0 lifts the middle finger: 1-3, not 2-3.
+ * - D to Dsus2 x-x-x-2-3-0 lifts the middle finger: 1-3, not 2-3 (and since #1691 1-3 is
+ *   Dsus2's own fingering too, `GUITAR_BOOK`).
  * - F x-3-3-2-x-x (2-3-1) to Fsus4 x-3-3-3-x-x adds the little finger: 2-3-4, not the index
  *   laid across all three.
  *
@@ -755,7 +834,8 @@ const offItsFret = (o: FingerOption): number =>
  * notes at most, so that is one of two things:
  *
  * - A finger LIFTED: a grip of two fretted notes, both already down. Any chord may do that,
- *   since nothing is placed (Dsus2 after D; D5 x-x-0-2-3-x after Dm x-x-3-2-3-x is 1-3).
+ *   since nothing is placed (Dsus2 after D, D5 x-x-0-2-3-x after Dm x-x-3-2-3-x: each is
+ *   1-3, which since #1691 is also what each takes cold).
  * - A finger ADDED: a grip of three, two of them down and one to place. Only a suspension
  *   beside its own chord (`FingerOption.sameRoot`, `onOneRoot`), which is what a suspension
  *   is: the chord's hand with one finger more, and back. Between two different chords each
@@ -774,6 +854,14 @@ const offItsFret = (o: FingerOption): number =>
  * The rule names no shape, so it holds wherever two fingers can stay: a sus chord beside its
  * minor (Dm x-x-x-2-3-1 to Dsus4 is 2-3-4), the F and D shapes at every fret, a sus2 beside
  * its power chord (E♭5 x-x-1-3-4-x to E♭sus2 x-x-3-3-4-x is 2-3-4).
+ *
+ * The index may lie flat in one (#1691), as it would in the chord's own barre form: Dm
+ * x-x-3-2-3-x (2-1-3) to Dsus2 x-x-2-2-3-x is 1-1-3, the index laid across the 4th and 3rd
+ * strings and the ring finger staying on D, where the cheapest, 1-1-2, moves the D from the
+ * ring finger to the middle. No other finger lies flat (a ring or little finger flat beside
+ * two held fingers is a hand no method shows), and the fingers above the barre sit no more
+ * than a fret back from their own (`indexBarreInPlace`): Dsus2 as 1-1-4, the little finger
+ * two frets back, is a cramp.
  */
 const crowdedOptions = (
     every: FingerOption[],
@@ -790,10 +878,11 @@ const crowdedOptions = (
             (o) =>
                 !o.p.includes(null) &&
                 !taken.has(o.p.join()) &&
-                !barringFinger(o) &&
+                (!barringFinger(o) || indexBarreInPlace(o)) &&
                 !behindTheNut(o) &&
                 !aheadOfItsFret(o, false) &&
-                !idleIndexStretches(o),
+                !idleIndexStretches(o) &&
+                !idleIndexTucked(o),
         )
         .map((o) => ({ ...o, cost, hold: 2, ...(added ? { sameRoot: true } : {}) }));
 };
@@ -817,7 +906,9 @@ const holdFor = (o: FingerOption): number =>
  *
  * - No dearer than the cheapest by more than `TAUGHT_MARGIN`, as for a shell: no stretch the
  *   cheapest does not have (B♭ x-5-3-3-x-x is the barre 3-1-1, never 4-2-3; the ukulele's B
- *   4-3-2-2 is 3-2-1-1, never 4-3-1-2), and no idle index over a stretch.
+ *   4-3-2-2 is 3-2-1-1, never 4-3-1-2), and no idle index over a stretch, nor on a guitar
+ *   under a little finger tucked inside the grip (`idleIndexTucked`, #1691: the D shape is
+ *   never 2-4-3).
  * - No ring or little finger laid flat a fret above the index (`crampedBarre`).
  * - Where the cheapest lays the ring or little finger flat, the fingering with a fingertip per
  *   note in position is taught beside it (`inPosition`): the power chord's 1-3-4 beside 1-3-3,
@@ -836,8 +927,10 @@ const holdFor = (o: FingerOption): number =>
  * after (`needs`): C as 2-1 into Am x-3-2-2-x-x, both fingers staying; Em as 1-2 into C, the
  * middle finger staying. Each needs a finger to stay for every fingertip it has off its own
  * fret (`offItsFret`, #1683), and so do that grip's fingers left down: C beside F is 3-2,
- * since 2-1 would keep one finger with two off their frets. And a ukulele grip's default is
- * `ukuleleDefault`'s. A guitar grip
+ * since 2-1 would keep one finger with two off their frets. A guitar grip whose book
+ * fingering the nut rule misses takes the book's (`GUITAR_BOOK`, #1691: D5 x-x-0-2-3-x and
+ * Dsus2 x-x-x-2-3-0 are 1-3), the rule's own a second fingering for one finger that stays.
+ * And a ukulele grip's default is `ukuleleDefault`'s. A guitar grip
  * up the neck keeps the cheapest: its review found nothing to correct there, and the dim
  * triad x-x-5-3-5-x stays 2-1-3, root first like the minor 7th whose hand it shares.
  *
@@ -872,7 +965,11 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
     // fingertip-each fingering players use (1-2-3-4) would be a stretch too far.
     const best = all.find((o) => !crampedBarre(o)) ?? all[0];
     const usual = all.filter(
-        (o) => o.cost <= best.cost + TAUGHT_MARGIN && !idleIndexStretches(o) && !crampedBarre(o),
+        (o) =>
+            o.cost <= best.cost + TAUGHT_MARGIN &&
+            !idleIndexStretches(o) &&
+            !(idleIndexTucked(o) && !ukulele) &&
+            !crampedBarre(o),
     );
     if (barringFinger(best) > 1) {
         // Priced at the margin, the dearest a taught fingering may be: `handCost` reads two
@@ -909,6 +1006,16 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
                 free = atTheNut;
             }
         }
+        // A guitar grip at the nut whose book fingering the nut rule misses (`GUITAR_BOOK`):
+        // the book's is the default, and what the rule chose waits for a finger that stays.
+        const book =
+            !ukulele && fromTheNut
+                ? guitarBookFingering(fr, everyFingering(notes, fr, opts))
+                : null;
+        if (book) {
+            ahead = [...free, ...ahead];
+            free = [book];
+        }
         const chosen = ukulele ? ukuleleDefault(notes, free) : free[0];
         free = [{ ...chosen, cost: best.cost }, ...free.filter((o) => o !== chosen)];
     }
@@ -925,12 +1032,14 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
     const taken = new Set([...free, ...ahead].map((o) => o.p.join()));
     const left = usual.filter((o) => !taken.has(o.p.join())).map((o) => mark(o, 'left'));
     if (!ukulele) {
-        // The hand off the nut, for fingers enough that stay (`offItsFret`).
+        // The hand off the nut, for fingers enough that stay (`offItsFret`), counted against
+        // the chord beside it unless this is an open chord every method drills (`drilledChord`).
+        const drilled = drilledChord(notes);
         const held = (o: FingerOption): FingerOption =>
-            fromTheNut ? { ...o, hold: offItsFret(o) } : o;
+            fromTheNut ? { ...o, hold: offItsFret(o), ...(drilled ? {} : { nut: true }) } : o;
         const crowded = crowdedOptions(
             everyFingering(notes, fr, opts),
-            new Set(usual.map((o) => o.p.join())),
+            new Set([...usual, ...free].map((o) => o.p.join())),
             best.cost + TAUGHT_MARGIN,
         );
         return [
@@ -1120,9 +1229,75 @@ function heldFingers(marked: FingerOption, other: FingerOption): number {
     return held.size;
 }
 
+/**
+ * A major or minor triad: every note the root, a 3rd or the 5th, and a 3rd among them. At the
+ * nut these are the open chords a method drills first (C x-3-2-0-1-0, A, Am, Em, E, D), and
+ * their fingering is the one the student learned, kept beside any chord but one that leaves
+ * two of its fingers down (`offItsFret`, #1683: C beside F is 3-2, C as 2-1 is for Am). The
+ * sus, dim, aug and power grips and the open shells are not drilled that way; a player
+ * fingers them from the chord beside them (`nutHoldKept`, #1691).
+ */
+const drilledChord = (notes: Note[]): boolean =>
+    notes.every(
+        (n) => n.degree === 'R' || n.degree === '3' || n.degree === 'b3' || n.degree === '5',
+    ) && notes.some((n) => n.degree === '3' || n.degree === 'b3');
+
+/**
+ * Whether the chord beside a guitar grip fingered from the nut keeps enough of the hand for
+ * one of its fingerings off the nut (`FingerOption.nut`, #1691). `offItsFret` asks a finger
+ * that stays for each fingertip off the fret of its own number, because one held finger used
+ * to drag the rest of the hand off its frets. Where the neighbour already has the hand there,
+ * nothing is dragged, and two things say so:
+ *
+ * - The index stays on its note: the hand is in the index's position, not at the nut, and the
+ *   fingertips are counted from there. C5 x-3-5-5-x-x (1-3-3) to Csus4 x-3-3-0-x-x keeps the
+ *   index on C in 3rd position, and Csus4 is 1-2 with the middle finger beside it, a fret
+ *   back from its own: one fingertip off, and one finger kept. It was 3-4, the index lifted
+ *   off the C it shares.
+ * - A finger slides a fret along its string, the same finger in both chords: it keeps its
+ *   string and its place in the hand, and counts as one that stays. E x-2-2-1-x-x (2-3-1) to
+ *   E° x-1-2-0-x-x keeps the ring finger on E while the middle slides from B to B♭: 2-3, where
+ *   it was 1-2 and both notes changed finger.
+ *
+ * A finger that changes string is still a change: C x-3-2-0-x-x beside F x-3-3-2-x-x keeps the
+ * middle finger on C, but 2-1 sends the index from the 3rd string to the 4th, and C stays 3-2
+ * (#1683).
+ */
+function nutHoldKept(marked: FingerOption, other: FingerOption): boolean {
+    // The fingers kept, each once: a barre that stays or slides is one finger, as in
+    // `heldFingers`.
+    const kept = new Set<number>();
+    let indexKept = false;
+    marked.fr.forEach((x, i) => {
+        const finger = marked.p[i];
+        const j = other.fr.findIndex((y) => y.string === x.string);
+        if (j < 0 || finger === null || other.p[j] !== finger) {
+            return;
+        }
+        if (other.fr[j].fret === x.fret) {
+            kept.add(finger);
+            indexKept ||= finger === 1;
+        } else if (Math.abs(other.fr[j].fret - x.fret) === 1) {
+            kept.add(finger);
+        }
+    });
+    const index = marked.p.indexOf(1);
+    // Counted from the index's fret where it stays, from the nut where it does not.
+    const asked = indexKept
+        ? Math.min(
+              2,
+              marked.p.filter(
+                  (f, i) =>
+                      f !== null && f !== 1 && marked.fr[i].fret !== marked.fr[index].fret + f - 1,
+              ).length,
+          )
+        : (marked.hold ?? 0);
+    return kept.size >= asked;
+}
+
 /** Whether `other` holds as many of a marked fingering's fingers as it asks (`FingerOption.hold`). */
 const holdsEnough = (marked: FingerOption, other: FingerOption): boolean =>
-    heldFingers(marked, other) >= (marked.hold ?? 0);
+    marked.nut ? nutHoldKept(marked, other) : heldFingers(marked, other) >= (marked.hold ?? 0);
 
 /**
  * Whether two grips are one chord with a note changed: every note they share (same string,
@@ -1192,6 +1367,13 @@ function arrives(a: FingerOption | null, b: FingerOption): boolean {
 }
 
 /**
+ * How close two ways through a chart may cost and still be a tie: float rounding, not a
+ * difference. The prices are sums of tenths (`handCost`, `holeCost`, `REFINGER_COST`), so
+ * two ways that differ at all differ by far more than this.
+ */
+const TIE = 1e-9;
+
+/**
  * The cheapest way through a chart, one option per chord: each option's own cost plus the cost
  * of every change (`fingerTransCost`), so a note two chords share keeps its finger where the
  * options allow. Every chord must hold an unmarked option (`FingerOption.needs`), which the
@@ -1203,38 +1385,63 @@ function arrives(a: FingerOption | null, b: FingerOption): boolean {
  * charged by the bar a second fingering's premium grew with the length of the chord until
  * the default won: F x-3-3-2-x-x to Fm x-3-3-1-x-x was 3-4-2 into 3-4-1 a bar each and
  * 2-3-1 into 3-3-1 two bars each. A run of one chord is now planned as one chord.
+ *
+ * Two ways through that cost the same (`TIE`) go to the one that takes fewer second
+ * fingerings (`ordinary`, counted once for a run), so where a held note can be kept on either
+ * side of a change the hand re-fingers it LATE, when it moves anyway (#1691): classic guitar
+ * 1-6, `Csus4 Csus2 A♭maj7`, Csus2 x-3-0-0-x-x keeps Csus4's ring finger on C, and the index
+ * takes the C with the rest of A♭maj7's hand. Taking the index early, a second fingering, put
+ * the re-fingering on the lift from Csus4 to Csus2, where nothing else moves.
  */
 function planFingers(options: FingerOption[][]): FingerOption[] {
+    // Each way through as [its cost, the second fingerings it takes].
+    const better = (v: number, m: number, bv: number, bm: number): boolean =>
+        v < bv - TIE || (v <= bv + TIE && m < bm);
+    const marks = (o: FingerOption): number => (ordinary(o) ? 0 : 1);
     let cost = options[0].map((o) => (arrives(null, o) ? o.cost : Infinity));
+    let second = options[0].map(marks);
     const back: number[][] = [];
     for (let i = 1; i < options.length; i++) {
         const nc: number[] = [],
+            nm: number[] = [],
             nb: number[] = [];
         options[i].forEach((b) => {
             let bi = 0,
-                bv = Infinity;
+                bv = Infinity,
+                bm = Infinity;
             options[i - 1].forEach((a, j) => {
                 if (!arrives(a, b)) {
                     return;
                 }
                 // The hand that has not moved pays nothing: a run of one grip under the same
                 // fingers pays that fingering's own cost once. Carried as it is, not taken off
-                // and put back, so a tie falls by order and never by float rounding (#1691).
-                const v = sameFingers(a, b) ? cost[j] : cost[j] + fingerTransCost(a, b) + b.cost;
-                if (v < bv) {
+                // and put back (#1691).
+                const same = sameFingers(a, b);
+                const v = same ? cost[j] : cost[j] + fingerTransCost(a, b) + b.cost;
+                const m = same ? second[j] : second[j] + marks(b);
+                if (better(v, m, bv, bm)) {
                     bv = v;
+                    bm = m;
                     bi = j;
                 }
             });
             nc.push(bv);
+            nm.push(bm);
             nb.push(bi);
         });
         cost = nc;
+        second = nm;
         back.push(nb);
     }
     const last = options.length - 1;
-    const end = cost.map((c, j) => (options[last][j].needs === 'after' ? Infinity : c));
-    let k = end.indexOf(Math.min(...end));
+    let k = -1;
+    options[last].forEach((o, j) => {
+        // A chart cannot end on a fingering still waiting for the chord after it.
+        if (o.needs !== 'after' && (k < 0 || better(cost[j], second[j], cost[k], second[k]))) {
+            k = j;
+        }
+    });
+    k = Math.max(k, 0);
     const out = new Array<FingerOption>(options.length);
     for (let i = last; i >= 0; i--) {
         out[i] = options[i][k];
