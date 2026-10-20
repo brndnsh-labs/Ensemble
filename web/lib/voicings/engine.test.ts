@@ -2645,7 +2645,8 @@ describe('fingers a teacher would show (#1611)', () => {
             // x32010, and 2-1 a second fingering for the chord beside it.
             expect(strummed('x 3 2 0 x x')).toEqual(['3-2', '2-1<', '2-1>', '4-3*']); // C
             expect(strummed('x 2 0 0 x x')).toEqual(['2', '1<', '1>', '3*', '4*']); // G
-            expect(strummed('x x x 2 2 0')).toEqual(['2-3', '1-2<', '1-2>', '3-4*']); // A
+            // A: never 1-2 (#1834); its book 1-3 is priced past `crowds`' reach, below.
+            expect(strummed('x x x 2 2 0')).toEqual(['2-3', '3-4*']); // A
         });
         it('a power chord is 1-3-3 or 1-3-4, never 1-2-3 or 2-3-4', () => {
             expect(strummed('x 2 4 4 x x')).toEqual(['1-3-3', '1-3-4']);
@@ -3216,9 +3217,9 @@ describe('fingers a teacher would show (#1611)', () => {
 
         describe('guitar: no barre lies on an open string on its palm side', () => {
             it('two notes on one fret under a sounding open string take a fingertip each', () => {
-                // Em and A: 2-3, and 1-2 for the chord beside it.
+                // Em and A: 2-3; Em 1-2 for the chord beside it, and A never 1-2 (#1834).
                 expect(strummed('x 2 2 0 x x')).toEqual(['2-3', '1-2<', '1-2>', '3-4*']);
-                expect(strummed('x x x 2 2 0')).toEqual(['2-3', '1-2<', '1-2>', '3-4*']);
+                expect(strummed('x x x 2 2 0')).toEqual(['2-3', '3-4*']);
                 // On the 1st fret, 1-2.
                 expect(strummed('x 1 1 0 x x')).toEqual(['1-2', '2-3*', '3-4*']);
                 expect(strummed('x x 1 1 0 x')).toEqual(['1-2', '2-3*', '3-4*']);
@@ -3241,13 +3242,14 @@ describe('fingers a teacher would show (#1611)', () => {
                 expect(planned(em)).toEqual(['2-3-0']);
                 expect(planned(em, ['x 2 0 0 x x', 0, STRUM])).toEqual(['2-3-0', '2-0-0']);
             });
-            it('A as 1-2 keeps the index into D, through two bars of A', () => {
+            it('A as 1-3 keeps the index into D, through two bars of A', () => {
                 // A fingering that waits for the chord after waits through its own repeat.
+                // It was 1-2, the middle finger on the B string, until #1834.
                 const a: [string, number, FingerOpts] = ['x x x 2 2 0', 0, STRUM];
                 const d: [string, number, FingerOpts] = ['x x x 2 3 2', 2, STRUM];
-                expect(planned(a, a, d, a)).toEqual(['1-2-0', '1-2-0', '1-3-2', '1-2-0']);
+                expect(planned(a, a, d, a)).toEqual(['1-3-0', '1-3-0', '1-3-2', '1-3-0']);
                 // D is never 2-4-3 to meet an A played 2-3.
-                expect(planned(a, d)).toEqual(['1-2-0', '1-3-2']);
+                expect(planned(a, d)).toEqual(['1-3-0', '1-3-2']);
             });
         });
 
@@ -3675,9 +3677,10 @@ describe('fingers a teacher would show (#1611)', () => {
                 const dm = chord('x x 3 2 3 x', 'b3 5 R');
                 const d5 = chord('x x 0 2 3 x', 'R 5 R');
                 expect(run(dm, d5, dm)).toEqual(['2-1-3', '0-1-3', '2-1-3']);
-                // One finger that stays is not two: D5 after A x x x 2 2 0 is its own 1-3
-                // (#1691), never the crowded 1-2.
-                expect(run(chord('x x x 2 2 0', '5 R 3'), d5)[1]).toBe('0-1-3');
+                // One finger that stays is not two: D5 after A x x x 2 2 0 is never the
+                // crowded 1-2. Since #1834 A is never 1-2 either, so D5 is 2-3, Dm minus a
+                // finger (#1691): A's middle finger stays and the ring finger slides a fret.
+                expect(run(chord('x x x 2 2 0', '5 R 3'), d5)).toEqual(['2-3-0', '0-2-3']);
             });
         });
 
@@ -5016,5 +5019,60 @@ describe('a guitar grip earns its open strings only as part of the open chord (#
         for (const home of [null, [1, 6] as [number, number]]) {
             expect(grips('E Edim E', home)).toEqual(['x 2 2 1 x x', 'x 1 2 0 x x', 'x 2 2 1 x x']);
         }
+    });
+});
+describe('guitar A at the nut: the B-string note is the ring finger (#1834)', () => {
+    // A x x x 2 2 0, the open A's top, was 1-2 beside D, the middle finger on the B string. In
+    // every method the B string is the ring finger: 2-3 (A as 1-2-3) or 1-3 (A as 2-1-3, the
+    // A taught beside D, the index staying on the G string's A).
+    const STRUM: FingerOpts = { barre: true };
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    /** A chart's grips as `tab [fingers]`, an open string's finger 0. */
+    const fingered = (names: string, home: [number, number] | null = [1, 6]) =>
+        voiceChart(chart(names), { instrument: GUITAR, home }).map(
+            (v) => `${tab(GUITAR, v)} [${v.notes.map((n) => n.finger).join('-')}]`,
+        );
+    /** The open A's top, x x x 2 2 0, with its real degrees. */
+    const a = (): Note[] => [
+        { string: 3, fret: 2, degree: '5', role: 'F', finger: null },
+        { string: 2, fret: 2, degree: '3', role: 'F', finger: null },
+        { string: 1, fret: 0, degree: 'R', role: 'R', finger: null },
+    ];
+    const A = 'x x x 2 2 0 [2-3-0]';
+    const A13 = 'x x x 2 2 0 [1-3-0]';
+    const D = 'x x x 2 3 2 [1-3-2]';
+
+    it('alone it is 2-3, 1-3 is its second fingering, and 1-2 is never offered', () => {
+        const offered = taughtOptions(a(), STRUM);
+        expect(offered[0].p).toEqual([2, 3]);
+        expect(offered.filter((o) => o.p[0] === 1 && o.p[1] === 3).map((o) => o.needs)).toEqual([
+            'before',
+            'after',
+        ]);
+        // Not as a second fingering, nor as fingers left down.
+        expect(offered.filter((o) => o.p[0] === 1 && o.p[1] === 2)).toEqual([]);
+        expect(fingered('A')).toEqual([A]);
+    });
+
+    it('beside D the index stays on the G string and the ring finger slides a fret (1-3)', () => {
+        expect(fingered('D A D A')).toEqual([D, A13, D, A13]);
+        expect(fingered('A D A')).toEqual([A13, D, A13]);
+        expect(fingered('D A Bm G').slice(0, 2)).toEqual([D, A13]);
+        // Through two bars of A; and beside a chord that keeps no finger, 2-3.
+        expect(fingered('A A D')).toEqual([A13, A13, D]);
+        expect(fingered('E A E')[1]).toBe(A);
+        // The F♯m barre x x x 2 2 2 shares both notes, but 1-3 would re-finger the B: 2-3.
+        expect(fingered('F#m A')[1]).toBe(A);
+    });
+
+    it('beside Asus4 x x x 2 3 0 the ring finger slides a fret, whichever comes first', () => {
+        const sus = 'x x x 2 3 0 [2-3-0]';
+        expect(fingered('A Asus4 A')).toEqual([A, sus, A]);
+        expect(fingered('Asus4 A Asus4')).toEqual([sus, A, sus]);
+        // Alone, Asus4 keeps the open D's top, 1-3 (#1691).
+        expect(fingered('Asus4')).toEqual(['x x x 2 3 0 [1-3-0]']);
     });
 });

@@ -894,4 +894,21 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
                 'finger 3 moves to the A string, fret 2.',
         );
     });
+
+    it('guitar A at the nut: the ring finger on the B string, sliding a fret (#1834)', () => {
+        // D x x x 2 3 2 to A x x x 2 2 0 keeps the index on the G string's A, and the ring
+        // finger slides down the B string (A 1-3). It was 1-2: "finger 2 moves to the 2nd
+        // string, fret 2", the middle finger on the B string.
+        expect(lines(['D', 'A'], guitar([1, 6]), 'D')).toEqual([
+            'Finger 1 stays down on A: the 5th becomes the root; finger 3 slides down 1 fret.',
+            'Finger 1 stays down on A: the root becomes the 5th; ' +
+                'finger 2 goes down on the 1st string, fret 2; finger 3 slides up 1 fret.',
+        ]);
+        // A and Asus4 x x x 2 3 0, in either order: the ring finger slides a fret, the middle
+        // finger staying (both 2-3).
+        const up = 'Finger 2 stays down; finger 3 slides up 1 fret.';
+        const down = 'Finger 2 stays down; finger 3 slides down 1 fret.';
+        expect(lines(['A', 'Asus4', 'A'], guitar([1, 6]), 'A').slice(0, 2)).toEqual([up, down]);
+        expect(lines(['Asus4', 'A', 'Asus4'], guitar([1, 6]), 'A').slice(0, 2)).toEqual([down, up]);
+    });
 });

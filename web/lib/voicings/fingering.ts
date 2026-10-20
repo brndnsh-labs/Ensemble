@@ -40,7 +40,8 @@ export interface FingerOption {
     /**
      * Set with `hold` on a guitar grip fingered from the nut (`offItsFret`): the hold is
      * counted against the chord beside it (`nutHoldKept`), which may already have the hand
-     * where this fingering puts it (#1691).
+     * where this fingering puts it (#1691). Also set on a `GUITAR_BOOK` row's second
+     * fingering, drilled chord or not (#1834: A x-x-x-2-2-0 as 1-3 beside D).
      */
     nut?: boolean;
     /**
@@ -739,30 +740,75 @@ function bookFingerings(notes: Note[]): string[] | null {
 
 /**
  * The guitar's open grips whose method-book fingering the nut rule (`aheadOfItsFret`) does not
- * reach (#1691). Keyed by the fretted notes as `string/fret`, highest-numbered string first,
- * and looked up only for a grip fingered from the nut (`fingeredFromTheNut`); each value is
- * the fingers in that order.
+ * reach (#1691, #1834). Keyed by the fretted notes as `string/fret`, highest-numbered string
+ * first, and looked up only for a grip fingered from the nut (`fingeredFromTheNut`). `taught`
+ * lists the book's fingerings, the fingers in that order, the first the default; the others
+ * are second fingerings, priced no dearer than the margin a taught fingering keeps to
+ * (`TAUGHT_MARGIN`) and taken where the chord beside it keeps the hand (`nutHoldKept`). What
+ * the nut rule chose stays a second fingering for a finger that stays, as before, but for
+ * the fingerings in `never`, which are not offered at all, not even as fingers left down.
  *
  * - The open D's top two fretted notes, x-x-x-2-3-x with an open string beside them: D5
- *   x-x-0-2-3-x and Dsus2 x-x-x-2-3-0 (and x-x-0-2-3-0). They are D x-x-0-2-3-2 (1-3-2) with
- *   the middle finger lifted, and every method prints them 1-3: index on the 3rd string, ring
- *   on the 2nd. The nut rule, a finger to the fret of its number, made them 2-3, which a
- *   teacher shows only as Dm x-x-0-2-3-1 (2-3-1) minus a finger, so 2-3 stays a second
- *   fingering for a chord that keeps one of those fingers. With the ring finger where D has
- *   it, B°'s x-x-3-4-3-x is not pulled to 2-4-3 beside D5 to keep it.
+ *   x-x-0-2-3-x and Dsus2 x-x-x-2-3-0 (and x-x-0-2-3-0, and Asus4 x-x-x-2-3-0, the same
+ *   frets). They are D x-x-0-2-3-2 (1-3-2) with the middle finger lifted, and every method
+ *   prints them 1-3: index on the 3rd string, ring on the 2nd. The nut rule, a finger to the
+ *   fret of its number, made them 2-3, which a teacher shows only as Dm x-x-0-2-3-1 (2-3-1)
+ *   minus a finger, so 2-3 stays a second fingering for a chord that keeps one of those
+ *   fingers. With the ring finger where D has it, B°'s x-x-3-4-3-x is not pulled to 2-4-3
+ *   beside D5 to keep it.
+ * - The top of the open A, x-x-x-2-2-0 (#1834): in every method the B-string note is the ring
+ *   finger, A x-0-2-2-2-0 as 1-2-3 (its top 2-3, the nut rule's choice and the default) or
+ *   2-1-3 (its top 1-3). 2-1-3 is the A taught beside D: the index stays on the G string's A
+ *   and the ring finger slides a fret along the B string, D x-x-0-2-3-2 (1-3-2) to A and back,
+ *   and Dsus2 and Asus4 x-x-x-2-3-0 (1-3) the same. 1-3 reads as a fret of stretch to
+ *   `handCost` (3.2 dearer than the cheapest), so no cost reached it, and the rules offered
+ *   1-2 in its place, the middle finger on the B string, to keep D's index: no method fingers
+ *   A that way.
  */
-const GUITAR_BOOK: Record<string, number[]> = {
-    '3/2 2/3': [1, 3],
+const GUITAR_BOOK: Record<string, { taught: number[][]; never?: number[][] }> = {
+    '3/2 2/3': { taught: [[1, 3]] },
+    '3/2 2/2': {
+        taught: [
+            [2, 3],
+            [1, 3],
+        ],
+        never: [[1, 2]],
+    },
 };
 
-/** A guitar grip's book fingering as `GUITAR_BOOK` lists it, among `every`, or null. */
-function guitarBookFingering(fr: Note[], every: FingerOption[]): FingerOption | null {
+/**
+ * A guitar grip's row of `GUITAR_BOOK`: its book fingerings found among `every`, the default
+ * first, and the fingerings it never takes (as `FingerOption.p` joins), or null.
+ */
+function guitarBook(
+    fr: Note[],
+    every: FingerOption[],
+): { taught: FingerOption[]; never: Set<string> } | null {
     const order = fr.map((_, i) => i).sort((i, j) => fr[j].string - fr[i].string);
-    const book = GUITAR_BOOK[order.map((i) => `${fr[i].string}/${fr[i].fret}`).join(' ')];
-    return book
-        ? (every.find((o) => order.every((i, k) => o.p[i] === book[k]) && !barringFinger(o)) ??
-              null)
-        : null;
+    const row = GUITAR_BOOK[order.map((i) => `${fr[i].string}/${fr[i].fret}`).join(' ')];
+    if (!row) {
+        return null;
+    }
+    // A row's fingers in the fretted notes' order (`FingerOption.p`).
+    const inOrder = (fingers: number[]): string => {
+        const p = new Array<number>(fr.length);
+        order.forEach((i, k) => {
+            p[i] = fingers[k];
+        });
+        return p.join();
+    };
+    const taught = row.taught.map((fingers) =>
+        every.find((o) => o.p.join() === inOrder(fingers) && !barringFinger(o)),
+    );
+    // The row's first fingering is its default: if the grip has none, the row does not apply,
+    // rather than promoting a second fingering to the default.
+    if (taught[0] === undefined) {
+        return null;
+    }
+    return {
+        taught: taught.filter((o): o is FingerOption => o !== undefined),
+        never: new Set((row.never ?? []).map(inOrder)),
+    };
 }
 
 /** An option's fingers from the highest-numbered string down, an open string 0: '0-2-3-1'. */
@@ -847,8 +893,9 @@ const ukuleleDefault = (notes: Note[], free: FingerOption[]): FingerOption => {
  * and C x-3-2-0-x-x beside F x-3-3-2-x-x played 2-1 for the middle finger, both fingertips a
  * fret past their own, where 2-1 is the fingering that keeps BOTH fingers into Am x-3-2-2-x-x.
  * A fingering with one fingertip off its fret still takes one finger that stays: Em
- * x-2-2-0-x-x as 1-2 into C (the middle finger is on its own fret and stays there), A as 1-2
- * into D.
+ * x-2-2-0-x-x as 1-2 into C (the middle finger is on its own fret and stays there). (A
+ * x-x-x-2-2-0 as 1-2 into D, the index staying, was one until #1834: no method fingers A so,
+ * and `GUITAR_BOOK` gives it 1-3 there.)
  *
  * That count is from the nut. For a grip no method drills (`drilledChord`: a sus, dim, aug
  * or power grip, an open shell) it is checked against the chord beside it (#1691,
@@ -1109,7 +1156,9 @@ const weakFingersAlone = (o: FingerOption): boolean =>
  * fret (`offItsFret`, #1683), and so do that grip's fingers left down: C beside F is 3-2,
  * since 2-1 would keep one finger with two off their frets. A guitar grip whose book
  * fingering the nut rule misses takes the book's (`GUITAR_BOOK`, #1691: D5 x-x-0-2-3-x and
- * Dsus2 x-x-x-2-3-0 are 1-3), the rule's own a second fingering for one finger that stays.
+ * Dsus2 x-x-x-2-3-0 are 1-3), the rule's own a second fingering for one finger that stays,
+ * and the book's second fingerings are offered beside it (#1834: A x-x-x-2-2-0 is 2-3, and
+ * 1-3 beside D, never 1-2).
  * And a ukulele grip's default is `ukuleleDefault`'s. A guitar grip
  * up the neck keeps the cheapest: its review found nothing to correct there, and the dim
  * triad x-x-5-3-5-x stays 2-1-3, root first like the minor 7th whose hand it shares.
@@ -1172,6 +1221,8 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
     let free: FingerOption[];
     // Taught, but with the hand off the nut: second fingerings.
     let ahead: FingerOption[] = [];
+    // What a guitar grip's `GUITAR_BOOK` row says it never takes.
+    let never = new Set<string>();
     const fromTheNut = !printed?.length && fingeredFromTheNut(notes, fr, ukulele);
     if (printed?.length) {
         // A choice of fingers apart (0.2 a finger-step), in the order the table gives them.
@@ -1189,14 +1240,26 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
             }
         }
         // A guitar grip at the nut whose book fingering the nut rule misses (`GUITAR_BOOK`):
-        // the book's is the default, and what the rule chose waits for a finger that stays.
+        // the book's first is the default, its others second fingerings counted against the
+        // chord beside them (`FingerOption.nut`), and what the rule chose waits for a finger
+        // that stays, but for what the book never takes.
         const book =
-            !ukulele && fromTheNut
-                ? guitarBookFingering(fr, everyFingering(notes, fr, opts))
-                : null;
+            !ukulele && fromTheNut ? guitarBook(fr, everyFingering(notes, fr, opts)) : null;
         if (book) {
-            ahead = [...free, ...ahead];
-            free = [book];
+            const [own, ...also] = book.taught;
+            const listed = new Set(book.taught.map((o) => o.p.join()));
+            never = book.never;
+            ahead = [
+                ...also.map((o) => ({
+                    ...o,
+                    cost: Math.min(o.cost, best.cost + TAUGHT_MARGIN),
+                    nut: true,
+                })),
+                ...[...free, ...ahead].filter(
+                    (o) => !listed.has(o.p.join()) && !never.has(o.p.join()),
+                ),
+            ];
+            free = [own];
         }
         const chosen = ukulele ? ukuleleDefault(notes, free) : free[0];
         free = [{ ...chosen, cost: best.cost }, ...free.filter((o) => o !== chosen)];
@@ -1212,16 +1275,22 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
         ...second.map((o) => ({ ...mark(o), needs: 'after' as const })),
     ];
     const taken = new Set([...free, ...ahead].map((o) => o.p.join()));
-    const left = usual.filter((o) => !taken.has(o.p.join())).map((o) => mark(o, 'left'));
+    const left = usual
+        .filter((o) => !taken.has(o.p.join()) && !never.has(o.p.join()))
+        .map((o) => mark(o, 'left'));
     if (!ukulele) {
         // The hand off the nut, for fingers enough that stay (`offItsFret`), counted against
-        // the chord beside it unless this is an open chord every method drills (`drilledChord`).
+        // the chord beside it unless this is an open chord every method drills (`drilledChord`)
+        // and the fingering is not one its book prints (A's 1-3 beside D keeps the index on
+        // its note and slides the ring finger a fret, the hand where D has it, #1834).
         const drilled = drilledChord(notes);
         const held = (o: FingerOption): FingerOption =>
-            fromTheNut ? { ...o, hold: offItsFret(o), ...(drilled ? {} : { nut: true }) } : o;
+            fromTheNut
+                ? { ...o, hold: offItsFret(o), ...(drilled && !o.nut ? {} : { nut: true }) }
+                : o;
         const crowded = crowdedOptions(
             everyFingering(notes, fr, opts),
-            new Set([...usual, ...free].map((o) => o.p.join())),
+            new Set([...[...usual, ...free, ...ahead].map((o) => o.p.join()), ...never]),
             best.cost + TAUGHT_MARGIN,
         );
         return [
@@ -1424,7 +1493,8 @@ function heldFingers(marked: FingerOption, other: FingerOption): number {
  * their fingering is the one the student learned, kept beside any chord but one that leaves
  * two of its fingers down (`offItsFret`, #1683: C beside F is 3-2, C as 2-1 is for Am). The
  * sus, dim, aug and power grips and the open shells are not drilled that way; a player
- * fingers them from the chord beside them (`nutHoldKept`, #1691).
+ * fingers them from the chord beside them (`nutHoldKept`, #1691). One exception: a
+ * `GUITAR_BOOK` row's second fingering is counted that way too (#1834, A as 1-3 beside D).
  */
 const drilledChord = (notes: Note[]): boolean =>
     notes.every(
