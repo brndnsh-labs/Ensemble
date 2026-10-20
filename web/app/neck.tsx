@@ -119,6 +119,10 @@ function dotKey(n: Note, leads: Record<number, Note>): string {
     return leads[n.finger] === n ? `F${n.finger}` : `F${n.finger}:${n.string}`;
 }
 
+/** "6th, 2nd and 1st", "G and C". */
+const listed = (items: string[]): string =>
+    items.length === 1 ? items[0] : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`;
+
 function labelFor(n: Note, root: Voicing['root'], mode: NeckLabels, lead: boolean): string {
     if (mode === 'finger') {
         // A barre's finger number is written once, on its lead dot.
@@ -309,13 +313,31 @@ export function Neck({
     const activeBarres = active ? barres(active.notes) : [];
     const barredFingers = new Set(activeBarres.map((b) => b.finger));
 
+    // The strings the grip leaves silent (#1811), highest-numbered first: a chord chart's ×,
+    // drawn where its open strings are, beside the nut. Zoomed up the neck the nut is out of
+    // view, so they sit in the first fret in view instead, beside the grip as a chart prints
+    // them; `viewWindow` keeps that fret clear of both grips' notes. Known limit: through a
+    // handle drag the view holds still (`held`) while the grip is re-voiced, so a new grip can
+    // land in that fret until the release re-zooms, as its dots can land outside the held view.
+    // Placed by a CSS transform, as a dot is, so a mark slides with the zoom when the view moves.
+    const silent = active
+        ? Array.from({ length: n }, (_, i) => n - i).filter(
+              (s) => !active.notes.some((x) => x.string === s),
+          )
+        : [];
+    const muteOnBoard = shown !== null && shown[0] > 0;
+    const muteX = muteOnBoard ? dx(shown[0]) : dx(0);
+    const silentText = silent.length
+        ? `; ${listed(silent.map((s) => instrument.strShort(s)))} string${silent.length > 1 ? 's' : ''} not played`
+        : '';
+
     const boardLabel = active
         ? `${active.symbol}: ${active.notes
               .map(
                   (x) =>
                       `${instrument.strName(x.string)} fret ${x.fret}${x.finger ? `, finger ${x.finger}${barredFingers.has(x.finger) ? ' barre' : ''}` : ''}, ${DEGREES[x.degree].name}`,
               )
-              .join('; ')}`
+              .join('; ')}${silentText}`
         : 'Fretboard showing the current chord';
 
     // The board as a button (#1596). A click lands here only when the press and the release are
@@ -603,6 +625,21 @@ export function Neck({
                                     data-barre={b.finger}
                                     {...pill(b, 19)}
                                 />
+                            ))}
+                            {silent.map((s) => (
+                                // Not a note, so no degree colour and no strike: the mark a
+                                // chord chart prints over a string not to sound, in every
+                                // label mode, dimmed with the grip under a hold.
+                                <g
+                                    key={`X${s}`}
+                                    className={`neck-mute${muteOnBoard ? ' is-on-board' : ''}`}
+                                    data-mute={s}
+                                    style={{
+                                        transform: `translate(${muteX}px, ${sy(s)}px)`,
+                                    }}
+                                >
+                                    <path d="M-6.5 -6.5 L6.5 6.5 M6.5 -6.5 L-6.5 6.5" />
+                                </g>
                             ))}
                             {dots.map((x) => {
                                 const key = dotKey(x, leads);

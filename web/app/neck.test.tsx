@@ -132,13 +132,92 @@ describe('Neck: a Gmaj7 on the 6A shape', () => {
                     (n, i) =>
                         `${i === 0 ? 'Gmaj7: ' : ''}${GUITAR.strName(n.string)} fret ${n.fret}, finger ${n.finger}, ${['Root', 'Major 7th', 'Major 3rd'][i]}`,
                 )
-                .join('; '),
+                .join('; ') + '; 5th, 2nd and 1st strings not played',
         );
     });
 
     it('dims the whole grip for a hold', () => {
         render({ dimmed: true });
         expect(host.querySelector('.neck-active')!.classList).toContain('is-dimmed');
+    });
+});
+
+describe('Neck: the strings a grip leaves silent (#1811)', () => {
+    const marks = () =>
+        [...host.querySelectorAll<SVGGElement>('.neck-mute')].map((g) => g.dataset.mute);
+    /** A mark's translate, in viewBox units. */
+    const markAt = (s: number): [number, number] => {
+        const t = host.querySelector<SVGGElement>(`[data-mute="${s}"]`)!.style.transform;
+        const m = /translate\(([-\d.]+)px,\s*([-\d.]+)px\)/.exec(t)!;
+        return [Number(m[1]), Number(m[2])];
+    };
+    const b5 = allPositions(UKULELE, { name: 'B', pc: 11, letter: 6 }, 'five').find(
+        (v) => v.notes.map((n) => `${n.string}/${n.fret}`).join() === '2/2,1/2',
+    )!;
+
+    it('marks a guitar shell’s three silent strings with a ×, beside the nut', () => {
+        render();
+        const { sy } = neckLayout(GUITAR.strings);
+        expect(marks()).toEqual(['5', '2', '1']);
+        for (const s of [5, 2, 1]) {
+            // Where an open string's dot sits, on the string's own line.
+            expect(markAt(s)).toEqual([dx(0), sy(s)]);
+        }
+        // Inked, not a note: no degree colour.
+        expect(host.querySelector('.neck-mute')!.getAttribute('class')).toBe('neck-mute');
+    });
+
+    it('marks the ukulele B5 x x 2 2 on the G and C strings, and says so', () => {
+        expect(b5.notes.map((n) => n.string)).toEqual([2, 1]);
+        render({ instrument: UKULELE, active: b5 });
+        expect(marks()).toEqual(['4', '3']);
+        expect(host.querySelector('[role="img"]')!.getAttribute('aria-label')).toMatch(
+            /; G and C strings not played$/,
+        );
+    });
+
+    it('marks nothing on a grip that sounds every string', () => {
+        const d7 = allPositions(UKULELE, { name: 'D', pc: 2, letter: 1 }, 'dom7')[0];
+        expect(d7.notes).toHaveLength(4);
+        render({ instrument: UKULELE, active: d7 });
+        expect(marks()).toEqual([]);
+        expect(host.querySelector('[role="img"]')!.getAttribute('aria-label')).not.toContain(
+            'not played',
+        );
+    });
+
+    it('shows the × in every label mode', () => {
+        for (const labels of ['finger', 'note', 'degree'] as const) {
+            render({ labels });
+            expect(marks(), labels).toEqual(['5', '2', '1']);
+        }
+    });
+
+    it('dims with the grip under a hold, and is never pulsed by the strike', () => {
+        render({ dimmed: true, strike: true });
+        const mark = host.querySelector('.neck-mute')!;
+        expect(mark.closest('.neck-active')!.classList).toContain('is-dimmed');
+        expect(mark.closest('.neck-core')).toBeNull();
+    });
+
+    it('marks only the grip that sounds, never the next one', () => {
+        const c7 = build(GUITAR, GUITAR.shapes[2], { name: 'C', pc: 0, letter: 0 }, 'dom7')!;
+        render({ next: c7, preview: 'strong', fingers: true });
+        expect(host.querySelector('.neck-ghost .neck-mute')).toBeNull();
+        expect(marks()).toEqual(['5', '2', '1']);
+    });
+
+    it('zoomed up the neck, sits in the first fret in view, which holds no note', () => {
+        render({ zoom: 'window' });
+        const [lo] = viewWindow(null, gmaj7, null);
+        expect(lo).toBeGreaterThan(0);
+        expect(gmaj7.notes.every((n) => n.fret > lo)).toBe(true);
+        const { sy } = neckLayout(GUITAR.strings);
+        expect(markAt(2)).toEqual([dx(lo), sy(2)]);
+        expect(host.querySelector('.neck-mute')!.getAttribute('class')).toContain('is-on-board');
+        // With the nut in view, beside it as on the whole board.
+        render({ zoom: 'window', home: [1, 6] });
+        expect(markAt(2)).toEqual([dx(0), sy(2)]);
     });
 });
 
