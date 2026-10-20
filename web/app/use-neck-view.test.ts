@@ -518,7 +518,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         );
         // Two fingers on two notes, on a ukulele: G7 0 2 1 2 to Em7 0 2 0 2.
         expect(lines(['G7', 'Em7'], uke)[0]).toBe(
-            'Fingers 2 and 3 stay down: D becomes the 7th and B the 5th.',
+            'Fingers 2 and 3 stay down: D becomes the 7th and B the 5th; lift finger 1.',
         );
     });
 
@@ -661,10 +661,12 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
 
     it('a ukulele grip that leaves strings out says to skip them (#1809)', () => {
         // B 4 3 2 2 to B5 x x 2 2: the open G and C would ring, and C over B5 is a ♭9.
-        expect(lines(['B', 'B5'], uke)[0]).toBe('Finger 1 stays down; skip the G and C strings.');
+        expect(lines(['B', 'B5'], uke)[0]).toBe(
+            'Finger 1 stays down; lift fingers 2 and 3; skip the G and C strings.',
+        );
         // F♯ 3 1 2 1 to F♯5 x 1 2 x: the index comes off the A string, which is not strummed.
         expect(lines(['F#', 'F#5'], uke)[0]).toBe(
-            'Finger 1 stays down on C♯; finger 2 stays down; skip the G and A strings.',
+            'Finger 1 stays down on C♯; finger 2 stays down; lift finger 3; skip the G and A strings.',
         );
         // G5 0 2 3 x leaves out one string.
         expect(lines(['C', 'G5'], uke)[0]).toBe(
@@ -742,7 +744,9 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // The ukulele's B♭7 1 2 1 1 to A7 0 1 0 0: the index was across the C string under the
         // middle finger and the other three ring open. It read "Finger 1 moves to the C string,
         // fret 1".
-        expect(lines(['Bb7', 'A7'], uke)[0]).toBe('Finger 1 stays down on the C string.');
+        expect(lines(['Bb7', 'A7'], uke)[0]).toBe(
+            'Finger 1 stays down on the C string; lift finger 2.',
+        );
         // Cm 0 3 3 3 to C5 0 0 3 3: the C string's E♭ would ring on under a flat index.
         expect(lines(['Cm', 'C5'], uke)[0]).toBe('Finger 1 stays down on the E and A strings.');
         // The notes a narrowing barre keeps count toward the jobs told: the ukulele's Cmaj7
@@ -791,6 +795,55 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         expect(lines(['Am7', 'C6'], uke)).toEqual(['', '']);
     });
 
+    it('a change that only lifts names the finger that lifts (#1837)', () => {
+        // D x x x 2 3 2 (1-3-2) to Dsus2 x x x 2 3 0: the middle finger comes off the 1st string.
+        expect(lines(['D', 'Dsus2'], guitar(null))[0]).toBe(
+            'Fingers 1 and 3 stay down; lift finger 2.',
+        );
+        // Em x 2 2 0 x x (2-3) to G x 2 0 0 x x: the ring finger comes off the 3rd string.
+        expect(lines(['Em', 'G'], guitar([1, 6]))[0]).toBe(
+            'Finger 2 stays down on B: the 5th becomes the 3rd; lift finger 3.',
+        );
+        // The ukulele's A 2 1 0 0 (2-1) to Am 2 0 0 0: the index comes off the C string.
+        expect(lines(['A', 'Am'], uke)[0]).toBe('Finger 2 stays down; lift finger 1.');
+        // Two that lift are "fingers": D 2 2 2 0 (1-2-3) to Am, the index staying on the G
+        // string's A; and Wonderwall's Dsus4 x x 5 2 3 x (4-1-2) to A7sus4 x 0 x 0 3 x.
+        expect(lines(['D', 'Am'], uke)[0]).toBe(
+            'Finger 1 stays down on A: the 5th becomes the root; lift fingers 2 and 3.',
+        );
+        const song = ['Em7', 'G', 'Dsus4', 'A7sus4', 'C', 'Dsus4', 'A7sus4'];
+        expect(lines(song, guitar(null), 'G')[2]).toBe(
+            'Finger 2 stays down on D: the root becomes the 4th; lift fingers 1 and 4.',
+        );
+        // A barre that stays on part of its strings is a finger that stays: the ukulele's B♭7
+        // 1 2 1 1 to A7 0 1 0 0.
+        expect(lines(['Bb7', 'A7'], uke)[0]).toBe(
+            'Finger 1 stays down on the C string; lift finger 2.',
+        );
+    });
+
+    it('a lift beside a move is still left out (#1837)', () => {
+        // G7 3 x 3 4 x x (1-2-3) to Cmaj7 x 3 x 4 5 x: the index lifts, but the hand has
+        // somewhere to go, and the line is the moves.
+        expect(lines(['Dm7', 'G7', 'Cmaj7'], guitar([2, 7]))[1]).toBe(
+            'Finger 3 stays down on B: the 3rd becomes the 7th; ' +
+                'finger 2 moves to the 5th string, fret 3; ' +
+                'finger 4 goes down on the 2nd string, fret 5.',
+        );
+        // Nothing stays and nothing moves: not a lift, but "lift every finger" (#1818).
+        expect(lines(['E7', 'Am7'], uke)[0]).toBe('Lift every finger: all four strings ring open.');
+    });
+
+    it('a lift that changes the strings a ukulele strums: lift first, then skip (#1837)', () => {
+        // B 4 3 2 2 (3-2-1-1) to B5 x x 2 2: the hand comes off, then the strum leaves out
+        // the G and C strings.
+        const [toB5, toB] = lines(['B', 'B5'], uke);
+        expect(toB5).toBe('Finger 1 stays down; lift fingers 2 and 3; skip the G and C strings.');
+        // And back: fingers go down, so nothing is lifted to say.
+        expect(toB).not.toContain('lift');
+        expect(toB).toMatch(/; strum all four strings\.$/);
+    });
+
     it('an add9’s added tone is the 9th, not the 2nd (#1820)', () => {
         // Good Riddance on a ukulele: G 0 2 3 2, Cadd9 0 2 0 3, D 2 2 2 0. The C string's D is
         // in all three, the 5th of G, the 9th of Cadd9 and the root of D.
@@ -809,10 +862,11 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
             'Finger 3 stays down; finger 2 goes down on the C string, fret 2.',
         );
         // Csus2 0 2 3 3 to Cadd9 lifts the middle finger: Cadd9 takes its second book
-        // fingering, 0-1-0-3, and the D keeps the index (the lift itself is not said).
+        // fingering, 0-1-0-3, and the D keeps the index. A change that only lifts says the
+        // lift (#1837).
         expect(lines(['Csus2', 'Cadd9', 'C'], uke).slice(0, 2)).toEqual([
-            'Fingers 1 and 3 stay down.',
-            'Finger 3 stays down.',
+            'Fingers 1 and 3 stay down; lift finger 2.',
+            'Finger 3 stays down; lift finger 1.',
         ]);
         // Into G the index stays on that D.
         expect(lines(['Cadd9', 'G', 'D', 'Em'], uke)[0]).toBe(
@@ -831,7 +885,9 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
                 'finger 3 goes down on the C string, fret 4.',
         );
         // From Am6 to Am the index stays on the G string's A.
-        expect(lines(['Am6', 'Am'], uke)[0]).toBe('Finger 1 stays down on A.');
+        expect(lines(['Am6', 'Am'], uke)[0]).toBe(
+            'Finger 1 stays down on A; lift fingers 2 and 3.',
+        );
         // Into E7 the index slides out of the barre to the G string's 1st fret.
         expect(lines(['Am6', 'E7'], uke)[0]).toBe(
             'Finger 1 slides down 1 fret; finger 2 moves to the C string, fret 2; ' +
