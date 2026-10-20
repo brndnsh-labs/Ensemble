@@ -8,8 +8,8 @@ export interface Spelled {
 }
 
 /**
- * Chord qualities the engine can voice: six 7th-chord shells, six triads (#1588) and the power
- * chord (`five`).
+ * Chord qualities the engine can voice: eight 7th-chord shells (the 7sus4 and m6 since #1817),
+ * six triads (#1588) and the power chord (`five`).
  */
 export type Quality =
     | 'maj7'
@@ -18,6 +18,8 @@ export type Quality =
     | 'm7b5'
     | 'dim7'
     | 'six'
+    | '7sus4'
+    | 'm6'
     | 'maj'
     | 'min'
     | 'dim'
@@ -40,7 +42,7 @@ export type Degree = 'R' | '2' | '3' | 'b3' | '4' | '7' | 'b7' | 'bb7' | '6' | '
 
 /**
  * Role of a shape's note.
- * R root, T third (a sus chord's 4th or 2nd), S seventh (or 6th), F the 5th (on ukulele shells a
+ * R root, T third (a sus chord's 4th or 2nd, a 7sus4's 4th), S seventh (or 6th), F the 5th (on ukulele shells a
  * helper so all strings can be strummed), O the root an octave up (a power chord's top note),
  * R2/T2/F2 the same degree again (a ukulele chord doubles one tone to fill its four strings).
  */

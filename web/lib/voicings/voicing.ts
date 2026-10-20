@@ -4,8 +4,9 @@
  *
  * PINNED. `test/shell-characterization.test.ts` holds `voiceChart`'s shell output — shape, root
  * fret, and every note's string, fret, degree, role and finger — to `test/golden.json`, for the
- * charts it lists: all six shell qualities (maj7, 7, m7, m7♭5, °7 and 6) on guitar (both
- * root-string limits) and ukulele (high G, and two low-G charts), with and without a hand
+ * charts it lists: six shell qualities (maj7, 7, m7, m7♭5, °7 and 6; the 7sus4 and m6 of #1817
+ * are pinned in `engine.test.ts`, since no golden chart writes them) on guitar (both root-string
+ * limits) and ukulele (high G, and two low-G charts), with and without a hand
  * window. A change to a shell cost here or in `fingering.ts` (`unaryCost`,
  * `transCost`, `handCost`, `fingerTransCost`) moves it — and for a ukulele shell, which is
  * costed and held to one grip as the ukulele triads are (`byHand`, #1609), a change to
@@ -720,6 +721,11 @@ const rootBuried = (v: Voicing, inst: InstrumentDef): boolean => {
  *   it is the same grip with the 3rd string moving 0, 1, 2, and sending it to the 6th fret
  *   instead makes a chart at the nut hop between the two positions.
  *
+ * - A 7sus4 or m6 on an open root, or at the 1st fret (#1817): A7sus4 x-0-x-0-3-x, D7sus4
+ *   x-x-0-x-1-3, E7sus4 0-x-0-2-x-x, Dm6 x-x-0-x-0-1, B♭m6 x-1-x-0-2-x, Fm6 1-x-0-1-x-x, the
+ *   same grips as the 7, m7 and 6 chords beside them with one note moved. One that frets
+ *   nothing at all, on three neighbouring open strings, is `openStrum`'s last resort instead.
+ *
  * Three-note shells only. A grip with an added tone (m7♭5, °7) was placed by `openOneOff`,
  * which lets one or two open strings ring in first position as the books print it (Bm7♭5
  * x-2-0-2-x-1), and a ukulele shell is taught on its open strings (`strumsEveryString`).
@@ -735,6 +741,22 @@ const openShapeOneOff = (v: Voicing, all: Voicing[], inst: InstrumentDef): boole
             w.rootFret === v.rootFret &&
             w.notes.every((n) => n.fret > 0),
     );
+
+/**
+ * A guitar shell on three neighbouring open strings (#1817): the hand holds nothing, so it is
+ * the open strings strummed rather than a grip, and it is a last resort (`candidates`), as an
+ * open shell's one-off is. The open strings are tuned a 4th apart, so only R–4–♭7 lands there:
+ * A7sus4 x-0-0-0-x-x and E7sus4 0-0-0-x-x-x. Offered, A7sus4's pulled a Wonderwall in frets 1–6
+ * onto the open strings throughout (Dsus4 x-0-0-0-x-x beside it); without it A7sus4 is
+ * x-0-x-0-3-x, the R–7–3 shape at the nut as A7 x-0-x-0-2-x is, and E7sus4 0-x-0-2-x-x. The
+ * R–7–3 shape skips a string the hand mutes, so an open one of those (Em7 0-x-0-0-x-x) is a
+ * hand and is left on offer.
+ */
+const openStrum = (v: Voicing, inst: InstrumentDef): boolean =>
+    v.shape.kind === 'shell' &&
+    !strumsEveryString(v, inst) &&
+    v.notes.every((n) => n.fret === 0) &&
+    v.notes.every((n, i) => i === 0 || Math.abs(n.string - v.notes[i - 1].string) === 1);
 
 /**
  * How far the window widens when it holds no grip a player would take: one fret, either end
@@ -947,8 +969,8 @@ const inRiffAt = (chart: ChartChord[], i: number): boolean => {
  *    #1688). Nothing step 2 holds back is among either: no strummed grip has a buried root or
  *    is an open shell's one-off, and none inside the 4th fret is five frets wide.
  * 2. Grips inside the hand window that a player would take: every one but those with a buried
- *    root (`rootBuried`), the open-string one-offs of a fretted shape (`openShapeOneOff`) and
- *    a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
+ *    root (`rootBuried`), the open-string one-offs of a fretted shape (`openShapeOneOff`), a
+ *    shell on three open strings (`openStrum`, #1817) and a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
  *    has another grip there, `leavesTheNut`). Where the window has one, nothing below is
  *    looked at.
  * 3. Such grips with the window widened by a fret: a shell's with its root in the window
@@ -999,6 +1021,7 @@ function candidates(c: ChartChord, opts: VoiceOptions, inRiff: boolean): Voicing
             (v) =>
                 !rootBuried(v, inst) &&
                 !openShapeOneOff(v, all, inst) &&
+                !openStrum(v, inst) &&
                 (reachStays || !fiveFretReach(v, inst)),
         );
     const inside = all.filter((v) => inHome(v, home));
