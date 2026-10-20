@@ -50,6 +50,13 @@ export interface FingerOption {
      */
     sameRoot?: boolean;
     /**
+     * Set with `needs` on a crowded guitar-shell fingering (`suspensionOptions`, #1825): it is
+     * taken only beside the same shell with its 3rd suspended, or the other way round
+     * (`suspends`), and that chord may be in any fingering it takes freely, not only its
+     * default (`arrives`).
+     */
+    resolves?: boolean;
+    /**
      * Set by `taughtOptions`: per note of `fr`, whether this fingering puts a different finger
      * on it than the grip's default fingering does (all false on the default itself). The
      * default is the cheapest unless a teaching rule names another (`taughtStrummed`,
@@ -904,18 +911,87 @@ const crowdedOptions = (
     if (fr.length < 2 || (added && !fr.some((n) => n.degree === '2' || n.degree === '4'))) {
         return [];
     }
-    return every
-        .filter(
-            (o) =>
-                !o.p.includes(null) &&
-                !taken.has(o.p.join()) &&
-                (!barringFinger(o) || indexBarreInPlace(o)) &&
-                !behindTheNut(o) &&
-                !aheadOfItsFret(o, false) &&
-                !idleIndexStretches(o) &&
-                !idleIndexTucked(o),
-        )
-        .map((o) => ({ ...o, cost, hold: 2, ...(added ? { sameRoot: true } : {}) }));
+    return crowded(every, taken).map((o) => ({
+        ...o,
+        cost,
+        hold: 2,
+        ...(added ? { sameRoot: true } : {}),
+    }));
+};
+
+/**
+ * The crowded fingerings among `every` that `taken` does not already hold: a fingertip each
+ * (or the index flat in place), the index not behind the nut, no finger ahead of its fret and
+ * no idle index (`crowdedOptions`, `suspensionOptions`).
+ */
+const crowded = (every: FingerOption[], taken: Set<string>): FingerOption[] =>
+    every.filter(
+        (o) =>
+            !o.p.includes(null) &&
+            !taken.has(o.p.join()) &&
+            (!barringFinger(o) || indexBarreInPlace(o)) &&
+            !behindTheNut(o) &&
+            !aheadOfItsFret(o, false) &&
+            !idleIndexStretches(o) &&
+            !idleIndexTucked(o),
+    );
+
+/**
+ * The crowded fingerings a guitar SHELL is offered beside its own suspension (#1825): the
+ * dominant 7th beside its 7sus4 on one root, the 4th a fret above the 3rd on the same string.
+ * On the R–3–♭7 shapes (A7 5-4-5-x-x-x, D7 x-5-4-5-x-x, G7 x-x-5-4-6-x) the 7sus4 lays the
+ * 4th level with the root and the ♭7, and its cheapest fingering, 1-2-3, has the root under
+ * the index, where the 7th's 3rd, a fret lower, needs the index under it. So `A7sus4 A7`
+ * re-fingered the root (1-2-3 into 2-1-3). A teacher keeps the root and the ♭7 down: A7sus4
+ * 2-3-4, a taught fingering already (0.6 dearer), then A7 2-1-4, the index dropping in for the
+ * 3rd while the ring finger lifts off the 4th. That A7 is 3.2 dearer than its cheapest, a
+ * fret of crowding `handCost` reads as a stretch, so `taughtAmong` never offers it.
+ *
+ * So these are second fingerings that need TWO fingers to stay (`FingerOption.hold`), as a
+ * strummed grip's crowded fingerings do (`crowdedOptions`), priced at the margin
+ * (`TAUGHT_MARGIN`), and taken only beside the suspension (`FingerOption.resolves`,
+ * `suspends`). Two things differ from a strummed grip's:
+ *
+ * - The neighbour may be in any fingering it takes freely (`arrives`), not only its default:
+ *   the 7sus4's default cannot keep the root under the finger the 7th needs there, and its
+ *   2-3-4 is not a second fingering but one a held note may choose. Two fingerings that
+ *   each wait on the other (`needs`) still do not justify each other.
+ * - Only the 4th and the 3rd: the two grips share every other note and differ in one note
+ *   each, on one string. A 6, a m7 or a maj7 beside its 7 differs the same way and is not
+ *   asked: offered, A7 x-x-7-6-8-x took 3-2-4 into Am7 3-1-4, the root on the ring finger
+ *   (`taughtAmong`'s root-first rule, which a crowded fingering does not pass through), A7
+ *   and Amaj7 x-x-7-x-9-9 1-3-4 with the middle finger idle, and F♯6 2-x-1-3-x-x 2-1-4 into
+ *   F♯7 2-3-4, both crowded, which no teacher was asked about. Nor is a triad: #1617 and
+ *   #1683 ruled the strummed cases (B♭ x-5-3-3-x-x 4-2-3 after Dm; D x-x-4-2-3-x 4-1-3 into
+ *   Dm), and this rule reaches only shells.
+ *
+ * Offered to every guitar shell with a 3rd or a 4th, both ways round, so the plan decides
+ * which side moves; on the shapes whose cheapest fingerings already keep both fingers (G7sus4
+ * 3-x-3-5-x-x to G7 3-x-3-4-x-x, 1-2-3 both) none is taken.
+ */
+const suspensionOptions = (
+    notes: Note[],
+    opts: FingerOpts,
+    taught: FingerOption[],
+    cost: number,
+): FingerOption[] => {
+    const first = taught[0];
+    const fr = first.fr;
+    if (fr.length < 2 || !fr.some((n) => n.degree === '3' || n.degree === '4')) {
+        return [];
+    }
+    return crowded(everyFingering(notes, fr, opts), new Set(taught.map((o) => o.p.join())))
+        .map((o) => ({
+            ...o,
+            cost,
+            hold: 2,
+            resolves: true,
+            own: o.p.map((f, i) => f !== first.p[i]),
+        }))
+        .flatMap((o) => [
+            { ...o, needs: 'before' as const },
+            { ...o, needs: 'after' as const },
+        ]);
 };
 
 /**
@@ -1118,14 +1194,17 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
  * The fingerings the chart plan may give a grip: the ones it is taught with, so across a chart
  * a held note only ever chooses between two fingerings a teacher would show. A guitar shell's
  * are `taughtAmong` (#1611); a triad's, a power chord's or a ukulele chord's (`barre`) are
- * `taughtStrummed` (#1617, #1681, #1677).
+ * `taughtStrummed` (#1617, #1681, #1677), and a guitar shell is also offered the crowded
+ * fingerings that keep its hand beside its own suspension (`suspensionOptions`, #1825).
  * The first is the grip's default, unmarked: what it takes alone (`assignFingers`).
  */
 export function taughtOptions(notes: Note[], opts: FingerOpts = {}): FingerOption[] {
     const all = fingerOptions(notes, opts);
-    return opts.barre
-        ? taughtStrummed(notes, all, opts)
-        : taughtAmong(all, fingeredFromTheNut(notes, all[0].fr, false));
+    if (opts.barre) {
+        return taughtStrummed(notes, all, opts);
+    }
+    const taught = taughtAmong(all, fingeredFromTheNut(notes, all[0].fr, false));
+    return [...taught, ...suspensionOptions(notes, opts, taught, all[0].cost + TAUGHT_MARGIN)];
 }
 
 /**
@@ -1361,14 +1440,35 @@ const onOneRoot = (a: FingerOption, b: FingerOption): boolean =>
     );
 
 /**
+ * Whether two grips are one chord with its 3rd suspended (#1825): they share every fretted note
+ * but one each, and those two are the 3rd in one and the 4th in the other, on the same string.
+ * A7 5-4-5-x-x-x and A7sus4 5-5-5-x-x-x; not A7 and Amaj7, A6 or Am7, whose other note is a
+ * fret along its string too, nor a sus4 on another string set. Sharing the rest, the two stand
+ * on one root and the 4th sits a fret above the 3rd, so neither is asked (measured: asking
+ * either moved no chart).
+ */
+const suspends = (a: FingerOption, b: FingerOption): boolean => {
+    const own = (x: FingerOption, y: FingerOption) =>
+        x.fr.filter((n) => !y.fr.some((m) => m.string === n.string && m.fret === n.fret));
+    const [p, q] = [own(a, b), own(b, a)];
+    return (
+        p.length === 1 &&
+        q.length === 1 &&
+        p[0].string === q[0].string &&
+        [p[0].degree, q[0].degree].sort().join() === '3,4'
+    );
+};
+
+/**
  * Whether a marked fingering has what it asks of the chord beside it: its fingers shared
- * (`sharesTheHand`), enough of them held (`holdsEnough`), and for a crowded one the same chord
- * (`FingerOption.sameRoot`).
+ * (`sharesTheHand`), enough of them held (`holdsEnough`), for a crowded one the same chord
+ * (`FingerOption.sameRoot`), and for a crowded shell its suspension (`FingerOption.resolves`).
  */
 const keptBy = (marked: FingerOption, other: FingerOption, inPlace: boolean): boolean =>
     sharesTheHand(marked, other, inPlace) &&
     holdsEnough(marked, other) &&
-    (!marked.sameRoot || onOneRoot(marked, other));
+    (!marked.sameRoot || onOneRoot(marked, other)) &&
+    (!marked.resolves || suspends(marked, other));
 
 /** The same grip under the same fingers: the hand has not moved. */
 const sameFingers = (a: FingerOption, b: FingerOption): boolean =>
@@ -1411,11 +1511,19 @@ function arrives(a: FingerOption | null, b: FingerOption): boolean {
     if (b.needs === 'left' && !(a && keptBy(b, a, true))) {
         return false;
     }
-    if (b.needs === 'before' && !(a && ordinary(a) && keptBy(b, a, false))) {
+    if (b.needs === 'before' && !(a && besideIt(b, a) && keptBy(b, a, false))) {
         return false;
     }
-    return !(a?.needs === 'after' && !(ordinary(b) && keptBy(a, b, false)));
+    return !(a?.needs === 'after' && !(besideIt(a, b) && keptBy(a, b, false)));
 }
+
+/**
+ * Whether `other` is fingered as a second fingering's neighbour must be: in its default
+ * (`ordinary`), or, beside a crowded shell's (`FingerOption.resolves`, #1825), in any
+ * fingering it takes freely (no `needs` of its own).
+ */
+const besideIt = (marked: FingerOption, other: FingerOption): boolean =>
+    ordinary(other) || (marked.resolves === true && !other.needs);
 
 /**
  * How close two ways through a chart may cost and still be a tie: float rounding, not a
