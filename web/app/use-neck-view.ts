@@ -374,6 +374,17 @@ export function fingersLine(
         }
     }
     const skip = skippedStrings(instrument, from, to);
+    // A chord that frets nothing (the ukulele's Am7 and C6 0-0-0-0, the guitar's Em7
+    // 0-x-0-0-x-x) is all lifts, which the line leaves out, so it would say nothing; a teacher
+    // says the move (#1818). On a ukulele every string then rings open, unless the skip clause
+    // already says what to strum.
+    if (to.notes.every((x) => x.fret === 0) && from.notes.some((x) => x.fret > 0)) {
+        parts.push(
+            instrument.id === 'uke' && !skip
+                ? `lift every finger: all ${COUNT_WORDS[instrument.strings] ?? instrument.strings} strings ring open`
+                : 'lift every finger',
+        );
+    }
     if (skip) {
         parts.push(skip);
     }
