@@ -460,6 +460,17 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         ]);
     });
 
+    it('a 7sus4 into its own 7 keeps the root and ♭7 fingers, and says so (#1825)', () => {
+        // A7sus4 5 5 5 x x x (2-3-4) to A7 5 4 5 x x x (2-1-4): the ring finger lifts off the
+        // 4th and the index takes the 3rd a fret below it. It said "finger 2 takes over" A.
+        expect(lines(['A7sus4', 'A7'], guitar([1, 6]))[0]).toBe(
+            'Fingers 2 and 4 stay down; finger 1 goes down on the 5th string, fret 4.',
+        );
+        expect(lines(['A7', 'A7sus4'], guitar([1, 6]))[0]).toBe(
+            'Fingers 2 and 4 stay down; finger 3 goes down on the 5th string, fret 5.',
+        );
+    });
+
     it('says no change of job for a note that is the same degree in both chords', () => {
         const [toDominant, , toMinor] = lines(['Cmaj7', 'C7', 'Fmaj7', 'Fm7'], guitar([1, 6]));
         // Cmaj7 to C7: the root stays the root and the 3rd the 3rd.

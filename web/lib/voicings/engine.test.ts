@@ -4414,7 +4414,8 @@ describe('7sus4 and m6 are shells of their own (#1817)', () => {
         }
         const classic = (names: string) => played(GUITAR, names, [2, 7], [6, 5]);
         expect(classic('Gm6')).toEqual(['3 x 2 3 x x [2-1-3]']);
-        expect(classic('A7sus4 A7')).toEqual(['5 5 5 x x x [1-2-3]', '5 4 5 x x x [2-1-3]']);
+        // Beside its own 7 the 7sus4 keeps the root and ♭7 fingers down (#1825, below).
+        expect(classic('A7sus4 A7')).toEqual(['5 5 5 x x x [2-3-4]', '5 4 5 x x x [2-1-4]']);
         expect(classic('C7sus4')).toEqual(['x 3 x 3 6 x [1-2-4]']);
         expect(classic('Gm Gm6 D7')).toEqual([
             'x 5 5 3 x x [3-3-1]',
@@ -4456,6 +4457,106 @@ describe('7sus4 and m6 are shells of their own (#1817)', () => {
             'x x 5 2 3 x [4-1-2]',
             'x 0 x 0 3 x [0-0-2]',
         ]);
+    });
+    describe('a guitar 7sus4 and its own 7 keep the root and the ♭7 down (#1825)', () => {
+        // On the R–3–♭7 shapes the 7sus4 is 1-2-3 alone and the 7 is 2-1-3, so the root
+        // changed finger between them. A teacher plays the 7sus4 2-3-4 and the 7 2-1-4: the
+        // root and ♭7 fingers stay, the ring finger lifts off the 4th and the index takes the
+        // 3rd a fret below it. That 7 is 3.2 dearer than its cheapest, a crowded hand
+        // (`suspensionOptions`), offered only beside its suspension.
+        it('both ways, on the 6th-, 5th- and 4th-string roots', () => {
+            for (const home of [[1, 6], [2, 7], null] as ([number, number] | null)[]) {
+                expect(played(GUITAR, 'A7 A7sus4 A7', home)).toEqual([
+                    '5 4 5 x x x [2-1-4]',
+                    '5 5 5 x x x [2-3-4]',
+                    '5 4 5 x x x [2-1-4]',
+                ]);
+            }
+            for (const home of [
+                [1, 6],
+                [2, 7],
+            ] as [number, number][]) {
+                expect(played(GUITAR, 'A7sus4 A7', home)).toEqual([
+                    '5 5 5 x x x [2-3-4]',
+                    '5 4 5 x x x [2-1-4]',
+                ]);
+            }
+            expect(played(GUITAR, 'D7sus4 D7 G', null)).toEqual([
+                'x 5 5 5 x x [2-3-4]',
+                'x 5 4 5 x x [2-1-4]',
+                'x 5 5 4 x x [2-3-1]',
+            ]);
+            expect(played(GUITAR, 'G7sus4 G7 C', [2, 7])).toEqual([
+                'x x 5 5 6 x [2-3-4]',
+                'x x 5 4 6 x [2-1-4]',
+                'x x 5 5 5 x [1-1-1]',
+            ]);
+            expect(played(GUITAR, 'E7sus4 E7 A', [2, 7])).toEqual([
+                'x 7 7 7 x x [2-3-4]',
+                'x 7 6 7 x x [2-1-4]',
+                'x 7 7 6 x x [2-3-1]',
+            ]);
+        });
+        it('where the cheapest fingerings already keep both, nothing changes', () => {
+            // The R–♭7–3 shape: the 4th falls a fret under the same finger.
+            expect(played(GUITAR, 'G7sus4 G7 C', [1, 6])).toEqual([
+                '3 x 3 5 x x [1-2-3]',
+                '3 x 3 4 x x [1-2-3]',
+                'x 3 2 0 x x [3-2-0]',
+            ]);
+            expect(played(GUITAR, 'E7sus4 E7 A', [1, 6])).toEqual([
+                'x x 2 x 3 5 [1-2-4]',
+                'x x 2 x 3 4 [1-2-3]',
+                'x x x 2 2 0 [2-3-0]',
+            ]);
+            // The open grips: one note fretted, nothing to hold.
+            expect(played(GUITAR, 'A7sus4 A7', null)).toEqual([
+                'x 0 x 0 3 x [0-0-1]',
+                'x 0 x 0 2 x [0-0-1]',
+            ]);
+        });
+        it('a neighbour takes a taught fingering that keeps the root for it', () => {
+            // Am7 5 x 5 5 as 2-3-4, the root under the middle finger, a taught fingering of the shape.
+            expect(played(GUITAR, 'Am7 A7sus4 A7 Dmaj7', [1, 6])).toEqual([
+                '5 x 5 5 x x [2-3-4]',
+                '5 5 5 x x x [2-3-4]',
+                '5 4 5 x x x [2-1-4]',
+                'x 5 4 6 x x [2-1-3]',
+            ]);
+        });
+        it('only the suspension, on one string: a 6, m7 or maj7 beside its 7 keeps its fingering', () => {
+            // Each differs from the 7 by one note a fret along its own string, on one root, as
+            // the 4th and the 3rd do. Offered beside them as well, the crowded fingering
+            // re-handed both chords: F♯6 2-1-4 into F♯7 2-3-4, A7 3-2-4 into Am7 3-1-4, A7 and
+            // Amaj7 1-3-4.
+            expect(played(GUITAR, 'F#6 F#7 Csus4 Ebm G6 G+ G+', null).slice(0, 2)).toEqual([
+                '2 x 1 3 x x [2-1-3]',
+                '2 x 2 3 x x [1-2-3]',
+            ]);
+            expect(played(GUITAR, 'Cdim7 Cm A7 Am7 A Gm F#dim', [5, 10]).slice(2, 4)).toEqual([
+                'x x 7 6 8 x [2-1-3]',
+                'x x 7 5 8 x [2-1-3]',
+            ]);
+            expect(played(GUITAR, 'Adim Am7b5 A7 Amaj7 A+', [5, 10]).slice(2, 4)).toEqual([
+                'x x 7 x 8 9 [1-2-3]',
+                'x x 7 x 9 9 [1-2-3]',
+            ]);
+            // And only on one string: E7 x x 2 x 3 4 has its 3rd on the 1st string, E7sus4
+            // x x 2 2 3 x its 4th on the 3rd, another hand. Offered, E7 took 1-3-4, the middle
+            // finger idle, to keep the index and ring finger into it.
+            expect(played(GUITAR, 'Bb6 Ab7 Eb+ E7 E7sus4 E5 Ebdim', [2, 7]).slice(3, 5)).toEqual([
+                'x x 2 x 3 4 [1-2-3]',
+                'x x 2 2 3 x [1-2-3]',
+            ]);
+        });
+        it('two crowded fingerings never justify each other', () => {
+            // Each beside the other in its own crowded 1-3-4, B7sus4 and B7 kept A on the ring
+            // finger into F; a crowded shell's neighbour takes a fingering of its own accord.
+            expect(played(GUITAR, 'Bdim Bsus4 B7sus4 B7 F', [5, 10]).slice(2, 4)).toEqual([
+                '7 x 7 9 x x [1-2-3]',
+                '7 x 7 8 x x [1-2-3]',
+            ]);
+        });
     });
 });
 
