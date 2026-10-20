@@ -40,7 +40,8 @@ export interface FingerOption {
     /**
      * Set with `hold` on a guitar grip fingered from the nut (`offItsFret`): the hold is
      * counted against the chord beside it (`nutHoldKept`), which may already have the hand
-     * where this fingering puts it (#1691).
+     * where this fingering puts it (#1691). Also set on a `GUITAR_BOOK` row's second
+     * fingering, drilled chord or not (#1834: A x-x-x-2-2-0 as 1-3 beside D).
      */
     nut?: boolean;
     /**
@@ -796,10 +797,18 @@ function guitarBook(
         });
         return p.join();
     };
-    const taught = row.taught
-        .map((fingers) => every.find((o) => o.p.join() === inOrder(fingers) && !barringFinger(o)))
-        .filter((o): o is FingerOption => o !== undefined);
-    return taught.length ? { taught, never: new Set((row.never ?? []).map(inOrder)) } : null;
+    const taught = row.taught.map((fingers) =>
+        every.find((o) => o.p.join() === inOrder(fingers) && !barringFinger(o)),
+    );
+    // The row's first fingering is its default: if the grip has none, the row does not apply,
+    // rather than promoting a second fingering to the default.
+    if (taught[0] === undefined) {
+        return null;
+    }
+    return {
+        taught: taught.filter((o): o is FingerOption => o !== undefined),
+        never: new Set((row.never ?? []).map(inOrder)),
+    };
 }
 
 /** An option's fingers from the highest-numbered string down, an open string 0: '0-2-3-1'. */
@@ -1484,7 +1493,8 @@ function heldFingers(marked: FingerOption, other: FingerOption): number {
  * their fingering is the one the student learned, kept beside any chord but one that leaves
  * two of its fingers down (`offItsFret`, #1683: C beside F is 3-2, C as 2-1 is for Am). The
  * sus, dim, aug and power grips and the open shells are not drilled that way; a player
- * fingers them from the chord beside them (`nutHoldKept`, #1691).
+ * fingers them from the chord beside them (`nutHoldKept`, #1691). One exception: a
+ * `GUITAR_BOOK` row's second fingering is counted that way too (#1834, A as 1-3 beside D).
  */
 const drilledChord = (notes: Note[]): boolean =>
     notes.every(
