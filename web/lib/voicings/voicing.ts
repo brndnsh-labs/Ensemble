@@ -750,17 +750,19 @@ const openShapeOneOff = (v: Voicing, all: Voicing[], inst: InstrumentDef): boole
     );
 
 /**
- * A guitar shell on three neighbouring open strings (#1817): the hand holds nothing, so it is
- * the open strings strummed rather than a grip, and it is a last resort (`candidates`), as an
- * open shell's one-off is. The open strings are tuned a 4th apart, so only R–4–♭7 lands there:
- * A7sus4 x-0-0-0-x-x and E7sus4 0-0-0-x-x-x. Offered, A7sus4's pulled a Wonderwall in frets 1–6
- * onto the open strings throughout (Dsus4 x-0-0-0-x-x beside it); without it A7sus4 is
- * x-0-x-0-3-x, the R–7–3 shape at the nut as A7 x-0-x-0-2-x is, and E7sus4 0-x-0-2-x-x. The
- * R–7–3 shape skips a string the hand mutes, so an open one of those (Em7 0-x-0-0-x-x) is a
- * hand and is left on offer.
+ * A guitar grip on three neighbouring open strings: the hand holds nothing, so it is the open
+ * strings strummed rather than a grip, and it is a last resort (`candidates`), as an open
+ * shell's one-off is. A shell (#1817): the open strings are tuned a 4th apart, so only R–4–♭7
+ * lands there, A7sus4 x-0-0-0-x-x and E7sus4 0-0-0-x-x-x; offered, A7sus4's pulled a Wonderwall
+ * in frets 1–6 onto the open strings throughout. A triad (#1822): Gsus2 and Dsus4 x-0-0-0-x-x,
+ * G x-x-0-0-0-x and Em x-x-x-0-0-0, the only four (a power chord always frets its 5th). A
+ * teacher puts a finger down for each: `E Em E` in frets 1–6 is x-x-2-1-0-x / x-x-2-0-0-x,
+ * the top of the open chords, not x-x-x-1-0-0 / x-x-x-0-0-0, and `G+ G G+` keeps G's finger,
+ * x-2-0-0-x-x. The R–7–3 shape skips a string the hand mutes, so an open one of those (Em7
+ * 0-x-0-0-x-x) is a hand and is left on offer. A ukulele strums every string, and its
+ * all-open grips (C6 0-0-0-0) are book grips.
  */
 const openStrum = (v: Voicing, inst: InstrumentDef): boolean =>
-    v.shape.kind === 'shell' &&
     !strumsEveryString(v, inst) &&
     v.notes.every((n) => n.fret === 0) &&
     v.notes.every((n, i) => i === 0 || Math.abs(n.string - v.notes[i - 1].string) === 1);
@@ -977,7 +979,7 @@ const inRiffAt = (chart: ChartChord[], i: number): boolean => {
  *    is an open shell's one-off, and none inside the 4th fret is five frets wide.
  * 2. Grips inside the hand window that a player would take: every one but those with a buried
  *    root (`rootBuried`), the open-string one-offs of a fretted shape (`openShapeOneOff`), a
- *    shell on three open strings (`openStrum`, #1817) and a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
+ *    guitar grip on three open strings alone (`openStrum`, #1817, #1822) and a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
  *    has another grip there, `leavesTheNut`). Where the window has one, nothing below is
  *    looked at.
  * 3. Such grips with the window widened by a fret: a shell's with its root in the window
@@ -998,8 +1000,9 @@ const inRiffAt = (chart: ChartChord[], i: number): boolean => {
  * is voiced exactly as if the wider window were not there. Of the shells, only a guitar's with roots
  * kept to the 6th and 5th strings ever get past step 2: with the 4th string's shapes
  * every chord has such a grip in every six-fret window, as every ukulele shell does. A guitar
- * triad or power chord has neither a buried root nor a reach, so for it this is what it
- * always was: the grips inside the window, or every grip when none fits. A ukulele triad gets
+ * triad or power chord has neither a buried root nor a reach, so for it this is the grips
+ * inside the window, or every grip when none fits, with the four triads that fret nothing held
+ * back (`openStrum`, #1822). A ukulele triad gets
  * to step 3 only where a window up the neck holds nothing but a five-fret reach, and its
  * power chords where such a window holds neither (the four-string grips first, then the
  * three-string one).

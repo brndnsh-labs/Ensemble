@@ -4574,3 +4574,68 @@ describe('a ukulele add9 plays its 9th in the seat the triad doubles (#1820)', (
         }
     });
 });
+
+describe('a guitar triad that frets nothing is a last resort (#1822)', () => {
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    const grips = (names: string, home: [number, number] | null, rootStrings?: number[]) =>
+        voiceChart(chart(names), { instrument: GUITAR, home, rootStrings }).map((v) =>
+            tab(GUITAR, v),
+        );
+
+    it('a teacher puts a finger down: the top of the open chord, or the closed grip', () => {
+        // Em x x x 0 0 0 took E onto the top strings beside it; with a finger down it is the
+        // open Em's top, beside the open E's.
+        expect(grips('E Em E', [1, 6])).toEqual(['x x 2 1 0 x', 'x x 2 0 0 x', 'x x 2 1 0 x']);
+        // G x x 0 0 0 x was a lift from G+ x x 1 0 0 x; G keeps a finger on its B.
+        expect(grips('G+ G G+', [1, 6])).toEqual(['x 2 1 0 x x', 'x 2 0 0 x x', 'x 2 1 0 x x']);
+        // Gsus2 x 0 0 0 x x is the closed grip on Gm's strings, the 3rd down a fret to the 2nd.
+        expect(grips('Gm Gsus2 Gm', [1, 6])).toEqual(['x x 5 3 3 x', 'x x 5 2 3 x', 'x x 5 3 3 x']);
+        expect(grips('A Asus4 Asus2 Edim Ebsus2 D5 G', [1, 6]).at(-1)).toBe('x 2 0 0 x x');
+    });
+
+    it('no guitar triad is voiced on open strings alone, in any window', () => {
+        const ROOTS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+        const SUFFIXES = ['', 'm', 'sus2', 'sus4', '5', 'dim', '+'];
+        const homes: ([number, number] | null)[] = [null, [1, 6], [2, 7]];
+        const charts = ROOTS.flatMap((r) =>
+            SUFFIXES.flatMap((a) => [
+                r + a,
+                ...SUFFIXES.filter((b) => b !== a).map((b) => `${r + a} ${r + b} ${r + a}`),
+            ]),
+        );
+        let checked = 0;
+        for (const home of homes) {
+            for (const rootStrings of [undefined, [6, 5]]) {
+                for (const names of charts) {
+                    for (const g of grips(names, home, rootStrings)) {
+                        expect(/[1-9]/.test(g), `${names} in ${home}: ${g}`).toBe(true);
+                        checked++;
+                    }
+                }
+            }
+        }
+        expect(checked).toBe(9576);
+    });
+
+    it('the open shells and the ukulele’s all-open grips stay', () => {
+        // Em7 0 x 0 0 x x skips a string the hand mutes: a book shell, not three open strings.
+        expect(grips('Em7 A7 Dmaj7', [1, 6])).toEqual([
+            '0 x 0 0 x x',
+            'x 0 x 0 2 x',
+            'x x 0 x 2 2',
+        ]);
+        // A ukulele strums every string, and its C6 and Am7 0 0 0 0 are book grips.
+        for (const inst of [UKULELE, UKULELE_LOW_G]) {
+            for (const names of ['C6', 'Am7', 'C C6 C']) {
+                const voiced = voiceChart(chart(names), { instrument: inst, home: [1, 6] });
+                expect(
+                    voiced.some((v) => tab(inst, v) === '0 0 0 0'),
+                    names,
+                ).toBe(true);
+            }
+        }
+    });
+});
