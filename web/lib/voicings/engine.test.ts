@@ -1471,6 +1471,47 @@ describe('a ukulele chart stays in first position (#1609)', () => {
             }
         });
     });
+    describe('a change of strum, all four strings or one left out, is a move (#1812)', () => {
+        // `triadTransCost`'s string-set term, kept for the ukulele: there it fires only between
+        // a grip that sounds the A string and a power grip that leaves it out. Each case below
+        // moves when it is dropped for the ukulele.
+        it('beside the open chords in frets 2–7 A5 is 2 4 0 0, not 2 4 5 x', () => {
+            // Dropped, these were 2 4 5 3 / 2 4 5 x / 2 4 5 3 and 2 4 5 2 / 2 4 5 x / 2 4 5 2.
+            expect(tabs(UKULELE, 'Am A5 Am', [2, 7])).toEqual(['2 0 0 0', '2 4 0 0', '2 0 0 0']);
+            expect(tabs(UKULELE, 'Asus2 A5 Asus2', [2, 7])).toEqual([
+                '2 4 0 2',
+                '2 4 0 0',
+                '2 4 0 2',
+            ]);
+        });
+        it('a power riff keeps its one shape as it slides past the window', () => {
+            // Dropped, A5 went back down to 2 4 5 x and B5 to 4 6 7 x.
+            expect(tabs(UKULELE, 'E5 G5 A5 E5', [5, 10])).toEqual([
+                '4 4 7 7',
+                '7 7 10 10',
+                '9 9 12 12',
+                '4 4 7 7',
+            ]);
+            expect(tabs(UKULELE, 'F♯5 A5 B5 F♯5', [7, 12])).toEqual([
+                '6 6 9 9',
+                '9 9 12 12',
+                '11 11 14 14',
+                '6 6 9 9',
+            ]);
+        });
+        it('at the nut B♭5 stays on the riff it is in', () => {
+            // Dropped, B♭5 left x x 1 1 for 3 5 6 x, and with no window F5 went to x 0 1 x.
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'B♭5 D♭5 E♭5 B♭5', home)).toEqual([
+                    'x x 1 1',
+                    '1 1 4 4',
+                    '3 3 6 6',
+                    'x x 1 1',
+                ]);
+            }
+            expect(tabs(UKULELE, 'B♭5 E♭5 F5', null)).toEqual(['3 5 6 x', '3 3 6 6', '5 5 8 8']);
+        });
+    });
     describe('a five-fret reach is the last resort (#1675)', () => {
         const span = (frets: string) => {
             const fretted = frets
