@@ -1512,6 +1512,86 @@ describe('a ukulele chart stays in first position (#1609)', () => {
             expect(tabs(UKULELE, 'B♭5 E♭5 F5', null)).toEqual(['3 5 6 x', '3 3 6 6', '5 5 8 8']);
         });
     });
+    describe('a lone power chord keeps the hand in the window (#1814, `powerAFretPast`)', () => {
+        it('takes the three-string grip a fret past, not the four-string one two frets out', () => {
+            // They were 10 9 8 8 / 5 5 8 8 / 10 9 8 8, 8 7 6 6 / 3 3 6 6 / 8 7 6 6 and
+            // 6 5 4 4 / 1 1 4 4 / 6 5 4 4: the hand left the window for one chord.
+            expect(tabs(UKULELE, 'F F5 F', [7, 12])).toEqual([
+                '10 9 8 8',
+                '10 12 13 x',
+                '10 9 8 8',
+            ]);
+            expect(tabs(UKULELE, 'Fm F5 Fm', [7, 12])[1]).toBe('10 12 13 x');
+            expect(tabs(UKULELE, 'E♭ E♭5 E♭', [5, 10])).toEqual([
+                '8 7 6 6',
+                '8 10 11 x',
+                '8 7 6 6',
+            ]);
+            expect(tabs(UKULELE, 'D♭ D♭5 D♭', [3, 8])).toEqual(['6 5 4 4', '6 8 9 x', '6 5 4 4']);
+            expect(tabs(UKULELE_LOW_G, 'F F5 F', [7, 12])[1]).toBe('10 12 13 x');
+        });
+        it('four strings first: A5 in frets 3–8 is still 2 4 0 0, not 2 4 5 x', () => {
+            // Both sit a fret below the window. Offered together, the costs took 2 4 5 x for
+            // A5 alone, which a strummed chart would have to skip the A string for.
+            expect(tabs(UKULELE, 'A5', [3, 8])).toEqual(['2 4 0 0']);
+            expect(tabs(UKULELE, 'A A5 A', [3, 8])).toEqual(['6 4 5 4', '2 4 0 0', '6 4 5 4']);
+        });
+        it('fretted only: G5 beside G in frets 3–8 is not the open 0 2 3 x', () => {
+            // Offered, it took G to 4 7 7 5 and the hand back to the nut for G5.
+            expect(tabs(UKULELE, 'G G5 G', [3, 8])).toEqual(['7 7 7 5', '7 7 10 10', '7 7 7 5']);
+        });
+        it('not in a riff: beside another power chord the costs keep the riff together', () => {
+            // Offered, these were 8 8 11 11 / 6 8 9 x / 3 3 6 6 and 12 12 15 15 / 10 12 13 x /
+            // 7 7 10 10.
+            expect(tabs(UKULELE, 'A♭5 D♭5 E♭5', [3, 8])).toEqual(['1 3 4 x', '1 1 4 4', '3 3 6 6']);
+            expect(tabs(UKULELE, 'C5 F5 G5', [7, 12])).toEqual(['5 7 8 x', '5 5 8 8', '7 7 10 10']);
+            expect(tabs(UKULELE, 'B♭5 E♭5 F5', [5, 10])).toEqual(['3 5 6 x', '3 3 6 6', '5 5 8 8']);
+        });
+        it('a symbol in a riff anywhere is in a riff throughout, so it keeps one grip', () => {
+            // Decided per occurrence, the lone F5 was offered 10 12 13 x alone and the riff's
+            // F5 every grip; `unifyGrips` then held F5 to the riff's 5 5 8 8, left the lone
+            // occurrence nothing, and the voicer threw.
+            expect(tabs(UKULELE, 'F5 G5 F F5 F', [7, 12])).toEqual([
+                '5 5 8 8',
+                '7 7 10 10',
+                '10 9 8 8',
+                '5 5 8 8',
+                '10 9 8 8',
+            ]);
+            expect(tabs(UKULELE, 'F F5 F F5 G5', [7, 12])).toEqual([
+                '10 9 8 8',
+                '5 5 8 8',
+                '10 9 8 8',
+                '5 5 8 8',
+                '7 7 10 10',
+            ]);
+            expect(tabs(UKULELE, 'E♭ E♭5 E♭ B♭5 E♭5', [5, 10])).toEqual([
+                '8 7 6 6',
+                '3 3 6 6',
+                '8 7 6 6',
+                '3 5 6 x',
+                '3 3 6 6',
+            ]);
+            expect(tabs(UKULELE, 'D♭ D♭5 D♭ A♭5 D♭5', [3, 8])).toEqual([
+                '6 5 4 4',
+                '1 1 4 4',
+                '6 5 4 4',
+                '1 3 4 x',
+                '1 1 4 4',
+            ]);
+        });
+        it('nothing changes at the nut or on guitar', () => {
+            for (const home of NUT) {
+                expect(tabs(UKULELE, 'F F5 F', home)).toEqual(['2 0 1 0', 'x 0 1 x', '2 0 1 0']);
+            }
+            // A guitar grip is never widened this way: F5 stays the 5th-string power chord.
+            expect(tabs(GUITAR, 'F F5 F', [7, 12])).toEqual([
+                'x 12 10 10 x x',
+                'x 8 10 10 x x',
+                'x 12 10 10 x x',
+            ]);
+        });
+    });
     describe('a five-fret reach is the last resort (#1675)', () => {
         const span = (frets: string) => {
             const fretted = frets
