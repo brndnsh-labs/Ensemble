@@ -293,5 +293,7 @@ const SPOKEN: Record<Degree, string | null> = {
     '7': '7th',
     b7: '7th',
     bb7: null,
+    // An add9's added tone (#1820), named as the chord names it.
+    '9': '9th',
 };
 export const spokenDegree = (degree: Degree): string | null => SPOKEN[degree];

@@ -766,4 +766,35 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // Open to open is no move at all.
         expect(lines(['Am7', 'C6'], uke)).toEqual(['', '']);
     });
+
+    it('an add9’s added tone is the 9th, not the 2nd (#1820)', () => {
+        // Good Riddance on a ukulele: G 0 2 3 2, Cadd9 0 2 0 3, D 2 2 2 0. The C string's D is
+        // in all three, the 5th of G, the 9th of Cadd9 and the root of D.
+        expect(lines(['G', 'Cadd9', 'D'], uke)).toEqual([
+            'D is in both chords: the 5th becomes the 9th; finger 2 takes it over; ' +
+                'finger 3 moves to the A string, fret 3.',
+            'Finger 2 stays down on D: the 9th becomes the root; ' +
+                'finger 1 goes down on the G string, fret 2; ' +
+                'finger 3 moves to the E string, fret 2.',
+            // D back to G, the line wrapping to the top.
+            'D is in both chords: the root becomes the 5th; finger 1 takes it over; ' +
+                'finger 2 moves to the A string, fret 2; finger 3 slides up 1 fret.',
+        ]);
+        // C to Cadd9 adds a finger, the ring finger staying on the A string.
+        expect(lines(['C', 'Cadd9'], uke)[0]).toBe(
+            'Finger 3 stays down; finger 2 goes down on the C string, fret 2.',
+        );
+        // Csus2 0 2 3 3 to Cadd9 lifts the middle finger: Cadd9 takes its second book
+        // fingering, 0-1-0-3, and the D keeps the index (the lift itself is not said).
+        expect(lines(['Csus2', 'Cadd9', 'C'], uke).slice(0, 2)).toEqual([
+            'Fingers 1 and 3 stay down.',
+            'Finger 3 stays down.',
+        ]);
+        // Into G the index stays on that D.
+        expect(lines(['Cadd9', 'G', 'D', 'Em'], uke)[0]).toBe(
+            'Finger 1 stays down on D: the 9th becomes the 5th; ' +
+                'finger 2 goes down on the A string, fret 2; ' +
+                'finger 3 moves to the E string, fret 3.',
+        );
+    });
 });

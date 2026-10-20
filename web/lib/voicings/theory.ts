@@ -45,6 +45,7 @@ export const DEGREES: Record<Degree, DegreeDef> = {
     '5': { label: '5', int: 7, step: 4, name: '5th' },
     b5: { label: '♭5', int: 6, step: 4, name: 'Flat 5th' },
     '#5': { label: '♯5', int: 8, step: 4, name: 'Sharp 5th' },
+    '9': { label: '9', int: 2, step: 1, name: '9th' },
 };
 
 /** Spell a chord tone, e.g. the ♭7 of G is F. */
@@ -81,6 +82,13 @@ export interface QualityDef {
      * their tones are in the shape.
      */
     required: Degree[];
+    /**
+     * A tone added to a triad (#1820: an add9's 9th), played in the seat a ukulele triad
+     * otherwise doubles (role N). Only shapes with that seat serve a quality that has one, and
+     * only such a quality uses them (`taughtFor` in `voicing.ts`); a guitar has none, so the
+     * adapter reads an add9 there as its plain triad, with a notice.
+     */
+    added?: Degree;
 }
 export const QUALITIES: Record<Quality, QualityDef> = {
     maj7: { kind: 'shell', symbol: 'maj7', third: '3', seventh: '7', five: '5', required: [] },
@@ -118,6 +126,11 @@ export const QUALITIES: Record<Quality, QualityDef> = {
     // A sus chord suspends its 3rd: the 4th (or 2nd) takes the 3rd's seat in the grip.
     sus4: { kind: 'triad', symbol: 'sus4', third: '4', five: '5', required: [] },
     sus2: { kind: 'triad', symbol: 'sus2', third: '2', five: '5', required: [] },
+    // An add9 keeps its 3rd and adds the 9th (#1820), where a sus2's 2 replaces the 3rd. A
+    // ukulele triad doubles one tone to fill four strings; the 9th takes that string, as the
+    // chord charts print it (Cadd9 0-2-0-3, the C chord's C-string root played as D). Ukulele
+    // only: a guitar's three-string triad has no string to spare (`voicingChord`).
+    add9: { kind: 'triad', symbol: 'add9', third: '3', five: '5', required: [], added: '9' },
     // A power chord has no 3rd: root, 5th and the octave root is what rock guitar plays.
     five: { kind: 'power', symbol: '5', third: null, five: '5', required: [] },
 };

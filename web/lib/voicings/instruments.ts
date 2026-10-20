@@ -174,9 +174,9 @@ const UKE_OPEN_FORMS: ShapeDef[] = [
  * voicer picks among them. Strings run G C E A (4 → 1), and the re-entrant G means the lowest
  * string is not the lowest note (`inversionOf` reads pitch, not string).
  */
-const UKE_TRIADS: ShapeDef[] = [
-    // The first six move: each is the first-position chord it is named for, and the same grip
-    // up the neck for every other root.
+// The six that move: each is the first-position chord it is named for, and the same grip up
+// the neck for every other root.
+const UKE_MOVING: ShapeDef[] = [
     // C 0003: G C E C — root on the C string, the root again on top.
     uke('UTC', 'C shape', 3, ['F', 'R', 'T', 'R2']),
     // F 2010: A C F A — root on the E string, the 3rd doubled on the A string.
@@ -189,10 +189,66 @@ const UKE_TRIADS: ShapeDef[] = [
     uke('UTD', 'D shape', 3, ['F', 'R', 'T', 'F2']),
     // Em 0432: G E G B — root on the C string, the 3rd doubled on the open G and the E string.
     uke('UTE', 'E shape', 3, ['T', 'R', 'T2', 'F']),
+];
+
+/** A doubled role's plain name: R2 is R, T2 is T, F2 is F. */
+const single = (role: ShapeRole): ShapeRole =>
+    role === 'R2' ? 'R' : role === 'T2' ? 'T' : role === 'F2' ? 'F' : role;
+
+/**
+ * A moving triad shape with an add9's 9th (role N, #1820) on string `seat`, one of the two
+ * strings the shape doubles a tone on; the other keeps that tone. Nothing else changes, so an
+ * add9 is the triad grip a student already holds with one note moved, and it is offered, costed
+ * and fingered as that triad is. A root that stays is `R` wherever it sits (`rootString`, and
+ * every reader that finds the root).
+ */
+function addNine(shape: ShapeDef, seat: number): ShapeDef {
+    const doubled = single(shape.voices.find(([s]) => s === seat)![1]);
+    const voices = shape.voices.map(
+        ([s, role]) =>
+            [s, s === seat ? 'N' : single(role) === doubled ? doubled : role] as [
+                number,
+                ShapeRole,
+            ],
+    );
+    return {
+        id: `${shape.id}9`,
+        kind: 'triad',
+        rootString: voices.find(([, role]) => role === 'R')![0],
+        name: `${shape.name}, 9th on the ${'AECG'[seat - 1]} string`,
+        voices,
+    };
+}
+
+/**
+ * The add9 grips (#1820): the moving shapes with the 9th in the doubled seat the
+ * chord charts put it in (kytary.cz and ukutabs.com, read 2026-10-20). The other seat of each
+ * pair is not offered: those grips are printed nowhere, and the two that ring an open string in
+ * first position (Aadd9 4-1-0-0, the A shape's G-string root as the 9th, and Gadd9 4-2-3-0, the
+ * F shape's A-string 3rd) took the chord from the book's grip (`bookGrip` in `voicing.ts`). The
+ * D shape is left out: no chart prints an add9 on its doubled 5th.
+ */
+const UKE_ADD9: ShapeDef[] = [
+    // Cadd9 0203, D♭add9 1314, Dadd9 2425: the C shape, its C-string root as the 9th.
+    addNine(UKE_MOVING[0], 3),
+    // Fadd9 0010, F♯add9 1121, Gadd9 2232, A♭add9 3343: the F shape, its G-string 3rd as the
+    // 9th (the G shape with its G-string root as the 9th is the same grip).
+    addNine(UKE_MOVING[1], 4),
+    // Gadd9 0252: the G shape, its E-string root as the 9th (ukutabs's grip).
+    addNine(UKE_MOVING[2], 2),
+    // Aadd9 2102, B♭add9 3213, Badd9 4324: the A shape, its A-string root as the 9th.
+    addNine(UKE_MOVING[3], 1),
+    // E♭add9 0311, Eadd9 1422: the E shape, its E-string 3rd as the 9th.
+    addNine(UKE_MOVING[5], 2),
+];
+
+const UKE_TRIADS: ShapeDef[] = [
+    ...UKE_MOVING,
     ...UKE_OPEN_FORMS,
     // F♯sus2 1124 / Fsus2 0013: G♯ C♯ F♯ C♯ — the Fm form's layout with the 2nd in the 3rd's
     // seat, and for a sus2 it is a shape that moves (index across the two low strings).
     { ...uke('UTFs', 'Fsus2 shape', 2, ['T', 'F', 'R', 'F2']), qualities: ['sus2'] },
+    ...UKE_ADD9,
 ];
 
 /**
