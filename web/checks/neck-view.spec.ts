@@ -64,6 +64,18 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(view.locator('svg.neck')).toBeVisible();
     await expect(view.locator('.neck-dot')).toHaveCount(3);
     await expect(view.getByTestId('neck-current')).toHaveText('Dm7');
+    // The shell Dm7 x 5 3 5 x x leaves three strings silent, each marked × as a chord chart
+    // marks them (#1811), and the board's text names them.
+    await expect(view.locator('.neck-mute')).toHaveCount(3);
+    expect(
+        await view
+            .locator('.neck-mute')
+            .evaluateAll((marks) => marks.map((m) => m.getAttribute('data-mute'))),
+    ).toEqual(['6', '2', '1']);
+    await expect(view.locator('.neck-strum')).toHaveAttribute(
+        'aria-label',
+        /^Hear Dm7: .*; 6th, 2nd and 1st strings not played$/,
+    );
     await expect(view.getByTestId('neck-next')).toContainText('G7');
     const headline = view.locator('.neck-headline');
     await expect(headline).toContainText('then G7');
@@ -439,5 +451,41 @@ test('stopped, the neck steps through the changes and the board strums (#1595, #
     await expect(current).toHaveText('C7');
     await expect(position).toHaveText(`1 / ${count}`);
     await expect(headline).toContainText('Starts on C7');
+    expect(errors).toEqual([]);
+});
+
+test('a ukulele B5 marks the G and C strings it leaves silent (#1811)', async ({ page }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    await page.getByLabel('Song title').fill('Power on the uke');
+    for (const [i, bar] of ['B', 'B5', 'B', 'B'].entries()) {
+        await typeBar(page, i + 1, bar);
+    }
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Neck', exact: true }).click();
+    const view = page.getByRole('region', { name: 'Neck' });
+    await view.getByLabel('Instrument', { exact: true }).selectOption('uke');
+    // B 4 3 2 2 sounds all four strings: nothing marked.
+    await expect(view.getByTestId('neck-current')).toHaveText('B');
+    await expect(view.locator('.neck-dot')).toHaveCount(4);
+    await expect(view.locator('.neck-mute')).toHaveCount(0);
+    // B5 x x 2 2: a × on the G and C strings, and the board's text names them.
+    await view.getByRole('button', { name: 'Next chord', exact: true }).click();
+    await expect(view.getByTestId('neck-current')).toHaveText('B5');
+    await expect(view.locator('.neck-dot')).toHaveCount(2);
+    await expect(view.locator('.neck-mute')).toHaveCount(2);
+    expect(
+        await view
+            .locator('.neck-mute')
+            .evaluateAll((marks) => marks.map((m) => m.getAttribute('data-mute'))),
+    ).toEqual(['4', '3']);
+    await expect(view.locator('.neck-strum')).toHaveAttribute(
+        'aria-label',
+        /^Hear B5: .*; G and C strings not played$/,
+    );
     expect(errors).toEqual([]);
 });
