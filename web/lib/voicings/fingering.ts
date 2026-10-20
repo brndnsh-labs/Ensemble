@@ -950,8 +950,9 @@ const crowdedOptions = (
  *
  * `splitOptions` never offers it, since on one fret it gives the lower-pitched string the
  * lower finger; so it is a second fingering (`needs`), priced at the margin (`TAUGHT_MARGIN`),
- * for TWO fingers that stay (`FingerOption.hold`): the neighbour must already hold the little
- * finger and another finger where this one has them, as D's 4-3-1 does. One held note does
+ * for TWO fingers that stay (`FingerOption.hold`, counted by `heldFingers`), as D's 4-3-1
+ * keeps the little finger and the index. Which two is not checked; the sweep finds no
+ * same-root neighbour that holds two without the little finger. One held note does
  * not buy it, nor a chord on another root (`FingerOption.sameRoot`): it is the suspension's
  * hand, the chord's with one finger moved.
  */
