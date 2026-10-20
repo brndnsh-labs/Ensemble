@@ -4718,7 +4718,9 @@ describe('a guitar triad that frets nothing is a last resort (#1822)', () => {
         // G x x 0 0 0 x was a lift from G+ x x 1 0 0 x; G keeps a finger on its B.
         expect(grips('G+ G G+', [1, 6])).toEqual(['x 2 1 0 x x', 'x 2 0 0 x x', 'x 2 1 0 x x']);
         // Gsus2 x 0 0 0 x x is the closed grip on Gm's strings, the 3rd down a fret to the 2nd.
-        expect(grips('Gm Gsus2 Gm', [1, 6])).toEqual(['x x 5 3 3 x', 'x x 5 2 3 x', 'x x 5 3 3 x']);
+        // Since #1827 the top strings, Gm the top of its 3rd-fret barre (it was x x 5 3 3 x /
+        // x x 5 2 3 x, aimed at the window's middle).
+        expect(grips('Gm Gsus2 Gm', [1, 6])).toEqual(['x x x 3 3 3', 'x x x 2 3 3', 'x x x 3 3 3']);
         expect(grips('A Asus4 Asus2 Edim Ebsus2 D5 G', [1, 6]).at(-1)).toBe('x 2 0 0 x x');
     });
 
@@ -4899,5 +4901,61 @@ describe('the guitar’s little finger never lies flat (#1819)', () => {
                 }
             }
         }
+    });
+});
+
+describe('a guitar triad in a window from fret 1 is aimed at first position (#1827)', () => {
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    const grips = (names: string, home: [number, number] | null, rootStrings?: number[]) =>
+        voiceChart(chart(names), { instrument: GUITAR, home, rootStrings }).map((v) =>
+            tab(GUITAR, v),
+        );
+
+    it('a lone Gsus2 or Dsus4 is the top of the book’s Dsus4, not a reach to the 5th fret', () => {
+        // Aimed at the window's middle (fret 3.5), x x 5 2 3 x won by 0.15.
+        for (const rootStrings of [undefined, [6, 5]]) {
+            expect(grips('Gsus2', [1, 6], rootStrings)).toEqual(['x x x 2 3 3']);
+            expect(grips('Dsus4', [1, 6], rootStrings)).toEqual(['x x x 2 3 3']);
+        }
+    });
+
+    it('the open chords’ tops and the book power chords, where the hand sits at the nut', () => {
+        expect(grips('E5', [1, 6])).toEqual(['0 2 2 x x x']); // was x x 2 4 5 x
+        expect(grips('F5', [1, 6])).toEqual(['1 3 3 x x x']); // was x x 3 5 6 x
+        // was x 5 4 2 x x / x 5 3 2 x x
+        expect(grips('D Dm D', [1, 6])).toEqual(['x x x 2 3 2', 'x x x 2 3 1', 'x x x 2 3 2']);
+        // F, C, Dm and B♭ on the top three strings: the tops of x x 3 2 1 1, x 3 2 0 1 0,
+        // x x 0 2 3 1 and x 1 3 3 3 1 (it was x 3 3 2 x x, x 3 2 0 x x, x 5 3 2 x x, x 5 3 3 x x).
+        expect(grips('F C Dm Bb', [1, 6])).toEqual([
+            'x x x 2 1 1',
+            'x x x 0 1 0',
+            'x x x 2 3 1',
+            'x x x 3 3 1',
+        ]);
+        // The tops of the open E and A (it was x x x 4 5 4 / x x x 6 5 5, up the neck).
+        expect(grips('E A E B', [1, 6])).toEqual([
+            'x x x 1 0 0',
+            'x x x 2 2 0',
+            'x x x 1 0 0',
+            'x x x 4 4 2',
+        ]);
+    });
+
+    it('keeps what #1822 put a finger down for, and E7 in first position', () => {
+        expect(grips('E Em E', [1, 6])).toEqual(['x x 2 1 0 x', 'x x 2 0 0 x', 'x x 2 1 0 x']);
+        expect(grips('G+ G G+', [1, 6])).toEqual(['x 2 1 0 x x', 'x 2 0 0 x x', 'x 2 1 0 x x']);
+        // E7 was x x 2 x 3 4 here once #1822 took Dsus4 off x 0 0 0 x x; now it is the open
+        // E7's middle strings (0 2 2 1 3 0), beside Adim x x 1 2 1 x and A♭dim x x 0 1 0 x. Not
+        // the 0 x 0 1 x x it was before #1822: a guitar shell is still aimed at the window's
+        // middle.
+        expect(grips('Gdim7 E7 Adim Abdim Dsus4 Em Cm7', [1, 6]).slice(0, 4)).toEqual([
+            '3 x 2 3 2 x',
+            'x x 2 1 3 x',
+            'x x 1 2 1 x',
+            'x x 0 1 0 x',
+        ]);
     });
 });
