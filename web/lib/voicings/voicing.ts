@@ -597,11 +597,26 @@ const lowString = (v: Voicing): number => Math.min(...v.notes.map((n) => n.strin
  *
  * - **Stay on the set.** The sets are compared by their lowest string, which is how a player
  *   names one ("the 4-3-2 set") and stays well-defined between a two-note power chord and a
- *   three-note triad, where an overlap count would read a smaller grip as a move. On a ukulele
- *   it fires only beside a power chord that leaves the A string out (G5 0-2-3-x, F♯5 x-1-2-x),
- *   which is no set a strummer moves between, only strings not played. Dropped for the
- *   ukulele it moved 37–43 charts in each window from fret 2 up, outside #1809's reach, so
- *   it is left as it is.
+ *   three-note triad, where an overlap count would read a smaller grip as a move. A ukulele
+ *   has no string sets: every grip but a power chord strums all four strings. There it fires
+ *   only between a grip that sounds the A string and a power grip that leaves it out, the
+ *   three-string G shape (G5 0-2-3-x, A5 2-4-5-x) or the C–E two-string grip (F♯5 x-1-2-x);
+ *   never for B♭5 x-x-1-1 or B5 x-x-2-2, which keep the A string. So on a ukulele it reads as
+ *   a change of strum, all four strings or one left out, and as that it does work a teacher's
+ *   grips rely on, so it stays (#1812). Dropped for the ukulele it moved 2–3 of 1,801 charts
+ *   at the nut and 37–43 in each window from fret 2 up, and lost three things: the open A5
+ *   beside the open chords in frets 2–7 (`Am A5 Am` 2-0-0-0 / 2-4-0-0 / 2-0-0-0 went to
+ *   2-4-5-3 / 2-4-5-x, the closed pair #1688's review ruled out), a power riff's one shape as
+ *   it slides up the neck (`E5 G5 A5 E5` in frets 5–10 ends 9-9-12-12, and went back down to
+ *   2-4-5-x), and the riffs at the nut (`B♭5 D♭5 E♭5 B♭5` left the book's x-x-1-1 beside D♭5
+ *   1-1-4-4 for 3-5-6-x; with no window, `B♭5 E♭5 F5` 3-5-6-x / 3-3-6-6 / 5-5-8-8 dropped F5
+ *   to x-0-1-x). What dropping it gained is real, and stays a known limit: up the neck, a
+ *   lone power chord between strummed chords whose window holds no grip for it takes the
+ *   four-string grip two frets out over the three-string one a fret past (`F F5 F` in frets
+ *   7–12 is 10-9-8-8 / 5-5-8-8 / 10-9-8-8, where a player keeps the hand at 10-12-13-x; E♭5
+ *   in frets 5–10 is 3-3-6-6, D♭5 in 3–8 1-1-4-4). That is not this term's: `aFretPast`
+ *   widens a window only for a grip that strums every string, so the three-string grip a fret
+ *   past is not on offer there.
  * - **Move by step.** Each note of the new grip is costed on its own string: a common tone (same
  *   string, same fret) is free, a slide costs by its fret distance (an open string is fret 0), a
  *   string that was silent before is a fresh placement. A note on an open string costs nothing in
