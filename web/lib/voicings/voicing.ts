@@ -167,9 +167,14 @@ export function allowedShapes(
     );
 }
 
-/** A shape held to some qualities (`ShapeDef.qualities`) serves only those; any other serves all. */
+/**
+ * A shape held to some qualities (`ShapeDef.qualities`) serves only those; any other serves all.
+ * And a shape with a 9th's seat (role N, #1820) serves exactly the qualities that add one
+ * (`QualityDef.added`): an add9 is never the plain triad, nor a plain triad an add9.
+ */
 const taughtFor = (shape: ShapeDef, quality: Quality): boolean =>
-    !shape.qualities || shape.qualities.includes(quality);
+    (!shape.qualities || shape.qualities.includes(quality)) &&
+    shape.voices.some(([, role]) => role === 'N') === (QUALITIES[quality].added !== undefined);
 
 /** Build one grip with its root at fret `r`. Returns null if any note falls off the neck. */
 export function buildAt(
@@ -188,7 +193,9 @@ export function buildAt(
                   ? q.third
                   : role === 'S'
                     ? q.seventh
-                    : q.five;
+                    : role === 'N'
+                      ? q.added
+                      : q.five;
         if (!deg) {
             throw new Error(`${quality} has no ${role} for shape ${shape.id}`);
         }

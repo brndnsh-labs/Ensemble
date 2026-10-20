@@ -1,6 +1,7 @@
 /**
  * The shell adapter (#1585, #1588): Ensemble's chord authority (`parseChord`) and key-aware
- * speller (`spellPitchClass`) read as the engine's eight shells, six triads and power chord. Pinned
+ * speller (`spellPitchClass`) read as the engine's eight shells, six triads, the ukulele's add9
+ * (#1820) and power chord. Pinned
  * here: the codec's whole quality
  * vocabulary adapts, the faithful/approximated split, key spelling, and every bundled standard
  * voicing inside a hand window.
@@ -11,6 +12,8 @@ import { describe, expect, it } from 'vitest';
 import { bandChart } from '../band-chart';
 import { buildStandardDocument, STANDARDS } from '../standards';
 import { voicingChord } from './adapter';
+import { GUITAR, UKULELE, UKULELE_LOW_G } from './instruments';
+import type { InstrumentDef } from './types';
 import { voiceBandChart } from './voice-chart';
 import { inHome } from './voicing';
 
@@ -101,6 +104,35 @@ describe('faithful and approximated shells', () => {
         const chord = shell(symbol);
         expect(chord.quality).toBe(quality);
         expect(chord.approximation).toMatch(reason);
+    });
+
+    it('an add9 is its own chord on an instrument with grips for it, the ukulele (#1820)', () => {
+        const on = (symbol: string, instrument: InstrumentDef | null) =>
+            voicingChord(
+                parseChord(symbol, { tonic: 0, minor: false })!,
+                'C',
+                false,
+                '',
+                instrument,
+            );
+        for (const uke of [UKULELE, UKULELE_LOW_G]) {
+            expect(on('Cadd9', uke)).toMatchObject({ quality: 'add9', approximation: null });
+            expect(on('Cadd9/E', uke)).toMatchObject({
+                quality: 'add9',
+                approximation: 'bass note E not played',
+            });
+            // The band reads an add2 as the same chord.
+            expect(on('Cadd2', uke)).toMatchObject({ quality: 'add9', approximation: null });
+            // A minor add9 keeps its reduction: no add9 shape is taught as one.
+            expect(on('Cmadd9', uke)).toMatchObject({ quality: 'min' });
+            expect(on('Cmadd9', uke).approximation).toMatch(/plain minor triad/);
+        }
+        // The guitar's three-string triads have no string to spare, nor has a chord read for no
+        // instrument at all.
+        for (const instrument of [GUITAR, null]) {
+            expect(on('Cadd9', instrument).quality).toBe('maj');
+            expect(on('Cadd9', instrument).approximation).toMatch(/the added 9 is not played/);
+        }
     });
 
     it('a slash bass is named and not played', () => {

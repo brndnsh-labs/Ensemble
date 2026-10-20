@@ -109,6 +109,9 @@ describe('spokenDegree (#1618)', () => {
             b7: '7th',
             // The diminished 7th has no name a student would match to the dot.
             bb7: null,
+            // An add9's added tone is the 9th, as the chord names it (#1820), where a sus2's is
+            // the 2nd: D 2-2-2-0 to Cadd9 0-2-0-3 is "the root becomes the 9th".
+            '9': '9th',
         });
     });
 });

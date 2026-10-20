@@ -1,7 +1,8 @@
 /**
  * Ensemble's chords, read as shells (#1585) and triads (#1588). The engine voices eight 7th-chord
  * qualities (maj7, 7, m7, m7♭5, °7, 6, and since #1817 7sus4 and m6) as three-note R/3/7 grips,
- * plain triads (major, minor, dim, aug, sus4, sus2) as closed triad grips and a power chord as
+ * plain triads (major, minor, dim, aug, sus4, sus2) as closed triad grips, on a ukulele an add9
+ * as its major triad's grip with the 9th in the doubled seat (#1820), and a power chord as
  * root–5th–octave; this adapter is the only place a chart chord becomes one. It reads the band's
  * chord authority (`parseChord`'s `ChordFacts`) rather than re-parsing the symbol, and spells
  * the root with the chart sheet's own key-aware speller (`spellPitchClass`), so the neck names
@@ -15,7 +16,8 @@
 import type { ChordFacts } from '@band/index';
 import { spellPitchClass } from '@core/engine/note-spelling';
 import { DEGREES, LETTERS, QUALITIES } from './theory';
-import type { Quality, Spelled } from './types';
+import type { InstrumentDef, Quality, Spelled } from './types';
+import { allowedShapes } from './voicing';
 
 // A type alias, not an interface: `ChartChord`'s extra-fields index signature needs one.
 export type VoicingChord = {
@@ -72,10 +74,17 @@ const ADDED_NAMES: Record<number, string> = {
 /**
  * A chord with no 7th and no 6th as the triad grip that plays it (#1588), or null when it is not
  * one of the six triads or a power chord (a minor ♯5, say, keeps the shell reduction). Added tones
- * (add9, add4, a minor ♭6) are left out: the triad under them is the harmony, and a closed
- * triad grip has no string to spare, so the notice names what the grip doesn't play.
+ * (add9, add4, a minor ♭6) are left out: the triad under them is the harmony, and a guitar's
+ * closed triad grip has no string to spare, so the notice names what the grip doesn't play.
+ *
+ * Except a major add9 on an instrument that has grips for it (#1820, `addsNinth`): a ukulele
+ * triad doubles one tone to fill four strings, and the 9th takes that string, as the chord
+ * charts print it (Cadd9 0-2-0-3); `parseChord` reads an add2 as the same chord. Only the 9th
+ * alone: a 9th beside another added tone keeps the reduction. So does a minor add9: the same
+ * shapes put half its roots at the nut on grips no chart prints (Fm(add9) 1-5-3-3, Dm(add9)
+ * 2-4-1-5, where the books give 0-5-4-3 and 7-5-5-7).
  */
-function readTriad(chord: ChordFacts): Reading | null {
+function readTriad(chord: ChordFacts, addsNinth: boolean): Reading | null {
     const { third, fifth, seventh, sixth, family, intervals } = chord;
     if (seventh !== null || sixth || fifth === null) {
         return null;
@@ -100,6 +109,9 @@ function readTriad(chord: ChordFacts): Reading | null {
     if (!added.length) {
         return [quality, null];
     }
+    if (addsNinth && quality === 'maj' && added.length === 1 && added[0] === 14) {
+        return ['add9', null];
+    }
     const names = added.map((n) => ADDED_NAMES[n] ?? String(n)).join(', ');
     return [
         quality,
@@ -107,9 +119,12 @@ function readTriad(chord: ChordFacts): Reading | null {
     ];
 }
 
-/** The triads, the eight shells, and the reduction (with its reason) for every other chord. */
-function read(chord: ChordFacts): Reading {
-    const triad = readTriad(chord);
+/**
+ * The triads, the add9s where the instrument voices them, the eight shells, and the reduction
+ * (with its reason) for every other chord.
+ */
+function read(chord: ChordFacts, addsNinth: boolean): Reading {
+    const triad = readTriad(chord, addsNinth);
     if (triad) {
         return triad;
     }
@@ -194,15 +209,20 @@ function read(chord: ChordFacts): Reading {
 /**
  * A chart chord as the shell the engine voices. `key`/`isMinor` are the chord's own key context
  * (a key change mid-chart spells by the new key); `written` is the chart's letter name for the
- * root, when it has one, so a written accidental agrees with the chart sheet.
+ * root, when it has one, so a written accidental agrees with the chart sheet. `instrument` is the
+ * one the chord will be voiced on: an add9 is read as one only where that instrument has grips
+ * for it (#1820, the ukulele), else as its plain triad with a notice, as it is with none given.
  */
 export function voicingChord(
     chord: ChordFacts,
     key: string,
     isMinor: boolean,
     written = '',
+    instrument: InstrumentDef | null = null,
 ): VoicingChord {
-    const [quality, reduction] = read(chord);
+    const addsNinth =
+        instrument !== null && allowedShapes(instrument, undefined, 'add9').length > 0;
+    const [quality, reduction] = read(chord, addsNinth);
     // A shell starts on the root, so a slash chord's bass is left to the bass player.
     const bass =
         chord.bass !== chord.root

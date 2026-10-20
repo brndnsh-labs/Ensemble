@@ -249,6 +249,12 @@ describe('triad grips (#1588)', () => {
         for (const inst of [GUITAR, UKULELE]) {
             for (const root of ROOTS) {
                 for (const q of Object.keys(QUALITIES) as Quality[]) {
+                    // The guitar has no add9 grip (#1820): its three-string triads have no
+                    // string to spare, so the adapter never hands it one.
+                    if (inst === GUITAR && q === 'add9') {
+                        expect(allPositions(inst, root, q)).toEqual([]);
+                        continue;
+                    }
                     expect(
                         allPositions(inst, root, q).length,
                         `${inst.name} ${root.name}${q}`,
@@ -4426,5 +4432,145 @@ describe('7sus4 and m6 are shells of their own (#1817)', () => {
             'x x 5 2 3 x [4-1-2]',
             'x 0 x 0 3 x [0-0-2]',
         ]);
+    });
+});
+
+describe('a ukulele add9 plays its 9th in the seat the triad doubles (#1820)', () => {
+    // It was the plain triad, with a notice: Cadd9 was C 0 0 0 3. A ukulele triad doubles one
+    // tone to fill four strings; the 9th takes that string, as the chord charts print it
+    // (Kytary and UkuTabs, read 2026-10-20). The guitar's three-string triads have none spare.
+    const chart = (names: string, inst: InstrumentDef) =>
+        names
+            .split(' ')
+            .map((s) =>
+                voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false, '', inst),
+            );
+    /** Each grip of a chart as `frets [fingers]`, fingers for the strings it sounds, low first. */
+    const played = (inst: InstrumentDef, names: string, home: [number, number] | null) =>
+        voiceChart(chart(names, inst), { instrument: inst, home }).map((v) => {
+            const low = [...v.notes].sort((a, b) => b.string - a.string);
+            return `${tab(inst, v)} [${low.map((n) => n.finger).join('-')}]`;
+        });
+    const NUT: ([number, number] | null)[] = [[1, 6], null];
+
+    it('at the nut every root takes the grip the charts print, with the book fingering', () => {
+        const BOOK: Record<string, string> = {
+            C: '0 2 0 3 [0-2-0-3]',
+            Db: '1 3 1 4 [1-3-1-4]',
+            D: '2 4 2 5 [1-3-1-4]',
+            Eb: '0 3 1 1 [0-3-1-1]',
+            // The books lay the middle finger across the E and A strings (1-4-2-2); a ukulele
+            // barre is the index's or the ring finger's (`barreOptions`), so here it is a
+            // fingertip each.
+            E: '1 4 2 2 [1-4-2-3]',
+            F: '0 0 1 0 [0-0-1-0]',
+            'F#': '1 1 2 1 [1-1-2-1]',
+            // Kytary's grip, and UkuTabs's easier one. UkuTabs leads with 0 2 5 2, which frets
+            // past the 4th fret, so at the nut it gives way to this one (`firstPosition`).
+            G: '2 2 3 2 [1-1-2-1]',
+            Ab: '3 3 4 3 [1-1-2-1]',
+            A: '2 1 0 2 [2-1-0-3]',
+            Bb: '3 2 1 3 [3-2-1-4]',
+            B: '4 3 2 4 [3-2-1-4]',
+        };
+        for (const home of NUT) {
+            for (const inst of [UKULELE, UKULELE_LOW_G]) {
+                for (const [root, grip] of Object.entries(BOOK)) {
+                    expect(played(inst, `${root}add9`, home), `${root}add9`).toEqual([grip]);
+                }
+            }
+        }
+    });
+    it('is named an add9, with its 9th as a degree of its own and no notice', () => {
+        const [v] = voiceChart(chart('Cadd9', UKULELE), { instrument: UKULELE, home: [1, 6] });
+        expect(v.symbol).toBe('Cadd9');
+        expect(v.approximation).toBeNull();
+        const degrees = v.notes.map((n) => `${spellDegree(v.root, n.degree)}:${n.degree}`);
+        expect(degrees.join(' ')).toBe('G:5 D:9 E:3 C:R');
+    });
+    it('beside its neighbours: C Cadd9 C, G Cadd9 D, Cadd9 G D Em, F Fadd9, G Gadd9 G', () => {
+        for (const home of NUT) {
+            // One finger added, the ring finger staying on the A string.
+            expect(played(UKULELE, 'C Cadd9 C', home)).toEqual([
+                '0 0 0 3 [0-0-0-3]',
+                '0 2 0 3 [0-2-0-3]',
+                '0 0 0 3 [0-0-0-3]',
+            ]);
+            expect(played(UKULELE, 'G Cadd9 D', home)).toEqual([
+                '0 2 3 2 [0-1-3-2]',
+                '0 2 0 3 [0-2-0-3]',
+                '2 2 2 0 [1-2-3-0]',
+            ]);
+            // From Csus2 0 2 3 3 (0-1-2-3) the middle finger lifts, index and ring staying:
+            // the book's second fingering (`UKE_BOOK`).
+            expect(played(UKULELE, 'Csus2 Cadd9 C', home)).toEqual([
+                '0 2 3 3 [0-1-2-3]',
+                '0 2 0 3 [0-1-0-3]',
+                '0 0 0 3 [0-0-0-3]',
+            ]);
+            // Into G the index stays on the C string's D. Between G and D (above) the D changes
+            // finger once whichever fingering Cadd9 takes, G holding it with the index and D
+            // with the middle finger, so it keeps its default.
+            expect(played(UKULELE, 'Cadd9 G D Em', home)).toEqual([
+                '0 2 0 3 [0-1-0-3]',
+                '0 2 3 2 [0-1-3-2]',
+                '2 2 2 0 [1-2-3-0]',
+                '0 4 3 2 [0-3-2-1]',
+            ]);
+            // F with the middle finger lifted.
+            expect(played(UKULELE, 'F Fadd9', home)).toEqual([
+                '2 0 1 0 [2-0-1-0]',
+                '0 0 1 0 [0-0-1-0]',
+            ]);
+            // From G its three fingers stay and the index lies across the G and C strings.
+            expect(played(UKULELE, 'G Gadd9 G', home)).toEqual([
+                '0 2 3 2 [0-1-3-2]',
+                '2 2 3 2 [1-1-3-2]',
+                '0 2 3 2 [0-1-3-2]',
+            ]);
+            expect(played(UKULELE, 'A Aadd9', home)).toEqual([
+                '2 1 0 0 [2-1-0-0]',
+                '2 1 0 2 [2-1-0-3]',
+            ]);
+        }
+    });
+    it('up the neck it takes the charts’ other grips of the same shapes', () => {
+        expect(played(UKULELE, 'Cadd9', [2, 7])).toEqual(['5 4 3 5 [3-2-1-4]']);
+        expect(played(UKULELE, 'Cadd9', [5, 10])).toEqual(['7 7 8 7 [1-1-2-1]']);
+        expect(played(UKULELE, 'Gadd9', [5, 10])).toEqual(['7 9 7 10 [1-3-1-4]']);
+        expect(played(UKULELE, 'Dadd9', [5, 10])).toEqual(['7 6 5 7 [3-2-1-4]']);
+        expect(played(UKULELE, 'F Fadd9', [7, 12])).toEqual([
+            '10 9 8 8 [3-2-1-1]',
+            '10 9 8 10 [3-2-1-4]',
+        ]);
+    });
+    it('the guitar keeps the plain triad and says so', () => {
+        const grips = (vs: Voicing[]) =>
+            vs.map((v) => `${v.symbol} ${tab(GUITAR, v)} ${v.notes.map((n) => n.finger)}`);
+        for (const home of [null, [1, 6], [2, 7]] as ([number, number] | null)[]) {
+            for (const [add, plain] of [
+                ['Cadd9', 'C'],
+                ['G Cadd9 D', 'G C D'],
+                ['Cadd9 G D Em', 'C G D Em'],
+                ['F Fadd9', 'F F'],
+            ]) {
+                const voiced = voiceChart(chart(add, GUITAR), { instrument: GUITAR, home });
+                const triad = voiceChart(chart(plain, GUITAR), { instrument: GUITAR, home });
+                expect(grips(voiced), `${add} in ${home}`).toEqual(grips(triad));
+            }
+        }
+        const [c] = chart('Cadd9', GUITAR);
+        expect(c.quality).toBe('maj');
+        expect(c.approximation).toMatch(/plain major triad \(the added 9 is not played\)/);
+    });
+    it('only an add9 takes the shapes with a 9th, and it takes no others', () => {
+        for (const q of Object.keys(QUALITIES) as Quality[]) {
+            const shapes = allowedShapes(UKULELE, undefined, q);
+            const ninth = shapes.filter((sh) => sh.voices.some(([, role]) => role === 'N'));
+            expect(ninth.length > 0, q).toBe(q === 'add9');
+            if (q === 'add9') {
+                expect(shapes).toEqual(ninth);
+            }
+        }
     });
 });

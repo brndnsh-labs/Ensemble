@@ -92,6 +92,8 @@ const DEGREE_FILL: Record<Degree, string> = {
     // `9` token: the 9th is the 2nd's pitch class).
     '2': 'neck-fill-9',
     '4': 'neck-fill-9',
+    // An add9's 9th (#1820), the token's own degree.
+    '9': 'neck-fill-9',
     '3': 'neck-fill-3',
     b3: 'neck-fill-b3',
     '7': 'neck-fill-7',

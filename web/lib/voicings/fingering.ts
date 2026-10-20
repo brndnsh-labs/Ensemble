@@ -650,6 +650,10 @@ const fingeredFromTheNut = (notes: Note[], fr: Note[], ukulele: boolean): boolea
  *   are index and middle, a fingertip each (UkuTabs). The rules lay the index across both;
  *   that stays only as fingers left down, beside a chord that already bars those strings
  *   (B 4-3-2-2 to B5).
+ * - Cadd9 0-2-0-3 is middle and ring (#1820, Kytary): C 0-0-0-3 with the middle finger added.
+ *   The rules put the index on the 2nd fret and the middle on the 3rd, the hand a fret up.
+ *   Index and ring, 0-1-0-3, is Csus2 0-2-3-3 (0-1-2-3) with the middle finger lifted, and
+ *   stays on offer for a chord that keeps the index there (Csus2, or G after it).
  *
  * C 0-0-0-3 under the ring finger and Am 2-0-0-0 under the middle were rows here; they are
  * `aheadOfItsFret`'s rule now.
@@ -660,17 +664,31 @@ const UKE_BOOK: Record<string, string[]> = {
     'o 3 3 3': ['0-1-1-1', '0-1-2-3'],
     'x x 2 2': ['1-2'],
     'x x 1 1': ['1-2'],
+    'o 2 o 3': ['0-2-0-3', '0-1-0-3'],
 };
 
 /**
- * The F shape, all four strings fretted (F♯ 3-1-2-1, G 4-2-3-2, A♭ 5-3-4-3): the index
- * across the lowest fret, middle and ring above it, at every fret. `holeCost` prices that
- * barre out below the 6th fret, where a guitar's frets are wide enough for a fingertip each
- * (the open D shape); a ukulele's are not, and every chart prints these three with the barre.
+ * Moving shapes, all four strings fretted, whose book fingering is the same at every fret:
+ * keyed by each string's fret above the grip's lowest, G string to A string. `holeCost` prices
+ * a barre out below the 6th fret, where a guitar's frets are wide enough for a fingertip each
+ * (the open D shape); a ukulele's are not, and the charts print these with the barre.
+ *
+ * - The F shape (F♯ 3-1-2-1, G 4-2-3-2, A♭ 5-3-4-3): the index across the lowest fret, middle
+ *   and ring above it.
+ * - Two add9 grips (#1820, Kytary; UkuTabs agrees for D and G): the C shape's (D♭add9
+ *   1-3-1-4, Dadd9 2-4-2-5) with the index across the G, C and E strings under the ring
+ *   finger, the little finger on top; and the F shape's (F♯add9 1-1-2-1, Gadd9 2-2-3-2,
+ *   A♭add9 3-3-4-3) with the index across all four and the middle finger on the E string. The
+ *   rules gave them 1-3-2-4 and 1-1-3-2 below the 6th fret and the book's above it. No other
+ *   grip the shapes hold has these frets.
  */
-const UKE_F_SHAPE = { frets: '2 0 1 0', fingers: ['3-1-2-1'] };
+const UKE_MOVING_BOOK: Record<string, string[]> = {
+    '2 0 1 0': ['3-1-2-1'],
+    '0 2 0 3': ['1-3-1-4'],
+    '0 0 1 0': ['1-1-2-1'],
+};
 
-/** A ukulele grip's book fingerings, as `UKE_BOOK` spells them, or null. */
+/** A ukulele grip's book fingerings, as `UKE_BOOK` or `UKE_MOVING_BOOK` spell them, or null. */
 function bookFingerings(notes: Note[]): string[] | null {
     if (notes.some((n) => n.string < 1 || n.string > 4)) {
         return null;
@@ -685,9 +703,7 @@ function bookFingerings(notes: Note[]): string[] | null {
     }
     const frets = byString.map((n) => (n as Note).fret);
     const low = Math.min(...frets);
-    return low > 0 && frets.map((f) => f - low).join(' ') === UKE_F_SHAPE.frets
-        ? UKE_F_SHAPE.fingers
-        : null;
+    return low > 0 ? (UKE_MOVING_BOOK[frets.map((f) => f - low).join(' ')] ?? null) : null;
 }
 
 /**
@@ -878,6 +894,8 @@ const crowdedOptions = (
 ): FingerOption[] => {
     const fr = every[0].fr;
     const added = fr.length > 2;
+    // A suspension's 2nd or 4th, not an add9's 9th (#1820): an add9 is no suspension, and a
+    // guitar, the only instrument asked here, has no add9 grip (it plays the plain triad).
     if (fr.length < 2 || (added && !fr.some((n) => n.degree === '2' || n.degree === '4'))) {
         return [];
     }

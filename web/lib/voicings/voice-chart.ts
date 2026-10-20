@@ -62,6 +62,7 @@ export function voiceBandChart(chart: BandChart, prefs: NeckPrefs): VoicedBandCh
             written.key,
             written.keyIsMinor === true,
             written.display?.name.root ?? '',
+            instrument,
         );
         chords.push({ ...read, globalIndex: written.globalIndex });
     }

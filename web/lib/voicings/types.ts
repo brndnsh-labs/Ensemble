@@ -9,7 +9,8 @@ export interface Spelled {
 
 /**
  * Chord qualities the engine can voice: eight 7th-chord shells (the 7sus4 and m6 since #1817),
- * six triads (#1588) and the power chord (`five`).
+ * six triads (#1588), the add9 (#1820, a major triad with its 9th, ukulele only) and the power
+ * chord (`five`).
  */
 export type Quality =
     | 'maj7'
@@ -26,6 +27,7 @@ export type Quality =
     | 'aug'
     | 'sus4'
     | 'sus2'
+    | 'add9'
     | 'five';
 
 /**
@@ -36,17 +38,33 @@ export type GripKind = 'shell' | 'triad' | 'power';
 
 /**
  * Chord degrees used in voicings. `bb7` is the diminished 7th (same fret as a 6th); `2` and `4`
- * are a sus chord's suspensions, `#5` an augmented triad's 5th.
+ * are a sus chord's suspensions, `#5` an augmented triad's 5th. `9` is an add9's added tone
+ * (#1820): the 2nd's pitch class, named apart so a sus2's 2 (the 3rd's stand-in) and an add9's 9
+ * (a colour over the 3rd) read as the chords name them.
  */
-export type Degree = 'R' | '2' | '3' | 'b3' | '4' | '7' | 'b7' | 'bb7' | '6' | '5' | 'b5' | '#5';
+export type Degree =
+    | 'R'
+    | '2'
+    | '3'
+    | 'b3'
+    | '4'
+    | '7'
+    | 'b7'
+    | 'bb7'
+    | '6'
+    | '5'
+    | 'b5'
+    | '#5'
+    | '9';
 
 /**
  * Role of a shape's note.
  * R root, T third (a sus chord's 4th or 2nd, a 7sus4's 4th), S seventh (or 6th), F the 5th (on ukulele shells a
  * helper so all strings can be strummed), O the root an octave up (a power chord's top note),
- * R2/T2/F2 the same degree again (a ukulele chord doubles one tone to fill its four strings).
+ * R2/T2/F2 the same degree again (a ukulele chord doubles one tone to fill its four strings),
+ * N an add9's 9th, in the seat a ukulele triad would double (#1820, `QualityDef.added`).
  */
-export type ShapeRole = 'R' | 'T' | 'S' | 'F' | 'O' | 'R2' | 'T2' | 'F2';
+export type ShapeRole = 'R' | 'T' | 'S' | 'F' | 'O' | 'R2' | 'T2' | 'F2' | 'N';
 
 /** Role of a note inside a grip: a shape role, or X<degree> for an added tone on a free string. */
 export type Role = ShapeRole | `X${string}`;
