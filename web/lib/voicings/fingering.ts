@@ -58,6 +58,18 @@ export interface FingerOption {
      */
     resolves?: boolean;
     /**
+     * Set on the default fingering of a guitar open chord a method drills (`drilledChord`,
+     * fingered from the nut): the book fingering, which the chord beside it adapts to
+     * (`FingerOption.adapts`, #1835).
+     */
+    drilled?: boolean;
+    /**
+     * Set with `needs` and `hold` on a guitar fingering that keeps two fingers of a drilled
+     * open chord's book fingering (`adaptOptions`, #1835): it is taken only beside that chord
+     * in it (`FingerOption.drilled`). C7 x-3-2-3-x-x as 3-2-4 after C x-3-2-0-x-x (3-2).
+     */
+    adapts?: boolean;
+    /**
      * Set by `taughtOptions`: per note of `fr`, whether this fingering puts a different finger
      * on it than the grip's default fingering does (all false on the default itself). The
      * default is the cheapest unless a teaching rule names another (`taughtStrummed`,
@@ -891,7 +903,7 @@ const ukuleleDefault = (notes: Note[], free: FingerOption[]): FingerOption => {
  * rest of the hand off its frets: C♯m x-x-x-1-2-0 after G♯m played 2-3 for the middle
  * finger, the index left behind the nut (it is 1-2); A x-x-x-2-2-0 after Bm7♭5 played 3-4;
  * and C x-3-2-0-x-x beside F x-3-3-2-x-x played 2-1 for the middle finger, both fingertips a
- * fret past their own, where 2-1 is the fingering that keeps BOTH fingers into Am x-3-2-2-x-x.
+ * fret past their own (since #1835 C is never 2-1: `adaptOptions`).
  * A fingering with one fingertip off its fret still takes one finger that stays: Em
  * x-2-2-0-x-x as 1-2 into C (the middle finger is on its own fret and stays there). (A
  * x-x-x-2-2-0 as 1-2 into D, the index staying, was one until #1834: no method fingers A so,
@@ -1022,6 +1034,84 @@ const crossedOptions = (first: FingerOption, cost: number): FingerOption[] => {
 };
 
 /**
+ * A hand in position: every fingertip on the fret of its own number or a fret back from it,
+ * counted from where the hand sits (the index's fret, or the fret its lowest finger leaves
+ * for it), none ahead. Two fingers may cross on one fret, as in the open A's 2-1-3, on
+ * neighbouring strings or not (F♯m7♭5 2-0-2-x-1-x as 3-0-2-1 beside the C top, #1835).
+ */
+const inHand = (o: FingerOption): boolean => {
+    const lowest = lowestFinger(o);
+    if (lowest < 0) {
+        return false;
+    }
+    // The fret under the index, used or not.
+    const first = o.fr[lowest].fret - ((o.p[lowest] as number) - 1);
+    return o.p.every((f, i) => {
+        const back = f === null ? 0 : first + f - 1 - o.fr[i].fret;
+        return back >= 0 && back <= 1;
+    });
+};
+
+/**
+ * The fingerings that keep a drilled open chord's book fingering under the hand (#1835): a
+ * guitar grip beside an open chord a method drills (`drilledChord`, fingered from the nut),
+ * fingered so that two of that chord's fingers stay where they are, a fingertip each and the
+ * hand in position (`inHand`), and no idle index over a stretch or under a tucked little
+ * finger. Every method fingers open C x-3-2-0-1-0 as 3-2-(0)-1, adds the little finger for
+ * C7 and lifts the index for Cmaj7, so beside C x-3-2-0-x-x (3-2) the chord with C's notes on
+ * the A and D strings keeps the ring and middle finger there: C7 x-3-2-3-x-x and Cmaj7
+ * x-3-2-4-x-x are 3-2-4, the little finger added (their own fingering, 2-1-3, has the root
+ * under the middle finger and the hand a fret up the neck), and Am x-3-2-2-x-x is 3-2-1, C
+ * with the index added on the G string, the middle and index crossed on one fret as in the
+ * open A's 2-1-3. Neither is a fingering `splitOptions` makes or `taughtAmong` takes (3-2-4
+ * puts a shell's root under the ring finger), so before #1835 the plan kept both fingers by
+ * moving C instead, to 2-1, both fingertips a fret past their own: the chord the student
+ * learned is the one that should not move.
+ *
+ * A second fingering (`needs`) for TWO fingers that stay (`FingerOption.hold`), priced at the
+ * margin (`TAUGHT_MARGIN`), and taken only beside the drilled chord in its book fingering
+ * (`FingerOption.adapts`, `FingerOption.drilled`): beside anything else these hands are the
+ * holds #1617 and #1683 ruled out (B♭ x-5-3-3-x-x 4-2-3 after Dm). Alone, Am x-3-2-2-x-x
+ * is still the barre 2-1-1, and C7 and Cmaj7 2-1-3.
+ *
+ * And the drilled chord no longer offers its hand a fret up (`taughtStrummed`: C as 2-1, both
+ * fingertips past their own frets, which no method teaches). Measured over 3,120
+ * progressions × 15 setups, every chord that shared both of 2-1's fingers is offered one of
+ * these: kept for a neighbour that could not adapt, 2-1 was taken in none of the 24 sweep
+ * lines that had it, and the sweep is the same without it.
+ */
+const adaptOptions = (first: FingerOption, taken: Set<string>, cost: number): FingerOption[] => {
+    const fr = first.fr;
+    if (fr.length < 2 || fr.length > 4 || first.p.includes(null)) {
+        return [];
+    }
+    return perms(fr.length)
+        .map((p): FingerOption => ({ p, cost: handCost(fr, p, false), fr }))
+        .filter(
+            (o) =>
+                !taken.has(o.p.join()) &&
+                !behindTheNut(o) &&
+                inHand(o) &&
+                !idleIndexStretches(o) &&
+                !idleIndexTucked(o),
+        )
+        .sort((a, b) => a.cost - b.cost)
+        .flatMap((o) => {
+            const adapted = {
+                ...o,
+                cost,
+                hold: 2,
+                adapts: true,
+                own: o.p.map((f, i) => f !== first.p[i]),
+            };
+            return [
+                { ...adapted, needs: 'before' as const },
+                { ...adapted, needs: 'after' as const },
+            ];
+        });
+};
+
+/**
  * The crowded fingerings among `every` that `taken` does not already hold: a fingertip each
  * (or the index flat in place), the index not behind the nut, no finger ahead of its fret and
  * no idle index (`crowdedOptions`, `suspensionOptions`).
@@ -1149,12 +1239,13 @@ const weakFingersAlone = (o: FingerOption): boolean =>
  * is priced as the cheapest, so the plan reaches for it cold. A grip fingered from the nut
  * (`fingeredFromTheNut`) takes the cheapest with no fingertip ahead of its fret
  * (`aheadOfItsFret`): the guitar's C x-3-2-0-x-x is 3-2 and Em x-2-2-0-x-x 2-3. The
- * fingerings that rule passes over are still taught (Em as 1-2, C as 2-1 with the hand a
- * fret up) but only as second fingerings, taken to keep a finger on the chord before or
- * after (`needs`): C as 2-1 into Am x-3-2-2-x-x, both fingers staying; Em as 1-2 into C, the
- * middle finger staying. Each needs a finger to stay for every fingertip it has off its own
- * fret (`offItsFret`, #1683), and so do that grip's fingers left down: C beside F is 3-2,
- * since 2-1 would keep one finger with two off their frets. A guitar grip whose book
+ * fingerings that rule passes over are still taught (Em as 1-2) but only as second
+ * fingerings, taken to keep a finger on the chord before or after (`needs`): Em as 1-2 into
+ * C, the middle finger staying. Each needs a finger to stay for every fingertip it has off
+ * its own fret (`offItsFret`, #1683), and so do that grip's fingers left down. But a drilled
+ * open chord never takes the hand a whole fret up, both fingertips past their own (C as 2-1,
+ * #1835): the chord beside it adapts instead (`adaptOptions`: Am x-3-2-2-x-x as 3-2-1, C7
+ * x-3-2-3-x-x as 3-2-4). A guitar grip whose book
  * fingering the nut rule misses takes the book's (`GUITAR_BOOK`, #1691: D5 x-x-0-2-3-x and
  * Dsus2 x-x-x-2-3-0 are 1-3), the rule's own a second fingering for one finger that stays,
  * and the book's second fingerings are offered beside it (#1834: A x-x-x-2-2-0 is 2-3, and
@@ -1284,21 +1375,40 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
         // and the fingering is not one its book prints (A's 1-3 beside D keeps the index on
         // its note and slides the ring finger a fret, the hand where D has it, #1834).
         const drilled = drilledChord(notes);
+        const drilledOpen = fromTheNut && drilled;
         const held = (o: FingerOption): FingerOption =>
             fromTheNut
                 ? { ...o, hold: offItsFret(o), ...(drilled && !o.nut ? {} : { nut: true }) }
                 : o;
+        // Never a drilled chord with the hand a fret up the neck, both fingertips past their
+        // own frets (C as 2-1): the chord beside it keeps the book's fingers instead
+        // (`adaptOptions`, #1835). One fingertip off is a book fingering of its own (Em
+        // x 2 2 0 x x as 1-2), and stays a second fingering.
+        const offBook = (o: FingerOption): boolean => drilledOpen && !o.nut && offItsFret(o) === 2;
+        // Built from `ahead` BEFORE `offBook` filters it, so `adaptOptions` never offers the
+        // drilled chord's own off-the-book hand (C 2-1) back as an adapting neighbour's.
+        const taughtHere = new Set([
+            ...[...usual, ...free, ...ahead].map((o) => o.p.join()),
+            ...never,
+        ]);
         const crowded = crowdedOptions(
             everyFingering(notes, fr, opts),
-            new Set([...[...usual, ...free, ...ahead].map((o) => o.p.join()), ...never]),
+            taughtHere,
             best.cost + TAUGHT_MARGIN,
         );
+        const [own, ...rest] = free.map((o) => mark(o));
         return [
-            ...free.map((o) => mark(o)),
-            ...beside(ahead).map(held),
+            drilledOpen ? { ...own, drilled: true } : own,
+            ...rest,
+            ...beside(ahead.filter((o) => !offBook(o))).map(held),
             ...left.map(held),
             ...beside(crowded),
             ...beside(crossedOptions(first, best.cost + TAUGHT_MARGIN)),
+            ...adaptOptions(
+                first,
+                new Set([...taughtHere, ...crowded.map((o) => o.p.join())]),
+                best.cost + TAUGHT_MARGIN,
+            ),
         ];
     }
     // A second fingering is offered once for the chord before and once for the chord after,
@@ -1332,7 +1442,12 @@ export function taughtOptions(notes: Note[], opts: FingerOpts = {}): FingerOptio
         return taughtStrummed(notes, all, opts);
     }
     const taught = taughtAmong(all, fingeredFromTheNut(notes, all[0].fr, false));
-    return [...taught, ...suspensionOptions(notes, opts, taught, all[0].cost + TAUGHT_MARGIN)];
+    const margin = all[0].cost + TAUGHT_MARGIN;
+    return [
+        ...taught,
+        ...suspensionOptions(notes, opts, taught, margin),
+        ...adaptOptions(taught[0], new Set(taught.map((o) => o.p.join())), margin),
+    ];
 }
 
 /**
@@ -1491,7 +1606,8 @@ function heldFingers(marked: FingerOption, other: FingerOption): number {
  * A major or minor triad: every note the root, a 3rd or the 5th, and a 3rd among them. At the
  * nut these are the open chords a method drills first (C x-3-2-0-1-0, A, Am, Em, E, D), and
  * their fingering is the one the student learned, kept beside any chord but one that leaves
- * two of its fingers down (`offItsFret`, #1683: C beside F is 3-2, C as 2-1 is for Am). The
+ * two of its fingers down (`offItsFret`, #1683: C beside F is 3-2), and never left for the
+ * hand a fret up: the chord beside it adapts to it (`adaptOptions`, #1835). The
  * sus, dim, aug and power grips and the open shells are not drilled that way; a player
  * fingers them from the chord beside them (`nutHoldKept`, #1691). One exception: a
  * `GUITAR_BOOK` row's second fingering is counted that way too (#1834, A as 1-3 beside D).
@@ -1591,13 +1707,16 @@ const suspends = (a: FingerOption, b: FingerOption): boolean => {
 /**
  * Whether a marked fingering has what it asks of the chord beside it: its fingers shared
  * (`sharesTheHand`), enough of them held (`holdsEnough`), for a crowded one the same chord
- * (`FingerOption.sameRoot`), and for a crowded shell its suspension (`FingerOption.resolves`).
+ * (`FingerOption.sameRoot`), for a crowded shell its suspension (`FingerOption.resolves`), and
+ * for one that keeps a drilled open chord's fingers that chord in its book fingering
+ * (`FingerOption.adapts`, `FingerOption.drilled`, #1835).
  */
 const keptBy = (marked: FingerOption, other: FingerOption, inPlace: boolean): boolean =>
     sharesTheHand(marked, other, inPlace) &&
     holdsEnough(marked, other) &&
     (!marked.sameRoot || onOneRoot(marked, other)) &&
-    (!marked.resolves || suspends(marked, other));
+    (!marked.resolves || suspends(marked, other)) &&
+    (!marked.adapts || other.drilled === true);
 
 /** The same grip under the same fingers: the hand has not moved. */
 const sameFingers = (a: FingerOption, b: FingerOption): boolean =>
@@ -1630,8 +1749,8 @@ const ordinary = (o: FingerOption): boolean => !o.own?.includes(true);
  * chord that holds that many of them (`keptBy`).
  *
  * The same grip again under the same fingers is no change at all (`sameHand`, #1677): a chart
- * writes a chord once a bar, and a second fingering waits for the next chord that differs. C
- * x-3-2-0-x-x for two bars and then Am keeps both fingers, as it does for one.
+ * writes a chord once a bar, and a second fingering waits for the next chord that differs. A
+ * x-x-x-2-2-0 for two bars and then D keeps the index, as it does for one (A as 1-3, #1834).
  */
 function arrives(a: FingerOption | null, b: FingerOption): boolean {
     if (a && sameHand(a, b)) {

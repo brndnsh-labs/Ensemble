@@ -911,4 +911,23 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         expect(lines(['A', 'Asus4', 'A'], guitar([1, 6]), 'A').slice(0, 2)).toEqual([up, down]);
         expect(lines(['Asus4', 'A', 'Asus4'], guitar([1, 6]), 'A').slice(0, 2)).toEqual([down, up]);
     });
+
+    it('guitar open C keeps 3-2 and the chord beside it adds or lifts a finger (#1835)', () => {
+        // C x 3 2 0 x x was 2-1 beside these, both fingertips a fret past their own: "finger
+        // 1 bars fret 2" into Am, "fingers 1 and 2 stay down; finger 3 goes down" into C7.
+        // C7 and Cmaj7 are C with the little finger added (3-2-4), Am x 3 2 2 x x C with the
+        // index added (3-2-1), and back to C the index lifts.
+        expect(lines(['C', 'Am'], guitar(null))).toEqual([
+            'Fingers 2 and 3 stay down: E becomes the 5th and C the 3rd; ' +
+                'finger 1 goes down on the 3rd string, fret 2.',
+            'Fingers 2 and 3 stay down: E becomes the 3rd and C the root; lift finger 1.',
+        ]);
+        expect(lines(['C', 'C7'], guitar([1, 6]))).toEqual([
+            'Fingers 2 and 3 stay down; finger 4 goes down on the 3rd string, fret 3.',
+            'Fingers 2 and 3 stay down; lift finger 4.',
+        ]);
+        expect(lines(['C', 'Cmaj7'], guitar([1, 6]))[0]).toBe(
+            'Fingers 2 and 3 stay down; finger 4 goes down on the 3rd string, fret 4.',
+        );
+    });
 });
