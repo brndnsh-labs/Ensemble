@@ -4330,9 +4330,13 @@ describe('7sus4 and m6 are shells of their own (#1817)', () => {
             // 2 4 2 3 is the Am6 ukutabs and kytary print (read 2026-10-20), and the F♯m7♭5
             // grip: the four shells play every m6 with its 5th as the helper. 2 0 2 0, which
             // leaves the 5th out and doubles the root, is a variant they do not print, and no
-            // shape holds it. Known limit: they finger 2 4 2 3 as 1-3-1-2, the index across the
-            // G and E strings; alone the costs give it 1-4-2-3, as they do F♯m7♭5.
-            expect(played(UKULELE, 'Am6', home)).toEqual(['2 4 2 3 [1-4-2-3]']);
+            // shape holds it. Both chords are fingered as the charts print them (#1823, a
+            // `UKE_BOOK` row): 1-3-1-2, the index across the G and E strings under the ring
+            // finger, the middle on the A string. Alone the costs gave 1-4-2-3.
+            for (const inst of [UKULELE, UKULELE_LOW_G]) {
+                expect(played(inst, 'Am6', home)).toEqual(['2 4 2 3 [1-3-1-2]']);
+                expect(played(inst, 'F#m7b5', home)).toEqual(['2 4 2 3 [1-3-1-2]']);
+            }
         }
     });
     it('a grip is named for the shell it plays, with that shell’s degrees: A7sus4, Am6', () => {
@@ -4369,9 +4373,29 @@ describe('7sus4 and m6 are shells of their own (#1817)', () => {
                 '0 2 0 1 [0-2-0-1]',
                 '2 2 2 3 [1-1-1-2]',
             ]);
-            expect(played(UKULELE, 'Am Am6', home)).toEqual([
+            // Am's middle finger gives way to the index barre: Am 2 0 0 0 is fingered from
+            // the nut (the middle finger on the 2nd fret), and only a finger already down may
+            // keep the index there (`needs: 'left'`), as Am6 Am does.
+            expect(played(UKULELE, 'Am Am6 Am', home)).toEqual([
                 '2 0 0 0 [2-0-0-0]',
-                '2 4 2 3 [1-4-2-3]',
+                '2 4 2 3 [1-3-1-2]',
+                '2 0 0 0 [1-0-0-0]',
+            ]);
+            // Into E7 and from Dm the grips are the book's, each in its book fingering.
+            expect(played(UKULELE, 'Am6 E7', home)).toEqual([
+                '2 4 2 3 [1-3-1-2]',
+                '1 2 0 2 [1-2-0-3]',
+            ]);
+            expect(played(UKULELE, 'Dm Am6', home)).toEqual([
+                '2 2 1 0 [2-3-1-0]',
+                '2 4 2 3 [1-3-1-2]',
+            ]);
+            // The ii of a minor ii–V–i keeps the book fingering beside its neighbours.
+            expect(played(UKULELE, 'Cmaj7 F#m7b5 B7 Em', home)).toEqual([
+                '0 0 0 2 [0-0-0-2]',
+                '2 4 2 3 [1-3-1-2]',
+                '2 3 2 2 [1-2-1-1]',
+                '0 4 3 2 [0-3-2-1]',
             ]);
         }
     });
