@@ -471,6 +471,16 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         );
     });
 
+    it('D to Dsus4 slides one finger: the little finger stays on the root (#1819)', () => {
+        // D x 5 4 2 x x (4-3-1) to Dsus4 x 5 5 2 x x (4-3-1) in frets 2–7: the ring finger slides
+        // from the 3rd to the 4th. Dsus4 was 4-4-1, the little finger flat, and both strings
+        // changed finger.
+        expect(lines(['D', 'Dsus4'], guitar([2, 7]))).toEqual([
+            'Fingers 1 and 4 stay down; finger 3 slides up 1 fret.',
+            'Fingers 1 and 4 stay down; finger 3 slides down 1 fret.',
+        ]);
+    });
+
     it('says no change of job for a note that is the same degree in both chords', () => {
         const [toDominant, , toMinor] = lines(['Cmaj7', 'C7', 'Fmaj7', 'Fm7'], guitar([1, 6]));
         // Cmaj7 to C7: the root stays the root and the 3rd the 3rd.
@@ -742,11 +752,13 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
                 'finger 4 takes it over; finger 2 goes down on the E string, fret 5.',
         );
         // A string another finger frets at the barre's own fret sounds the same with the flat
-        // finger under it, so the little finger plainly stays: F♯sus2 x 4 4 1 x x (4-4-1) to
-        // F♯5 2 4 4 x x x (1-3-4), the ring finger on the 5th string's 4th fret.
-        expect(lines(['F#sus2', 'F#5'], guitar(null))[0]).toBe(
-            'Finger 4 stays down; C♯ is in both chords; finger 3 takes it over; ' +
-                'finger 1 moves to the 6th string, fret 2.',
+        // finger under it, so the ring finger plainly stays: Am x 7 7 5 x x (3-3-1) to A
+        // x 7 7 6 x x (2-3-1) in frets 5–10, the middle finger on the 5th string's 7th fret.
+        // (It was F♯sus2 x 4 4 1 x x to F♯5, until the guitar's little finger stopped lying
+        // flat, #1819: F♯sus2 is 3-4-1 and both fingers stay.)
+        expect(lines(['A5', 'Am', 'A'], guitar([5, 10]))[1]).toBe(
+            'Finger 3 stays down; E is in both chords; finger 2 takes it over; ' +
+                'finger 1 slides up 1 fret.',
         );
         // On a guitar a string the next chord leaves out is muted by the finger lying across
         // it, so the barre plainly stays: B°7 to Bsus2 in frets 2–7.

@@ -95,8 +95,8 @@ function perms(k: number): number[][] {
 export interface FingerOpts {
     /**
      * A strummed grip — a triad or power grip, or any ukulele chord: a finger may lie across
-     * a run of same-fret notes (#1594). Which finger is `barreOptions`' rule: the index, ring
-     * or little finger on a guitar, the index or ring on a ukulele (#1677), never the middle.
+     * a run of same-fret notes (#1594). Which finger is `barreOptions`' rule: the index or the
+     * ring finger, never the middle or the little finger (#1677, #1819).
      */
     barre?: boolean;
     /**
@@ -180,11 +180,22 @@ const BARRE_COST = 0.6;
 const holeCost = (fret: number): number => 4.6 - 0.3 * fret;
 
 /**
+ * The fingers that may lie flat: the index and the ring finger, never the middle, and never the
+ * little finger, which teachers rarely ask to (#1677 on the ukulele, #1819 on the guitar). The
+ * ukulele's closed E shape 1-4-4-2 is 1-3-4-2, a fingertip each, where the costs had the little
+ * finger across two strings; the guitar's Dsus4 x-5-5-2-x-x, E♭sus4 x-6-6-3-x-x and Csus2
+ * x-10-10-7-x-x are 3-4-1 where they were 4-4-1, and the power chord x-2-4-4-x-x is 1-3-3 or
+ * 1-3-4, never 1-4-4. Beside a chord that keeps the little finger on the lower string (D
+ * x-5-4-2-x-x, 4-3-1) the guitar grip is 4-3-1 instead (`crossedOptions`).
+ */
+const BARRE_FINGERS = [1, 3];
+
+/**
  * Barre fingerings (#1594): one finger flat across a contiguous run of strings at one fret, the
  * run's ends both notes of the grip at that fret. Legal only when every string inside the run is
  * in the grip at that fret or higher — a lower note (an open string included) would be stopped by
  * the barre, and a string left out would sound it. The index bars at the grip's lowest fret; the
- * ring or little finger bars above an index note (C 5-5-3: index on the 3, ring across the 5s).
+ * ring finger bars above an index note (C 5-5-3: index on the 3, ring across the 5s).
  * The middle finger never bars. One barre per grip. Every other finger keeps the split rule, with
  * the barre counted once at its fret. The candidates are costed alongside the split ones, so the
  * planner, not a rule, decides between them.
@@ -204,16 +215,9 @@ const holeCost = (fret: number): number => 4.6 - 0.3 * fret;
  * string beyond the fingertip is clear of it: Gm7 0-2-1-1 and Gmaj7 0-2-2-2 are barres, and
  * so are the guitar's E5 0-2-2-x-x-x and A5 x-0-2-2-x-x.
  *
- * `fingers` is which fingers may lie flat. The ukulele's little finger never does (#1677): the
- * closed E shape 1-4-4-2 is 1-3-4-2, a fingertip each, where the costs had the little finger
- * across two strings.
+ * Only the index and the ring finger lie flat (`BARRE_FINGERS`).
  */
-function barreOptions(
-    notes: Note[],
-    fr: Note[],
-    strummed: boolean,
-    fingers: number[] = [1, 3, 4],
-): FingerOption[] {
+function barreOptions(notes: Note[], fr: Note[], strummed: boolean): FingerOption[] {
     const out: FingerOption[] = [];
     const byString = new Map(notes.map((n) => [n.string, n]));
     for (const f of new Set(fr.map((n) => n.fret))) {
@@ -238,7 +242,7 @@ function barreOptions(
                 }
                 const inBarre = fr.map((n) => n.fret === f && n.string >= lo && n.string <= hi);
                 const rest = fr.filter((_, i) => !inBarre[i]);
-                for (const b of fingers) {
+                for (const b of BARRE_FINGERS) {
                     if (hole && b !== 1) {
                         continue;
                     }
@@ -264,7 +268,7 @@ function barreOptions(
                                 }
                             }
                         }
-                        // A ring or little-finger barre sits above an index note on a lower fret.
+                        // A ring-finger barre sits above an index note on a lower fret.
                         if (ok && b !== 1) {
                             ok = rest.some((n, i) => q[i] === 1 && n.fret < f);
                         }
@@ -315,7 +319,7 @@ function rootBarreOptions(notes: Note[], fr: Note[], split: FingerOption[]): Fin
 function everyFingering(notes: Note[], fr: Note[], opts: FingerOpts): FingerOption[] {
     const out = splitOptions(fr, !opts.barre);
     if (opts.barre) {
-        out.push(...barreOptions(notes, fr, true, opts.ukulele ? [1, 3] : [1, 3, 4]));
+        out.push(...barreOptions(notes, fr, true));
     } else if (opts.rootBarre) {
         out.push(...rootBarreOptions(notes, fr, out));
     }
@@ -588,13 +592,28 @@ const barringFinger = (o: FingerOption): number =>
  * ring finger across a fret that is only one above the index's (F x-3-3-2-x-x as 3-3-1, Dm
  * 2-2-1-0 as 3-3-1). A flat finger cannot also be pulled back, and the grip has a fingering
  * with a fingertip per note (2-3-1). Two frets above the index the ring finger lies flat as it
- * does in the A-shape barre chord (C x-x-x-5-5-3, B5 x-2-4-4-x-x), and three above, the little
- * finger.
+ * does in the A-shape barre chord (C x-x-x-5-5-3, B5 x-2-4-4-x-x); three above, on a guitar,
+ * it is a stretch (`stretchedBarre`).
  */
 const crampedBarre = (o: FingerOption): boolean => {
     const b = barringFinger(o);
     const index = o.p.indexOf(1);
     return b > 1 && index >= 0 && o.fr[o.p.indexOf(b)].fret - o.fr[index].fret < b - 1;
+};
+
+/**
+ * A guitar ring finger laid flat three frets or more above the index (#1819): Dsus4
+ * x-5-5-2-x-x as 3-3-1. That was the little finger's barre (4-4-1), and with the little finger
+ * never flat (`BARRE_FINGERS`) the ring finger took its place beside a power chord's ring
+ * barre (G5 3-5-5-x-x-x 1-3-3 to Gsus2 x-5-5-2-x-x), a stretch no guitar method shows: the
+ * ring finger lies flat two frets above the index, as in the A shape (`crampedBarre`), and
+ * three above the grip is a fingertip each, 3-4-1. The ukulele is not asked: its closed E
+ * shape's second fingering 1-3-3-2 is one the books print.
+ */
+const stretchedBarre = (o: FingerOption): boolean => {
+    const b = barringFinger(o);
+    const index = o.p.indexOf(1);
+    return b === 3 && index >= 0 && o.fr[o.p.indexOf(b)].fret - o.fr[index].fret > 2;
 };
 
 /**
@@ -920,6 +939,41 @@ const crowdedOptions = (
 };
 
 /**
+ * The ring and little finger crossed on one fret (#1819): a guitar grip whose default puts the
+ * ring finger on the lower-pitched of two neighbouring strings and the little finger on the
+ * higher, above the index, also offered the other way round, 4-3-1. Dsus4 x-5-5-2-x-x is 3-4-1
+ * alone, a fingertip each (it was 4-4-1, the little finger flat, `BARRE_FINGERS`); beside D
+ * x-5-4-2-x-x, 4-3-1, the little finger stays on the root and the index on the 5th, and the
+ * ring finger slides a fret up its string to the 4th and back, as a teacher shows it. Taken
+ * as 3-4-1 there, both strings changed finger. The same shape at every fret: E♭ x-6-5-3-x-x to
+ * E♭sus4 x-6-6-3-x-x, and the sus2 under its root a string lower.
+ *
+ * `splitOptions` never offers it, since on one fret it gives the lower-pitched string the
+ * lower finger; so it is a second fingering (`needs`), priced at the margin (`TAUGHT_MARGIN`),
+ * for TWO fingers that stay (`FingerOption.hold`): the neighbour must already hold the little
+ * finger and another finger where this one has them, as D's 4-3-1 does. One held note does
+ * not buy it, nor a chord on another root (`FingerOption.sameRoot`): it is the suspension's
+ * hand, the chord's with one finger moved.
+ */
+const crossedOptions = (first: FingerOption, cost: number): FingerOption[] => {
+    const { fr, p } = first;
+    const ring = p.indexOf(3);
+    const little = p.indexOf(4);
+    if (
+        ring < 0 ||
+        little < 0 ||
+        !p.includes(1) ||
+        p.includes(null) ||
+        fr[ring].fret !== fr[little].fret ||
+        fr[ring].string !== fr[little].string + 1
+    ) {
+        return [];
+    }
+    const swapped = p.map((f) => (f === 3 ? 4 : f === 4 ? 3 : f));
+    return [{ ...first, p: swapped, cost, hold: 2, sameRoot: true }];
+};
+
+/**
  * The crowded fingerings among `every` that `taken` does not already hold: a fingertip each
  * (or the index flat in place), the index not behind the nut, no finger ahead of its fret and
  * no idle index (`crowdedOptions`, `suspensionOptions`).
@@ -1033,7 +1087,8 @@ const weakFingersAlone = (o: FingerOption): boolean =>
  *   4-3-2-2 is 3-2-1-1, never 4-3-1-2), and no idle index over a stretch, nor on a guitar
  *   under a little finger tucked inside the grip (`idleIndexTucked`, #1691: the D shape is
  *   never 2-4-3).
- * - No ring or little finger laid flat a fret above the index (`crampedBarre`).
+ * - No ring finger laid flat a fret above the index (`crampedBarre`), nor on a guitar three
+ *   above it (`stretchedBarre`, #1819).
  * - Where the cheapest lays the ring or little finger flat, the fingering with a fingertip per
  *   note in position is taught beside it (`inPosition`): the power chord's 1-3-4 beside 1-3-3,
  *   the A shape's 3-4-1 beside 3-3-1, the ukulele's E♭m 3-3-2-1 as 3-4-2-1. Teachers show
@@ -1075,7 +1130,8 @@ const weakFingersAlone = (o: FingerOption): boolean =>
  *
  * A guitar grip is also offered the fingerings that crowd the hand to keep two fingers down
  * (`crowdedOptions`, #1683): a finger lifted, or a suspension's finger added beside its own
- * chord (Dsus4 x-x-x-2-3-3 as 1-3-4 beside D).
+ * chord (Dsus4 x-x-x-2-3-3 as 1-3-4 beside D); and its ring and little finger crossed on one
+ * fret beside its own chord (`crossedOptions`, #1819: Dsus4 x-5-5-2-x-x as 4-3-1 beside D).
  */
 function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): FingerOption[] {
     if (all[0].p.includes(null)) {
@@ -1093,6 +1149,7 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
             o.cost <= best.cost + TAUGHT_MARGIN &&
             !idleIndexStretches(o) &&
             !(idleIndexTucked(o) && !ukulele) &&
+            !(stretchedBarre(o) && !ukulele) &&
             !crampedBarre(o),
     );
     if (barringFinger(best) > 1) {
@@ -1171,6 +1228,7 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
             ...beside(ahead).map(held),
             ...left.map(held),
             ...beside(crowded),
+            ...beside(crossedOptions(first, best.cost + TAUGHT_MARGIN)),
         ];
     }
     // A second fingering is offered once for the chord before and once for the chord after,
