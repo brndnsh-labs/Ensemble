@@ -750,4 +750,20 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
             'Finger 1 stays down on D; fingers 3 and 4 stay down; skip the A string.',
         );
     });
+
+    it('a chord that frets nothing says to lift every finger (#1818)', () => {
+        // Uke E7 1 2 0 2 to Am7 0 0 0 0: all lifts, which the line otherwise leaves out.
+        expect(lines(['E7', 'Am7'], uke)).toEqual([
+            'Lift every finger: all four strings ring open.',
+            'Finger 1 goes down on the G string, fret 1; finger 2 goes down on the C string, ' +
+                'fret 2; finger 3 goes down on the A string, fret 2.',
+        ]);
+        // From a grip that skipped strings the skip clause says what to strum: G5 0 2 3 x to
+        // C6 0 0 0 0.
+        expect(lines(['G5', 'C6'], uke)[0]).toBe('Lift every finger; strum all four strings.');
+        // The guitar's open Em7 shell 0 x 0 0 x x, after Am7 x 0 x 0 1 x.
+        expect(lines(['Am7', 'Em7'], guitar(null))[0]).toBe('Lift every finger.');
+        // Open to open is no move at all.
+        expect(lines(['Am7', 'C6'], uke)).toEqual(['', '']);
+    });
 });
