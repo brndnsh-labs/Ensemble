@@ -610,13 +610,12 @@ const lowString = (v: Voicing): number => Math.min(...v.notes.map((n) => n.strin
  *   it slides up the neck (`E5 G5 A5 E5` in frets 5–10 ends 9-9-12-12, and went back down to
  *   2-4-5-x), and the riffs at the nut (`B♭5 D♭5 E♭5 B♭5` left the book's x-x-1-1 beside D♭5
  *   1-1-4-4 for 3-5-6-x; with no window, `B♭5 E♭5 F5` 3-5-6-x / 3-3-6-6 / 5-5-8-8 dropped F5
- *   to x-0-1-x). What dropping it gained is real, and stays a known limit: up the neck, a
- *   lone power chord between strummed chords whose window holds no grip for it takes the
- *   four-string grip two frets out over the three-string one a fret past (`F F5 F` in frets
- *   7–12 is 10-9-8-8 / 5-5-8-8 / 10-9-8-8, where a player keeps the hand at 10-12-13-x; E♭5
- *   in frets 5–10 is 3-3-6-6, D♭5 in 3–8 1-1-4-4). That is not this term's: `aFretPast`
- *   widens a window only for a grip that strums every string, so the three-string grip a fret
- *   past is not on offer there.
+ *   to x-0-1-x). What dropping it gained was not this term's to give: up the neck, a lone
+ *   power chord between strummed chords whose window holds no grip for it took the four-string
+ *   grip two frets out over the three-string one a fret past (`F F5 F` in frets 7–12 was
+ *   10-9-8-8 / 5-5-8-8 / 10-9-8-8, where a player keeps the hand at 10-12-13-x), because the
+ *   three-string grip was not on offer there. Since #1814 it is (`powerAFretPast`), and this
+ *   term is left as it was.
  * - **Move by step.** Each note of the new grip is costed on its own string: a common tone (same
  *   string, same fret) is free, a slide costs by its fret distance (an open string is fret 0), a
  *   string that was silent before is a fresh placement. A note on an open string costs nothing in
@@ -886,6 +885,60 @@ const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): bo
     v.notes.every((n) => n.fret === 0 || (n.fret >= home[0] - REACH && n.fret <= home[1] + REACH));
 
 /**
+ * A ukulele power chord's three-string grip, the G shape, no more than a fret past a window up
+ * the neck (#1814): where the hand stays when a power chord falls among strummed chords and
+ * the window holds no grip for it. `F F5 F` in frets 7–12 is 10-9-8-8 / 10-12-13-x /
+ * 10-9-8-8, E♭5 beside E♭ in frets 5–10 8-10-11-x, D♭5 beside D♭ in 3–8 6-8-9-x. Left to the
+ * costs, every grip out of the window paid the same, and the four-string grip two frets out
+ * won on the notes it shares with the chord beside it (5-5-8-8, 3-3-6-6, 1-1-4-4): the hand
+ * left the window for one chord and came back.
+ *
+ * A step of its own in `candidates`, after `aFretPast`'s, for two reasons.
+ *
+ * - **Four strings first.** A grip that leaves a string out is taken only where no grip that
+ *   strums every string is in reach, as the two-string grips are at the nut (`ShapeDef.nutOnly`,
+ *   #1809). So A5 in frets 3–8 is still the book's 2-4-0-0, all four strings, and not
+ *   2-4-5-x: both sit a fret below the window, and a strummed chart would have to skip the A
+ *   string for the closed one. Offered together, the costs took 2-4-5-x for A5 alone.
+ * - **Not in a riff** (`inRiffAt`). Beside another power chord the hand moves with the riff's
+ *   shape, and the costs keep it: offered there, the three-string grip pulled the riff apart
+ *   (`A♭5 D♭5 E♭5` in frets 3–8 went from 1-3-4-x / 1-1-4-4 / 3-3-6-6 to 8-8-11-11 / 6-8-9-x /
+ *   3-3-6-6, `C5 F5 G5` in 7–12 to 12-12-15-15 / 10-12-13-x / 7-7-10-10).
+ *
+ * Fretted only: every note within the widened window, none open, since up the neck an open
+ * string is the hand gone back to the nut. Offered the open G5 0-2-3-x in frets 3–8, `G G5 G`
+ * went from 7-7-7-5 / 7-7-10-10 to 4-7-7-5 / 0-2-3-x, where the index stays at the 7th fret.
+ * The four-string open forms (A5 2-4-0-0, E5 4-4-0-2) are `aFretPast`'s, as they were. Never
+ * at the nut (`atTheNut`), where the two-string grips cover these chords.
+ */
+const powerAFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
+    home !== null &&
+    !atTheNut(home) &&
+    inst.id === 'uke' &&
+    v.shape.kind === 'power' &&
+    v.notes.every((n) => n.fret >= home[0] - REACH && n.fret <= home[1] + REACH);
+
+/**
+ * A power chord in a riff (#1814): the nearest different chord before or after it in the chart
+ * is a power chord too. A chord repeated is the same chord, so `E♭5 E♭5 F5` is a riff.
+ */
+const inRiffAt = (chart: ChartChord[], i: number): boolean => {
+    if (chart[i].quality !== 'five') {
+        return false;
+    }
+    const key = chordKey(chart[i]);
+    const nextDifferent = (step: number): ChartChord | undefined => {
+        for (let j = i + step; j >= 0 && j < chart.length; j += step) {
+            if (chordKey(chart[j]) !== key) {
+                return chart[j];
+            }
+        }
+        return undefined;
+    };
+    return [-1, 1].some((step) => nextDifferent(step)?.quality === 'five');
+};
+
+/**
  * The grips a chord is voiced from: the first of these that holds any.
  *
  * 1. A ukulele chord's book grips in first position (`bookGrip`, #1675): where it has one, it
@@ -904,6 +957,8 @@ const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): bo
  *    before a grip somewhere else on the neck (in frets 1–6, roots on the 6th and 5th strings,
  *    E♭m7♭5 is x-6-7-6-7-x, not x-6-4-6-x-5; E♭maj7, which has no grip inside at all, is
  *    x-6-5-7-x-x and not the 11th fret).
+ *    Then, where none of those is in reach, a ukulele power chord's three-string grip a fret
+ *    past (`powerAFretPast`, #1814), unless the chord is in a riff (`inRiffAt`).
  * 4. Any grip inside the window, those three kinds included: an awkward grip in the place the
  *    musician put the hand is still the right chord, and it beats leaving.
  * 5. Nothing near: every grip on the neck, those three kinds last, and the costs pick (they
@@ -915,14 +970,15 @@ const aFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): bo
  * every chord has such a grip in every six-fret window, as every ukulele shell does. A guitar
  * triad or power chord has neither a buried root nor a reach, so for it this is what it
  * always was: the grips inside the window, or every grip when none fits. A ukulele triad gets
- * to step 3 only where a window up the neck holds nothing but a five-fret reach, and its two
- * power shapes where such a window holds neither.
+ * to step 3 only where a window up the neck holds nothing but a five-fret reach, and its
+ * power chords where such a window holds neither (the four-string grips first, then the
+ * three-string one).
  *
  * Each step's grips are all inside the window or all outside it (step 3 is only looked at for
  * what step 2 did not find inside, and step 5 when nothing is inside at all), which is why
  * `unaryCost`'s out-of-window term never picks between them.
  */
-function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
+function candidates(c: ChartChord, opts: VoiceOptions, inRiff: boolean): Voicing[] {
     const home = opts.home ?? null;
     const inst = opts.instrument;
     const every = allPositions(inst, c.root, c.quality, { rootStrings: opts.rootStrings });
@@ -950,6 +1006,7 @@ function candidates(c: ChartChord, opts: VoiceOptions): Voicing[] {
         () => inside.filter((v) => firstPosition(v, home, inst)),
         () => clear(inside),
         () => clear(all.filter((v) => inReach(v, home) || aFretPast(v, home, inst))),
+        () => (inRiff ? [] : all.filter((v) => powerAFretPast(v, home, inst))),
         () => inside,
         () => clear(all),
     ];
@@ -1108,7 +1165,7 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     };
     const picked = unifyGrips(
         chart,
-        chart.map((c) => candidates(c, opts)),
+        chart.map((c, i) => candidates(c, opts, inRiffAt(chart, i))),
         plan,
         opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
         opts.instrument,
