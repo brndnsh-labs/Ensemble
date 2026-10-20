@@ -1,6 +1,6 @@
 /**
  * The shell adapter (#1585, #1588): Ensemble's chord authority (`parseChord`) and key-aware
- * speller (`spellPitchClass`) read as the engine's six shells, six triads and power chord. Pinned
+ * speller (`spellPitchClass`) read as the engine's eight shells, six triads and power chord. Pinned
  * here: the codec's whole quality
  * vocabulary adapts, the faithful/approximated split, key spelling, and every bundled standard
  * voicing inside a hand window.
@@ -70,13 +70,24 @@ describe('faithful and approximated shells', () => {
         ['Csus2', 'sus2'],
         ['C2', 'sus2'],
         ['C5', 'five'],
+        // A shell's seats hold a 7sus4's 4th and a m6's 6th (#1817); the 9ths and 13ths above
+        // them are dropped as they are from any shell, and an 11 chord is a 9sus4.
+        ['C7sus4', '7sus4'],
+        ['C7sus', '7sus4'],
+        ['C9sus4', '7sus4'],
+        ['C13sus4', '7sus4'],
+        ['C11', '7sus4'],
+        ['C7b9sus', '7sus4'],
+        ['A7sus4', '7sus4'],
+        ['Cm6', 'm6'],
+        ['Am6', 'm6'],
+        ['C-6', 'm6'],
+        ['C-69', 'm6'],
     ])('%s is a faithful %s', (symbol, quality) => {
         expect(shell(symbol)).toMatchObject({ quality, approximation: null });
     });
 
     it.each([
-        ['C7sus4', 'dom7', /sus/],
-        ['Cm6', 'm7', /m6/],
         ['C-^7', 'm7', /minor-major/],
         ['C7#5', 'dom7', /augmented/],
         ['Cmaj7#5', 'maj7', /augmented/],

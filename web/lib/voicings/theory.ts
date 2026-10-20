@@ -62,9 +62,12 @@ export interface QualityDef {
     /** Which shapes voice it: 7th-chord shells, closed triads, or power chords. */
     kind: GripKind;
     symbol: string;
-    /** The T role's degree; a sus chord's 4th or 2nd sits there. Null for a power chord. */
+    /**
+     * The T role's degree; a sus chord's 4th or 2nd sits there, and a 7sus4 shell's 4th. Null
+     * for a power chord.
+     */
     third: Degree | null;
-    /** The S role's degree: a shell's 7th (or 6th). Triads and power chords have none. */
+    /** The S role's degree: a shell's 7th (or a 6 or m6's 6th). Triads and power chords have none. */
     seventh?: Degree;
     /** The F role's degree: the triad's 5th, or what a uke shell's helper note plays. */
     five: Degree;
@@ -100,6 +103,11 @@ export const QUALITIES: Record<Quality, QualityDef> = {
         required: ['b5'],
     },
     six: { kind: 'shell', symbol: '6', third: '3', seventh: '6', five: '5', required: [] },
+    // A shell's two seats hold whatever names the chord (#1817): a 7sus4 is R–4–♭7, the 4th in
+    // the 3rd's seat as in a sus triad, and a m6 is R–♭3–6, the 6th in the 7th's as in `six`.
+    // So Wonderwall's A7sus4 plays its D, where the dominant 7 it used to be played a C♯.
+    '7sus4': { kind: 'shell', symbol: '7sus4', third: '4', seventh: 'b7', five: '5', required: [] },
+    m6: { kind: 'shell', symbol: 'm6', third: 'b3', seventh: '6', five: '5', required: [] },
     // Triads (#1588): three chord tones, all of them played — a pop, rock or country chart writes
     // these, and adding a 7th to them would teach a chord the chart doesn't ask for.
     maj: { kind: 'triad', symbol: '', third: '3', five: '5', required: [] },

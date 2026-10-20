@@ -1,7 +1,8 @@
 /**
- * Ensemble's chords, read as shells (#1585) and triads (#1588). The engine voices six 7th-chord
- * qualities as three-note R/3/7 grips, plain triads (major, minor, dim, aug, sus4, sus2) as
- * closed triad grips and a power chord as root–5th–octave; this adapter is the only place a chart chord becomes one. It reads the band's
+ * Ensemble's chords, read as shells (#1585) and triads (#1588). The engine voices eight 7th-chord
+ * qualities (maj7, 7, m7, m7♭5, °7, 6, and since #1817 7sus4 and m6) as three-note R/3/7 grips,
+ * plain triads (major, minor, dim, aug, sus4, sus2) as closed triad grips and a power chord as
+ * root–5th–octave; this adapter is the only place a chart chord becomes one. It reads the band's
  * chord authority (`parseChord`'s `ChordFacts`) rather than re-parsing the symbol, and spells
  * the root with the chart sheet's own key-aware speller (`spellPitchClass`), so the neck names
  * a chord the way the chart above it does: B♭ major has E♭, never D♯.
@@ -106,7 +107,7 @@ function readTriad(chord: ChordFacts): Reading | null {
     ];
 }
 
-/** The triads, the six shells, and the reduction (with its reason) for every other chord. */
+/** The triads, the eight shells, and the reduction (with its reason) for every other chord. */
 function read(chord: ChordFacts): Reading {
     const triad = readTriad(chord);
     if (triad) {
@@ -114,14 +115,21 @@ function read(chord: ChordFacts): Reading {
     }
     const { third, fifth, seventh, sixth } = chord;
     if (third === null) {
-        // A sus or power chord with a 7th (7sus4, 9sus): a shell can't hold both the suspension
-        // and the 7th, so it supplies the 3rd. A sus resolves to its dominant (the 3rd replaces
-        // the 4th); a power chord keeps whichever 7th it wrote, else the plain maj7.
+        // A power chord with a 7th: the shell supplies the 3rd, and keeps whichever 7th it wrote,
+        // else the plain maj7.
         if (chord.family === 'power') {
             return seventh === 10
                 ? ['dom7', 'power chord played as a 7 (adds the 3rd)']
                 : ['maj7', 'power chord played as maj7 (adds the 3rd and 7th)'];
         }
+        // A 7sus4 holds its 4th in the shell's 3rd seat, as a sus triad does (#1817). The 9sus4,
+        // 13sus4 and 11 (a 9sus4 by another name) are the same shell: it drops their 9th and
+        // 13th as it drops a dom9's, and an altered 9th or 13th is colour over the same chord.
+        if (seventh === 10 && chord.intervals.some((n) => n % 12 === 5)) {
+            return ['7sus4', null];
+        }
+        // No other sus chord with a 7th reaches here today (the codec writes no 7sus2 or
+        // maj7sus4); were one to, it resolves to the 7th chord under it.
         return seventh === 11
             ? ['maj7', 'sus chord played as maj7 (the 3rd replaces the 4th)']
             : ['dom7', 'sus chord played as a dominant 7 (the 3rd replaces the 4th)'];
@@ -143,7 +151,8 @@ function read(chord: ChordFacts): Reading {
                     : 'diminished triad played as a °7 shell',
             ];
         }
-        // Every other minor chord is a m7 shell: the ♭3 and ♭7 are what a minor chord sounds like.
+        // Every other minor chord but the m6 is a m7 shell: the ♭3 and ♭7 are what a minor chord
+        // sounds like.
         if (fifth === 8) {
             return ['m7', 'minor ♯5 played as m7 (the ♯5 is not played)'];
         }
@@ -153,8 +162,10 @@ function read(chord: ChordFacts): Reading {
         if (seventh === 11) {
             return ['m7', 'minor-major 7 played as m7 (the 7th is lowered)'];
         }
+        // A m6 (and a m6/9, whose 9th the shell drops) is R–♭3–6, the 6th in the 7th's seat
+        // as in a 6 chord (#1817).
         if (sixth) {
-            return ['m7', 'm6 played as m7 (♭7 instead of 6)'];
+            return ['m6', null];
         }
         if (chord.intervals.some((n) => n % 12 === 8)) {
             return ['m7', 'minor ♭6 played as m7 (♭7 instead of ♭6)'];
