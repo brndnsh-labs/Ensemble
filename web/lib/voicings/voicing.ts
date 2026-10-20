@@ -455,8 +455,20 @@ function viterbi<T>(states: T[][], unary: (s: T) => number, trans: (a: T, b: T) 
  * Every ukulele grip since #1809; until then only one that strums every string
  * (`strumsEveryString`), so a two- or three-string power chord in frets 1–6 was still aimed
  * at the window's middle, and B♭5 alone took 3-5-6-x for the book's x-x-1-1 (F5 and F♯5,
- * with no grip inside the window then, took 10-12-13-x and 11-13-14-x). No guitar grip is
- * aimed this way.
+ * with no grip inside the window then, took 10-12-13-x and 11-13-14-x).
+ *
+ * A guitar triad or power grip in a window from fret 1 is aimed at first position too (#1827):
+ * the middle of the frets the hand covers there, the 1st to the 4th (`FIRST_POSITION_TOP`),
+ * not the window's middle, a fret higher. That fret is what sat a lone Gsus2 or Dsus4 on
+ * x-x-5-2-3-x, a finger reaching from the 2nd fret to the 5th, over x-x-x-2-3-3, the top of
+ * the book's Dsus4, by 0.15; and E5 alone on x-x-2-4-5-x for 0-2-2-x-x-x, F5 x-x-3-5-6-x for
+ * 1-3-3-x-x-x, D x-5-4-2-x-x for x-x-x-2-3-2. Not the guitar's no-window home, the 3rd fret
+ * (`defaultTarget`): from there x-x-x-2-3-3 and x-x-5-2-3-x are each half a fret off and tie. The
+ * pull stays the window's 0.15, the window still keeping the hand close: at the no-window 0.45
+ * the sweep moved 1,902 lines rather than 1,116, and jumps of the hand by three frets or of
+ * the string set by two strings rose by 89 and 114 where at 0.15 they rise by 42 and not at
+ * all. A guitar shell keeps the window's middle: its costs are a jazz comper's (`byHand`),
+ * and the characterization pins them.
  */
 function unaryCost(v: Voicing, opts: VoiceOptions): number {
     const home = opts.home ?? null;
@@ -464,7 +476,11 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
     const target = windowed ? (home[0] + home[1]) / 2 : opts.instrument.defaultTarget;
     const pull = windowed ? 0.15 : 0.45;
     if (byHand(v, opts.instrument)) {
-        return triadUnaryCost(v, target, pull, home, opts.instrument);
+        // A guitar triad or power grip in a window from fret 1 is aimed at first position, at
+        // the window's pull (#1827, above). Guitar only: `windowed` is already false for a
+        // ukulele window from fret 1, which takes `defaultTarget` instead.
+        const aim = windowed && atTheNut(home) ? (1 + FIRST_POSITION_TOP) / 2 : target;
+        return triadUnaryCost(v, aim, pull, home, opts.instrument);
     }
     // The out-of-window term (here and in `triadUnaryCost`) never picks a grip: `candidates` gives
     // a chord its in-window grips, else its grips a fret's reach past the window (`inReach`,

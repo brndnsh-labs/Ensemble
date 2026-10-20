@@ -596,10 +596,11 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
             'F and D are in both chords: F becomes the 5th and D the 3rd; ' +
                 'finger 3 takes over D; finger 1 bars fret 3 on the 4th and 3rd strings.',
         );
-        // Both notes to a fingertip each, and they are still "them": B♭ back to Dm.
+        // Both notes to a fingertip each, and they are still "them": B♭ back to Dm (x x 3 2 3 x
+        // and x x 3 3 3 x since #1827, a fret lower than x 5 3 2 x x and x 5 3 3 x x).
         expect(lines(['Dm', 'Bb'], guitar([1, 6]))[1]).toBe(
             'F and D are in both chords: F becomes the 3rd and D the root; ' +
-                'fingers 2 and 4 take them over; finger 1 moves to the 3rd string, fret 2.',
+                'fingers 2 and 3 take them over; finger 1 moves to the 3rd string, fret 2.',
         );
     });
 
