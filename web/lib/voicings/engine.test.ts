@@ -2211,11 +2211,13 @@ describe('fingers a teacher would show (#1611)', () => {
     /**
      * A guitar shell's taught fingerings, cheapest first. A mark is a fingering taken only
      * beside a chord that shares its fingers: `*` fingers left where they were, `<` and `>`
-     * the second standard fingering that keeps the hand on the chord before or after.
+     * the second standard fingering that keeps the hand on the chord before or after. The
+     * fingerings taken only beside a drilled open chord (`FingerOption.adapts`, #1835) are
+     * left out, as the crowded ones are: they are pinned in their own describe.
      */
     const taught = (tabs: string, root: number, opts: FingerOpts = SHELL) =>
         taughtOptions(notesOf(tabs, root), opts)
-            .filter((o) => !crowds(tabs, root, opts)(o))
+            .filter((o) => !crowds(tabs, root, opts)(o) && !o.adapts)
             .map((o) => fingersOf(o.p) + (o.needs ? MARK[o.needs] : ''));
     /** Every fingering within reach, cheapest first, each with how much dearer than the cheapest. */
     const within = (tabs: string, root: number) => {
@@ -3196,7 +3198,9 @@ describe('fingers a teacher would show (#1611)', () => {
             const second = taughtOptions(notesOf('x 2 2 0 x x', 0), { barre: true }).slice(1, 3);
             expect(second.map((o) => `${fingersOf(o.p)}:${o.hold}`)).toEqual(['1-2:1', '1-2:1']);
             // And a closed grip's asks for nothing more than the note it shares.
-            const closed = taughtOptions(notesOf('x 3 3 2 x x', 0), { barre: true });
+            const closed = taughtOptions(notesOf('x 3 3 2 x x', 0), { barre: true }).filter(
+                (o) => !o.adapts,
+            );
             expect(closed.map((o) => `${fingersOf(o.p)}:${o.hold}`)).toEqual([
                 '2-3-1:undefined',
                 '3-4-2:undefined',
@@ -3255,6 +3259,9 @@ describe('fingers a teacher would show (#1611)', () => {
 
         describe('guitar: from the nut a finger takes the fret of its number', () => {
             it('open C x 3 2 0 x x is 3-2; 2-1 only to keep both fingers into Am', () => {
+                // These grips carry only roots and 5ths (`notesOf`), so no drilled chord is
+                // asked: the nut rule alone. The real C, a drilled chord, is never 2-1 and the
+                // Am beside it is 3-2-1 (#1835, the describe at the end of this file).
                 const c: [string, number, FingerOpts] = ['x 3 2 0 x x', 5, STRUM];
                 const am: [string, number, FingerOpts] = ['x 3 2 2 x x', 0, STRUM];
                 expect(strummed('x 3 2 0 x x')).toEqual(['3-2', '2-1<', '2-1>', '4-3*']);
@@ -3529,7 +3536,7 @@ describe('fingers a teacher would show (#1611)', () => {
                 all.filter((o) => o.cost <= all[0].cost + 1.0001).map((o) => fingersOf(o.p)),
             );
             return taughtOptions(c.notes, STRUM)
-                .filter((o) => o.needs === 'before' && !near.has(fingersOf(o.p)))
+                .filter((o) => o.needs === 'before' && !o.adapts && !near.has(fingersOf(o.p)))
                 .map((o) => fingersOf(o.p));
         };
         const D = chord('x x x 2 3 2', '5 R 3');
@@ -3707,7 +3714,7 @@ describe('fingers a teacher would show (#1611)', () => {
             it('each fingertip off its own fret asks for a finger that stays, up to two', () => {
                 const holds = (tabs: string, root: number, opts: FingerOpts) =>
                     taughtOptions(notesOf(tabs, root), opts)
-                        .filter((o) => o.needs && !crowds(tabs, root, opts)(o))
+                        .filter((o) => o.needs && !o.adapts && !crowds(tabs, root, opts)(o))
                         .map((o) => `${fingersOf(o.p)}${MARK[o.needs!]}${o.hold}`);
                 expect(holds('x x x 1 2 0', 0, STRUM)).toEqual(['2-3*2', '3-4*2']);
                 expect(holds('x 3 2 0 x x', 0, STRUM)).toEqual(['2-1<2', '2-1>2', '4-3*2']);
@@ -3717,8 +3724,10 @@ describe('fingers a teacher would show (#1611)', () => {
                 expect(holds('x x 0 x 2 2', 4, SHELL)).toEqual(['3-4*2']);
                 expect(holds('x 1 x 2 3 x', 5, SHELL)).toEqual(['2-3-4*undefined']);
             });
-            it('two fingers that stay still take it: C into Am, Asus2 after F♯m7♭5', () => {
-                expect(run(C, Am)).toEqual(['2-1-0', '2-1-1']);
+            it('two fingers that stay still take it: Asus2 after F♯m7♭5', () => {
+                // C into Am x 3 2 2 x x kept both as 2-1 into 2-1-1 until #1835: now C stays
+                // 3-2 and Am takes the index, 3-2-1.
+                expect(run(C, Am)).toEqual(['3-2-0', '3-2-1']);
                 expect(planned(['2 x 2 2 1 x', 6, SHELL], ['x x 2 2 0 x', 0, STRUM])).toEqual([
                     '2-3-4-1',
                     '3-4-0',
@@ -5074,5 +5083,114 @@ describe('guitar A at the nut: the B-string note is the ring finger (#1834)', ()
         expect(fingered('Asus4 A Asus4')).toEqual([sus, A, sus]);
         // Alone, Asus4 keeps the open D's top, 1-3 (#1691).
         expect(fingered('Asus4')).toEqual(['x x x 2 3 0 [1-3-0]']);
+    });
+});
+describe('guitar open C keeps 3-2 beside C7, Cmaj7 and Am; the neighbour adapts (#1835)', () => {
+    // C x 3 2 0 x x is 3-2 in every method (C x 3 2 0 1 0, 3-2-0-1). Beside a chord that kept
+    // its notes on the A and D strings it was 2-1, both fingertips a fret past their own, so
+    // that chord could keep its own fingering. Now the chord beside it adds or lifts a finger.
+    const STRUM: FingerOpts = { barre: true };
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    /** A chart's grips as `tab [fingers]`, an open string's finger 0. */
+    const fingered = (names: string, home: [number, number] | null = [1, 6]) =>
+        voiceChart(chart(names), { instrument: GUITAR, home }).map(
+            (v) => `${tab(GUITAR, v)} [${v.notes.map((n) => n.finger).join('-')}]`,
+        );
+    /** A guitar grip from its tab and its degrees, low string to high, sounding strings only. */
+    const grip = (tabs: string, degrees: string): Note[] => {
+        const frets = tabs.split(' ');
+        const named = degrees.split(' ') as Note['degree'][];
+        let k = 0;
+        return frets.flatMap((t, i): Note[] => {
+            if (t === 'x') {
+                return [];
+            }
+            const degree = named[k++];
+            const role = degree === 'R' ? 'R' : 'F';
+            return [{ string: frets.length - i, fret: Number(t), degree, role, finger: null }];
+        });
+    };
+    const C = 'x 3 2 0 x x [3-2-0]';
+
+    it('C7 and Cmaj7 are C with the little finger added, 3-2-4', () => {
+        expect(fingered('C C7 F')).toEqual([
+            C,
+            'x 3 2 3 x x [3-2-4]',
+            // The ring finger stays on C into F, 3-4-2, as it does from C (#1683).
+            'x 3 3 2 x x [3-4-2]',
+        ]);
+        // Imagine.
+        expect(fingered('C Cmaj7 F G').slice(0, 2)).toEqual([C, 'x 3 2 4 x x [3-2-4]']);
+        expect(fingered('C7 C')).toEqual(['x 3 2 3 x x [3-2-4]', C]);
+        expect(fingered('C C C7')).toEqual([C, C, 'x 3 2 3 x x [3-2-4]']);
+        // Csus4 x 3 3 0 x x keeps its nut fingering, 3-4, the ring finger staying into C7.
+        expect(fingered('Csus4 C7 C')).toEqual(['x 3 3 0 x x [3-4-0]', 'x 3 2 3 x x [3-2-4]', C]);
+    });
+
+    it('Am x 3 2 2 x x beside C is C with the index added, 3-2-1', () => {
+        // The middle finger and the index crossed on one fret, as in the open A's 2-1-3.
+        const am = 'x 3 2 2 x x [3-2-1]';
+        expect(fingered('C Am F G', null).slice(0, 2)).toEqual([C, am]);
+        expect(fingered('Am C', null)).toEqual([am, C]);
+        expect(fingered('C C Am', null)).toEqual([C, C, am]);
+        // C6, the same frets.
+        expect(fingered('C6 C', null)).toEqual(['x 3 2 2 x x [3-2-1]', C]);
+    });
+
+    it('the fingerings that adapt keep the hand in position, a fingertip each', () => {
+        const adapting = (notes: Note[], opts: FingerOpts) =>
+            taughtOptions(notes, opts)
+                .filter((o) => o.adapts && o.needs === 'before')
+                .map((o) => `${o.p.join('-')}:${o.hold}`);
+        // Never 3-2-4 for Am, the little finger two frets back from its own; never a barre.
+        expect(adapting(grip('x 3 2 2 x x', 'b3 5 R'), STRUM)).toEqual([
+            '3-1-2:2',
+            '3-2-1:2',
+            '4-2-3:2',
+            '4-3-2:2',
+        ]);
+        expect(adapting(grip('x 3 2 3 x x', 'R 3 b7'), { rootBarre: true })).toEqual([
+            '3-1-2:2',
+            '3-2-4:2',
+            '4-2-3:2',
+        ]);
+        // Each is offered both ways round, for the chord before and the chord after.
+        const am = taughtOptions(grip('x 3 2 2 x x', 'b3 5 R'), STRUM).filter((o) => o.adapts);
+        expect(am.filter((o) => o.needs === 'after')).toHaveLength(4);
+        // The ukulele is not asked.
+        const uke = grip('0 0 0 3', 'R 3 5 R');
+        expect(taughtOptions(uke, { barre: true, ukulele: true }).some((o) => o.adapts)).toBe(
+            false,
+        );
+    });
+
+    it('open C is never fingered 2-1, and stays 3-2 beside F and Cm7', () => {
+        const c = grip('x 3 2 0 x x', 'R 3 5');
+        expect(taughtOptions(c, STRUM).filter((o) => o.p.join() === '2,1')).toEqual([]);
+        expect(fingered('C')).toEqual([C]);
+        expect(fingered('C F')).toEqual([C, 'x 3 3 2 x x [3-4-2]']);
+        expect(fingered('C Cm7')).toEqual([C, 'x 3 1 3 x x [3-1-4]']);
+        // One fingertip off its fret is a book fingering of its own: Em as 1-2 into C.
+        expect(fingered('Em C', null)).toEqual(['x 2 2 0 x x [1-2-0]', C]);
+    });
+
+    it('alone, or beside a chord no method drills, each keeps its own fingering', () => {
+        // Am the barre 2-1-1; C7 and Cmaj7 x 3 2 4 x x 2-1-3, the root under the middle.
+        expect(fingered('Am', null)).toEqual(['x 3 2 2 x x [2-1-1]']);
+        for (const [tabs, degrees] of [
+            ['x 3 2 3 x x', 'R 3 b7'],
+            ['x 3 2 4 x x', 'R 3 7'],
+        ]) {
+            expect(taughtOptions(grip(tabs, degrees), { rootBarre: true })[0].p, tabs).toEqual([
+                2, 1, 3,
+            ]);
+        }
+        // C+ x 3 2 1 x x holds C's notes under the same fingers, but it is no drilled chord,
+        // so Am and C7 do not take the hand it leaves.
+        expect(fingered('Caug Am', null)).toEqual(['x 3 2 1 x x [3-2-1]', 'x 3 2 2 x x [2-1-1]']);
+        expect(fingered('Caug C7')).toEqual(['x 3 2 1 x x [3-2-1]', 'x 3 2 3 x x [2-1-3]']);
     });
 });
