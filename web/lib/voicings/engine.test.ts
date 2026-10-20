@@ -2961,27 +2961,46 @@ describe('fingers a teacher would show (#1611)', () => {
                                         return;
                                     }
                                     second++;
-                                    // The nearest different grip on either side.
-                                    const beside = [-1, 1].map((step) => {
-                                        let j = i + step;
-                                        while (v[j] && gripOf(v[j]) === gripOf(g)) {
-                                            j += step;
-                                        }
-                                        return v[j];
-                                    });
-                                    const kept = g.notes.some(
-                                        (n, k) =>
-                                            n.fret > 0 &&
-                                            n.finger !== alone[k].finger &&
-                                            beside.some((o) =>
-                                                o?.notes.some(
-                                                    (m) =>
-                                                        m.string === n.string &&
-                                                        m.fret === n.fret &&
-                                                        m.finger === n.finger,
+                                    // The nearest different grip on either side of `at`.
+                                    const besideOf = (at: number) =>
+                                        [-1, 1].map((step) => {
+                                            let j = at + step;
+                                            while (v[j] && gripOf(v[j]) === gripOf(g)) {
+                                                j += step;
+                                            }
+                                            return v[j];
+                                        });
+                                    // The same grip under these fingers at `at` keeps a note
+                                    // under a finger of its own.
+                                    const keeps = (at: number) =>
+                                        v[at].notes.some(
+                                            (n, k) =>
+                                                n.fret > 0 &&
+                                                n.finger !== alone[k].finger &&
+                                                besideOf(at).some((o) =>
+                                                    o?.notes.some(
+                                                        (m) =>
+                                                            m.string === n.string &&
+                                                            m.fret === n.fret &&
+                                                            m.finger === n.finger,
+                                                    ),
                                                 ),
-                                            ),
-                                    );
+                                        );
+                                    // A guitar triad or power grip keeps one fingering for the
+                                    // song (#1836): where it keeps nothing, it is the fingering
+                                    // the same grip takes elsewhere in the chart to keep a note.
+                                    const kept =
+                                        keeps(i) ||
+                                        (!ukulele &&
+                                            !shell &&
+                                            v.some(
+                                                (w, j) =>
+                                                    gripOf(w) === gripOf(g) &&
+                                                    w.notes.every(
+                                                        (n, k) => n.finger === g.notes[k].finger,
+                                                    ) &&
+                                                    keeps(j),
+                                            ));
                                     // A ukulele chord leaves its default only for two fingers
                                     // that stay on the chord right beside it; or for one, when
                                     // that is the only finger it moves (#1677) or the fingering
@@ -5192,5 +5211,108 @@ describe('guitar open C keeps 3-2 beside C7, Cmaj7 and Am; the neighbour adapts 
         // so Am and C7 do not take the hand it leaves.
         expect(fingered('Caug Am', null)).toEqual(['x 3 2 1 x x [3-2-1]', 'x 3 2 2 x x [2-1-1]']);
         expect(fingered('Caug C7')).toEqual(['x 3 2 1 x x [3-2-1]', 'x 3 2 3 x x [2-1-3]']);
+    });
+});
+describe('a guitar chord keeps one fingering through a song, unless two fingers stay (#1836)', () => {
+    // A teacher gives a chord one fingering for the song and fingers it a second way only where
+    // two fingers stay down into the next chord, or come down from the one before. The plan
+    // kept a held note at every change it could, so one held note was reason enough for a
+    // second fingering, and F x 3 3 2 x x was two fingerings in one song.
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    /** A chart's grips as `tab [fingers]`, an open string's finger 0. */
+    const fingered = (names: string, home: [number, number] | null = [1, 6]) =>
+        voiceChart(chart(names), { instrument: GUITAR, home }).map(
+            (v) => `${tab(GUITAR, v)} [${v.notes.map((n) => n.finger).join('-')}]`,
+        );
+    const pick = (v: string[], ...at: number[]) => at.map((i) => v[i]);
+
+    it('Let It Be, Hey Jude, La Bamba and Ring of Fire finger each chord one way', () => {
+        // Let It Be: F was 2-3-1 after Am and 3-4-2 after G, the ring finger kept into C. Am
+        // to F keeps two fingers (the middle on C, the index on A), so F is 2-3-1 throughout.
+        for (const home of [[1, 6], null] as ([number, number] | null)[]) {
+            const v = fingered('C G Am F C G F C', home);
+            expect(pick(v, 3, 6)).toEqual(Array(2).fill('x 3 3 2 x x [2-3-1]'));
+        }
+        // Hey Jude: F was 3-4-2 into C and 2-3-1 after B♭.
+        const jude = fingered('F C C7 F Bb F C7 F');
+        expect(pick(jude, 0, 3, 5, 7)).toEqual(Array(4).fill('x 3 3 2 x x [2-3-1]'));
+        // La Bamba: F keeps the ring finger on C from C, and keeps that fingering after G.
+        expect(fingered('C F G F')).toEqual([
+            'x 3 2 0 x x [3-2-0]',
+            'x 3 3 2 x x [3-4-2]',
+            'x 2 0 0 x x [2-0-0]',
+            'x 3 3 2 x x [3-4-2]',
+        ]);
+        // Ring of Fire in frets 2–7: G x x 5 4 3 x was 3-2-1 and 4-3-2.
+        const ring = fingered('G C G G D G', [2, 7]);
+        expect(pick(ring, 0, 2, 3, 5)).toEqual(Array(4).fill('x x 5 4 3 x [4-3-2]'));
+    });
+
+    it('a second fingering stays where two fingers stay, or slide along their strings', () => {
+        // Hallelujah: Am x 3 2 2 x x is C with the index added after C (#1835), keeping two
+        // fingers, and the barre where nothing is kept.
+        const v = fingered('C Am C Am F G C G C F G Am F G E7 Am');
+        expect(pick(v, 1, 3, 11, 15)).toEqual([
+            'x 3 2 2 x x [3-2-1]',
+            'x 3 2 2 x x [3-2-1]',
+            'x 3 2 2 x x [2-1-1]',
+            'x 3 2 2 x x [2-1-1]',
+        ]);
+        // E° after E keeps the ring finger on E and slides the middle from B to B♭ (#1691).
+        expect(fingered('Edim E Edim')).toEqual([
+            'x 1 2 0 x x [1-2-0]',
+            'x 2 2 1 x x [2-3-1]',
+            'x 1 2 0 x x [2-3-0]',
+        ]);
+        // A grip that frets one note keeps its one finger: C x x x 0 1 0 after C+.
+        expect(fingered('C C+ C')).toEqual([
+            'x x x 0 1 0 [0-1-0]',
+            'x x x 1 1 0 [1-2-0]',
+            'x x x 0 1 0 [0-2-0]',
+        ]);
+    });
+
+    it('the fingerings the audit kept are unchanged', () => {
+        // Em and E to B7 x 2 1 2 x x keep the middle finger on B.
+        expect(fingered('Em B7 Em')).toEqual([
+            'x 2 2 0 x x [2-3-0]',
+            'x 2 1 2 x x [2-1-3]',
+            'x 2 2 0 x x [2-3-0]',
+        ]);
+        expect(fingered('E B7 E')).toEqual([
+            'x 2 2 1 x x [2-3-1]',
+            'x 2 1 2 x x [2-1-3]',
+            'x 2 2 1 x x [2-3-1]',
+        ]);
+        // D to Dsus4 adds the little finger (#1683); D x 5 4 2 x x keeps the little finger and
+        // the index (#1819).
+        expect(fingered('D Dsus4 D')).toEqual([
+            'x x x 2 3 2 [1-3-2]',
+            'x x x 2 3 3 [1-3-4]',
+            'x x x 2 3 2 [1-3-2]',
+        ]);
+        expect(fingered('D Dsus4 D', [2, 7])).toEqual([
+            'x 5 4 2 x x [4-3-1]',
+            'x 5 5 2 x x [4-3-1]',
+            'x 5 4 2 x x [4-3-1]',
+        ]);
+        // F to Fm keeps the ring and little finger (#1683).
+        expect(fingered('F Fm F')).toEqual([
+            'x 3 3 2 x x [3-4-2]',
+            'x 3 3 1 x x [3-4-1]',
+            'x 3 3 2 x x [3-4-2]',
+        ]);
+        // Em as 1-2 into C, the middle finger staying (#1683).
+        expect(fingered('Em C', null)).toEqual(['x 2 2 0 x x [1-2-0]', 'x 3 2 0 x x [3-2-0]']);
+        // The open A beside D is 1-3, the ring finger on the B string (#1834).
+        expect(fingered('D A D A')).toEqual([
+            'x x x 2 3 2 [1-3-2]',
+            'x x x 2 2 0 [1-3-0]',
+            'x x x 2 3 2 [1-3-2]',
+            'x x x 2 2 0 [1-3-0]',
+        ]);
     });
 });

@@ -126,7 +126,9 @@ export interface FingerOpts {
      * chord keeps one fingering unless enough fingers can stay down (`taughtStrummed`,
      * `holdFor`). A guitar grip takes a second taught fingering for one held note, unless it
      * is fingered from the nut and that fingering takes the hand off it (`offItsFret`), and
-     * in first position its fingers take the frets of their own numbers (`aheadOfItsFret`).
+     * in first position its fingers take the frets of their own numbers (`aheadOfItsFret`);
+     * then a guitar triad or power grip keeps one of them for the song unless the other
+     * keeps two fingers (`unifyFingerings`, #1836).
      */
     ukulele?: boolean;
 }
@@ -1261,7 +1263,9 @@ const weakFingersAlone = (o: FingerOption): boolean =>
  * 1-0-1-3 stays for a chord that leaves it there.
  *
  * A ukulele chord (`FingerOpts.ukulele`, #1681) asks more before it leaves its default. On a
- * guitar one held note is reason enough to take a second taught fingering. In first position
+ * guitar one held note is reason enough to take a second taught fingering here, and the chart
+ * then holds the grip to one fingering for the song unless the second keeps two fingers
+ * (`unifyFingerings`, #1836). In first position
  * on a ukulele each chord has the one fingering its chart prints, so there a fingering other
  * than the default — a second one, or fingers left down (`needs: 'left'`) — is taken only
  * beside a chord that holds enough of its fingers (`holdFor`, `FingerOption.hold`,
@@ -1799,8 +1803,11 @@ const TIE = 1e-9;
  * 1-6, `Csus4 Csus2 A♭maj7`, Csus2 x-3-0-0-x-x keeps Csus4's ring finger on C, and the index
  * takes the C with the rest of A♭maj7's hand. Taking the index early, a second fingering, put
  * the re-fingering on the lift from Csus4 to Csus2, where nothing else moves.
+ *
+ * Returns the way and what it costs, `Infinity` when the options leave no way through
+ * (`unifyFingerings` holds a grip to one fingering and asks).
  */
-function planFingers(options: FingerOption[][]): FingerOption[] {
+function planFingers(options: FingerOption[][]): { path: FingerOption[]; cost: number } {
     // Each way through as [its cost, the second fingerings it takes].
     const better = (v: number, m: number, bv: number, bm: number): boolean =>
         v < bv - TIE || (v <= bv + TIE && m < bm);
@@ -1848,6 +1855,7 @@ function planFingers(options: FingerOption[][]): FingerOption[] {
             k = j;
         }
     });
+    const total = k < 0 ? Infinity : cost[k];
     k = Math.max(k, 0);
     const out = new Array<FingerOption>(options.length);
     for (let i = last; i >= 0; i--) {
@@ -1856,7 +1864,132 @@ function planFingers(options: FingerOption[][]): FingerOption[] {
             k = back[i - 1][k];
         }
     }
-    return out;
+    return { path: out, cost: total };
+}
+
+/**
+ * How many of `a`'s fingers `b` has on the same strings: on the same note, or a fret along it,
+ * the same finger in both. A finger that stays and a finger that slides along its string both
+ * keep their place in the hand, as `nutHoldKept` counts them (#1691: E x-2-2-1-x-x to E°
+ * x-1-2-0-x-x keeps the ring finger on E and slides the middle from B to B♭). A barre is one
+ * finger.
+ */
+function fingersKept(a: FingerOption, b: FingerOption): number {
+    const kept = new Set<number>();
+    a.fr.forEach((x, i) => {
+        const finger = a.p[i];
+        const j = b.fr.findIndex((y) => y.string === x.string);
+        if (
+            finger !== null &&
+            j >= 0 &&
+            b.p[j] === finger &&
+            Math.abs(b.fr[j].fret - x.fret) <= 1
+        ) {
+            kept.add(finger);
+        }
+    });
+    return kept.size;
+}
+
+/**
+ * Whether the fingering at `i` keeps two of its fingers down from the chord before or into the
+ * chord after it, the nearest grip on either side that is not this one under these fingers
+ * (`sameFingers`: a chord held for several bars is one chord). A grip that frets one note
+ * keeps its one finger. It is the ukulele's rule for leaving the default (`holdFor`, #1681),
+ * which a teacher holds a guitar chord to as well (#1836).
+ */
+function keepsTwo(path: FingerOption[], i: number): boolean {
+    const o = path[i];
+    const want = Math.min(2, new Set(o.p.filter((f) => f !== null)).size);
+    const beside = (step: number): FingerOption | undefined => {
+        let j = i + step;
+        while (path[j] && sameFingers(path[j], o)) {
+            j += step;
+        }
+        return path[j];
+    };
+    return [beside(-1), beside(1)].some((n) => n !== undefined && fingersKept(o, n) >= want);
+}
+
+/**
+ * One fingering per guitar chord per song (#1836). A teacher gives a chord one fingering for the
+ * whole song and fingers it a second way only where that clearly pays: where two fingers stay
+ * down into the next chord, or come down from the one before. The plan kept a held note at
+ * every change it could, so a strummed guitar grip took a second fingering for ONE note and
+ * played two in one song: Let It Be's F x-3-3-2-x-x was 2-3-1 after Am and 3-4-2 after G (to
+ * keep the ring finger into C), and Ring of Fire's G x-x-5-4-3-x 3-2-1 and 4-3-2. The ukulele
+ * has asked for two held fingers since #1681 (`holdFor`).
+ *
+ * So, after the plan, a grip (`keys`: its strings and frets; `null` for one not asked) that is
+ * fingered two ways is re-planned held to each fingering it took, most used first, and takes
+ * the cheapest that has a way through. The split stays only if every occurrence fingered
+ * another way than that one keeps two fingers (`keepsTwo`): `Am F` keeps the middle finger on
+ * C and the index on A (2-1-1 into 2-3-1), so Let It Be's F is 2-3-1 throughout, and the ring
+ * finger into C is the one held note given up. Like `unifyGrips`, which holds a strummed
+ * symbol to one grip, one grip is settled at a time, in chart order.
+ *
+ * Asked of no ukulele grip (its rule already is this one, and its charts stay as they are) and
+ * no guitar shell, whose fingers a jazz comper chooses afresh for a held note (`taughtAmong`;
+ * the blues in B♭'s E♭7 x-x-1-x-2-3 is 1-2-3, and 2-3-4 after F7; the shell characterization
+ * pins them). The rule #1836 first proposed, a guitar grip leaving its default only for two
+ * fingers that stay, as the ukulele's does, was measured against this one: over 3,120
+ * progressions × 15 setups it moved 3,079 sweep lines and gave up 4,033 held notes, most in
+ * charts that already played each chord one way (`D♭ D♭dim D♭`'s D♭dim x-4-2-0-x-x, 4-2 to
+ * keep the little finger), where this moves 87 and gives up 9.
+ */
+function unifyFingerings(options: FingerOption[][], keys: Array<string | null>): FingerOption[] {
+    const held = new Map<string, string>();
+    const decided = new Set<string>();
+    const holding = () =>
+        options.map((step, i) => {
+            const key = keys[i];
+            const fingers = key === null ? undefined : held.get(key);
+            return fingers === undefined ? step : step.filter((o) => o.p.join() === fingers);
+        });
+    let best = planFingers(options);
+    for (;;) {
+        // The fingerings each undecided grip takes, and how often, in chart order.
+        const used = new Map<string, Map<string, number>>();
+        best.path.forEach((o, i) => {
+            const key = keys[i];
+            if (key === null || decided.has(key)) {
+                return;
+            }
+            const fingerings = used.get(key) ?? new Map<string, number>();
+            fingerings.set(o.p.join(), (fingerings.get(o.p.join()) ?? 0) + 1);
+            used.set(key, fingerings);
+        });
+        const split = [...used].find(([, fingerings]) => fingerings.size > 1);
+        if (!split) {
+            return best.path;
+        }
+        const [key, fingerings] = split;
+        decided.add(key);
+        let pick: { path: FingerOption[]; cost: number; fingers: string } | null = null;
+        for (const [fingers] of [...fingerings].sort((a, b) => b[1] - a[1])) {
+            held.set(key, fingers);
+            // A fingering taken only beside a chord that shares its fingers (`needs`) may have
+            // no way through where the grip stands elsewhere: then it is no hold.
+            const tried = planFingers(holding());
+            if (tried.cost < Infinity && (!pick || tried.cost < pick.cost - TIE)) {
+                pick = { ...tried, fingers };
+            }
+        }
+        if (pick === null) {
+            held.delete(key);
+            continue;
+        }
+        const main = pick.fingers;
+        const earned = best.path.every(
+            (o, i) => keys[i] !== key || o.p.join() === main || keepsTwo(best.path, i),
+        );
+        if (earned) {
+            held.delete(key);
+        } else {
+            held.set(key, main);
+            best = pick;
+        }
+    }
 }
 
 /**
@@ -1869,7 +2002,9 @@ function planFingers(options: FingerOption[][]): FingerOption[] {
  * one pass, so a held note never costs a stretch, a buried root or a cramped barre, no finger
  * is newly placed with the index behind the nut, and a ukulele chord leaves its default only
  * for fingers enough that stay (`holdFor`), as a guitar's open grip leaves the nut
- * (`offItsFret`) and any guitar grip crowds the hand (`crowdedOptions`).
+ * (`offItsFret`) and any guitar grip crowds the hand (`crowdedOptions`). Then a guitar triad or
+ * power grip fingered two ways is held to one, unless the second keeps two fingers
+ * (`unifyFingerings`, #1836).
  */
 export function fingerSequence(chords: Array<{ notes: Note[] } & FingerOpts>): void {
     if (!chords.length) {
@@ -1882,7 +2017,12 @@ export function fingerSequence(chords: Array<{ notes: Note[] } & FingerOpts>): v
             ukulele: b.ukulele,
         }),
     );
-    planFingers(options).forEach((o, i) => {
+    // A guitar triad or power grip, by its strings and frets: one hand, whatever the chart
+    // calls it (Am x-3-2-2-x-x and C6 are one grip, #1835).
+    const keys = chords.map((c) =>
+        c.ukulele || !c.barre ? null : c.notes.map((n) => `${n.string}/${n.fret}`).join(' '),
+    );
+    unifyFingerings(options, keys).forEach((o, i) => {
         applyFingers(chords[i].notes, o);
     });
 }
