@@ -1547,6 +1547,39 @@ describe('a ukulele chart stays in first position (#1609)', () => {
             expect(tabs(UKULELE, 'C5 F5 G5', [7, 12])).toEqual(['5 7 8 x', '5 5 8 8', '7 7 10 10']);
             expect(tabs(UKULELE, 'B♭5 E♭5 F5', [5, 10])).toEqual(['3 5 6 x', '3 3 6 6', '5 5 8 8']);
         });
+        it('a symbol in a riff anywhere is in a riff throughout, so it keeps one grip', () => {
+            // Decided per occurrence, the lone F5 was offered 10 12 13 x alone and the riff's
+            // F5 every grip; `unifyGrips` then held F5 to the riff's 5 5 8 8, left the lone
+            // occurrence nothing, and the voicer threw.
+            expect(tabs(UKULELE, 'F5 G5 F F5 F', [7, 12])).toEqual([
+                '5 5 8 8',
+                '7 7 10 10',
+                '10 9 8 8',
+                '5 5 8 8',
+                '10 9 8 8',
+            ]);
+            expect(tabs(UKULELE, 'F F5 F F5 G5', [7, 12])).toEqual([
+                '10 9 8 8',
+                '5 5 8 8',
+                '10 9 8 8',
+                '5 5 8 8',
+                '7 7 10 10',
+            ]);
+            expect(tabs(UKULELE, 'E♭ E♭5 E♭ B♭5 E♭5', [5, 10])).toEqual([
+                '8 7 6 6',
+                '3 3 6 6',
+                '8 7 6 6',
+                '3 5 6 x',
+                '3 3 6 6',
+            ]);
+            expect(tabs(UKULELE, 'D♭ D♭5 D♭ A♭5 D♭5', [3, 8])).toEqual([
+                '6 5 4 4',
+                '1 1 4 4',
+                '6 5 4 4',
+                '1 3 4 x',
+                '1 1 4 4',
+            ]);
+        });
         it('nothing changes at the nut or on guitar', () => {
             for (const home of NUT) {
                 expect(tabs(UKULELE, 'F F5 F', home)).toEqual(['2 0 1 0', 'x 0 1 x', '2 0 1 0']);

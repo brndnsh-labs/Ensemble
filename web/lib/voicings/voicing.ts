@@ -921,6 +921,7 @@ const powerAFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef
 /**
  * A power chord in a riff (#1814): the nearest different chord before or after it in the chart
  * is a power chord too. A chord repeated is the same chord, so `E♭5 E♭5 F5` is a riff.
+ * `voiceChart` reads it per symbol: one occurrence in a riff puts every occurrence there.
  */
 const inRiffAt = (chart: ChartChord[], i: number): boolean => {
     if (chart[i].quality !== 'five') {
@@ -1006,6 +1007,8 @@ function candidates(c: ChartChord, opts: VoiceOptions, inRiff: boolean): Voicing
         () => inside.filter((v) => firstPosition(v, home, inst)),
         () => clear(inside),
         () => clear(all.filter((v) => inReach(v, home) || aFretPast(v, home, inst))),
+        // Not `clear`ed: it holds only power grips, which are never a buried root, an open
+        // shell's one-off or a five-fret reach.
         () => (inRiff ? [] : all.filter((v) => powerAFretPast(v, home, inst))),
         () => inside,
         () => clear(all),
@@ -1127,7 +1130,15 @@ function unifyGrips(
         // order): on equal cost the chart keeps the shape it already plays most.
         for (const [grip, count] of [...grips].sort((a, b) => b[1] - a[1])) {
             held.set(key, grip);
-            const tried = plan(holding());
+            const options = holding();
+            // Every occurrence of a symbol is offered the same grips (`voiceChart` decides
+            // riff status per symbol for that, #1814), so a grip one occurrence used is on
+            // offer at each. If that ever breaks, a grip some occurrence cannot take is no hold:
+            // skipping it leaves the symbol split instead of handing `viterbi` an empty step.
+            if (options.some((step) => !step.length)) {
+                continue;
+            }
+            const tried = plan(options);
             if (!pick || tried.cost < pick.cost - COST_NOISE) {
                 pick = { ...tried, grip, changed: occurrences - count };
             }
@@ -1163,9 +1174,13 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
         );
         return { path, cost };
     };
+    // Per symbol, not per occurrence: `unifyGrips` holds every occurrence of a symbol to one
+    // grip, so each must be offered the same grips. A symbol in a riff anywhere in the chart is
+    // in a riff throughout (a lone F5 beside a riff's F5 plays the riff's grip, #1814).
+    const riffs = new Set(chart.filter((_, i) => inRiffAt(chart, i)).map(chordKey));
     const picked = unifyGrips(
         chart,
-        chart.map((c, i) => candidates(c, opts, inRiffAt(chart, i))),
+        chart.map((c) => candidates(c, opts, riffs.has(chordKey(c)))),
         plan,
         opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
         opts.instrument,
