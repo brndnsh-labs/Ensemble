@@ -477,7 +477,8 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
     const pull = windowed ? 0.15 : 0.45;
     if (byHand(v, opts.instrument)) {
         // A guitar triad or power grip in a window from fret 1 is aimed at first position, at
-        // the window's pull (#1827, above).
+        // the window's pull (#1827, above). Guitar only: `windowed` is already false for a
+        // ukulele window from fret 1, which takes `defaultTarget` instead.
         const aim = windowed && atTheNut(home) ? (1 + FIRST_POSITION_TOP) / 2 : target;
         return triadUnaryCost(v, aim, pull, home, opts.instrument);
     }

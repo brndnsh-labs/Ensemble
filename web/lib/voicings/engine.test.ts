@@ -4944,7 +4944,7 @@ describe('a guitar triad in a window from fret 1 is aimed at first position (#18
         ]);
     });
 
-    it('keeps what #1822 put a finger down for, and E7 in first position', () => {
+    it('keeps what #1822 put a finger down for, and E7 on the middle of the open E7 (not open: shells keep the window middle)', () => {
         expect(grips('E Em E', [1, 6])).toEqual(['x x 2 1 0 x', 'x x 2 0 0 x', 'x x 2 1 0 x']);
         expect(grips('G+ G G+', [1, 6])).toEqual(['x 2 1 0 x x', 'x 2 0 0 x x', 'x 2 1 0 x x']);
         // E7 was x x 2 x 3 4 here once #1822 took Dsus4 off x 0 0 0 x x; now it is the open
