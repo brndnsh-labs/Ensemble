@@ -133,6 +133,42 @@ export const GUITAR: InstrumentDef = {
 };
 
 /**
+ * The guitar's open chords, as the method books print them for the first lessons (#1833): the
+ * CAGED open forms C, A, G, E and D, their minors Am, Em and Dm, the sus chords on the open A,
+ * D and E (Asus2, Asus4, Dsus2, Dsus4, Esus4) with Csus4 x-3-3-0-1-1 and Fsus2 x-x-3-0-1-1, and
+ * the three open power chords. Each is `[root pitch class, quality, frets low E first]`. A
+ * guitar triad or power grip earns its open strings' credit only as part of one of these
+ * (`openFormGrip` in `voicing.ts`): E x-x-2-1-0-x is the open E's middle, A x-x-x-2-2-0 the open
+ * A's top. Any other grip that rings an open string is a chord no teacher shows, however
+ * little it costs the hand (E♭ x-1-1-0-x-x, B♭ in the bass; Cm x-3-1-0-x-x).
+ *
+ * Only forms that ring an open string are listed, since no other grip is credited; the closed
+ * forms (F, B♭, Bm) need none. Left out on purpose, being grips a chord dictionary prints and
+ * a beginner's book does not: Gm 3-1-0-0-3-3, Csus2 x-3-0-0-1-3, Gsus4 3-3-0-0-1-3. The
+ * diminished and augmented triads have no forms here, and so are not judged (`openFormGrip`).
+ */
+export const GUITAR_OPEN_CHORDS: readonly [number, Quality, string][] = [
+    [0, 'maj', 'x 3 2 0 1 0'], // C
+    [9, 'maj', 'x 0 2 2 2 0'], // A
+    [7, 'maj', '3 2 0 0 0 3'], // G
+    [4, 'maj', '0 2 2 1 0 0'], // E
+    [2, 'maj', 'x x 0 2 3 2'], // D
+    [9, 'min', 'x 0 2 2 1 0'], // Am
+    [4, 'min', '0 2 2 0 0 0'], // Em
+    [2, 'min', 'x x 0 2 3 1'], // Dm
+    [9, 'sus2', 'x 0 2 2 0 0'], // Asus2
+    [2, 'sus2', 'x x 0 2 3 0'], // Dsus2
+    [5, 'sus2', 'x x 3 0 1 1'], // Fsus2
+    [0, 'sus4', 'x 3 3 0 1 1'], // Csus4
+    [9, 'sus4', 'x 0 2 2 3 0'], // Asus4
+    [2, 'sus4', 'x x 0 2 3 3'], // Dsus4
+    [4, 'sus4', '0 2 2 2 0 0'], // Esus4
+    [4, 'five', '0 2 2 x x x'], // E5
+    [9, 'five', 'x 0 2 2 x x'], // A5
+    [2, 'five', 'x x 0 2 3 x'], // D5
+];
+
+/**
  * First-position chords that are not a moving shape (#1613): each is the book grip for ONE
  * root, made by an open string, and the six shapes of `UKE_TRIADS` cannot reach it — they
  * voiced Fm as 1543 (a five-fret reach), E as 1442 or 4442 and Cm as 5333. Every ukulele method

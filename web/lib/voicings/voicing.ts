@@ -29,6 +29,7 @@
  */
 import { assignFingers, type FingerOpts, fingerOptions, fingerSequence } from './fingering';
 import { HOME_FRETS } from './home-window';
+import { GUITAR_OPEN_CHORDS } from './instruments';
 import { DEGREES, mod, QUALITIES } from './theory';
 import type {
     ChartChord,
@@ -592,10 +593,53 @@ const handFree = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boo
  * enough to choose the open grip among those near the hand — the uke's G7 0-2-1-2, half a fret
  * below its target, over 4-5-3-5 two frets above it — never enough to carry a grip across the
  * neck. Up the neck an open string earns nothing.
+ *
+ * On a guitar, only a grip that is part of its chord's open form earns it (#1833,
+ * `openFormGrip`). Aimed at first position (#1827), the credit took grips no teacher shows over
+ * the top of a closed book grip: E♭ x-1-1-0-x-x for x-x-x-3-4-3.
  */
-function openStringCredit(v: Voicing, home: HomeWindow | null): number {
-    return atTheNut(home) ? v.notes.filter((n) => n.fret === 0).length * 0.2 : 0;
+function openStringCredit(v: Voicing, home: HomeWindow | null, inst: InstrumentDef): number {
+    if (!atTheNut(home) || (inst.id === 'guitar' && !openFormGrip(v))) {
+        return 0;
+    }
+    return v.notes.filter((n) => n.fret === 0).length * 0.2;
 }
+
+/** Each of `GUITAR_OPEN_CHORDS` as its chord (root pitch class and quality) and its frets by string. */
+const OPEN_FORMS: { pc: number; quality: Quality; frets: Map<number, number> }[] =
+    GUITAR_OPEN_CHORDS.map(([pc, quality, tabs]) => {
+        const cells = tabs.split(' ');
+        const frets = new Map<number, number>();
+        cells.forEach((t, i) => {
+            if (t !== 'x') {
+                frets.set(cells.length - i, Number(t));
+            }
+        });
+        return { pc, quality, frets };
+    });
+const OPEN_FORM_QUALITIES = new Set(OPEN_FORMS.map((f) => f.quality));
+
+/**
+ * A guitar triad or power grip whose open strings ring as a teacher shows them (#1833): every
+ * note on the string and fret it has in one of its chord's open forms (`GUITAR_OPEN_CHORDS`,
+ * same root and quality). E x-x-2-1-0-x and Esus4 x-x-2-2-0-x are the middles of the open E and
+ * Esus4, Fsus2 x-x-3-0-1-x the bottom of x-x-3-0-1-1, A x-x-x-2-2-0 the open A's top. E♭
+ * x-1-1-0-x-x is part of none, nor Cm x-3-1-0-x-x or Gm x-1-0-0-x-x: those chords have no open
+ * form, and their closed grip is the book's.
+ *
+ * A diminished or augmented triad keeps the credit whatever its grip: the table has no open
+ * forms for those to be judged against, and taking it away moved the open chords beside them
+ * up the neck (`E E° E` in frets 1–6 went from x-2-2-1-x-x / x-1-2-0-x-x to x-x-x-4-5-4 /
+ * x-x-x-3-5-3, and the open E7 of #1827's chart closed again).
+ */
+const openFormGrip = (v: Voicing): boolean =>
+    !OPEN_FORM_QUALITIES.has(v.quality) ||
+    OPEN_FORMS.some(
+        (f) =>
+            f.pc === v.root.pc &&
+            f.quality === v.quality &&
+            v.notes.every((n) => f.frets.get(n.string) === n.fret),
+    );
 
 function triadUnaryCost(
     v: Voicing,
@@ -608,7 +652,7 @@ function triadUnaryCost(
         (handFree(v, home, inst) ? 0 : Math.abs(handAt(v) - target) * pull) +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
         (inHome(v, home) ? 0 : 5) -
-        openStringCredit(v, home)
+        openStringCredit(v, home, inst)
     );
 }
 

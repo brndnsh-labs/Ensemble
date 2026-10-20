@@ -4959,3 +4959,62 @@ describe('a guitar triad in a window from fret 1 is aimed at first position (#18
         ]);
     });
 });
+
+describe('a guitar grip earns its open strings only as part of the open chord (#1833)', () => {
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    const grips = (names: string, home: [number, number] | null, rootStrings?: number[]) =>
+        voiceChart(chart(names), { instrument: GUITAR, home, rootStrings }).map((v) =>
+            tab(GUITAR, v),
+        );
+
+    it('a chord with no open form takes the top of its closed grip, not an open string', () => {
+        // E♭ x 1 1 0 x x (B♭ in the bass, the open G as its 3rd) is no part of any open chord.
+        for (const rootStrings of [undefined, [6, 5]]) {
+            expect(grips('Eb', [1, 6], rootStrings)).toEqual(['x x x 3 4 3']);
+            expect(grips('Gm', [1, 6], rootStrings)).toEqual(['x x x 3 3 3']); // was x 1 0 0 x x
+        }
+        expect(grips('Eb Ebsus4 Eb', [1, 6])).toEqual([
+            'x x x 3 4 3',
+            'x x x 3 4 4',
+            'x x x 3 4 3',
+        ]);
+        // The tops of the 1st- and 3rd-fret barres (Gm and E♭ were x 1 0 0 x x / x 1 1 0 x x).
+        expect(grips('Bb F Gm Eb', [1, 6])).toEqual([
+            'x x x 3 3 1',
+            'x x x 2 1 1',
+            'x x x 3 3 3',
+            'x x x 3 4 3',
+        ]);
+        // Fsus2 x 3 3 0 x x is Csus4's grip under another name; the book's is x x 3 0 1 1.
+        expect(grips('F Fsus2 F', [1, 6])).toEqual(['x x 3 2 1 x', 'x x 3 0 1 x', 'x x 3 2 1 x']);
+    });
+
+    it('the open chords keep their open strings', () => {
+        expect(grips('Fsus2', [1, 6])).toEqual(['x x 3 0 1 x']);
+        expect(grips('E Em E', [1, 6])).toEqual(['x x 2 1 0 x', 'x x 2 0 0 x', 'x x 2 1 0 x']);
+        expect(grips('Esus4 Em Esus4', [1, 6])).toEqual([
+            'x x 2 2 0 x',
+            'x x 2 0 0 x',
+            'x x 2 2 0 x',
+        ]);
+        expect(grips('C Bdim Am Em', [1, 6]).at(-1)).toBe('x 2 2 0 x x');
+        expect(grips('C G Am F', [1, 6])).toEqual([
+            'x 3 2 0 x x',
+            'x 2 0 0 x x',
+            'x 3 2 2 x x',
+            'x 3 3 2 x x',
+        ]);
+        expect(grips('Csus4 C', [1, 6])).toEqual(['x 3 3 0 x x', 'x 3 2 0 x x']);
+        // Csus4's x 3 3 0 1 1 is a book chord: x x 3 0 1 x is its middle (uncredited, x x 5 5 6 x).
+        expect(grips('Dbm6 Csus4', [1, 6]).at(-1)).toBe('x x 3 0 1 x');
+        expect(grips('E5 A5 D5', [1, 6])).toEqual(['0 2 2 x x x', 'x 0 2 2 x x', 'x x 0 2 3 x']);
+        // A diminished triad is not judged: E° x 1 2 0 x x keeps the open E beside it (judged,
+        // with no window the chart went to x x x 4 5 4 / x x x 3 5 3).
+        for (const home of [null, [1, 6] as [number, number]]) {
+            expect(grips('E Edim E', home)).toEqual(['x 2 2 1 x x', 'x 1 2 0 x x', 'x 2 2 1 x x']);
+        }
+    });
+});
