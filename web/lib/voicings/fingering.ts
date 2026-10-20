@@ -909,6 +909,23 @@ const holdFor = (o: FingerOption): number =>
     Math.min(2, new Set(o.p.filter((_, i) => o.own?.[i])).size);
 
 /**
+ * A grip of two or more fretted notes held by the ring and little finger alone, the index and
+ * middle finger both idle (#1811): fingertips (3-4) or either one laid flat (a ring or little
+ * finger barre, 3-3 or 4-4, which the ukulele's barre rules already keep off its own). On a ukulele it is never a fingering a teacher shows, even
+ * for fingers left down: the two weakest fingers, the least independent of the hand, fret the
+ * whole chord while the two strong ones hang over nothing, and in first position the hand sits
+ * with the index behind the nut. Lifting a finger to leave the middle and ring is a lift a
+ * teacher shows (Dm 2-2-1-0 to Dsus2 2-2-0-0 keeps 2-3, Fm 1-0-1-3 to Fsus2 0-0-1-3 keeps 2-4),
+ * and so is the ring finger alone on a one-finger chord (Cmaj7 0-0-0-2 after G7); the ring and
+ * little finger left together are not. Dsus4 2-2-3-0 as 2-3-4 into G5 0-2-3-x was 3-4, Ddim7
+ * 1-2-1-2 into Em7 0-2-0-2 3-4, and both are the book's index and middle (or the middle and
+ * ring, lifted from a grip that has them there). The guitar is not asked: at the nut a finger
+ * takes the fret of its own number, so its Csus4 x-3-3-0-x-x IS 3-4 (`aheadOfItsFret`).
+ */
+const weakFingersAlone = (o: FingerOption): boolean =>
+    o.p.length > 1 && o.p.every((f) => f !== null && f >= 3);
+
+/**
  * The taught ones among a strummed grip's fingerings (a triad, a power chord), the default
  * first. Three rules choose them, and a table overrules the rules for a few ukulele chords:
  *
@@ -1059,9 +1076,12 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
     }
     // A second fingering is offered once for the chord before and once for the chord after,
     // as a shell's is (`taughtAmong`). A one-finger chord's other fingers are fingers left
-    // down, as they were when C and Am were rows of the table.
+    // down, as they were when C and Am were rows of the table. None is the ring and little
+    // finger alone (`weakFingersAlone`), however many fingers it keeps.
     const second = beside(free.slice(1));
-    const marked = [...second, ...ahead.map((o) => mark(o, 'left')), ...left];
+    const marked = [...second, ...ahead.map((o) => mark(o, 'left')), ...left].filter(
+        (o) => !weakFingersAlone(o),
+    );
     return [
         mark(first),
         ...marked.map((o) => ({

@@ -218,6 +218,30 @@
 .neck-barre.is-lift {
     opacity: 0.45;
 }
+/* A string the grip leaves silent (#1811): a chord chart's ×, in ink beside the nut where the
+   open strings sit, and in the strings' colour on the wood when a zoomed board has the nut out
+   of view. Not a note: no degree colour, no strike pulse; it fades in and out like a dot. */
+.neck-mute {
+    pointer-events: none;
+    /* The zoom's own slide (`.neck-zoom`), so a mark moved to a new first fret rides with it. */
+    transition:
+        transform 0.3s ease,
+        opacity 0.3s;
+}
+@starting-style {
+    .neck-mute {
+        opacity: 0;
+    }
+}
+.neck-mute path {
+    fill: none;
+    stroke: var(--ink);
+    stroke-width: 2.6;
+    stroke-linecap: round;
+}
+.neck-mute.is-on-board path {
+    stroke: var(--string);
+}
 .neck-ring {
     fill: none;
     stroke: var(--hold);
@@ -295,6 +319,7 @@
 @media (prefers-reduced-motion: reduce) {
     .neck-dot,
     .neck-barre,
+    .neck-mute,
     .neck-ring,
     .neck-body,
     .neck-active,

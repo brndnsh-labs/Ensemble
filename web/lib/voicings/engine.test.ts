@@ -2632,8 +2632,9 @@ describe('fingers a teacher would show (#1611)', () => {
                 expect(strummed('x x x 2 3 2')[0]).toBe('1-3-2');
             });
             it('the chords the costs already finger by the book keep it', () => {
-                expect(ukulele('2 0 1 0')).toEqual(['2-1', '3-2*', '4-3*']); // F
-                expect(ukulele('2 1 0 0')).toEqual(['2-1', '3-2*', '4-3*']); // A
+                // Never 4-3, the ring and little finger alone, even left down (#1811).
+                expect(ukulele('2 0 1 0')).toEqual(['2-1', '3-2*']); // F
+                expect(ukulele('2 1 0 0')).toEqual(['2-1', '3-2*']); // A
                 expect(ukulele('0 2 3 2')).toEqual(['1-3-2', '2-4-3<', '2-4-3>']); // G
                 expect(ukulele('0 2 3 1')).toEqual(['2-3-1', '3-4-2*']); // Gm
                 expect(ukulele('0 4 3 2')).toEqual(['3-2-1', '4-3-2<', '4-3-2>']); // Em
@@ -3343,6 +3344,47 @@ describe('fingers a teacher would show (#1611)', () => {
                         .filter((o) => o.needs)
                         .every((o) => o.hold === 2),
                 ).toBe(true);
+            });
+        });
+
+        describe('ukulele: never the ring and little finger alone (#1811)', () => {
+            it('Dm7 Dsus4 G5 Gsus2: G5 is not left under the ring and little finger', () => {
+                // It was Dsus4 2-3-4 (Dm7's middle and ring kept) and then G5 and Gsus2 3-4,
+                // the middle finger lifted and the index behind the nut. Now Dsus4 takes its
+                // book 1-2-3 and G5 is that grip with the index lifted.
+                expect(uke(['D', 'm7'], ['D', 'sus4'], ['G', 'five'], ['G', 'sus2'])).toEqual([
+                    '2 2 1 3 [2-3-1-4]',
+                    '2 2 3 0 [1-2-3-0]',
+                    '0 2 3 x [0-2-3]',
+                    '0 2 3 0 [0-2-3-0]',
+                ]);
+                // Alone, or after a chord that holds none of their notes, the book's 1-2.
+                expect(alone('0 2 3 x')).toBe('0-1-2');
+                expect(alone('0 2 3 0')).toBe('0-1-2-0');
+                expect(uke(['D', 'sus4'], ['G', 'five'])[1]).toBe('0 2 3 x [0-1-2]');
+            });
+            it('Em7 0 2 0 2 after Ddim7 or Bm7♭5 is index and middle, not 3-4', () => {
+                expect(uke(['D', 'dim7'], ['E', 'm7'], ['D', 'dim7'])[1]).toBe('0 2 0 2 [0-1-0-2]');
+                expect(uke(['B', 'm7b5'], ['E', 'm7'])[1]).toBe('0 2 0 2 [0-1-0-2]');
+            });
+            it('a lift that leaves the middle finger down is still taken', () => {
+                expect(uke(['D', 'min'], ['D', 'sus2'], ['D', 'min'])[1]).toBe('2 2 0 0 [2-3-0-0]');
+                expect(uke(['F', 'min'], ['F', 'sus2'], ['F', 'min'])[1]).toBe('0 0 1 3 [0-0-2-4]');
+                expect(uke(['G', 'min'], ['G', 'five'], ['G', 'min'])[1]).toBe('0 2 3 x [0-2-3]');
+                // And a one-finger chord keeps the ring finger G7 leaves there.
+                expect(uke(['G', 'dom7'], ['C', 'maj7'])[1]).toBe('0 0 0 2 [0-0-0-3]');
+            });
+            it('no fingering a ukulele grip is taught leaves the ring and little finger alone', () => {
+                for (const root of ROOTS) {
+                    for (const q of Object.keys(QUALITIES) as Quality[]) {
+                        for (const v of allPositions(UKULELE, root, q)) {
+                            for (const o of taughtOptions(v.notes, UKE)) {
+                                const weak = o.p.length > 1 && o.p.every((f) => (f ?? 0) >= 3);
+                                expect(weak, `${root}${q} ${tab(UKULELE, v)}`).toBe(false);
+                            }
+                        }
+                    }
+                }
             });
         });
     });
