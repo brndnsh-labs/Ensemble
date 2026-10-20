@@ -654,6 +654,10 @@ const fingeredFromTheNut = (notes: Note[], fr: Note[], ukulele: boolean): boolea
  *   The rules put the index on the 2nd fret and the middle on the 3rd, the hand a fret up.
  *   Index and ring, 0-1-0-3, is Csus2 0-2-3-3 (0-1-2-3) with the middle finger lifted, and
  *   stays on offer for a chord that keeps the index there (Csus2, or G after it).
+ * - Am6 2-4-2-3 is the index across the G and E strings under the ring finger on the C string,
+ *   the middle finger on the A string, 1-3-1-2 (#1823, Kytary). It is also F♯m7♭5, which the
+ *   books finger the same way (Kytary's F♯m7♭5, UkuTabs's G♭m7♭5), so the row is right for
+ *   both. The rules gave them 1-4-2-3, a fingertip each.
  *
  * C 0-0-0-3 under the ring finger and Am 2-0-0-0 under the middle were rows here; they are
  * `aheadOfItsFret`'s rule now.
@@ -665,6 +669,7 @@ const UKE_BOOK: Record<string, string[]> = {
     'x x 2 2': ['1-2'],
     'x x 1 1': ['1-2'],
     'o 2 o 3': ['0-2-0-3', '0-1-0-3'],
+    '2 4 2 3': ['1-3-1-2'],
 };
 
 /**

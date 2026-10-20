@@ -797,4 +797,21 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
                 'finger 3 moves to the E string, fret 3.',
         );
     });
+
+    it('Am6 2 4 2 3 is the index across the G and E strings under the ring finger (#1823)', () => {
+        // The barre runs from the G string to the E string at the 2nd fret; the ring finger
+        // frets the C string above it, as the charts print it.
+        expect(lines(['Am', 'Am6'], uke)[0]).toBe(
+            'A is in both chords; finger 1 bars fret 2 on the G, C and E strings; ' +
+                'finger 2 moves to the A string, fret 3; ' +
+                'finger 3 goes down on the C string, fret 4.',
+        );
+        // From Am6 to Am the index stays on the G string's A.
+        expect(lines(['Am6', 'Am'], uke)[0]).toBe('Finger 1 stays down on A.');
+        // Into E7 the index slides out of the barre to the G string's 1st fret.
+        expect(lines(['Am6', 'E7'], uke)[0]).toBe(
+            'Finger 1 slides down 1 fret; finger 2 moves to the C string, fret 2; ' +
+                'finger 3 moves to the A string, fret 2.',
+        );
+    });
 });
