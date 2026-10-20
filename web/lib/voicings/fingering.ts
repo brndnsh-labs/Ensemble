@@ -1036,7 +1036,8 @@ const crossedOptions = (first: FingerOption, cost: number): FingerOption[] => {
 /**
  * A hand in position: every fingertip on the fret of its own number or a fret back from it,
  * counted from where the hand sits (the index's fret, or the fret its lowest finger leaves
- * for it), none ahead. Two fingers may cross on one fret, as in the open A's 2-1-3.
+ * for it), none ahead. Two fingers may cross on one fret, as in the open A's 2-1-3, on
+ * neighbouring strings or not (F♯m7♭5 2-0-2-x-1-x as 3-0-2-1 beside the C top, #1835).
  */
 const inHand = (o: FingerOption): boolean => {
     const lowest = lowestFinger(o);
@@ -1384,6 +1385,8 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
         // (`adaptOptions`, #1835). One fingertip off is a book fingering of its own (Em
         // x 2 2 0 x x as 1-2), and stays a second fingering.
         const offBook = (o: FingerOption): boolean => drilledOpen && !o.nut && offItsFret(o) === 2;
+        // Built from `ahead` BEFORE `offBook` filters it, so `adaptOptions` never offers the
+        // drilled chord's own off-the-book hand (C 2-1) back as an adapting neighbour's.
         const taughtHere = new Set([
             ...[...usual, ...free, ...ahead].map((o) => o.p.join()),
             ...never,
