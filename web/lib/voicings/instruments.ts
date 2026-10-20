@@ -146,6 +146,9 @@ export const GUITAR: InstrumentDef = {
  * forms (F, B♭, Bm) need none. Left out on purpose, being grips a chord dictionary prints and
  * a beginner's book does not: Gm 3-1-0-0-3-3, Csus2 x-3-0-0-1-3, Gsus4 3-3-0-0-1-3. The
  * diminished and augmented triads have no forms here, and so are not judged (`openFormGrip`).
+ * Adding one form of a quality judges EVERY chord of that quality (`OPEN_FORM_QUALITIES`):
+ * judged, the dim triads lost their open grips (`E E° E` went up the neck), so add a whole
+ * quality's forms at once and sweep.
  */
 export const GUITAR_OPEN_CHORDS: readonly [number, Quality, string][] = [
     [0, 'maj', 'x 3 2 0 1 0'], // C
