@@ -1895,8 +1895,13 @@ function fingersKept(a: FingerOption, b: FingerOption): number {
  * Whether the fingering at `i` keeps two of its fingers down from the chord before or into the
  * chord after it, the nearest grip on either side that is not this one under these fingers
  * (`sameFingers`: a chord held for several bars is one chord). A grip that frets one note
- * keeps its one finger. It is the ukulele's rule for leaving the default (`holdFor`, #1681),
- * which a teacher holds a guitar chord to as well (#1836).
+ * keeps its one finger. It asks for two as the ukulele does (`holdFor`, #1681), but counts
+ * every finger that stays, not only the ones the song's fingering would not keep there: `Cm
+ * Cdim C` with no window keeps Cm x-x-x-5-4-3 as 4-3-2 into Cdim x-x-x-5-4-2 (4-3-1), two
+ * fingers, where the default 3-2-1 keeps one. Counted only beyond what the song's fingering
+ * keeps, it was measured and left: the open A beside D went back to 2-3 (its 1-3 keeps the
+ * index, and the ring finger slides as 2-3's does, #1834), `Fm F Fm6 Fm` gave up F 3-4-2 into
+ * Fm 3-4-1 (#1683), and 53 sweep lines lost two fingers they kept.
  */
 function keepsTwo(path: FingerOption[], i: number): boolean {
     const o = path[i];
@@ -1921,21 +1926,29 @@ function keepsTwo(path: FingerOption[], i: number): boolean {
  * has asked for two held fingers since #1681 (`holdFor`).
  *
  * So, after the plan, a grip (`keys`: its strings and frets; `null` for one not asked) that is
- * fingered two ways is re-planned held to each fingering it took, most used first, and takes
- * the cheapest that has a way through. The split stays only if every occurrence fingered
- * another way than that one keeps two fingers (`keepsTwo`): `Am F` keeps the middle finger on
- * C and the index on A (2-1-1 into 2-3-1), so Let It Be's F is 2-3-1 throughout, and the ring
- * finger into C is the one held note given up. Like `unifyGrips`, which holds a strummed
- * symbol to one grip, one grip is settled at a time, in chart order.
+ * fingered two ways is re-planned held to its DEFAULT, the fingering it takes alone, whether
+ * or not the plan took it, and keeps that wherever it has a way through: a grip leaves its
+ * default only for two fingers. Only where it has none (a fingering that waits on a neighbour,
+ * `needs`, cannot be held everywhere) does it take the cheapest of the fingerings the plan
+ * used, most used first. Then the split stays only if every occurrence fingered another way
+ * than that one keeps two fingers (`keepsTwo`): Hallelujah's Am x-3-2-2-x-x is 3-2-1 after C
+ * (both of C's fingers kept, #1835) and the barre elsewhere. Let It Be's F is 2-3-1 throughout,
+ * La Bamba's (`C F G F`) too, giving up the ring finger kept on C, and Ring of Fire's G
+ * 3-2-1. Like `unifyGrips`, which holds a strummed symbol to one grip, one grip is settled at a
+ * time, in chart order, and all or nothing: a grip fingered three ways keeps only the split
+ * whose every other occurrence keeps two. A grip settled earlier is not judged again when a
+ * later one re-plans its neighbour; the test of every chart (`engine.test.ts`) reads the result
+ * itself.
  *
  * Asked of no ukulele grip (its rule already is this one, and its charts stay as they are) and
  * no guitar shell, whose fingers a jazz comper chooses afresh for a held note (`taughtAmong`;
  * the blues in B♭'s E♭7 x-x-1-x-2-3 is 1-2-3, and 2-3-4 after F7; the shell characterization
- * pins them). The rule #1836 first proposed, a guitar grip leaving its default only for two
- * fingers that stay, as the ukulele's does, was measured against this one: over 3,120
- * progressions × 15 setups it moved 3,079 sweep lines and gave up 4,033 held notes, most in
- * charts that already played each chord one way (`D♭ D♭dim D♭`'s D♭dim x-4-2-0-x-x, 4-2 to
- * keep the little finger), where this moves 87 and gives up 9.
+ * pins them), though a shell beside a grip held here may re-finger to keep a note of it. The
+ * same rule put on every guitar second fingering (`holdFor` on each, the plan's way) was
+ * measured against this one: over 3,120 progressions × 15 setups it moved 3,079 sweep lines
+ * and gave up 4,033 held notes, most in charts that already played each chord one way
+ * (`D♭ D♭dim D♭`'s D♭dim x-4-2-0-x-x, 4-2 to keep the little finger), where this moves 65,
+ * every changed grip but two to its default, and gives up 64.
  */
 function unifyFingerings(options: FingerOption[][], keys: Array<string | null>): FingerOption[] {
     const held = new Map<string, string>();
@@ -1965,13 +1978,27 @@ function unifyFingerings(options: FingerOption[][], keys: Array<string | null>):
         }
         const [key, fingerings] = split;
         decided.add(key);
+        // The grip's default first (what it takes alone), taken if it has a way through.
+        const own = options[keys.indexOf(key)][0].p.join();
+        const order = [
+            own,
+            ...[...fingerings]
+                .sort((x, y) => y[1] - x[1])
+                .map(([f]) => f)
+                .filter((f) => f !== own),
+        ];
         let pick: { path: FingerOption[]; cost: number; fingers: string } | null = null;
-        for (const [fingers] of [...fingerings].sort((a, b) => b[1] - a[1])) {
+        for (const fingers of order) {
             held.set(key, fingers);
-            // A fingering taken only beside a chord that shares its fingers (`needs`) may have
-            // no way through where the grip stands elsewhere: then it is no hold.
             const tried = planFingers(holding());
-            if (tried.cost < Infinity && (!pick || tried.cost < pick.cost - TIE)) {
+            if (tried.cost === Infinity) {
+                continue;
+            }
+            if (fingers === own) {
+                pick = { ...tried, fingers };
+                break;
+            }
+            if (!pick || tried.cost < pick.cost - TIE) {
                 pick = { ...tried, fingers };
             }
         }
