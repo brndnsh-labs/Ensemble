@@ -2652,7 +2652,8 @@ describe('fingers a teacher would show (#1611)', () => {
             expect(strummed('7 9 9 x x x')).toEqual(['1-3-3', '1-3-4']);
             expect(strummed('x 0 2 2 x x')).toEqual(['1-1']);
             const all = fingerOptions(notesOf('x 2 4 4 x x', 5), STRUM).map((o) => fingersOf(o.p));
-            expect(all).toEqual(['1-3-3', '1-2-3', '1-3-4', '2-3-4', '1-4-4']);
+            // Never 1-4-4: the little finger never lies flat (#1819).
+            expect(all).toEqual(['1-3-3', '1-2-3', '1-3-4', '2-3-4']);
         });
         it('the fingertip-per-note fingering beside a ring-finger barre is priced as a choice', () => {
             // `handCost` reads 3-4 on one fret as a fret of stretch, 2.6: more than a held
@@ -3345,8 +3346,8 @@ describe('fingers a teacher would show (#1611)', () => {
                         }
                     }
                 }
-                // A guitar power chord may still take it (1-4-4 is on its list).
-                expect(reach('x 2 4 4 x x', STRUM)).toContain('1-4-4');
+                // Nor, since #1819, a guitar grip: the power chord is 1-3-3 or 1-3-4.
+                expect(reach('x 2 4 4 x x', STRUM)).not.toContain('1-4-4');
             });
             it('only the index lies flat under another finger: the G shape is 1-2-4-3 at every fret', () => {
                 for (let f = 1; f <= 10; f++) {
@@ -4760,6 +4761,142 @@ describe('a guitar triad that frets nothing is a last resort (#1822)', () => {
                     voiced.some((v) => tab(inst, v) === '0 0 0 0'),
                     names,
                 ).toBe(true);
+            }
+        }
+    });
+});
+
+describe('the guitar’s little finger never lies flat (#1819)', () => {
+    // A triad with two notes on one fret and the index three frets lower was 4-4-1, the little
+    // finger laid across two strings (Dsus4 x 5 5 2 x x, E♭sus4 x 6 6 3 x x, Csus2
+    // x 10 10 7 x x). Teachers rarely ask for that: alone it is 3-4-1, a fingertip each, and
+    // beside D x 5 4 2 x x (4-3-1) it is 4-3-1, the ring finger sliding up a fret.
+    const STRUM: FingerOpts = { barre: true };
+    /** A guitar grip from its tab with its real degrees, one for each sounding string. */
+    const grip = (tabs: string, degrees: string): Note[] => {
+        const frets = tabs.split(' ');
+        const named = degrees.split(' ') as Note['degree'][];
+        let k = 0;
+        return frets.flatMap((t, i): Note[] => {
+            if (t === 'x') {
+                return [];
+            }
+            const degree = named[k++];
+            return [
+                {
+                    string: frets.length - i,
+                    fret: Number(t),
+                    degree,
+                    role: degree === 'R' ? 'R' : 'F',
+                    finger: null,
+                },
+            ];
+        });
+    };
+    /** Fingers planned across grips built by `grip`, each a fresh copy, low string first. */
+    const run = (...grips: Note[][]) => {
+        const fresh = grips.map((notes) => ({ notes: notes.map((n) => ({ ...n })), ...STRUM }));
+        fingerSequence(fresh);
+        return fresh.map((c) => c.notes.map((n) => n.finger).join('-'));
+    };
+    const D = grip('x 5 4 2 x x', 'R 3 5');
+    const Dm = grip('x 5 3 2 x x', 'R b3 5');
+    const Dsus2 = grip('x 5 2 2 x x', 'R 2 5');
+    const Dsus4 = grip('x 5 5 2 x x', 'R 4 5');
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    /** Each grip of a chart as `frets [fingers]`, fingers for the strings it sounds, low first. */
+    const played = (names: string, home: [number, number] | null) =>
+        voiceChart(chart(names), { instrument: GUITAR, home }).map((v) => {
+            const low = [...v.notes].sort((a, b) => b.string - a.string);
+            return `${tab(GUITAR, v)} [${low.map((n) => n.finger).join('-')}]`;
+        });
+
+    it('a lone Dsus4 x 5 5 2 x x is 3-4-1, a fingertip each', () => {
+        expect(run(Dsus4)).toEqual(['3-4-1']);
+        const alone = Dsus4.map((n) => ({ ...n }));
+        assignFingers(alone, STRUM);
+        expect(alone.map((n) => n.finger).join('-')).toBe('3-4-1');
+        // The same shape at every fret, and its sus2 under the root a string lower.
+        for (let f = 1; f <= 9; f++) {
+            const tabs = `x ${f + 3} ${f + 3} ${f} x x`;
+            expect(run(grip(tabs, 'R 4 5')), `sus4, fret ${f}`).toEqual(['3-4-1']);
+            expect(run(grip(tabs, '5 R 2')), `sus2, fret ${f}`).toEqual(['3-4-1']);
+        }
+        // Nor does the ring finger take the little finger's barre three frets above the index.
+        expect(taughtOptions(Dsus4, STRUM).map((o) => o.p.join('-'))).not.toContain('3-3-1');
+    });
+
+    it('D to Dsus4 and back keeps the little finger: Dsus4 is 4-3-1 beside D', () => {
+        expect(run(D, Dsus4, D)).toEqual(['4-3-1', '4-3-1', '4-3-1']);
+        expect(run(Dsus4, D)).toEqual(['4-3-1', '4-3-1']);
+        expect(run(D, Dsus4)).toEqual(['4-3-1', '4-3-1']);
+        // Beside its minor and its sus2 the same: the little finger on the root, the index on
+        // the 5th.
+        expect(run(Dm, Dsus4, Dm)).toEqual(['4-2-1', '4-3-1', '4-2-1']);
+        expect(run(Dsus2, Dsus4, Dsus2)).toEqual(['4-1-1', '4-3-1', '4-1-1']);
+        // The same shape at other frets: E♭ x 6 5 3 x x to E♭sus4, and on.
+        for (let f = 1; f <= 9; f++) {
+            const major = grip(`x ${f + 3} ${f + 2} ${f} x x`, 'R 3 5');
+            const sus4 = grip(`x ${f + 3} ${f + 3} ${f} x x`, 'R 4 5');
+            expect(run(major, sus4, major), `fret ${f}`).toEqual(['4-3-1', '4-3-1', '4-3-1']);
+        }
+        // In a chart: in frets 2–7, D is x 5 4 2 x x and Dsus4 x 5 5 2 x x.
+        expect(played('D Dsus4 D', [2, 7])).toEqual([
+            'x 5 4 2 x x [4-3-1]',
+            'x 5 5 2 x x [4-3-1]',
+            'x 5 4 2 x x [4-3-1]',
+        ]);
+        // A second fingering: offered only beside its own chord, for two fingers that stay.
+        const crossed = taughtOptions(Dsus4, STRUM).filter((o) => o.p.join('-') === '4-3-1');
+        expect(crossed.map((o) => [o.needs, o.hold, o.sameRoot])).toEqual([
+            ['before', 2, true],
+            ['after', 2, true],
+        ]);
+    });
+
+    it('no guitar fingering puts the little finger on two strings', () => {
+        let checked = 0;
+        for (const root of ROOTS) {
+            for (const q of Object.keys(QUALITIES) as Quality[]) {
+                const opts: FingerOpts =
+                    QUALITIES[q].kind === 'shell' ? { rootBarre: true } : { barre: true };
+                for (const v of allPositions(GUITAR, root, q)) {
+                    const notes = v.notes.map((n) => ({ ...n }));
+                    for (const o of [
+                        ...fingerOptions(notes, opts),
+                        ...taughtOptions(notes, opts),
+                    ]) {
+                        expect(
+                            o.p.filter((f) => f === 4).length,
+                            `${v.symbol} ${tab(GUITAR, v)} ${o.p.join('-')}`,
+                        ).toBeLessThan(2);
+                        checked++;
+                    }
+                }
+            }
+        }
+        expect(checked).toBeGreaterThan(1000);
+        // And across charts, where a chord may take the fingering that keeps its neighbour's.
+        const homes: ([number, number] | null)[] = [null, [1, 6], [2, 7], [5, 10], [7, 12]];
+        for (const home of homes) {
+            for (const r of ['C', 'D', 'Eb', 'F#', 'Ab', 'B']) {
+                for (const names of [
+                    `${r} ${r}sus4 ${r}`,
+                    `${r}sus2 ${r}sus4 ${r}sus2`,
+                    `${r}m ${r}sus4 ${r}m`,
+                    `${r}5 ${r}sus2 ${r}5`,
+                    `${r}sus4 ${r}dim ${r}sus4`,
+                ]) {
+                    for (const v of voiceChart(chart(names), { instrument: GUITAR, home })) {
+                        expect(
+                            v.notes.filter((n) => n.finger === 4).length,
+                            `${names} in ${home}: ${tab(GUITAR, v)}`,
+                        ).toBeLessThan(2);
+                    }
+                }
             }
         }
     });
