@@ -231,7 +231,8 @@ export function rootLine(
  * The finger-by-finger detail of the change, as one sentence: which fingers stay down, then any
  * note that stays under another finger, then where each moving finger goes; '' when nothing
  * moves. Lifts are left out — the strong preview already dims the dots that come off, and naming
- * them is noise.
+ * them beside a move is noise — except in a change that only lifts (#1837), where the lift is
+ * the instruction: "Fingers 1 and 3 stay down; lift finger 2." (D to Dsus2).
  *
  * A note both grips fret in the same place is said as a teacher says it (#1618): the note stays
  * and its job changes. Under the same finger that is "Finger 3 stays down on B: the 3rd becomes
@@ -372,6 +373,17 @@ export function fingersLine(
         if (m.kind === 'move' && (m.barre || !said(m.finger, m.to))) {
             parts.push(`finger ${m.finger} ${m.text}`);
         }
+    }
+    // A change that only lifts (#1837): some fingers stay and none moves, so the lift is the
+    // whole instruction and a teacher says it ("Fingers 1 and 3 stay down; lift finger 2",
+    // D to Dsus2). Beside a move it is still left out, the preview dimming the dots that go.
+    const lifted = moves.filter((m) => m.kind === 'lift').map((m) => m.finger);
+    if (
+        lifted.length &&
+        moves.some((m) => m.kind === 'hold') &&
+        !moves.some((m) => m.kind === 'move')
+    ) {
+        parts.push(`lift ${lifted.length === 1 ? 'finger' : 'fingers'} ${list(lifted)}`);
     }
     const skip = skippedStrings(instrument, from, to);
     // A chord that frets nothing (the ukulele's Am7 and C6 0-0-0-0, the guitar's Em7
