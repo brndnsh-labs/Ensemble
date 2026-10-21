@@ -63,7 +63,8 @@ describe('sharedNotes (#1618)', () => {
     });
 
     it('reads a note with the same degree in both chords as that', () => {
-        const [maj, dom] = voiced(GUITAR, ['Cmaj7', 'C7'], [1, 6]);
+        // In frets 2–7: at the nut both are the book's open chords (#1838).
+        const [maj, dom] = voiced(GUITAR, ['Cmaj7', 'C7'], [2, 7]);
         expect(shared(maj, dom)).toEqual(['C 5/3 R>R 1>1', 'E 2/5 3>3 3>3']);
     });
 
@@ -86,8 +87,9 @@ describe('sharedNotes (#1618)', () => {
     });
 
     it('gives both names where the two chords spell the note differently', () => {
-        // F7 to B7, the tritone substitution: F7's E♭ is B7's D♯.
-        const v = voiced(GUITAR, ['B♭maj7', 'Gm7', 'Cm7', 'F7', 'B7'], [1, 6], { key: 'B♭' });
+        // F7 to B7, the tritone substitution: F7's E♭ is B7's D♯. In frets 2–7, where B7 is
+        // the shell (at the nut, the book's open x 2 1 2 0 2, #1838).
+        const v = voiced(GUITAR, ['B♭maj7', 'Gm7', 'Cm7', 'F7', 'B7'], [2, 7], { key: 'B♭' });
         expect(shared(v[3], v[4])).toEqual(['A 3/2 3>♭7 1>2', 'E♭/D♯ 2/4 ♭7>3 3>3']);
     });
 });

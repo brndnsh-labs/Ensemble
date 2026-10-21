@@ -1,4 +1,4 @@
-import { ordinal } from './theory';
+import { DEGREES, mod, ordinal, QUALITIES } from './theory';
 import type { InstrumentDef, Quality, ShapeDef, ShapeRole } from './types';
 
 /**
@@ -40,6 +40,107 @@ const powerChord = (root: number): ShapeDef => ({
     ],
 });
 
+/** The guitar's open strings, MIDI, by string number (1 = the high E). */
+const GUITAR_OPEN: Record<number, number> = { 1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40 };
+
+/**
+ * The guitar's open 7th chords as the method books print them at the nut (#1838): full chords,
+ * strummed across every string they sound, with no string between two sounding ones left to a
+ * hand that has no finger beside it to mute it. A learner meets the blues in A and E at the nut,
+ * and there the comping shells rang their skipped string (A7 x-0-x-0-2-x, E7 0-x-0-1-x-x). Each
+ * row is `[root pitch class, quality, frets low E first]`, and each is one root's chord
+ * (`openSeventh`), offered alone in first position (`bookGrip` in `voicing.ts`).
+ *
+ * Sources (read 2026-10-20). Every grip and its fingering is fachords.com's
+ * (`/guitar-chord/<root>/<type>/textual/`). The six dominant 7ths are the set the open-7th
+ * lessons teach (JustinGuitar's, as D'Addario lists it; Guitar Pro Academy's; fretjam's;
+ * Dummies'). Guitar Pro Academy's minor-7th lesson covers Am7, Em7 and Dm7, and fretjam's open
+ * 7ths cover the six major 7ths. Fingers come from the nut rule and the book tables in
+ * `fingering.ts`, and they agree with fachords: E7 2-1, D7 2-1-3, G7 3-2-1, C7 3-2-4-1, B7
+ * 2-1-3-4, Am7 2-1, Em7 the middle finger (Fender's lesson too), Dm7 2-1-1 (the index across
+ * the 1st fret), Cmaj7 3-2, Dmaj7 the index across the 2nd fret, Amaj7 2-1-3, Fmaj7 3-2-1,
+ * Emaj7 3-1-2, E7sus4 2-3, D7sus4 2-1-3, Dm6 2-1 and D6 2-3. Two have printed variants: A7 is 2-3 here, as
+ * Fender's lesson prints it, where fachords gives 1-3; and A7sus4 is 2-3, the ring finger
+ * sliding up a fret from A7, where fachords gives 1-3.
+ *
+ * The sus and 6 chords are chord-dictionary grips rather than lesson chords. Four are here
+ * because their shells at the nut were the skipped-string grips a strum rings (A7sus4
+ * x-0-x-0-3-x, E7sus4 0-x-0-2-x-x, Dm6 x-x-0-x-0-1, D6 x-x-0-x-0-2), and D7sus4 because it is
+ * the open D7 with one finger moved: without it `D7sus4 D7` with `classic` shells jumped from
+ * x-5-5-5-x-x to the nut and back. Left out, as grips no lesson needs here: Bm7 x-2-0-2-0-2,
+ * Gmaj7 (printed both 3-2-0-0-0-2 and 3-x-0-0-0-2) and the other 6 and m6 chords.
+ */
+export const GUITAR_OPEN_SEVENTHS: readonly [number, Quality, string][] = [
+    [4, 'dom7', '0 2 0 1 0 0'], // E7
+    [9, 'dom7', 'x 0 2 0 2 0'], // A7
+    [2, 'dom7', 'x x 0 2 1 2'], // D7
+    [7, 'dom7', '3 2 0 0 0 1'], // G7
+    [0, 'dom7', 'x 3 2 3 1 0'], // C7
+    [11, 'dom7', 'x 2 1 2 0 2'], // B7
+    [9, 'm7', 'x 0 2 0 1 0'], // Am7
+    [4, 'm7', '0 2 0 0 0 0'], // Em7
+    [2, 'm7', 'x x 0 2 1 1'], // Dm7
+    [0, 'maj7', 'x 3 2 0 0 0'], // Cmaj7
+    [2, 'maj7', 'x x 0 2 2 2'], // Dmaj7
+    [9, 'maj7', 'x 0 2 1 2 0'], // Amaj7
+    [5, 'maj7', 'x x 3 2 1 0'], // Fmaj7
+    [4, 'maj7', '0 2 1 1 0 0'], // Emaj7
+    [9, '7sus4', 'x 0 2 0 3 0'], // A7sus4
+    [4, '7sus4', '0 2 0 2 0 0'], // E7sus4
+    [2, '7sus4', 'x x 0 2 1 3'], // D7sus4
+    [2, 'm6', 'x x 0 2 0 1'], // Dm6
+    [2, 'six', 'x x 0 2 0 2'], // D6
+];
+
+/**
+ * One of `GUITAR_OPEN_SEVENTHS` as a shape: its root on the lowest string it sounds, each
+ * string's role read off the note it plays (a tone heard twice is R2, T2 or F2, as the
+ * ukulele's grips double one). Built from that root by `fretFor` like any shape, so it is
+ * `openOnly`: its notes sit at fixed frets above and below the root, and only one root puts
+ * one of them on an open string. That root is this row's, which the tests check. A row that
+ * doubles its 7th, or has a note that is not a tone of its chord, is a mistake in the table
+ * and throws.
+ */
+function openSeventh(pc: number, quality: Quality, tabs: string): ShapeDef {
+    const q = QUALITIES[quality];
+    const tones: [ShapeRole, ShapeRole | null, number | undefined][] = [
+        ['R', 'R2', 0],
+        ['T', 'T2', q.third ? DEGREES[q.third].int : undefined],
+        ['S', null, q.seventh ? DEGREES[q.seventh].int : undefined],
+        ['F', 'F2', DEGREES[q.five].int],
+    ];
+    const cells = tabs.split(' ');
+    const used = new Set<ShapeRole>();
+    const voices: [number, ShapeRole][] = [];
+    cells.forEach((t, i) => {
+        if (t === 'x') {
+            return;
+        }
+        const string = cells.length - i;
+        const interval = mod(GUITAR_OPEN[string] + Number(t) - pc, 12);
+        const tone = tones.find(([, , int]) => int === interval);
+        const role = tone && (used.has(tone[0]) ? tone[1] : tone[0]);
+        if (!role || used.has(role)) {
+            throw new Error(`open ${quality} ${tabs}: string ${string} is no tone it may hold`);
+        }
+        used.add(role);
+        voices.push([string, role]);
+    });
+    if (voices[0][1] !== 'R') {
+        throw new Error(`open ${quality} ${tabs}: the lowest string is not the root`);
+    }
+    return {
+        id: `O${pc}${quality}`,
+        kind: 'shell',
+        rootString: voices[0][0],
+        name: 'open chord',
+        voices,
+        qualities: [quality],
+        openOnly: true,
+        book: true,
+    };
+}
+
 /**
  * Guitar shells: R–7–3 skips a string (mute it with the root finger), R–3–7 uses neighboring strings.
  * Each pair exists with the root on the 6th, 5th and 4th strings.
@@ -49,7 +150,7 @@ export const GUITAR: InstrumentDef = {
     name: 'Guitar',
     strings: 6,
     maxFret: 15,
-    open: { 1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40 },
+    open: GUITAR_OPEN,
     letters: 'eBGDAE',
     defaultTarget: 3,
     strName: (s) => `${ordinal(s)} string`,
@@ -129,6 +230,8 @@ export const GUITAR: InstrumentDef = {
         powerChord(6),
         powerChord(5),
         powerChord(4),
+        // The book's open 7th chords, each for one root (#1838).
+        ...GUITAR_OPEN_SEVENTHS.map(([pc, quality, tabs]) => openSeventh(pc, quality, tabs)),
     ],
 };
 

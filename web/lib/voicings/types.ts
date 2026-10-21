@@ -97,6 +97,14 @@ export interface ShapeDef {
      * charts give at the nut and nowhere else (F♯5 x-1-2-x, B5 x-x-2-2).
      */
     nutOnly?: boolean;
+    /**
+     * One of the guitar's open 7th chords as the method books print it (#1838,
+     * `GUITAR_OPEN_SEVENTHS`): a full strummed chord for one root, E7 0-2-0-1-0-0, built only
+     * on its open strings (`openOnly`), offered only in first position and there alone
+     * (`bookGrip` in `voicing.ts`), and fingered as a strummed chord rather than a comping
+     * shell (`fingerRules`). Still `kind: 'shell'`: it voices a 7th-chord quality.
+     */
+    book?: boolean;
 }
 
 export interface InstrumentDef {
