@@ -828,11 +828,16 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // From a grip that skipped strings the skip clause says what to strum: G5 0 2 3 x to
         // C6 0 0 0 0.
         expect(lines(['G5', 'C6'], uke)[0]).toBe('Lift every finger; strum all four strings.');
-        // The guitar's open Em7 shell 0 x 0 0 x x, after B7 x 2 x 2 4 x, with roots on the 6th and
-        // 5th strings in frets 2–7. At the nut Em7 is the book's 0 2 0 0 0 0 (#1838), and Am7
+        // No guitar grip frets nothing any more. The last was the open Em7 shell 0 x 0 0 x x
+        // after B7 x 2 x 2 4 x, roots on the 6th and 5th strings in frets 2–7, "Lift every
+        // finger."; it rang its skipped 5th string, and since #1850 Em7 there is the closed
+        // x 7 5 7 x x, a move. At the nut Em7 is the book's 0 2 0 0 0 0 (#1838), and Am7
         // x 0 2 0 1 0 to it is a move.
         const classic: NeckPrefs = { instrument: 'guitar', home: [2, 7], rootStrings: 'classic' };
-        expect(lines(['F#m7b5', 'B7', 'Em7'], classic)[1]).toBe('Lift every finger.');
+        expect(lines(['F#m7b5', 'B7', 'Em7'], classic)[1]).toBe(
+            'Finger 1 moves to the 4th string, fret 5; finger 2 moves to the 5th string, fret 7; ' +
+                'finger 3 moves to the 3rd string, fret 7.',
+        );
         expect(lines(['Am7', 'Em7'], guitar(null))[0]).toBe(
             'Finger 2 moves to the 5th string, fret 2.',
         );

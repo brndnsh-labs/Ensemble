@@ -525,9 +525,10 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
  * one-off for one root (Fmaj7 1-0-2-x-x-x, B♭6 x-1-x-0-3-x), and with the credit a chart at
  * the nut swaps its shells for a different such grip per chord. Where the same root also holds
  * a fretted shell the open form is a last resort (`openShapeOneOff`: Fmaj7 is 1-x-2-2-x-x);
- * otherwise one is still taken when the costs already favour it (Am7 x-0-x-0-1-x, A7
- * x-0-x-0-2-x, in a window from the 2nd fret); it is not sought. At the nut those chords play
- * the book's full open chords instead (#1838, `bookGrip`).
+ * otherwise one is still taken when the costs already favour it; it is not sought. At the nut
+ * the open-root ones (Am7 x-0-x-0-1-x, A7 x-0-x-0-2-x) give way to the book's full open chords
+ * (#1838, `bookGrip`), and up the neck to the closed shells, since their skipped string rings
+ * (#1850, `ringsASkippedString`).
  */
 // Ukulele-only, and so is every rule gated on it. Some of the guitar's open 7ths sound all six
 // strings (E7 0-2-0-1-0-0, #1838), but they are one root's book chord with a tier of their own
@@ -812,7 +813,8 @@ const rootBuried = (v: Voicing, inst: InstrumentDef): boolean => {
  *   would be behind the nut), so there is no fretted grip on that root, and these ten are the
  *   open E, A and D chords a learner already knows, less the 5th. In first position the
  *   chords among them that the book prints whole play that instead (#1838, `bookGrip`), so
- *   these are taken up the neck, where a fretted note of theirs is in the window.
+ *   up the neck most of these ring their skipped string and give way to a closed shell
+ *   (`ringsASkippedString`, #1850).
  * - A 6 chord at the 1st fret (B♭6 x-1-x-0-3-x, F6 1-x-0-2-x-x): both shapes put the 6th on an
  *   open string, so neither is the fretted one. Between B♭7 x-1-x-1-3-x and B♭maj7 x-1-x-2-3-x
  *   it is the same grip with the 3rd string moving 0, 1, 2, and sending it to the 6th fret
@@ -848,15 +850,40 @@ const openShapeOneOff = (v: Voicing, all: Voicing[], inst: InstrumentDef): boole
  * G x-x-0-0-0-x and Em x-x-x-0-0-0, the only four (a power chord always frets its 5th). A
  * teacher puts a finger down for each: `E Em E` in frets 1–6 is x-x-2-1-0-x / x-x-2-0-0-x,
  * the top of the open chords, not x-x-x-1-0-0 / x-x-x-0-0-0, and `G+ G G+` keeps G's finger,
- * x-2-0-0-x-x. The R–7–3 shape skips a string the hand mutes, so an open one of those (Em7
- * 0-x-0-0-x-x) is a hand and is left on offer (up the neck: at the nut Em7 is the book's
- * 0-2-0-0-0-0, #1838). A ukulele strums every string, and its
+ * x-2-0-0-x-x. The R–7–3 shape on an open root (Em7 0-x-0-0-x-x) skips a string, so it is not
+ * this rule's; its skipped string rings, which is `ringsASkippedString`'s (#1850), and at the
+ * nut Em7 is the book's 0-2-0-0-0-0 (#1838). A ukulele strums every string, and its
  * all-open grips (C6 0-0-0-0) are book grips.
  */
 const openStrum = (v: Voicing, inst: InstrumentDef): boolean =>
     !strumsEveryString(v, inst) &&
     v.notes.every((n) => n.fret === 0) &&
     v.notes.every((n, i) => i === 0 || Math.abs(n.string - v.notes[i - 1].string) === 1);
+
+/**
+ * A grip that skips a string a strum rings (#1850): a muted string between two sounding
+ * strings with no fretted note on either side of it. A comper mutes a skipped string with the
+ * fretting finger beside it, the bass finger's underside or the next finger's tip (x-5-x-5-7-x,
+ * Dmaj7 x-x-0-x-2-2, Emaj7 0-x-1-1-x-x), so those stay. With an open string on both sides no
+ * finger is there: A7 x-0-x-0-2-x, A7sus4 x-0-x-0-3-x, Em7 0-x-0-0-x-x and E7sus4 0-x-0-2-x-x
+ * ring it. A last resort (`candidates`), like `openStrum`. Only guitar shells skip strings:
+ * triads and power grips sit on neighbouring strings, and a ukulele shell sounds every string.
+ *
+ * It acts up the neck, in a window from the 2nd fret. At the nut and with no window those
+ * chords already play the book's open chords (`bookGrip`), so it moves nothing there (measured,
+ * 3,120 progressions × 15 setups), and it needs no exemption: a strum rings the string there too.
+ */
+const ringsASkippedString = (v: Voicing): boolean => {
+    const fretAt = new Map(v.notes.map((n) => [n.string, n.fret]));
+    const sounding = v.notes.map((n) => n.string);
+    const fretted = (s: number) => (fretAt.get(s) ?? 0) > 0;
+    for (let s = Math.min(...sounding) + 1; s < Math.max(...sounding); s++) {
+        if (!fretAt.has(s) && !fretted(s - 1) && !fretted(s + 1)) {
+            return true;
+        }
+    }
+    return false;
+};
 
 /**
  * How far the window widens when it holds no grip a player would take: one fret, either end
@@ -1084,7 +1111,8 @@ const inRiffAt = (chart: ChartChord[], i: number): boolean => {
  *    is an open shell's one-off, and none inside the 4th fret is five frets wide.
  * 2. Grips inside the hand window that a player would take: every one but those with a buried
  *    root (`rootBuried`), the open-string one-offs of a fretted shape (`openShapeOneOff`), a
- *    guitar grip on three open strings alone (`openStrum`, #1817, #1822) and a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
+ *    guitar grip on three open strings alone (`openStrum`, #1817, #1822), a grip that rings a
+ *    skipped string (`ringsASkippedString`, #1850) and a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
  *    has another grip there, `leavesTheNut`). Where the window has one, nothing below is
  *    looked at.
  * 3. Such grips with the window widened by a fret: a shell's with its root in the window
@@ -1144,6 +1172,7 @@ function candidates(c: ChartChord, opts: VoiceOptions, inRiff: boolean): Voicing
                 !rootBuried(v, inst) &&
                 !openShapeOneOff(v, all, inst) &&
                 !openStrum(v, inst) &&
+                !ringsASkippedString(v) &&
                 (reachStays || !fiveFretReach(v, inst)),
         );
     const inside = all.filter((v) => inHome(v, home));
