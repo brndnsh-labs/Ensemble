@@ -778,9 +778,21 @@ function bookFingerings(notes: Note[]): string[] | null {
  *   `handCost` (3.2 dearer than the cheapest), so no cost reached it, and the rules offered
  *   1-2 in its place, the middle finger on the B string, to keep D's index: no method fingers
  *   A that way.
+ * - The open A7, x-0-2-0-2-0 (#1838, one of `GUITAR_OPEN_SEVENTHS`): 2-3, or 1-3, never 1-2,
+ *   for the same reason as A's top.
  */
 const GUITAR_BOOK: Record<string, { taught: number[][]; never?: number[][] }> = {
     '3/2 2/3': { taught: [[1, 3]] },
+    // The open A7 x-0-2-0-2-0 (#1838): middle and ring finger, the nut rule's 2-3 and Fender's
+    // lesson's, or 1-3 as fachords prints it; never 1-2, the middle finger on the B string,
+    // which the rules took after Em7♭5 x-x-2-3-3-3 to keep the index's fret.
+    '4/2 2/2': {
+        taught: [
+            [2, 3],
+            [1, 3],
+        ],
+        never: [[1, 2]],
+    },
     '3/2 2/2': {
         taught: [
             [2, 3],

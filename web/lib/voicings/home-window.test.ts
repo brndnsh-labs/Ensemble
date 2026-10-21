@@ -41,11 +41,12 @@ describe('an F blues in first position', () => {
             'B♭7 x 1 x 1 3 x',
             'B♭7 x 1 x 1 3 x',
             'F7 1 x 1 2 x x',
-            'D7 x 5 4 5 x x',
-            'Gm7 3 x 3 3 x x',
-            'C7 x 3 2 3 x x',
+            // The book's open D7 and C7 (#1838), and Gm7 the R–3–7 shell beside them.
+            'D7 x x 0 2 1 2',
+            'Gm7 3 1 3 x x x',
+            'C7 x 3 2 3 1 0',
             'F7 1 x 1 2 x x',
-            'C7 x 3 2 3 x x',
+            'C7 x 3 2 3 1 0',
         ]);
     });
 });
