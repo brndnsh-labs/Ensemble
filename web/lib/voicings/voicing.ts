@@ -63,6 +63,30 @@ const MAX_SPAN = 4;
 const FIRST_POSITION_TOP = 4;
 
 /**
+ * Where a guitar shell sits in first position (#1851): its frets centred on the 2nd (`center`),
+ * as F♯m7 2-x-2-2-x-x, Cm7 x-3-1-3-x-x and Gm7 3-1-3-x-x-x are. A shell is read by all its
+ * frets, so the middle of frets 1 to 4 (2.5, the triads' aim, which `handAt` reads off
+ * fretted notes) is half a fret from both F♯m7 2-x-2-2-x-x and the stretch x-x-4-2-5-x
+ * (centre 3.5) and barely parts them.
+ */
+const FIRST_POSITION_SHELL = 2;
+
+/**
+ * What a guitar shell in a window from fret 1 pays for a stretch (#1851): fretted notes three
+ * frets apart, index to little finger (Fm7 x-x-3-1-4-x, F♯m7 x-x-4-2-5-x, B7sus4 x-2-x-2-5-x),
+ * where a teacher shows a grip with a finger a fret (Fm7 1-x-1-1-x-x, B7sus4 x-2-2-2-x-x). Read
+ * by its `center` alone, the stretch sits nearer the 2nd fret than the 1st fret's grip does,
+ * and Fm7 x-x-3-1-4-x won 25 of 35 sweep lines in frets 1–6 (16 on main). Measured: at 0.5 it
+ * won 15, at 1.0 10 (F♯m7's stretch 12 to 7, 118 lines moved, one hand jump more), at 1.5 7,
+ * with more of the triads beside the shells on open-string fragments (Cm x-3-1-0-x-x). So a
+ * stretch costs about what two frets off the aim do.
+ */
+const FIRST_POSITION_STRETCH = 1;
+/** Fretted notes three frets or more apart (`FIRST_POSITION_STRETCH`). */
+const stretched = (v: Voicing): boolean =>
+    spanOf(v.notes.filter((n) => n.fret > 0).map((n) => n.fret)) >= 3;
+
+/**
  * The most open strings a grip with an added tone may ring. One or two beside fretted notes in
  * first position is a grip the books print (Am7♭5 x-0-1-0-1-x, Bm7♭5 x-2-0-2-x-1). Three of
  * four notes open is not a shell any more: it is a fragment of an open-position chord, good for
@@ -484,8 +508,19 @@ function viterbi<T>(states: T[][], unary: (s: T) => number, trans: (a: T, b: T) 
  * pull stays the window's 0.15, the window still keeping the hand close: at the no-window 0.45
  * the sweep moved 1,902 lines rather than 1,116, and jumps of the hand by three frets or of
  * the string set by two strings rose by 89 and 114 where at 0.15 they rise by 42 and not at
- * all. A guitar shell keeps the window's middle: its costs are a jazz comper's (`byHand`),
- * and the characterization pins them.
+ * all.
+ *
+ * A guitar shell in a window from fret 1 is aimed at first position as well (#1851), at the
+ * 2nd fret (`FIRST_POSITION_SHELL`) and the no-window pull, 0.45, as the ukulele is (#1809).
+ * Aimed at the window's middle it was held to a stretch a teacher doesn't show first: F♯m7
+ * x-x-4-2-5-x for 2-x-2-2-x-x, B♭m7 6-4-6-x-x-x for x-1-x-1-2-x. Measured over the sweep: at
+ * the guitar's no-window home (`defaultTarget`, the 3rd fret) F♯m7 was still the stretch in
+ * 30 of 51 lines in frets 1–6 (29 before); at the triads' 2.5, in 18 to 20 at pulls of 0.15
+ * to 0.45; at the 2nd fret and 0.45, in 12, each beside C♯m7♭5 x-4-5-4-5-x or a triad on the
+ * top strings. A pull of 0.6 took it to 10 but moved 425 lines for 344. There a shell also pays
+ * for a stretch (`FIRST_POSITION_STRETCH`), which the aim alone favoured (Fm7 x-x-3-1-4-x). Up the neck and with
+ * no window a shell keeps the window's middle or `defaultTarget`: its costs there are a jazz
+ * comper's (`byHand`).
  */
 function unaryCost(v: Voicing, opts: VoiceOptions): number {
     const home = opts.home ?? null;
@@ -506,9 +541,13 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
     // term pick a shell any more: the one shell wider than three frets was a reach around an
     // open string (`openOneOff`, #1607), and without it none is on offer. It stays for a
     // shape that would be.
+    // A guitar shell in a window from fret 1 is aimed at first position, at the no-window pull
+    // (#1851, above).
+    const nut = windowed && atTheNut(home);
     return (
-        Math.abs(center(v) - target) * pull +
+        Math.abs(center(v) - (nut ? FIRST_POSITION_SHELL : target)) * (nut ? 0.45 : pull) +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
+        (nut && stretched(v) ? FIRST_POSITION_STRETCH : 0) +
         (inHome(v, home) ? 0 : 5)
     );
 }
@@ -1242,7 +1281,17 @@ const gripKey = (v: Voicing): string => `${v.shape.id}@${v.rootFret}`;
  * are `byHand` already).
  */
 const heldToOneGrip = (v: Voicing, inst: InstrumentDef, home: HomeWindow | null): boolean =>
-    byHand(v, inst) || (inst.id === 'guitar' && home !== null && home[0] === 1);
+    byHand(v, inst) || learnersShell(v, inst, home);
+
+/**
+ * A guitar shell in a window from the 1st fret (#1839), held to one grip whatever it costs
+ * (#1851): `unifyGrips` keeps no split for it past `SAME_GRIP_TOLERANCE`. Aimed at the nut, a
+ * hold to F♯m7 2-x-2-2-x-x cost more than the tolerance where the chord before it, C♯7
+ * x-4-3-4-x-x, keeps its root's path to x-x-4-2-5-x, so `bossa` and `minorDim` in F♯ played
+ * F♯m7 both ways; a learner is taught one grip and moves the hand for it.
+ */
+const learnersShell = (v: Voicing, inst: InstrumentDef, home: HomeWindow | null): boolean =>
+    !byHand(v, inst) && inst.id === 'guitar' && home !== null && home[0] === 1;
 
 interface Plan {
     path: Voicing[];
@@ -1265,7 +1314,8 @@ interface Plan {
  * charts in frets 1–6 and 49 in frets 5–10 voiced a 7th chord two ways (Gm7 Cm7 D7 Gm7 opened
  * on 3-5-3-5 and closed on 0-2-1-1). A guitar shell is left out up the neck and with no
  * window: its jazz comping moves a chord between its two root strings on purpose. In a window
- * from the 1st fret it is held too (#1839, `heldToOneGrip`).
+ * from the 1st fret it is held too (#1839, `heldToOneGrip`), and since #1851 to one grip
+ * whatever the hold costs (`learnersShell`).
  *
  * Which grip is the cheapest hold's business alone. From #1613 to #1675 a ukulele symbol in
  * first position took the hold with an open string over a cheaper closed one; a chord that has
@@ -1284,6 +1334,9 @@ function unifyGrips(
 ): Voicing[] {
     const keys = chart.map((c, i) =>
         states[i].every((v) => heldToOneGrip(v, inst, home)) ? chordKey(c) : null,
+    );
+    const always = new Set(
+        chart.filter((_, i) => states[i].every((v) => learnersShell(v, inst, home))).map(chordKey),
     );
     const held = new Map<string, string>();
     const decided = new Set<string>();
@@ -1331,7 +1384,10 @@ function unifyGrips(
                 pick = { ...tried, grip, changed: occurrences - count };
             }
         }
-        if (pick && pick.cost - best.cost < tolerance * pick.changed - COST_NOISE) {
+        if (
+            pick &&
+            (always.has(key) || pick.cost - best.cost < tolerance * pick.changed - COST_NOISE)
+        ) {
             held.set(key, pick.grip);
             best = pick;
         } else {
@@ -1377,7 +1433,11 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(
-        out.map((v) => ({ notes: v.notes, ...fingerRules(v.shape, v.notes, opts.instrument) })),
+        out.map((v) => ({
+            notes: v.notes,
+            ...fingerRules(v.shape, v.notes, opts.instrument),
+            oneFingering: learnersShell(v, opts.instrument, home),
+        })),
     );
     return out;
 }
