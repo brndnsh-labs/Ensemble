@@ -2093,15 +2093,22 @@ describe('the window widens a fret; an open string is not a shape (#1610)', () =
             const f7 = voiced(null, CLASSIC, ['E', 'dom7'], ['F', 'dom7'], ['E', 'dom7']);
             expect(tabsOf(f7)[1]).toBe('1 x 1 2 x x');
         });
-        it('a root on an open string stays on offer: A7sus4 x 0 x 0 3 x, A7 x 0 x 0 2 x in frets 2–7', () => {
-            // The R–7–3 shape at the nut; no fretted shell can sit on an open root. In first
-            // position these chords are the book's open ones since #1838, so it is up the neck
-            // that the shell is still taken, its fretted note inside the window.
-            const v = voiced([2, 7], undefined, ['A', '7sus4'], ['A', 'dom7'], ['D', 'maj']);
-            expect(tabsOf(v)).toEqual(['x 0 x 0 3 x', 'x 0 x 0 2 x', 'x x 4 2 3 x']);
-            for (const g of [v[0], v[1]]) {
-                expect(frettedOnItsRoot(g), g.symbol).toBe(false);
+        it('a root on an open string has no fretted shell: this rule leaves A7 x 0 x 0 2 x alone', () => {
+            // The R–7–3 shape at the nut; no fretted shell can sit on an open root, so it is not
+            // this rule's one-off. Re-aimed by #1850: it was taken in frets 2–7, and there its
+            // skipped 4th string rings with no finger beside it, so another rule holds it back
+            // (`ringsASkippedString`) and the closed shells play. At the nut these chords are
+            // the book's open ones (#1838).
+            for (const [q, open] of [
+                ['7sus4', 'x 0 x 0 3 x'],
+                ['dom7', 'x 0 x 0 2 x'],
+            ] as const) {
+                const g = allPositions(GUITAR, R('A'), q).find((w) => tab(GUITAR, w) === open)!;
+                expect(g, open).toBeDefined();
+                expect(frettedOnItsRoot(g), open).toBe(false);
             }
+            const v = voiced([2, 7], undefined, ['A', '7sus4'], ['A', 'dom7'], ['D', 'maj']);
+            expect(tabsOf(v)).toEqual(['5 5 5 x x x', '5 4 5 x x x', 'x 5 4 2 x x']);
             const nut = voiced([1, 6], CLASSIC, ['A', 'm7'], ['E', 'm7']);
             expect(tabsOf(nut)).toEqual(['x 0 2 0 1 0', '0 2 0 0 0 0']);
         });
@@ -2157,21 +2164,19 @@ describe('the window widens a fret; an open string is not a shape (#1610)', () =
                     }
                 }
             }
-            // The open grips that are voiced: the R–7–3 shape on an open root, now only up the
-            // neck (in frets 2–7: at the nut those chords play the book's open chords, #1838),
-            // and the 6 and m6 chords at the 1st fret. A 7sus4's R–3–7 shape on an open root frets nothing
-            // (A7sus4 x 0 0 0 x x, E7sus4 0 0 0 x x x) and is a last resort (`openStrum`,
-            // #1817): offered, A7sus4's took a Wonderwall in frets 1–6 onto the open strings.
+            // The open grips that are voiced: the 6 and m6 chords at the 1st fret, and Emaj7
+            // 0 x 1 1 x x, whose skipped string has a fretted note beside it to mute it. The
+            // R–7–3 shape on an open root is gone: at the nut those chords play the book's open
+            // chords (#1838), and up the neck its skipped string rings with no finger beside it
+            // (A7 x 0 x 0 2 x, Em7 0 x 0 0 x x), a last resort (`ringsASkippedString`, #1850).
+            // F6 1 0 0 x x x went with it: it was taken in frets 2–7 beside the open Em7. A
+            // 7sus4's R–3–7 shape on an open root frets nothing (A7sus4 x 0 0 0 x x) and is
+            // `openStrum`'s last resort (#1817).
             expect([...kept].sort()).toMatchInlineSnapshot(`
               [
-                "A7 x 0 x 0 2 x",
-                "A7sus4 x 0 x 0 3 x",
                 "B♭6 x 1 x 0 3 x",
                 "B♭m6 x 1 x 0 2 x",
-                "E7sus4 0 x 0 2 x x",
-                "Em7 0 x 0 0 x x",
                 "Emaj7 0 x 1 1 x x",
-                "F6 1 0 0 x x x",
                 "F6 1 x 0 2 x x",
                 "Fm6 1 x 0 1 x x",
               ]
@@ -4556,10 +4561,13 @@ describe('7sus4 and m6 are shells of their own (#1817)', () => {
             }
         }
     });
-    it('the guitar holds a shared note into A7sus4: Dsus4 A7sus4 keeps the middle finger on D', () => {
+    it('the guitar holds shared notes into A7sus4: Dsus4 A7sus4 keeps fingers 3 and 4 on D and G', () => {
+        // Up the neck A7sus4 x 0 x 0 3 x rang its skipped 4th string (#1850), so it is the
+        // closed shell, and Dsus4 sits on the same strings to keep two fingers into it. It was
+        // x x 5 2 3 x [4-1-2] to x 0 x 0 3 x [0-0-2], the middle finger on D.
         expect(played(GUITAR, 'Dsus4 A7sus4', [2, 7])).toEqual([
-            'x x 5 2 3 x [4-1-2]',
-            'x 0 x 0 3 x [0-0-2]',
+            'x 5 5 2 x x [3-4-1]',
+            '5 5 5 x x x [2-3-4]',
         ]);
     });
     describe('a guitar 7sus4 and its own 7 keep the root and the ♭7 down (#1825)', () => {
@@ -4856,11 +4864,12 @@ describe('a guitar triad that frets nothing is a last resort (#1822)', () => {
         expect(checked).toBe(9576);
     });
 
-    it('the open shells and the ukulele’s all-open grips stay', () => {
-        // A7 x 0 x 0 2 x skips a string: a shell on its open root, not three open strings, and
-        // still taken up the neck. At the nut a 7th chord plays the book's open chord instead
-        // (#1838): the skipped string had no finger beside it to mute it.
-        expect(grips('A7sus4 A7 D', [2, 7])).toEqual(['x 0 x 0 3 x', 'x 0 x 0 2 x', 'x x 4 2 3 x']);
+    it('the open shells are left to their own rules, and the ukulele’s all-open grips stay', () => {
+        // A7 x 0 x 0 2 x skips a string: a shell on its open root, not three open strings, so
+        // this rule never touched it. Re-aimed by #1850: up the neck its skipped string rings
+        // with no finger beside it (`ringsASkippedString`), so frets 2–7 play the closed
+        // shells; at the nut a 7th chord plays the book's open chord (#1838).
+        expect(grips('A7sus4 A7 D', [2, 7])).toEqual(['5 5 5 x x x', '5 4 5 x x x', 'x 5 4 2 x x']);
         expect(grips('Em7 A7 Dmaj7', [1, 6])).toEqual([
             '0 2 0 0 0 0',
             'x 0 2 0 2 0',
@@ -4876,6 +4885,111 @@ describe('a guitar triad that frets nothing is a last resort (#1822)', () => {
                 ).toBe(true);
             }
         }
+    });
+});
+
+describe('up the neck, a grip that rings a skipped string is a last resort (#1850)', () => {
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    const grips = (
+        inst: InstrumentDef,
+        names: string,
+        home: [number, number] | null,
+        rootStrings?: number[],
+    ) => voiceChart(chart(names), { instrument: inst, home, rootStrings }).map((v) => tab(inst, v));
+    /** A muted string between two sounding ones, with no fretted note beside it to mute it. */
+    const rings = (g: string) => {
+        const t = g.split(' ');
+        const sounding = t.flatMap((f, i) => (f === 'x' ? [] : [i]));
+        const fretted = (i: number) => t[i] !== 'x' && t[i] !== '0';
+        return t.some(
+            (f, i) =>
+                f === 'x' &&
+                i > sounding[0] &&
+                i < sounding.at(-1)! &&
+                !fretted(i - 1) &&
+                !fretted(i + 1),
+        );
+    };
+
+    it('in frets 2–7 the open-root shells give way to closed ones', () => {
+        // A7 x 0 x 0 2 x, A7sus4 x 0 x 0 3 x, Em7 0 x 0 0 x x and E7sus4 0 x 0 2 x x left the
+        // 4th or 5th string ringing with an open string on each side of it.
+        expect(grips(GUITAR, 'A7sus4 A7 D', [2, 7])).toEqual([
+            '5 5 5 x x x',
+            '5 4 5 x x x',
+            'x 5 4 2 x x',
+        ]);
+        // The 6th- and 5th-string shells a comper alternates: it was 0 x 0 0 x x /
+        // x 0 x 0 2 x / x x 0 x 2 2.
+        expect(grips(GUITAR, 'Em7 A7 Dmaj7', [2, 7])).toEqual([
+            'x 7 5 7 x x',
+            '5 x 5 6 x x',
+            'x 5 4 6 x x',
+        ]);
+        expect(grips(GUITAR, 'E7sus4 B5 E+', [2, 7])).toEqual([
+            'x x 2 2 3 x',
+            'x 2 4 4 x x',
+            'x 7 6 5 x x',
+        ]);
+        // With the roots on the 6th and 5th strings Em7 has one closed shell there, and B7 meets
+        // it at the 7th fret.
+        expect(grips(GUITAR, 'B7 Em7', [2, 7], [6, 5])).toEqual(['7 6 7 x x x', 'x 7 5 7 x x']);
+    });
+
+    it('a skipped string with a fretted note beside it stays: the finger there mutes it', () => {
+        // Closed shells, the comper's: the bass finger's underside damps the string above it.
+        expect(grips(GUITAR, 'Cmaj7', [2, 7])).toEqual(['x 3 x 4 5 x']);
+        expect(grips(GUITAR, 'Dm7 G7 Cmaj7', [2, 7])[2]).toBe('x 3 x 4 5 x');
+        // An open string on one side and a fretted note on the other.
+        expect(grips(GUITAR, 'Dmaj7 Cm Fm7', [2, 7])[0]).toBe('x x 0 x 2 2');
+        expect(grips(GUITAR, 'F#m7 B7 Emaj7', [2, 7], [6, 5])[2]).toBe('0 x 1 1 x x');
+    });
+
+    it('at the nut and with no window nothing changes: the book chords play there', () => {
+        for (const home of [null, [1, 6]] as ([number, number] | null)[]) {
+            expect(grips(GUITAR, 'A7sus4 A7 D', home)).toEqual([
+                'x 0 2 0 3 0',
+                'x 0 2 0 2 0',
+                'x x 0 2 3 2',
+            ]);
+            expect(grips(GUITAR, 'Em7 A7 Dmaj7', home)).toEqual([
+                '0 2 0 0 0 0',
+                'x 0 2 0 2 0',
+                'x x 0 2 2 2',
+            ]);
+        }
+    });
+
+    it('no guitar grip up the neck rings a skipped string; closed skips are still played', () => {
+        const ROOTS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+        const SUFFIXES = ['7', 'maj7', 'm7', '6', 'm6', '7sus4', 'm7b5', 'dim7'];
+        let closedSkips = 0;
+        for (const home of [
+            [2, 7],
+            [3, 8],
+            [5, 10],
+        ] as [number, number][]) {
+            for (const rootStrings of [undefined, [6, 5]]) {
+                for (const r of ROOTS) {
+                    for (const q of SUFFIXES) {
+                        for (const names of [r + q, `A7 ${r + q} Em7`]) {
+                            for (const g of grips(GUITAR, names, home, rootStrings)) {
+                                expect(rings(g), `${names} in ${home}: ${g}`).toBe(false);
+                                closedSkips += /\d x \d/.test(g) ? 1 : 0;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        expect(closedSkips).toBeGreaterThan(100);
+    });
+
+    it('the ukulele is not asked: it sounds every string', () => {
+        expect(grips(UKULELE, 'A7sus4 A7 D', [2, 7])).toEqual(['2 4 3 5', '2 4 3 4', '2 2 2 5']);
     });
 });
 

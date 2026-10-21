@@ -385,10 +385,10 @@ export function fingersLine(
         parts.push(`lift ${lifted.length === 1 ? 'finger' : 'fingers'} ${list(lifted)}`);
     }
     const skip = skippedStrings(instrument, from, to);
-    // A chord that frets nothing (the ukulele's Am7 and C6 0-0-0-0, the guitar's Em7
-    // 0-x-0-0-x-x) is all lifts, which the line leaves out, so it would say nothing; a teacher
-    // says the move (#1818). On a ukulele every string then rings open, unless the skip clause
-    // already says what to strum.
+    // A chord that frets nothing (the ukulele's Am7 and C6 0-0-0-0; no guitar grip since #1850,
+    // which took the open Em7 shell 0-x-0-0-x-x off frets 2–7) is all lifts, which the line
+    // leaves out, so it would say nothing; a teacher says the move (#1818). On a ukulele every
+    // string then rings open, unless the skip clause already says what to strum.
     if (to.notes.every((x) => x.fret === 0) && from.notes.some((x) => x.fret > 0)) {
         parts.push(
             instrument.id === 'uke' && !skip
