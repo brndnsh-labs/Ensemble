@@ -822,7 +822,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // The ukulele's A 2 1 0 0 (2-1) to Am 2 0 0 0: the index comes off the C string.
         expect(lines(['A', 'Am'], uke)[0]).toBe('Finger 2 stays down; lift finger 1.');
         // Two that lift are "fingers": D 2 2 2 0 (1-2-3) to Am, the index staying on the G
-        // string's A; and on a guitar Am x x 2 2 1 0 (2-3-1) to the book's Am7 x 0 2 0 1 0,
+        // string's A; and on a guitar Am x x 2 2 1 x (2-3-1) to the book's Am7 x 0 2 0 1 0,
         // the ring finger lifting (#1838). Wonderwall's Dsus4 x x 5 2 3 x to A7sus4 x 0 x 0 3 x
         // was the guitar's example; A7sus4 is the book's x 0 2 0 3 0 now, a move.
         expect(lines(['D', 'Am'], uke)[0]).toBe(
