@@ -5661,3 +5661,60 @@ describe('at the nut a guitar 7th chord plays the book’s open chord (#1838)', 
         }
     });
 });
+
+describe('in first position a guitar 7th keeps one grip through a chart (#1839)', () => {
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    /** The grips each symbol of a chart is voiced with. */
+    const grips = (
+        names: string,
+        home: [number, number] | null,
+        rootStrings?: number[],
+    ): Map<string, Set<string>> => {
+        const by = new Map<string, Set<string>>();
+        const symbols = names.split(' ');
+        voiceChart(chart(names), { instrument: GUITAR, home, rootStrings }).forEach((v, i) => {
+            by.set(symbols[i], (by.get(symbols[i]) ?? new Set()).add(tab(GUITAR, v)));
+        });
+        return by;
+    };
+    const blues = (I: string, IV: string, V: string) =>
+        [I, IV, I, I, IV, IV, I, I, V, IV, I, V].map((r) => `${r}7`).join(' ');
+
+    it('at frets 1–6 every shell symbol plays one grip', () => {
+        for (const rootStrings of [undefined, [6, 5]]) {
+            for (const names of [
+                // F♯7 was 2 1 2 x x x and 2 x 2 3 x x.
+                blues('F♯', 'B', 'C♯'),
+                // F7 was x x 3 2 4 x and 1 x 1 2 x x.
+                blues('C', 'F', 'G'),
+                // A♭7 was 4 3 4 x x x and 4 x 4 5 x x; D♭7 x 4 3 4 x x and x 4 x 4 6 x.
+                blues('A♭', 'D♭', 'E♭'),
+                // Cm7 opened on x 3 x 3 4 x and came back as x 3 1 3 x x.
+                'Cm7 Fm7 G7 Cm7',
+            ]) {
+                for (const [sym, set] of grips(names, [1, 6], rootStrings)) {
+                    expect([...set], `${sym} in ${names}`).toHaveLength(1);
+                }
+            }
+        }
+        const c = grips(blues('C', 'F', 'G'), [1, 6]);
+        expect([...c.get('F7')!]).toEqual(['x x 3 2 4 x']);
+        // The book's open 7ths beside it are as they were (#1838).
+        expect([...c.get('C7')!]).toEqual(['x 3 2 3 1 0']);
+        expect([...c.get('G7')!]).toEqual(['3 2 0 0 0 1']);
+    });
+    it('up the neck a comper still moves a 7th between its root strings', () => {
+        // Frets 2–7: G7 on the 6th string, then on the 4th.
+        expect([...grips(blues('G', 'C', 'D'), [2, 7]).get('G7')!].sort()).toEqual([
+            '3 x 3 4 x x',
+            'x x 5 4 6 x',
+        ]);
+    });
+    it('a chart with no window is left to the plan, as before', () => {
+        // The rule is for a window placed at the nut; with none, F7 still plays two ways.
+        expect(grips(blues('C', 'F', 'G'), null).get('F7')!.size).toBe(2);
+    });
+});
