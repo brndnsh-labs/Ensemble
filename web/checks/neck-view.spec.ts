@@ -491,3 +491,43 @@ test('a ukulele B5 marks the G and C strings it leaves silent (#1811)', async ({
     );
     expect(errors).toEqual([]);
 });
+
+test('"Show the shell" dims an open chord\'s doubles and is remembered (#1853)', async ({
+    page,
+}) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
+    await editorRevealed(page);
+    await page.getByLabel('Song title').fill('Shell study');
+    for (const [i, bar] of ['G7', 'C', 'G7', 'C'].entries()) {
+        await typeBar(page, i + 1, bar);
+    }
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await page.getByRole('button', { name: 'Neck', exact: true }).click();
+    const view = page.getByRole('region', { name: 'Neck' });
+    // First position: the book's open G7 3 2 0 0 0 1, six dots, none dimmed by default.
+    await expect(view.getByTestId('neck-current')).toHaveText('G7');
+    await expect(view.locator('.neck-dot')).toHaveCount(6);
+    const dimmed = view.locator('.neck-dot.is-outside-shell');
+    await expect(dimmed).toHaveCount(0);
+    const shell = view.getByRole('checkbox', { name: 'Show the shell' });
+    await expect(shell).not.toBeChecked();
+    // On: the D and the second G and B fade; the low G, the B and the top F stay bright.
+    await shell.check();
+    await expect(dimmed).toHaveCount(3);
+    await expect(view.locator('.neck-dot')).toHaveCount(6);
+    // The open C x 3 2 0 1 0 keeps its 5th: only the doubled C and E fade.
+    await view.getByRole('button', { name: 'Next chord', exact: true }).click();
+    await expect(view.getByTestId('neck-current')).toHaveText('C');
+    await expect(dimmed).toHaveCount(2);
+    // Remembered on this device.
+    await page.reload();
+    await songLink(page, 'Shell study').first().click();
+    await expect(view.getByRole('checkbox', { name: 'Show the shell' })).toBeChecked();
+    await expect(view.getByTestId('neck-current')).toHaveText('G7');
+    await expect(dimmed).toHaveCount(3);
+    expect(errors).toEqual([]);
+});

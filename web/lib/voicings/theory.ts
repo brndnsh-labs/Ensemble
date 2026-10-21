@@ -1,4 +1,4 @@
-import type { Degree, GripKind, Quality, Spelled } from './types';
+import type { Degree, GripKind, Note, Quality, Role, Spelled } from './types';
 
 export const LETTERS = 'CDEFGAB';
 export const NAT = [0, 2, 4, 5, 7, 9, 11];
@@ -134,3 +134,26 @@ export const QUALITIES: Record<Quality, QualityDef> = {
     // A power chord has no 3rd: root, 5th and the octave root is what rock guitar plays.
     five: { kind: 'power', symbol: '5', third: null, five: '5', required: [] },
 };
+
+/** The roles that sound a tone the grip already holds: a doubled root, 3rd or 5th. */
+const DOUBLED: ReadonlySet<Role> = new Set<Role>(['R2', 'T2', 'F2']);
+
+/**
+ * Whether a note of a grip lies outside its shell (#1853, the neck's "Show the shell"): the
+ * notes it dims so the root, 3rd and 7th stand out. A display rule only; the grip is unchanged.
+ * Every doubled note is outside (G7 `3 2 0 0 0 1`'s second G and B). So is a PERFECT 5th, but
+ * only on a 7th or 6th chord, because a shell is R–3–7 or R–3–6 and drops it (that G7's D); a
+ * ♭5 or ♯5 names the chord (m7♭5, °7, dim, aug) and stays, and a plain triad keeps its 5th.
+ * A sus chord's 4th or 2nd sits in the 3rd's seat and stays, as does an added tone (an add9's
+ * 9th). Up the neck a three-note shell has nothing outside. A power chord has no shell to
+ * show (no 3rd), so none of its notes dim, its octave included.
+ */
+export function outsideShell(quality: Quality, note: Pick<Note, 'role' | 'degree'>): boolean {
+    if (QUALITIES[quality].kind === 'power') {
+        return false;
+    }
+    if (DOUBLED.has(note.role)) {
+        return true;
+    }
+    return note.degree === '5' && QUALITIES[quality].kind === 'shell';
+}

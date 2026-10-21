@@ -228,6 +228,7 @@ export function NeckView({
                             fingers={prefs.fingers}
                             zoom={zoom}
                             labels={prefs.labels}
+                            shell={prefs.shell}
                             home={prefs.home}
                             onHome={(start) => onPrefs({ home: [start, start + HOME_W - 1] })}
                             dimmed={model.held !== null}
@@ -308,6 +309,15 @@ export function NeckView({
                             onChange={(e) => onPrefs({ fingers: e.target.checked })}
                         />
                         <span className="setting-label">Say the fingers</span>
+                    </label>
+                    <label className="neck-setting neck-check">
+                        <input
+                            type="checkbox"
+                            aria-label="Show the shell"
+                            checked={prefs.shell}
+                            onChange={(e) => onPrefs({ shell: e.target.checked })}
+                        />
+                        <span className="setting-label">Show the shell</span>
                     </label>
                 </div>
             </div>

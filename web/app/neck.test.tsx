@@ -612,3 +612,33 @@ describe('Neck: the board strums its grip (#1596)', () => {
         expect(onStrum).not.toHaveBeenCalled();
     });
 });
+
+describe('Neck: "Show the shell" (#1853)', () => {
+    // The book's open G7 3 2 0 0 0 1: G B D G B F.
+    const openG7 = allPositions(GUITAR, G, 'dom7').find(
+        (v) => v.shape.book && v.notes.find((n) => n.string === 6)?.fret === 3,
+    ) as Voicing;
+    const dimmedStrings = () =>
+        openG7.notes
+            .filter((n) => dotFor(n)?.classList.contains('is-outside-shell'))
+            .map((n) => n.string)
+            .sort((a, b) => b - a);
+
+    it('off, no dot is dimmed', () => {
+        render({ active: openG7 });
+        expect(dots()).toHaveLength(6);
+        expect(host.querySelectorAll('.is-outside-shell')).toHaveLength(0);
+    });
+
+    it('on, dims the D and the second G and B; the board says which notes', () => {
+        render({ active: openG7, shell: true, onStrum: () => {} });
+        expect(dimmedStrings()).toEqual([4, 3, 2]);
+        const label = host.querySelector('.neck-strum')!.getAttribute('aria-label')!;
+        expect(label.match(/outside the shell/g)).toHaveLength(3);
+    });
+
+    it('on, a three-note shell up the neck dims nothing', () => {
+        render({ active: g7, shell: true });
+        expect(host.querySelectorAll('.is-outside-shell')).toHaveLength(0);
+    });
+});
