@@ -870,8 +870,9 @@ const openStrum = (v: Voicing, inst: InstrumentDef): boolean =>
  * triads and power grips sit on neighbouring strings, and a ukulele shell sounds every string.
  *
  * It acts up the neck, in a window from the 2nd fret. At the nut and with no window those
- * chords already play the book's open chords (`bookGrip`), so it moves nothing there (measured,
- * 3,120 progressions × 15 setups), and it needs no exemption: a strum rings the string there too.
+ * chords play the book's open chords: every grip it flags (A7, A7sus4, Am7, E7, E7sus4, Em7,
+ * Dm6, D6 on their open roots) is a chord with a book grip, the first tier there (`bookGrip`).
+ * It needs no exemption either: a strum rings the string at the nut too.
  */
 const ringsASkippedString = (v: Voicing): boolean => {
     const fretAt = new Map(v.notes.map((n) => [n.string, n.fret]));
@@ -1112,9 +1113,9 @@ const inRiffAt = (chart: ChartChord[], i: number): boolean => {
  * 2. Grips inside the hand window that a player would take: every one but those with a buried
  *    root (`rootBuried`), the open-string one-offs of a fretted shape (`openShapeOneOff`), a
  *    guitar grip on three open strings alone (`openStrum`, #1817, #1822), a grip that rings a
- *    skipped string (`ringsASkippedString`, #1850) and a ukulele's five-fret reaches (`fiveFretReach`; in first position only where the chord
- *    has another grip there, `leavesTheNut`). Where the window has one, nothing below is
- *    looked at.
+ *    skipped string (`ringsASkippedString`, #1850) and a ukulele's five-fret reaches
+ *    (`fiveFretReach`; in first position only where the chord has another grip there,
+ *    `leavesTheNut`). Where the window has one, nothing below is looked at.
  * 3. Such grips with the window widened by a fret: a shell's with its root in the window
  *    (`inReach`, #1610), a strummed ukulele chord's wherever its root is, in a window up
  *    the neck (`aFretPast`). They
