@@ -2946,8 +2946,11 @@ describe('fingers a teacher would show (#1611)', () => {
                 expect(v.filter((x) => x.startsWith('x 1 x 1 3 x'))).toEqual(
                     Array(7).fill('x 1 x 1 3 x [1-2-3]'),
                 );
-                // What does take a second fingering has a finger to keep: E♭7 after F7.
-                expect(v.slice(8, 10)).toEqual(['1 x 1 2 x x [1-2-3]', 'x x 1 x 2 3 [2-3-4]']);
+                // E♭7 after F7 took 2-3-4 to keep the index's note; since #1851 a shell in frets
+                // 1–6 keeps one fingering a song, and with no window a comper still re-fingers.
+                expect(v.slice(8, 10)).toEqual(['1 x 1 2 x x [1-2-3]', 'x x 1 x 2 3 [1-2-3]']);
+                const free = played(GUITAR, null, undefined, ...blues);
+                expect(free.slice(8, 10)).toEqual(['1 x 1 2 x x [1-2-3]', 'x x 1 x 2 3 [2-3-4]']);
             });
             it('in every key, both instruments: a fingering that is not the default holds a note', () => {
                 const PROGRESSIONS: [number, Quality][][] = [
@@ -6142,5 +6145,63 @@ describe('in first position a guitar shell is aimed at the nut (#1851)', () => {
             'C♯7 1 1 1 2',
             'F♯m7 2 4 2 4',
         ]);
+    });
+});
+
+describe('in first position a guitar shell keeps one fingering per song (#1851)', () => {
+    /** Each grip a chart plays, by its frets, and the fingerings it takes. */
+    const fingerings = (
+        song: string,
+        key: string,
+        home: [number, number] | null,
+        rootStrings?: number[],
+    ): Map<string, Set<string>> => {
+        const by = new Map<string, Set<string>>();
+        voiceChart(songChart(keyRoot(key), SONG_SHAPES[song]), {
+            instrument: GUITAR,
+            home,
+            rootStrings,
+        }).forEach((v) => {
+            const fingers = [...v.notes]
+                .sort((a, b) => b.string - a.string)
+                .map((n) => n.finger ?? 0)
+                .join('-');
+            const grip = `${v.symbol} ${tab(GUITAR, v)}`;
+            by.set(grip, (by.get(grip) ?? new Set()).add(fingers));
+        });
+        return by;
+    };
+
+    it('in frets 1–6 a shell grip is fingered one way through a chart', () => {
+        // E♭7 x x 1 x 2 3 was 1-2-3, and 2-3-4 after F7 1 x 1 2 x x for its index's note.
+        expect(fingerings('blues', 'B♭', [1, 6]).get('E♭7 x x 1 x 2 3')).toEqual(
+            new Set(['1-2-3']),
+        );
+        for (const key of ['C', 'F♯', 'B♭']) {
+            for (const rootStrings of [undefined, [6, 5]]) {
+                for (const song of ['pop', 'canon', 'autumn', 'blues', 'bridge', 'bossa']) {
+                    for (const [grip, set] of fingerings(song, key, [1, 6], rootStrings)) {
+                        expect([...set], `${grip} in ${song} in ${key}`).toHaveLength(1);
+                    }
+                }
+            }
+        }
+    });
+
+    it('a second fingering that keeps two fingers stays, as for a triad (#1836)', () => {
+        // Cm7 x 3 1 3 x x is 3-1-4 into the open C7 x 3 2 3 1 0, the ring and little finger
+        // staying, and 2-1-3 after G7.
+        expect(fingerings('minorDim', 'C', [1, 6]).get('Cm7 x 3 1 3 x x')).toEqual(
+            new Set(['3-1-4', '2-1-3']),
+        );
+    });
+
+    it('up the neck and with no window a comper still re-fingers a shell for a held note', () => {
+        expect(fingerings('blues', 'B♭', null).get('E♭7 x x 1 x 2 3')).toEqual(
+            new Set(['1-2-3', '2-3-4']),
+        );
+        expect(fingerings('blues', 'C', [2, 7]).get('F7 x x 3 x 4 5')).toEqual(
+            new Set(['1-2-3', '2-3-4']),
+        );
     });
 });

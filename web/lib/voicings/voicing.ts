@@ -1416,7 +1416,11 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(
-        out.map((v) => ({ notes: v.notes, ...fingerRules(v.shape, v.notes, opts.instrument) })),
+        out.map((v) => ({
+            notes: v.notes,
+            ...fingerRules(v.shape, v.notes, opts.instrument),
+            oneFingering: learnersShell(v, opts.instrument, home),
+        })),
     );
     return out;
 }

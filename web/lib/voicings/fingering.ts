@@ -144,6 +144,12 @@ export interface FingerOpts {
      * (`FingerOption.book`).
      */
     book?: boolean;
+    /**
+     * A guitar shell in a window from the 1st fret (`voicing.ts`'s `learnersShell`, #1851): held
+     * to one fingering through a song as a triad is (`unifyFingerings`), where up the neck and
+     * with no window a comper chooses a shell's fingers afresh for a held note.
+     */
+    oneFingering?: boolean;
 }
 
 /**
@@ -2024,9 +2030,13 @@ function keepsTwo(path: FingerOption[], i: number): boolean {
  * itself.
  *
  * Asked of no ukulele grip (its rule already is this one, and its charts stay as they are) and
- * no guitar shell, whose fingers a jazz comper chooses afresh for a held note (`taughtAmong`;
- * the blues in B♭'s E♭7 x-x-1-x-2-3 is 1-2-3, and 2-3-4 after F7; the shell characterization
- * pins them), though a shell beside a grip held here may re-finger to keep a note of it. The
+ * no guitar shell up the neck or with no window, whose fingers a jazz comper chooses afresh for
+ * a held note (`taughtAmong`; the blues in B♭'s E♭7 x-x-1-x-2-3 is 1-2-3, and 2-3-4 after F7;
+ * the shell characterization pins them), though a shell beside a grip held here may re-finger
+ * to keep a note of it. In a window from the 1st fret a guitar shell is asked too
+ * (`FingerOpts.oneFingering`, #1851): a learner is taught one fingering for it, so there the
+ * blues in B♭ plays E♭7 1-2-3 throughout, and Cm7 x-3-1-3-x-x keeps 3-1-4 into the open C7
+ * only because the ring and little finger stay. The
  * same rule put on every guitar second fingering (`holdFor` on each, the plan's way) was
  * measured against this one: over 3,120 progressions × 15 setups it moved 3,079 sweep lines
  * and gave up 4,033 held notes, most in charts that already played each chord one way
@@ -2114,7 +2124,8 @@ function unifyFingerings(options: FingerOption[][], keys: Array<string | null>):
  * for fingers enough that stay (`holdFor`), as a guitar's open grip leaves the nut
  * (`offItsFret`) and any guitar grip crowds the hand (`crowdedOptions`). Then a guitar triad or
  * power grip fingered two ways is held to one, unless the second keeps two fingers
- * (`unifyFingerings`, #1836).
+ * (`unifyFingerings`, #1836), and so is a guitar shell in first position (`oneFingering`,
+ * #1851).
  */
 export function fingerSequence(chords: Array<{ notes: Note[] } & FingerOpts>): void {
     if (!chords.length) {
@@ -2129,9 +2140,12 @@ export function fingerSequence(chords: Array<{ notes: Note[] } & FingerOpts>): v
         }),
     );
     // A guitar triad or power grip, by its strings and frets: one hand, whatever the chart
-    // calls it (Am x-3-2-2-x-x and C6 are one grip, #1835).
+    // calls it (Am x-3-2-2-x-x and C6 are one grip, #1835); and a guitar shell in first
+    // position (`oneFingering`, #1851).
     const keys = chords.map((c) =>
-        c.ukulele || !c.barre ? null : c.notes.map((n) => `${n.string}/${n.fret}`).join(' '),
+        c.ukulele || !(c.barre || c.oneFingering)
+            ? null
+            : c.notes.map((n) => `${n.string}/${n.fret}`).join(' '),
     );
     unifyFingerings(options, keys).forEach((o, i) => {
         applyFingers(chords[i].notes, o);
