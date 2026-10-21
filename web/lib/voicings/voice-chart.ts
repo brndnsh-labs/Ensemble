@@ -4,10 +4,8 @@
  * `globalIndex`, the written event the slot performs, so a repeat or a D.C. reuses the grip it
  * was voiced with.
  */
-import { notePc } from '@band/index';
 import type { BandChart } from '../band-chart';
 import { type VoicingChord, voicingChord } from './adapter';
-import type { HomeKey } from './home-window';
 import { GUITAR, UKULELE, UKULELE_LOW_G } from './instruments';
 import type { HomeWindow, InstrumentDef, VoicedChord } from './types';
 import { voiceChart } from './voicing';
@@ -35,18 +33,6 @@ export const NECK_INSTRUMENTS: Record<NeckPrefs['instrument'], InstrumentDef> = 
     uke: UKULELE,
     'uke-low-g': UKULELE_LOW_G,
 };
-
-/**
- * The key a chart's hand position is chosen for (#1598): the key it OPENS in, read off its first
- * written event (a chord, hold or N.C. — each carries its bar's key), or null for an empty chart.
- * A chart that changes key keeps this one window: the home window is where the hand stays for
- * the whole tune, and a player reading a bridge in another key reaches for it from the position
- * they are in rather than re-seating the hand.
- */
-export function chartHomeKey(chart: BandChart): HomeKey | null {
-    const first = chart.chords[0];
-    return first ? { tonic: notePc(first.key), minor: first.keyIsMinor === true } : null;
-}
 
 /** Voice every written chord of a chart, in written order; holds and N.C. have nothing to voice. */
 export function voiceBandChart(chart: BandChart, prefs: NeckPrefs): VoicedBandChord[] {

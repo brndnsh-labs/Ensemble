@@ -119,7 +119,7 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
         }),
     ).toBe(true);
 
-    // The hand position is the neck's own slider; in C it starts in first position (#1598).
+    // The hand position is the neck's own slider; it starts in first position (#1598, #1840).
     const hand = view.getByRole('slider', { name: 'Hand position' });
     await expect(hand).toHaveAttribute('aria-valuenow', '1');
     await hand.focus();
@@ -339,7 +339,7 @@ test('a phone board follows the hand; a laptop shows the whole neck (#1593)', as
     }
     await expect.poll(scale).toBeGreaterThan(1.4);
     const before = await scale();
-    // The board follows a home-window move (a C blues starts on frets 1–6, #1598).
+    // The board follows a home-window move (every chart starts on frets 1–6, #1840).
     const hand = view.getByRole('slider', { name: 'Hand position' });
     await hand.focus();
     for (let i = 0; i < 4; i++) {
@@ -353,29 +353,30 @@ test('a phone board follows the hand; a laptop shows the whole neck (#1593)', as
     ).toBe(true);
 });
 
-test('the hand sits where the key puts it until the musician moves it (#1598)', async ({
+test('the hand sits in first position until the musician moves it (#1598, #1840)', async ({
     page,
 }) => {
     await seedStarters(page);
     const view = page.getByRole('region', { name: 'Neck' });
     const hand = view.getByRole('slider', { name: 'Hand position' });
     const open = (title: string) => songLink(page, title).first().click();
-    // 'Blue pocket' is in C: first position, where F's root is under the first finger.
+    // 'Blue pocket' is in C: first position.
     await open('Blue pocket');
     await page.getByRole('button', { name: 'Neck', exact: true }).click();
     await expect(hand).toHaveAttribute('aria-valuetext', 'frets 1 to 6');
-    // 'Minor swing sketch' is in A minor, whose E7 is rooted at the 7th fret: frets 2–7. Neck
-    // mode is remembered, so the song opens on the neck.
+    // 'Minor swing sketch' is in A minor, whose E7 is rooted at the 7th fret: first position
+    // too, whatever the key (it was frets 2–7 until #1840). Neck mode is remembered, so the
+    // song opens on the neck.
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await open('Minor swing sketch');
-    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 2 to 7');
+    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 1 to 6');
     // A window the musician moved stays put on the next chart.
     await hand.focus();
     await hand.press('ArrowRight');
-    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 3 to 8');
+    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 2 to 7');
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await open('Blue pocket');
-    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 3 to 8');
+    await expect(hand).toHaveAttribute('aria-valuetext', 'frets 2 to 7');
 });
 
 test('stopped, the neck steps through the changes and the board strums (#1595, #1596)', async ({

@@ -1,11 +1,4 @@
-import {
-    GUITAR,
-    type HomeKey,
-    type HomeWindow,
-    keyHomeWindow,
-    NECK_INSTRUMENTS,
-    type NeckPrefs,
-} from './voicings';
+import { HOME_FRETS, type HomeWindow, NECK_INSTRUMENTS, type NeckPrefs } from './voicings';
 
 const LAST_OPENED = 'ensemble-v2-preview:last-opened';
 
@@ -209,10 +202,11 @@ const NECK_PREFS = 'ensemble-v2-preview:neck-prefs';
 export type NeckLabels = 'finger' | 'degree' | 'note';
 /**
  * Where the hand lives (#1598): a window the musician chose (dragged, or stepped with the
- * handle), `null` for anywhere on the neck, or `'key'` — no window chosen, so the hand sits where
- * each chart's key puts it (`defaultNeckHome`). "Still on the default" is this value, never a
- * comparison of frets: a chosen window that happens to equal one key's default is still chosen
- * and stays put on the next chart.
+ * handle), `null` for anywhere on the neck, or `'key'` — no window chosen, so the hand sits in
+ * first position (`placeNeckHand`). The value keeps its name from when the default followed the
+ * chart's key (until #1840): devices store it. "Still on the default" is this value, never a
+ * comparison of frets: a chosen window that happens to equal the default is still chosen and
+ * stays put on the next chart.
  */
 export type NeckHome = HomeWindow | null | 'key';
 /**
@@ -236,28 +230,16 @@ const NECK_ROOT_STRINGS: readonly NeckPrefs['rootStrings'][] = ['all', 'classic'
 const NECK_LABELS: readonly NeckLabels[] = ['finger', 'degree', 'note'];
 
 /**
- * Where the hand starts when the musician has not chosen (#1598). A guitar follows the chart's
- * key (`keyHomeWindow`, roots on the 6th and 5th strings): frets 1–6 for C, F and the flat keys,
- * 2–7 for the sharp keys — and 2–7 with no key to read (an empty chart). A uke (either tuning)
- * stays on 1–6 whatever the key: its roots go on any of four strings a 4th or less apart, so
- * first position already holds every key's chords.
+ * Place the hand for a chart: a chosen window (or none) as it is, `'key'` in first position,
+ * frets 1 to `HOME_FRETS`, on every instrument and in every key (#1598; #1840, 2026-10-20). The
+ * guitar used to follow the chart's opening key and sit on frets 2–7 for the sharp keys, where
+ * their roots on the low strings run up to the 7th fret, so a beginner song in G, D, A or E
+ * showed no open chord; since #1827 and #1833 first position plays the open forms, the chords a
+ * learner knows. A ukulele always started there: its roots go on any of four strings a 4th or
+ * less apart, so first position holds every key's chords.
  */
-export function defaultNeckHome(
-    instrument: NeckPrefs['instrument'],
-    key: HomeKey | null,
-): HomeWindow {
-    if (instrument !== 'guitar') {
-        return [1, 6];
-    }
-    return key ? keyHomeWindow(GUITAR, [6, 5], key) : [2, 7];
-}
-
-/** Place the hand for a chart in `key`: a chosen window (or none) as it is, `'key'` by the key. */
-export function placeNeckHand(prefs: NeckPreferences, key: HomeKey | null): PlacedNeckPreferences {
-    return {
-        ...prefs,
-        home: prefs.home === 'key' ? defaultNeckHome(prefs.instrument, key) : prefs.home,
-    };
+export function placeNeckHand(prefs: NeckPreferences): PlacedNeckPreferences {
+    return { ...prefs, home: prefs.home === 'key' ? [1, HOME_FRETS] : prefs.home };
 }
 
 export function defaultNeckPreferences(): NeckPreferences {
@@ -284,6 +266,12 @@ const pick = <T>(allowed: readonly T[], value: unknown, fallback: T): T =>
 
 /** The stored shape that can say `home: 'key'` (#1598); a blob without it predates the rule. */
 const NECK_PREFS_VERSION = 2;
+/** The window each instrument opened on before #1598: that era's blob stored it like a moved one. */
+const PRE_1598_HOME: Record<NeckPrefs['instrument'], HomeWindow> = {
+    guitar: [2, 7],
+    uke: [1, 6],
+    'uke-low-g': [1, 6],
+};
 
 /**
  * Device-local neck preferences — never document fields: which instrument, where the hand
@@ -292,9 +280,9 @@ const NECK_PREFS_VERSION = 2;
  * losing the rest; anything that is not a JSON object is all defaults.
  *
  * A blob from before #1598 always held a window, moved or not, so a window equal to that era's
- * fixed default (a guitar's 2–7, a uke's 1–6 — `defaultNeckHome` with no key) is read as never
- * moved and follows the key from now on; any other window was moved and is kept. The cost is a
- * musician who dragged away and back to exactly that default, who gets the key's window instead.
+ * fixed default (a guitar's 2–7, a uke's 1–6: `PRE_1598_HOME`) is read as never moved and takes
+ * the default from now on; any other window was moved and is kept. The cost is a musician who
+ * dragged away and back to exactly that default, who gets first position instead.
  */
 export function neckPreferences(): NeckPreferences {
     const defaults = defaultNeckPreferences();
@@ -318,7 +306,7 @@ export function neckPreferences(): NeckPreferences {
         home = null;
     } else if (isHomeWindow(stored.home, instrument)) {
         const [from, to] = stored.home;
-        const old = defaultNeckHome(instrument, null);
+        const old = PRE_1598_HOME[instrument];
         const unmoved = stored.version !== NECK_PREFS_VERSION && from === old[0] && to === old[1];
         home = unmoved ? 'key' : [from, to];
     }

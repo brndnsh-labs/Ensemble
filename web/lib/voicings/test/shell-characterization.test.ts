@@ -100,8 +100,8 @@ const grid = (
 // in #1604's count (the wide-span cost nudged either way, `MAX_SPAN` lowered) are caught by
 // nothing now; the counts above are that measurement, not a new one.
 //
-// The last 90 (#1607) are the window the app opens on: frets 1–6, where a ukulele always starts
-// and a guitar does in C, F and the flat keys (`defaultNeckHome`). The 273 before them never
+// The last 90 (#1607) are the window the app opens on: frets 1–6, where every chart starts on
+// either instrument (`placeNeckHand`; a guitar in a sharp key opened on 2–7 until #1840). The 273 before them never
 // voiced it (their windows are none, 2–7 and 7–12), and first position is the only place two
 // of #1607's rules act: the open-string credit a ukulele shell earns (`openStringCredit`) and
 // the open strings an added tone may leave (`openOneOff`). Every setup, song and key above, at

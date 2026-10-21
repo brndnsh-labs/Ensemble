@@ -40,8 +40,8 @@ function chart(bars: (ScoreEvent | ScoreEvent[])[]): BandChart {
     };
     return bandChart(score, compileTimeline(score));
 }
-// No key to read, so the hand is on a guitar's keyless default, frets 2–7 (`defaultNeckHome`).
-const prefs = placeNeckHand(defaultNeckPreferences(), null);
+// A guitar in frets 2–7, the window these grips were written for (the default is 1–6, #1840).
+const prefs = placeNeckHand({ ...defaultNeckPreferences(), home: [2, 7] });
 const voice = (band: BandChart): Map<number, VoicedBandChord> =>
     new Map(voiceBandChart(band, prefs).map((v) => [v.globalIndex, v] as const));
 

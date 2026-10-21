@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
     allSongsSortPreference,
     countInPreference,
-    defaultNeckHome,
     forgetOpened,
     type NeckPreferences,
     neckPreferences,
@@ -17,7 +16,6 @@ import {
     rememberSongMode,
     songModePreference,
 } from './session';
-import type { HomeKey } from './voicings';
 
 // happy-dom in this repo ships no Storage implementation, so `session.ts`'s
 // `localStorage.getItem`/`setItem` calls get a plain in-memory stand-in instead.
@@ -134,10 +132,7 @@ describe('the neck preferences (#1586)', () => {
         labels: 'finger',
         fingers: false,
     };
-    const F: HomeKey = { tonic: 5, minor: false };
-    const G: HomeKey = { tonic: 7, minor: false };
-
-    it("defaults to guitar, the key's window, all root strings, finger labels and no finger detail", () => {
+    it('defaults to guitar, first position, all root strings, finger labels and no finger detail', () => {
         expect(neckPreferences()).toEqual(defaults);
     });
 
@@ -177,50 +172,38 @@ describe('the neck preferences (#1586)', () => {
         // A uke with a broken window is back on its default, which is the uke's, not the guitar's.
         store.set(KEY, JSON.stringify({ instrument: 'uke', home: [7, 2] }));
         expect(neckPreferences()).toEqual({ ...defaults, instrument: 'uke' });
-        expect(placeNeckHand(neckPreferences(), F).home).toEqual([1, 6]);
+        expect(placeNeckHand(neckPreferences()).home).toEqual([1, 6]);
     });
 
-    it('swaps a default home window with the instrument, and keeps one the musician moved', () => {
+    it('keeps a default home window default across instruments, and one the musician moved', () => {
         const uke = patchNeckPreferences(defaults, { instrument: 'uke' });
-        expect(placeNeckHand(uke, G).home).toEqual([1, 6]);
+        expect(placeNeckHand(uke).home).toEqual([1, 6]);
         const guitar = patchNeckPreferences(uke, { instrument: 'guitar' });
-        expect(placeNeckHand(guitar, G).home).toEqual([2, 7]);
-        expect(
-            placeNeckHand(patchNeckPreferences(uke, { instrument: 'uke-low-g' }), G).home,
-        ).toEqual([1, 6]);
+        expect(placeNeckHand(guitar).home).toEqual([1, 6]);
+        expect(placeNeckHand(patchNeckPreferences(uke, { instrument: 'uke-low-g' })).home).toEqual([
+            1, 6,
+        ]);
         const moved = { ...defaults, home: [5, 10] as [number, number] };
         expect(patchNeckPreferences(moved, { instrument: 'uke' }).home).toEqual([5, 10]);
         expect(patchNeckPreferences(defaults, { instrument: 'uke', home: null }).home).toBeNull();
     });
 
-    describe("the home window follows the chart's key until the musician moves it (#1598)", () => {
-        it('places an unchosen guitar window by the key: 1–6 in F, 2–7 in G, 2–7 with no key', () => {
-            expect(defaultNeckHome('guitar', F)).toEqual([1, 6]);
-            expect(defaultNeckHome('guitar', G)).toEqual([2, 7]);
-            expect(defaultNeckHome('guitar', null)).toEqual([2, 7]);
-            expect(placeNeckHand(defaults, F).home).toEqual([1, 6]);
-            expect(placeNeckHand(defaults, G).home).toEqual([2, 7]);
-        });
-
-        it('keeps a uke on frets 1–6 in every key, major and minor', () => {
-            for (const instrument of ['uke', 'uke-low-g'] as const) {
-                for (let tonic = 0; tonic < 12; tonic++) {
-                    for (const minor of [false, true]) {
-                        expect(defaultNeckHome(instrument, { tonic, minor })).toEqual([1, 6]);
-                    }
-                }
+    describe('the home window is first position until the musician moves it (#1598, #1840)', () => {
+        it('places an unchosen window on frets 1–6 for every instrument', () => {
+            for (const instrument of ['guitar', 'uke', 'uke-low-g'] as const) {
+                expect(placeNeckHand({ ...defaults, instrument }).home).toEqual([1, 6]);
             }
         });
 
-        it('leaves a window the musician moved where it is, on every chart', () => {
+        it('leaves a window the musician moved where it is', () => {
             const moved = patchNeckPreferences(defaults, { home: [5, 10] });
-            expect(placeNeckHand(moved, F).home).toEqual([5, 10]);
-            expect(placeNeckHand(moved, G).home).toEqual([5, 10]);
-            // Moved onto one key's default is still moved: it does not start following again.
-            const onDefault = patchNeckPreferences(defaults, { home: [2, 7] });
-            expect(placeNeckHand(onDefault, F).home).toEqual([2, 7]);
+            expect(placeNeckHand(moved).home).toEqual([5, 10]);
+            // Moved onto the default is still moved: it stays put if the default ever changes.
+            const onDefault = patchNeckPreferences(defaults, { home: [1, 6] });
+            expect(placeNeckHand(onDefault).home).toEqual([1, 6]);
+            expect(onDefault.home).not.toBe('key');
             // Anywhere is not a window to place either.
-            expect(placeNeckHand({ ...defaults, home: null }, F).home).toBeNull();
+            expect(placeNeckHand({ ...defaults, home: null }).home).toBeNull();
         });
 
         it('remembers followed, moved and anywhere apart, across a reload', () => {
@@ -230,9 +213,9 @@ describe('the neck preferences (#1586)', () => {
             expect(neckPreferences().home).toEqual([2, 7]);
             rememberNeckPreferences({ ...defaults, home: null });
             expect(neckPreferences().home).toBeNull();
-            // Locking the hand again is `'key'`: back to following.
+            // Locking the hand again is `'key'`: back on the default.
             rememberNeckPreferences(patchNeckPreferences(neckPreferences(), { home: 'key' }));
-            expect(placeNeckHand(neckPreferences(), F).home).toEqual([1, 6]);
+            expect(placeNeckHand(neckPreferences()).home).toEqual([1, 6]);
         });
 
         it('reads a window stored before the rule as unmoved only when it is the old default', () => {
@@ -248,7 +231,7 @@ describe('the neck preferences (#1586)', () => {
             expect(neckPreferences().home).toEqual([4, 9]);
             store.set(KEY, JSON.stringify({ instrument: 'guitar', home: null }));
             expect(neckPreferences().home).toBeNull();
-            // An unknown string is not a window: back to following.
+            // An unknown string is not a window: back on the default.
             store.set(KEY, JSON.stringify({ version: 2, instrument: 'guitar', home: 'nut' }));
             expect(neckPreferences().home).toBe('key');
         });

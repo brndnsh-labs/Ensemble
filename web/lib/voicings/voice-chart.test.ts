@@ -6,7 +6,7 @@ import { compileTimeline } from '@band/index';
 import type { ScoreEvent, SemanticScore } from '@core/songbook/score-types';
 import { describe, expect, it } from 'vitest';
 import { bandChart } from '../band-chart';
-import { chartHomeKey, voiceBandChart } from './voice-chart';
+import { voiceBandChart } from './voice-chart';
 import { inHome } from './voicing';
 
 const chord = (symbol: string): ScoreEvent => ({ kind: 'chord', symbol, duration: [4, 1] });
@@ -128,38 +128,5 @@ describe('voiceBandChart', () => {
             rootStrings: 'classic',
         });
         expect(uke).toHaveLength(3);
-    });
-});
-
-describe('chartHomeKey (#1598)', () => {
-    it('reads the key a chart opens in, and stays there when a later section changes key', () => {
-        const chart = bandChart(twoFiveOne, compileTimeline(twoFiveOne));
-        expect(chartHomeKey(chart)).toEqual({ tonic: 0, minor: false });
-        const modulating: SemanticScore = {
-            ...twoFiveOne,
-            key: 'F',
-            sections: [
-                {
-                    ...twoFiveOne.sections[0],
-                    measures: twoFiveOne.sections[0].measures.slice(0, 3),
-                },
-                {
-                    ...twoFiveOne.sections[0],
-                    id: 'b',
-                    label: 'B',
-                    key: 'A',
-                    isMinor: true,
-                    measures: [{ id: 'b0', content: { kind: 'events', events: [chord('Am7')] } }],
-                },
-            ],
-        };
-        const moved = bandChart(modulating, compileTimeline(modulating));
-        expect(moved.chords.at(-1)?.key).toBe('A');
-        expect(chartHomeKey(moved)).toEqual({ tonic: 5, minor: false });
-    });
-
-    it('has no key to read on a chart with nothing written', () => {
-        const chart = bandChart(twoFiveOne, compileTimeline(twoFiveOne));
-        expect(chartHomeKey({ ...chart, chords: [] })).toBeNull();
     });
 });
