@@ -84,4 +84,8 @@ describe('outsideShell (#1853)', () => {
             }
         }
     });
+
+    it('a power chord has no shell to show: E5 0 2 2 x x x dims nothing, its octave included', () => {
+        expect(outside(grip(GUITAR, 'E', 'five', '0 2 2 x x x'))).toEqual([]);
+    });
 });
