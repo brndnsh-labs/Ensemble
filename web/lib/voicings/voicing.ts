@@ -13,7 +13,7 @@
  * `triadUnaryCost`, `triadTransCost`, `handFree` or `unifyGrips` does too; so does a change to
  * which grips a chord is offered (`allPositions`, a quality's `required` tones, where `buildAt`
  * puts one, what `candidates` puts first — a ukulele chord's `bookGrip`, else its
- * `firstPosition` grips, and a guitar 7th chord's open book chord at the nut (#1838) — or holds back as a last resort, and how far past the window it looks,
+ * `firstPosition` grips, and a guitar chord's open book chord at the nut (#1838, #1849) — or holds back as a last resort, and how far past the window it looks,
  * `inReach`), to which barre a shell may take
  * (`fingerRules`), to which fingerings the chart plan may give a shell and what a change of
  * fingering costs it (`fingering.ts`'s `taughtAmong`, #1611, and `fingerTransCost`, #1617:
@@ -114,15 +114,20 @@ const mayBarre = (shape: ShapeDef): boolean => shape.kind !== 'shell';
  * strummed grip's fingering (`rootBuried` and `buildAt`'s added tone are a guitar shell's),
  * so the strummed rules move fingers only.
  *
- * The guitar's open 7ths (#1838, `ShapeDef.book`) are strummed chords too, every string between
- * their lowest and highest sounding, so they are fingered as the open triads are: from the nut
- * (`fingeredFromTheNut`), the book's fingering where the nut rule misses it (`GUITAR_BOOK`),
- * held to one fingering through a song (`unifyFingerings`). E7 0-2-0-1-0-0 is 2-1, C7
- * x-3-2-3-1-0 3-2-4-1, B7 x-2-1-2-0-2 2-1-3-4.
+ * The guitar's book chords, the open 7ths (#1838) and the open triads and sus chords (#1849,
+ * `ShapeDef.book`), are strummed chords, every string between their lowest and highest
+ * sounding, fingered from the nut (`fingeredFromTheNut`), the book's fingering where the nut
+ * rule misses it (`GUITAR_BOOK`), held to one fingering through a song (`unifyFingerings`).
+ * E7 0-2-0-1-0-0 is 2-1, C7 x-3-2-3-1-0 3-2-4-1, C x-3-2-0-1-0 3-2-1, G 3-2-0-0-0-3 2-1-3. They
+ * are marked `book` (`FingerOpts.book`): a book chord keeps the book's fingering rather than
+ * adapting to its neighbour, and a neighbour bends to it only on its own root.
  */
 const fingerRules = (shape: ShapeDef, notes: Note[], inst: InstrumentDef): FingerOpts => {
     const ukulele = inst.id === 'uke';
-    return mayBarre(shape) || shape.book || strumsEveryString({ notes }, inst)
+    if (shape.book) {
+        return { barre: true, ukulele, book: true };
+    }
+    return mayBarre(shape) || strumsEveryString({ notes }, inst)
         ? { barre: true, ukulele }
         : { rootBarre: true };
 };
@@ -227,10 +232,12 @@ export function buildAt(
     // book's grip (the same notes as A♭sus4, also 1-3-4-4). Without it D♭sus2 was 6-3-4-4 and
     // `D♭ D♭sus2 D♭` jumped five frets each way. Further up it is the Em7-shaped stretch a
     // teacher does not show (Esus2 4-6-7-7 for 4-4-2-2), so it moves no further.
+    // The guitar's book chords (#1838, #1849) never move: Asus2 x-0-2-2-0-0 a fret up is
+    // x-2-4-4-2-2, a grip no book prints, and as a sus2 it took B♭sus2 and Bsus2 at the nut.
     if (
         shape.openOnly &&
         !notes.some((n) => n.fret === 0) &&
-        !(quality === 'sus2' && notes.every((n) => n.fret <= FIRST_POSITION_TOP))
+        (shape.book || !(quality === 'sus2' && notes.every((n) => n.fret <= FIRST_POSITION_TOP)))
     ) {
         return null;
     }
@@ -712,8 +719,9 @@ function triadTransCost(
     home: HomeWindow | null,
     inst: InstrumentDef,
 ): number {
-    // A guitar open 7th (#1838) is no string set: it strums every string from its root up, and
-    // the triad or power grip beside it has no set of its own to stay on. Read by its top
+    // A guitar book chord (#1838, #1849) is no string set: it strums every string from its root
+    // up, and the grip beside it has no set of its own to stay on (measured for the 7ths; the
+    // open triads beside each other have no other grip to choose). Read by its top
     // string it pulled the grips beside it onto the top strings (F5 1-3-3-x-x-x beside Fmaj7
     // x-x-3-2-1-0 went to x-x-3-5-6-x, 37 sweep lines); read as a set holding every string it
     // sounds, the same, since F5's set lies below it. Read by its bass string, the hand jumps
@@ -909,13 +917,17 @@ export const inReach = (v: Voicing, home: HomeWindow | null): boolean => {
  * inversion among three, not the book's one grip, and a guitar shell's open string is a
  * one-off (`openShapeOneOff`).
  *
- * The guitar's one exception is its open 7ths (#1838, `GUITAR_OPEN_SEVENTHS`, `ShapeDef.book`):
- * at the nut a 7th chord that has one plays it, whatever stands beside it, as a ukulele chord
- * plays its book grip. The comping shells there skipped a string between two open ones with no
- * finger beside it to mute it (A7 x-0-x-0-2-x, E7 0-x-0-1-x-x, Am7 x-0-x-0-1-x, Em7
- * 0-x-0-0-x-x, A7sus4 x-0-x-0-3-x, Dm6 x-x-0-x-0-1), and a strummed chord rang it; every
- * method shows the full chord instead (A7 x-0-2-0-2-0, E7 0-2-0-1-0-0). Each chord has one
- * such grip, so the tier is that grip. Up the neck none is offered (`candidates`).
+ * The guitar's exception is its book chords (`ShapeDef.book`): the open 7ths (#1838,
+ * `GUITAR_OPEN_SEVENTHS`) and, since #1849, the open triads and sus chords (`GUITAR_OPEN_CHORDS`,
+ * C x-3-2-0-1-0, G 3-2-0-0-0-3, Am x-0-2-2-1-0). At the nut a chord that has one plays it,
+ * whatever stands beside it, as a ukulele chord plays its book grip; its three-string grips,
+ * one inversion among three, are not offered there. The comping shells there skipped a string
+ * between two open ones with no finger beside it to mute it (A7 x-0-x-0-2-x, E7 0-x-0-1-x-x,
+ * Am7 x-0-x-0-1-x, Em7 0-x-0-0-x-x, A7sus4 x-0-x-0-3-x, Dm6 x-x-0-x-0-1), and a strummed chord
+ * rang it; the triads took the open chords' top or bass strings, and dropped the root from the
+ * bass beside a book 7th (C x-x-x-0-1-0 beside G7). Every method shows the full chord instead
+ * (A7 x-0-2-0-2-0, E7 0-2-0-1-0-0, C x-3-2-0-1-0). Each chord has one such grip, so the tier is
+ * that grip. Up the neck none is offered (`candidates`).
  */
 const bookGrip = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
     atTheNut(home) &&
@@ -1066,8 +1078,8 @@ const inRiffAt = (chart: ChartChord[], i: number): boolean => {
  * The grips a chord is voiced from: the first of these that holds any.
  *
  * 1. A ukulele chord's book grips in first position (`bookGrip`, #1675): where it has one, it
- *    is the chord, whatever stands beside it. A guitar 7th chord's open book chord, there,
- *    the same way (#1838). Else, its closed grips there (`firstPosition`,
+ *    is the chord, whatever stands beside it. A guitar chord's open book chord, there, the
+ *    same way (#1838's 7ths, #1849's triads and sus chords). Else, its closed grips there (`firstPosition`,
  *    #1688). Nothing step 2 holds back is among either: no strummed grip has a buried root or
  *    is an open shell's one-off, and none inside the 4th fret is five frets wide.
  * 2. Grips inside the hand window that a player would take: every one but those with a buried
@@ -1117,9 +1129,9 @@ function candidates(c: ChartChord, opts: VoiceOptions, inRiff: boolean): Voicing
     const nearTheNut = every.some(
         (v) => !v.shape.nutOnly && v.notes.every((n) => n.fret <= FIRST_POSITION_TOP),
     );
-    // The guitar's open 7ths are the nut's alone (#1838): in a window from the 2nd fret up an
-    // open chord is the hand gone back to the nut, and A7 x-0-2-0-2-0, every note inside frets
-    // 2–7, would otherwise be on offer there beside the shells.
+    // The guitar's book chords are the nut's alone (#1838, #1849): in a window from the 2nd
+    // fret up an open chord is the hand gone back to the nut, and A7 x-0-2-0-2-0, every note
+    // inside frets 2–7, would otherwise be on offer there beside the shells.
     const all = every.filter(
         (v) =>
             (!v.shape.nutOnly || (atTheNut(home) && !nearTheNut)) &&
