@@ -64,6 +64,12 @@ export interface FingerOption {
      */
     drilled?: boolean;
     /**
+     * Set with `drilled` on a book chord's default (`FingerOpts.book`, #1849). A neighbour
+     * adapts to it only on the same root (`onOneRoot`): C6 x-3-2-2-x-x as 3-2-1 beside the open
+     * C, never F x-x-3-2-1-x as 4-3-1 beside the open Am, a fingering no method teaches for F.
+     */
+    book?: boolean;
+    /**
      * Set with `needs` and `hold` on a guitar fingering that keeps two fingers of a drilled
      * open chord's book fingering (`adaptOptions`, #1835): it is taken only beside that chord
      * in it (`FingerOption.drilled`). C7 x-3-2-3-x-x as 3-2-4 after C x-3-2-0-x-x (3-2).
@@ -131,6 +137,13 @@ export interface FingerOpts {
      * keeps two fingers (`unifyFingerings`, #1836).
      */
     ukulele?: boolean;
+    /**
+     * One of the guitar's book chords at the nut (`ShapeDef.book`: the open 7ths of #1838 and
+     * the open chords of #1849). It keeps its book fingering, so it never adapts to the chord
+     * beside it (`adaptOptions`), and a neighbour adapts to it only on its own root
+     * (`FingerOption.book`).
+     */
+    book?: boolean;
 }
 
 /**
@@ -415,6 +428,13 @@ const idleIndexStretches = (o: FingerOption): boolean =>
             (b, j) => a !== null && b !== null && a < b && o.fr[j].fret - o.fr[i].fret > b - a,
         ),
     );
+
+/**
+ * The little finger down while the index is idle (#1849): a hand moved up a finger to keep
+ * a note, A° x-3-1-2-x-x as 4-2-3 for the open Am's ring finger on the G string. Asked only of
+ * fingers left down from a book chord (`keptBy`).
+ */
+const idleIndexReaches = (o: FingerOption): boolean => !o.p.includes(1) && o.p.includes(4);
 
 /**
  * An idle index under a little finger tucked inside the grip: nothing under finger 1 while
@@ -780,6 +800,10 @@ function bookFingerings(notes: Note[]): string[] | null {
  *   A that way.
  * - The open A7, x-0-2-0-2-0 (#1838, one of `GUITAR_OPEN_SEVENTHS`): 2-3, or 1-3, never 1-2,
  *   for the same reason as A's top.
+ * - Four of the open chords of #1849 (`GUITAR_OPEN_CHORDS`, whose JSDoc names the sources): A
+ *   x-0-2-2-2-0 1-2-3 or 2-1-3, G 3-2-0-0-0-3 2-1-3 or 3-2-4, Asus4 x-0-2-2-3-0 1-2-3 or 1-2-4,
+ *   Dsus4 x-x-0-2-3-3 1-3-4 or 1-2-3. A row's fingering need not be one the rules build: A's
+ *   2-1-3 crosses two fingers on one fret, which `splitOptions` never does (`guitarBook`).
  */
 const GUITAR_BOOK: Record<string, { taught: number[][]; never?: number[][] }> = {
     '3/2 2/3': { taught: [[1, 3]] },
@@ -799,6 +823,36 @@ const GUITAR_BOOK: Record<string, { taught: number[][]; never?: number[][] }> = 
             [1, 3],
         ],
         never: [[1, 2]],
+    },
+    // The open chords of #1849 the nut rule misses.
+    // A x-0-2-2-2-0: 1-2-3, or 2-1-3, the A taught beside D (its top's rows above).
+    '4/2 3/2 2/2': {
+        taught: [
+            [1, 2, 3],
+            [2, 1, 3],
+        ],
+    },
+    // G 3-2-0-0-0-3: 2-1-3, the first G the beginner courses teach; 3-2-4, the G that moves
+    // to C with the ring and middle finger shifting a string together, a second fingering.
+    '6/3 5/2 1/3': {
+        taught: [
+            [2, 1, 3],
+            [3, 2, 4],
+        ],
+    },
+    // Asus4 x-0-2-2-3-0: 1-2-3, A's 1-2-3 with the ring finger up a fret; 1-2-4 second.
+    '4/2 3/2 2/3': {
+        taught: [
+            [1, 2, 3],
+            [1, 2, 4],
+        ],
+    },
+    // Dsus4 x-x-0-2-3-3: 1-3-4, D's 1-3-2 with the little finger for the middle.
+    '3/2 2/3 1/3': {
+        taught: [
+            [1, 3, 4],
+            [1, 2, 3],
+        ],
     },
 };
 
@@ -823,8 +877,17 @@ function guitarBook(
         });
         return p.join();
     };
-    const taught = row.taught.map((fingers) =>
-        every.find((o) => o.p.join() === inOrder(fingers) && !barringFinger(o)),
+    // A row may print a fingering the rules never build: the open A's 2-1-3 crosses the index
+    // and the middle finger on one fret (#1849), which `splitOptions` never does.
+    const taught = row.taught.map(
+        (fingers): FingerOption | undefined =>
+            every.find((o) => o.p.join() === inOrder(fingers) && !barringFinger(o)) ??
+            (new Set(fingers).size === fingers.length
+                ? (() => {
+                      const p = inOrder(fingers).split(',').map(Number);
+                      return { p, cost: handCost(fr, p, false), fr };
+                  })()
+                : undefined),
     );
     // The row's first fingering is its default: if the grip has none, the row does not apply,
     // rather than promoting a second fingering to the default.
@@ -1414,17 +1477,20 @@ function taughtStrummed(notes: Note[], all: FingerOption[], opts: FingerOpts): F
         );
         const [own, ...rest] = free.map((o) => mark(o));
         return [
-            drilledOpen ? { ...own, drilled: true } : own,
+            drilledOpen ? { ...own, drilled: true, ...(opts.book ? { book: true } : {}) } : own,
             ...rest,
             ...beside(ahead.filter((o) => !offBook(o))).map(held),
             ...left.map(held),
             ...beside(crowded),
             ...beside(crossedOptions(first, best.cost + TAUGHT_MARGIN)),
-            ...adaptOptions(
-                first,
-                new Set([...taughtHere, ...crowded.map((o) => o.p.join())]),
-                best.cost + TAUGHT_MARGIN,
-            ),
+            // A book chord keeps the book's fingers: it is what the chord beside it adapts to.
+            ...(opts.book
+                ? []
+                : adaptOptions(
+                      first,
+                      new Set([...taughtHere, ...crowded.map((o) => o.p.join())]),
+                      best.cost + TAUGHT_MARGIN,
+                  )),
         ];
     }
     // A second fingering is offered once for the chord before and once for the chord after,
@@ -1732,7 +1798,12 @@ const keptBy = (marked: FingerOption, other: FingerOption, inPlace: boolean): bo
     holdsEnough(marked, other) &&
     (!marked.sameRoot || onOneRoot(marked, other)) &&
     (!marked.resolves || suspends(marked, other)) &&
-    (!marked.adapts || other.drilled === true);
+    (!marked.adapts || (other.drilled === true && (!other.book || onOneRoot(marked, other)))) &&
+    // Fingers left down from a book chord (#1849) never reach for the little finger with the
+    // index idle: A° x-3-1-2-x-x is not 4-2-3 after Am to keep its ring finger, where the free
+    // index would take a note. E° x-1-2-0-x-x after E stays 2-3 (#1691: the ring finger stays,
+    // the middle slides a fret), its index idle but no finger reaching past the hand.
+    (marked.needs !== 'left' || !other.book || !idleIndexReaches(marked));
 
 /** The same grip under the same fingers: the hand has not moved. */
 const sameFingers = (a: FingerOption, b: FingerOption): boolean =>
@@ -2054,6 +2125,7 @@ export function fingerSequence(chords: Array<{ notes: Note[] } & FingerOpts>): v
             barre: b.barre,
             rootBarre: b.rootBarre,
             ukulele: b.ukulele,
+            book: b.book,
         }),
     );
     // A guitar triad or power grip, by its strings and frets: one hand, whatever the chart

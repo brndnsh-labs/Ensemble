@@ -3,11 +3,20 @@
  * timeline): which grip sounds at a performed slot, which comes next in performance order, and
  * the headline and finger detail between them.
  */
-import { compileTimeline } from '@band/index';
+import { compileTimeline, parseChord } from '@band/index';
 import type { ScoreEvent, ScoreMeasure, SemanticScore } from '@core/songbook/score-types';
 import { describe, expect, it } from 'vitest';
 import { bandChart } from '../lib/band-chart';
-import { GUITAR, type NeckPrefs, UKULELE, voiceBandChart } from '../lib/voicings';
+import {
+    GUITAR,
+    type InstrumentDef,
+    type NeckPrefs,
+    UKULELE,
+    type VoicedBandChord,
+    voiceBandChart,
+    voiceChart,
+} from '../lib/voicings';
+import { voicingChord } from '../lib/voicings/adapter';
 import {
     changePosition,
     chordChanges,
@@ -437,6 +446,24 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         const instrument = prefs.instrument === 'uke' ? UKULELE : GUITAR;
         return voiced.map((g, i) => fingersLine(instrument, g, voiced[(i + 1) % voiced.length]));
     };
+    /**
+     * The guitar without the open triads and sus chords of #1849, whose finger lines these
+     * tests pin on the three-string grips they were written for: at the nut the real guitar
+     * plays those chords whole (C x 3 2 0 1 0), and the chords with no open form and every
+     * window from the 2nd fret still play the three-string grips.
+     */
+    const GUITAR_TRIADS: InstrumentDef = {
+        ...GUITAR,
+        shapes: GUITAR.shapes.filter((s) => !(s.book && s.kind !== 'shell')),
+    };
+    /** `lines` on `GUITAR_TRIADS`. */
+    const triadLines = (names: string[], home: [number, number] | null, key = 'C'): string[] => {
+        const voiced = voiceChart(
+            names.map((n) => voicingChord(parseChord(n, { tonic: 0, minor: false })!, key, false)),
+            { instrument: GUITAR_TRIADS, home },
+        ) as unknown as VoicedBandChord[];
+        return voiced.map((g, i) => fingersLine(GUITAR, g, voiced[(i + 1) % voiced.length]));
+    };
     const guitar = (home: NeckPrefs['home']): NeckPrefs => ({
         instrument: 'guitar',
         home,
@@ -504,7 +531,8 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // other. "The 3rd becomes the 3rd" is nothing a teacher says. No finger stays on it:
         // A♭ is the barre 3-1-1 (#1617), not 2-1-1 with the middle finger two frets from the
         // index, so the note is named and the ring finger takes it.
-        expect(lines(['Am', 'Ab'], guitar(null))[0]).toBe(
+        // The three-string Am: the real one at the nut is x 0 2 2 1 0 (#1849).
+        expect(triadLines(['Am', 'Ab'], null)[0]).toBe(
             'C is in both chords; finger 3 takes it over; finger 1 slides down 1 fret.',
         );
     });
@@ -600,14 +628,15 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // Dm x 5 3 2 x x (4-2-1) to B♭ x 5 3 3 x x (3-1-1). F goes under the index barre,
         // which says its own fret and strings; D is the one note the ring finger takes. It
         // read "re-finger them with 3".
-        const pop = lines(['F', 'C', 'Dm', 'Bb'], guitar(null));
+        // The three-string C and Dm (the real ones at the nut are whole, #1849).
+        const pop = triadLines(['F', 'C', 'Dm', 'Bb'], null);
         expect(pop[2]).toBe(
             'F and D are in both chords: F becomes the 5th and D the 3rd; ' +
                 'finger 3 takes over D; finger 1 bars fret 3 on the 4th and 3rd strings.',
         );
         // Both notes to a fingertip each, and they are still "them": B♭ back to Dm (x x 3 2 3 x
         // and x x 3 3 3 x since #1827, a fret lower than x 5 3 2 x x and x 5 3 3 x x).
-        expect(lines(['Dm', 'Bb'], guitar([1, 6]))[1]).toBe(
+        expect(triadLines(['Dm', 'Bb'], [1, 6])[1]).toBe(
             'F and D are in both chords: F becomes the 3rd and D the root; ' +
                 'fingers 2 and 3 take them over; finger 1 moves to the 3rd string, fret 2.',
         );
@@ -628,7 +657,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
                 'finger 3 bars fret 5 on the 3rd and 2nd strings.',
         );
         // Am x 3 2 2 x x (2-1-1) to F x 3 3 2 x x (2-3-1): the index stays on the 3rd string.
-        expect(lines(['Am', 'F'], guitar(null))[0]).toBe(
+        expect(triadLines(['Am', 'F'], null)[0]).toBe(
             'Fingers 1 and 2 stay down: A becomes the 3rd and C the 5th; ' +
                 'finger 3 goes down on the 4th string, fret 3.',
         );
@@ -639,7 +668,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         );
         // A barre that leaves its fret has moved, whatever it lands on: B♭ x 5 3 3 x x back
         // to Dm x 5 3 2 x x.
-        expect(lines(['Dm', 'Bb'], guitar([1, 6]))[1]).toContain(
+        expect(triadLines(['Dm', 'Bb'], [1, 6])[1]).toContain(
             'finger 1 moves to the 3rd string, fret 2',
         );
     });
@@ -731,7 +760,7 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // Plain "stays down" where every string it leaves is fretted higher by another finger:
         // Dsus2 x x 2 2 3 x (1-1-3) to Dm x x 3 2 3 x, the 4th string under the middle finger
         // again; the ukulele's B♭m 3 1 1 1 to B♭ 3 2 1 1 the same.
-        expect(lines(['Dm', 'Dsus2', 'Dm'], guitar(null))[1]).toBe(
+        expect(triadLines(['Dm', 'Dsus2', 'Dm'], null)[1]).toBe(
             'Fingers 1 and 3 stay down; finger 2 goes down on the 4th string, fret 3.',
         );
         expect(lines(['Bbm', 'Bb'], uke)[0]).toBe(
@@ -741,7 +770,8 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // where it stays. Esus4 x 2 2 2 x x to A5 x 0 2 2 x x: the A string rings open. It read
         // "finger 1 bars fret 2 on the 4th and 3rd strings", a new barre.
         // The notes it keeps there still say what they become.
-        expect(lines(['Esus4', 'A5'], guitar(null))[0]).toBe(
+        // (The three-string Esus4: the real one at the nut is 0 2 2 2 0 0, #1849.)
+        expect(triadLines(['Esus4', 'A5'], null)[0]).toBe(
             'Finger 1 stays down on the 4th and 3rd strings: E becomes the 5th and A the root.',
         );
         // On the note it keeps, where that is one both chords share: A5 to D5 x x 0 2 3 x, the
@@ -812,11 +842,11 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
 
     it('a change that only lifts names the finger that lifts (#1837)', () => {
         // D x x x 2 3 2 (1-3-2) to Dsus2 x x x 2 3 0: the middle finger comes off the 1st string.
-        expect(lines(['D', 'Dsus2'], guitar(null))[0]).toBe(
+        expect(triadLines(['D', 'Dsus2'], null)[0]).toBe(
             'Fingers 1 and 3 stay down; lift finger 2.',
         );
         // Em x 2 2 0 x x (2-3) to G x 2 0 0 x x: the ring finger comes off the 3rd string.
-        expect(lines(['Em', 'G'], guitar([1, 6]))[0]).toBe(
+        expect(triadLines(['Em', 'G'], [1, 6])[0]).toBe(
             'Finger 2 stays down on B: the 5th becomes the 3rd; lift finger 3.',
         );
         // The ukulele's A 2 1 0 0 (2-1) to Am 2 0 0 0: the index comes off the C string.
@@ -832,10 +862,11 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
             'Fingers 1 and 2 stay down; lift finger 3.',
             'Fingers 1 and 2 stay down; finger 3 goes down on the 3rd string, fret 2.',
         ]);
-        // E x x x 1 0 0 to E7 0 2 0 1 0 0 and back.
+        // E to E7 0 2 0 1 0 0 and back: the open E since #1849 (it was x x x 1 0 0, and the
+        // middle finger went down for E7), so E7 is E with the ring finger lifted.
         expect(lines(['E', 'E7'], guitar([1, 6]))).toEqual([
-            'Finger 1 stays down; finger 2 goes down on the 5th string, fret 2.',
-            'Finger 1 stays down; lift finger 2.',
+            'Fingers 1 and 2 stay down; lift finger 3.',
+            'Fingers 1 and 2 stay down; finger 3 goes down on the 4th string, fret 2.',
         ]);
         // A barre that stays on part of its strings is a finger that stays: the ukulele's B♭7
         // 1 2 1 1 to A7 0 1 0 0.
@@ -921,7 +952,8 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // D x x x 2 3 2 to A x x x 2 2 0 keeps the index on the G string's A, and the ring
         // finger slides down the B string (A 1-3). It was 1-2: "finger 2 moves to the 2nd
         // string, fret 2", the middle finger on the B string.
-        expect(lines(['D', 'A'], guitar([1, 6]), 'D')).toEqual([
+        // On the three-string grips; the whole open D and A say the same, below (#1849).
+        expect(triadLines(['D', 'A'], [1, 6], 'D')).toEqual([
             'Finger 1 stays down on A: the 5th becomes the root; finger 3 slides down 1 fret.',
             'Finger 1 stays down on A: the root becomes the 5th; ' +
                 'finger 2 goes down on the 1st string, fret 2; finger 3 slides up 1 fret.',
@@ -930,8 +962,8 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // finger staying (both 2-3).
         const up = 'Finger 2 stays down; finger 3 slides up 1 fret.';
         const down = 'Finger 2 stays down; finger 3 slides down 1 fret.';
-        expect(lines(['A', 'Asus4', 'A'], guitar([1, 6]), 'A').slice(0, 2)).toEqual([up, down]);
-        expect(lines(['Asus4', 'A', 'Asus4'], guitar([1, 6]), 'A').slice(0, 2)).toEqual([down, up]);
+        expect(triadLines(['A', 'Asus4', 'A'], [1, 6], 'A').slice(0, 2)).toEqual([up, down]);
+        expect(triadLines(['Asus4', 'A', 'Asus4'], [1, 6], 'A').slice(0, 2)).toEqual([down, up]);
     });
 
     it('guitar open C keeps 3-2 and the chord beside it adds or lifts a finger (#1835)', () => {
@@ -939,7 +971,8 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         // 1 bars fret 2" into Am, "fingers 1 and 2 stay down; finger 3 goes down" into C7.
         // C7 and Cmaj7 are C with the little finger added (3-2-4), Am x 3 2 2 x x C with the
         // index added (3-2-1), and back to C the index lifts.
-        expect(lines(['C', 'Am'], guitar(null))).toEqual([
+        // On the three-string grips; the whole open C and Am are below (#1849).
+        expect(triadLines(['C', 'Am'], null)).toEqual([
             'Fingers 2 and 3 stay down: E becomes the 5th and C the 3rd; ' +
                 'finger 1 goes down on the 3rd string, fret 2.',
             'Fingers 2 and 3 stay down: E becomes the 3rd and C the root; lift finger 1.',
@@ -951,13 +984,44 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         expect(lines(['C', 'Cmaj7', 'F', 'G'], guitar([2, 7]))[0]).toBe(
             'Fingers 2 and 3 stay down; finger 4 goes down on the 3rd string, fret 4.',
         );
-        // At the nut C7 and Cmaj7 are the book's open chords (#1838), C with fingers added or
-        // open strings: C7 x 3 2 3 1 0 adds the little finger and the index.
+        // At the nut C7 and Cmaj7 are the book's open chords (#1838) and C the open C
+        // x 3 2 0 1 0 (#1849): C7 adds the little finger, Cmaj7 lifts the index.
         expect(lines(['C', 'C7'], guitar([1, 6]))).toEqual([
-            'Fingers 2 and 3 stay down; finger 1 goes down on the 2nd string, fret 1; ' +
-                'finger 4 goes down on the 3rd string, fret 3.',
-            'Fingers 2 and 3 stay down; lift fingers 1 and 4.',
+            'Fingers 1, 2 and 3 stay down; finger 4 goes down on the 3rd string, fret 3.',
+            'Fingers 1, 2 and 3 stay down; lift finger 4.',
         ]);
-        expect(lines(['C', 'Cmaj7'], guitar([1, 6]))[0]).toBe('Fingers 2 and 3 stay down.');
+        expect(lines(['C', 'Cmaj7'], guitar([1, 6]))[0]).toBe(
+            'Fingers 2 and 3 stay down; lift finger 1.',
+        );
+    });
+
+    it('the whole open chords at the nut read as a teacher says them (#1849)', () => {
+        // C to Am: the index and middle finger stay, the ring finger moves to the G string.
+        expect(lines(['C', 'Am'], guitar(null))).toEqual([
+            'Fingers 1 and 2 stay down: C becomes the 3rd and E the 5th; ' +
+                'finger 3 moves to the 3rd string, fret 2.',
+            'Fingers 1 and 2 stay down: C becomes the root and E the 3rd; ' +
+                'finger 3 moves to the 5th string, fret 3.',
+        ]);
+        // D to A 2-1-3: the index stays on the G string's A, the ring finger slides a fret.
+        expect(lines(['D', 'A'], guitar([1, 6]), 'D')).toEqual([
+            'Finger 1 stays down on A: the 5th becomes the root; ' +
+                'finger 2 moves to the 4th string, fret 2; finger 3 slides down 1 fret.',
+            'Finger 1 stays down on A: the root becomes the 5th; ' +
+                'finger 2 moves to the 1st string, fret 2; finger 3 slides up 1 fret.',
+        ]);
+        // E to B7 keeps the middle finger on B, as the open E taught beside B7 does.
+        expect(lines(['E', 'B7'], guitar([1, 6]), 'E')[0]).toBe(
+            'Finger 2 stays down on B: the 5th becomes the root; ' +
+                'finger 1 moves to the 4th string, fret 1; finger 3 moves to the 3rd string, fret 2; ' +
+                'finger 4 goes down on the 1st string, fret 2.',
+        );
+        // A suspension is one finger: A to Asus4 slides the ring finger, D to Dsus2 lifts one.
+        expect(lines(['A', 'Asus4'], guitar([1, 6]), 'A')[0]).toBe(
+            'Fingers 1 and 2 stay down; finger 3 slides up 1 fret.',
+        );
+        expect(lines(['D', 'Dsus2'], guitar([1, 6]), 'D')[0]).toBe(
+            'Fingers 1 and 3 stay down; lift finger 2.',
+        );
     });
 });

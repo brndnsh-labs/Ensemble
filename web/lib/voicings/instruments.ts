@@ -44,12 +44,66 @@ const powerChord = (root: number): ShapeDef => ({
 const GUITAR_OPEN: Record<number, number> = { 1: 64, 2: 59, 3: 55, 4: 50, 5: 45, 6: 40 };
 
 /**
+ * The guitar's open chords, as the method books print them for the first lessons (#1833): the
+ * CAGED open forms C, A, G, E and D, their minors Am, Em and Dm, the sus chords on the open A,
+ * D and E (Asus2, Asus4, Dsus2, Dsus4, Esus4) with Csus4 x-3-3-0-1-1 and Fsus2 x-x-3-0-1-1, and
+ * the three open power chords. Each is `[root pitch class, quality, frets low E first]`.
+ *
+ * At the nut the triads and sus chords here are what their chords play, whole (#1849): each is
+ * a book shape (`openChord`, `ShapeDef.book`), offered alone in first position (`bookGrip` in
+ * `voicing.ts`) as the open 7ths are. Up the neck they are not offered and the three-string
+ * grips play. The power chords are left out of that: E5 0-2-2-x-x-x is the power shape's own
+ * grip already. G is 3-2-0-0-0-3, the first G the beginner pages print (fachords.com's first
+ * position; 3-2-0-0-3-3 and 3-2-0-0-1-3 are variants the courses teach later).
+ *
+ * Fingers (fachords.com `/guitar-chord/<root>/<type>/textual/`, read 2026-10-21): C 3-2-1, A
+ * 1-2-3, G 2-1-3, E 2-3-1, D 1-3-2, Am 2-3-1, Em 2-3, Dm 2-3-1, Asus2 2-3, Dsus2 1-3 and Dsus4
+ * 1-3-4; Fsus2 is 3-1-1, the index across the top two strings (fachords prints its notes as
+ * Csus4's grip). The nut rule gives most of them (`fingering.ts`); `GUITAR_BOOK` gives the
+ * rest: A 1-2-3 (and 2-1-3 beside D, the index staying on the G string), G 2-1-3 (3-2-4 second),
+ * Asus4 1-2-3 (fachords prints the index across, 1-1-2; 1-2-3 is A's hand with the ring finger
+ * up a fret), Dsus4 1-3-4. Esus4 is 2-3-4, E's hand with the little finger added (fachords
+ * prints 1-2-3), and Csus4 3-4-1-2 (fachords prints x-3-3-0-1-x, 3-4-1).
+ *
+ * The same table judges the three-string grips (#1833): a guitar triad or power grip earns its
+ * open strings' credit only as part of one of these (`openFormGrip` in `voicing.ts`), so where a
+ * chord has no open form its closed grip's top is taken, not an open-string grip no teacher
+ * shows (E♭ x-1-1-0-x-x, B♭ in the bass; Cm x-3-1-0-x-x). Only forms that ring an open string are
+ * listed, since no other grip is credited; the closed forms (F, B♭, Bm) need none. Left out on
+ * purpose, being grips a chord dictionary prints and a beginner's book does not: Gm
+ * 3-1-0-0-3-3, Csus2 x-3-0-0-1-3, Gsus4 3-3-0-0-1-3. The diminished and augmented triads have no
+ * forms here, and so are not judged (`openFormGrip`). Adding one form of a quality judges EVERY
+ * chord of that quality (`OPEN_FORM_QUALITIES`): judged, the dim triads lost their open grips
+ * (`E E° E` went up the neck), so add a whole quality's forms at once and sweep.
+ */
+export const GUITAR_OPEN_CHORDS: readonly [number, Quality, string][] = [
+    [0, 'maj', 'x 3 2 0 1 0'], // C
+    [9, 'maj', 'x 0 2 2 2 0'], // A
+    [7, 'maj', '3 2 0 0 0 3'], // G
+    [4, 'maj', '0 2 2 1 0 0'], // E
+    [2, 'maj', 'x x 0 2 3 2'], // D
+    [9, 'min', 'x 0 2 2 1 0'], // Am
+    [4, 'min', '0 2 2 0 0 0'], // Em
+    [2, 'min', 'x x 0 2 3 1'], // Dm
+    [9, 'sus2', 'x 0 2 2 0 0'], // Asus2
+    [2, 'sus2', 'x x 0 2 3 0'], // Dsus2
+    [5, 'sus2', 'x x 3 0 1 1'], // Fsus2
+    [0, 'sus4', 'x 3 3 0 1 1'], // Csus4
+    [9, 'sus4', 'x 0 2 2 3 0'], // Asus4
+    [2, 'sus4', 'x x 0 2 3 3'], // Dsus4
+    [4, 'sus4', '0 2 2 2 0 0'], // Esus4
+    [4, 'five', '0 2 2 x x x'], // E5
+    [9, 'five', 'x 0 2 2 x x'], // A5
+    [2, 'five', 'x x 0 2 3 x'], // D5
+];
+
+/**
  * The guitar's open 7th chords as the method books print them at the nut (#1838): full chords,
  * strummed across every string they sound, with no string between two sounding ones left to a
  * hand that has no finger beside it to mute it. A learner meets the blues in A and E at the nut,
  * and there the comping shells rang their skipped string (A7 x-0-x-0-2-x, E7 0-x-0-1-x-x). Each
  * row is `[root pitch class, quality, frets low E first]`, and each is one root's chord
- * (`openSeventh`), offered alone in first position (`bookGrip` in `voicing.ts`).
+ * (`openChord`), offered alone in first position (`bookGrip` in `voicing.ts`).
  *
  * Sources (read 2026-10-20). Every grip and its fingering is fachords.com's
  * (`/guitar-chord/<root>/<type>/textual/`). The six dominant 7ths are the set the open-7th
@@ -93,15 +147,16 @@ export const GUITAR_OPEN_SEVENTHS: readonly [number, Quality, string][] = [
 ];
 
 /**
- * One of `GUITAR_OPEN_SEVENTHS` as a shape: its root on the lowest string it sounds, each
- * string's role read off the note it plays (a tone heard twice is R2, T2 or F2, as the
- * ukulele's grips double one). Built from that root by `fretFor` like any shape, so it is
- * `openOnly`: its notes sit at fixed frets above and below the root, and only one root puts
- * one of them on an open string. That root is this row's, which the tests check. A row that
- * doubles its 7th, or has a note that is not a tone of its chord, is a mistake in the table
- * and throws.
+ * One of `GUITAR_OPEN_SEVENTHS` or `GUITAR_OPEN_CHORDS` as a shape: its root on the lowest
+ * string it sounds, each string's role read off the note it plays (a tone heard again is R2, T2
+ * or F2, as the ukulele's grips double one; the open E and G hold their root three times, and
+ * the third is R2 as well). Its kind is its quality's, so an open triad is a triad grip and an
+ * open 7th a shell. Built from that root by `fretFor` like any shape, so it is `openOnly`: its
+ * notes sit at fixed frets above and below the root, and only one root puts one of them on an
+ * open string. That root is this row's, which the tests check. A row that doubles its 7th, or
+ * has a note that is not a tone of its chord, is a mistake in the table and throws.
  */
-function openSeventh(pc: number, quality: Quality, tabs: string): ShapeDef {
+function openChord(pc: number, quality: Quality, tabs: string): ShapeDef {
     const q = QUALITIES[quality];
     const tones: [ShapeRole, ShapeRole | null, number | undefined][] = [
         ['R', 'R2', 0],
@@ -120,7 +175,8 @@ function openSeventh(pc: number, quality: Quality, tabs: string): ShapeDef {
         const interval = mod(GUITAR_OPEN[string] + Number(t) - pc, 12);
         const tone = tones.find(([, , int]) => int === interval);
         const role = tone && (used.has(tone[0]) ? tone[1] : tone[0]);
-        if (!role || used.has(role)) {
+        // A doubled tone may come again (R2 twice in E 0-2-2-1-0-0); the 7th never doubles.
+        if (!role || (used.has(role) && role === tone[0])) {
             throw new Error(`open ${quality} ${tabs}: string ${string} is no tone it may hold`);
         }
         used.add(role);
@@ -131,7 +187,7 @@ function openSeventh(pc: number, quality: Quality, tabs: string): ShapeDef {
     }
     return {
         id: `O${pc}${quality}`,
-        kind: 'shell',
+        kind: q.kind,
         rootString: voices[0][0],
         name: 'open chord',
         voices,
@@ -231,48 +287,14 @@ export const GUITAR: InstrumentDef = {
         powerChord(5),
         powerChord(4),
         // The book's open 7th chords, each for one root (#1838).
-        ...GUITAR_OPEN_SEVENTHS.map(([pc, quality, tabs]) => openSeventh(pc, quality, tabs)),
+        ...GUITAR_OPEN_SEVENTHS.map(([pc, quality, tabs]) => openChord(pc, quality, tabs)),
+        // The book's open triads and sus chords, each for one root (#1849). The open power
+        // chords are already the power shapes' own grips at the nut (E5 0-2-2-x-x-x).
+        ...GUITAR_OPEN_CHORDS.filter(([, quality]) => QUALITIES[quality].kind === 'triad').map(
+            ([pc, quality, tabs]) => openChord(pc, quality, tabs),
+        ),
     ],
 };
-
-/**
- * The guitar's open chords, as the method books print them for the first lessons (#1833): the
- * CAGED open forms C, A, G, E and D, their minors Am, Em and Dm, the sus chords on the open A,
- * D and E (Asus2, Asus4, Dsus2, Dsus4, Esus4) with Csus4 x-3-3-0-1-1 and Fsus2 x-x-3-0-1-1, and
- * the three open power chords. Each is `[root pitch class, quality, frets low E first]`. A
- * guitar triad or power grip earns its open strings' credit only as part of one of these
- * (`openFormGrip` in `voicing.ts`): E x-x-2-1-0-x is the open E's middle, A x-x-x-2-2-0 the open
- * A's top. Any other grip that rings an open string is a chord no teacher shows, however
- * little it costs the hand (E♭ x-1-1-0-x-x, B♭ in the bass; Cm x-3-1-0-x-x).
- *
- * Only forms that ring an open string are listed, since no other grip is credited; the closed
- * forms (F, B♭, Bm) need none. Left out on purpose, being grips a chord dictionary prints and
- * a beginner's book does not: Gm 3-1-0-0-3-3, Csus2 x-3-0-0-1-3, Gsus4 3-3-0-0-1-3. The
- * diminished and augmented triads have no forms here, and so are not judged (`openFormGrip`).
- * Adding one form of a quality judges EVERY chord of that quality (`OPEN_FORM_QUALITIES`):
- * judged, the dim triads lost their open grips (`E E° E` went up the neck), so add a whole
- * quality's forms at once and sweep.
- */
-export const GUITAR_OPEN_CHORDS: readonly [number, Quality, string][] = [
-    [0, 'maj', 'x 3 2 0 1 0'], // C
-    [9, 'maj', 'x 0 2 2 2 0'], // A
-    [7, 'maj', '3 2 0 0 0 3'], // G
-    [4, 'maj', '0 2 2 1 0 0'], // E
-    [2, 'maj', 'x x 0 2 3 2'], // D
-    [9, 'min', 'x 0 2 2 1 0'], // Am
-    [4, 'min', '0 2 2 0 0 0'], // Em
-    [2, 'min', 'x x 0 2 3 1'], // Dm
-    [9, 'sus2', 'x 0 2 2 0 0'], // Asus2
-    [2, 'sus2', 'x x 0 2 3 0'], // Dsus2
-    [5, 'sus2', 'x x 3 0 1 1'], // Fsus2
-    [0, 'sus4', 'x 3 3 0 1 1'], // Csus4
-    [9, 'sus4', 'x 0 2 2 3 0'], // Asus4
-    [2, 'sus4', 'x x 0 2 3 3'], // Dsus4
-    [4, 'sus4', '0 2 2 2 0 0'], // Esus4
-    [4, 'five', '0 2 2 x x x'], // E5
-    [9, 'five', 'x 0 2 2 x x'], // A5
-    [2, 'five', 'x x 0 2 3 x'], // D5
-];
 
 /**
  * First-position chords that are not a moving shape (#1613): each is the book grip for ONE

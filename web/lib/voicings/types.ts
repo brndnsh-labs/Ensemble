@@ -98,11 +98,12 @@ export interface ShapeDef {
      */
     nutOnly?: boolean;
     /**
-     * One of the guitar's open 7th chords as the method books print it (#1838,
-     * `GUITAR_OPEN_SEVENTHS`): a full strummed chord for one root, E7 0-2-0-1-0-0, built only
-     * on its open strings (`openOnly`), offered only in first position and there alone
-     * (`bookGrip` in `voicing.ts`), and fingered as a strummed chord rather than a comping
-     * shell (`fingerRules`). Still `kind: 'shell'`: it voices a 7th-chord quality.
+     * One of the guitar's open chords as the method books print it: a 7th (#1838,
+     * `GUITAR_OPEN_SEVENTHS`, E7 0-2-0-1-0-0) or a triad or sus chord (#1849,
+     * `GUITAR_OPEN_CHORDS`, C x-3-2-0-1-0). A full strummed chord for one root, built only on its
+     * open strings (`openOnly`), offered only in first position and there alone (`bookGrip` in
+     * `voicing.ts`), and fingered as a strummed chord that keeps the book's fingering
+     * (`fingerRules`, `FingerOpts.book`). Its kind is its quality's: an open 7th is a `shell`.
      */
     book?: boolean;
 }
