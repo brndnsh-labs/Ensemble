@@ -430,6 +430,13 @@ const idleIndexStretches = (o: FingerOption): boolean =>
     );
 
 /**
+ * The little finger down while the index is idle (#1849): a hand moved up a finger to keep
+ * a note, A° x-3-1-2-x-x as 4-2-3 for the open Am's ring finger on the G string. Asked only of
+ * fingers left down from a book chord (`keptBy`).
+ */
+const idleIndexReaches = (o: FingerOption): boolean => !o.p.includes(1) && o.p.includes(4);
+
+/**
  * An idle index under a little finger tucked inside the grip: nothing under finger 1 while
  * the little finger frets a note with a fingered string on either side of it, a fret above
  * the ring finger on the thinner side (#1691). It is the D shape x-x-x-2-3-2 (1-3-2) moved up
@@ -1792,12 +1799,11 @@ const keptBy = (marked: FingerOption, other: FingerOption, inPlace: boolean): bo
     (!marked.sameRoot || onOneRoot(marked, other)) &&
     (!marked.resolves || suspends(marked, other)) &&
     (!marked.adapts || (other.drilled === true && (!other.book || onOneRoot(marked, other)))) &&
-    // Fingers left down from a book chord (#1849) are two of them on its own root (E+
-    // x-3-2-1-x-x 4-3-1 after E), never another chord's hand bent to fit (F x-x-3-2-1-x 4-3-1
-    // after Am) nor one finger kept with the index idle (A° x-3-1-2-x-x 4-2-3 after Am).
-    (marked.needs !== 'left' ||
-        !other.book ||
-        (onOneRoot(marked, other) && heldFingers(marked, other) >= 2));
+    // Fingers left down from a book chord (#1849) never reach for the little finger with the
+    // index idle: A° x-3-1-2-x-x is not 4-2-3 after Am to keep its ring finger, where the free
+    // index would take a note. E° x-1-2-0-x-x after E stays 2-3 (#1691: the ring finger stays,
+    // the middle slides a fret), its index idle but no finger reaching past the hand.
+    (marked.needs !== 'left' || !other.book || !idleIndexReaches(marked));
 
 /** The same grip under the same fingers: the hand has not moved. */
 const sameFingers = (a: FingerOption, b: FingerOption): boolean =>

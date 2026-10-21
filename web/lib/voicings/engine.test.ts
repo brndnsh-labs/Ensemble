@@ -3921,6 +3921,14 @@ describe('fingers a teacher would show (#1611)', () => {
                     'x 1 2 0 x x [2-3-0]',
                     'x 2 2 1 x x [2-3-1]',
                 ]);
+                // The same beside the whole open E the real guitar plays (#1849).
+                expect(
+                    played(GUITAR, null, undefined, ['E', 'maj'], ['E', 'dim'], ['E', 'maj']),
+                ).toEqual([
+                    '0 2 2 1 0 0 [0-2-3-1-0-0]',
+                    'x 1 2 0 x x [2-3-0]',
+                    '0 2 2 1 0 0 [0-2-3-1-0-0]',
+                ]);
                 // An open chord a method drills keeps #1683's count: Am F C G, F to C is a
                 // full change, C at 3-2, and C beside F is never 2-1.
                 expect(any(['A', 'min'], ['F', 'maj'], ['C', 'maj'], ['G', 'maj'])).toEqual([
@@ -5375,6 +5383,12 @@ describe('a guitar chord keeps one fingering through a song, unless two fingers 
             'x 2 2 1 x x [2-3-1]',
             'x 1 2 0 x x [2-3-0]',
         ]);
+        // And beside the whole open E the real guitar plays at the nut (#1849).
+        expect(
+            voiceChart(chart('Edim E Edim'), { instrument: GUITAR, home: [1, 6] }).map(
+                (v) => `${tab(GUITAR, v)} [${v.notes.map((n) => n.finger).join('-')}]`,
+            ),
+        ).toEqual(['x 1 2 0 x x [1-2-0]', '0 2 2 1 0 0 [0-2-3-1-0-0]', 'x 1 2 0 x x [2-3-0]']);
         // A grip that frets one note keeps its one finger: C x x x 0 1 0 after C+.
         expect(fingered('C C+ C')).toEqual([
             'x x x 0 1 0 [0-1-0]',
