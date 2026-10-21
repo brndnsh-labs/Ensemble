@@ -62,19 +62,20 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(view).toBeVisible();
     await expect(page.getByRole('region', { name: 'Chord chart' })).toHaveCount(0);
     await expect(view.locator('svg.neck')).toBeVisible();
-    await expect(view.locator('.neck-dot')).toHaveCount(3);
+    // First position (#1840) plays the book's open Dm7 x x 0 2 1 1 (#1838).
+    await expect(view.locator('.neck-dot')).toHaveCount(4);
     await expect(view.getByTestId('neck-current')).toHaveText('Dm7');
-    // The shell Dm7 x 5 3 5 x x leaves three strings silent, each marked × as a chord chart
-    // marks them (#1811), and the board's text names them.
-    await expect(view.locator('.neck-mute')).toHaveCount(3);
+    // It leaves the two bass strings silent, each marked × as a chord chart marks them (#1811),
+    // and the board's text names them.
+    await expect(view.locator('.neck-mute')).toHaveCount(2);
     expect(
         await view
             .locator('.neck-mute')
             .evaluateAll((marks) => marks.map((m) => m.getAttribute('data-mute'))),
-    ).toEqual(['6', '2', '1']);
+    ).toEqual(['6', '5']);
     await expect(view.locator('.neck-strum')).toHaveAttribute(
         'aria-label',
-        /^Hear Dm7: .*; 6th, 2nd and 1st strings not played$/,
+        /^Hear Dm7: .*; 6th and 5th strings not played$/,
     );
     await expect(view.getByTestId('neck-next')).toContainText('G7');
     const headline = view.locator('.neck-headline');
@@ -86,16 +87,14 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(sayFingers).not.toBeChecked();
     await sayFingers.check();
     await expect(view.locator('.neck-fingers')).toBeVisible();
-    // Dm7 x 5 3 5 x x (2-1-3) to G7 3 x 3 4 x x (1-2-3): no finger stays on the F both chords
-    // fret, so the line names the note and its two jobs (#1618), then the fingers that move —
-    // the 7th slides down to G7's 3rd.
+    // Dm7 x x 0 2 1 1 to G7 3 2 0 0 0 1: the first finger stays on the F both chords fret, and
+    // the line names the note and its two jobs (#1618), then the fingers that move.
     const fingers = view.locator('.neck-fingers');
-    await expect(fingers).toContainText(
-        'F is in both chords: the 3rd becomes the 7th; finger 2 takes it over',
+    await expect(fingers).toHaveText(
+        'Finger 1 stays down on F: the 3rd becomes the 7th; ' +
+            'finger 2 moves to the 5th string, fret 2; ' +
+            'finger 3 goes down on the 6th string, fret 3.',
     );
-    await expect(fingers).not.toContainText('finger 2 moves');
-    await expect(fingers).toContainText('finger 1 moves to');
-    await expect(fingers).toContainText('finger 3 slides down 1 fret');
     await page.reload();
     await songLink(page, 'Neck study').first().click();
     await expect(view.getByRole('checkbox', { name: 'Say the fingers' })).toBeChecked();
@@ -148,8 +147,9 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
 
-    // Stopped, one step on: G7 to Cmaj7 keeps the ring finger on its note, and the line still
-    // says so — now with the note and what it becomes (#1618).
+    // Stopped, one step on, with the hand moved up to frets 2 to 7 above, so the shells:
+    // G7 3 x 3 4 x x to Cmaj7 x 3 x 4 5 x keeps the ring finger on its note, and the line says
+    // so, with the note and what it becomes (#1618).
     await view.getByRole('button', { name: 'Next chord' }).click();
     await expect(view.getByTestId('neck-current')).toHaveText('G7');
     await expect(view.getByTestId('neck-next')).toContainText('Cmaj7');
@@ -162,6 +162,7 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
         'aria-pressed',
         'true',
     );
+    // The hand stays where it was moved, so Dm7 is the frets 2 to 7 shell, x 5 3 5 x x.
     await expect(page.getByRole('region', { name: 'Neck' }).locator('.neck-dot')).toHaveCount(3);
     // The editor overlays the neck without forgetting it: leaving the editor by Play (no mode
     // button pressed) lands back on Neck, the mode a reload would bring back too.
