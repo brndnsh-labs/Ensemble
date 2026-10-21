@@ -180,7 +180,9 @@ export interface VoiceOptions {
     /**
      * What keeping one grip per strummed symbol (a triad, a power chord, a ukulele shell) may
      * cost a chart, per occurrence that changes grip (`unifyGrips`). The stand never sets it; 0
-     * turns the rule off, and the tests bracket the default with it.
+     * turns the rule off for those, and the tests bracket the default with it. A guitar shell in
+     * a window from the 1st fret is held to one grip whatever it costs (`learnersShell`, #1851),
+     * so this does not reach it.
      */
     sameGripTolerance?: number;
 }

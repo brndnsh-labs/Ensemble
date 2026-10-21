@@ -72,6 +72,21 @@ const FIRST_POSITION_TOP = 4;
 const FIRST_POSITION_SHELL = 2;
 
 /**
+ * What a guitar shell in a window from fret 1 pays for a stretch (#1851): fretted notes three
+ * frets apart, index to little finger (Fm7 x-x-3-1-4-x, F♯m7 x-x-4-2-5-x, B7sus4 x-2-x-2-5-x),
+ * where a teacher shows a grip with a finger a fret (Fm7 1-x-1-1-x-x, B7sus4 x-2-2-2-x-x). Read
+ * by its `center` alone, the stretch sits nearer the 2nd fret than the 1st fret's grip does,
+ * and Fm7 x-x-3-1-4-x won 25 of 35 sweep lines in frets 1–6 (16 on main). Measured: at 0.5 it
+ * won 15, at 1.0 10 (F♯m7's stretch 12 to 7, 118 lines moved, one hand jump more), at 1.5 7,
+ * with more of the triads beside the shells on open-string fragments (Cm x-3-1-0-x-x). So a
+ * stretch costs about what two frets off the aim do.
+ */
+const FIRST_POSITION_STRETCH = 1;
+/** Fretted notes three frets or more apart (`FIRST_POSITION_STRETCH`). */
+const stretched = (v: Voicing): boolean =>
+    spanOf(v.notes.filter((n) => n.fret > 0).map((n) => n.fret)) >= 3;
+
+/**
  * The most open strings a grip with an added tone may ring. One or two beside fretted notes in
  * first position is a grip the books print (Am7♭5 x-0-1-0-1-x, Bm7♭5 x-2-0-2-x-1). Three of
  * four notes open is not a shell any more: it is a fragment of an open-position chord, good for
@@ -502,7 +517,8 @@ function viterbi<T>(states: T[][], unary: (s: T) => number, trans: (a: T, b: T) 
  * the guitar's no-window home (`defaultTarget`, the 3rd fret) F♯m7 was still the stretch in
  * 30 of 51 lines in frets 1–6 (29 before); at the triads' 2.5, in 18 to 20 at pulls of 0.15
  * to 0.45; at the 2nd fret and 0.45, in 12, each beside C♯m7♭5 x-4-5-4-5-x or a triad on the
- * top strings. A pull of 0.6 took it to 10 but moved 425 lines for 344. Up the neck and with
+ * top strings. A pull of 0.6 took it to 10 but moved 425 lines for 344. There a shell also pays
+ * for a stretch (`FIRST_POSITION_STRETCH`), which the aim alone favoured (Fm7 x-x-3-1-4-x). Up the neck and with
  * no window a shell keeps the window's middle or `defaultTarget`: its costs there are a jazz
  * comper's (`byHand`).
  */
@@ -531,6 +547,7 @@ function unaryCost(v: Voicing, opts: VoiceOptions): number {
     return (
         Math.abs(center(v) - (nut ? FIRST_POSITION_SHELL : target)) * (nut ? 0.45 : pull) +
         (spanOf(v.notes.map((n) => n.fret)) > 3 ? 0.4 : 0) +
+        (nut && stretched(v) ? FIRST_POSITION_STRETCH : 0) +
         (inHome(v, home) ? 0 : 5)
     );
 }

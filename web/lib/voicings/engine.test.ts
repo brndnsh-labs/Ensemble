@@ -6111,6 +6111,24 @@ describe('in first position a guitar shell is aimed at the nut (#1851)', () => {
         expect([g[0], g[6], g[7]]).toEqual(['x 1 x 1 2 x', '1 x 1 2 x x', 'x 1 x 1 2 x']);
     });
 
+    it('a shell comes down without a stretch: pop in F♯, and Fm7 at the 1st fret', () => {
+        // `pop` in F♯ was the comper's x x 4 x 6 6 / x 4 x 4 6 x / x 6 4 6 x x / x 2 x 3 4 x.
+        expect(shells('pop', 'F♯', [1, 6])).toEqual([
+            'F♯maj7 2 x 3 3 x x',
+            'C♯7 x 4 3 4 x x',
+            'D♯m7 x x 1 x 2 2',
+            'Bmaj7 x 2 1 3 x x',
+        ]);
+        // Aimed at the 2nd fret by its centre alone, Fm7 took the 1–4 stretch x x 3 1 4 x over
+        // the 1st fret's 1 x 1 1 x x (`FIRST_POSITION_STRETCH`).
+        expect(symbol('minorLoop', 'C', [1, 6], 'Fm7')).toEqual(new Set(['1 x 1 1 x x']));
+        const lone = voiceChart(
+            [voicingChord(parseChord('Fm7', { tonic: 0, minor: false })!, 'C', false)],
+            { instrument: GUITAR, home: [1, 6] },
+        );
+        expect(tab(GUITAR, lone[0])).toBe('1 x 1 1 x x');
+    });
+
     it('up the neck, with no window and on the ukulele nothing moves', () => {
         // A comper's costs: the window's middle (frets 2–7) or the guitar's home (no window),
         // and the chord moves between its root strings.
@@ -6118,15 +6136,8 @@ describe('in first position a guitar shell is aimed at the nut (#1851)', () => {
         expect(symbol('minorLoop', 'F♯', [2, 7], 'F♯m7')).toEqual(both);
         expect(symbol('bossa', 'F♯', [2, 7], 'F♯m7')).toEqual(both);
         expect(symbol('minorLoop', 'F♯', null, 'F♯m7')).toEqual(both);
-        // `pop` in F♯ comes down to the 2nd–4th frets in frets 1–6 (F♯maj7 x x 4 3 6 x, D♯m7
-        // x x 1 x 2 2) and stays the comper's with no window; `pop` in C in frets 2–7 keeps
+        // `pop` in F♯ stays the comper's with no window, and `pop` in C in frets 2–7 keeps
         // Cmaj7 on the 5th string's root (aimed at the 2nd fret it was x 3 2 4 x x).
-        expect(shells('pop', 'F♯', [1, 6])).toEqual([
-            'F♯maj7 x x 4 3 6 x',
-            'C♯7 x 4 3 4 x x',
-            'D♯m7 x x 1 x 2 2',
-            'Bmaj7 x 2 1 3 x x',
-        ]);
         expect(shells('pop', 'F♯', null)).toEqual([
             'F♯maj7 x x 4 x 6 6',
             'C♯7 x 4 x 4 6 x',
