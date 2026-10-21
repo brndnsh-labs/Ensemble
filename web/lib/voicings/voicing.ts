@@ -1191,6 +1191,17 @@ const chordKey = (c: ChartChord): string => `${c.root.pc}:${c.quality}`;
 /** One of a chord's candidate grips: the shape and where its root sits. */
 const gripKey = (v: Voicing): string => `${v.shape.id}@${v.rootFret}`;
 
+/**
+ * A grip `unifyGrips` holds to one per symbol: one costed by the hand (`byHand`), and since
+ * #1839 a guitar shell in a window from the 1st fret. Up the neck a comper moves a 7th chord
+ * between its two root strings on purpose; at the nut a learner is taught one grip per chord
+ * and keeps it for the song (F7 in a blues in C was `x x 3 2 4 x` and `1 x 1 2 x x`). Only a
+ * window placed at the 1st fret, not a chart with no window, and never a ukulele (its shells
+ * are `byHand` already).
+ */
+const heldToOneGrip = (v: Voicing, inst: InstrumentDef, home: HomeWindow | null): boolean =>
+    byHand(v, inst) || (inst.id === 'guitar' && home !== null && home[0] === 1);
+
 interface Plan {
     path: Voicing[];
     cost: number;
@@ -1210,8 +1221,9 @@ interface Plan {
  * For the grips costed by the hand (`byHand`): triads, power chords, and since #1609 a
  * ukulele's shells, which are strummed chords too. Left to the plan alone, 15 of 140 ukulele
  * charts in frets 1–6 and 49 in frets 5–10 voiced a 7th chord two ways (Gm7 Cm7 D7 Gm7 opened
- * on 3-5-3-5 and closed on 0-2-1-1). A guitar shell is left out: its jazz comping moves a chord
- * between its two root strings on purpose.
+ * on 3-5-3-5 and closed on 0-2-1-1). A guitar shell is left out up the neck and with no
+ * window: its jazz comping moves a chord between its two root strings on purpose. In a window
+ * from the 1st fret it is held too (#1839, `heldToOneGrip`).
  *
  * Which grip is the cheapest hold's business alone. From #1613 to #1675 a ukulele symbol in
  * first position took the hold with an open string over a cheaper closed one; a chord that has
@@ -1226,9 +1238,10 @@ function unifyGrips(
     plan: (states: Voicing[][]) => Plan,
     tolerance: number,
     inst: InstrumentDef,
+    home: HomeWindow | null,
 ): Voicing[] {
     const keys = chart.map((c, i) =>
-        states[i].every((v) => byHand(v, inst)) ? chordKey(c) : null,
+        states[i].every((v) => heldToOneGrip(v, inst, home)) ? chordKey(c) : null,
     );
     const held = new Map<string, string>();
     const decided = new Set<string>();
@@ -1287,9 +1300,10 @@ function unifyGrips(
 
 /**
  * Voice a whole chart at once: one grip per chord, chosen so the hand moves as little as possible
- * and the root takes simple paths, a strummed symbol (a triad, a ukulele shell) kept to one grip
- * where that costs little (`unifyGrips`), then fingers planned across the chart so held notes
- * stay held, between the fingerings each grip is taught with (`fingerSequence`, #1611, #1617).
+ * and the root takes simple paths, a strummed symbol (a triad, a ukulele shell) and a guitar
+ * shell in first position kept to one grip where that costs little (`unifyGrips`), then
+ * fingers planned across the chart so held notes stay held, between the fingerings each grip
+ * is taught with (`fingerSequence`, #1611, #1617).
  * Extra fields on each chart entry (bar, beat, numeral, duration...) are carried through.
  */
 export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions): VoicedChord<C>[] {
@@ -1317,6 +1331,7 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
         plan,
         opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
         opts.instrument,
+        home,
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(
