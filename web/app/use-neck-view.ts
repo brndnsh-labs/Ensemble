@@ -3,7 +3,6 @@ import type { BandChart, BandChartChord } from '../lib/band-chart';
 import { placeNeckHand } from '../lib/session';
 import {
     COUNT_WORDS,
-    chartHomeKey,
     type FingerMove,
     fingerMoves,
     type InstrumentDef,
@@ -533,17 +532,14 @@ export function neckModel(
 }
 
 /**
- * The stand's neck voicing: the per-device prefs with the hand placed for this chart's key
- * (`placeNeckHand`: a window the musician has not chosen follows the key, #1598), and the whole
- * chart voiced once per loaded chart + prefs — keyed by written index, never per frame. Voices
- * nothing while the neck is not showing.
+ * The stand's neck voicing: the per-device prefs with the hand placed (`placeNeckHand`: a window
+ * the musician has not chosen is first position, #1598, #1840), and the whole chart voiced once
+ * per loaded chart + prefs — keyed by written index, never per frame. Voices nothing while the
+ * neck is not showing.
  */
 export function useNeckVoicing(band: BandChart | null, showing: boolean) {
     const { prefs: stored, setPrefs } = useNeckPrefs();
-    const prefs = useMemo(
-        () => placeNeckHand(stored, band ? chartHomeKey(band) : null),
-        [stored, band],
-    );
+    const prefs = useMemo(() => placeNeckHand(stored), [stored]);
     const voiced = useMemo(
         () =>
             band && showing

@@ -45,7 +45,7 @@ interface NeckViewProps {
     playing: boolean;
     /** Sound these MIDI pitches as a strum, lowest string first (`runtime.auditionPitches`). */
     onStrum?: (midis: number[]) => void;
-    /** The settings with the hand placed for this chart's key (`placeNeckHand`). */
+    /** The settings with the hand placed (`placeNeckHand`). */
     prefs: PlacedNeckPreferences;
     onPrefs: (patch: Partial<NeckPreferences>) => void;
 }
@@ -261,7 +261,7 @@ export function NeckView({
                     <button
                         type="button"
                         className="btn neck-hand-toggle"
-                        // Locking the hand again hands the window back to the chart's key (#1598).
+                        // Locking the hand again puts it back in first position (#1598, #1840).
                         onClick={() => onPrefs({ home: prefs.home ? null : 'key' })}
                     >
                         {prefs.home ? 'Anywhere' : 'Lock hand'}
