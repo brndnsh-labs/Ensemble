@@ -15,7 +15,7 @@ export {
     sharedNotes,
     spokenDegree,
 } from './motion';
-export { DEGREES, spellDegree } from './theory';
+export { DEGREES, outsideShell, spellDegree } from './theory';
 export type { Degree, HomeWindow, InstrumentDef, Note, Voicing } from './types';
 export type { NeckPrefs, VoicedBandChord } from './voice-chart';
 export { NECK_INSTRUMENTS, voiceBandChart } from './voice-chart';

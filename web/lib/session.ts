@@ -211,13 +211,15 @@ export type NeckLabels = 'finger' | 'degree' | 'note';
 export type NeckHome = HomeWindow | null | 'key';
 /**
  * The neck's per-device settings (#1586): the voicer's `NeckPrefs` — its window as the musician
- * left it, `NeckHome` — plus what the dots show and whether the finger-by-finger detail is spoken
- * under the headline (#1587, off by default).
+ * left it, `NeckHome` — plus what the dots show, whether the finger-by-finger detail is spoken
+ * under the headline (#1587, off by default) and whether the dots outside the shell are dimmed
+ * (#1853, "Show the shell", off by default: `outsideShell`).
  */
 export interface NeckPreferences extends Omit<NeckPrefs, 'home'> {
     home: NeckHome;
     labels: NeckLabels;
     fingers: boolean;
+    shell: boolean;
 }
 /** The settings with the hand placed for one chart (`placeNeckHand`): what the voicer and the neck read. */
 export interface PlacedNeckPreferences extends NeckPreferences {
@@ -249,6 +251,7 @@ export function defaultNeckPreferences(): NeckPreferences {
         rootStrings: 'all',
         labels: 'finger',
         fingers: false,
+        shell: false,
     };
 }
 
@@ -275,7 +278,8 @@ const PRE_1598_HOME: Record<NeckPrefs['instrument'], HomeWindow> = {
 
 /**
  * Device-local neck preferences — never document fields: which instrument, where the hand
- * lives, which strings may hold a root, what the dots say and whether the fingers are spoken.
+ * lives, which strings may hold a root, what the dots say, whether the fingers are spoken and
+ * whether the shell is shown.
  * Each field is validated on its own, so one unknown value falls back to its default without
  * losing the rest; anything that is not a JSON object is all defaults.
  *
@@ -316,12 +320,13 @@ export function neckPreferences(): NeckPreferences {
         rootStrings: pick(NECK_ROOT_STRINGS, stored.rootStrings, defaults.rootStrings),
         labels: pick(NECK_LABELS, stored.labels, defaults.labels),
         fingers: typeof stored.fingers === 'boolean' ? stored.fingers : defaults.fingers,
+        shell: typeof stored.shell === 'boolean' ? stored.shell : defaults.shell,
     };
 }
 
 export function rememberNeckPreferences(prefs: NeckPreferences): void {
     try {
-        const { instrument, home, rootStrings, labels, fingers } = prefs;
+        const { instrument, home, rootStrings, labels, fingers, shell } = prefs;
         localStorage.setItem(
             NECK_PREFS,
             JSON.stringify({
@@ -331,6 +336,7 @@ export function rememberNeckPreferences(prefs: NeckPreferences): void {
                 rootStrings,
                 labels,
                 fingers,
+                shell,
             }),
         );
     } catch {

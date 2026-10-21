@@ -12,6 +12,7 @@ import {
     type HomeWindow,
     type InstrumentDef,
     type Note,
+    outsideShell,
     rootMove,
     spellDegree,
     type Voicing,
@@ -62,6 +63,12 @@ export interface NeckProps {
     zoom?: NeckZoom;
     /** What's inside the dots. */
     labels: NeckLabels;
+    /**
+     * "Show the shell" (#1853): dim the grip's notes outside its shell (`outsideShell`: the
+     * doubles, and the perfect 5th of a 7th or 6th chord) so the root, 3rd and 7th stand out.
+     * Display only; the grip, its fingers and its strum are unchanged.
+     */
+    shell?: boolean;
     /** Shaded window + draggable handle; null = no band. */
     home: HomeWindow | null;
     /** Handle moved: the new start fret (the window is `[start, start + HOME_W − 1]`). */
@@ -176,6 +183,7 @@ export function Neck({
     preview,
     fingers = false,
     labels,
+    shell = false,
     home,
     onHome,
     dimmed = false,
@@ -329,6 +337,9 @@ export function Neck({
         : [];
     const muteOnBoard = shown !== null && shown[0] > 0;
     const muteX = muteOnBoard ? dx(shown[0]) : dx(0);
+    // The notes "Show the shell" dims (#1853); the board's text says so too.
+    const outside = (x: Note): boolean =>
+        shell && active !== null && outsideShell(active.quality, x);
     const silentText = silent.length
         ? `; ${listed(silent.map((s) => instrument.strShort(s)))} string${silent.length > 1 ? 's' : ''} not played`
         : '';
@@ -337,7 +348,7 @@ export function Neck({
         ? `${active.symbol}: ${active.notes
               .map(
                   (x) =>
-                      `${instrument.strName(x.string)} fret ${x.fret}${x.finger ? `, finger ${x.finger}${barredFingers.has(x.finger) ? ' barre' : ''}` : ''}, ${DEGREES[x.degree].name}`,
+                      `${instrument.strName(x.string)} fret ${x.fret}${x.finger ? `, finger ${x.finger}${barredFingers.has(x.finger) ? ' barre' : ''}` : ''}, ${DEGREES[x.degree].name}${outside(x) ? ', outside the shell' : ''}`,
               )
               .join('; ')}${silentText}`
         : 'Fretboard showing the current chord';
@@ -661,7 +672,7 @@ export function Neck({
                                 return (
                                     <g
                                         key={key}
-                                        className={`neck-dot${state}`}
+                                        className={`neck-dot${state}${outside(x) ? ' is-outside-shell' : ''}`}
                                         data-dot={key}
                                         style={{
                                             transform: `translate(${dx(x.fret)}px, ${sy(x.string)}px)`,

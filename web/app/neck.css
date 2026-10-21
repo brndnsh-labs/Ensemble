@@ -194,6 +194,15 @@
 .neck-dot.is-lift {
     opacity: 0.45;
 }
+/* "Show the shell" (#1853): a note outside the shell (a double, or a 7th chord's perfect 5th)
+   fades back so the root, 3rd and 7th stand out. Its degree colour and label stay, readable on
+   the wood in both themes; only the core fades, so a hold ring around it keeps full strength. */
+.neck-core {
+    transition: opacity 0.3s;
+}
+.neck-dot.is-outside-shell .neck-core {
+    opacity: 0.38;
+}
 /* A barre (#1594): one finger lying flat across the dots it joins, drawn behind them. A finger,
    not a degree, so it takes the strings' neutral colour, never a degree's. */
 .neck-barre {
@@ -321,6 +330,7 @@
     .neck-barre,
     .neck-mute,
     .neck-ring,
+    .neck-core,
     .neck-body,
     .neck-active,
     .neck-zoom,
