@@ -1301,8 +1301,9 @@ function unifyGrips(
 /**
  * Voice a whole chart at once: one grip per chord, chosen so the hand moves as little as possible
  * and the root takes simple paths, a strummed symbol (a triad, a ukulele shell) and a guitar
- * shell in first position kept to one grip where that costs little (`unifyGrips`), then fingers planned across the chart so held notes
- * stay held, between the fingerings each grip is taught with (`fingerSequence`, #1611, #1617).
+ * shell in first position kept to one grip where that costs little (`unifyGrips`), then
+ * fingers planned across the chart so held notes stay held, between the fingerings each grip
+ * is taught with (`fingerSequence`, #1611, #1617).
  * Extra fields on each chart entry (bar, beat, numeral, duration...) are carried through.
  */
 export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions): VoicedChord<C>[] {
