@@ -1,6 +1,4 @@
 import { stripDangerousChars } from '../../core/sanitize.js';
-import { validateChartDocumentV2 } from '../../core/songbook/document-v2.js';
-import type { ChartDocumentV2 } from '../../core/songbook/score-types.js';
 
 /**
  * A collection (#1474, decided on #1443): a named, ORDERED list of song ids that is its own
@@ -58,9 +56,6 @@ export interface CollectionDocument {
     /** A collection the app owns and the musician cannot delete (#1443 decision 5). */
     builtIn?: BuiltInCollection;
 }
-
-/** Every synced document kind. A chart carries no `kind`; a collection carries `'collection'`. */
-export type AnyDocument = ChartDocumentV2 | CollectionDocument;
 
 /** The key set this build writes, in the order it writes them. Anything else is refused. */
 const KEYS = [
@@ -201,26 +196,6 @@ export function validateCollection(candidate: unknown): CollectionDocument {
         throw new Error(`Cannot open this collection: ${reason} The source has not been changed.`);
     }
     return result.value;
-}
-
-/**
- * The one dispatch every reader of "any synced document" goes through: a candidate that carries
- * `kind` is a collection (or refused), and one that does not is a chart, through the chart codec
- * exactly as before this kind existed.
- */
-export function validateAnyDocument(candidate: unknown): AnyDocument {
-    if (isCollectionCandidate(candidate)) {
-        return validateCollection(candidate);
-    }
-    const result = validateChartDocumentV2(candidate);
-    if (result.kind !== 'ok') {
-        throw new Error('Cannot open this document. The source has not been changed.');
-    }
-    return result.value;
-}
-
-export function isCollection(document: AnyDocument): document is CollectionDocument {
-    return (document as { kind?: unknown }).kind === 'collection';
 }
 
 /**
