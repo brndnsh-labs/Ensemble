@@ -1,12 +1,11 @@
 /**
- * The collection document (#1474): its decoder, the any-document dispatch, the read-time song
+ * The collection document (#1474): its decoder, the read-time song
  * filter, and the Save request path a collection travels — the pure halves. What a collection
  * does in storage is proven against real IndexedDB in
  * `tests/browser/account-collections.browser.test.ts`, and on the server in
  * `api/test/http/documents-collections.test.ts`.
  */
 import { describe, expect, it } from 'vitest';
-import { accountChart } from '../../tests/utils/account-songbook-fixture';
 import {
     type CollectionDocument,
     decodeCollection,
@@ -18,7 +17,6 @@ import {
     STARRED_COLLECTION_ID,
     songsOnlyIn,
     starredOf,
-    validateAnyDocument,
     validateCollection,
     withSong,
 } from './collections';
@@ -109,23 +107,6 @@ describe('decodeCollection', () => {
         const created = newCollection('Set list', ['a']);
         expect(validateCollection(created)).toEqual(created);
         expect(created.revision).toBe(0);
-    });
-});
-
-describe('validateAnyDocument — one dispatch on `kind`', () => {
-    it('reads a chart, which carries no kind, exactly as the chart codec does', () => {
-        const chart = accountChart('A', 'study');
-        expect(validateAnyDocument(chart)).toEqual(syncDocument(chart));
-        expect('kind' in validateAnyDocument(chart)).toBe(false);
-    });
-
-    it('reads a collection as a collection', () => {
-        expect(validateAnyDocument(collection())).toEqual(collection());
-    });
-
-    it('refuses a chart that claims a kind, and a kind it does not know', () => {
-        expect(() => validateAnyDocument({ ...accountChart(), kind: 'chart' })).toThrow();
-        expect(() => validateAnyDocument({ kind: 'playlist' })).toThrow();
     });
 });
 
