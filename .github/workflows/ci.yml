@@ -119,8 +119,29 @@ jobs:
       # host libraries were installed once by hand. A GitHub-hosted runner is a fresh
       # VM every run, and `test:sync` runs in real WebKit, whose system libraries are
       # NOT preinstalled on ubuntu-latest.
-      # The browser binaries cache; the apt-installed libraries cannot, so a cache hit
-      # still has to re-run `install-deps`.
+      # The browser binaries cache, but the libraries apt installs are not on the
+      # fresh VM, so a cache hit still has to re-run `install-deps`.
+      # The system packages the browsers need come from the runner's Ubuntu mirror,
+      # which some runners reach at ~100 KB/s: the WebKit set is ~117 MB, so a slow
+      # mirror held "install-deps" until the job timed out (#1872, four legs on
+      # 2026-10-22, each passing on a rerun). The downloaded .debs are cached like the
+      # browsers, keyed on the runner image, so a slow mirror costs only a cache miss.
+      - name: Keep apt's downloads where the cache can reach them
+        id: apt-archives
+        run: |
+          dir="$HOME/apt-archives"
+          mkdir -p "$dir/partial"
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\n' "$dir" \
+            | sudo tee /etc/apt/apt.conf.d/90-playwright-archives > /dev/null
+          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright system packages
+        id: apt-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/apt-archives
+          key: apt-playwright-all-${{ env.PLAYWRIGHT_VERSION }}-${{ steps.apt-archives.outputs.image }}
+
       - name: Install Playwright browsers + system deps
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps
@@ -128,6 +149,17 @@ jobs:
       - name: Install Playwright system deps (browsers came from cache)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps
+
+      - name: Hand apt's downloads to the runner user for the cache
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        run: sudo chown -R "$USER" ~/apt-archives
+
+      - name: Upload Playwright system packages to the cache
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/apt-archives
+          key: apt-playwright-all-${{ env.PLAYWRIGHT_VERSION }}-${{ steps.apt-archives.outputs.image }}
 
       # The offline-audio guards (reverb tail decays, reverb stability) run in
       # Vitest browser mode against the same Chromium installed above — they need
@@ -296,6 +328,27 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-v2-${{ matrix.browser }}-${{ env.PLAYWRIGHT_VERSION }}
 
+      # The system packages the browsers need come from the runner's Ubuntu mirror,
+      # which some runners reach at ~100 KB/s: the WebKit set is ~117 MB, so a slow
+      # mirror held "install-deps" until the job timed out (#1872, four legs on
+      # 2026-10-22, each passing on a rerun). The downloaded .debs are cached like the
+      # browsers, keyed on the runner image, so a slow mirror costs only a cache miss.
+      - name: Keep apt's downloads where the cache can reach them
+        id: apt-archives
+        run: |
+          dir="$HOME/apt-archives"
+          mkdir -p "$dir/partial"
+          printf 'Dir::Cache::Archives "%s";\nAPT::Keep-Downloaded-Packages "true";\n' "$dir" \
+            | sudo tee /etc/apt/apt.conf.d/90-playwright-archives > /dev/null
+          echo "image=$ImageOS-$ImageVersion" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Playwright system packages
+        id: apt-cache
+        uses: actions/cache/restore@v5
+        with:
+          path: ~/apt-archives
+          key: apt-playwright-${{ matrix.browser }}-${{ env.PLAYWRIGHT_VERSION }}-${{ steps.apt-archives.outputs.image }}
+
       - name: Install Playwright browser + system deps
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps ${{ matrix.browser }}
@@ -305,6 +358,17 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         run: npx playwright install-deps ${{ matrix.browser }}
         working-directory: web
+
+      - name: Hand apt's downloads to the runner user for the cache
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        run: sudo chown -R "$USER" ~/apt-archives
+
+      - name: Upload Playwright system packages to the cache
+        if: steps.apt-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v5
+        with:
+          path: ~/apt-archives
+          key: apt-playwright-${{ matrix.browser }}-${{ env.PLAYWRIGHT_VERSION }}-${{ steps.apt-archives.outputs.image }}
 
       # Typechecks core/ again, exports the app, then scripts/offline.mjs copies
       # the sound packs beside it and writes build.json (fingerprint + HEAD).
