@@ -106,6 +106,12 @@ export interface ShapeDef {
      * (`fingerRules`, `FingerOpts.book`). Its kind is its quality's: an open 7th is a `shell`.
      */
     book?: boolean;
+    /**
+     * A book chord the plan never chooses from (#1843, `GUITAR_OPEN_SUS_AFTER_PLAN`): it takes
+     * the place of an open-string grip the plan gave its chord, after the plan (`toOpenSus` in
+     * `voicing.ts`), so the chords beside it are never moved to suit it.
+     */
+    afterPlan?: boolean;
 }
 
 export interface InstrumentDef {

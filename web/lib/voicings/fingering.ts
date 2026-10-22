@@ -810,6 +810,8 @@ function bookFingerings(notes: Note[]): string[] | null {
  *   x-0-2-2-2-0 1-2-3 or 2-1-3, G 3-2-0-0-0-3 2-1-3 or 3-2-4, Asus4 x-0-2-2-3-0 1-2-3 or 1-2-4,
  *   Dsus4 x-x-0-2-3-3 1-3-4 or 1-2-3. A row's fingering need not be one the rules build: A's
  *   2-1-3 crosses two fingers on one fret, which `splitOptions` never does (`guitarBook`).
+ * - The two open sus chords of #1843, as fachords prints them: Csus2 x-3-0-0-3-3 2-3-4 (the
+ *   rules gave the index on the A string's 3rd fret) and Gsus4 3-x-0-0-1-3 3-1-4.
  */
 const GUITAR_BOOK: Record<string, { taught: number[][]; never?: number[][] }> = {
     '3/2 2/3': { taught: [[1, 3]] },
@@ -860,6 +862,11 @@ const GUITAR_BOOK: Record<string, { taught: number[][]; never?: number[][] }> = 
             [1, 2, 3],
         ],
     },
+    // The open sus chords of #1843. Csus2 x-3-0-0-3-3: 2-3-4, a finger a string on the 3rd fret;
+    // never 1-2-3, the index on the 3rd fret, which the rules took to slide it into G.
+    '5/3 2/3 1/3': { taught: [[2, 3, 4]], never: [[1, 2, 3]] },
+    // Gsus4 3-x-0-0-1-3: 3-1-4, the ring finger on the bass, the index on the B string's C.
+    '6/3 2/1 1/3': { taught: [[3, 1, 4]] },
 };
 
 /**

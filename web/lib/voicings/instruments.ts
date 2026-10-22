@@ -71,7 +71,8 @@ const GUITAR_OPEN: Record<number, number> = { 1: 64, 2: 59, 3: 55, 4: 50, 5: 45,
  * shows (E♭ x-1-1-0-x-x, B♭ in the bass; Cm x-3-1-0-x-x). Only forms that ring an open string are
  * listed, since no other grip is credited; the closed forms (F, B♭, Bm) need none. Left out on
  * purpose, being grips a chord dictionary prints and a beginner's book does not: Gm
- * 3-1-0-0-3-3, Csus2 x-3-0-0-1-3, Gsus4 3-3-0-0-1-3. The diminished and augmented triads have no
+ * 3-1-0-0-3-3, Csus2 x-3-0-0-1-3, Gsus4 3-3-0-0-1-3 (the open Csus2 and Gsus4 the books do print
+ * come in after the plan, `GUITAR_OPEN_SUS_AFTER_PLAN`). The diminished and augmented triads have no
  * forms here, and so are not judged (`openFormGrip`). Adding one form of a quality judges EVERY
  * chord of that quality (`OPEN_FORM_QUALITIES`): judged, the dim triads lost their open grips
  * (`E E° E` went up the neck), so add a whole quality's forms at once and sweep.
@@ -95,6 +96,29 @@ export const GUITAR_OPEN_CHORDS: readonly [number, Quality, string][] = [
     [4, 'five', '0 2 2 x x x'], // E5
     [9, 'five', 'x 0 2 2 x x'], // A5
     [2, 'five', 'x x 0 2 3 x'], // D5
+];
+
+/**
+ * Two open sus chords a chord dictionary prints and the first lessons do not (#1843): Csus2
+ * x-3-0-0-3-3 and Gsus4 3-x-0-0-1-3 (fachords.com, read 2026-10-21: Csus2's open positions are
+ * x-3-x-0-3-3 and x-3-0-0-3-3, Gsus4's first is 3-x-0-0-1-3). Without them the plan played
+ * their chords at the nut on the fragment x-3-0-0-x-x, the open G and D strings under the A
+ * string's C, which no book prints. Csus2 is x-3-0-0-3-3 rather than the dictionary's
+ * x-3-0-0-1-3, which fachords does not print, and x-3-x-0-3-3, whose muted D string has no
+ * finger beside it. Fingers (`GUITAR_BOOK`): Csus2 2-3-4, Gsus4 3-1-4.
+ *
+ * Unlike `GUITAR_OPEN_CHORDS` they are never among the grips the plan chooses from
+ * (`ShapeDef.afterPlan`). They come in after it (`toOpenSus` in `voicing.ts`), in place of an
+ * open-string grip the plan gave the chord, as #1861's lesson grips do. Offered to the plan as
+ * book chords, they moved the chords beside them to suit (Gm x-x-x-3-3-3 to x-1-0-0-x-x, F
+ * x-x-3-2-1-x to x-x-x-5-6-5 beside Gsus4) and took the hand off a one-finger move on the same
+ * root (`Gm Gsus4 Gm`, Gsus4 x-x-x-5-3-3 to 3-x-0-0-1-3): 18 of 156 judged lines read worse.
+ * Not in `GUITAR_OPEN_CHORDS` either, so `openFormGrip` judges no three-string grip against them
+ * and the plan is what it was.
+ */
+export const GUITAR_OPEN_SUS_AFTER_PLAN: readonly [number, Quality, string][] = [
+    [0, 'sus2', 'x 3 0 0 3 3'], // Csus2
+    [7, 'sus4', '3 x 0 0 1 3'], // Gsus4
 ];
 
 /**
@@ -293,6 +317,11 @@ export const GUITAR: InstrumentDef = {
         ...GUITAR_OPEN_CHORDS.filter(([, quality]) => QUALITIES[quality].kind === 'triad').map(
             ([pc, quality, tabs]) => openChord(pc, quality, tabs),
         ),
+        // Two open sus chords that come in only after the plan (#1843).
+        ...GUITAR_OPEN_SUS_AFTER_PLAN.map(([pc, quality, tabs]) => ({
+            ...openChord(pc, quality, tabs),
+            afterPlan: true,
+        })),
     ],
 };
 

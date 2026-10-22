@@ -1248,7 +1248,8 @@ function offered(c: ChartChord, opts: VoiceOptions): Offered {
     const all = every.filter(
         (v) =>
             (!v.shape.nutOnly || (atTheNut(home) && !nearTheNut)) &&
-            (!v.shape.book || atTheNut(home)),
+            (!v.shape.book || atTheNut(home)) &&
+            !v.shape.afterPlan,
     );
     const reachStays = leavesTheNut(all, home, inst);
     const clear = (grips: Voicing[]) =>
@@ -1576,23 +1577,90 @@ const lowFret = (v: Voicing): number =>
     Math.min(...v.notes.filter((n) => n.fret > 0).map((n) => n.fret));
 
 /**
- * The grips of the chords beside each of `at`'s occurrences: the nearest different chord before
- * and after, the form read as coming round, as the band plays it (`nextDifferent`'s `around`).
+ * The chart indices of the chords beside each of `at`'s occurrences, one list per occurrence:
+ * the nearest different chord before and after, the form read as coming round, as the band
+ * plays it (`nextDifferent`'s `around`).
  */
-const gripsBeside = (chart: ChartChord[], path: Voicing[], at: number[]): Voicing[] => {
+const besideAt = (chart: ChartChord[], at: number[]): number[][] => {
     const key = chordKey(chart[at[0]]);
-    const n = path.length;
-    return at.flatMap((i) =>
+    const n = chart.length;
+    return at.map((i) =>
         [-1, 1].flatMap((step) => {
             for (let k = 1; k < n; k++) {
                 const j = (((i + step * k) % n) + n) % n;
                 if (chordKey(chart[j]) !== key) {
-                    return [path[j]];
+                    return [j];
                 }
             }
             return [];
         }),
     );
+};
+
+/** The grips of the chords beside each of `at`'s occurrences (`besideAt`), all together. */
+const gripsBeside = (chart: ChartChord[], path: Voicing[], at: number[]): Voicing[] =>
+    besideAt(chart, at)
+        .flat()
+        .map((j) => path[j]);
+
+/**
+ * The grips of the chords on the same root beside each of `at`'s occurrences, one list per
+ * occurrence (`besideAt`): Gm beside Gsus4, C5 beside Csus2.
+ */
+const sameRootBeside = (chart: ChartChord[], path: Voicing[], at: number[]): Voicing[][] =>
+    besideAt(chart, at).map((js) =>
+        js.filter((j) => chart[j].root.pc === chart[at[0]].root.pc).map((j) => path[j]),
+    );
+
+/**
+ * The moves into and out of a chord's occurrences `at` with grip `g` in their place, each once
+ * (two occurrences side by side share one), the form read round as `gripsBeside` reads it: the
+ * move from the last chord back to the first is one too, so a loop voices alike whichever chord
+ * the page starts on. `cost` sums them (`trans`); `jumps` counts the moves of the hand by three
+ * frets or more, read off the lowest fretted note (`lowFret`).
+ */
+function movesAround(path: Voicing[], at: number[], trans: (a: Voicing, b: Voicing) => number) {
+    const n = path.length;
+    const mine = new Set(at);
+    const pick = (g: Voicing, i: number) => (mine.has(i % n) ? g : path[i % n]);
+    const edges = n < 2 ? [] : [...new Set(at.flatMap((i) => [(i - 1 + n) % n, i]))];
+    return {
+        cost: (g: Voicing) => edges.reduce((sum, e) => sum + trans(pick(g, e), pick(g, e + 1)), 0),
+        jumps: (g: Voicing) =>
+            edges.filter((e) => {
+                const a = lowFret(pick(g, e)),
+                    b = lowFret(pick(g, e + 1));
+                return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) >= 3;
+            }).length,
+    };
+}
+
+/** The grip of `grips` that costs least (`cost`), the first on a tie; null for none. */
+const cheapestOf = (grips: Voicing[], cost: (g: Voicing) => number): Voicing | null =>
+    grips
+        .map((v) => ({ v, cost: cost(v) }))
+        .reduce<{ v: Voicing; cost: number } | null>(
+            (b, c) => (!b || c.cost < b.cost - COST_NOISE ? c : b),
+            null,
+        )?.v ?? null;
+
+/**
+ * Each chord the plan voiced on a grip `which` picks, its occurrences grouped by that grip:
+ * after `unifyGrips` a symbol has one grip, so a group is a symbol's every occurrence.
+ */
+const groupsOn = (
+    chart: ChartChord[],
+    path: Voicing[],
+    which: (v: Voicing) => boolean,
+): number[][] => {
+    const groups = new Map<string, number[]>();
+    path.forEach((v, i) => {
+        if (which(v)) {
+            const key = `${chordKey(chart[i])}|${gripKey(v)}`;
+            groups.set(key, [...(groups.get(key) ?? []), i]);
+        }
+    });
+    return [...groups.values()];
 };
 
 /**
@@ -1641,34 +1709,13 @@ function toLessonGrips(
     inst: InstrumentDef,
 ): Voicing[] {
     const out = [...path];
-    const groups = new Map<string, number[]>();
-    out.forEach((v, i) => {
-        if (offFormOpen(v, home, inst)) {
-            const key = `${chordKey(chart[i])}|${gripKey(v)}`;
-            groups.set(key, [...(groups.get(key) ?? []), i]);
-        }
-    });
-    for (const at of groups.values()) {
+    for (const at of groupsOn(chart, out, (v) => offFormOpen(v, home, inst))) {
         const was = out[at[0]];
         const beside = gripsBeside(chart, out, at);
         if (beside.some((b) => slidFrom(was, b))) {
             continue;
         }
-        const n = out.length;
-        const mine = new Set(at);
-        const pick = (g: Voicing, i: number) => (mine.has(i % n) ? g : out[i % n]);
-        // The moves that touch the chord, each once (two occurrences side by side share one),
-        // the form read round as `gripsBeside` reads it: the move from the last chord back to
-        // the first is one too, so a loop voices alike whichever chord the page starts on.
-        const edges = n < 2 ? [] : [...new Set(at.flatMap((i) => [(i - 1 + n) % n, i]))];
-        const moves = (g: Voicing) =>
-            edges.reduce((sum, e) => sum + trans(pick(g, e), pick(g, e + 1)), 0);
-        const jumps = (g: Voicing) =>
-            edges.filter((e) => {
-                const a = lowFret(pick(g, e)),
-                    b = lowFret(pick(g, e + 1));
-                return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) >= 3;
-            }).length;
+        const { cost, jumps } = movesAround(out, at, trans);
         // Every occurrence of a symbol is offered the same grips (`voiceChart` decides per
         // symbol), so the first occurrence's are every occurrence's.
         const lessons = states[at[0]].filter(
@@ -1679,15 +1726,146 @@ function toLessonGrips(
                     (b) => b.shape.book || (lessonGrip(b, inst) && lowString(b) === lowString(v)),
                 ),
         );
-        const best = lessons
-            .map((v) => ({ v, cost: moves(v) }))
-            .reduce<{ v: Voicing; cost: number } | null>(
-                (b, c) => (!b || c.cost < b.cost - COST_NOISE ? c : b),
-                null,
-            );
+        const best = cheapestOf(lessons, cost);
         if (best) {
             for (const i of at) {
-                out[i] = best.v;
+                out[i] = best;
+            }
+        }
+    }
+    return out;
+}
+
+/** Two grips one finger apart: the same strings sounding, exactly one of them at another fret. */
+export const oneFingerApart = (a: Voicing, b: Voicing): boolean => {
+    const frets = new Map(b.notes.map((n) => [n.string, n.fret]));
+    return (
+        a.notes.length === b.notes.length &&
+        a.notes.every((n) => frets.has(n.string)) &&
+        a.notes.filter((n) => frets.get(n.string) !== n.fret).length === 1
+    );
+};
+
+/**
+ * A sus chord's open-string grip swapped, after the plan, for its open form (#1843,
+ * `GUITAR_OPEN_SUS_AFTER_PLAN`): Csus2 x-3-0-0-x-x for x-3-0-0-3-3, Gsus4 x-3-0-0-x-x or
+ * x-x-0-0-1-x for 3-x-0-0-1-3. No book prints those grips, and alone, beside the open C or G or
+ * in an open-position song the chord is its open form.
+ *
+ * After the plan, as #1861's lesson grips are, and never offered to it (`ShapeDef.afterPlan`).
+ * Offered as book chords (`bookGrip`), the open forms moved the chords beside them to suit (Gm
+ * x-x-x-3-3-3 to x-1-0-0-x-x, F x-x-3-2-1-x to x-x-x-5-6-5 beside the open Gsus4), took the hand
+ * off a one-finger move on the same root (`Gm Gsus4 Gm`, x-x-x-5-3-3 to 3-x-0-0-1-3) and raised
+ * the hand jumps with no window: 18 of 156 judged lines read worse. Here only the sus chord
+ * changes, and only where the plan put it on an open-string grip. A closed grip the plan chose
+ * stays: it is the hand in a closed position beside the chords the plan put there (Gsus4
+ * x-x-x-5-3-3 a finger from Gm x-x-x-3-3-3, Csus2 x-x-x-5-3-3 beside Cdim x-x-x-5-4-2). Every
+ * occurrence on that grip changes together, so the symbol keeps one grip (`unifyGrips`).
+ *
+ * The plan's grip stays, too, where a closed grip on the same root beside it (`sameRootBeside`:
+ * C5 x-3-5-5-x-x, Cm7♭5 x-3-4-3-4-x, C+ x-3-2-1-x-x) holds its fretted root, the same string at
+ * the same fret: the root stays down. C5 to Csus2 x-3-0-0-x-x keeps the index on C and lifts the
+ * ring finger; the open form's book fingering, 2-3-4, takes the C with the middle finger, a
+ * re-finger at every change. Swapped there, 5 of the 6 lines of 102 judged worse were these.
+ *
+ * And it stays where the open form would make more moves of the hand by three frets or more
+ * (`movesAround`): beside a chord with nothing near the nut (`Ab7sus4 Db6 Gsus4`, A♭7sus4
+ * 4-4-4-x-x-x round the form) the open form's 1st-fret C is a jump the fragment's 3rd fret was
+ * not. Without the check, hand jumps over distinct charts read round the form rose by 2 or 3 in
+ * each nut setup.
+ *
+ * A one-finger move to a closed grip on the same root beside the fragment, as a reason to keep
+ * the fragment, was measured and changed nothing: at the nut no chord beside these sus chords is
+ * one finger from their open-string grips but an off-form one, whose own grip #1861 replaces.
+ *
+ * Guitar only, in first position (`atTheNut`): up the neck the open forms are not offered, and
+ * a ukulele has its own (`UKE_OPEN_FORMS`).
+ */
+function toOpenSus(
+    chart: ChartChord[],
+    path: Voicing[],
+    opts: VoiceOptions,
+    trans: (a: Voicing, b: Voicing) => number,
+): Voicing[] {
+    const home = opts.home ?? null;
+    const inst = opts.instrument;
+    const out = [...path];
+    if (inst.id !== 'guitar' || !atTheNut(home)) {
+        return out;
+    }
+    const sus = (v: Voicing) =>
+        (v.quality === 'sus2' || v.quality === 'sus4') && v.notes.some((n) => n.fret === 0);
+    for (const at of groupsOn(chart, out, sus)) {
+        const was = out[at[0]];
+        const c = chart[at[0]];
+        const open = allPositions(inst, c.root, c.quality, { rootStrings: opts.rootStrings }).find(
+            (v) => v.shape.afterPlan,
+        );
+        if (!open) {
+            continue;
+        }
+        const sameRoot = sameRootBeside(chart, out, at).flat();
+        const root = was.notes.find((n) => n.role === 'R' && n.fret > 0);
+        const holdsTheRoot = (h: Voicing) =>
+            root !== undefined &&
+            h.notes.every((n) => n.fret > 0) &&
+            h.notes.some((n) => n.string === root.string && n.fret === root.fret);
+        if (sameRoot.some(holdsTheRoot)) {
+            continue;
+        }
+        const { jumps } = movesAround(out, at, trans);
+        if (jumps(open) > jumps(was)) {
+            continue;
+        }
+        for (const i of at) {
+            out[i] = open;
+        }
+    }
+    return out;
+}
+
+/**
+ * An open sus form that `toOpenSus` put in gives way to the closed grip one finger from the
+ * chord beside it on the same root (#1843), where #1861 has since given that chord its lesson
+ * grip: `Csus2 Cm Csus2` was x-3-0-0-x-x / x-3-1-0-x-x, both grips no book prints; the swaps
+ * make Cm the A-shape top x-x-x-5-4-3 beside the open Csus2, and here Csus2 takes x-x-x-5-3-3,
+ * one finger from it, rather than a re-finger to the open form and back.
+ *
+ * Only to a closed grip, every note fretted, that is one finger from a same-root chord beside
+ * every occurrence that has one and makes no more jumps of three frets (`movesAround`), and of
+ * those the cheapest to move into and out of, from the grips the plan was offered (`states`).
+ * Closed, or the fragment the open form replaced comes back (`Abm Gsus4 Gm Ab Adim`, Gsus4
+ * x-3-0-0-x-x one finger from Gm x-1-0-0-x-x); no jump, or `Gsus4 Gsus2 Gsus4` with no window
+ * takes x-5-5-5-x-x, three frets from Gsus2 x-5-5-2-x-x's index. (The open forms are never one
+ * finger from a same-root grip themselves: they sound four or five strings.) Only the
+ * forms `toOpenSus` put in: the plan's own book chords were the plan's choice, and it was offered
+ * them alone (`bookGrip`). (Probed over the plan's other grips instead, it took Csus4
+ * x-3-3-0-1-1 beside Cm x-x-x-5-4-3 to x-x-x-5-6-3, a four-fret stretch, and Esus4 0-2-2-2-0-0
+ * between Esus2 x-x-x-4-5-2 and the open D to x-x-x-4-5-5.)
+ */
+function toOneFingerMoves(
+    chart: ChartChord[],
+    states: Voicing[][],
+    path: Voicing[],
+    trans: (a: Voicing, b: Voicing) => number,
+): Voicing[] {
+    const out = [...path];
+    for (const at of groupsOn(chart, out, (v) => v.shape.afterPlan === true)) {
+        const was = out[at[0]];
+        const sameRoot = sameRootBeside(chart, out, at);
+        const { cost, jumps } = movesAround(out, at, trans);
+        // The open form was never on offer to the plan, so `states` holds the plan's grips.
+        const moves = states[at[0]].filter(
+            (g) =>
+                g.notes.every((n) => n.fret > 0) &&
+                jumps(g) <= jumps(was) &&
+                sameRoot.some((s) => s.length) &&
+                sameRoot.every((s) => !s.length || s.some((h) => oneFingerApart(g, h))),
+        );
+        const best = cheapestOf(moves, cost);
+        if (best) {
+            for (const i of at) {
+                out[i] = best;
             }
         }
     }
@@ -1737,22 +1915,20 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     const states = chart.map((c) =>
         candidates(c, opts, riffs.has(chordKey(c)), atTheNutSymbols.has(chordKey(c))),
     );
-    // An off-form open triad gives way to its lesson grip once the path is set (#1857, #1861).
-    const picked = toLessonGrips(
+    const unified = unifyGrips(
         chart,
         states,
-        unifyGrips(
-            chart,
-            states,
-            plan,
-            opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
-            opts.instrument,
-            home,
-        ),
-        trans,
-        home,
+        plan,
+        opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
         opts.instrument,
+        home,
     );
+    // Off-form open grips give way once the path is set: a sus chord's to its open form (#1843),
+    // then a triad's to its lesson grip (#1857, #1861), and last an open form #1843 put in to the
+    // grip one finger from the same-root lesson grip beside it.
+    const opened = toOpenSus(chart, unified, opts, trans);
+    const lessons = toLessonGrips(chart, states, opened, trans, home, opts.instrument);
+    const picked = toOneFingerMoves(chart, states, lessons, trans);
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(
         out.map((v) => ({
