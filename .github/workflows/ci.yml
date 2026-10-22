@@ -127,7 +127,18 @@ jobs:
 
       - name: Install Playwright system deps (browsers came from cache)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps
+        # A stalled apt download used to hold this step until the job timed out
+        # (#1872); a healthy run takes under a minute, so give each try 4 minutes and
+        # retry. A try killed mid-install can leave dpkg half-configured, so settle it
+        # before the next.
+        timeout-minutes: 14
+        run: |
+          for attempt in 1 2 3; do
+            timeout 240 npx playwright install-deps && exit 0
+            echo "::warning::playwright install-deps attempt $attempt failed or stalled; retrying"
+            sudo dpkg --configure -a || true
+          done
+          exit 1
 
       # The offline-audio guards (reverb tail decays, reverb stability) run in
       # Vitest browser mode against the same Chromium installed above — they need
@@ -303,7 +314,18 @@ jobs:
 
       - name: Install Playwright system deps (browser came from cache)
         if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps ${{ matrix.browser }}
+        # A stalled apt download used to hold this step until the job timed out
+        # (#1872); a healthy run takes under a minute, so give each try 4 minutes and
+        # retry. A try killed mid-install can leave dpkg half-configured, so settle it
+        # before the next.
+        timeout-minutes: 14
+        run: |
+          for attempt in 1 2 3; do
+            timeout 240 npx playwright install-deps ${{ matrix.browser }} && exit 0
+            echo "::warning::playwright install-deps attempt $attempt failed or stalled; retrying"
+            sudo dpkg --configure -a || true
+          done
+          exit 1
         working-directory: web
 
       # Typechecks core/ again, exports the app, then scripts/offline.mjs copies
