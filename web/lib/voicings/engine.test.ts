@@ -30,7 +30,7 @@ import { GUITAR_OPEN_CHORDS, GUITAR_OPEN_SEVENTHS, UKULELE_LOW_G } from './instr
 import { keyRoot, SONG_SHAPES, songChart } from './test/keys';
 import { QUALITIES } from './theory';
 import type { Quality } from './types';
-import { allowedShapes, buildAt, inReach, rootFrets } from './voicing';
+import { allowedShapes, buildAt, inReach, lessonGrip, rootFrets, slidFrom } from './voicing';
 
 const tab = (inst: InstrumentDef, v: Voicing) => {
     const m = new Map(v.notes.map((n) => [n.string, n.fret]));
@@ -6340,5 +6340,157 @@ describe('a guitar book chord plays alone only where the song sits at the nut ar
                 expect(v.shape.book, `${home}: ${v.symbol}`).toBeFalsy();
             }
         }
+    });
+});
+describe('an off-form open triad gives way to its lesson grip (#1857/#1861)', () => {
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    const grips = (names: string, home: [number, number] | null, inst: InstrumentDef = GUITAR) =>
+        voiceChart(chart(names), { instrument: inst, home }).map((v) => tab(inst, v));
+    /** The grip of `root` `quality` written as `t`, from every position it may take. */
+    const grip = (root: string, quality: Quality, t: string, inst: InstrumentDef = GUITAR) => {
+        const v = allPositions(inst, R(root), quality).find((w) => tab(inst, w) === t);
+        expect(v, `${root} ${quality} ${t}`).toBeDefined();
+        return v!;
+    };
+    const AT_THE_NUT = [null, [1, 6]] as ([number, number] | null)[];
+
+    it('a lesson grip is a closed triad on G-B-E or D-G-B, in any inversion', () => {
+        // The barre chords' tops: the A shape's Cm and C♯m, the E shape's Gm and A♭m, E♭'s.
+        for (const [root, q, t] of [
+            ['C', 'min', 'x x x 5 4 3'],
+            ['G', 'min', 'x x x 3 3 3'],
+            ['E♭', 'maj', 'x x x 3 4 3'],
+            ['C♯', 'min', 'x x x 6 5 4'],
+            ['A♭', 'min', 'x x x 4 4 4'],
+            // Every inversion, on both sets.
+            ['C', 'maj', 'x x x 5 5 3'],
+            ['C', 'maj', 'x x x 9 8 8'],
+            ['C', 'min', 'x x 5 5 4 x'],
+            ['G', 'min', 'x x 5 3 3 x'],
+            ['C♯', 'min', 'x x 2 1 2 x'],
+        ] as [string, Quality, string][]) {
+            expect(lessonGrip(grip(root, q, t), GUITAR), `${root} ${q} ${t}`).toBe(true);
+        }
+        for (const [root, q, t] of [
+            // A-D-G, under the barre's top.
+            ['A♭', 'min', 'x 2 1 1 x x'],
+            ['E♭', 'maj', 'x 6 5 3 x x'],
+            // An open string, on any set.
+            ['C', 'min', 'x 3 1 0 x x'],
+            ['C', 'min', 'x x 1 0 1 x'],
+            ['C', 'maj', 'x x x 0 1 0'],
+            // A book chord, a shell, a power chord.
+            ['C', 'maj', 'x 3 2 0 1 0'],
+            ['C', 'm7', 'x 3 1 3 x x'],
+            ['C', 'five', 'x 3 5 5 x x'],
+        ] as [string, Quality, string][]) {
+            expect(lessonGrip(grip(root, q, t), GUITAR), `${root} ${q} ${t}`).toBe(false);
+        }
+        // The ukulele has no string sets: its Cm 0 3 3 3 strums all four.
+        expect(lessonGrip(grip('C', 'min', '0 3 3 3', UKULELE), UKULELE)).toBe(false);
+    });
+
+    it('a grip slid from another: its strings, every fret moved the same', () => {
+        const abm = grip('A♭', 'min', 'x x 1 1 0 x');
+        const dbm = grip('C♯', 'min', 'x x x 1 2 0');
+        // B♭m's shape two frets down; the open Dm's top a fret down (Dm sounds the open D too).
+        expect(slidFrom(abm, grip('B♭', 'min', 'x x 3 3 2 x'))).toBe(true);
+        expect(slidFrom(dbm, grip('D', 'min', 'x x 0 2 3 1'))).toBe(true);
+        // Not the other way round: Dm sounds a string C♯m leaves out.
+        expect(slidFrom(grip('D', 'min', 'x x 0 2 3 1'), dbm)).toBe(false);
+        // Not a finger moved alone (D♭ x x x 1 2 1), not another set.
+        expect(slidFrom(dbm, grip('D♭', 'maj', 'x x x 1 2 1'))).toBe(false);
+        expect(slidFrom(abm, grip('B♭', 'min', 'x x x 3 2 1'))).toBe(false);
+    });
+
+    it('beside open chords the off-form grip takes the barre top', () => {
+        for (const home of AT_THE_NUT) {
+            // The issue's own example: Cm x 3 1 0 x x beside the open C.
+            expect(grips('C Cm C', home), `${home}`).toEqual([
+                'x 3 2 0 1 0',
+                'x x x 5 4 3',
+                'x 3 2 0 1 0',
+            ]);
+            expect(grips('Csus4 Cm Csus4', home)[1], `${home}`).toBe('x x x 5 4 3');
+            // The open C7 is a book chord too, though no open triad form.
+            expect(grips('C7 Cm C7', home)[1], `${home}`).toBe('x x x 5 4 3');
+            expect(grips('Cm', home), `${home}`).toEqual(['x x x 5 4 3']);
+        }
+    });
+
+    it('in a line of barre tops it takes the top on their strings', () => {
+        for (const home of AT_THE_NUT) {
+            // C♯m beside B x x x 4 4 2, the A-shape tops moving together.
+            expect(grips('E B Dbm A', home)[2], `${home}`).toBe('x x x 6 5 4');
+            expect(grips('B Dbm B', home)[1], `${home}`).toBe('x x x 6 5 4');
+            // F x x 3 2 1 x and B♭ x x 3 3 3 x are on D-G-B; Cm's top is on G-B-E, so the open
+            // grip stays rather than leave their strings.
+            expect(grips('Cm F Bb Bb', home)[0], `${home}`).toBe('x x 1 0 1 x');
+        }
+    });
+
+    it('among other small grips at the nut the open triad stays', () => {
+        for (const home of AT_THE_NUT) {
+            // E♭ among A♭ and D♭ on A-D-G, Cm between two C+ x 3 2 1 x x: the hand is already
+            // playing small shapes in first position.
+            expect(grips('Ab Db Eb Db', home)[2], `${home}`).toBe('x 1 1 0 x x');
+            expect(grips('C+ Cm C+', home)[1], `${home}`).toBe('x 3 1 0 x x');
+            expect(grips('Csus2 Cm Csus2', home)[1], `${home}`).toBe('x 3 1 0 x x');
+            // Read round: the line comes back from D♭sus4 x x 4 1 2 x to the first Cm.
+            expect(grips('Dbsus4 Csus4 Cm Cm', home)[2], `${home}`).toBe('x 3 1 0 x x');
+        }
+    });
+
+    it('a grip that is the shape of the chord beside it, slid, stays', () => {
+        for (const home of AT_THE_NUT) {
+            // A♭m x x 1 1 0 x is B♭m x x 3 3 2 x two frets down, a lesson grip on its own set;
+            // C♯m x x x 1 2 0 is the open Dm's top a fret down.
+            expect(grips('Bbm Abm Bbm', home), `${home}`).toEqual([
+                'x x 3 3 2 x',
+                'x x 1 1 0 x',
+                'x x 3 3 2 x',
+            ]);
+            expect(grips('Dm Dbm Dm', home), `${home}`).toEqual([
+                'x x 0 2 3 1',
+                'x x x 1 2 0',
+                'x x 0 2 3 1',
+            ]);
+        }
+    });
+
+    it('no new move of the hand by three frets', () => {
+        // A♭m's lesson grips on D-G-B sit from the 4th fret, three frets from D♭ x x 3 1 2 x.
+        expect(grips('Abm Db F# F#', [1, 6])[0]).toBe('x x 1 1 0 x');
+        // C♯m's top-set grip is x x x 6 5 4, three frets from D♭ x x x 1 2 1.
+        expect(grips('B Dbm Db', [1, 6])[1]).toBe('x x x 1 2 0');
+    });
+
+    it('counts the move round the form, so a loop voices alike from any chord', () => {
+        // C♯m x x x 6 5 4 would be three frets from F x x x 2 1 1, the chord before it round
+        // the form; read off the page alone, `Dbm D G F` took it and `F Dbm D G` did not. (With
+        // no window the plan itself puts C♯m on x 4 2 1 x x in the first, before this pass.)
+        expect(grips('Dbm D G F', [1, 6])[0]).toBe('x x x 1 2 0');
+        expect(grips('F Dbm D G', [1, 6])[1]).toBe('x x x 1 2 0');
+    });
+
+    it('of two lesson grips that pass, the one the hand reaches more cheaply', () => {
+        // E♭ x x x 3 4 3 and x x 5 3 4 x (Gm x x x 3 3 3 and x x 5 3 3 x) both pass beside
+        // the open chords; the top-set grip is the cheaper move, and it is taken.
+        for (const home of AT_THE_NUT) {
+            expect(grips('C Eb C', home)[1], `${home}`).toBe('x x x 3 4 3');
+            expect(grips('Em Gm Em', home)[1], `${home}`).toBe('x x x 3 3 3');
+        }
+    });
+
+    it('the ukulele, and windows up the neck, are untouched', () => {
+        for (const home of AT_THE_NUT) {
+            expect(grips('C Cm C', home, UKULELE)[1], `${home}`).toBe('0 3 3 3');
+        }
+        expect(grips('C Cm C', [2, 7])[1]).toBe('x x 5 5 4 x');
+        expect(grips('C Cm C', [5, 10])[1]).toBe('x x x 8 8 8');
+        expect(grips('Csus2 Cm Csus2', [2, 7])[1]).toBe('x x 5 5 4 x');
     });
 });
