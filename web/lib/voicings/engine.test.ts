@@ -6328,6 +6328,10 @@ describe('a guitar book chord plays alone only where the song sits at the nut ar
     it('the ukulele, and windows up the neck, are untouched', () => {
         expect(grips('Cdim C Cdim', [1, 6], undefined, UKULELE)[1]).toBe('0 0 0 3');
         expect(grips('Cdim C Cdim', null, undefined, UKULELE)[1]).toBe('0 0 0 3');
+        // E♭5 `3 3 6 6` has no ukulele grip inside the 4th fret, so on the guitar's rule E♭
+        // would be priced and take the closed `3 3 3 1`.
+        expect(grips('Eb Eb5 Eb', [1, 6], undefined, UKULELE)[0]).toBe('0 3 3 1');
+        expect(grips('Eb Eb5 Eb', null, undefined, UKULELE)[0]).toBe('0 3 3 1');
         for (const home of [
             [2, 7],
             [5, 10],

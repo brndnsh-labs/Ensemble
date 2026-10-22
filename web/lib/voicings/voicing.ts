@@ -1230,7 +1230,8 @@ const takenAtTheNut = (c: ChartChord, opts: VoiceOptions): boolean => {
  * nut the open chord is a jump there and back for one chord. `Cdim C Cdim` took the open C
  * x-3-2-0-1-0 between two closed diminished grips x-x-x-5-4-2; it is x-x-x-5-5-3, a finger
  * from them. There the book chord joins the grips step 2 of `candidates` offers, and the costs
- * choose.
+ * choose; a book 7th step 2 holds back (G7, C7, B7, Cmaj7, Fmaj7) is left out, and a shell
+ * taken.
  *
  * Decided per symbol, in `voiceChart`, as `inRiffAt` is: `unifyGrips` holds every occurrence of
  * a symbol to one grip, so every occurrence must be offered the same grips. It is also #1839's
@@ -1314,8 +1315,10 @@ function candidates(
     const inst = opts.instrument;
     const { all, inside, clear } = offered(c, opts);
     // A guitar book chord is offered alone only where the song is at the nut around it
-    // (`atTheNutAround`, #1859); elsewhere it is among step 2's grips, priced like them. Its
-    // own fragments are not among them, the open chord with strings left out (C x-3-2-0-x-x,
+    // (`atTheNutAround`, #1859); elsewhere it is among step 2's grips, priced like them, or
+    // left out where `clear` holds it back (the open G7, C7, B7, Cmaj7 and Fmaj7, whose root
+    // a closed shell holds fretted: `openShapeOneOff`, `rootBuried`). Its own fragments are
+    // never among them, at this step or the next, the open chord with strings left out (C x-3-2-0-x-x,
     // Csus4 x-3-3-0-x-x): where the hand would finger part of the open chord a player plays all
     // of it, and at the nut a chord with a book chord never offered them (#1849). Offered,
     // they took `C C5 C` and `Csus4 C5 Csus4` off the open chords onto them.
@@ -1330,7 +1333,10 @@ function candidates(
         () => (alone ? book : []),
         () => inside.filter((v) => firstPosition(v, home, inst)),
         () => clear(inside.filter((v) => !fragment(v))),
-        () => clear(all.filter((v) => inReach(v, home) || aFretPast(v, home, inst))),
+        () =>
+            clear(
+                all.filter((v) => !fragment(v) && (inReach(v, home) || aFretPast(v, home, inst))),
+            ),
         // Not `clear`ed: it holds only power grips, which are never a buried root, an open
         // shell's one-off or a five-fret reach.
         () => (inRiff ? [] : all.filter((v) => powerAFretPast(v, home, inst))),
