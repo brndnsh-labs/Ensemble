@@ -987,7 +987,8 @@ export const inReach = (v: Voicing, home: HomeWindow | null): boolean => {
  * The guitar's exception is its book chords (`ShapeDef.book`): the open 7ths (#1838,
  * `GUITAR_OPEN_SEVENTHS`) and, since #1849, the open triads and sus chords (`GUITAR_OPEN_CHORDS`,
  * C x-3-2-0-1-0, G 3-2-0-0-0-3, Am x-0-2-2-1-0). At the nut a chord that has one plays it,
- * whatever stands beside it, as a ukulele chord plays its book grip; its three-string grips,
+ * as a ukulele chord plays its book grip, in a song that sits at the nut around it
+ * (`atTheNutAround`, #1859; elsewhere the costs choose); its three-string grips,
  * one inversion among three, are not offered there. The comping shells there skipped a string
  * between two open ones with no finger beside it to mute it (A7 x-0-x-0-2-x, E7 0-x-0-1-x-x,
  * Am7 x-0-x-0-1-x, Em7 0-x-0-0-x-x, A7sus4 x-0-x-0-3-x, Dm6 x-x-0-x-0-1), and a strummed chord
@@ -1125,20 +1126,137 @@ const powerAFretPast = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef
  * is a power chord too. A chord repeated is the same chord, so `E♭5 E♭5 F5` is a riff.
  * `voiceChart` reads it per symbol: one occurrence in a riff puts every occurrence there.
  */
-const inRiffAt = (chart: ChartChord[], i: number): boolean => {
-    if (chart[i].quality !== 'five') {
-        return false;
-    }
+const inRiffAt = (chart: ChartChord[], i: number): boolean =>
+    chart[i].quality === 'five' &&
+    [-1, 1].some((step) => nextDifferent(chart, i, step)?.quality === 'five');
+
+/**
+ * The nearest chord before (`step` −1) or after (+1) `chart[i]` that is a different chord.
+ * With `around`, the chart is read as the form that comes round: past its last chord is its
+ * first again.
+ */
+const nextDifferent = (
+    chart: ChartChord[],
+    i: number,
+    step: number,
+    around = false,
+): ChartChord | undefined => {
     const key = chordKey(chart[i]);
-    const nextDifferent = (step: number): ChartChord | undefined => {
-        for (let j = i + step; j >= 0 && j < chart.length; j += step) {
-            if (chordKey(chart[j]) !== key) {
-                return chart[j];
-            }
+    const n = chart.length;
+    for (let k = 1; k < n; k++) {
+        const j = i + step * k;
+        if (!around && (j < 0 || j >= n)) {
+            return undefined;
         }
-        return undefined;
-    };
-    return [-1, 1].some((step) => nextDifferent(step)?.quality === 'five');
+        const c = chart[((j % n) + n) % n];
+        if (chordKey(c) !== key) {
+            return c;
+        }
+    }
+    return undefined;
+};
+
+/** A chord's grips as `candidates` sorts them (`offered`). */
+interface Offered {
+    /** Every grip on offer anywhere on the neck. */
+    all: Voicing[];
+    /** Those inside the window. */
+    inside: Voicing[];
+    /** The grips of a list a player would take: step 2's filter. */
+    clear: (grips: Voicing[]) => Voicing[];
+}
+
+/**
+ * A chord's grips and the filter `candidates` sorts them by, shared with `takenAtTheNut` so
+ * "a grip a player would take" is one rule.
+ */
+function offered(c: ChartChord, opts: VoiceOptions): Offered {
+    const home = opts.home ?? null;
+    const inst = opts.instrument;
+    const every = allPositions(inst, c.root, c.quality, { rootStrings: opts.rootStrings });
+    // A two-string power grip (`ShapeDef.nutOnly`, #1809) is what the books print for a power
+    // chord that has nothing else near the nut (F5 x-0-1-x, F♯5 x-1-2-x, B♭5 x-x-1-1, B5
+    // x-x-2-2), so it is offered only there: at the nut, and only to a chord with no other grip
+    // inside the 4th fret. A muted string costs the plan nothing, so offered beside G5 0-2-3-x
+    // or A♭5 1-3-4-x it took G5 Bsus4 to x-2-3-x and E♭5 A♭5 to x-3-4-x; up the neck it took
+    // `C C5 C` in frets 2–7 off 0-0-0-3 / 0-0-3-3 to 5-4-3-3 / x-x-3-3.
+    const nearTheNut = every.some(
+        (v) => !v.shape.nutOnly && v.notes.every((n) => n.fret <= FIRST_POSITION_TOP),
+    );
+    // The guitar's book chords are the nut's alone (#1838, #1849): in a window from the 2nd
+    // fret up an open chord is the hand gone back to the nut, and A7 x-0-2-0-2-0, every note
+    // inside frets 2–7, would otherwise be on offer there beside the shells.
+    const all = every.filter(
+        (v) =>
+            (!v.shape.nutOnly || (atTheNut(home) && !nearTheNut)) &&
+            (!v.shape.book || atTheNut(home)),
+    );
+    const reachStays = leavesTheNut(all, home, inst);
+    const clear = (grips: Voicing[]) =>
+        grips.filter(
+            (v) =>
+                !rootBuried(v, inst) &&
+                !openShapeOneOff(v, all, inst) &&
+                !openStrum(v, inst) &&
+                !ringsASkippedString(v) &&
+                (reachStays || !fiveFretReach(v, inst)),
+        );
+    const inside = all.filter((v) => inHome(v, home));
+    return { all, inside, clear };
+}
+
+/**
+ * A chord a player would take in first position (#1859): a grip inside the window that step 2
+ * of `candidates` does not hold back (`clear`), or the chord's own book chord (`bookGrip`),
+ * with nothing fretted past the 4th fret (`FIRST_POSITION_TOP`). What `atTheNutAround` asks
+ * of the chords beside a book chord.
+ */
+const takenAtTheNut = (c: ChartChord, opts: VoiceOptions): boolean => {
+    const home = opts.home ?? null;
+    const { inside, clear } = offered(c, opts);
+    return inside.some(
+        (v) =>
+            v.notes.every((n) => n.fret <= FIRST_POSITION_TOP) &&
+            (bookGrip(v, home, opts.instrument) || clear([v]).length > 0),
+    );
+};
+
+/**
+ * Whether a guitar chord's book chord is offered alone (#1859): the song is at the nut around
+ * it. Some occurrence of the chord has a neighbour, the nearest different chord before or after
+ * it, that a player takes in first position (`takenAtTheNut`). A teacher keeps the hand where
+ * the song lives: in an open-position song (`C G Am F`, `E A B7 E`, `F C F`, whose F has
+ * x-3-3-2-x-x) the open chord is the one taught, but between two chords with nothing near the
+ * nut the open chord is a jump there and back for one chord. `Cdim C Cdim` took the open C
+ * x-3-2-0-1-0 between two closed diminished grips x-x-x-5-4-2; it is x-x-x-5-5-3, a finger
+ * from them. There the book chord joins the grips step 2 of `candidates` offers, and the costs
+ * choose.
+ *
+ * Decided per symbol, in `voiceChart`, as `inRiffAt` is: `unifyGrips` holds every occurrence of
+ * a symbol to one grip, so every occurrence must be offered the same grips. It is also #1839's
+ * rule: a learner gets one grip per chord per song, so if any C sits beside an open-position
+ * chord, every C is the open C. A neighbour that has a book chord of its own counts, whatever
+ * its own neighbours: the test asks where the song can sit, not what the plan picks there.
+ *
+ * The form comes round (`nextDifferent`'s `around`): the chord before the first is the last,
+ * as the band plays it and the neck steps through it. Read off the page alone, the first or
+ * last chord had one neighbour, and where that one had nothing near the nut the open chord
+ * left a song that is open everywhere else: `C D♭°7 Dm7 G7` opened on x-x-5-5-5-x for the
+ * open C beside the open G7 it comes back from, `D E♭°7 Em7 A7` on x-x-4-2-3-x, and a lone A
+ * after D♭5 x-4-6-6-x-x took x-4-2-2-x-x, though the chart's first chord, B♭sus2 x-3-3-3-x-x,
+ * follows it (9 of 102 such sweep lines read worse that way; with the form read round, none).
+ * A chart of one chord has nothing beside it to say where the song sits: the window does, and
+ * from the nut that is first position.
+ */
+const atTheNutAround = (
+    chart: ChartChord[],
+    i: number,
+    takenThere: (c: ChartChord) => boolean,
+): boolean => {
+    const beside = [-1, 1]
+        .map((step) => nextDifferent(chart, i, step, true))
+        .filter((c) => c !== undefined);
+    return beside.length === 0 || beside.some(takenThere);
 };
 
 /**
@@ -1146,7 +1264,9 @@ const inRiffAt = (chart: ChartChord[], i: number): boolean => {
  *
  * 1. A ukulele chord's book grips in first position (`bookGrip`, #1675): where it has one, it
  *    is the chord, whatever stands beside it. A guitar chord's open book chord, there, the
- *    same way (#1838's 7ths, #1849's triads and sus chords). Else, its closed grips there (`firstPosition`,
+ *    same way (#1838's 7ths, #1849's triads and sus chords), where the song is at the nut
+ *    around it (`atTheNutAround`, #1859); elsewhere the book chord is one of step 2's grips.
+ *    Else, its closed grips there (`firstPosition`,
  *    #1688). Nothing step 2 holds back is among either: no strummed grip has a buried root or
  *    is an open shell's one-off, and none inside the 4th fret is five frets wide.
  * 2. Grips inside the hand window that a player would take: every one but those with a buried
@@ -1184,42 +1304,32 @@ const inRiffAt = (chart: ChartChord[], i: number): boolean => {
  * what step 2 did not find inside, and step 5 when nothing is inside at all), which is why
  * `unaryCost`'s out-of-window term never picks between them.
  */
-function candidates(c: ChartChord, opts: VoiceOptions, inRiff: boolean): Voicing[] {
+function candidates(
+    c: ChartChord,
+    opts: VoiceOptions,
+    inRiff: boolean,
+    bookAlone: boolean,
+): Voicing[] {
     const home = opts.home ?? null;
     const inst = opts.instrument;
-    const every = allPositions(inst, c.root, c.quality, { rootStrings: opts.rootStrings });
-    // A two-string power grip (`ShapeDef.nutOnly`, #1809) is what the books print for a power
-    // chord that has nothing else near the nut (F5 x-0-1-x, F♯5 x-1-2-x, B♭5 x-x-1-1, B5
-    // x-x-2-2), so it is offered only there: at the nut, and only to a chord with no other grip
-    // inside the 4th fret. A muted string costs the plan nothing, so offered beside G5 0-2-3-x
-    // or A♭5 1-3-4-x it took G5 Bsus4 to x-2-3-x and E♭5 A♭5 to x-3-4-x; up the neck it took
-    // `C C5 C` in frets 2–7 off 0-0-0-3 / 0-0-3-3 to 5-4-3-3 / x-x-3-3.
-    const nearTheNut = every.some(
-        (v) => !v.shape.nutOnly && v.notes.every((n) => n.fret <= FIRST_POSITION_TOP),
-    );
-    // The guitar's book chords are the nut's alone (#1838, #1849): in a window from the 2nd
-    // fret up an open chord is the hand gone back to the nut, and A7 x-0-2-0-2-0, every note
-    // inside frets 2–7, would otherwise be on offer there beside the shells.
-    const all = every.filter(
-        (v) =>
-            (!v.shape.nutOnly || (atTheNut(home) && !nearTheNut)) &&
-            (!v.shape.book || atTheNut(home)),
-    );
-    const reachStays = leavesTheNut(all, home, inst);
-    const clear = (grips: Voicing[]) =>
-        grips.filter(
-            (v) =>
-                !rootBuried(v, inst) &&
-                !openShapeOneOff(v, all, inst) &&
-                !openStrum(v, inst) &&
-                !ringsASkippedString(v) &&
-                (reachStays || !fiveFretReach(v, inst)),
+    const { all, inside, clear } = offered(c, opts);
+    // A guitar book chord is offered alone only where the song is at the nut around it
+    // (`atTheNutAround`, #1859); elsewhere it is among step 2's grips, priced like them. Its
+    // own fragments are not among them, the open chord with strings left out (C x-3-2-0-x-x,
+    // Csus4 x-3-3-0-x-x): where the hand would finger part of the open chord a player plays all
+    // of it, and at the nut a chord with a book chord never offered them (#1849). Offered,
+    // they took `C C5 C` and `Csus4 C5 Csus4` off the open chords onto them.
+    const alone = inst.id === 'uke' || bookAlone;
+    const book = inside.filter((v) => bookGrip(v, home, inst));
+    const fragment = (v: Voicing) =>
+        !v.shape.book &&
+        book.some((b) =>
+            v.notes.every((n) => b.notes.some((m) => m.string === n.string && m.fret === n.fret)),
         );
-    const inside = all.filter((v) => inHome(v, home));
     const tiers = [
-        () => inside.filter((v) => bookGrip(v, home, inst)),
+        () => (alone ? book : []),
         () => inside.filter((v) => firstPosition(v, home, inst)),
-        () => clear(inside),
+        () => clear(inside.filter((v) => !fragment(v))),
         () => clear(all.filter((v) => inReach(v, home) || aFretPast(v, home, inst))),
         // Not `clear`ed: it holds only power grips, which are never a buried root, an open
         // shell's one-off or a five-fret reach.
@@ -1423,9 +1533,24 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     // grip, so each must be offered the same grips. A symbol in a riff anywhere in the chart is
     // in a riff throughout (a lone F5 beside a riff's F5 plays the riff's grip, #1814).
     const riffs = new Set(chart.filter((_, i) => inRiffAt(chart, i)).map(chordKey));
+    // The same per symbol for a guitar book chord (#1859): one occurrence beside a chord a
+    // player takes in first position puts the song at the nut around every occurrence.
+    const taken = new Map<string, boolean>();
+    const takenThere = (c: ChartChord): boolean => {
+        const key = chordKey(c);
+        if (!taken.has(key)) {
+            taken.set(key, takenAtTheNut(c, opts));
+        }
+        return taken.get(key) === true;
+    };
+    const atTheNutSymbols = new Set(
+        chart.filter((_, i) => atTheNutAround(chart, i, takenThere)).map(chordKey),
+    );
     const picked = unifyGrips(
         chart,
-        chart.map((c) => candidates(c, opts, riffs.has(chordKey(c)))),
+        chart.map((c) =>
+            candidates(c, opts, riffs.has(chordKey(c)), atTheNutSymbols.has(chordKey(c))),
+        ),
         plan,
         opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
         opts.instrument,

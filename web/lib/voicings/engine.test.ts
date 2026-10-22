@@ -6216,3 +6216,125 @@ describe('in first position a guitar shell keeps one fingering per song (#1851)'
         );
     });
 });
+
+describe('a guitar book chord plays alone only where the song sits at the nut around it (#1859)', () => {
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    const grips = (
+        names: string,
+        home: [number, number] | null,
+        rootStrings?: number[],
+        inst: InstrumentDef = GUITAR,
+    ) => voiceChart(chart(names), { instrument: inst, home, rootStrings }).map((v) => tab(inst, v));
+    const SETUPS = ([null, [1, 6]] as ([number, number] | null)[]).flatMap((home) =>
+        [undefined, [6, 5]].map((rootStrings) => ({ home, rootStrings })),
+    );
+
+    it('an open-position song is unchanged: the book chords, beside each other', () => {
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            expect(grips('C G Am F', home, rootStrings).slice(0, 3), at).toEqual([
+                'x 3 2 0 1 0',
+                '3 2 0 0 0 3',
+                'x 0 2 2 1 0',
+            ]);
+            // F has x 3 3 2 x x inside the 4th fret, so C beside it is the open C.
+            expect(grips('F C F', home, rootStrings)[1], at).toBe('x 3 2 0 1 0');
+            expect(grips('E A B7 E', home, rootStrings), at).toEqual([
+                '0 2 2 1 0 0',
+                'x 0 2 2 2 0',
+                'x 2 1 2 0 2',
+                '0 2 2 1 0 0',
+            ]);
+            expect(grips('G Em C D', home, rootStrings), at).toEqual([
+                '3 2 0 0 0 3',
+                '0 2 2 0 0 0',
+                'x 3 2 0 1 0',
+                'x x 0 2 3 2',
+            ]);
+            expect(
+                new Set(grips('A7 A7 A7 A7 D7 D7 A7 A7 E7 D7 A7 E7', home, rootStrings)),
+            ).toEqual(new Set(['x 0 2 0 2 0', 'x x 0 2 1 2', '0 2 0 1 0 0']));
+            expect(
+                new Set(grips('E7 E7 E7 E7 A7 A7 E7 E7 B7 A7 E7 B7', home, rootStrings)),
+            ).toEqual(new Set(['0 2 0 1 0 0', 'x 0 2 0 2 0', 'x 2 1 2 0 2']));
+            expect(grips('Em7 G Dsus4 A7sus4 C Dsus4 A7sus4', home, rootStrings), at).toEqual([
+                '0 2 0 0 0 0',
+                '3 2 0 0 0 3',
+                'x x 0 2 3 3',
+                'x 0 2 0 3 0',
+                'x 3 2 0 1 0',
+                'x x 0 2 3 3',
+                'x 0 2 0 3 0',
+            ]);
+            // A chart of one chord: the window says where it sits.
+            expect(grips('C', home, rootStrings), at).toEqual(['x 3 2 0 1 0']);
+        }
+    });
+
+    it('between chords with nothing near the nut it is priced with the grips beside them', () => {
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            // The open C between two closed diminished grips is the A-shape C's top, a finger
+            // from them (it was x 3 2 0 1 0).
+            expect(grips('Cdim C Cdim', home, rootStrings), at).toEqual([
+                'x x x 5 4 2',
+                'x x x 5 5 3',
+                'x x x 5 4 2',
+            ]);
+            // E beside an Esus2 with no grip inside the 4th fret: one finger, not the open E.
+            expect(grips('Esus2 E Esus2', home, rootStrings), at).toEqual([
+                'x x x 4 5 2',
+                'x x x 4 5 4',
+                'x x x 4 5 2',
+            ]);
+            // D7 a fret above D♭maj7, not the open D7 and a jump.
+            expect(grips('D7 D7 Dbmaj7', home, rootStrings), at).toEqual([
+                'x 5 4 5 x x',
+                'x 5 4 5 x x',
+                'x 4 3 5 x x',
+            ]);
+        }
+    });
+
+    it('the book chord’s own fragments are not offered in its place', () => {
+        // C5 has no grip inside the 4th fret, so C is priced; C x 3 2 0 x x, the open C with
+        // strings left out, is not on offer, and the whole open C wins.
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            expect(grips('C C5 C', home, rootStrings), at).toEqual([
+                'x 3 2 0 1 0',
+                'x 3 5 5 x x',
+                'x 3 2 0 1 0',
+            ]);
+            expect(grips('Csus4 C5 Csus4', home, rootStrings)[0], at).toBe('x 3 3 0 1 1');
+        }
+    });
+
+    it('the form comes round: a first chord’s neighbour is the last', () => {
+        // C's only neighbour on the page is D♭°7, with nothing near the nut; the form comes
+        // back to it from the open G7.
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            expect(grips('C Dbdim7 Dm7 G7', home, rootStrings)[0], at).toBe('x 3 2 0 1 0');
+            expect(grips('Bbsus2 Adim F+ Db5 Db5 A', home, rootStrings).at(-1), at).toBe(
+                'x 0 2 2 2 0',
+            );
+        }
+    });
+
+    it('the ukulele, and windows up the neck, are untouched', () => {
+        expect(grips('Cdim C Cdim', [1, 6], undefined, UKULELE)[1]).toBe('0 0 0 3');
+        expect(grips('Cdim C Cdim', null, undefined, UKULELE)[1]).toBe('0 0 0 3');
+        for (const home of [
+            [2, 7],
+            [5, 10],
+        ] as [number, number][]) {
+            for (const v of voiceChart(chart('Cdim C Cdim'), { instrument: GUITAR, home })) {
+                expect(v.shape.book, `${home}: ${v.symbol}`).toBeFalsy();
+            }
+        }
+    });
+});
