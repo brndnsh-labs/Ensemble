@@ -26,11 +26,24 @@ import {
     type Voicing,
     voiceChart,
 } from './index';
-import { GUITAR_OPEN_CHORDS, GUITAR_OPEN_SEVENTHS, UKULELE_LOW_G } from './instruments';
+import {
+    GUITAR_OPEN_CHORDS,
+    GUITAR_OPEN_SEVENTHS,
+    GUITAR_OPEN_SUS_AFTER_PLAN,
+    UKULELE_LOW_G,
+} from './instruments';
 import { keyRoot, SONG_SHAPES, songChart } from './test/keys';
 import { QUALITIES } from './theory';
 import type { Quality } from './types';
-import { allowedShapes, buildAt, inReach, lessonGrip, rootFrets, slidFrom } from './voicing';
+import {
+    allowedShapes,
+    buildAt,
+    inReach,
+    lessonGrip,
+    oneFingerApart,
+    rootFrets,
+    slidFrom,
+} from './voicing';
 
 const tab = (inst: InstrumentDef, v: Voicing) => {
     const m = new Map(v.notes.map((n) => [n.string, n.fret]));
@@ -5928,7 +5941,8 @@ describe('at the nut a guitar chord with an open form plays the whole open chord
     const OPEN = GUITAR_OPEN_CHORDS.filter(([, q]) => QUALITIES[q].kind === 'triad');
 
     it('each open chord is its own root and quality, and no other', () => {
-        const books = GUITAR.shapes.filter((s) => s.book && s.kind === 'triad');
+        // Not the open sus chords that come in after the plan (#1843): those have their own table.
+        const books = GUITAR.shapes.filter((s) => s.book && !s.afterPlan && s.kind === 'triad');
         expect(books).toHaveLength(OPEN.length);
         OPEN.forEach(([pc, quality, frets], i) => {
             for (const root of ROOTS) {
@@ -6438,7 +6452,14 @@ describe('an off-form open triad gives way to its lesson grip (#1857/#1861)', ()
             // playing small shapes in first position.
             expect(grips('Ab Db Eb Db', home)[2], `${home}`).toBe('x 1 1 0 x x');
             expect(grips('C+ Cm C+', home)[1], `${home}`).toBe('x 3 1 0 x x');
-            expect(grips('Csus2 Cm Csus2', home)[1], `${home}`).toBe('x 3 1 0 x x');
+            // Csus2 was the fragment x 3 0 0 x x here, a small grip too. Since #1843 it plays its
+            // open form x 3 0 0 3 3, Cm beside it takes the A-shape top, and Csus2 the grip one
+            // finger from that (see the #1843 tests).
+            expect(grips('Csus2 Cm Csus2', home), `${home}`).toEqual([
+                'x x x 5 3 3',
+                'x x x 5 4 3',
+                'x x x 5 3 3',
+            ]);
             // Read round: the line comes back from D♭sus4 x x 4 1 2 x to the first Cm.
             expect(grips('Dbsus4 Csus4 Cm Cm', home)[2], `${home}`).toBe('x 3 1 0 x x');
         }
@@ -6492,5 +6513,176 @@ describe('an off-form open triad gives way to its lesson grip (#1857/#1861)', ()
         expect(grips('C Cm C', [2, 7])[1]).toBe('x x 5 5 4 x');
         expect(grips('C Cm C', [5, 10])[1]).toBe('x x x 8 8 8');
         expect(grips('Csus2 Cm Csus2', [2, 7])[1]).toBe('x x 5 5 4 x');
+    });
+});
+describe('Csus2 and Gsus4 play their open forms at the nut (#1843)', () => {
+    const chart = (names: string) =>
+        names
+            .split(' ')
+            .map((s) => voicingChord(parseChord(s, { tonic: 0, minor: false })!, 'C', false));
+    /** A chart's grips as `tab [fingers]`, an open string's finger 0. */
+    const played = (
+        names: string,
+        home: [number, number] | null,
+        rootStrings?: number[],
+        inst: InstrumentDef = GUITAR,
+    ) =>
+        voiceChart(chart(names), { instrument: inst, home, rootStrings }).map(
+            (v) => `${tab(inst, v)} [${v.notes.map((n) => n.finger).join('-')}]`,
+        );
+    const grips = (names: string, home: [number, number] | null, rootStrings?: number[]) =>
+        played(names, home, rootStrings).map((g) => g.split(' [')[0]);
+    const SETUPS = ([null, [1, 6]] as ([number, number] | null)[]).flatMap((home) =>
+        [undefined, [6, 5]].map((rootStrings) => ({ home, rootStrings })),
+    );
+    /** The grip of `root` `quality` written as `t`, from every position it may take. */
+    const grip = (root: string, quality: Quality, t: string) => {
+        const v = allPositions(GUITAR, R(root), quality).find((w) => tab(GUITAR, w) === t);
+        expect(v, `${root} ${quality} ${t}`).toBeDefined();
+        return v!;
+    };
+
+    it('each open form is its own root and quality, and comes in only after the plan', () => {
+        const forms = GUITAR.shapes.filter((s) => s.afterPlan);
+        expect(forms).toHaveLength(GUITAR_OPEN_SUS_AFTER_PLAN.length);
+        GUITAR_OPEN_SUS_AFTER_PLAN.forEach(([pc, quality, frets], i) => {
+            expect(forms[i].book, frets).toBe(true);
+            for (const root of ROOTS) {
+                for (const q of ['sus2', 'sus4'] as Quality[]) {
+                    const built = build(GUITAR, forms[i], root, q);
+                    expect(built && tab(GUITAR, built), `${frets} as ${root.name} ${q}`).toBe(
+                        root.pc === pc && q === quality ? frets : null,
+                    );
+                }
+            }
+        });
+        // The ukulele has its own open forms (`UKE_OPEN_FORMS`), and none of these.
+        expect(UKULELE.shapes.some((s) => s.afterPlan)).toBe(false);
+    });
+
+    it('two grips are one finger apart when only one string changes fret', () => {
+        const gm = grip('G', 'min', 'x x x 3 3 3');
+        expect(oneFingerApart(gm, grip('G', 'sus4', 'x x x 5 3 3'))).toBe(true);
+        expect(oneFingerApart(gm, grip('G', 'sus2', 'x x x 2 3 3'))).toBe(true);
+        // Two strings move; another string set; the same grip.
+        const csus2 = grip('C', 'sus2', 'x x x 5 3 3');
+        expect(oneFingerApart(csus2, grip('C', 'dim', 'x x x 5 4 2'))).toBe(false);
+        expect(oneFingerApart(gm, grip('G', 'sus4', 'x x 5 5 3 x'))).toBe(false);
+        expect(oneFingerApart(gm, gm)).toBe(false);
+    });
+
+    it('alone, and beside the open C and G, they are the open forms', () => {
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            // Fingered as fachords prints them; they were the fragment x 3 0 0 x x, no book's.
+            expect(played('Csus2', home, rootStrings), at).toEqual(['x 3 0 0 3 3 [2-0-0-3-4]']);
+            expect(played('Gsus4', home, rootStrings), at).toEqual(['3 x 0 0 1 3 [3-0-0-1-4]']);
+            expect(grips('C Csus2 C', home, rootStrings), at).toEqual([
+                'x 3 2 0 1 0',
+                'x 3 0 0 3 3',
+                'x 3 2 0 1 0',
+            ]);
+            expect(grips('G Gsus4 G', home, rootStrings), at).toEqual([
+                '3 2 0 0 0 3',
+                '3 x 0 0 1 3',
+                '3 2 0 0 0 3',
+            ]);
+        }
+    });
+
+    it('the chords beside them are not moved to suit them: Gm Gsus4 Gm moves one finger', () => {
+        // Offered to the plan as book chords, the open Gsus4 took the hand off this one-finger
+        // move (x x x 3 3 3 to x x x 5 3 3) for a jump to the nut and back.
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            expect(grips('Gm Gsus4 Gm', home, rootStrings), at).toEqual([
+                'x x x 3 3 3',
+                'x x x 5 3 3',
+                'x x x 3 3 3',
+            ]);
+            expect(grips('Gsus4 Gm Gsus4', home, rootStrings), at).toEqual([
+                'x x x 5 3 3',
+                'x x x 3 3 3',
+                'x x x 5 3 3',
+            ]);
+        }
+    });
+
+    it('beside the same-root lesson grip, the open form gives way to the grip a finger from it', () => {
+        // Cm x 3 1 0 x x beside the open Csus2 takes the A-shape top (#1861), and Csus2 then
+        // takes x x x 5 3 3, its 3rd down a fret, rather than a re-finger to the open form.
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            expect(grips('Cm Csus2 Cm', home, rootStrings), at).toEqual([
+                'x x x 5 4 3',
+                'x x x 5 3 3',
+                'x x x 5 4 3',
+            ]);
+        }
+    });
+
+    it('a closed grip on the same root that holds the root keeps it down', () => {
+        // C5 to Csus2 x 3 0 0 x x keeps the index on C; the open form's 2-3-4 would re-finger it
+        // at every change. (In frets 1–6 C5 has no grip inside the 4th fret and the plan already
+        // takes Csus2 x 5 5 5 x x, #1859.)
+        expect(played('C5 Csus2 C5', null)).toEqual([
+            'x 3 5 5 x x [1-3-3]',
+            'x 3 0 0 x x [1-0-0]',
+            'x 3 5 5 x x [1-3-3]',
+        ]);
+    });
+
+    it('no new move of the hand by three frets', () => {
+        // Round the form from A♭7sus4 4 4 4 x x x, the open form's 1st-fret C is a jump the
+        // fragment's 3rd fret is not.
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            expect(grips('Ab7sus4 Db6 Gsus4', home, rootStrings)[2], at).toBe('x 3 0 0 x x');
+        }
+    });
+
+    it('only the chords on its own root decide whether a closed grip keeps the root down', () => {
+        // C7 x 3 2 3 1 0 holds the fragment's C on the A string, but it is not a Csus2's own
+        // chord: the open form comes in.
+        for (const { home, rootStrings } of SETUPS) {
+            const at = `${home} ${rootStrings}`;
+            expect(grips('F+ C7 Csus2 Fm Bbm7 Eb7sus4', home, rootStrings)[2], at).toBe(
+                'x 3 0 0 3 3',
+            );
+        }
+    });
+
+    it('the open form gives way only to a closed grip, and to no jump', () => {
+        // Beside Gm x 1 0 0 x x the fragment x 3 0 0 x x is one finger away; it does not come
+        // back for the open form.
+        for (const rootStrings of [undefined, [6, 5]]) {
+            expect(grips('Abm Gsus4 Gm Ab Adim', [1, 6], rootStrings)[1], `${rootStrings}`).toBe(
+                '3 x 0 0 1 3',
+            );
+            // x 5 5 5 x x is one finger from Gsus2 x 5 5 2 x x, but three frets from it.
+            expect(grips('Gsus4 Gsus2 Gsus4', null, rootStrings), `${rootStrings}`).toEqual([
+                '3 x 0 0 1 3',
+                'x 5 5 2 x x',
+                '3 x 0 0 1 3',
+            ]);
+        }
+    });
+
+    it('the ukulele, and windows up the neck, are untouched', () => {
+        expect(played('Csus2', [1, 6], undefined, UKULELE)[0]).toBe('0 2 3 3 [0-1-2-3]');
+        // In frets 2–7 the open form's notes are all in the window, but it is the nut's alone.
+        for (const rootStrings of [undefined, [6, 5]]) {
+            expect(grips('Bb5 Csus2 C', [2, 7], rootStrings)[1], `${rootStrings}`).toBe(
+                'x 3 0 0 x x',
+            );
+        }
+        for (const home of [
+            [2, 7],
+            [5, 10],
+        ] as [number, number][]) {
+            for (const v of voiceChart(chart('C Csus2 G Gsus4'), { instrument: GUITAR, home })) {
+                expect(v.shape.book, `${home}: ${v.symbol}`).toBeFalsy();
+            }
+        }
     });
 });
