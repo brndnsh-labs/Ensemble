@@ -701,6 +701,65 @@ const openFormGrip = (v: Voicing): boolean =>
             v.notes.every((n) => f.frets.get(n.string) === n.fret),
     );
 
+/**
+ * A guitar triad at the nut that rings an open string but is part of no open form (#1857,
+ * `openFormGrip`): Cm x-3-1-0-x-x and x-x-1-0-1-x, E♭ x-1-1-0-x-x, Gm x-1-0-0-x-x, C♯m
+ * x-x-x-1-2-0, A♭m x-x-1-1-0-x. No teacher shows these; the chord's lesson grip is the book's
+ * (`lessonGrip`: Cm x-x-x-5-4-3, E♭ x-x-x-3-4-3). Sus chords are left alone: Csus2 x-3-0-0-x-x
+ * is the open Csus2's fragment in all but name, and the open sus grips are #1843's business.
+ * A diminished or augmented triad is never one (`openFormGrip` does not judge them), and a
+ * power chord is not asked (`kind === 'triad'`).
+ */
+const offFormOpen = (v: Voicing, home: HomeWindow | null, inst: InstrumentDef): boolean =>
+    inst.id === 'guitar' &&
+    atTheNut(home) &&
+    v.shape.kind === 'triad' &&
+    !v.shape.book &&
+    v.quality !== 'sus2' &&
+    v.quality !== 'sus4' &&
+    v.notes.some((n) => n.fret === 0) &&
+    !openFormGrip(v);
+
+/**
+ * The string sets a lesson grip sits on, by their lowest string: G-B-E (3-2-1) and D-G-B
+ * (4-3-2), the top strings a rhythm player is taught triads on.
+ */
+const LESSON_SETS = new Set([1, 2]);
+
+/**
+ * A grip a teacher shows for a triad (#1861, DECISION 2026-10-22): a closed triad, every note
+ * fretted, on the top two string sets, G-B-E or D-G-B, in any of its three inversions
+ * (`closedTriads`). These are the tops of the barre chords a lesson teaches: Cm x-x-x-5-4-3 (the
+ * A shape's), Gm x-x-x-3-3-3 (the E shape's), E♭ x-x-x-3-4-3, C♯m x-x-x-6-5-4, A♭m x-x-x-4-4-4.
+ * A triad on A-D-G (A♭m x-2-1-1-x-x) is not one: it sits under the barre's top, where no lesson
+ * stops, and as the cheapest closed grip it read worse in 17 of #1857's 21 lost lines. Nor is
+ * a grip with an open string, a book chord or a shell. Guitar only: the ukulele's triads strum
+ * every string and have no string sets. On the guitar every triad shape but the book chords is
+ * a `closedTriads` set, three neighbouring strings, so the lowest string names the set. The
+ * quality is not asked: a diminished, augmented or sus triad there (D° x-x-3-1-3-x) is one too,
+ * which counts where it stands beside the chord being replaced.
+ */
+export const lessonGrip = (v: Voicing, inst: InstrumentDef): boolean =>
+    inst.id === 'guitar' &&
+    v.shape.kind === 'triad' &&
+    !v.shape.book &&
+    v.notes.every((n) => n.fret > 0) &&
+    LESSON_SETS.has(lowString(v));
+
+/**
+ * Grip `a` is grip `b`'s shape slid along the neck (#1857): `b` sounds every string `a` does,
+ * each at `a`'s fret moved by the same number of frets. A♭m x-x-1-1-0-x is B♭m x-x-3-3-2-x two
+ * frets down; C♯m x-x-x-1-2-0 is the top of the open Dm x-x-0-2-3-1 a fret down. The hand keeps
+ * its shape and moves it, so `a` beside `b` is a grip in place, whatever else it is. `b` may
+ * sound more strings than `a` (Dm's open D), never fewer. (A move of no frets is the same grip,
+ * which a different chord beside it never is.)
+ */
+export const slidFrom = (a: Voicing, b: Voicing): boolean => {
+    const frets = new Map(b.notes.map((n) => [n.string, n.fret]));
+    const moves = a.notes.map((n) => (frets.get(n.string) ?? Number.NaN) - n.fret);
+    return moves.every((m) => m === moves[0]);
+};
+
 function triadUnaryCost(
     v: Voicing,
     target: number,
@@ -1512,6 +1571,129 @@ function unifyGrips(
     }
 }
 
+/** The grip's lowest fretted fret, where the hand sits; Infinity for a grip that frets nothing. */
+const lowFret = (v: Voicing): number =>
+    Math.min(...v.notes.filter((n) => n.fret > 0).map((n) => n.fret));
+
+/**
+ * The grips of the chords beside each of `at`'s occurrences: the nearest different chord before
+ * and after, the form read as coming round, as the band plays it (`nextDifferent`'s `around`).
+ */
+const gripsBeside = (chart: ChartChord[], path: Voicing[], at: number[]): Voicing[] => {
+    const key = chordKey(chart[at[0]]);
+    const n = path.length;
+    return at.flatMap((i) =>
+        [-1, 1].flatMap((step) => {
+            for (let k = 1; k < n; k++) {
+                const j = (((i + step * k) % n) + n) % n;
+                if (chordKey(chart[j]) !== key) {
+                    return [path[j]];
+                }
+            }
+            return [];
+        }),
+    );
+};
+
+/**
+ * An off-form open triad swapped, after the plan, for its chord's lesson grip (#1857, #1861:
+ * `offFormOpen`, `lessonGrip`). Cm x-3-1-0-x-x beside the open C is x-x-x-5-4-3, the A-shape
+ * barre's top; C♯m x-x-x-1-2-0 beside B x-x-x-4-4-2 is x-x-x-6-5-4.
+ *
+ * After the plan, not in `candidates`: holding these grips back there changed what their chord
+ * cost everywhere it appears, so the plan moved its neighbours to suit (C6 x-3-2-2-x-x to
+ * x-3-x-2-5-x, F5 1-3-3-x-x-x to x-x-3-5-6-x) and broke up lines of barre tops. Here the rest of
+ * the path is the plan's: only the chord changes, and only where the plan put it on such a grip.
+ * Every occurrence on that grip changes together, so the symbol keeps one grip (`unifyGrips`).
+ *
+ * Only a lesson grip replaces it, and only where the hand is in one of the two settings a
+ * teacher would move it for, at every occurrence: each chord beside it (`gripsBeside`) is an
+ * open chord (`ShapeDef.book`) or a lesson grip on the replacement's own string set (a line of
+ * barre tops). Among other small closed grips at the nut (A° x-3-1-2-x-x, B7sus4 x-2-2-2-x-x,
+ * C6 x-3-2-2-x-x) the little open triad is in place: the hand is already playing small shapes in
+ * first position, and every lesson grip of these chords sits from the 3rd fret up. Swapped there
+ * too, 16 of 90 judged lines read worse (and 29 of 70 with no check on the neighbours' strings).
+ * Chosen by cost alone, without the lesson grip, the replacement was most often one no lesson
+ * shows (A♭m x-2-1-1-x-x, Cm x-6-5-5-x-x): 21 of 70 read worse. Counting a grip of an open form
+ * (`openFormGrip`) as an open chord too changed nothing: at the nut those chords play their book
+ * chord.
+ *
+ * Of the lesson grips on offer, the cheapest moves into and out of the chord (`trans`), and none
+ * that makes more moves of the hand by three frets or more (the lowest fretted note, `lowFret`)
+ * beside the chord than the open grip did, the move round the form from the last chord to the
+ * first counted too: a barre top sits higher than the open grip, and without the check A♭m
+ * x-x-1-1-0-x before D♭ x-x-3-1-2-x went to x-x-6-4-4-x. No cost margin. Where none
+ * passes, the plan's grip stays.
+ *
+ * It also stays where some occurrence of it is the shape of a chord beside it slid along the
+ * neck (`slidFrom`), whatever that chord is: A♭m x-x-1-1-0-x after B♭m x-x-3-3-2-x is the same
+ * hand two frets down, and C♯m x-x-x-1-2-0 after the open Dm x-x-0-2-3-1 is Dm's top a fret down.
+ * Swapped, those were the only 6 of 36 judged lines that read worse: the barre top took the hand
+ * off a shape it was moving. Guitar only, in first position (`atTheNut`), as `offFormOpen` and
+ * `lessonGrip` say: up the neck no plan holds such a grip, and a ukulele has no lesson grip.
+ */
+function toLessonGrips(
+    chart: ChartChord[],
+    states: Voicing[][],
+    path: Voicing[],
+    trans: (a: Voicing, b: Voicing) => number,
+    home: HomeWindow | null,
+    inst: InstrumentDef,
+): Voicing[] {
+    const out = [...path];
+    const groups = new Map<string, number[]>();
+    out.forEach((v, i) => {
+        if (offFormOpen(v, home, inst)) {
+            const key = `${chordKey(chart[i])}|${gripKey(v)}`;
+            groups.set(key, [...(groups.get(key) ?? []), i]);
+        }
+    });
+    for (const at of groups.values()) {
+        const was = out[at[0]];
+        const beside = gripsBeside(chart, out, at);
+        if (beside.some((b) => slidFrom(was, b))) {
+            continue;
+        }
+        const n = out.length;
+        const mine = new Set(at);
+        const pick = (g: Voicing, i: number) => (mine.has(i % n) ? g : out[i % n]);
+        // The moves that touch the chord, each once (two occurrences side by side share one),
+        // the form read round as `gripsBeside` reads it: the move from the last chord back to
+        // the first is one too, so a loop voices alike whichever chord the page starts on.
+        const edges = n < 2 ? [] : [...new Set(at.flatMap((i) => [(i - 1 + n) % n, i]))];
+        const moves = (g: Voicing) =>
+            edges.reduce((sum, e) => sum + trans(pick(g, e), pick(g, e + 1)), 0);
+        const jumps = (g: Voicing) =>
+            edges.filter((e) => {
+                const a = lowFret(pick(g, e)),
+                    b = lowFret(pick(g, e + 1));
+                return Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) >= 3;
+            }).length;
+        // Every occurrence of a symbol is offered the same grips (`voiceChart` decides per
+        // symbol), so the first occurrence's are every occurrence's.
+        const lessons = states[at[0]].filter(
+            (v) =>
+                lessonGrip(v, inst) &&
+                jumps(v) <= jumps(was) &&
+                beside.every(
+                    (b) => b.shape.book || (lessonGrip(b, inst) && lowString(b) === lowString(v)),
+                ),
+        );
+        const best = lessons
+            .map((v) => ({ v, cost: moves(v) }))
+            .reduce<{ v: Voicing; cost: number } | null>(
+                (b, c) => (!b || c.cost < b.cost - COST_NOISE ? c : b),
+                null,
+            );
+        if (best) {
+            for (const i of at) {
+                out[i] = best.v;
+            }
+        }
+    }
+    return out;
+}
+
 /**
  * Voice a whole chart at once: one grip per chord, chosen so the hand moves as little as possible
  * and the root takes simple paths, a strummed symbol (a triad, a ukulele shell) and a guitar
@@ -1552,15 +1734,24 @@ export function voiceChart<C extends ChartChord>(chart: C[], opts: VoiceOptions)
     const atTheNutSymbols = new Set(
         chart.filter((_, i) => atTheNutAround(chart, i, takenThere)).map(chordKey),
     );
-    const picked = unifyGrips(
+    const states = chart.map((c) =>
+        candidates(c, opts, riffs.has(chordKey(c)), atTheNutSymbols.has(chordKey(c))),
+    );
+    // An off-form open triad gives way to its lesson grip once the path is set (#1857, #1861).
+    const picked = toLessonGrips(
         chart,
-        chart.map((c) =>
-            candidates(c, opts, riffs.has(chordKey(c)), atTheNutSymbols.has(chordKey(c))),
+        states,
+        unifyGrips(
+            chart,
+            states,
+            plan,
+            opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
+            opts.instrument,
+            home,
         ),
-        plan,
-        opts.sameGripTolerance ?? SAME_GRIP_TOLERANCE,
-        opts.instrument,
+        trans,
         home,
+        opts.instrument,
     );
     const out = picked.map((v, i) => stamp(v, chart[i]));
     fingerSequence(
