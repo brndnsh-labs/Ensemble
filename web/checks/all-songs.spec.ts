@@ -236,6 +236,22 @@ test('leaving the All songs page returns focus to its entry link on home', async
     await expect(page.getByTestId('all-songs-link')).toBeFocused();
 });
 
+/**
+ * The search box is a borderless input inside a bordered `.search` field, so the focus ring is
+ * drawn on the field (#1878): `outline: none` on the input alone left a keyboard user no cue.
+ */
+test('tabbing into the search shows the focus ring on the search field', async ({ page }) => {
+    await seedStarters(page);
+    await page.getByTestId('all-songs-link').click();
+    const input = page.getByRole('textbox', { name: 'Search your songs' });
+    await input.focus();
+    await expect(input).toBeFocused();
+    const field = page.locator('.all-songs-toolbar .search');
+    await expect(field).toHaveCSS('outline-style', 'solid');
+    await expect(field).toHaveCSS('outline-width', '3px');
+    await expect(input).toHaveCSS('outline-style', 'none');
+});
+
 test('the row ⋯ menu: Star/Unstar, Rename, Duplicate, Export file, Delete…', async ({ page }) => {
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();
