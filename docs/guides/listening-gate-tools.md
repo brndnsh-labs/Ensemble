@@ -521,17 +521,18 @@ satisfies the bass note's evidence. Measured — muting the bass lane entirely o
   against a real click's ~1.96, too narrow to separate without proper bandwidth
   estimation.
 - **A deliberately quiet note under a louder tail reports as MISSED.** This is the
-  big one, and it produced a wrong bug report before it was understood. On funk bass
-  the whole gap between its ~82% rate and the kit's 100% is the **slap "chuck"**
-  (`bass-styles.ts`): a dead note that emits `muted: 1`, so it plays at
-  `vol × 0.15` — exactly −16.5 dB — with a halved cutoff, landing 144 ms after a note
-  still ringing 17–28 dB above it. It is 27% of that lane's notes. **The note sounds;
-  presence detection cannot see it.** `mix:verify` measures a band-energy *rise*
-  across the onset, and a note 17 dB below the ongoing tail does not produce one.
-  Confirmed by instrumenting the render: 161 scheduled notes → 161 voices built and
-  started, zero early returns. (That measurement is the old engine's. The band's funk
-  bass has the same class: its muted notes play at `muteGain(0.85)` = 0.2775 and are 13
-  of the 13 misses on `funk-pocket`; see the band measurement below.)
+  big one, and it produced a wrong bug report before it was understood. On the band's
+  funk bass the whole gap between its rate and the kit's is the **muted note**: a funk
+  bass event with `muted` set plays at `muteGain(0.85)` = 0.2775 (`BASS_MUTE` in
+  `web/lib/band-host.ts`, the shared `core/engine/mute-contract.ts`), close behind a note
+  still ringing well above it. Re-measured 2026-10-23 (`mix:verify --scene=funk-pocket`):
+  bass 43 of 57 attacks matched, and all 14 misses are muted notes at level 0.125–0.135.
+  **The note sounds; presence detection cannot see it.** `mix:verify` measures a
+  band-energy *rise* across the onset, and a note well below the ongoing tail does not
+  produce one. (The class was first found on the old engine's slap "chuck", in its
+  `bass-styles.ts`, deleted with that engine in #1404: a dead note at `vol × 0.15`,
+  −16.5 dB, 144 ms after a note ringing 17–28 dB above it, 27% of the lane. Instrumenting
+  that render confirmed 161 scheduled notes → 161 voices started, zero early returns.)
 
   Two traps this exposed, both worth knowing before trusting a MISSED report:
   **(1)** ~~the bass visualizer payload omits velocity, so the tool cannot tell an
