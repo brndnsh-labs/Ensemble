@@ -573,7 +573,7 @@ export function syncBusReverbSend(state: EnsembleState, module: InstrumentModule
     if (!playback.audio || !graph) {
         return;
     }
-    const inst = state[module] as unknown as { reverb: number; voice: InstrumentVoice };
+    const inst = state[module];
     const bus = graph[MODULE_BUS_KEY[module]];
     const t = playback.audio.currentTime;
     bus.reverb.gain.cancelScheduledValues(t);
@@ -593,7 +593,7 @@ export function syncBusVolume(state: EnsembleState, module: InstrumentModule): v
     if (!playback.audio || !graph) {
         return;
     }
-    const inst = state[module] as unknown as { volume: number; enabled: boolean };
+    const inst = state[module];
     const busKey = MODULE_BUS_KEY[module];
     const bus = graph[busKey];
     const mult = MIXER_GAIN_MULTIPLIERS[busKey];
