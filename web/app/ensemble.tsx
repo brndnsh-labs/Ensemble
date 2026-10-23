@@ -6,7 +6,7 @@ import { compileScoreForm } from '@core/songbook/score-form';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { InstrumentVoice } from '@core/types';
 import { keyDistance } from '@core/utils';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import {
     computeAdoptCandidates,
@@ -105,7 +105,6 @@ import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
 import { type BarMarkers, GuidedForm } from './guided-form';
 import { downloadImportSource, ImportDialog } from './import-dialog';
-import { NeckView } from './neck-view';
 import { SettingsSheet } from './settings-sheet';
 import { SongHeader } from './song-header';
 import { SongMenu, type SongMenuView } from './song-menu';
@@ -128,10 +127,13 @@ import {
 import { useChartFit } from './use-chart-fit';
 import { useChartView } from './use-chart-view';
 import { useCollections } from './use-collections';
-import { useNeckVoicing } from './use-neck-view';
+import { useNeckPrefs } from './use-neck-prefs';
 import { useOfflineInstall } from './use-offline-install';
 import { usePalette } from './use-palette';
 import { useStageTheme } from './use-stage-theme';
+
+// The neck and its voicer load only when the neck first shows (#1877).
+const NeckStand = lazy(() => import('./neck-stand'));
 
 /**
  * Deep equality over plain JSON data that ignores the order of object keys: a chart read back
@@ -1286,7 +1288,7 @@ export default function Ensemble() {
         [current, feel.songMinutes, playing, bandTab],
     );
     const neckShowing = neck && !editing;
-    const neckVoicing = useNeckVoicing(followChart, neckShowing);
+    const neckPrefs = useNeckPrefs();
     // The chart reads as one page where it can (#1712); editing, it scrolls at a reading size.
     useChartFit(scroll, !current || neckShowing ? null : editing ? 'edit' : 'page', blocks);
     // Bars typed but not yet applied (#1723).
@@ -6541,16 +6543,17 @@ export default function Ensemble() {
                     />
                     <div className={`workspace-body ${editing ? 'editing' : ''}`}>
                         {neckShowing ? (
-                            <NeckView
-                                band={followChart}
-                                voiced={neckVoicing.voiced}
-                                active={active}
-                                changeSoon={changeSoon}
-                                playing={playbackActive}
-                                onStrum={(midis) => runtime.auditionPitches(midis)}
-                                prefs={neckVoicing.prefs}
-                                onPrefs={neckVoicing.setPrefs}
-                            />
+                            <Suspense fallback={null}>
+                                <NeckStand
+                                    band={followChart}
+                                    stored={neckPrefs.prefs}
+                                    onPrefs={neckPrefs.setPrefs}
+                                    active={active}
+                                    changeSoon={changeSoon}
+                                    playing={playbackActive}
+                                    onStrum={(midis) => runtime.auditionPitches(midis)}
+                                />
+                            </Suspense>
                         ) : (
                             <>
                                 <div
