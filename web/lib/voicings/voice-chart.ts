@@ -6,33 +6,15 @@
  */
 import type { BandChart } from '../band-chart';
 import { type VoicingChord, voicingChord } from './adapter';
-import { GUITAR, UKULELE, UKULELE_LOW_G } from './instruments';
-import type { HomeWindow, InstrumentDef, VoicedChord } from './types';
+import { GUITAR } from './instruments';
+import { NECK_INSTRUMENTS, type NeckPrefs } from './neck-instruments';
+import type { VoicedChord } from './types';
 import { voiceChart } from './voicing';
-
-export interface NeckPrefs {
-    instrument: 'guitar' | 'uke' | 'uke-low-g';
-    /** Inclusive fret window the hand stays in, or null for anywhere on the neck. */
-    home: HomeWindow | null;
-    /** `classic` keeps guitar roots on the 6th and 5th strings; a uke ignores it. */
-    rootStrings: 'all' | 'classic';
-}
 
 /** A chord to voice, with its index into `BandChart.chords`. */
 type BandVoicingChord = VoicingChord & { globalIndex: number };
 
 export type VoicedBandChord = VoicedChord<BandVoicingChord>;
-
-/**
- * The neck's instruments by pref id: the one table every caller reads. A plain literal is safe
- * here — its key is only ever an already-validated pref (`lib/session.ts` checks a stored value
- * against these keys), never a raw stored or shared value.
- */
-export const NECK_INSTRUMENTS: Record<NeckPrefs['instrument'], InstrumentDef> = {
-    guitar: GUITAR,
-    uke: UKULELE,
-    'uke-low-g': UKULELE_LOW_G,
-};
 
 /** Voice every written chord of a chart, in written order; holds and N.C. have nothing to voice. */
 export function voiceBandChart(chart: BandChart, prefs: NeckPrefs): VoicedBandChord[] {

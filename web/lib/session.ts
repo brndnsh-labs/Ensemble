@@ -1,4 +1,8 @@
-import { HOME_FRETS, type HomeWindow, NECK_INSTRUMENTS, type NeckPrefs } from './voicings';
+// Leaf modules, not the `./voicings` barrel: the barrel would pull the whole voicer into every
+// page that reads a setting (#1877).
+import { HOME_FRETS } from './voicings/home-window';
+import { NECK_INSTRUMENTS, type NeckPrefs } from './voicings/neck-instruments';
+import type { HomeWindow } from './voicings/types';
 
 const LAST_OPENED = 'ensemble-v2-preview:last-opened';
 

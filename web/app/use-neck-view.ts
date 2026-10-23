@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import type { BandChart, BandChartChord } from '../lib/band-chart';
-import { placeNeckHand } from '../lib/session';
+import { type NeckPreferences, placeNeckHand } from '../lib/session';
 import {
     COUNT_WORDS,
     type FingerMove,
@@ -15,7 +15,6 @@ import {
     type VoicedBandChord,
     voiceBandChart,
 } from '../lib/voicings';
-import { useNeckPrefs } from './use-neck-prefs';
 
 // The neck view's follow logic (#1587): which grip sounds on a performed slot, which one comes
 // next, and the headline and finger detail between them. Pure functions over the band's chart
@@ -534,18 +533,18 @@ export function neckModel(
 /**
  * The stand's neck voicing: the per-device prefs with the hand placed (`placeNeckHand`: a window
  * the musician has not chosen is first position, #1598, #1840), and the whole chart voiced once
- * per loaded chart + prefs — keyed by written index, never per frame. Voices nothing while the
- * neck is not showing.
+ * per loaded chart + prefs — keyed by written index, never per frame. It runs inside the lazy
+ * `NeckStand` (#1877), so it voices only while the neck is showing; the prefs themselves load
+ * with the shell (`useNeckPrefs`).
  */
-export function useNeckVoicing(band: BandChart | null, showing: boolean) {
-    const { prefs: stored, setPrefs } = useNeckPrefs();
+export function useNeckVoicing(band: BandChart | null, stored: NeckPreferences) {
     const prefs = useMemo(() => placeNeckHand(stored), [stored]);
     const voiced = useMemo(
         () =>
-            band && showing
+            band
                 ? new Map(voiceBandChart(band, prefs).map((v) => [v.globalIndex, v] as const))
                 : null,
-        [band, showing, prefs],
+        [band, prefs],
     );
-    return { prefs, setPrefs, voiced };
+    return { prefs, voiced };
 }

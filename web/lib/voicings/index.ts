@@ -15,8 +15,10 @@ export {
     sharedNotes,
     spokenDegree,
 } from './motion';
+export type { NeckPrefs } from './neck-instruments';
+export { NECK_INSTRUMENTS } from './neck-instruments';
 export { DEGREES, outsideShell, spellDegree } from './theory';
 export type { Degree, HomeWindow, InstrumentDef, Note, Voicing } from './types';
-export type { NeckPrefs, VoicedBandChord } from './voice-chart';
-export { NECK_INSTRUMENTS, voiceBandChart } from './voice-chart';
+export type { VoicedBandChord } from './voice-chart';
+export { voiceBandChart } from './voice-chart';
 export { allPositions, build, gripMidis, inHome, inversionOf, voiceChart } from './voicing';
