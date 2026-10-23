@@ -4,7 +4,6 @@ export type { DeleteCommand, DeleteOutcome } from './document-delete.js';
 export { commitDelete } from './document-delete.js';
 export type {
     DocumentRow,
-    DocumentSummary,
     ManifestEntry,
     ManifestPage,
     ReceiptRow,
@@ -12,7 +11,6 @@ export type {
 } from './documents.js';
 export {
     deleteDocument,
-    listDocuments,
     listManifest,
     MAX_LIST_LIMIT,
     readDocument,
