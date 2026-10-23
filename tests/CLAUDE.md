@@ -121,7 +121,7 @@ quality, and the notes each symbol rules out (`chord-clash.ts`).
 
 ## Flakes
 
-- **`docs/FLAKY_TESTS.md` + the `/flake` skill are the canonical flake workflow** — four classes:
+- **`docs/FLAKY_TESTS.md` + DOCTRINE §4's flake workflow are the canonical one** — four classes:
   unseeded-statistical (fix: `installSeededRandom()`), ordering-dependent (fix: the leaking file's
   missing `afterEach`/`restoreAllMocks`), e2e-timing, and slow-legitimate (a production-faithful
   sweep whose real runtime crowds the 30s `testTimeout` and tips over under load — fix: raise the

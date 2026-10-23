@@ -8,7 +8,7 @@ vocabulary, not two.
 | --- | --- | --- |
 | `needs-triage` | *no `status:*` label* | The untriaged pile. |
 | `needs-info` | `status:needs-decision` | Blocked on Brandon; say what is needed in a comment. |
-| `ready-for-agent` | `status:ready` | Pickable, so an unattended `/burndown` may build it. See the gate below. |
+| `ready-for-agent` | `status:ready` | Pickable, so an unattended `/cycle --all` may build it. See the gate below. |
 | `ready-for-human` | `status:needs-decision` | A judgment call. Use `status:needs-ear` instead when the call is a listening pass. |
 | `wontfix` | close the issue | Also add the existing `wontfix` label when the request was rejected rather than already built. |
 
@@ -16,8 +16,8 @@ Category roles map directly: `bug` is `bug`, and `enhancement` is `enhancement`.
 
 ## The gate on `ready-for-agent`
 
-`status:ready` is real scheduling, so it follows the certainty call in step 5 of
-`.claude/skills/FILING.md`, not a skill's default:
+`status:ready` is real scheduling, so it follows the certainty call in the certainty rule in
+`.claude/skills/DOCTRINE.md` §2, not a skill's default:
 
 - **Deterministic and gate-provable** means `status:ready`.
 - **Any judgment call** means `status:needs-decision`, with the fix pre-drafted.

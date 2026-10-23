@@ -7,8 +7,9 @@ ranges, and the e2e suite drives a live browser. This file is where we
 track each flake, its root-cause class, and its fix so we don't re-diagnose the
 same thing twice.
 
-Use the [`/flake`](../.claude/skills/flake/SKILL.md) skill to diagnose a new
-flake (measure its fail-rate, classify it, and append an entry here).
+Diagnose a new flake with the flake workflow in
+[DOCTRINE §4](../.claude/skills/DOCTRINE.md) (measure its fail-rate, classify it, and append an
+entry here).
 
 ## The flake classes in this app
 
@@ -346,8 +347,8 @@ authored with real headroom already.
 
 ## Adding an entry
 
-When you hit a flake, run `/flake <test-path>` — it measures the fail-rate,
-classifies it against the table above, applies the canonical fix, and appends
-the entry here. If you're recording one by hand, match the heading format above
+When you hit a flake, follow the flake workflow in DOCTRINE §4: measure the fail-rate,
+classify it against the table above, apply the canonical fix, and append the entry here.
+Match the heading format above
 (`### <status-emoji> <test path or short name> — "<failing assertion>"`) and
 fill all five fields (class, symptom, root cause, fix, last seen).
