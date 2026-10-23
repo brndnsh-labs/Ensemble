@@ -41,7 +41,7 @@
       {
         "name": "status:ready",
         "meaning": "scoped + pickable",
-        "action": "`/next` ranks & picks; `/implement`/`/cycle` build"
+        "action": "`/next` ranks & picks; `/cycle` builds"
       },
       {
         "name": "status:in-progress",
