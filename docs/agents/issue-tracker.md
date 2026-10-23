@@ -37,8 +37,7 @@ set here. The triage-role mapping is in `triage-labels.md`.
 
 ## Issue body shape
 
-`/implement` and `/cycle` build from a **Why / Touches / Acceptance** body (step 4 of
-`.claude/skills/FILING.md`).
+`/cycle` builds from a **Why / Touches / Acceptance** body (`.claude/skills/DOCTRINE.md` §2).
 When a skill publishes a ticket or spec that should become pickable work, give it that shape:
 
 ```

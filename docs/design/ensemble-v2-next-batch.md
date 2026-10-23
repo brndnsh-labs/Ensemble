@@ -60,7 +60,7 @@ implemented and verified on the branch; read live labels rather than this senten
 current position. **None of
 #1188–#1192 is unattended work** — every one is a frontier-tier authentication surface requiring
 an independent correctness and security review with cold context, per the
-[v2 handoff](../../web/CLAUDE.md). Do not pick them up in a `/burndown` or `/nightly`
+[v2 handoff](../../web/CLAUDE.md). Do not pick them up in a `/cycle --all`
 run.
 
 Stage 2 is deliberately **server-only**. No child touches `web/`, the browser client,
@@ -104,7 +104,7 @@ sessions to authenticate the caller before any of this can wire up for real.
 
 **None of #1202/#1204 is unattended work** — both are frontier-tier authorization/concurrency
 surfaces requiring an independent correctness and security review with cold context, the same
-requirement stage 2 placed on #1188–#1192. Do not pick them up in a `/burndown` or `/nightly` run.
+requirement stage 2 placed on #1188–#1192. Do not pick them up in a `/cycle --all` run.
 
 Stage 3 is server-only, like stage 2: no child touches `web/`, the browser client, or
 the UI. Wiring the document API into the product is stage 5, after library download/reconciliation
