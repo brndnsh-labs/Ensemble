@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { assertAccountDeletionCoverage } from '../../src/db/account-deletion-registry.js';
 import {
     deleteDocument,
-    listDocuments,
     listManifest,
     MAX_LIST_LIMIT,
     readDocument,
@@ -53,10 +52,6 @@ describe('owner-scoped documents, receipts and tombstones (#1201)', () => {
         expect(readDocument(db, 'owner-a', 'doc-1')?.body).toBe('{"title":"A one"}');
         expect(readDocument(db, 'owner-b', 'doc-1')?.body).toBe('{"title":"B one, same id"}');
         expect(readDocument(db, 'owner-c', 'doc-1')).toBeUndefined();
-        expect(listDocuments(db, 'owner-a', { limit: 10, offset: 0 })).toEqual([
-            { documentId: 'doc-1', revision: 'r1', updatedAt: 100 },
-        ]);
-        expect(listDocuments(db, 'owner-c', { limit: 10, offset: 0 })).toEqual([]);
     });
 
     it('writes and deletes never cross owners; a delete leaves a tombstone only for that owner', () => {
@@ -117,33 +112,12 @@ describe('owner-scoped documents, receipts and tombstones (#1201)', () => {
         expect(readReceipt(db, 'owner-a', 'op-1')?.requestDigest).toBe('sha256:aaa');
     });
 
-    it('listing is newest-first and bounded whatever the caller asks for', () => {
-        const db = seed();
-        for (let i = 0; i < 5; i += 1) {
-            writeDocument(db, 'owner-a', {
-                documentId: `doc-${i + 10}`,
-                revision: 'r1',
-                body: '{}',
-                updatedAt: 1000 + i,
-            });
-        }
-        const page = listDocuments(db, 'owner-a', { limit: 2, offset: 1 });
-        expect(page.map((d) => d.documentId)).toEqual(['doc-13', 'doc-12']);
-        expect(listDocuments(db, 'owner-a', { limit: -5, offset: -5 })).toEqual([]);
-        expect(listDocuments(db, 'owner-a', { limit: 10_000, offset: 0 })).toHaveLength(6);
-        expect(MAX_LIST_LIMIT).toBe(500);
-        // A limit above the cap is clamped, not rejected: the cap is the contract.
-        expect(
-            listDocuments(db, 'owner-a', { limit: Number.POSITIVE_INFINITY, offset: 0 }),
-        ).toHaveLength(6);
-    });
-
     it('the manifest interleaves tombstones by id, is owner-scoped, and is resumable (#1259)', () => {
         const db = seed();
         for (const id of ['doc-2', 'doc-4', 'doc-6']) {
             writeDocument(db, 'owner-a', {
                 documentId: id,
-                // Descending updatedAt, so a manifest that leaked `listDocuments`' ordering
+                // Descending updatedAt, so a manifest that leaked an updated_at ordering
                 // would come back reversed rather than merely in a different-but-valid order.
                 revision: `r-${id}`,
                 body: '{"body":"åå"}',
@@ -184,7 +158,8 @@ describe('owner-scoped documents, receipts and tombstones (#1201)', () => {
             { documentId: 'doc-1', revision: 'r9', deleted: false, bytes: 26 },
         ]);
         expect(listManifest(db, 'owner-c', { limit: 10 }).entries).toEqual([]);
-        // Same ceiling contract as `listDocuments`: the cap clamps, it does not reject.
+        // A limit above the cap is clamped, not rejected: the cap is the contract.
+        expect(MAX_LIST_LIMIT).toBe(500);
         expect(listManifest(db, 'owner-a', { limit: 10_000 }).entries).toHaveLength(4);
         // But the FLOOR is 1, not 0 (#1259 review, F5). An empty page with `nextAfter: null` is
         // indistinguishable from the end of the library, so a caller whose computed page size

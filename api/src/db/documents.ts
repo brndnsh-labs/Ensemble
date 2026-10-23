@@ -38,13 +38,6 @@ export interface TombstoneRow {
     deletedAt: number;
 }
 
-/** Bounded listing per the sync contract: id, revision and updatedAt only — never bodies. */
-export interface DocumentSummary {
-    documentId: string;
-    revision: string;
-    updatedAt: number;
-}
-
 /**
  * One row of the S1 manifest (#1259; `docs/archive/ensemble-v2-rollout.md` decision 9): the
  * client pages this and diffs it against its local records. Identity, the current revision, and
@@ -138,46 +131,18 @@ export function readDocument(
 }
 
 /**
- * Newest-first page of an owner's documents, bounded. `limit` is clamped to `MAX_LIST_LIMIT`
- * and `offset` to a non-negative integer, so a caller-supplied page can never turn into an
- * unbounded scan or a negative offset (which SQLite treats as no offset).
- */
-export function listDocuments(
-    db: DatabaseSync,
-    ownerId: string,
-    page: { limit: number; offset: number },
-): DocumentSummary[] {
-    const limit = Math.min(Math.max(Math.trunc(page.limit), 0), MAX_LIST_LIMIT);
-    const offset = Math.max(Math.trunc(page.offset), 0);
-    const rows = db
-        .prepare(
-            `SELECT document_id, revision, updated_at FROM documents
-             WHERE owner_id = ? ORDER BY updated_at DESC, document_id ASC LIMIT ? OFFSET ?`,
-        )
-        .all(ownerId, limit, offset) as Pick<
-        RawDocument,
-        'document_id' | 'revision' | 'updated_at'
-    >[];
-    return rows.map((row) => ({
-        documentId: row.document_id,
-        revision: row.revision,
-        updatedAt: row.updated_at,
-    }));
-}
-
-/**
  * One page of the owner's S1 manifest: live documents and tombstones interleaved in a single
  * `document_id`-ascending sequence, resumable from `after` (#1259).
  *
- * **Why not `listDocuments`.** That one is `updated_at DESC` with an `OFFSET`, which is fine for
- * a "recently edited" view and unusable as a manifest cursor: every Save rewrites `updated_at`,
+ * **Why not offset paging by `updated_at`.** That ordering suits a "recently edited" view and is
+ * unusable as a manifest cursor: every Save rewrites `updated_at`,
  * so a document can cross the offset boundary between two page fetches and be either skipped or
  * returned twice. Ordering by the immutable `document_id` and carrying the last id as the cursor
  * makes a page boundary stable under concurrent writes — a Save can change a row's `revision`,
  * but nothing can move it past the cursor. A create below the cursor is missed by the pass in
  * progress and picked up by the next one, which is exactly what a manifest DIFF tolerates and
- * why decision 9 needs no watermark or cursor-expiry machinery. `listDocuments` stays as it is;
- * do not "unify" the two — they have opposite ordering requirements.
+ * why decision 9 needs no watermark or cursor-expiry machinery. A future "recently edited" list
+ * needs its own query, not this one — the two have opposite ordering requirements.
  *
  * `after` is compared with the same binary collation the `ORDER BY` uses (no `COLLATE` anywhere
  * in the schema), which is what makes the cursor and the ordering agree. An empty/absent cursor
@@ -199,9 +164,8 @@ export function listDocuments(
  * F5): a zero or negative limit used to return `{ entries: [], nextAfter: null }`, which in this
  * shape does not read as "you asked for nothing" — it reads as END OF LIBRARY, and a caller that
  * computed its page size and got zero would conclude the account is empty and diff a whole
- * library away against it. `listDocuments`' floor of 0 is a different contract: it returns a
- * bare array with no end-of-list flag to misread. The HTTP layer rejects a zero `limit` outright
- * before reaching here; this is the in-process backstop.
+ * library away against it. The HTTP layer rejects a zero `limit` outright before reaching here;
+ * this is the in-process backstop.
  */
 export function listManifest(
     db: DatabaseSync,
