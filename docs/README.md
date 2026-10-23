@@ -35,7 +35,7 @@ This folder groups the living documentation for Ensemble.
 - [`docs/design/band-engine.md`](design/band-engine.md) — DECISION 2026-09-23/25: the ground-up band engine (`band/`), the default since the 2026-09-25 cutover, and the only engine the app runs.
 - [`tests/README.md`](../tests/README.md) — test-suite conventions.
 - [`docs/agents/`](agents/) — repo config read by the general-purpose engineering skills: [`issue-tracker.md`](agents/issue-tracker.md), [`triage-labels.md`](agents/triage-labels.md) (triage roles mapped onto `status:*`), [`domain.md`](agents/domain.md) (where the glossary and decisions live).
-- [`docs/FLAKY_TESTS.md`](FLAKY_TESTS.md) — registry of known-flaky tests, the four flake classes (unseeded-statistical / ordering-dependent / e2e-timing / slow-legitimate), and their fixes. Diagnose new flakes with the `/flake` skill.
+- [`docs/FLAKY_TESTS.md`](FLAKY_TESTS.md) — registry of known-flaky tests, the four flake classes (unseeded-statistical / ordering-dependent / e2e-timing / slow-legitimate), and their fixes. Classify a new flake by those four classes, then add it to the registry.
 
 ## Historical references
 
