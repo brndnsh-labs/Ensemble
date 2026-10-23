@@ -48,7 +48,7 @@
         "prepare": "husky"
     },
     "devDependencies": {
-        "@biomejs/biome": "^2.4.10",
+        "@biomejs/biome": "2.5.15",
         "@playwright/test": "1.63.0",
         "@tonaljs/chord": "6.1.2",
         "@types/chai": "^5.2.3",
