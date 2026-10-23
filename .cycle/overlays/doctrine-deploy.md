@@ -8,7 +8,7 @@ own, nothing to rsync.
 **Prod is continuous.** A push to `main` only happens via a green PR merge (branch-protected,
 required CI contexts `checks` + `e2e-tests` + `v2-checks`), and the CI `deploy` job releases
 every merged commit's tags to `ensemble.brndn.zip` and then `ensembletest.brndn.zip` —
-including unattended overnight `/burndown`/`/nightly` merges. `/deploy-prod` is the manual
+including unattended overnight `/cycle --all` merges. `/deploy-prod` is the manual
 break-glass path (re-run CI on `main`), not the normal route.
 
 **Environments:**

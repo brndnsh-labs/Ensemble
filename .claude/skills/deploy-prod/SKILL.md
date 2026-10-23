@@ -1,16 +1,13 @@
 ---
 name: deploy-prod
-description: Deploy Ensemble to production — the gated ritual. Preflight (clean pushed main, what's actually shipping, any migration plan), then STOP for Brandon's explicit go, then deploy, then independently verify the public origin. Includes the rollback path. Never runs unattended. Usage `/deploy-prod`.
+description: Deploy Ensemble to production — preflight (clean pushed main, exactly what's shipping, any migration), then STOP for Brandon's explicit go, then deploy and independently verify the public origin. Never runs unattended. Usage `/deploy-prod`.
 ---
-<!-- cycle:rendered template=skills/deploy-prod.md.tmpl hash=ca5463e72e78 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/deploy-prod.md.tmpl hash=c17d674d9750 — managed by the-cycle; edit the template, not this file -->
 
 # /deploy-prod — ship to production
 
-Goal: make the safe path automatic — **not** the decision to ship.
-
-**Shared rules in `.claude/skills/DOCTRINE.md` — read it if not already in context.** This is the
-one skill with a hard human gate. `/burndown`, `/cycle` and every unattended path are forbidden
-from invoking it.
+**Shared rules in `.claude/skills/DOCTRINE.md`.** The one skill with a hard human gate: `/cycle --all`
+and every unattended path are forbidden from invoking it (§5).
 
 ## Topology
 
@@ -68,61 +65,35 @@ the previous tag running; `journalctl -t ensemble-release` on `docker04` has the
 
 ## 1. Preflight (read-only)
 
-- **Clean tree, on `main`, pushed.** A dirty or unpushed tree means the thing you're about to ship
-  isn't the thing in the repo. Refuse.
-- **Gates green** (§4).
-- **Show exactly what's shipping.** Diff against what's *live*, not against the last tag or a
-  stored ref — a stored deploy ref drifts silently and will happily lie to you. Read the live
-  revision from the running origin and `git log <live>..HEAD`.
-- **Any data migration in the pending set → surface it before the gate**, with what it does and
-  whether it's reversible. A migration is a §5 always-brake surface in its own right.
+- Clean tree, on `main`, pushed — otherwise what you'd ship isn't what's in the repo. Refuse.
+- Gates green (§4).
+- **Exactly what's shipping:** diff against what's *live* — read the running revision from the origin
+  and `git log <live>..HEAD` — not against a tag or stored ref, which drift silently.
+- Any data migration pending → say what it does and whether it's reversible.
 
-## 2. THE GATE
+## 2. The gate
 
 Present the preflight and **stop.** Wait for one explicit "go" from Brandon in this turn.
-
-Not a go: general enthusiasm, approval of the *code*, a merged PR, or an earlier "ship it" about
-something else. Approval of the work is not approval of the deploy. If you're unsure whether you
-have a go, you don't.
+Enthusiasm, approval of the code, a merged PR, or an earlier "ship it" about something else is not a
+go. If you're unsure whether you have one, you don't.
 
 ## 3. Deploy
 
 `gh api -X POST repos/brndnsh-labs/Ensemble/actions/workflows/ci.yml/dispatches -f ref=main`
 
-What that command does — and does *not* — do is the `deploy` overlay's job to say. Don't
-assume it takes a backup, runs migrations, or waits for a healthy result; assume none of
-those unless the overlay says otherwise.
+What that command does — backups, migrations, health waits — is the `deploy` overlay's job to say;
+assume none of them unless it does.
 
 ## 4. Verify independently
 
-Don't trust the deploy script's own success report — check the **public origin** yourself:
-
-- It responds (and with the right status).
-- The served build **is the one you just deployed** — compare the revision, don't assume.
-- Spot-check one surface that actually changed in this deploy.
-
-Report green only if all of those hold. "The script said OK" is not verification.
+Check the **public origin**, not the script's success message: it responds with the right status,
+it serves the revision you just deployed, and one surface that changed in this deploy works.
 
 ## 5. Report + rollback
 
-State what shipped, the live revision, and the verification results.
+State what shipped, the live revision, and the verification. **Rollback = roll forward:** `git revert`
+→ PR → green → deploy again; reverting in place leaves the repo and the box disagreeing.
 
-**Rollback = roll forward.** `git revert` → PR → green → deploy again. Reverting the deploy in
-place leaves the repo and the box disagreeing about reality, which is worse than the bug you're
-rolling back.
-
-## Why this one is gated
-
-Everything else in this pipeline is auto-merged on green because a wrong merge is cheap to walk
-back. Prod is different: it's the one place where a mistake is visible to real users on someone
-else's schedule. The gate isn't distrust of the pipeline — it's an acknowledgment that the *cost
-function* changes here, and the person who owns the consequences should be the one who says go.
-
-## Edge cases
-
-- **Preflight fails:** stop, report which check. Never "deploy anyway."
-- **Deploy fails partway:** say exactly which step, and whether a migration ran. Do not retry
-  blindly — a half-applied migration needs a decision, not a rerun.
-- **Verification disagrees with the deploy script:** trust the origin. Report as a failure.
-- **Asked to deploy unattended** (from `/burndown`, an overnight lane, or a chained skill):
-  **refuse.** Report that prod needs an explicit invocation.
+- **Deploy fails partway:** say exactly which step and whether a migration ran. Don't retry
+  blindly — a half-applied migration needs a decision.
+- **Verification disagrees with the deploy script:** trust the origin; report a failure.

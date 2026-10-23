@@ -22,12 +22,12 @@ notes and restatements of Brandon's words — **starts with a bold harness marke
 only a real-world sensory glance remains — build + auto-merge it, then attach a
 lightweight residual check instead of gating the merge on it:
 - `verify-on-device` — a real-device visual glance (mobile safe-area/viewport/touch
-  target); lands on `/nightly`'s morning device-verify checklist.
+  target); lands on the morning device-verify checklist (`/wrap-up`).
 - `verify-by-ear` — a musical-correctness change whose idiom is captured by a critique
   test; ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new) in which
   **every line is a link**: `npm run --silent audition-link -- --base-url=<host>/ --prog="…"
-  --genre=… [--key --ts --int --density --on=soloist --off=chords,harmony]` opens the scenario
-  pre-set behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
+  --genre=… [--key --ts --bpm --int --on=soloist --off=chords]` opens the scenario
+  pre-set (an unsaved `#chart=` draft) behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
   PR's 🎧 section **and** post them as a `**[claude]**` comment on the issue. The
   test is the correctness gate, the listen is *confirmation* — a follow-up tweak if it
   feels off, never a rollback (musical diffs are reversible).
@@ -67,7 +67,7 @@ proceed — instead of parking `needs-decision` — when **all five** hold:
 
 Record it **on the issue, before acting**:
 `**[<harness>]** MACHINE-DECISION (date): <what> — <why> — <revert path>`.
-`/nightly`'s morning report and `/wrap-up` list the machine decisions taken, so Brandon
+`/wrap-up` and an unattended `/cycle --all` run's report list the machine decisions taken, so Brandon
 audits the *log* asynchronously; reversing one is a normal follow-up, not a rollback.
 Anything failing a condition parks `needs-decision` exactly as before.
 
