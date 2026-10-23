@@ -474,7 +474,12 @@ html [hidden] {
     border: 0;
     background: transparent;
     font-size: 12px;
+    /* The ring goes on the whole field below, not the borderless input inside it (#1878). */
     outline: none;
+}
+.search:has(input:focus-visible) {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: 1px;
 }
 .shelf-chips {
     display: flex;
