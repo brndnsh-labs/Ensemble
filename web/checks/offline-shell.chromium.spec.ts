@@ -1,9 +1,11 @@
 import type { Page } from '@playwright/test';
-import { expect, test } from './fixtures';
+import { encodeChartLink } from '../../core/songbook/chart-link';
+import { appUrl, expect, starterDocuments, test } from './fixtures';
 
 /**
  * The installed app: its web manifest, its service worker's cache names, the offline fallback,
- * and the "close all tabs to update" policy.
+ * and the update policy: a newer build waits until the musician presses Reload (#1889), then
+ * every idle tab reloads onto it.
  *
  * Chromium only, deliberately: every assertion here turns on service-worker lifecycle plus a
  * real offline transition, and WebKit's emulation of the last of those is already known-broken
@@ -179,6 +181,90 @@ test('a newer build of the stand waits behind the running one', async ({ page, r
             };
         }),
     ).resolves.toEqual({ waiting: 'installed', controllerUnchanged: true, activeUnchanged: true });
+});
+
+/** Stage a byte-different copy of the shipped worker and wait until it is installed, waiting. */
+async function stageUpdate(page: Page, request: import('@playwright/test').APIRequestContext) {
+    await request.post('/__test/sw-revision');
+    await page.evaluate(async () => {
+        await (await navigator.serviceWorker.getRegistration('/'))?.update();
+    });
+    await expect
+        .poll(
+            () =>
+                page
+                    .evaluate(
+                        async () =>
+                            (await navigator.serviceWorker.getRegistration('/'))?.waiting?.state ??
+                            'none',
+                    )
+                    .catch(() => null),
+            { timeout: 30_000 },
+        )
+        .toBe('installed');
+}
+
+/** Mark this page's `window`: a reload loses the mark, so its absence is the reload. */
+function mark(page: Page) {
+    return page.evaluate(() => {
+        (window as unknown as { __mark: boolean }).__mark = true;
+    });
+}
+function marked(page: Page) {
+    return page
+        .evaluate(() => (window as unknown as { __mark?: boolean }).__mark === true)
+        .catch(() => null);
+}
+function shellCache(page: Page) {
+    return page
+        .evaluate(async () =>
+            (await caches.keys()).filter((name) => name.startsWith('ensemble-v2-root-')),
+        )
+        .catch(() => null);
+}
+
+test('Reload installs the update: idle tabs reload onto it, a tab with unsaved work waits', async ({
+    context,
+    page,
+    request,
+}) => {
+    test.setTimeout(90_000);
+    await page.goto('/');
+    await expect.poll(() => controller(page)).toContain('/sw.js');
+    const before = await shellCache(page);
+    expect(before).toHaveLength(1);
+
+    // A second idle tab on the songbook, and a third with an unsaved shared draft on the stand.
+    const idle = await context.newPage();
+    await idle.goto('/');
+    const busy = await context.newPage();
+    await busy.goto(
+        appUrl(await encodeChartLink({ ...starterDocuments()[0], title: 'Shared song' })),
+    );
+    await expect(busy.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    for (const tab of [page, idle, busy]) {
+        await expect.poll(() => controller(tab)).toContain('/sw.js');
+        await mark(tab);
+    }
+
+    await stageUpdate(page, request);
+    const footer = page.locator('.home-offline');
+    await expect(footer).toContainText('Update ready');
+    await footer.getByRole('button', { name: 'Reload' }).click();
+
+    // The pressing tab and the idle one reload onto the new worker, which retired the old shell.
+    await expect.poll(() => marked(page), { timeout: 30_000 }).toBe(false);
+    await expect.poll(() => marked(idle), { timeout: 30_000 }).toBe(false);
+    await expect.poll(() => shellCache(page), { timeout: 30_000 }).toEqual([`${before![0]}-r1`]);
+    await expect(footer).toHaveText('App available offline');
+
+    // The tab with unsaved work is now controlled by the new worker but kept its page. A fixed
+    // settle is the instrument: what is asserted is that nothing further happens.
+    await busy.waitForTimeout(1500);
+    expect(await marked(busy)).toBe(true);
+    await expect(busy.getByRole('heading', { name: 'Shared song' })).toBeVisible();
+    // It says why it has not reloaded.
+    await expect(busy.getByTestId('stand-toast')).toContainText('Updated in another tab');
 });
 
 test('the update, once it activates, retires the old shell and keeps the downloaded sounds', async ({
