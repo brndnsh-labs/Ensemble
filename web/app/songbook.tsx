@@ -109,6 +109,8 @@ interface SongbookProps {
     busy: boolean;
     /** The offline-install label (`useOfflineInstall`). */
     offline: string;
+    /** Reload onto the newer release, when one is waiting (or has taken over) — else null. */
+    offlineUpdate: (() => void) | null;
     /** The one search box's query (the box itself is in the shell's top bar). */
     search: string;
     /**
@@ -154,6 +156,7 @@ export function Songbook(props: SongbookProps) {
         search,
         busy,
         offline,
+        offlineUpdate,
     } = props;
     const rows = home?.rows ?? [];
     const { libraryUnreadable, onExportUnreadable, onRemoveUnreadable } = props;
@@ -280,7 +283,21 @@ export function Songbook(props: SongbookProps) {
                     {accountLibrary
                         ? 'In your account. Saved songs sync to your other devices.'
                         : 'Saved on this device. Browser storage can be cleared; export songs you want to keep.'}{' '}
-                    <span className="home-offline">{offline}</span>
+                    <span className="home-offline">
+                        {offline}
+                        {offlineUpdate && (
+                            <>
+                                {' '}
+                                <button
+                                    type="button"
+                                    className="home-update"
+                                    onClick={offlineUpdate}
+                                >
+                                    Reload
+                                </button>
+                            </>
+                        )}
+                    </span>
                 </span>
                 <span>Music stand beta · {process.env.NEXT_PUBLIC_SOURCE_REV}</span>
             </footer>

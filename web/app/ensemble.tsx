@@ -716,7 +716,6 @@ export default function Ensemble() {
         }
     }, [settingsOpen]);
     const [following, setFollowing] = useState(true);
-    const offline = useOfflineInstall();
     // The Song menu (•••, #1756): which of its lists or small dialogs is showing, else null.
     const [songMenu, setSongMenu] = useState<SongMenuView | null>(null);
     const songMenuTrigger = useRef<HTMLButtonElement>(null);
@@ -1312,6 +1311,9 @@ export default function Ensemble() {
         !!saved &&
         sameMusic(current, saved);
     const playbackActive = playing || playbackPending;
+    // A tab with something to lose is not reloaded out from under the musician by an update
+    // another tab set off (#1889); it reloads once this clears.
+    const offline = useOfflineInstall(playbackActive || dirty || busy);
     // Typing on the chart (#1723) is for the editor; leaving it closes the field (what it held is
     // applied or still pending, never lost).
     const typeOnChart = editing && !!current;
@@ -5763,9 +5765,14 @@ export default function Ensemble() {
         : messageTone === 'warning' && message
           ? 'warning'
           : 'info';
+    // #1889 — another tab installed the update; this one waits for the band or the edit.
+    const updateHint =
+        offline.update === 'deferred' && current
+            ? 'Updated in another tab · this one reloads when you stop or save'
+            : null;
     const toastText = showBusy
         ? soundProgress || 'Updating…'
-        : [message || null, pendingAutoplayHint].filter(Boolean).join(' · ') || null;
+        : [message || null, pendingAutoplayHint, updateHint].filter(Boolean).join(' · ') || null;
     // Auto-dismiss a plain `info` message ~4s after it is actually SHOWN (masked time under the
     // busy spinner doesn't count against it, nor does the toast being hovered/focused — review
     // P2 #3/#5) — never `warning`, which persists until its own close button, and never the old
@@ -6327,6 +6334,10 @@ export default function Ensemble() {
                     continued={continuedSave !== null}
                     busy={busy}
                     offline={offline.label}
+                    // Not mid-song: the press reloads this tab whatever it is doing.
+                    offlineUpdate={
+                        offline.update === 'none' || playbackActive ? null : offline.applyUpdate
+                    }
                     accountLibrary={signedIn}
                     loading={songbookLoading}
                     // #1357 patch P1-4 — the first session read was released by its deadline

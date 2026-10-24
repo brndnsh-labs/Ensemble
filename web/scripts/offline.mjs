@@ -198,7 +198,10 @@ const navigationFallback = `
         }`;
 
 // One atomic cache installation: a partial download never earns offline-ready.
-// Waiting updates do not replace a running band's code. Close all tabs to update.
+// A newer worker waits behind the running one until the musician presses Reload (its
+// `skip-waiting` message, #1889) or every tab closes. Once it takes over, every page reloads
+// (`app/use-offline-install.ts`): activate deletes the old shell, so a page left on the old
+// release would miss its own lazy chunks.
 //
 // SCOPE is `/`, so the prefix test alone matches everything on the origin, the account API
 // included. PASSES names that exclusion explicitly instead of inheriting it from a narrower
@@ -226,6 +229,9 @@ self.addEventListener('activate', event => event.waitUntil((async () => {
     for (const name of await caches.keys().catch(() => [])) if (name.startsWith(SHELL_CACHES) && name !== CACHE) await caches.delete(name).catch(() => {});
     await self.clients.claim();
 })()));
+self.addEventListener('message', event => {
+    if (event.data && event.data.type === 'skip-waiting') self.skipWaiting();
+});
 self.addEventListener('fetch', event => {
     const url = new URL(event.request.url);
     if (event.request.method !== 'GET' || url.origin !== self.location.origin || !url.pathname.startsWith(SCOPE)) return;
