@@ -159,12 +159,17 @@ export const STANDARDS: readonly StandardEntry[] = [
         bpm: 140,
         key: 'G',
         isMinor: true,
-        // AABC, 32 bars, per iReal Jazz 1460 and the Real Book (C keeps the chromatic walk-down).
+        // AABC, 32 bars. C follows the lead-sheet reading (NIU jazz-camp chart; PianoGroove): the
+        // walk-down lands on Ebmaj7, then a one-bar ii-V turns home. iReal Jazz 1460 instead goes
+        // E7 to a full bar each of Am7b5 and D7, which skips the Eb the walk-down sets up.
         sections: [
             { label: 'A', bars: ['Cm7', 'F7', 'Bbmaj7', 'Ebmaj7', 'Am7b5', 'D7', 'Gm7', 'Gm7'] },
             { label: 'A', bars: ['Cm7', 'F7', 'Bbmaj7', 'Ebmaj7', 'Am7b5', 'D7', 'Gm7', 'Gm7'] },
             { label: 'B', bars: ['Am7b5', 'D7', 'Gm7', 'Gm7', 'Cm7', 'F7', 'Bbmaj7', 'Ebmaj7'] },
-            { label: 'C', bars: ['Am7b5', 'D7', 'Gm7 Gb7', 'Fm7 E7', 'Am7b5', 'D7', 'Gm7', 'Gm7'] },
+            {
+                label: 'C',
+                bars: ['Am7b5', 'D7', 'Gm7 Gb7', 'Fm7 E7', 'Ebmaj7', 'Am7b5 D7', 'Gm7', 'Gm7'],
+            },
         ],
     },
     {
