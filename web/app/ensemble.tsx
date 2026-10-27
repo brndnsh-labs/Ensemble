@@ -100,7 +100,6 @@ import {
     DeleteCollectionDialog,
 } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
-import { closeDialog } from './dialog-close';
 import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
 import { type BarMarkers, GuidedForm } from './guided-form';
@@ -128,6 +127,7 @@ import { useChartFit } from './use-chart-fit';
 import { useChartView } from './use-chart-view';
 import { useCollections } from './use-collections';
 import { useFollowScroll } from './use-follow-scroll';
+import { useModalDialog } from './use-modal-dialog';
 import { useNeckPrefs } from './use-neck-prefs';
 import { useOfflineInstall } from './use-offline-install';
 import { usePalette } from './use-palette';
@@ -604,14 +604,7 @@ export default function Ensemble() {
     const { palette, choosePalette } = usePalette();
     // Settings (#1783): per-device preferences, on the songbook and on a chart.
     const [settingsOpen, setSettingsOpen] = useState(false);
-    const settingsDialog = useRef<HTMLDialogElement>(null);
-    useEffect(() => {
-        if (settingsOpen) {
-            settingsDialog.current?.showModal();
-        } else {
-            closeDialog(settingsDialog.current);
-        }
-    }, [settingsOpen]);
+    const settingsDialog = useModalDialog(settingsOpen);
     const [following, setFollowing] = useState(true);
     // The Song menu (•••, #1756): which of its lists or small dialogs is showing, else null.
     const [songMenu, setSongMenu] = useState<SongMenuView | null>(null);
@@ -626,7 +619,7 @@ export default function Ensemble() {
     useEffect(() => {
         setKeyOpen(false);
     }, [standId]);
-    const exportDialogRef = useRef<HTMLDialogElement>(null);
+    const exportDialogRef = useModalDialog(exportOpen);
     const standKeys = useRef<((event: KeyboardEvent) => void) | null>(null);
     const [importing, setImporting] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
@@ -720,13 +713,14 @@ export default function Ensemble() {
     // #1477 — the collection dialogs of the All songs page: naming one (New, Rename) and deleting
     // one, each driven from this state like the row menu's own dialogs.
     const [collectionNaming, setCollectionNaming] = useState<CollectionNameRequest | null>(null);
-    const collectionNameDialogRef = useRef<HTMLDialogElement>(null);
+    // #1477 — the collection dialogs, driven from their state like the delete dialog.
+    const collectionNameDialogRef = useModalDialog(collectionNaming !== null);
     const [collectionDeleteTarget, setCollectionDeleteTarget] =
         useState<CollectionDeleteTarget | null>(null);
     const [collectionDeleteFailure, setCollectionDeleteFailure] = useState<string | null>(null);
     // The collection THIS TAB's own delete just removed (#1477 review R5) — `deletedRowId`'s rule.
     const [deletedCollectionId, setDeletedCollectionId] = useState<string | null>(null);
-    const collectionDeleteDialogRef = useRef<HTMLDialogElement>(null);
+    const collectionDeleteDialogRef = useModalDialog(collectionDeleteTarget !== null);
     // The row ⋯ menu (#1440), shared by the All songs page and the songbook home. One menu
     // instance for whichever row is targeted, per `SongRowMenu`'s own note on why; anchored at
     // that row's ⋯ (#1755).
@@ -743,7 +737,7 @@ export default function Ensemble() {
         /** Asked from the Song menu (#1756): the song is the one on the stand. */
         onStand?: boolean;
     } | null>(null);
-    const guestDeleteDialogRef = useRef<HTMLDialogElement>(null);
+    const guestDeleteDialogRef = useModalDialog(guestDeleteTarget !== null);
     // The row menu's account delete confirm (#1440 review P2) — reuses `DeleteSongDialog`, the
     // same tombstone route the stand's own "Song actions" uses (`deleteOpen` below), but bound to
     // a row target instead of `current`: this one must never navigate to open the song, since the
@@ -752,7 +746,6 @@ export default function Ensemble() {
         null,
     );
     const [rowDeleteFailure, setRowDeleteFailure] = useState<string | null>(null);
-    const rowDeleteDialogRef = useRef<HTMLDialogElement>(null);
     // Delete from this device for good (#1754): one song the account no longer holds or never
     // received (`title` set), or every "No longer in your account" row at once (`title` null).
     // `unconfirmed`: the cloud never confirmed the one song, so no cloud delete came first and
@@ -764,7 +757,7 @@ export default function Ensemble() {
         unconfirmed?: boolean;
         onStand?: boolean;
     } | null>(null);
-    const purgeDialogRef = useRef<HTMLDialogElement>(null);
+    const purgeDialogRef = useModalDialog(purgeTarget !== null);
     // The "couldn't be read" notices' Remove (#1805): the songs this build cannot read that would
     // go, and how many something keeps, read fresh when the musician asked, so the confirm counts
     // what it will act on and says first what it will keep.
@@ -772,7 +765,7 @@ export default function Ensemble() {
         ids: string[];
         kept: number;
     } | null>(null);
-    const unreadableRemovalRef = useRef<HTMLDialogElement>(null);
+    const unreadableRemovalRef = useModalDialog(unreadableRemoval !== null);
     // The songbook's own status line (#1440 review P2) — set only by row actions (renamed,
     // duplicated, deleted, "hasn't reached your account yet"), NEVER the stand's `message`
     // (`open()` always sets one, and reusing it here showed a stale stand status on every visit
@@ -1113,13 +1106,19 @@ export default function Ensemble() {
     // One document is all this needs, so it comes from the home slices (#1441), never a full read.
     const template =
         liveHome?.rows[0] ?? liveHome?.continued ?? guestHome?.rows[0] ?? defaultTemplate;
-    const accountDialogRef = useRef<HTMLDialogElement>(null);
-    const accountPageDialogRef = useRef<HTMLDialogElement>(null);
-    const deleteDialogRef = useRef<HTMLDialogElement>(null);
-    const signOutDialogRef = useRef<HTMLDialogElement>(null);
-    const adoptDialogRef = useRef<HTMLDialogElement>(null);
-    const adoptRemoteDialogRef = useRef<HTMLDialogElement>(null);
-    const bandDialog = useRef<HTMLDialogElement>(null);
+    const accountDialogRef = useModalDialog(accountDialog !== null);
+    const accountPageDialogRef = useModalDialog(accountPageOpen);
+    // A guarded dialog's guard is its own effect below, beside its comment: the confirm steps
+    // (`deleteOpen`, `rowDeleteTarget`, `adoptRemoteOffer` — whose hook sits further down, with
+    // `adoptRemoteOffered`) and the sign-out preflight (`signOutMoot`).
+    const deleteDialogRef = useModalDialog(deleteOpen && inAccount);
+    const rowDeleteDialogRef = useModalDialog(rowDeleteTarget !== null && rowInAccount);
+    const signOutMoot =
+        (signOutStep === 'session' && !signedIn) ||
+        (signOutStep === 'device' && !heldWithoutSession);
+    const signOutDialogRef = useModalDialog(signOutStep !== null && !signOutMoot);
+    const adoptDialogRef = useModalDialog(adoptOpen);
+    const bandDialog = useModalDialog(bandOpen);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
     /**
@@ -1676,13 +1675,6 @@ export default function Ensemble() {
                 ?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
         }
     }, [editing, measureId]);
-    useEffect(() => {
-        if (exportOpen) {
-            exportDialogRef.current?.showModal();
-        } else {
-            closeDialog(exportDialogRef.current);
-        }
-    }, [exportOpen]);
     // The Song menu belongs to the chart on the stand: none left there, nothing of it stays open
     // (a delete from another tab, a sign-out), so the next ••• opens it rather than closing it.
     const standOpen = current !== null;
@@ -1697,18 +1689,8 @@ export default function Ensemble() {
             // Refreshed on every open: these fields can drift from what the sheet last
             // showed (a different song opened, which resets the energy level).
             setFeel(feelSnapshot());
-            bandDialog.current?.showModal();
-        } else {
-            closeDialog(bandDialog.current);
         }
     }, [bandOpen]);
-    useEffect(() => {
-        if (accountDialog) {
-            accountDialogRef.current?.showModal();
-        } else {
-            closeDialog(accountDialogRef.current);
-        }
-    }, [accountDialog]);
     // #1266 — the account library is re-read on sign-in and whenever the loop reports it changed
     // on disk (a Save committed, a download advanced or removed a record) — but since #1441 only
     // once a surface has asked for the WHOLE library (`wantLibrary`); the home page reads its own
@@ -1814,63 +1796,14 @@ export default function Ensemble() {
             accountDrafts.current = new Map();
         }
     }, [sync.owner]);
-    useEffect(() => {
-        if (accountPageOpen) {
-            accountPageDialogRef.current?.showModal();
-        } else {
-            closeDialog(accountPageDialogRef.current);
-        }
-    }, [accountPageOpen]);
     // `inAccount` is a dependency, not just a guard: the confirm step unmounts when the answer
     // turns false (a session expiring under an account chart is the realistic way), and a flag
     // left true would spring the dialog open again on the next chart that qualifies.
     useEffect(() => {
-        if (!inAccount) {
+        if (deleteOpen && !inAccount) {
             setDeleteOpen(false);
-            return;
-        }
-        if (deleteOpen) {
-            deleteDialogRef.current?.showModal();
-        } else {
-            closeDialog(deleteDialogRef.current);
         }
     }, [deleteOpen, inAccount]);
-    // #1477 — the collection dialogs, driven from their state like the delete dialog above.
-    useEffect(() => {
-        if (collectionNaming) {
-            collectionNameDialogRef.current?.showModal();
-        } else {
-            closeDialog(collectionNameDialogRef.current);
-        }
-    }, [collectionNaming]);
-    useEffect(() => {
-        if (collectionDeleteTarget) {
-            collectionDeleteDialogRef.current?.showModal();
-        } else {
-            closeDialog(collectionDeleteDialogRef.current);
-        }
-    }, [collectionDeleteTarget]);
-    useEffect(() => {
-        if (guestDeleteTarget) {
-            guestDeleteDialogRef.current?.showModal();
-        } else {
-            closeDialog(guestDeleteDialogRef.current);
-        }
-    }, [guestDeleteTarget]);
-    useEffect(() => {
-        if (purgeTarget) {
-            purgeDialogRef.current?.showModal();
-        } else {
-            closeDialog(purgeDialogRef.current);
-        }
-    }, [purgeTarget]);
-    useEffect(() => {
-        if (unreadableRemoval) {
-            unreadableRemovalRef.current?.showModal();
-        } else {
-            closeDialog(unreadableRemovalRef.current);
-        }
-    }, [unreadableRemoval]);
     // Closes itself if `rowInAccount` goes false while open (the same posture the stand's own
     // `deleteOpen` effect takes) — a queued Save landing mid-confirm, or the account detaching,
     // must not leave a confirm button pointed at a state that no longer supports it. Releases the
@@ -1880,18 +1813,10 @@ export default function Ensemble() {
     // calling `closeRowDeleteConfirm` so this effect's dependency list stays exhaustive without
     // naming a plain function that is recreated every render.
     useEffect(() => {
-        if (!rowInAccount) {
-            if (rowDeleteTarget) {
-                setRowDeleteTarget(null);
-                accountSync.setActiveDocument(null);
-                void accountSync.watch(null);
-            }
-            return;
-        }
-        if (rowDeleteTarget) {
-            rowDeleteDialogRef.current?.showModal();
-        } else {
-            closeDialog(rowDeleteDialogRef.current);
+        if (!rowInAccount && rowDeleteTarget) {
+            setRowDeleteTarget(null);
+            accountSync.setActiveDocument(null);
+            void accountSync.watch(null);
         }
     }, [rowDeleteTarget, rowInAccount]);
     // Focus returns to the entry point on the way back from either sub-view (#1440 review P3),
@@ -1956,18 +1881,10 @@ export default function Ensemble() {
     // device stops holding an account with no session — a fresh sign-in, or its own clear. A flag
     // left set would spring either open again.
     useEffect(() => {
-        const moot =
-            (signOutStep === 'session' && !signedIn) ||
-            (signOutStep === 'device' && !heldWithoutSession);
-        if (signOutStep === null || moot) {
-            if (moot) {
-                setSignOutStep(null);
-            }
-            closeDialog(signOutDialogRef.current);
-            return;
+        if (signOutMoot) {
+            setSignOutStep(null);
         }
-        signOutDialogRef.current?.showModal();
-    }, [signOutStep, signedIn, heldWithoutSession]);
+    }, [signOutMoot]);
     // The preflight read is its own effect, keyed on the owner the step is about rather than on
     // the session state: for the ordinary step that is the loop's published owner, which exists
     // only once it actually has a scope, so this cannot race the attach and be left permanently on
@@ -2018,11 +1935,6 @@ export default function Ensemble() {
         // Mirrored here rather than written during render, the way the dialog itself mirrors its
         // own `open` prop: one place that knows whether a question is on screen (#1359).
         adoptOnScreen.current = adoptOpen;
-        if (adoptOpen) {
-            adoptDialogRef.current?.showModal();
-        } else {
-            closeDialog(adoptDialogRef.current);
-        }
     }, [adoptOpen]);
     /**
      * An offer cannot outlive the session it is about (#1359 patch P1-2).
@@ -2046,15 +1958,10 @@ export default function Ensemble() {
     // Reads `standVersionCandidate`, not `standCandidate` (#1362): this offer is "Use the account's
     // version", and a `'deleted'` or `'unsupported'` row is never that offer.
     const adoptRemoteOffered = standVersionCandidate !== null;
+    const adoptRemoteDialogRef = useModalDialog(adoptRemoteOffer !== null && adoptRemoteOffered);
     useEffect(() => {
-        if (!adoptRemoteOffered) {
+        if (adoptRemoteOffer !== null && !adoptRemoteOffered) {
             setAdoptRemoteOffer(null);
-            return;
-        }
-        if (adoptRemoteOffer !== null) {
-            adoptRemoteDialogRef.current?.showModal();
-        } else {
-            closeDialog(adoptRemoteDialogRef.current);
         }
     }, [adoptRemoteOffer, adoptRemoteOffered]);
     /**
