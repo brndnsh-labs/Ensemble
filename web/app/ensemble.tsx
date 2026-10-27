@@ -134,6 +134,7 @@ import { useNeckPrefs } from './use-neck-prefs';
 import { useOfflineInstall } from './use-offline-install';
 import { usePalette } from './use-palette';
 import { useStageTheme } from './use-stage-theme';
+import { useStandToast } from './use-stand-toast';
 
 // The neck and its voicer load only when the neck first shows (#1877).
 const NeckStand = lazy(() => import('./neck-stand'));
@@ -469,50 +470,6 @@ export default function Ensemble() {
     // true when what it waited behind was refused.
     const waiting = useRef<Promise<boolean> | null>(null);
     const [error, setError] = useState('');
-    // #1460 — the stand's toast replaced the footer's single-slot status line. `messageToken`
-    // exists only so the auto-dismiss effect below can tell "the same sentence, set again" from
-    // "still the sentence from four seconds ago": two Saves in a row often produce the exact same
-    // text, and a dependency on `message` alone would not re-arm the timer for the second one.
-    // `setMessage` is a plain function, not the raw state setter, so every one of this file's
-    // existing call sites keeps working unchanged; a `tone` of `'warning'` (review P2 #3) is for
-    // a sentence that needs deliberate reading or action — it persists with its own close button
-    // instead of auto-dismissing.
-    type MessageTone = 'info' | 'warning';
-    const [message, setMessageState] = useState('');
-    const [messageTone, setMessageToneState] = useState<MessageTone>('info');
-    const [messageToken, setMessageToken] = useState(0);
-    // Re-review P3 — a REF, not the `messageTone` state value, because an async caller (one that
-    // sets its message from inside a promise chain) closes over whatever `messageTone` was when IT started, which can be stale by the time it
-    // resolves. The ref is always current at call time, which is what the guard below needs.
-    const messageToneRef = useRef<MessageTone>('info');
-    function setMessage(text: string, options?: { tone?: MessageTone }) {
-        const tone = options?.tone ?? 'info';
-        // Re-review P3 — a transient `info` message must not silently replace an undismissed
-        // `warning`: the rename flow's own warning ("This song has unsaved changes…") was getting
-        // overwritten moments later by an async path's plain `info` (the draft-retention toast
-        // then, retired in #1760). A `warning` can still replace another `warning` (a newer one supersedes);
-        // only an `info` call is held off. The close button (below) is the one place `messageTone`
-        // resets afterward — a dismissed warning must not go on blocking every `info` forever.
-        if (messageToneRef.current === 'warning' && tone === 'info') {
-            return;
-        }
-        messageToneRef.current = tone;
-        setMessageToken((token) => token + 1);
-        setMessageState(text);
-        setMessageToneState(tone);
-    }
-    /** The toast's own close button — the one path that clears a `warning`, since `setMessage`'s
-     * guard above refuses to let a plain `info` call do it. Resets the tone too, or a dismissed
-     * warning would go on blocking every `info` message for the rest of the session. */
-    function dismissMessage() {
-        messageToneRef.current = 'info';
-        setMessageState('');
-        setMessageToneState('info');
-    }
-    // Review P2 #1/#5 — the auto-dismiss timer is paused while the toast has the pointer or
-    // focus, so a musician reading (or about to click the close button on) a message it would
-    // otherwise clear out from under them gets the time back.
-    const [toastHeld, setToastHeld] = useState(false);
     // An audition/share link's `?autoplay=1` (#1382): browsers block audio before a gesture,
     // so this arms one instead of playing immediately — the shared-link effect sets it, and
     // the gesture effect below clears it on the first pointer or key event anywhere on the page.
@@ -5220,35 +5177,6 @@ export default function Ensemble() {
      * reappear just because the words changed.
      */
     const standSyncFailure = syncStatusProps ? syncFailureNotice(syncStatusProps) : null;
-    const [dismissedSyncFailureKey, setDismissedSyncFailureKey] = useState<string | null>(null);
-    const standSyncFailureVisible =
-        standSyncFailure !== null && standSyncFailure.key !== dismissedSyncFailureKey;
-    // Review P3 — clears the dismissal the moment the VISIBLE fact moves on from it, not only
-    // when it goes null: without this, a fact that goes A → B → A (never passing through null in
-    // between — a retry failure whose wording flips back and forth across passes) would find its
-    // second "A" still matching the stale dismissal and stay silenced forever.
-    useEffect(() => {
-        setDismissedSyncFailureKey((prev) =>
-            prev !== null && prev !== standSyncFailure?.key ? null : prev,
-        );
-    }, [standSyncFailure?.key]);
-    /**
-     * Review P3 — "Updating…" must not flash on every `run()`: the busy toast only shows once
-     * `soundProgress` actually has something to say, or `busy` has held for ~300ms without one.
-     */
-    const [busyToastVisible, setBusyToastVisible] = useState(false);
-    useEffect(() => {
-        if (!busy) {
-            setBusyToastVisible(false);
-            return;
-        }
-        if (soundProgress) {
-            setBusyToastVisible(true);
-            return;
-        }
-        const timer = window.setTimeout(() => setBusyToastVisible(true), 300);
-        return () => window.clearTimeout(timer);
-    }, [busy, soundProgress]);
     /**
      * Review P2 #3 — an armed `?autoplay=1` link's hint is derived from `pendingAutoplay` itself,
      * not captured once into `message` text: the link's own note (below) still auto-dismisses
@@ -5256,56 +5184,27 @@ export default function Ensemble() {
      * long as autoplay is actually armed, however long that takes.
      */
     const pendingAutoplayHint = pendingAutoplay ? 'tap anywhere to play' : null;
-    // Re-review P3 — `busyToastVisible` flips false via an effect, which runs AFTER the render
-    // that already has `busy === false`: without this extra `busy` check, that one render would
-    // still read the stale `busyToastVisible === true` and flash "Updating…" the instant a fast
-    // action finished, which is exactly the flash `busyToastVisible`'s own debounce exists to
-    // prevent on the way IN.
-    const showBusy = busy && busyToastVisible;
-    /**
-     * #1460 — the stand's message toast, replacing the footer's single-slot status line. Busy
-     * (debounced above) outranks a `message`; within `message`, `'warning'` persists with its own
-     * close button, `'info'` auto-dismisses below. "Band is playing" and the offline label are
-     * gone outright, not read here at all (acceptance: they appear nowhere on the stand). Review
-     * P2 #1 — this is its OWN element now: a standing sync failure no longer masks it (see the
-     * `.stand-stack` markup below).
-     */
-    const toastTone: 'busy' | 'warning' | 'info' = showBusy
-        ? 'busy'
-        : messageTone === 'warning' && message
-          ? 'warning'
-          : 'info';
     // #1889 — another tab installed the update; this one waits for the band or the edit.
     const updateHint =
         offline.update === 'deferred' && current
             ? 'Updated in another tab · this one reloads when you stop or save'
             : null;
-    const toastText = showBusy
-        ? soundProgress || 'Updating…'
-        : [message || null, pendingAutoplayHint, updateHint].filter(Boolean).join(' · ') || null;
-    // Auto-dismiss a plain `info` message ~4s after it is actually SHOWN (masked time under the
-    // busy spinner doesn't count against it, nor does the toast being hovered/focused — review
-    // P2 #3/#5) — never `warning`, which persists until its own close button, and never the old
-    // top-of-page banner (unrelated to this toast, `.error-banner` above), which handles errors
-    // its own way. `messageToken` re-arms the timer for two identical messages in a row; it is
-    // deliberately unread in the body below.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see above.
-    useEffect(() => {
-        if (toastTone !== 'info' || !message || toastHeld) {
-            return;
-        }
-        const timer = window.setTimeout(() => setMessageState(''), 4000);
-        return () => window.clearTimeout(timer);
-    }, [message, messageToken, toastTone, toastHeld]);
-    // Re-review P3 — WebKit fires no `focusout` when the focused element (the warning's close
-    // button) is removed from under it, so `toastHeld` could get stuck `true` forever the moment
-    // a warning is dismissed while focused. Resetting it whenever the toast goes empty is the
-    // general fix: there is nothing left to "hold" once it has nothing to show.
-    useEffect(() => {
-        if (!toastText) {
-            setToastHeld(false);
-        }
-    }, [toastText]);
+    const {
+        setMessage,
+        dismissMessage,
+        toastTone,
+        toastText,
+        messageToken,
+        setToastHeld,
+        standSyncFailureVisible,
+        dismissSyncFailure,
+    } = useStandToast({
+        busy,
+        soundProgress,
+        standSyncFailureKey: standSyncFailure?.key ?? null,
+        pendingAutoplayHint,
+        updateHint,
+    });
     const {
         deleteUndo,
         undoLive,
@@ -6197,7 +6096,7 @@ export default function Ensemble() {
                                 <button
                                     className="toast-close"
                                     aria-label="Dismiss"
-                                    onClick={() => setDismissedSyncFailureKey(standSyncFailure.key)}
+                                    onClick={dismissSyncFailure}
                                 >
                                     ×
                                 </button>
