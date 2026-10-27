@@ -713,6 +713,7 @@ export default function Ensemble() {
     // #1477 — the collection dialogs of the All songs page: naming one (New, Rename) and deleting
     // one, each driven from this state like the row menu's own dialogs.
     const [collectionNaming, setCollectionNaming] = useState<CollectionNameRequest | null>(null);
+    // #1477 — the collection dialogs, driven from their state like the delete dialog.
     const collectionNameDialogRef = useModalDialog(collectionNaming !== null);
     const [collectionDeleteTarget, setCollectionDeleteTarget] =
         useState<CollectionDeleteTarget | null>(null);

@@ -1,5 +1,3 @@
-'use client';
-
 import { type RefObject, useEffect, useRef } from 'react';
 import { closeDialog } from './dialog-close';
 
