@@ -106,7 +106,7 @@ interface SongDeletesOptions {
 }
 
 /** What the five delete dialogs, the menus' Delete… and the songbook's notices read back. */
-interface SongDeletes {
+export interface SongDeletes {
     /** The guest delete confirm's song, or null when it is shut. */
     guestDeleteTarget: GuestDeleteTarget | null;
     /** Delete-from-this-device's songs, or null when it is shut. */

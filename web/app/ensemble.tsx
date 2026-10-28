@@ -15,7 +15,6 @@ import {
     belongsToAnotherAccount,
     OWNER_MESSAGES,
 } from '../lib/account/sync-loop';
-import { songsOnlyIn } from '../lib/collections';
 import {
     blankSong,
     genreOf,
@@ -34,7 +33,6 @@ import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
 import {
     allSongsSortPreference,
-    forgetOpened as forgetOpenedGuest,
     openedAtMap as guestOpenedAtMap,
     recordOpened as recordOpenedGuest,
     rememberAllSongsSort,
@@ -71,12 +69,7 @@ import { PlayersTab } from './band-players';
 import { BandSheet, type BandTab } from './band-sheet';
 import { TradeTab } from './band-trade';
 import { ChartSheet, type OpenBar } from './chart-sheet';
-import {
-    type CollectionDeleteTarget,
-    CollectionNameDialog,
-    type CollectionNameRequest,
-    DeleteCollectionDialog,
-} from './collection-dialogs';
+import { CollectionNameDialog, DeleteCollectionDialog } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
 import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
@@ -101,6 +94,7 @@ import {
 import { useBarEditing } from './use-bar-editing';
 import { useChartFit } from './use-chart-fit';
 import { useChartView } from './use-chart-view';
+import { useCollectionActions } from './use-collection-actions';
 import { useCollections } from './use-collections';
 import { useDeleteUndo } from './use-delete-undo';
 import { useFollowScroll } from './use-follow-scroll';
@@ -510,17 +504,6 @@ export default function Ensemble() {
     // updated directly by `recordOpenedPreference`. Stars are no longer here: since #1477 they
     // are the built-in Starred collection (`useCollections`, below).
     const [openedAt, setOpenedAtState] = useState<Map<string, string>>(() => new Map());
-    // #1477 — the collection dialogs of the All songs page: naming one (New, Rename) and deleting
-    // one, each driven from this state like the row menu's own dialogs.
-    const [collectionNaming, setCollectionNaming] = useState<CollectionNameRequest | null>(null);
-    // #1477 — the collection dialogs, driven from their state like the delete dialog.
-    const collectionNameDialogRef = useModalDialog(collectionNaming !== null);
-    const [collectionDeleteTarget, setCollectionDeleteTarget] =
-        useState<CollectionDeleteTarget | null>(null);
-    const [collectionDeleteFailure, setCollectionDeleteFailure] = useState<string | null>(null);
-    // The collection THIS TAB's own delete just removed (#1477 review R5) — `deletedRowId`'s rule.
-    const [deletedCollectionId, setDeletedCollectionId] = useState<string | null>(null);
-    const collectionDeleteDialogRef = useModalDialog(collectionDeleteTarget !== null);
     // The row ⋯ menu (#1440), shared by the All songs page and the songbook home. One menu
     // instance for whichever row is targeted, per `SongRowMenu`'s own note on why; anchored at
     // that row's ⋯ (#1755).
@@ -1434,6 +1417,34 @@ export default function Ensemble() {
         standBelongsElsewhere,
         bindStand,
         clearBuffers,
+    });
+    const {
+        collectionNaming,
+        setCollectionNaming,
+        collectionNameDialogRef,
+        collectionDeleteTarget,
+        setCollectionDeleteTarget,
+        collectionDeleteFailure,
+        deletedCollectionId,
+        collectionDeleteDialogRef,
+        toggleStar,
+        addRowToCollection,
+        createCollectionWithRow,
+        submitCollectionName,
+        requestDeleteCollection,
+        deleteCollectionConfirmed,
+    } = useCollectionActions({
+        collections,
+        starred,
+        rowMenuFor,
+        closeRowMenu,
+        signedIn,
+        sync,
+        run,
+        refreshSongs,
+        commitCloudDelete,
+        setHomeNoticeState,
+        setOpenedAtState,
     });
     // Focus returns to the entry point on the way back from either sub-view (#1440 review P3),
     // rather than falling to `<body>` — see `standardsEntryRef`'s own note above for why this has
@@ -2611,18 +2622,6 @@ export default function Ensemble() {
         return repository.get(id);
     }
     /**
-     * Star or unstar one song — since #1477 a Save of the built-in Starred collection, which the
-     * first star creates. Shown at once (`useCollections` applies it before the write lands); a
-     * write that fails undoes it and says why on the songbook's own line — at the account's
-     * document cap, the same remedy a song Save at the cap is given.
-     */
-    function toggleStar(id: string) {
-        setHomeNoticeState('');
-        collections.toggleStar(id, !starred.has(id)).catch((failure: unknown) => {
-            setHomeNoticeState(failure instanceof Error ? failure.message : String(failure));
-        });
-    }
-    /**
      * Write a whole iReal playlist into the live songbook (#1478): its songs in ONE transaction,
      * then the collection holding them — the songbook `storeSave` would write a single import to,
      * by the same rule. Signed in, the account's one transaction (`accountSync.importPlaylist`)
@@ -2680,180 +2679,6 @@ export default function Ensemble() {
         }
         openAllSongs(write.documentId);
         setHomeNoticeState(sentence);
-    }
-    /** Add the row menu's song to one of the songbook's collections (#1477). */
-    function addRowToCollection(collectionId: string) {
-        const target = rowMenuFor;
-        if (!target) {
-            return;
-        }
-        closeRowMenu();
-        void run(async () => {
-            const added = await collections.addSong(collectionId, target.id);
-            const name =
-                collections.collections?.find((entry) => entry.document.id === collectionId)
-                    ?.document.name ?? 'the collection';
-            setHomeNoticeState(
-                added ? `Added “${target.title}” to “${name}”` : `Already in “${name}”`,
-            );
-        });
-    }
-    /** A new collection holding just the row menu's song (#1477's "Add to collection…"). */
-    function createCollectionWithRow(name: string) {
-        const target = rowMenuFor;
-        if (!target) {
-            return;
-        }
-        closeRowMenu();
-        void run(async () => {
-            await collections.create(name, [target.id]);
-            setHomeNoticeState(`Added “${target.title}” to “${name}”`);
-        });
-    }
-    /** New collection / Rename, answered by `CollectionNameDialog` (#1477). */
-    function submitCollectionName(name: string) {
-        const request = collectionNaming;
-        if (!request) {
-            return;
-        }
-        setCollectionNaming(null);
-        void run(async () => {
-            if (request.kind === 'new') {
-                await collections.create(name);
-                setHomeNoticeState(`Created “${name}”`);
-            } else {
-                await collections.rename(request.collectionId, name);
-                setHomeNoticeState(`Renamed to “${name}”`);
-            }
-        });
-    }
-    /** Open the delete confirm for one user collection, counting what "also delete" would take. */
-    function requestDeleteCollection(collectionId: string) {
-        const entry = collections.collections?.find((item) => item.document.id === collectionId);
-        if (!entry || entry.document.builtIn) {
-            return;
-        }
-        setHomeNoticeState('');
-        setCollectionDeleteFailure(null);
-        setCollectionDeleteTarget({
-            collectionId,
-            name: entry.document.name,
-            songCount: entry.resolvedSongIds.length,
-            onlyHere: songsOnlyIn(collectionId, collections.collections ?? []),
-        });
-    }
-    /**
-     * Delete a collection (#1443 decision 3) — and, only when the box was checked, the songs in it
-     * that are in no other collection, through the songbook's EXISTING delete paths: the guest
-     * repository's own delete, or the account's online cloud delete (`commitCloudDelete`, the
-     * tombstone route every account song delete takes). Songs FIRST, the collection LAST, so an
-     * interruption — a refused cloud delete, a closed tab — leaves the collection standing with
-     * the songs still to delete, never song deletes nobody can see a reason for. For a guest the
-     * two halves are two databases, which is exactly why the order matters.
-     */
-    function deleteCollectionConfirmed(alsoDeleteSongs: boolean) {
-        const target = collectionDeleteTarget;
-        if (!target) {
-            return;
-        }
-        const owner = sync.owner;
-        void run(async () => {
-            setCollectionDeleteFailure(null);
-            let deletedSongs = 0;
-            // Re-decided NOW (#1477 review R4), and only ever NARROWED (C3): a song another
-            // collection gained meanwhile is no longer "in no other collection" and stays, while a
-            // song that arrived in this collection meanwhile was never shown to the musician, so
-            // it is never deleted either — the confirm-time read may only take songs OFF the list
-            // the dialog showed.
-            let onlyHere: string[] = [];
-            if (alsoDeleteSongs) {
-                // And the collection's own delete is asked first: one still uploading must stop
-                // this before a single song is gone, not after.
-                const refusal = await collections.deleteRefusal(target.collectionId);
-                if (refusal !== null) {
-                    setCollectionDeleteFailure(refusal);
-                    return;
-                }
-                onlyHere = songsOnlyIn(target.collectionId, await collections.fresh()).filter(
-                    (songId) => target.onlyHere.includes(songId),
-                );
-                for (const songId of onlyHere) {
-                    if (signedIn) {
-                        const done = deletedSongs;
-                        const result = await commitCloudDelete(songId, owner, {
-                            // Stopped part-way (#1477 review C4): the sentence says how far it
-                            // got, and the dialog's counts move to what is actually left.
-                            setFailure: (message) =>
-                                setCollectionDeleteFailure(
-                                    done === 0
-                                        ? message
-                                        : `${message} ${done} of ${onlyHere.length} songs were deleted; the collection and the rest are kept.`,
-                                ),
-                            dialogOpen: () => !!collectionDeleteDialogRef.current?.open,
-                        });
-                        if (result === null) {
-                            const gone = new Set(onlyHere.slice(0, done));
-                            if (done > 0) {
-                                setCollectionDeleteTarget((current) =>
-                                    current?.collectionId === target.collectionId
-                                        ? {
-                                              ...current,
-                                              songCount: current.songCount - done,
-                                              onlyHere: current.onlyHere.filter(
-                                                  (id) => !gone.has(id),
-                                              ),
-                                          }
-                                        : current,
-                                );
-                            }
-                            await refreshSongs();
-                            return;
-                        }
-                    } else {
-                        try {
-                            await repository.remove(songId);
-                        } catch (failure) {
-                            // Stopped part-way: the collection is kept (songs first, collection
-                            // last), and the songs already gone leave the list now, not later.
-                            if (deletedSongs > 0) {
-                                await refreshSongs();
-                            }
-                            throw failure;
-                        }
-                        forgetOpenedGuest(songId);
-                    }
-                    deletedSongs += 1;
-                }
-                setOpenedAtState((previous) => {
-                    const updated = new Map(previous);
-                    for (const songId of onlyHere) {
-                        updated.delete(songId);
-                    }
-                    return updated;
-                });
-            }
-            let message: string;
-            try {
-                message = await collections.remove(target.collectionId);
-            } catch (failure) {
-                setCollectionDeleteFailure(
-                    failure instanceof Error ? failure.message : String(failure),
-                );
-                if (deletedSongs > 0) {
-                    await refreshSongs();
-                }
-                return;
-            }
-            // Closing the dialog and naming the removal in one render (R5): the page then moves
-            // focus to the All songs filter, after the dialog has let go of it.
-            setCollectionDeleteTarget(null);
-            setDeletedCollectionId(target.collectionId);
-            if (deletedSongs > 0) {
-                await refreshSongs();
-                message = `Collection deleted, with ${deletedSongs === 1 ? '1 song' : `${deletedSongs} songs`} that were in no other collection.`;
-            }
-            setHomeNoticeState(message);
-        });
     }
     /**
      * Records this song as opened just now (#1440) — a per-song preference, alongside the
