@@ -3241,6 +3241,26 @@ export default function Ensemble() {
         }
     }
     /**
+     * Save an imported chart as a new song and open it: the file input's and the import dialog's
+     * one sequence (#1910). The caller has validated the chart and committed the stand's pending
+     * bars; this commits it, refreshes the songbook, opens it and says so.
+     *
+     * No owner claim (#1311): a file off this device's disk is nobody's chart until it is
+     * committed, so it belongs to whichever account is live — never to whoever happens to be on
+     * the stand behind this dialog.
+     */
+    async function importAndOpen(checked: ChartDocument, format: 'file' | 'ireal') {
+        const result = await storeSave({ ...checked, id: crypto.randomUUID() }, null, {
+            owner: null,
+            stand: false,
+        });
+        await refreshSongs();
+        await open(result);
+        setMessage('Imported and saved');
+        track('chart_imported', { format });
+        track('chart_opened', { source: 'import' });
+    }
+    /**
      * Closes the Song menu (#1756), whichever list or small dialog it shows, Export… and the
      * transport's Key popover (#1757): a refusal is shown with nothing open over it.
      */
@@ -4013,19 +4033,7 @@ export default function Ensemble() {
                         }
                         const candidate = repository.validated(JSON.parse(await source.text()));
                         checkPlayable(candidate.chart.score);
-                        // No owner claim (#1311): a file off this device's disk is nobody's chart
-                        // until it is committed, so it belongs to whichever account is live —
-                        // never to whoever happens to be on the stand behind this dialog.
-                        const result = await storeSave(
-                            { ...candidate, id: crypto.randomUUID() },
-                            null,
-                            { owner: null, stand: false },
-                        );
-                        await refreshSongs();
-                        await open(result);
-                        setMessage('Imported and saved');
-                        track('chart_imported', { format: 'file' });
-                        track('chart_opened', { source: 'import' });
+                        await importAndOpen(candidate, 'file');
                     });
                 }}
             />
@@ -4039,23 +4047,12 @@ export default function Ensemble() {
                         if (current) {
                             updateChart();
                         }
-                        // No owner claim, exactly as the file import above (#1311).
-                        const result = await storeSave(
-                            { ...checked, id: crypto.randomUUID() },
-                            null,
-                            { owner: null, stand: false },
-                        );
-                        await refreshSongs();
-                        await open(result);
-                        setMessage('Imported and saved');
                         // Both `irealbook`/`irealb` decode the same iReal Pro format; the
                         // telemetry vocabulary tracks the format, not the decoder variant.
-                        track('chart_imported', {
-                            format: checked.importSource?.format?.startsWith('ireal')
-                                ? 'ireal'
-                                : 'file',
-                        });
-                        track('chart_opened', { source: 'import' });
+                        await importAndOpen(
+                            checked,
+                            checked.importSource?.format?.startsWith('ireal') ? 'ireal' : 'file',
+                        );
                     }}
                     playlist={{
                         library: songbookLoading ? null : liveSongs,
