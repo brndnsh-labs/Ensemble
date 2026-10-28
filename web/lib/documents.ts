@@ -11,6 +11,7 @@ import type {
 } from '@core/songbook/score-types';
 import type { ChartSettings } from '@core/songbook/types';
 import { withSectionMeter } from './song-meter';
+import type { SavedSong } from './sync/protocol';
 
 /** The chart the app stores, opens, plays and edits: a measure chart (schemaVersion 2), the only kind. */
 export type ChartDocument = ChartDocumentV2;
@@ -402,4 +403,16 @@ export function withSectionSettings(
         section.isMinor = change.isMinor;
     }
     return { kind: 'ok', score };
+}
+
+/**
+ * The account library in the order the songbook already reads in (#1266): most recently updated
+ * first, exactly as `lib/repository.ts`'s guest `list()` returns it. `AccountSongbook.list` pages
+ * in document-ID order instead — the right choice for a resumable cursor, and an arbitrary one to
+ * a musician — so the ordering a person sees is the shell's to apply, not storage's to change.
+ */
+export function libraryDocuments(library: SavedSong[]): ChartDocument[] {
+    return library
+        .map((song) => song.document)
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }

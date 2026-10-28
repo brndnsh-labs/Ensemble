@@ -440,7 +440,7 @@ export async function revokeOtherSessions(api: AccountApi): Promise<AccountOutco
  * `204`, no body: there is no account left to describe. There is deliberately NO logout call after
  * it — the server deleted the session row itself and cleared the cookie on this very response, so
  * a `POST /api/auth/logout` would be a round trip that could only answer "already gone". The
- * caller's remaining work is local (see `app/ensemble.tsx`'s `forgetDeletedAccount`).
+ * caller's remaining work is local (see `app/use-account-exit.ts`'s `forgetDeletedAccount`).
  */
 export async function deleteAccount(api: AccountApi): Promise<AccountOutcome<null>> {
     const result = await withFreshAuth(

@@ -742,7 +742,7 @@ export interface SignOutPreflight {
      *
      * Still the loop's half only. A draft whose storage write was REFUSED exists nowhere but the
      * open tab's own memory, and the loop cannot see that; the shell adds it, along with any guest
-     * slot left over from before #1299, in `withLocalDrafts` (`app/ensemble.tsx`). That composition
+     * slot left over from before #1299, in `withLocalDrafts` (`app/use-account-exit.ts`). That composition
      * can over-count by one in the narrow case where a retained row and a failed later write both
      * exist for the same song, and that is the safe direction: it offers an export nobody needed,
      * where under-counting destroys work after saying it would not.
