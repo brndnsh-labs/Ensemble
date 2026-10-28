@@ -409,6 +409,33 @@ export function useSongDeletes({
         }
     }
     /**
+     * What this tab holds for songs just removed from this device's account store (#1915), shared
+     * by `purgeConfirmed` and `removeUnreadableConfirmed`: its in-memory drafts, the guest-namespace
+     * recovery slot an older build may have left under the id (`clearOwnRecovery`), and its
+     * opened-at entries.
+     */
+    function forgetRemovedLocally(ids: ReadonlySet<string>) {
+        for (const id of ids) {
+            volatileDrafts.current.delete(id);
+            accountDrafts.current.delete(id);
+            try {
+                repository.clearOwnRecovery(id);
+            } catch {
+                /* Recovery is a convenience; a stale slot is not worth failing a removal. */
+            }
+        }
+        setOpenedAtState((previous) => {
+            if (![...ids].some((id) => previous.has(id))) {
+                return previous;
+            }
+            const updated = new Map(previous);
+            for (const id of ids) {
+                updated.delete(id);
+            }
+            return updated;
+        });
+    }
+    /**
      * Delete songs from this device for good (#1754) — `accountSync.purgeLocal`, one transaction,
      * nothing queued or sent. What this tab holds for them goes too: its in-memory drafts, its
      * opened-at entries, and the guest-namespace recovery slot an older build may have left under
@@ -423,25 +450,7 @@ export function useSongDeletes({
         void run(async () => {
             const result = await accountSync.purgeLocal(target.ids, owner);
             const purged = new Set(result.purged);
-            for (const id of purged) {
-                volatileDrafts.current.delete(id);
-                accountDrafts.current.delete(id);
-                try {
-                    repository.clearOwnRecovery(id);
-                } catch {
-                    /* Recovery is a convenience; a stale slot is not worth failing the delete. */
-                }
-            }
-            setOpenedAtState((previous) => {
-                if (![...purged].some((id) => previous.has(id))) {
-                    return previous;
-                }
-                const updated = new Map(previous);
-                for (const id of purged) {
-                    updated.delete(id);
-                }
-                return updated;
-            });
+            forgetRemovedLocally(purged);
             if (target.title !== null && purged.size === 1) {
                 setDeletedRowId(target.ids[0]);
             }
@@ -728,25 +737,7 @@ export function useSongDeletes({
         void run(async () => {
             const result = await accountSync.removeUnreadable(ids, owner);
             const removed = new Set(result.removed);
-            for (const id of removed) {
-                volatileDrafts.current.delete(id);
-                accountDrafts.current.delete(id);
-                try {
-                    repository.clearOwnRecovery(id);
-                } catch {
-                    /* Recovery is a convenience; a stale slot is not worth failing the removal. */
-                }
-            }
-            setOpenedAtState((previous) => {
-                if (![...removed].some((id) => previous.has(id))) {
-                    return previous;
-                }
-                const updated = new Map(previous);
-                for (const id of removed) {
-                    updated.delete(id);
-                }
-                return updated;
-            });
+            forgetRemovedLocally(removed);
             setUnreadableRemoval(null);
             await refreshSongs();
             setHomeNoticeState(removeUnreadableOutcome(removed.size, result.waiting.length));

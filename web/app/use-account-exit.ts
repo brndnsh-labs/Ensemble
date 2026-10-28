@@ -291,6 +291,32 @@ export function useAccountExit({
         // render, so naming them re-runs nothing.
     }, [signOutStep, heldOwner, sync.owner, volatileDrafts, accountDrafts]);
     /**
+     * What this device does once an account has left it, whichever way the server side was
+     * settled (#1915): `signOutOfAccount` after #1269's awaited logout or #1351's dead session,
+     * `forgetDeletedAccount` after #1271's server-side deletion. Puts the shell back to a guest
+     * device — the account chart's baseline, the stand if it holds an account chart, the account
+     * library and home, and this tab's drafts for `documentIds`, every song this account held here.
+     */
+    function clearDeviceAfterExit(documentIds: readonly string[]) {
+        // Unconditional: `saved` is an account chart's committed baseline, and nothing of that
+        // account may outlive its exit. (The header's account chip, the way to Sign out, is
+        // hidden while a chart is open, so in practice `currentStore` is already null by the
+        // time this runs — which is exactly why the guard below must not be what protects
+        // `saved`.)
+        setSaved(null);
+        if (currentStore.current?.store === 'account') {
+            setCurrent(null);
+            bindStand(null);
+            clearBuffers();
+        }
+        setAccountSongs(null);
+        setAccountHome(null);
+        accountDrafts.current = new Map();
+        for (const id of documentIds) {
+            volatileDrafts.current.delete(id);
+        }
+    }
+    /**
      * Sign out of the account (#1269) — the other destructive account operation, and the one where
      * unsent work gets destroyed if nothing stands in front of it.
      *
@@ -356,22 +382,7 @@ export function useAccountExit({
             setSignOutStep(null);
             setSignOutPlan(null);
             setSignOutSongs(null);
-            // Unconditional: `saved` is an account chart's committed baseline, and nothing of that
-            // account may outlive the sign-out. (The header's account chip, the way to Sign out,
-            // is hidden while a chart is open, so in practice `currentStore` is already null by the time this runs —
-            // which is exactly why the guard below must not be what protects `saved`.)
-            setSaved(null);
-            if (currentStore.current?.store === 'account') {
-                setCurrent(null);
-                bindStand(null);
-                clearBuffers();
-            }
-            setAccountSongs(null);
-            setAccountHome(null);
-            accountDrafts.current = new Map();
-            for (const id of documentIds) {
-                volatileDrafts.current.delete(id);
-            }
+            clearDeviceAfterExit(documentIds);
             // Read live rather than from the `sync` snapshot this render closed over: the loop
             // publishes this during the sign-out above. A wipe that failed after a confirmed
             // revocation is still a sign-out — but the songs really are still here, so the
@@ -441,18 +452,7 @@ export function useAccountExit({
         setDeletedOwner(owner);
         await account.forgetDeletedAccount();
         setHeldOwner(await heldAccount());
-        setSaved(null);
-        if (currentStore.current?.store === 'account') {
-            setCurrent(null);
-            bindStand(null);
-            clearBuffers();
-        }
-        setAccountSongs(null);
-        setAccountHome(null);
-        accountDrafts.current = new Map();
-        for (const id of documentIds) {
-            volatileDrafts.current.delete(id);
-        }
+        clearDeviceAfterExit(documentIds);
         // Read live rather than from the `sync` snapshot this render closed over, exactly as
         // `signOutOfAccount` does: a wipe that failed after the account was already deleted is
         // still a deletion, but the songs really are still here and the reason has to be said.
