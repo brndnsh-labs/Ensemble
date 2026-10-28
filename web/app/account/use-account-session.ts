@@ -304,7 +304,7 @@ export function useAccountSession(active: boolean): AccountView {
         // re-attaches this device to the (deleted) owner and restores whatever `state.failure`
         // held before the attempt — typically `null` — before rethrowing, so by the time this
         // catch runs, the loop no longer has any record that anything went wrong. Left silent,
-        // that would send `ensemble.tsx`'s `forgetDeletedAccount` (which reads exactly that
+        // that would send `use-account-exit.ts`'s `forgetDeletedAccount` (which reads exactly that
         // now-blank `state.failure`) straight to "Account deleted · your guest songbook is
         // unchanged" while the account's records — re-attached, not cleared — are still on this
         // device. Rethrowing the friendly sentence routes it through the same `run()` error
