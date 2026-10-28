@@ -3,6 +3,7 @@
 import { type IRealImportResult, parseIRealImportInSteps } from '@core/songbook/ireal-import';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ChartDocument, genreOf, validateDocument } from '../lib/documents';
+import { downloadFile } from '../lib/download';
 import { checkPlayable } from '../lib/engine-mode';
 import { importedDocument } from '../lib/import-document';
 import {
@@ -20,13 +21,8 @@ import { closeDialog, dialogRule } from './dialog-close';
 import './import-dialog.css';
 
 export function downloadImportSource(text: string) {
-    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-    const anchor = document.createElement('a');
-    anchor.href = url;
     // Inert download: never open untrusted source as an HTML document.
-    anchor.download = 'original-ireal-source.txt';
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    downloadFile(text, 'original-ireal-source.txt', 'text/plain;charset=utf-8');
 }
 
 /**

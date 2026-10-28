@@ -43,6 +43,7 @@ import {
     withSectionAfter,
     withSectionSettings,
 } from '../lib/documents';
+import { exportDocument, exportUnreadable } from '../lib/download';
 import { checkPlayable } from '../lib/engine-mode';
 import { firstBars } from '../lib/first-bars';
 import type { HomeSlice } from '../lib/home';
@@ -4910,34 +4911,6 @@ export default function Ensemble() {
         });
     }
     /**
-     * Write one chart to a file on this device. Extracted from `exportSong` for #1269's sign-out
-     * preflight, which exports songs from the LIBRARY rather than the stand — the header (and its
-     * account chip, the way to Sign out) is hidden while a chart is open, so at that moment there
-     * is no chart on the stand to export and the work at risk is named by document id.
-     *
-     * `onExportAccountSongs`'s export-everything offer (#1271) and the sign-out preflight's own
-     * export both call this once per song in a plain loop, one user gesture triggering several
-     * downloads. Chromium allows a handful of same-gesture downloads through without prompting,
-     * which is what the checks assert (`*.chromium.spec.ts`); Safari and Firefox are known to
-     * prompt before the second download or drop later ones silently past their own per-gesture
-     * cap. There is no E2E coverage for either engine here — WebKit/Firefox-specific handling
-     * (batching into one archive, or a click-through per file) is unverified and out of scope.
-     */
-    function exportDocument(candidate: ChartDocument) {
-        downloadFile(
-            JSON.stringify(repository.validated(candidate), null, 2),
-            `${candidate.title.replace(/[^\p{L}\p{N} -]/gu, '').slice(0, 80) || 'chart'}.ensemble`,
-        );
-    }
-    /**
-     * A song row this build cannot read (a text chart, retired in #1740, or a corrupt row), written
-     * out as it is stored before a sign-out or account deletion removes it: no build will open the
-     * file, but the bytes are the musician's and nothing else here keeps them.
-     */
-    function exportUnreadable(row: { documentId: string; raw: string }) {
-        downloadFile(row.raw, `${row.documentId.slice(0, 80)} (unreadable).json`);
-    }
-    /**
      * The home's and All songs' "couldn't be read" notices' Export (#1782): every account row this
      * build cannot read, read fresh and written out as stored, the file the sign-out step offers.
      */
@@ -5016,14 +4989,6 @@ export default function Ensemble() {
             await refreshSongs();
             setHomeNoticeState(removeUnreadableOutcome(removed.size, result.waiting.length));
         });
-    }
-    function downloadFile(contents: string, name: string) {
-        const url = URL.createObjectURL(new Blob([contents], { type: 'application/json' }));
-        const anchor = document.createElement('a');
-        anchor.href = url;
-        anchor.download = name;
-        anchor.click();
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
     function exportSong() {
         if (!current) {
