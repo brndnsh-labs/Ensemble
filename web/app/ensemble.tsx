@@ -100,6 +100,7 @@ import { useSongDeletes } from './use-song-deletes';
 import { useSongbookLibrary } from './use-songbook-library';
 import { useStageTheme } from './use-stage-theme';
 import { useStandConflict } from './use-stand-conflict';
+import { useStandKeys } from './use-stand-keys';
 import { useStandToast } from './use-stand-toast';
 
 // The neck and its voicer load only when the neck first shows (#1877).
@@ -338,7 +339,6 @@ export default function Ensemble() {
         setKeyOpen(false);
     }, [standId]);
     const exportDialogRef = useModalDialog(exportOpen);
-    const standKeys = useRef<((event: KeyboardEvent) => void) | null>(null);
     const [importing, setImporting] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
@@ -691,35 +691,6 @@ export default function Ensemble() {
     const bandDialog = useModalDialog(bandOpen);
     const file = useRef<HTMLInputElement>(null);
     const scroll = useRef<HTMLDivElement>(null);
-    /**
-     * Re-review P3 — measures `.stand-stack`'s ACTUAL rendered height (0 when nothing shows,
-     * taller as the message toast/failure notice/pill stack up) into a CSS custom property, so
-     * `.chart-scroll`'s bottom padding only grows past its normal floor while the stack genuinely
-     * has something in it, instead of a fixed worst-case reservation eating chart space that used
-     * to fit before any of this existed. A callback ref, not `useRef`+`useEffect`: the stack only
-     * exists inside the conditionally-rendered stand, so an effect keyed on mount alone would run
-     * once at the WHOLE APP's mount (before any chart is ever open) and never re-attach when the
-     * stand's own JSX later mounts the node this actually needs to observe.
-     */
-    const standStackObserver = useRef<ResizeObserver | null>(null);
-    const standStackRef = useCallback((el: HTMLDivElement | null) => {
-        standStackObserver.current?.disconnect();
-        standStackObserver.current = null;
-        if (!el) {
-            document.documentElement.style.setProperty('--stand-stack-height', '0px');
-            return;
-        }
-        const observer = new ResizeObserver((entries) => {
-            for (const entry of entries) {
-                document.documentElement.style.setProperty(
-                    '--stand-stack-height',
-                    `${entry.contentRect.height}px`,
-                );
-            }
-        });
-        observer.observe(el);
-        standStackObserver.current = observer;
-    }, []);
     // Moved up from beside its JSX consumers so the Following look-ahead (`useFollowScroll`,
     // next) — which needs `activeBar` (patch review P3-2) — can read it without a forward
     // reference; `useChartView` has no render boundary of its own, so calling it here instead of
@@ -1493,7 +1464,7 @@ export default function Ensemble() {
      * callers can't drift: an autoplay link is otherwise indistinguishable from a musician
      * pressing Play themselves.
      */
-    /** The Play/Stop button, and Space on the stand (`standKeys`). */
+    /** The Play/Stop button, and Space on the stand (`useStandKeys`). */
     function togglePlayback() {
         if (runtime.state().playback.isPlaying || playbackPending) {
             runtime.stop();
@@ -2775,76 +2746,16 @@ export default function Ensemble() {
         open,
     });
 
-    // Keys on the stand (UI audit): Space plays and stops, and PageDown/PageUp step through the
-    // chart a section at a time — what a page-turn pedal sends. Only on the stand's chart, with no
-    // sheet or dialog open, and never while typing: Space on a focused button or control is that
-    // control's own, so it is left alone. Read through a ref so the listener, added once, always
-    // sees this render's state.
-    standKeys.current = (event: KeyboardEvent) => {
-        if (!current || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
-            return;
-        }
-        if (document.querySelector('dialog[open]')) {
-            return;
-        }
-        const target = event.target instanceof Element ? event.target : null;
-        if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
-            return;
-        }
-        if (event.key === ' ') {
-            if (target?.closest('button, a, [role="button"], [role="tab"], [role="menuitem"]')) {
-                return;
-            }
-            event.preventDefault();
-            if (!busy || playbackActive) {
-                togglePlayback();
-            }
-            return;
-        }
-        if ((event.key === 'PageDown' || event.key === 'PageUp') && !editing && !neckShowing) {
-            const box = scroll.current;
-            if (!box) {
-                return;
-            }
-            const sections = [...box.querySelectorAll<HTMLElement>('.section')].map(
-                (section) =>
-                    section.getBoundingClientRect().top -
-                    box.getBoundingClientRect().top +
-                    box.scrollTop -
-                    8,
-            );
-            // The next section's top, or one screen on when that is nearer: a page turn that
-            // never skips bars, in a long section as much as between short ones. A section
-            // within a row's height of the view's top is the one being read: the chart's own
-            // padding puts the first one a few pixels down.
-            const at = box.scrollTop;
-            const near = 24;
-            const page = box.clientHeight * 0.85;
-            const down = event.key === 'PageDown';
-            const section = down
-                ? sections.find((top) => top > at + near)
-                : sections.filter((top) => top < at - near).at(-1);
-            const to = down
-                ? Math.min(section ?? Infinity, at + page)
-                : Math.max(section ?? -Infinity, at - page);
-            const max = box.scrollHeight - box.clientHeight;
-            if ((down && at >= max - 1) || (!down && at <= 0)) {
-                return;
-            }
-            event.preventDefault();
-            setFollowing(false);
-            const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-            box.scrollTo({
-                top: Math.max(0, Math.min(max, to)),
-                behavior: reduce ? 'instant' : 'smooth',
-            });
-        }
-    };
-    useEffect(() => {
-        const onKey = (event: KeyboardEvent) => standKeys.current?.(event);
-        window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
-    }, []);
+    useStandKeys({
+        current,
+        busy,
+        playbackActive,
+        editing,
+        neckShowing,
+        scroll,
+        togglePlayback,
+        setFollowing,
+    });
 
     // The songbook home itself, not the stand or one of its two sub-views (#1441): the top bar's
     // search, Import chart and New song belong to this view only.
@@ -3506,7 +3417,6 @@ export default function Ensemble() {
                         )}
                     </div>
                     <StandStack
-                        stackRef={standStackRef}
                         toastTone={toastTone}
                         toastText={toastText}
                         messageToken={messageToken}

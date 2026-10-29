@@ -1,14 +1,13 @@
-import type { Ref } from 'react';
+import { useCallback, useRef } from 'react';
 import type { DeleteUndo } from './use-delete-undo';
 
 /**
  * The stand's status strip (#1922): the message toast, the delete Undo, the sync-failure line and
- * the Resume-follow pill, stacked bottom-centre. Presentational: the session shell owns every
- * input (the toast hook, the delete-undo hook, the sync notice, the follow state) and the ref
- * that measures the stack's height.
+ * the Resume-follow pill, stacked bottom-centre. The session shell owns every input (the toast
+ * hook, the delete-undo hook, the sync notice, the follow state); the component owns the
+ * observer that publishes the stack's height.
  */
 export function StandStack({
-    stackRef,
     toastTone,
     toastText,
     messageToken,
@@ -23,7 +22,6 @@ export function StandStack({
     showResume,
     onResumeFollow,
 }: {
-    stackRef: Ref<HTMLDivElement>;
     toastTone: 'busy' | 'warning' | 'info';
     toastText: string | null;
     messageToken: number;
@@ -40,6 +38,35 @@ export function StandStack({
     showResume: boolean;
     onResumeFollow: () => void;
 }) {
+    /**
+     * Re-review P3 — measures `.stand-stack`'s ACTUAL rendered height (0 when nothing shows,
+     * taller as the message toast/failure notice/pill stack up) into a CSS custom property, so
+     * `.chart-scroll`'s bottom padding only grows past its normal floor while the stack genuinely
+     * has something in it, instead of a fixed worst-case reservation eating chart space that used
+     * to fit before any of this existed. A callback ref, not `useRef`+`useEffect`: the stack only
+     * exists inside the conditionally-rendered stand, so an effect keyed on mount alone would run
+     * once at the WHOLE APP's mount (before any chart is ever open) and never re-attach when the
+     * stand's own JSX later mounts the node this actually needs to observe.
+     */
+    const standStackObserver = useRef<ResizeObserver | null>(null);
+    const stackRef = useCallback((el: HTMLDivElement | null) => {
+        standStackObserver.current?.disconnect();
+        standStackObserver.current = null;
+        if (!el) {
+            document.documentElement.style.setProperty('--stand-stack-height', '0px');
+            return;
+        }
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                document.documentElement.style.setProperty(
+                    '--stand-stack-height',
+                    `${entry.contentRect.height}px`,
+                );
+            }
+        });
+        observer.observe(el);
+        standStackObserver.current = observer;
+    }, []);
     /*
      * #1460 — one fixed, bottom-centred stack (review P2 #1/#4): the message
      * toast, the sync-failure notice and the Resume-follow pill each get their
