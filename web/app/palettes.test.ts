@@ -1,4 +1,5 @@
 import { readdirSync, readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
 import { PALETTES, type Palette } from '../lib/session';
 
 /**

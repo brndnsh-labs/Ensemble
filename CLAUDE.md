@@ -79,12 +79,12 @@ npm run test:vitest      # Vitest only — fast targeted iteration, not the full
 npm run test:browser     # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
 npm run test:sync        # v2 account storage contract in real IndexedDB (Chromium + WebKit)
 npm run golden           # golden-render check: do fixed notes still sound the same? (--update / --refreeze)
-npm run validate         # format + jscpd + `npm run ci` (typecheck, typecheck:tests, knip, npm test)
+npm run validate         # format + jscpd + `npm run ci` (typecheck, typecheck:tests, knip, knip:prod, npm test)
 npm run depcheck         # circular-import gate (Biome noImportCycles) — RUNTIME cycles only
 
 # The app (web), from the repo root:
 npm run dev --prefix web       # Next dev server on http://localhost:3100/
-npm run build --prefix web     # root + v2 typecheck, next build, offline.mjs → web/out
+npm run build --prefix web     # root + v2 typecheck (web/app's tests too, #1939), next build, offline.mjs → web/out
 npm run test:e2e --prefix web  # v2 Playwright suite against the BUILT export (build first)
 ```
 
