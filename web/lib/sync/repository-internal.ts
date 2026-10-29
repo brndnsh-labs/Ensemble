@@ -90,7 +90,10 @@ export function operations<T>(
     queueOf(tx, scope, id, snapshot, consume);
 }
 
-/** One stored collection row, re-proved, or null. Shared by every collection read below. */
+/**
+ * One stored collection row, re-proved, or null. Shared by the collection reads in
+ * `collections.ts` and by `savedRecord` in `repository.ts`.
+ */
 export function storedCollection(
     row: SavedCollection | undefined,
     scope: AccountScope,
