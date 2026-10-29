@@ -106,7 +106,7 @@ import { usePalette } from './use-palette';
 import { usePlaybackState } from './use-playback-state';
 import { useRowMenu } from './use-row-menu';
 import { useSongDeletes } from './use-song-deletes';
-import { useSongbookLibrary } from './use-songbook-library';
+import { type Browse, useSongbookLibrary } from './use-songbook-library';
 import { useStageTheme } from './use-stage-theme';
 import { useStandConflict } from './use-stand-conflict';
 import { useStandKeys } from './use-stand-keys';
@@ -389,17 +389,11 @@ export default function Ensemble() {
     // Whether the unsaved draft on the stand came from the standards catalog rather than a shared
     // link (#1700) — the header said "Opened from a shared link" for a standard.
     const [standardDraft, setStandardDraft] = useState(false);
-    // The standards browse surface (#1439): a second songbook-home view, shown instead of the
-    // library list while no chart is on the stand. Opening a standard clears it the same way
-    // opening a saved song does.
-    const [standardsOpen, setStandardsOpen] = useState(false);
-    // The All songs page (#1440): a third songbook-home view, alongside the standards browser.
-    const [allSongsOpen, setAllSongsOpen] = useState(false);
-    /**
-     * The collection the All songs page opens on (#1478) — the one a whole-playlist import just
-     * wrote — or null for All songs itself. Set only by that import; every other way in clears it.
-     */
-    const [allSongsCollection, setAllSongsCollection] = useState<string | null>(null);
+    // Which songbook-home view shows while no chart is on the stand: the library list, the
+    // standards browser (#1439), or the All songs page (#1440, opened on a collection by a
+    // whole-playlist import, #1478). One value, so two views can never be open at once.
+    // Opening a standard or a saved song resets it to home.
+    const [browse, setBrowse] = useState<Browse>({ view: 'home' });
     // Which home entry point opened the standards browser (#1441) — "Browse all →" or one
     // shelf's link — so the browser opens on that shelf and focus comes back to that button.
     const [standardsEntry, setStandardsEntry] = useState<StandardsEntry>('all');
@@ -662,8 +656,7 @@ export default function Ensemble() {
         sync,
         onStand,
         setError,
-        setAllSongsOpen,
-        setAllSongsCollection,
+        setBrowse,
     });
     // #1478 — how much room the signed-in account has, by this device's VERIFIED copy of it, for
     // the import's cap line (review R1: or why that can't be told yet). Stable per owner, so the
@@ -1043,10 +1036,10 @@ export default function Ensemble() {
                         ? { kind: 'draft' }
                         : { kind: 'song', id: current.id },
           }
-        : standardsOpen
+        : browse.view === 'standards'
           ? { kind: 'standards', entry: standardsEntry }
-          : allSongsOpen
-            ? { kind: 'all', collection: allSongsCollection }
+          : browse.view === 'all'
+            ? { kind: 'all', collection: browse.collection }
             : { kind: 'home' };
     const navViewKey = navKey(navView);
 
@@ -1305,6 +1298,7 @@ export default function Ensemble() {
     // rather than falling to `<body>` — see `standardsEntryRef`'s own note above for why this has
     // to live here rather than inside `StandardsBrowser`/`AllSongs`. Guarded by the PREVIOUS value
     // so this only fires on the true→false transition, never on the render that first opens one.
+    const standardsOpen = browse.view === 'standards';
     const wasStandardsOpen = useRef(false);
     useEffect(() => {
         if (wasStandardsOpen.current && !standardsOpen) {
@@ -1312,6 +1306,7 @@ export default function Ensemble() {
         }
         wasStandardsOpen.current = standardsOpen;
     }, [standardsOpen]);
+    const allSongsOpen = browse.view === 'all';
     const wasAllSongsOpen = useRef(false);
     useEffect(() => {
         if (wasAllSongsOpen.current && !allSongsOpen) {
@@ -2001,26 +1996,23 @@ export default function Ensemble() {
             return;
         }
         nav.entry.current = target;
-        const browse = () => {
+        const applyBrowse = () => {
             if (view.kind === 'standards') {
-                setAllSongsOpen(false);
                 setStandardsEntry((view.entry ?? 'all') as StandardsEntry);
-                setStandardsOpen(true);
+                setBrowse({ view: 'standards' });
             } else if (view.kind === 'all') {
-                setStandardsOpen(false);
                 openAllSongs(view.collection);
             } else {
-                setStandardsOpen(false);
-                setAllSongsOpen(false);
+                setBrowse({ view: 'home' });
             }
         };
         if (view.kind !== 'song') {
             if (current) {
                 // The chart couldn't be left — the editor is showing why — so the stand stays,
                 // and so does its entry.
-                closeSong(browse, () => nav.undoPop(target, from));
+                closeSong(applyBrowse, () => nav.undoPop(target, from));
             } else {
-                browse();
+                applyBrowse();
             }
             return;
         }
@@ -2419,9 +2411,10 @@ export default function Ensemble() {
             await open(document);
             // #1440 — this is also the All songs page's own `onOpenSong`, and unlike
             // `openStandard` a real song has no "leaving" gesture of its own here: without this,
-            // `goHome` (which never resets either sub-view flag) would land back on the All
-            // songs page instead of the library list `standardsOpen`'s reset already keeps true.
-            setAllSongsOpen(false);
+            // `goHome` (which never resets the browse view) would land back on the All songs
+            // page instead of the library list. (Standards can't be open here: its own surface
+            // opens only through `openStandard`.)
+            setBrowse({ view: 'home' });
             track('chart_opened', { source: 'songbook' });
         });
     }
@@ -2444,7 +2437,7 @@ export default function Ensemble() {
             landDraftOnStand(document, '');
             standardOnStand.current = { documentId: document.id, standardId: id };
             setStandardDraft(true);
-            setStandardsOpen(false);
+            setBrowse({ view: 'home' });
             track('chart_opened', { source: 'standard' });
         });
     }
@@ -2467,7 +2460,7 @@ export default function Ensemble() {
                 throw new Error('Song no longer exists.');
             }
             const opened = await open(document);
-            setAllSongsOpen(false);
+            setBrowse({ view: 'home' });
             track('chart_opened', { source: 'songbook' });
             await runtime.toggle(setSoundProgress);
             setPlaying(runtime.state().playback.isPlaying);
@@ -2776,7 +2769,7 @@ export default function Ensemble() {
 
     // The songbook home itself, not the stand or one of its two sub-views (#1441): the top bar's
     // search, Import chart and New song belong to this view only.
-    const homeView = ready && !current && !standardsOpen && !allSongsOpen;
+    const homeView = ready && !current && browse.view === 'home';
 
     return (
         <div
@@ -2790,8 +2783,7 @@ export default function Ensemble() {
                         runtime.stop();
                         setCurrent(null);
                         bindStand(null);
-                        setStandardsOpen(false);
-                        setAllSongsOpen(false);
+                        setBrowse({ view: 'home' });
                     }}
                 >
                     Ensemble
@@ -3059,13 +3051,13 @@ export default function Ensemble() {
                     <h1>Getting the band together.</h1>
                     <p>Loading your local songbook and musical engine.</p>
                 </main>
-            ) : !current && standardsOpen ? (
+            ) : !current && browse.view === 'standards' ? (
                 <StandardsBrowser
                     initialShelf={standardsEntry === 'all' ? null : standardsEntry}
-                    onBack={() => setStandardsOpen(false)}
+                    onBack={() => setBrowse({ view: 'home' })}
                     onOpen={openStandard}
                 />
-            ) : !current && allSongsOpen ? (
+            ) : !current && browse.view === 'all' ? (
                 <AllSongs
                     // The full library, read lazily (#1441) — `null` until it lands, which the page
                     // shows as loading, never as a songbook with no songs.
@@ -3082,8 +3074,8 @@ export default function Ensemble() {
                     busy={busy}
                     initialSort={allSongsSortPreference()}
                     onSortChange={rememberAllSongsSort}
-                    initialCollectionId={allSongsCollection}
-                    onBack={() => setAllSongsOpen(false)}
+                    initialCollectionId={browse.collection}
+                    onBack={() => setBrowse({ view: 'home' })}
                     onOpenSong={openSong}
                     onToggleStar={toggleStar}
                     onOpenRowMenu={openRowMenu}
@@ -3120,7 +3112,7 @@ export default function Ensemble() {
                     onOpenStandard={openStandard}
                     onBrowseStandards={(entry) => {
                         setStandardsEntry(entry);
-                        setStandardsOpen(true);
+                        setBrowse({ view: 'standards' });
                     }}
                     standardsEntry={standardsEntry}
                     standardsEntryRef={standardsEntryRef}

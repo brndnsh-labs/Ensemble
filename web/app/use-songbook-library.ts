@@ -16,6 +16,16 @@ import { openedAtMap as guestOpenedAtMap, recordOpened as recordOpenedGuest } fr
 import { readGuestHome } from '../lib/starters';
 
 /** What the shell hands `useSongbookLibrary`. */
+/**
+ * Which songbook-home view shows while no chart is on the stand: the library list, the standards
+ * browser (#1439), or the All songs page (#1440) — opened on a collection (#1478) or on All songs
+ * itself (`collection: null`).
+ */
+export type Browse =
+    | { view: 'home' }
+    | { view: 'standards' }
+    | { view: 'all'; collection: string | null };
+
 interface SongbookLibraryOptions {
     /** The boot read (`start()`) has finished: the runtime is up and the guest home was read. */
     ready: boolean;
@@ -32,10 +42,8 @@ interface SongbookLibraryOptions {
     onStand: boolean;
     /** The shell's error line. */
     setError: Dispatch<SetStateAction<string>>;
-    /** Opens the All songs page (`openAllSongs`). */
-    setAllSongsOpen: Dispatch<SetStateAction<boolean>>;
-    /** The collection the All songs page opens on, or null for All songs itself. */
-    setAllSongsCollection: Dispatch<SetStateAction<string | null>>;
+    /** Opens the All songs page (`openAllSongs`), on a collection or on All songs itself. */
+    setBrowse: Dispatch<SetStateAction<Browse>>;
 }
 
 /** What the songbook surfaces read back, and the setters the shell's other paths write. */
@@ -101,8 +109,7 @@ export function useSongbookLibrary({
     sync,
     onStand,
     setError,
-    setAllSongsOpen,
-    setAllSongsCollection,
+    setBrowse,
 }: SongbookLibraryOptions): SongbookLibrary {
     // Two songbooks, never merged and never switched between by a control (#1266, rollout
     // decision 9 S3): the guest library is what a signed-out device plays from, the account
@@ -369,7 +376,6 @@ export function useSongbookLibrary({
      * replaces it (a rename in another tab changes no count).
      */
     function openAllSongs(collectionId: string | null = null) {
-        setAllSongsCollection(collectionId);
         const which = signedIn ? 'account' : 'guest';
         if (liveSongs === null || !libraryWanted.current[which]) {
             wantLibrary(which);
@@ -396,7 +402,7 @@ export function useSongbookLibrary({
         } else {
             void reloadGuestLibrary();
         }
-        setAllSongsOpen(true);
+        setBrowse({ view: 'all', collection: collectionId });
     }
     /**
      * The guest songbook, all of it, validated — `repository.list()`, which refuses a songbook it
