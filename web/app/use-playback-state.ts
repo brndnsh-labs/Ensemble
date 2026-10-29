@@ -1,4 +1,4 @@
-import { type Dispatch, type SetStateAction, useEffect, useState } from 'react';
+import { type Dispatch, type SetStateAction, useEffect, useEffectEvent, useState } from 'react';
 import { flushSync } from 'react-dom';
 import * as runtime from '../lib/runtime';
 
@@ -117,10 +117,10 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
             window.clearTimeout(idle);
         };
     }, []);
-    // `startPlayback` is the shell's component-scope function declaration, a new reference every
-    // render; listing it would re-arm the listeners on every render while a link's autoplay is
-    // pending, and `pendingAutoplay` is what decides.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `startPlayback` is a new reference every render; see above.
+    // `startPlayback` is the shell's component-scope function declaration, new every render:
+    // reached through an effect event, so `pendingAutoplay` alone arms the listeners and no
+    // render re-arms them.
+    const onStart = useEffectEvent(startPlayback);
     useEffect(() => {
         // An armed `?autoplay=1` link (#1382): browsers block audio before a user gesture, so
         // this waits for the first one anywhere on the page — a click/tap or a key press,
@@ -142,7 +142,7 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
             if (target instanceof Element && target.closest('[data-play-toggle]')) {
                 return;
             }
-            startPlayback();
+            onStart();
         };
         // `capture: true` so a nested handler's `stopPropagation` on the way up can't
         // swallow the gesture before this sees it — this listener only ever reads the

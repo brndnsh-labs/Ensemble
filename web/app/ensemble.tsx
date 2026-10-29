@@ -5,7 +5,16 @@ import { writtenChart } from '@core/songbook/codec';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { InstrumentVoice } from '@core/types';
 import { keyDistance } from '@core/utils';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+    lazy,
+    Suspense,
+    useCallback,
+    useEffect,
+    useEffectEvent,
+    useMemo,
+    useRef,
+    useState,
+} from 'react';
 import { libraryDownloaded } from '../lib/account/adopt-guest';
 import {
     AccountMismatchError,
@@ -946,9 +955,10 @@ export default function Ensemble() {
         const section = document.chart.score.sections[0];
         setMeasureId(section.measures[0].id);
     }
-    // `landDraftOnStand` is a component-scope function declaration, a new reference every
-    // render, which useExhaustiveDependencies rightly rejects as a hook dependency.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see above.
+    // `landDraftOnStand` is a component-scope function declaration, new every render: the
+    // shared-link effect below reaches it through an effect event, which always calls the latest
+    // one, so the effect runs on `ready` alone.
+    const landSharedLink = useEffectEvent(landDraftOnStand);
     useEffect(() => {
         // Runtime must be initialized (awaited inside `start()`, gated on `ready`)
         // before `runtime.load` is safe to call.
@@ -980,7 +990,7 @@ export default function Ensemble() {
             // to play, #1632). This runs outside `run()`, so say why here instead of leaving
             // an unhandled rejection and a silent page.
             try {
-                landDraftOnStand(link, note);
+                landSharedLink(link, note);
             } catch (e) {
                 setError(e instanceof Error ? e.message : String(e));
             }
@@ -1019,7 +1029,8 @@ export default function Ensemble() {
         return () => {
             alive = false;
         };
-    }, [ready]);
+        // `setPendingAutoplay` is `usePlaybackState`'s state setter (stable identity).
+    }, [ready, setPendingAutoplay]);
 
     // Where the musician is, as a history entry names it (#1700).
     const navView: NavView = current
@@ -1054,27 +1065,30 @@ export default function Ensemble() {
     // re-arms it (`busy`). It runs as a quiet `run`: nothing is disabled, so typing goes on
     // through it (the latest chart is what it retains), and an action pressed meanwhile waits for
     // it. Save and Back keep the song themselves when they come first.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `keepNewSong`/`run` are new each render; `current`, `busy` and the flag are what decide.
+    // `current`, `busy` and the flag are what decide; the shell's own functions it calls are new
+    // each render, so they are read as the latest render's through effect events, never deps.
+    const isUntouchedNewSong = useEffectEvent(untouchedNewSong);
+    const keepFirstChange = useEffectEvent((chart: ChartDocument) => {
+        void run(async () => {
+            if (!newSongNow.current) {
+                return;
+            }
+            try {
+                await keepNewSong(chart, false);
+            } catch (error) {
+                markSharedDraft(true);
+                throw error;
+            }
+        }, true);
+    });
     useEffect(() => {
-        if (!newSongDraft || busy || !current || untouchedNewSong(current)) {
+        if (!newSongDraft || busy || !current || isUntouchedNewSong(current)) {
             return;
         }
         let wait = 0;
         const arm = () => {
             window.clearTimeout(wait);
-            wait = window.setTimeout(() => {
-                void run(async () => {
-                    if (!newSongNow.current) {
-                        return;
-                    }
-                    try {
-                        await keepNewSong(current, false);
-                    } catch (error) {
-                        markSharedDraft(true);
-                        throw error;
-                    }
-                }, true);
-            }, NEW_SONG_KEEP_DELAY_MS);
+            wait = window.setTimeout(() => keepFirstChange(current), NEW_SONG_KEEP_DELAY_MS);
         };
         arm();
         const activity = ['pointerdown', 'keydown'] as const;

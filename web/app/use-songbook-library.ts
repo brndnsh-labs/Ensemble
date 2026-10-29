@@ -3,6 +3,7 @@ import {
     type RefObject,
     type SetStateAction,
     useEffect,
+    useEffectEvent,
     useRef,
     useState,
 } from 'react';
@@ -160,6 +161,10 @@ export function useSongbookLibrary({
     // still out — never `[]` for "not read". Only surfaces that need every song read this.
     const liveSongs = signedIn ? accountSongs : guestSongs;
     const liveLibraryFailure = signedIn ? accountLibraryFailure : guestLibraryFailure;
+    // The two full-library reads as of the latest render, for the effects below to call: each
+    // read is this hook's own function, new every render, so it cannot be a dependency.
+    const onReloadAccountLibrary = useEffectEvent(reloadAccountLibrary);
+    const onReloadGuestLibrary = useEffectEvent(reloadGuestLibrary);
     // #1266 — the account library is re-read on sign-in and whenever the loop reports it changed
     // on disk (a Save committed, a download advanced or removed a record) — but since #1441 only
     // once a surface has asked for the WHOLE library (`wantLibrary`); the home page reads its own
@@ -168,8 +173,9 @@ export function useSongbookLibrary({
     // `current`/`saved` — the list changing is never allowed to change the chart on the stand.
     // `libraryVersion` and `libraryDemand` are not read in the body: they are "the stored library
     // moved" and "a surface just asked", and re-running this read is exactly why the effect
-    // depends on them. `reloadAccountLibrary` is this hook's function, new every render.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `sync.libraryVersion` and `libraryDemand` are re-run triggers; `reloadAccountLibrary` is new every render.
+    // depends on them. The read itself is the latest render's `reloadAccountLibrary`, through an
+    // effect event (`onReloadAccountLibrary`), so it is not a dependency.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `sync.libraryVersion` and `libraryDemand` are re-run triggers.
     useEffect(() => {
         if (sync.owner === null) {
             accountLibraryRead.current += 1;
@@ -186,7 +192,7 @@ export function useSongbookLibrary({
         if (!libraryWanted.current.account) {
             return;
         }
-        void reloadAccountLibrary(sync.owner);
+        void onReloadAccountLibrary(sync.owner);
     }, [sync.owner, sync.libraryVersion, libraryDemand]);
     // #1440 — the opened-at map follows whichever songbook is live, the same gate
     // `accountSongs` uses above: `sync.owner` publishes only once the loop has attached, so the
@@ -219,14 +225,14 @@ export function useSongbookLibrary({
     }, [sync.owner, sync.libraryVersion]);
     // #1441 — the guest songbook's FULL library, read once a surface asks for it (`wantLibrary`)
     // and kept for the page. A read that failed leaves it null with its reason in
-    // `guestLibraryFailure`, and the next ask retries. `libraryDemand` is the ask;
-    // `reloadGuestLibrary` is this hook's function, new every render.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `libraryDemand` is a re-run trigger; `reloadGuestLibrary` is new every render.
+    // `guestLibraryFailure`, and the next ask retries. `libraryDemand` is the ask; the read is
+    // the latest render's `reloadGuestLibrary`, through an effect event (`onReloadGuestLibrary`).
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `libraryDemand` is a re-run trigger.
     useEffect(() => {
         if (!ready || !libraryWanted.current.guest || guestSongs !== null) {
             return;
         }
-        void reloadGuestLibrary();
+        void onReloadGuestLibrary();
     }, [ready, libraryDemand, guestSongs]);
     /**
      * #1441 — the live songbook's HOME slice, re-read whenever the home page comes back into view

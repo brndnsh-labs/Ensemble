@@ -119,14 +119,13 @@ export function KeyPopover({
         }
         latest.current.onClose();
     }
-    const closeRef = useRef(close);
-    closeRef.current = close;
 
-    useAnchoredDismiss([node, backdrop], anchor, (refocus) => closeRef.current(refocus));
+    // Both hooks call the latest render's `close` from their effects and listeners.
+    useAnchoredDismiss([node, backdrop], anchor, close);
     useAnchoredPlacement(node, anchor, {
         enabled: !sheet,
         align: 'start',
-        onGone: () => closeRef.current(false),
+        onGone: () => close(false),
     });
 
     useEffect(() => {
