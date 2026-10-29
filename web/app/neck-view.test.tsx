@@ -11,7 +11,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type BandChart, bandChart } from '../lib/band-chart';
 import { defaultNeckPreferences, placeNeckHand } from '../lib/session';
-import { GUITAR, gripMidis, type VoicedBandChord, voiceBandChart } from '../lib/voicings';
+import { gripMidis, type VoicedBandChord, voiceBandChart } from '../lib/voicings';
+import { GUITAR } from '../lib/voicings/instruments';
 import { NeckView } from './neck-view';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;

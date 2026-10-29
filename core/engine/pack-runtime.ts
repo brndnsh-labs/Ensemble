@@ -111,7 +111,10 @@ export function ensurePacksForVoices(
     }
 }
 
-/** Test helper: clear built zones + in-flight bookkeeping between cases. */
+/**
+ * Test helper: clear built zones + in-flight bookkeeping between cases.
+ * @internal a test seam.
+ */
 export function __resetPackRuntimeForTest(): void {
     zoneCache.clear();
     ensuring.clear();

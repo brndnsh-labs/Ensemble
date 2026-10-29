@@ -164,7 +164,10 @@ const QUALITIES = new Set([
     'alt',
     '6/9',
 ]);
-/** The accepted quality spellings — read by the band engine's chord-parity test. */
+/**
+ * The accepted quality spellings — read by the band engine's chord-parity test.
+ * @internal a test seam: only that test reads it.
+ */
 export const SCORE_CHORD_QUALITIES: ReadonlySet<string> = QUALITIES;
 const ROOT = /^(?:[#b]?(?:III|II|IV|I|VII|VI|V|iii|ii|iv|i|vii|vi|v)|[#b]?[1-7]|[A-Ga-g][#b]?)/;
 

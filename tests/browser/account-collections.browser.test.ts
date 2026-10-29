@@ -9,10 +9,8 @@ import {
 import {
     deleteCollection as deleteGuestCollection,
     editCollection as editGuestCollection,
-    getCollection as getGuestCollection,
     listCollections as listGuestCollections,
     list as listGuestSongs,
-    saveCollection as saveGuestCollection,
 } from '../../web/lib/repository.js';
 import { ACCOUNT_DATABASE_VERSION } from '../../web/lib/sync/database.js';
 import { runLibraryDownload } from '../../web/lib/sync/download.js';
@@ -711,24 +709,21 @@ describe('guest collections (#1474) live beside the songbook, never inside it', 
         });
         const before = await dump(GUEST);
 
-        const created = await saveGuestCollection(
-            newCollection('Gig', ['three', 'gone', 'one']),
-            null,
-        );
-        expect(created.revision).toBe(0);
+        const gig = newCollection('Gig', ['three', 'gone', 'one']);
+        const created = await editGuestCollection(gig.id, () => gig);
+        expect(created?.revision).toBe(0);
         const [listed] = await listGuestCollections();
         expect(listed.document.songIds).toEqual(['three', 'gone', 'one']);
         expect(listed.resolvedSongIds).toEqual(['three', 'one']);
 
-        const updated = await saveGuestCollection({ ...created, songIds: ['one'] }, 0);
-        expect(updated.revision).toBe(1);
-        await expect(saveGuestCollection({ ...created, name: 'Stale' }, 0)).rejects.toThrow(
-            'saved in another tab',
+        const updated = await editGuestCollection(gig.id, (current) =>
+            current ? { ...current, songIds: ['one'] } : null,
         );
-        expect((await getGuestCollection(created.id))?.songIds).toEqual(['one']);
+        expect(updated?.revision).toBe(1);
+        expect((await listGuestCollections())[0].document.songIds).toEqual(['one']);
 
-        await deleteGuestCollection(created.id);
-        expect(await getGuestCollection(created.id)).toBeNull();
+        await deleteGuestCollection(gig.id);
+        expect(await listGuestCollections()).toEqual([]);
         // Deleting a collection never deletes its songs, and the songbook still reads.
         expect((await listGuestSongs()).map((song) => song.id).sort()).toEqual([
             'one',
@@ -752,11 +747,8 @@ describe('guest collections (#1474) live beside the songbook, never inside it', 
                 current ? { ...current, name: 'Favourites' } : null,
             ),
         ).rejects.toBeInstanceOf(BuiltInCollectionError);
-        await expect(
-            saveGuestCollection({ ...starred!, name: 'Favourites' }, starred!.revision),
-        ).rejects.toBeInstanceOf(BuiltInCollectionError);
         // Still there, unchanged, and still an ordinary collection to star into.
-        expect((await getGuestCollection(STARRED_COLLECTION_ID))?.name).toBe('Starred');
+        expect((await listGuestCollections())[0].document.name).toBe('Starred');
         expect(
             (
                 await editGuestCollection(STARRED_COLLECTION_ID, (current) =>

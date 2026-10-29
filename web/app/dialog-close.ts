@@ -1,22 +1,5 @@
 import type { MouseEvent, SyntheticEvent } from 'react';
 
-/**
- * A `<dialog>`'s `close` event is QUEUED by `close()`, not fired inside it (HTML spec: "queue an
- * element task … to fire an event named close"). The shell drives every dialog's
- * `showModal()`/`close()` from its own state, so when an action closes one and the musician
- * reopens it before that task runs — Duplicate closes the song menu, "Song actions" is tapped
- * again at once — the stale event reaches a dialog that is OPEN again, and a plain
- * `onClose={() => setOpen(false)}` shuts it under them (#1402). Only a dialog that is actually
- * closed reports a close.
- */
-export function whenClosed(onClose: () => void) {
-    return (event: SyntheticEvent<HTMLDialogElement>) => {
-        if (!event.currentTarget.open) {
-            onClose();
-        }
-    };
-}
-
 /** Dialogs whose current press began on the backdrop — not inside the box. */
 const pressedOnBackdrop = new WeakSet<HTMLDialogElement>();
 
@@ -84,7 +67,7 @@ export interface DialogRule {
  *   click on the dialog, outside its box, and must not close it. The tap closes on `click`, never
  *   on the way down (WebKit would hand that tap's click to whatever lay beneath), and the press's
  *   start is read from `mousedown`, never `pointerdown` (web/CLAUDE.md's WebKit rules).
- * - **`close`** reaches `onClose` only from a dialog that is really closed (`whenClosed`), and a
+ * - **`close`** reaches `onClose` only from a dialog that is really closed, and a
  *   `busy` dialog the browser closed without `closeDialog` is shown again instead.
  *
  * The unmounted dialogs (import, the Repeats and endings guide) keep their own Esc, put after the
@@ -103,7 +86,12 @@ export function dialogRule({ onClose, busy = false, keep = false }: DialogRule) 
             const dialog = event.currentTarget;
             const asked = closedOnPurpose.has(dialog);
             closedOnPurpose.delete(dialog);
-            // A queued close reaching a dialog already open again is stale (`whenClosed`).
+            // A `<dialog>`'s `close` event is QUEUED by `close()`, not fired inside it (HTML spec:
+            // "queue an element task … to fire an event named close"). The shell drives every
+            // dialog from its own state, so when an action closes one and the musician reopens it
+            // before that task runs — Duplicate closes the song menu, "Song actions" is tapped
+            // again at once — the stale event reaches a dialog that is OPEN again, and shutting
+            // it would close it under them (#1402). Only a dialog that is closed reports a close.
             if (dialog.open) {
                 return;
             }

@@ -43,7 +43,7 @@
         "mix:ab": "tsx scripts/mix-ab.ts",
         "audition-link": "tsx scripts/audition-link.ts",
         "band:render": "tsx scripts/band-render.ts",
-        "ci": "npm run typecheck && npm run typecheck:tests && npm run knip && npm test",
+        "ci": "npm run typecheck && npm run typecheck:tests && npm run knip && npm run knip:prod && npm test",
         "validate": "npm run format && npm run jscpd && npm run ci",
         "prepare": "husky"
     },

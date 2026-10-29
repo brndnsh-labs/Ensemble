@@ -186,7 +186,10 @@ for (const [spellings, formula] of QUALITY_TABLE) {
     }
 }
 
-/** The quality spellings this parser knows (for the codec-parity test). */
+/**
+ * The quality spellings this parser knows (for the codec-parity test).
+ * @internal a test seam: only the codec-parity test reads it.
+ */
 export const KNOWN_QUALITIES: ReadonlySet<string> = new Set(FORMULAS.keys());
 
 // Mirrors the codec's ROOT grammar (roman, then Nashville numbers, then note names), with

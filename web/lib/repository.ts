@@ -535,76 +535,15 @@ export async function listCollections(): Promise<GuestCollection[]> {
     });
 }
 
-/** One guest collection by id, or null. */
-export async function getCollection(id: string): Promise<CollectionDocument | null> {
-    const db = await openCollections();
-    const raw = await new Promise<unknown>((resolve, reject) => {
-        const request = db.transaction(COLLECTIONS, 'readonly').objectStore(COLLECTIONS).get(id);
-        request.onerror = () => reject(new Error('Unable to read your collections.'));
-        request.onsuccess = () => resolve(request.result);
-    });
-    return raw === undefined ? null : validateCollection(raw);
-}
-
-/**
- * Save one guest collection — `save()`'s compare-and-swap for a collection: `expected` is the
- * revision the caller read (null to create), a mismatch is a `ConflictError`, and the committed
- * document gets the next revision and a fresh `updatedAt`. Local only: a guest collection is never
- * uploaded without the musician's own gesture, exactly like a guest song.
- */
-export async function saveCollection(
-    candidate: unknown,
-    expected: number | null,
-): Promise<CollectionDocument> {
-    const document = validateCollection(candidate);
-    const db = await openCollections();
-    return new Promise((resolve, reject) => {
-        const tx = db.transaction(COLLECTIONS, 'readwrite');
-        const store = tx.objectStore(COLLECTIONS);
-        const read = store.get(document.id);
-        let committed: CollectionDocument;
-        let failure: Error | undefined;
-        read.onsuccess = () => {
-            const previous = read.result as CollectionDocument | undefined;
-            if (
-                (expected === null && previous) ||
-                (expected !== null && previous?.revision !== expected)
-            ) {
-                failure = new ConflictError();
-                tx.abort();
-                return;
-            }
-            try {
-                assertBuiltInKept(previous ? validateCollection(previous) : null, document);
-            } catch (error) {
-                failure = error instanceof Error ? error : new Error(String(error));
-                tx.abort();
-                return;
-            }
-            committed = validateCollection({
-                ...document,
-                revision: expected === null ? 0 : expected + 1,
-                createdAt: previous?.createdAt ?? document.createdAt,
-                updatedAt: new Date().toISOString(),
-            });
-            store.put(committed);
-        };
-        tx.oncomplete = () => resolve(committed);
-        tx.onerror = () =>
-            reject(failure || new Error('Saving the collection failed. Storage may be full.'));
-        tx.onabort = () => reject(failure || new Error('Saving the collection was interrupted.'));
-    });
-}
-
 /**
  * Read-modify-write one guest collection in ONE transaction (#1477): `edit` gets the stored
  * document (null when there is none) and returns the next one, or null to write nothing. The
- * committed copy takes the next revision and a fresh `updatedAt`, exactly as `saveCollection`'s.
+ * committed copy takes the next revision and a fresh `updatedAt`.
  *
- * What a star toggle and "Add to collection…" write through, rather than a read in one
- * transaction and a `saveCollection` in another: two quick toggles would otherwise race each
- * other's compare-and-swap, and the second would fail on a conflict nobody else caused. `edit`
- * runs synchronously inside the transaction; a throw aborts it and rejects with its own sentence.
+ * What a star toggle and "Add to collection…" write through, and the only guest collection
+ * write: a read in one transaction and a compare-and-swap write in another would let two quick
+ * toggles race, the second failing on a conflict nobody else caused. `edit` runs synchronously
+ * inside the transaction; a throw aborts it and rejects with its own sentence.
  */
 export async function editCollection(
     id: string,

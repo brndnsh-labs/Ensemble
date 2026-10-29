@@ -7,8 +7,6 @@
 export const PPQ = 480;
 
 export type Lane = 'drums' | 'bass' | 'comp' | 'lead';
-/** In playing order: each lane hears the ones before it, so the comp can answer the lead. */
-export const LANES: readonly Lane[] = ['drums', 'bass', 'lead', 'comp'];
 
 /**
  * The kit, named for what a drummer plays rather than for any one sound source.

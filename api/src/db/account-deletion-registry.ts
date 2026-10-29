@@ -49,6 +49,7 @@ const ACCOUNT_DELETION_RETAINED = {
     _migrations: 'Global migration checksums; contains no account data.',
 } as const;
 
+/** @internal a test seam: the coverage test asserts the registry names every table. */
 export function assertAccountDeletionCoverage(db: DatabaseSync): void {
     const actual = db
         .prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%'")
