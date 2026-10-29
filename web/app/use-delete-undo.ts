@@ -3,6 +3,7 @@ import {
     type RefObject,
     type SetStateAction,
     useEffect,
+    useEffectEvent,
     useRef,
     useState,
 } from 'react';
@@ -96,8 +97,8 @@ export function useDeleteUndo({
     const undoFocus = useRef<{ sectionId: string } | { measureId: string } | null>(null);
     // An Undo pressed while another action ran, to run once it is done.
     const undoAfterWork = useRef(false);
-    const undoDeleteRef = useRef(undoDelete);
-    undoDeleteRef.current = undoDelete;
+    // The shell's restore as of the latest render, for the Undo that waited (`undoAfterWork`).
+    const onUndoAfterWork = useEffectEvent(undoDelete);
     /** Offer Undo for the delete just made (#1758): the chart as it now stands is `after`. */
     function offerUndo(undo: Omit<DeleteUndo, 'after' | 'token'>) {
         const after = currentNow.current;
@@ -145,11 +146,11 @@ export function useDeleteUndo({
         return () => window.clearTimeout(timer);
     }, [deleteUndo?.token, undoLive, undoHeld]);
     // An Undo that waited for the action before it (`undoDelete`): the shell coming free is the
-    // trigger, and `undoDelete` is read through `undoDeleteRef`'s latest closure.
+    // trigger, and `undoDelete` is the latest render's, read through `onUndoAfterWork`.
     useEffect(() => {
         if (!busy && undoAfterWork.current) {
             undoAfterWork.current = false;
-            undoDeleteRef.current();
+            onUndoAfterWork();
         }
     }, [busy]);
     // Focus after an Undo whose bar does not open (a section's, or a bar's outside Edit): on

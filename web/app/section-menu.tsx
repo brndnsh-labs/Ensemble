@@ -1,7 +1,7 @@
 'use client';
 
 import type { ScoreSection, SemanticScore } from '@core/songbook/score-types';
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useEffectEvent, useRef } from 'react';
 import type { SectionChange } from '../lib/documents';
 import './bar-menu.css';
 // The phone sheet's slide and backdrop are `<Menu>`'s (#1755), the one copy of that motion.
@@ -87,8 +87,8 @@ export function SectionMenu({
         }
         latest.current.onClose(refocus);
     }
-    const closeRef = useRef(close);
-    closeRef.current = close;
+    // The latest render's `close`, for the outside-press listener added once below.
+    const onOutsidePress = useEffectEvent(() => close(false));
     closer.current = close;
     useEffect(
         () => () => {
@@ -124,7 +124,7 @@ export function SectionMenu({
             if (node.current?.contains(target) || letter?.contains(target)) {
                 return;
             }
-            closeRef.current(false);
+            onOutsidePress();
         }
         document.addEventListener('pointerdown', outside, true);
         return () => document.removeEventListener('pointerdown', outside, true);
@@ -135,7 +135,7 @@ export function SectionMenu({
     useAnchoredPlacement(node, anchor, {
         enabled: !sheet,
         align: 'start',
-        onGone: () => closeRef.current(false),
+        onGone: () => close(false),
     });
 
     return (

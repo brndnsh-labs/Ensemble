@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useEffectEvent, useRef } from 'react';
 import { isNavEntry, type NavEntry, type NavView, navKey, stepTo } from '../lib/navigation';
 
 /** What the shell hands `useHistoryNavigation`. */
@@ -80,8 +80,6 @@ export function useHistoryNavigation({
     const leaveDraftWarned = useRef(false);
     const navViewKey = navKey(navView);
 
-    const navViewRef = useRef(navView);
-    navViewRef.current = navView;
     /** Writes the history step that reaches `view` from the entry on top now (#1700). */
     function syncHistory(view: NavView) {
         const history = window.history;
@@ -114,6 +112,10 @@ export function useHistoryNavigation({
             history.go(step.delta);
         }
     }
+    // The shell's `applyNav`, and the step to the view on screen now, as of the latest render:
+    // called from the popstate listener and the pending-Back effect, never during render.
+    const onApplyNav = useEffectEvent(applyNav);
+    const onDeferredSync = useEffectEvent(() => syncHistory(navView));
     // Every view change writes history: deeper pushes, shallower goes back (so Forward still
     // reopens what was left), level replaces. The first run claims the page's entry in place —
     // a reload lands on the songbook whatever entry it reloaded on.
@@ -133,7 +135,8 @@ export function useHistoryNavigation({
     // Browser Back and Forward (#1700). Reuses the in-app paths — `closeSong`, `openSong`,
     // `openStandard`, the sub-views' own setters — so an unchecked chart, a recovered draft or a
     // missing song behaves exactly as it does from a button.
-    // The handler reads only refs, and `applyNav` through `applyNavRef`'s latest closure.
+    // The handler reads only refs, and the latest render's `applyNav` and view through effect
+    // events (`onApplyNav`, `onDeferredSync`), so it is added once per `ready`.
     // `working` is the shell's lock ref: the same object every render, so naming it re-runs nothing.
     useEffect(() => {
         if (!ready) {
@@ -147,7 +150,7 @@ export function useHistoryNavigation({
                 }
                 if (silentPops.current === 0 && deferredNavSync.current) {
                     deferredNavSync.current = false;
-                    syncHistoryRef.current(navViewRef.current);
+                    onDeferredSync();
                 }
                 return;
             }
@@ -182,21 +185,17 @@ export function useHistoryNavigation({
                 pendingNav.current = target;
                 return;
             }
-            applyNavRef.current(target, from);
+            onApplyNav(target, from);
         }
         window.addEventListener('popstate', onPopState);
         return () => window.removeEventListener('popstate', onPopState);
     }, [ready, working]);
-    const applyNavRef = useRef<(target: NavEntry, from: NavEntry | null) => void>(() => {});
-    applyNavRef.current = applyNav;
-    const syncHistoryRef = useRef(syncHistory);
-    syncHistoryRef.current = syncHistory;
     // A Back pressed while the shell was busy is applied once it settles.
     useEffect(() => {
         if (!busy && pendingNav.current) {
             const target = pendingNav.current;
             pendingNav.current = null;
-            applyNavRef.current(target, navEntry.current);
+            onApplyNav(target, navEntry.current);
         }
     }, [busy]);
 

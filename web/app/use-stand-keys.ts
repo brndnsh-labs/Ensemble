@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useEffectEvent } from 'react';
 import type { ChartDocument } from '../lib/runtime';
 
 /** What the shell hands `useStandKeys`: exactly what the key handler reads. */
@@ -32,13 +32,12 @@ export function useStandKeys({
     togglePlayback,
     setFollowing,
 }: StandKeysOptions) {
-    const standKeys = useRef<((event: KeyboardEvent) => void) | null>(null);
     // Keys on the stand (UI audit): Space plays and stops, and PageDown/PageUp step through the
     // chart a section at a time — what a page-turn pedal sends. Only on the stand's chart, with no
     // sheet or dialog open, and never while typing: Space on a focused button or control is that
-    // control's own, so it is left alone. Read through a ref so the listener, added once, always
-    // sees this render's state.
-    standKeys.current = (event: KeyboardEvent) => {
+    // control's own, so it is left alone. An effect event, so the listener, added once, always
+    // sees the latest render's state.
+    const onStandKey = useEffectEvent((event: KeyboardEvent) => {
         if (!current || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
             return;
         }
@@ -97,9 +96,9 @@ export function useStandKeys({
                 behavior: reduce ? 'instant' : 'smooth',
             });
         }
-    };
+    });
     useEffect(() => {
-        const onKey = (event: KeyboardEvent) => standKeys.current?.(event);
+        const onKey = (event: KeyboardEvent) => onStandKey(event);
         window.addEventListener('keydown', onKey);
         return () => window.removeEventListener('keydown', onKey);
     }, []);

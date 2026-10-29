@@ -105,17 +105,16 @@ export function Menu({
         }
         latest.current.onClose();
     }
-    const closeRef = useRef(close);
-    closeRef.current = close;
 
+    // Both hooks call the latest render's `close` from their effects and listeners.
     useAnchoredPlacement(node, anchor, {
         enabled: !sheet,
         align,
-        onGone: () => closeRef.current(false),
+        onGone: () => close(false),
     });
 
     // Its trigger's `aria-expanded`, a press outside and Esc anywhere: shared with the Key popover.
-    useAnchoredDismiss([node, backdrop], anchor, (refocus) => closeRef.current(refocus));
+    useAnchoredDismiss([node, backdrop], anchor, close);
 
     useEffect(() => {
         const rows = Array.from(
