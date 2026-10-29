@@ -15,7 +15,6 @@ import type { ChartDocument } from '../lib/runtime';
 import { openedAtMap as guestOpenedAtMap, recordOpened as recordOpenedGuest } from '../lib/session';
 import { readGuestHome } from '../lib/starters';
 
-/** What the shell hands `useSongbookLibrary`. */
 /**
  * Which songbook-home view shows while no chart is on the stand: the library list, the standards
  * browser (#1439), or the All songs page (#1440) — opened on a collection (#1478) or on All songs
@@ -26,6 +25,7 @@ export type Browse =
     | { view: 'standards' }
     | { view: 'all'; collection: string | null };
 
+/** What the shell hands `useSongbookLibrary`. */
 interface SongbookLibraryOptions {
     /** The boot read (`start()`) has finished: the runtime is up and the guest home was read. */
     ready: boolean;
