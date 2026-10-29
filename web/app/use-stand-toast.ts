@@ -40,9 +40,11 @@ interface StandToast {
 /**
  * The stand's message toast (#1460): the message and its tone, the busy line's debounce, the
  * sync-failure notice's dismissal, and the auto-dismiss clock. The shell keeps what each hint
- * says and the notice itself (`syncFailureNotice`). Call it where `syncStatusProps` is known and
- * before `useDeleteUndo`, where these effects have always run; every `setMessage` caller above it
- * runs from an event or an effect, never during render.
+ * says and the notice itself (`syncFailureNotice`). Call it right after `offline`
+ * (`useOfflineInstall`), the last input `syncStatusProps` reads, and before `useRowMenu` and
+ * `useSongDeletes`, whose handlers say their sentences through `setMessage` (#1930); its effects
+ * set only its own state, so running them earlier changes nothing. Every `setMessage` caller
+ * above it runs from an event or an effect, never during render.
  */
 export function useStandToast({
     busy,

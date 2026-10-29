@@ -11,7 +11,7 @@ import { libraryDocuments } from '../lib/documents';
 import type { HomeSlice } from '../lib/home';
 import * as repository from '../lib/repository';
 import type { ChartDocument } from '../lib/runtime';
-import { openedAtMap as guestOpenedAtMap } from '../lib/session';
+import { openedAtMap as guestOpenedAtMap, recordOpened as recordOpenedGuest } from '../lib/session';
 import { readGuestHome } from '../lib/starters';
 
 /** What the shell hands `useSongbookLibrary`. */
@@ -57,7 +57,7 @@ interface SongbookLibrary {
     accountUnreadable: number;
     /** The live songbook's per-device opened-at map (#1440). */
     openedAt: Map<string, string>;
-    /** `recordOpenedPreference`, `useSongDeletes` and `useCollectionActions` update it directly. */
+    /** `useSongDeletes` and `useCollectionActions` update it directly (and `recordOpened` here). */
     setOpenedAtState: Dispatch<SetStateAction<Map<string, string>>>;
     /** The live songbook's home slice, or null while it has not been read. */
     liveHome: HomeSlice | null;
@@ -79,6 +79,8 @@ interface SongbookLibrary {
     reloadGuestLibrary: () => Promise<void>;
     /** One song from the live songbook, by id. */
     readLiveSong: (id: string) => Promise<ChartDocument | null>;
+    /** Records a song as opened just now, in `owner`'s songbook or the guest one (#1440). */
+    recordOpened: (id: string, owner: string | null) => void;
 }
 
 /**
@@ -86,10 +88,10 @@ interface SongbookLibrary {
  * the per-device opened-at map, the live songbook's derivations, the effects that read them
  * (the account full read, the opened-at map, the guest full read, the home slice's re-read) and
  * the functions every surface asks them through (`refreshSongs`, `wantLibrary`, `openAllSongs`,
- * `readLiveSong`, …). The shell keeps the boot effect that writes the first guest home slice
- * (`setGuestHome`, `bootHomeFresh`), `useAccountExit`'s clears, `songbookLoading`, `template`
- * and `importPlaylist`. Call it right after `sessionOwner`, before anything reads `liveHome` or
- * `guestHome` during render.
+ * `readLiveSong`, `recordOpened`, …). The shell keeps the boot effect that writes the first guest
+ * home slice (`setGuestHome`, `bootHomeFresh`), `useAccountExit`'s clears, `songbookLoading`,
+ * `template` and `importPlaylist`. Call it right after `sessionOwner`, before anything reads
+ * `liveHome` or `guestHome` during render.
  */
 export function useSongbookLibrary({
     ready,
@@ -144,7 +146,7 @@ export function useSongbookLibrary({
     // Per-device opened-at map (#1440) — never a document field, and scoped to whichever songbook
     // is live the same way `songs` itself is (guest `localStorage`, or the account database read
     // through `accountSync`). Refreshed by the effect beside the account library read below, and
-    // updated directly by `recordOpenedPreference`. Stars are no longer here: since #1477 they
+    // updated directly by `recordOpened`. Stars are no longer here: since #1477 they
     // are the built-in Starred collection (`useCollections`, the shell's).
     const [openedAt, setOpenedAtState] = useState<Map<string, string>>(() => new Map());
     // The live songbook's home slice (#1441), or null while it has not been read. Signed in, a
@@ -448,6 +450,30 @@ export function useSongbookLibrary({
         }
         return repository.get(id);
     }
+    /**
+     * Records this song as opened just now (#1440) — a per-song preference, alongside the
+     * existing single Continue-card pointer the shell's `rememberOpened` already writes. Never a
+     * document edit: this touches neither `songs`/`operations` nor the guest `documents` store.
+     *
+     * `owner` is the STAND's resolved owner (the shell's `rememberOpened`'s own `stand.ownerId`,
+     * already checked against `standBelongsElsewhere`), not a fresh read of `sync.owner` — the two
+     * can differ for one render while an account attach is settling, and this must land in the
+     * same songbook the chart itself was just bound to, never a guess at the live one.
+     */
+    function recordOpened(id: string, owner: string | null) {
+        if (owner !== null) {
+            accountSync.recordOpened(id, owner).catch(() => {
+                /* A preference nobody can store is still a chart just opened. */
+            });
+        } else {
+            recordOpenedGuest(id);
+        }
+        setOpenedAtState((previous) => {
+            const updated = new Map(previous);
+            updated.set(id, new Date().toISOString());
+            return updated;
+        });
+    }
 
     return {
         guestHome,
@@ -470,5 +496,6 @@ export function useSongbookLibrary({
         openAllSongs,
         reloadGuestLibrary,
         readLiveSong,
+        recordOpened,
     };
 }
