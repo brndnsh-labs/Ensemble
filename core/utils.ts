@@ -28,7 +28,7 @@ import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
  * clamp inlined — don't route it through here.
  */
 export function clamp01(x: number): number {
-    return x < 0 ? 0 : x > 1 ? 1 : x;
+    return Math.min(1, Math.max(0, x));
 }
 
 /**

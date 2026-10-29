@@ -50,9 +50,12 @@ quality, and the notes each symbol rules out (`chord-clash.ts`).
   reason a player would recognise. If the dictionary is right, fix the band's table.
 - **Only the comp is held to the clash rules.** A walking line and a solo reach wrong notes on
   purpose (approach notes, enclosures, blue notes); a rule cannot tell a good one from a bad one.
-- **`@tonaljs/chord` is pinned, with three `overrides` in `package.json`.** The 2026-09-28
-  releases of the library ship a `main` that points at a file they do not contain, so node cannot
-  load them. Drop the pin and the overrides once a later release loads under `npx tsx`.
+- **`@tonaljs/chord` is pinned exact, like the rest of `package.json`'s engine deps.** The
+  2026-09-28 releases of the library shipped a `main` pointing at a file they did not contain, so
+  node could not load them, and three `overrides` held its `pitch-*` packages back. 6.2.1 and the
+  current `pitch-*` releases load under `npx tsx` again (checked 2026-10-29), so the overrides are
+  gone; a bump still has to be probed under `npx tsx` from inside the repo, since Vitest's loader
+  is more forgiving than node's.
 
 ## Determinism & seeding
 

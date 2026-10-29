@@ -944,6 +944,8 @@ function keepMineAsNewSong(
         .sort((a, b) => (a.capturedAt < b.capturedAt ? -1 : a.capturedAt > b.capturedAt ? 1 : 0))
         .forEach((draft, i) => {
             const at = new Date(Date.parse(now) + i).toISOString();
+            // ISO timestamps, compared as strings: `Math.max` would coerce them to NaN.
+            // biome-ignore lint/complexity/useMathMinMax: the operands are ISO strings, not numbers.
             restamped.set(draft, draft.capturedAt >= at ? draft.capturedAt : at);
         });
     for (const moved of drafts) {

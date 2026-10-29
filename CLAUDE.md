@@ -235,6 +235,16 @@ The few engine tests that need a **real `OfflineAudioContext`** (reverb-tail dec
 
 4-space indent, single quotes, 100-char line width. Run `npm run format` before finishing.
 
+Two of Biome 2.6's recommended rules are off in `biome.json`, and its Markdown and YAML formatters
+with them (2026-10-29): `usePlaywrightValidDescribeCallback` fires on `band/theory/chord.ts`'s own
+`describe` (a chord, not a suite; every `test.describe` here has its callback, and tsc would
+refuse one without). `useDomNodeTextContent` fires only on Playwright locators' `innerText()`
+in `web/checks/`, where the visible text is the point; no app code reads `innerText`. The
+Markdown formatter's first release rewrites YAML front matter in the rendered skill and agent
+files, which the-cycle manages, so it stays off until it leaves front matter alone. The YAML
+formatter would re-indent the workflows and compose files to four spaces, against the
+GitHub Actions and Compose convention they follow, so it is off as well.
+
 ## Commit & PR Conventions
 
 Conventional Commit style, scoped where useful: `feat(soloist): ...`, `fix(ts): ...`, `chore(deps): ...`, `refactor(mobile): ...`. Keep commits focused. PRs should include a short summary, test commands run, linked issues if applicable, and screenshots/recordings for UI changes. Commit-message and PR-body trailers, branch policy, and `git add`-explicit-paths rules live in **DOCTRINE §8/§9**.
