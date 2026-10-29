@@ -1,0 +1,150 @@
+/* The stand's bottom-centred stack (#1460): the message toast, the sync-failure notice and the
+   Resume-follow pill.
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+/* #1460 review P2 #1/#4 — one fixed, bottom-centred STACK holding the message toast, the
+   sync-failure notice and the Resume-follow pill, in normal flex-column flow. This is what makes
+   the three unable to ever overlap or mask one another: the old single fixed-position toast let
+   an undismissed sync failure hide every later "Link copied"/"Saved" message (they shared one
+   slot), and the pill and the toast could overlap by a few px at some viewport sizes (independent
+   `bottom` offsets, no shared layout). None of the three below claims flow height on its own any
+   more (the chart gets that back) — only this container is `position: fixed`. It must not cover
+   the playing row — with #1458's look-ahead the playing row sits in the top third of
+   `.chart-scroll`, so a bottom-anchored stack only ever reaches bars further ahead. */
+.stand-stack {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    max-width: calc(100vw - 28px);
+    /* Re-review P3 — the empty `.stand-toast` collapses to zero size (below), but the STACK
+       CONTAINER itself is a full-width-capped, fixed-position box sitting over the bottom of the
+       chart at every moment, whether or not anything inside it is currently showing — on phone
+       widths that silently ate taps meant for the chord grid underneath. `none` here, `auto` on
+       each visible child, so only the toast/notice/pill themselves ever intercept a tap. */
+    pointer-events: none;
+}
+/* Always mounted (`data-empty` collapses it) for the same reason `.status-banner` is: a live
+   region's TEXT CHANGE is announced reliably, a freshly-inserted one is not (#1440). */
+.stand-toast {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    background: var(--ink);
+    color: var(--surface);
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: var(--shadow);
+    border-radius: 12px;
+    max-width: 100%;
+    pointer-events: auto;
+}
+.stand-toast[data-empty="true"] {
+    padding: 0;
+    max-width: 0;
+    max-height: 0;
+    overflow: hidden;
+}
+/* A `warning`-tone message (review P2 #3): persists until its own close button, unlike the
+   auto-dismiss `info` tone — the accent palette is the visual cue telling the two apart, the
+   same "a decision is waiting" language `.conflict-banner` already uses, never the danger
+   palette (that is spent on things that were actually lost). */
+.stand-toast[data-tone="warning"] {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+/* #1460 review P2 #2 — the sync-failure notice, its own element (not a tone of `.stand-toast`
+   any more) so a standing failure can never mask a later message. Review P3: accent, not danger
+   — the account will retry, or the musician has an explicit way out (Keep both / a fresh Save);
+   nothing here was lost the way the danger palette implies. */
+.stand-sync-failure {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 18px;
+    background: var(--accent-light);
+    color: var(--accent);
+    font-size: 12px;
+    line-height: 1.5;
+    box-shadow: var(--shadow);
+    border-radius: 12px;
+    max-width: 100%;
+    pointer-events: auto;
+}
+/* A toast's one action (a delete's Undo, #1758): a text button in the toast's own colours, 44px
+   tall like its close button. */
+.toast-action {
+    flex-shrink: 0;
+    min-height: 44px;
+    margin-block: -8px;
+    margin-right: -6px;
+    padding: 0 10px;
+    border: 0;
+    border-radius: 8px;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 700;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+}
+.toast-action:focus-visible {
+    outline: 3px solid var(--focus-ring);
+    outline-offset: -3px;
+}
+.toast-close {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    line-height: 1;
+    color: inherit;
+}
+/* #1460 — Resume follow, in the same stack. Shown only while playing with Following off (a
+   musician scrolled away); tapping it turns Following back on and hides it, the only direction
+   this control still offers — turning Following OFF stays a scroll/wheel/touch gesture, same as
+   before. */
+.resume-follow-pill {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    padding: 0 18px;
+    background: var(--green);
+    color: var(--on-ink);
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 22px;
+    box-shadow: var(--shadow);
+    pointer-events: auto;
+}
+.popover {
+    position: fixed;
+    z-index: 30;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    box-shadow: var(--shadow);
+    padding: 17px;
+    width: 260px;
+}
+dialog {
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: var(--shadow);
+    padding: 30px;
+    width: min(460px, calc(100vw - 32px));
+    max-height: 90dvh;
+    overflow: auto;
+}

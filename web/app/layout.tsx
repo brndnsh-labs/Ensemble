@@ -1,5 +1,19 @@
 import type { Metadata, Viewport } from 'next';
+// The order of these side-effect imports IS the cascade: `style.css` was one file, cut at its
+// section boundaries, and later rules win ties. Do not sort or regroup them (#1936).
 import './style.css';
+import './song-header.css';
+import './chart-sheet.css';
+import './stand-stack.css';
+import './responsive.css';
+import './stand-shell.css';
+import './transport.css';
+import './chart-editing.css';
+import './band-sheet.css';
+import './workspace.css';
+import './account.css';
+import './songbook.css';
+import './chart-page.css';
 import './motion.css';
 
 export const metadata: Metadata = {

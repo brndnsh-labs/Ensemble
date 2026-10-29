@@ -1,0 +1,192 @@
+/* The open song's viewport (`.song-open`), its phone and landscape fits, the Day/Stage choice and
+   the Stage toggle.
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+/* The open song owns the viewport. Branding and installation belong outside
+   the score; errors participate in layout instead of pushing transport offscreen. */
+.app-shell.song-open {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+}
+.song-open .workspace {
+    height: auto;
+    flex: 1;
+    min-height: 0;
+}
+.song-open .song-header {
+    padding: 10px 24px;
+    gap: 12px;
+}
+.song-open .song-title {
+    font-size: 24px;
+}
+.song-open .song-subtitle {
+    margin-top: 3px;
+}
+.song-open .transport-bar {
+    padding: 8px 24px;
+    gap: 16px;
+}
+/* #1460 — the bottom padding clears the fixed `.stand-stack` (it no longer claims any of
+   `.chart-scroll`'s own flow height the way the removed footer did): the last row can still
+   scroll fully clear of it. Re-review P3 — 108px is the ORIGINAL floor, sized for the common
+   case (the message toast, or the toast plus the pill); it does not grow just because the stack
+   COULD hold a third thing. `--stand-stack-height` (set by the `ResizeObserver` in
+   `app/stand-stack.tsx`) is the stack's OWN actual current height, 0 when nothing shows, so `max()`
+   only asks for more room while the stack genuinely needs it — a chart that fit before this
+   story still fits, and the last row still clears the stack on the rare render where all three
+   are up. */
+.song-open .chart-scroll {
+    padding: 12px 24px max(108px, calc(var(--stand-stack-height, 0px) + 28px));
+}
+.song-open .sheet {
+    max-width: 1200px;
+    /* #1186 — the stand's scale lives here, in the layer that actually governs an
+       open chart. The base .bar/.chord rules never win once .song-open is on the
+       shell, so scaling them had no effect on the stand. Floors equal the previous
+       flat values, so nothing shrinks anywhere. */
+    --bar-min: clamp(86px, 15vh, 150px);
+    --chord-size: clamp(30px, 4.8vh, 52px);
+    --section-letter-size: clamp(12px, 2vh, 21px);
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    /* Top-anchored, not centred: a short chart reads as a page starting at the top
+       with room below, not as content floating mid-screen. Centering was tried and
+       reverted (#1186) — it pushed the first bar ~200px down on a short chart at
+       laptop width, which regressed the existing top-of-stand contract. */
+    justify-content: flex-start;
+}
+.song-open .section {
+    margin-bottom: 18px;
+}
+.song-open .section-head {
+    margin-bottom: 6px;
+}
+.song-open .bar {
+    min-height: var(--bar-min, 86px);
+}
+.song-open .chord {
+    font-size: var(--chord-size, 30px);
+}
+.song-open .section-letter {
+    /* Section identity is navigation now that repeats and endings make
+       multi-section forms real; the box is em-sized so it tracks the letter. */
+    font-size: var(--section-letter-size, 12px);
+    min-width: 2em;
+    height: 1.9em;
+}
+.performance-focus .song-subtitle,
+.performance-focus .mode-switch,
+.performance-focus .save-btn,
+.performance-focus .menu-btn,
+.performance-focus .band-button {
+    display: none;
+}
+/* One size for idle and playing: a second, larger playing-only scale used to
+   reflow every bar/chord/section-letter the instant playback started or
+   stopped, which read as the chart jumping around rather than settling. The
+   idle scale above already uses the available space well, so the modest extra
+   size playing used to add (#1186) wasn't worth that jump. Chrome (Edit/Save/
+   genre controls) still hides via the rules above; only typography stopped
+   changing. */
+/* Phone portrait already reads well at playing distance and is the reference
+   layout (#1186); only section identity grows here. */
+@media (max-width: 760px) {
+    .song-open .sheet {
+        --bar-min: 86px;
+        --chord-size: 30px;
+        --section-letter-size: clamp(12px, 2.2vh, 18px);
+    }
+}
+/* Landscape phone trades height for width; hold every floor. */
+@media (max-height: 520px) and (orientation: landscape) {
+    .song-open .sheet {
+        --bar-min: 86px;
+        --chord-size: 27px;
+        --section-letter-size: 12px;
+    }
+}
+@media (max-width: 760px) {
+    .song-open .song-header {
+        padding: 8px 12px;
+        gap: 6px;
+    }
+    .song-open .song-heading {
+        min-width: 0;
+        flex: 1 1 190px;
+    }
+    .song-open .song-title {
+        font-size: 22px;
+        max-width: calc(100vw - 82px);
+    }
+    .song-open .song-actions {
+        min-width: 0;
+        flex: 0 1 auto;
+    }
+    .song-open .transport-bar {
+        padding: 8px 12px;
+        gap: 10px;
+    }
+    .song-open .band-controls {
+        order: 2;
+        padding-top: 6px;
+    }
+    .song-open .genre-setting {
+        margin-left: 0;
+    }
+    .song-open .chart-scroll {
+        /* #1460 — 100px is the original phone-width floor; see the base rule's note. */
+        padding: 10px 14px max(100px, calc(var(--stand-stack-height, 0px) + 24px));
+    }
+    .song-open .tempo-control .step {
+        /* Taller, not wider: the transport row has no width to spare on a phone (Feel wraps
+           to its own line at the first extra pixels on CI's WebKit). */
+        width: 28px;
+        height: 36px;
+    }
+    .song-open .transport-bar {
+        --setting-row: 36px;
+    }
+    .song-open .band-toggle {
+        min-height: 36px;
+    }
+    .performance-focus .song-heading {
+        flex-basis: 0;
+    }
+    .performance-focus .song-title {
+        max-width: calc(100vw - 185px);
+    }
+}
+/* Explicit Day/Stage choice (#1208) overrides the system preference by picking
+   the light-dark() side; tokens are defined only on `:root` and the palette blocks after it
+   (#1280), which are light-dark() pairs too, so the two choices combine. */
+html[data-theme="day"] {
+    color-scheme: light;
+}
+html[data-theme="stage"] {
+    color-scheme: dark;
+}
+/* Stage mode's toggle reads "Stage" where there is room and is a moon on a phone (#1700), where
+   its word was the slack the header row lacked (it wrapped with "Keep a copy" or mid-song). */
+.theme-glyph {
+    display: none;
+    font-size: 15px;
+    line-height: 1;
+}
+@media (max-width: 760px) {
+    .song-actions .theme-toggle {
+        min-width: 40px;
+    }
+    .theme-glyph {
+        display: inline;
+    }
+    .theme-label {
+        display: none;
+    }
+}
+.theme-toggle[aria-pressed="true"] {
+    background: var(--primary);
+    color: var(--on-primary);
+    border-color: var(--primary);
+}
