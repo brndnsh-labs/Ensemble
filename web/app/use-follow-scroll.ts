@@ -12,7 +12,7 @@ import { type RefObject, useEffect, useRef } from 'react';
  *
  * `'instant'`, not `'auto'`: the `behavior` option's `'auto'` means "do whatever the element's
  * `scroll-behavior` CSS property says", and `.chart-scroll`'s own `scroll-behavior: smooth`
- * (`style.css`) — a class selector — outranks `* { scroll-behavior: auto }`'s reduced-motion
+ * (`chart-sheet.css`) — a class selector — outranks `* { scroll-behavior: auto }`'s reduced-motion
  * override on specificity alone; the universal selector never wins that fight regardless of the
  * media query. `'instant'` is an explicit value the CSS property cannot override.
  */
