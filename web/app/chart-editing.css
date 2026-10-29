@@ -168,3 +168,9 @@
 .sound-progress:empty {
     display: none;
 }
+/* A chord button the chart has disabled reads as the chord, not as a faded button (#1949, moved
+   from stand-shell.css). */
+.chord-button:disabled {
+    opacity: 1;
+    cursor: default;
+}

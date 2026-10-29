@@ -453,3 +453,22 @@
         height: calc(100dvh - 44px);
     }
 }
+/* The title, typed in the header while editing (#1726): the heading's own type, with a rule
+   under it so it reads as a field. */
+.song-title-input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    border-bottom: 1px dashed var(--line);
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    padding: 0 0 1px;
+}
+.song-title-input:focus-visible {
+    outline: none;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0;
+}
