@@ -442,9 +442,6 @@ button.bar-number {
     gap: 8px;
     flex-wrap: wrap;
 }
-.chord {
-    overflow-wrap: anywhere;
-}
 .sheet {
     min-width: 0;
 }

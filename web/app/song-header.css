@@ -129,10 +129,6 @@
 .tempo-control input::-webkit-inner-spin-button {
     appearance: none;
 }
-.tempo-control .unit {
-    font-size: 10px;
-    color: var(--muted);
-}
 .tempo-control .step {
     display: inline-flex;
     align-items: center;
@@ -144,11 +140,6 @@
     height: 28px;
     border: 1px solid var(--line);
     border-radius: 5px;
-}
-.divider {
-    width: 1px;
-    height: 30px;
-    background: var(--line);
 }
 .band-controls {
     margin-left: auto;
@@ -262,7 +253,7 @@
     }
     .song-title {
         font-size: 25px;
-        max-width: 250px;
+        max-width: 270px;
     }
     .song-subtitle {
         font-size: 10px;
@@ -323,15 +314,9 @@
         font-size: 19px;
         width: 38px;
     }
-    .tempo-control .unit {
-        display: none;
-    }
     .tempo-control .step {
         width: 21px;
         height: 22px;
-    }
-    .transport-bar > .divider {
-        display: none;
     }
     .setting-label {
         font-size: 8px;
