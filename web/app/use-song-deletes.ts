@@ -162,8 +162,8 @@ export interface SongDeletes {
  * stand and from a row, delete-from-this-device, and removing the songs this build cannot read —
  * each confirm's state, its `<dialog>`, its guard and the handlers that open and answer it. The
  * shell keeps the dialogs' rendering, the controls that open them (the row ⋯ menu, the Song menu,
- * the songbook's notices) and the paths these reach (`run`, `refreshSongs`, `exportSong`, the
- * stand binding). Call it where the two cloud-delete confirms' guard effects always ran, after
+ * the songbook's notices) and the paths these reach (`run`, `useSongbookLibrary`'s
+ * `refreshSongs`, `exportSong`, the stand binding). Call it where the two cloud-delete confirms' guard effects always ran, after
  * `dirty`; its `useModalDialog` order (guest, purge, unreadable, stand, row) is theirs before
  * the move: `deleteFromAccount` closes one confirm and then opens delete-from-this-device.
  */

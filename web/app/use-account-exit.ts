@@ -171,7 +171,7 @@ interface AccountExit {
  * of Delete my account — the step's state, its preflight, the clears and the exports in front of
  * them. The shell keeps the controls that open the step (the account page, the expired banner),
  * the held and deleted owners render reads, and the paths these reach (`run`, `bindStand`,
- * `refreshGuest`). Call it after the effect that reads `heldAccount()`, where the sign-out
+ * `useSongbookLibrary`'s `refreshGuest`). Call it after the effect that reads `heldAccount()`, where the sign-out
  * preflight's effects always ran.
  */
 export function useAccountExit({
