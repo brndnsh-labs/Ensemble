@@ -3151,7 +3151,7 @@ export default function Ensemble() {
                     data-focused={focused}
                     // A bar's field is open on the chart. At phone width that is the dock on the
                     // keyboard (#1724), and the transport folds away so the chart keeps its rows
-                    // above it (`style.css`).
+                    // above it (`song-header.css`).
                     data-bar-open={openBar ? '' : undefined}
                 >
                     <SongHeader
