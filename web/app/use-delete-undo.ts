@@ -10,7 +10,7 @@ import type { ChartDocument } from '../lib/runtime';
 import type { BarDraft } from './use-bar-drafts';
 
 /** How long a delete's Undo is offered (#1758), unless the toast has the pointer or focus. */
-const DELETE_UNDO_MS = 6000;
+export const DELETE_UNDO_MS = 6000;
 
 /**
  * What a delete's Undo puts back (#1758): the chart and its pending bars just before the delete,
