@@ -1,4 +1,4 @@
-import { type Dispatch, type RefObject, type SetStateAction, useState } from 'react';
+import { type Dispatch, type RefObject, type SetStateAction, useCallback, useState } from 'react';
 import type { SyncSnapshot } from '../lib/account/sync-loop';
 import { songsOnlyIn } from '../lib/collections';
 import * as repository from '../lib/repository';
@@ -60,6 +60,8 @@ interface CollectionActions {
     collectionDeleteFailure: string | null;
     /** The collection THIS TAB's own delete just removed (#1477 review R5), or null. */
     deletedCollectionId: string | null;
+    /** Clears `deletedCollectionId` once the page has acted on it; stable across renders. */
+    collectionRemovalHandled: () => void;
     collectionDeleteDialogRef: RefObject<HTMLDialogElement | null>;
     toggleStar: (id: string) => void;
     addRowToCollection: (collectionId: string) => void;
@@ -99,6 +101,7 @@ export function useCollectionActions({
     const [collectionDeleteFailure, setCollectionDeleteFailure] = useState<string | null>(null);
     // The collection THIS TAB's own delete just removed (#1477 review R5) — `deletedRowId`'s rule.
     const [deletedCollectionId, setDeletedCollectionId] = useState<string | null>(null);
+    const collectionRemovalHandled = useCallback(() => setDeletedCollectionId(null), []);
     const collectionDeleteDialogRef = useModalDialog(collectionDeleteTarget !== null);
     /**
      * Star or unstar one song — since #1477 a Save of the built-in Starred collection, which the
@@ -294,6 +297,7 @@ export function useCollectionActions({
         setCollectionDeleteTarget,
         collectionDeleteFailure,
         deletedCollectionId,
+        collectionRemovalHandled,
         collectionDeleteDialogRef,
         toggleStar,
         addRowToCollection,

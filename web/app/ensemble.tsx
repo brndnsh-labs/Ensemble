@@ -417,6 +417,8 @@ export default function Ensemble() {
     // set for a sync-driven removal (another device's delete, a library refresh), which must not
     // steal focus from wherever the musician actually is.
     const [deletedRowId, setDeletedRowId] = useState<string | null>(null);
+    // Stable identity, so the list effects that take it as a dependency do not re-run every render.
+    const removalHandled = useCallback(() => setDeletedRowId(null), []);
     // Set only when the Clipboard API is unavailable or the write is rejected
     // (notably the Playwright WebKit project, which grants no clipboard
     // permission) — the visible fallback the acceptance criteria calls for.
@@ -1264,6 +1266,7 @@ export default function Ensemble() {
         setCollectionDeleteTarget,
         collectionDeleteFailure,
         deletedCollectionId,
+        collectionRemovalHandled,
         collectionDeleteDialogRef,
         toggleStar,
         addRowToCollection,
@@ -3071,6 +3074,7 @@ export default function Ensemble() {
                     onToggleStar={toggleStar}
                     onOpenRowMenu={openRowMenu}
                     lastRemovedId={deletedRowId}
+                    onRemovalHandled={removalHandled}
                     collections={collections.collections}
                     onNewCollection={() => setCollectionNaming({ kind: 'new' })}
                     onRenameCollection={(collectionId, name) =>
@@ -3078,6 +3082,7 @@ export default function Ensemble() {
                     }
                     onDeleteCollection={requestDeleteCollection}
                     removedCollectionId={deletedCollectionId}
+                    onCollectionRemovalHandled={collectionRemovalHandled}
                     onRemoveGone={requestPurgeGone}
                 />
             ) : !current ? (
@@ -3132,6 +3137,7 @@ export default function Ensemble() {
                     onNewSong={newSong}
                     onOpenSong={openSong}
                     lastRemovedId={deletedRowId}
+                    onRemovalHandled={removalHandled}
                 />
             ) : (
                 <main
