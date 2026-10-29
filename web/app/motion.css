@@ -188,3 +188,12 @@ dialog[open]::backdrop {
         transform: none;
     }
 }
+/* The blanket reduced-motion rule (#1949, moved from responsive.css). The universal selector
+   loses to every rule that names a class or an element, so motion here works through the tokens
+   above; this catches only what nothing else styles. */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        scroll-behavior: auto;
+        transition: none;
+    }
+}

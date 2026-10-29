@@ -5,7 +5,6 @@ import './style.css';
 import './song-header.css';
 import './chart-sheet.css';
 import './stand-stack.css';
-import './responsive.css';
 import './stand-shell.css';
 import './transport.css';
 import './chart-editing.css';

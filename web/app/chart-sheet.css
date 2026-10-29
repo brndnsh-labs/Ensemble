@@ -348,7 +348,7 @@ button.bar-number {
         padding-bottom: 16px;
     }
     /* Typing a bar on a phone (#1724): its field is docked on the keyboard (`bar-dock.css`), so
-       the transport row folds away while it is up (`responsive.css`) and the chart keeps two or
+       the transport row folds away while it is up (`song-header.css`) and the chart keeps two or
        three rows above it. The chart's padding lets its last bar scroll clear of the dock and
        keyboard (`--bar-dock-space`, set by the dock), and its scroll padding keeps the bar being
        typed above them when it is scrolled into view. */
@@ -399,7 +399,7 @@ button.bar-number {
     }
 }
 @media (prefers-reduced-motion: reduce) {
-    /* responsive.css's reduced-motion `*` can't reach this: `.chart-scroll { scroll-behavior:
+    /* motion.css's reduced-motion `*` can't reach this: `.chart-scroll { scroll-behavior:
        smooth }` is a class selector, outranking the universal selector on specificity regardless
        of media query membership. Repeat the override at the same specificity so source order
        decides it (#1458 patch review P1-5). Belt-and-suspenders for `Element.scrollTo`'s own
