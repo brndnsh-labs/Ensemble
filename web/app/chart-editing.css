@@ -130,9 +130,6 @@
     color: var(--muted);
     overflow-wrap: anywhere;
 }
-.home-actions input {
-    display: none;
-}
 .mode-switch button:disabled {
     opacity: 0.6;
 }
@@ -146,9 +143,6 @@
     }
     .error-banner {
         font-size: 11px;
-    }
-    .song-title {
-        max-width: 270px;
     }
     .modal-box {
         padding: 20px;

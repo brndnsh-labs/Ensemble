@@ -439,11 +439,6 @@ html [hidden] {
     font-size: 14px;
     color: var(--muted);
 }
-.home-actions {
-    display: flex;
-    gap: 9px;
-    padding-bottom: 4px;
-}
 .section-heading {
     display: flex;
     align-items: center;
@@ -615,9 +610,6 @@ html [hidden] {
     .home h1 {
         font-size: 39px;
     }
-    .home-actions .btn {
-        padding: 9px 11px;
-    }
 }
 @media (max-width: 760px) {
     .header-right {
@@ -627,11 +619,7 @@ html [hidden] {
         font-size: 11px;
         padding: 7px 9px;
     }
-    .home {
-        padding: 29px 20px 24px;
-    }
     .home h1 {
-        font-size: 38px;
         margin-top: 8px;
     }
     .home-intro {
@@ -641,12 +629,6 @@ html [hidden] {
     .home-intro p {
         font-size: 13px;
         line-height: 1.6;
-    }
-    .home-actions {
-        margin-top: 19px;
-    }
-    .home-actions .btn {
-        font-size: 12px;
     }
     .section-heading h2 {
         font-size: 15px;

@@ -174,11 +174,8 @@ dialog p {
     margin-top: 22px;
     flex-wrap: wrap;
 }
-/* The modal box's backdrop and a second actions-row rule (its 9px gap wins over the 8px above),
-   moved from stand-shell.css (#1949) to sit just after that rule, as they came after it there. */
-.modal-box::backdrop {
-    background: var(--backdrop);
-}
+/* A second actions-row rule (its 9px gap wins over the 8px above), moved from stand-shell.css
+   (#1949) to sit just after that rule, as it came after it there. */
 .dialog-actions {
     display: flex;
     flex-wrap: wrap;
