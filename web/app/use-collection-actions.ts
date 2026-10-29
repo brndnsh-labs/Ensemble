@@ -73,8 +73,8 @@ interface CollectionActions {
  * The All songs page's collection actions (#1477): starring, the row ⋯ menu's "Add to
  * collection…", the New/Rename dialog and the delete confirm — each dialog's state, its
  * `<dialog>` and the handlers that open and answer it. The shell keeps the collection state
- * (`useCollections`), the dialogs' rendering and the paths these reach (`run`, `refreshSongs`,
- * the row menu). Call it after `useSongDeletes`, for its `commitCloudDelete`.
+ * (`useCollections`), the dialogs' rendering and the paths these reach (`run`,
+ * `useSongbookLibrary`'s `refreshSongs`, the row menu). Call it after `useSongDeletes`, for its `commitCloudDelete`.
  */
 export function useCollectionActions({
     collections,

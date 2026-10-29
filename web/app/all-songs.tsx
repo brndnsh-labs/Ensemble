@@ -105,8 +105,8 @@ interface AllSongsProps {
      * state for a mouse user who has clicked nothing since loading the page, so it fired on a
      * row disappearing for ANY reason (a sync-driven removal, another device's delete) and stole
      * focus from wherever the musician actually was. This is set only by the delete handlers in
-     * `app/ensemble.tsx` and cleared right after, so the effect below can require the removed row
-     * to match this specific id before it moves focus at all.
+     * `app/use-song-deletes.ts` and cleared right after, so the effect below can require the
+     * removed row to match this specific id before it moves focus at all.
      */
     lastRemovedId: string | null;
     /**
