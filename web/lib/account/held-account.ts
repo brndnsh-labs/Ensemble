@@ -17,7 +17,7 @@ const HELD_FLAG = 'ensemble-v2-preview:account-held';
  * A device that has never held an account cannot have a session to discover: signing in is what
  * creates its records, and that path asks for itself. So the bootstrap `GET /api/auth/session`
  * is skipped for it entirely — no request, and therefore no account database either, since
- * `ensemble.tsx`'s held-account read is gated on the session having answered.
+ * `useHeldAccount`'s held-account read is gated on the session having answered.
  *
  * That is a guest-boundary rule before it is anything else — a musician who never signed in
  * should not have this app talking to a server on their behalf — but it was found the hard way.

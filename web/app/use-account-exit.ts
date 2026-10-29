@@ -134,7 +134,7 @@ interface AccountExitOptions {
     clearBuffers: () => void;
     /** Re-reads the guest songbook, whatever the session says. */
     refreshGuest: () => Promise<void>;
-    /** Which account this device holds, from storage: the shell's module-level `heldAccount`. */
+    /** Which account this device holds, from storage: `useHeldAccount`'s `heldAccount`. */
     heldAccount: () => Promise<string | null>;
 }
 
@@ -169,10 +169,10 @@ interface AccountExit {
 /**
  * Leaving an account (#1269, #1271, #1351): Sign out, Sign out on this device, and the local half
  * of Delete my account — the step's state, its preflight, the clears and the exports in front of
- * them. The shell keeps the controls that open the step (the account page, the expired banner),
- * the held and deleted owners render reads, and the paths these reach (`run`, `bindStand`,
- * `useSongbookLibrary`'s `refreshGuest`). Call it after the effect that reads `heldAccount()`, where the sign-out
- * preflight's effects always ran.
+ * them. The shell keeps the controls that open the step (the account page, the expired banner)
+ * and the paths these reach (`run`, `bindStand`, `useSongbookLibrary`'s `refreshGuest`); the held
+ * and deleted owners render reads are `useHeldAccount`'s. Call it after `useHeldAccount`, whose
+ * effect reads `heldAccount()`, where the sign-out preflight's effects always ran.
  */
 export function useAccountExit({
     account,

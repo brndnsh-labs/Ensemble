@@ -7,7 +7,6 @@ import type { InstrumentVoice } from '@core/types';
 import { keyDistance } from '@core/utils';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { libraryDownloaded } from '../lib/account/adopt-guest';
-import { heldAccountBanner } from '../lib/account/messages';
 import {
     AccountMismatchError,
     accountSync,
@@ -89,6 +88,7 @@ import { useCollectionActions } from './use-collection-actions';
 import { useCollections } from './use-collections';
 import { useDeleteUndo } from './use-delete-undo';
 import { useFollowScroll } from './use-follow-scroll';
+import { useHeldAccount } from './use-held-account';
 import { useHistoryNavigation } from './use-history-navigation';
 import { useModalDialog } from './use-modal-dialog';
 import { useNeckPrefs } from './use-neck-prefs';
@@ -194,21 +194,6 @@ const sameMusic = (a: ChartDocument, b: ChartDocument) =>
  */
 type StandStore = { store: 'account'; ownerId: string } | { store: 'guest' };
 
-/**
- * Which account this device HOLDS, from storage (#1351 patch R1) — `meta.active`, through the
- * loop rather than by reaching into the repository.
- *
- * Module-level so both readers share one expression: the shell's effect that watches the
- * transitions which can change it, and `useAccountExit`'s clears (handed it as a prop), which
- * have just changed it.
- *
- * An unreadable store answers null, which hides the sign-out offer rather than showing one that
- * cannot name what it would clear — the conservative direction, and the same one `heldScope`
- * takes when it refuses.
- */
-function heldAccount(): Promise<string | null> {
-    return accountSync.heldOwner().catch(() => null);
-}
 /** Read the live engine values the Feel sheet needs but doesn't read off `ChartDocument`. */
 function feelSnapshot(): FeelSnapshot {
     const { playback } = runtime.state();
@@ -274,32 +259,6 @@ export default function Ensemble() {
      * one" — which is the only transition the effect below acts on.
      */
     const attachedOwner = useRef<string | null>(null);
-    /**
-     * Which account this device HOLDS on disk, or null (#1351, storage-derived per patch R1).
-     *
-     * A STORAGE fact, read through `heldAccount()`, never a mirror of anything in memory. That is
-     * the whole correction: an earlier draft followed the loop's published owner, which made the
-     * sign-out offer depend on the session state — and `expired` only exists in the page load
-     * where a live session lapsed (`session.ts` moves a `signedIn` session to `expired`, and a
-     * cold `unknown` straight to `guest`). So a RELOAD of an expired device landed on `guest` with
-     * every one of that account's rows still here and nothing on screen able to name them, which
-     * is exactly the sequence this story exists for: the device changes hands, and it is restarted
-     * in between.
-     *
-     * Written in two places, one expression: the effect below, on every transition that can change
-     * it, and the sign-out cleanup, which has just changed it and re-reads rather than assuming —
-     * a clear that failed after the fence moved puts the owner back (patch R2), and the offer has
-     * to come back with it or the retry is unreachable.
-     */
-    const [heldOwner, setHeldOwner] = useState<string | null>(null);
-    /**
-     * The owner a DELETION ran for in this tab, when its local clear did not finish (#1351 patch
-     * N1). In-memory on purpose: it is the one thing storage cannot tell us apart — `meta.active`
-     * naming an account looks identical whether that account still exists or was deleted a second
-     * ago — and a reload legitimately falls back to the generic held-account sentence, which stays
-     * true. What it buys is that this tab never offers to sign in to an account it just deleted.
-     */
-    const [deletedOwner, setDeletedOwner] = useState<string | null>(null);
     const [recoveryHealthy, setRecoveryHealthy] = useState(true);
     // #1266 — whether the LAST explicit Save failed locally. `status.ts` ranks that above an
     // older successful revision, so it cannot be inferred from `saved` and needs its own fact.
@@ -496,35 +455,10 @@ export default function Ensemble() {
      * is only true while the queue's own explanation is on screen beside it.
      */
     const expiredSession = account.session.status === 'expired';
-    /**
-     * This device HOLDS an account and has no live session for it (#1351 patch R1) — the banner's
-     * condition, and the one state in which "Sign out on this device" exists.
-     *
-     * Two routes into it, and the honest condition covers both because it asks storage rather than
-     * the session: the session lapsed in this page load (`expired`), or it lapsed and the page was
-     * reloaded, which lands on `guest` with `meta.active` unchanged. `unknown` is excluded, not
-     * treated as guest — before the first session read this device does not know whether it has a
-     * live session, and offering to clear the account on that basis would be a guess.
-     *
-     * A plain guest device that has never signed in holds nothing, so `heldOwner` is null and this
-     * is false without the session state ever mattering.
-     */
-    const heldWithoutSession =
-        heldOwner !== null &&
-        (account.session.status === 'expired' || account.session.status === 'guest');
-    /**
-     * Which of the three things that banner is about (#1351 patch N1) — because ONE sentence said
-     * in all three states is a lie in two of them. `deleted` outranks the session state: this tab
-     * watched the account go, and "sign in again" must never be offered for it.
-     */
-    const banner = heldAccountBanner(
-        heldOwner !== null && heldOwner === deletedOwner
-            ? 'deleted'
-            : account.session.status === 'expired'
-              ? 'expired'
-              : 'guest',
-    );
     const sync = useAccountLibrary(account.session, current?.id ?? null);
+    // #1351 — which account this device's storage holds, the expired banner's condition and copy.
+    const { heldOwner, setHeldOwner, setDeletedOwner, heldWithoutSession, banner, heldAccount } =
+        useHeldAccount({ ready, account, owner: sync.owner });
     // #1477 — the live songbook's collections, and the star set every surface reads (Starred's
     // songs). Read keyed on the ATTACHED owner, written to whichever songbook `signedIn` names.
     const collections = useCollections({
@@ -1405,36 +1339,6 @@ export default function Ensemble() {
             setHomeNoticeState('');
         }
     }, [current]);
-    /**
-     * #1351 patch R1 — read which account this device HOLDS, from storage.
-     *
-     * Deliberately off the guest first-paint path, on two counts: `ready` means the guest
-     * songbook is already up, and `settled` means the first session read has answered (or the
-     * deadline released it). Nothing here is ever awaited by startup or by playback.
-     *
-     * `unknown` is excluded rather than read: the answer would be fine, but acting on it is not —
-     * see `heldWithoutSession`.
-     *
-     * `sync.owner` is not read in the body: it is the loop's "I attached or detached" signal, and
-     * `attach` is what moves `meta.active` to a new owner — re-running this read is exactly why
-     * the effect depends on it. The only other thing that moves the pointer is the clear, which
-     * writes `heldOwner` itself rather than going round through a counter.
-     */
-    // biome-ignore lint/correctness/useExhaustiveDependencies: deliberate re-run trigger.
-    useEffect(() => {
-        if (!ready || !account.settled || account.session.status === 'unknown') {
-            return;
-        }
-        let alive = true;
-        void heldAccount().then((owner) => {
-            if (alive) {
-                setHeldOwner(owner);
-            }
-        });
-        return () => {
-            alive = false;
-        };
-    }, [ready, account.settled, account.session.status, sync.owner]);
     // #1269, #1351, #1271 — leaving the account: the sign-out step, its preflight and the clears.
     // Called here, where the step's moot and preflight effects always ran (`useAccountExit`).
     const {
