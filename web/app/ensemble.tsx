@@ -25,7 +25,6 @@ import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
 import {
     allSongsSortPreference,
-    recordOpened as recordOpenedGuest,
     rememberAllSongsSort,
     rememberSong,
     rememberStandMode,
@@ -69,7 +68,7 @@ import { downloadImportSource, ImportDialog } from './import-dialog';
 import { SettingsSheet } from './settings-sheet';
 import { SongHeader } from './song-header';
 import { SongMenu, type SongMenuView } from './song-menu';
-import { SongRowMenu, type SongRowMenuTarget } from './song-row-menu';
+import { SongRowMenu } from './song-row-menu';
 import { type FeaturedSummary, Songbook, type StandardsEntry } from './songbook';
 import { StandStack } from './stand-stack';
 import { StandardsBrowser } from './standards-browser';
@@ -96,6 +95,7 @@ import { useNeckPrefs } from './use-neck-prefs';
 import { useOfflineInstall } from './use-offline-install';
 import { usePalette } from './use-palette';
 import { usePlaybackState } from './use-playback-state';
+import { useRowMenu } from './use-row-menu';
 import { useSongDeletes } from './use-song-deletes';
 import { useSongbookLibrary } from './use-songbook-library';
 import { useStageTheme } from './use-stage-theme';
@@ -446,14 +446,6 @@ export default function Ensemble() {
     // see either component's own note on why.
     const standardsEntryRef = useRef<HTMLButtonElement>(null);
     const allSongsEntryRef = useRef<HTMLButtonElement>(null);
-    // The row ⋯ menu (#1440), shared by the All songs page and the songbook home. One menu
-    // instance for whichever row is targeted, per `SongRowMenu`'s own note on why; anchored at
-    // that row's ⋯ (#1755).
-    const [rowMenuFor, setRowMenuFor] = useState<SongRowMenuTarget | null>(null);
-    const rowMenuTrigger = useRef<HTMLElement | null>(null);
-    // Counts openings, so a ⋯ activated while another row's menu is open (a click with no
-    // press before it: a screen reader, a script) mounts a fresh menu at the new ⋯.
-    const [rowMenuOpening, setRowMenuOpening] = useState(0);
     // The songbook's own status line (#1440 review P2) — set only by row actions (renamed,
     // duplicated, deleted, "hasn't reached your account yet"), NEVER the stand's `message`
     // (`open()` always sets one, and reusing it here showed a stale stand status on every visit
@@ -717,6 +709,7 @@ export default function Ensemble() {
         openAllSongs,
         reloadGuestLibrary,
         readLiveSong,
+        recordOpened,
     } = useSongbookLibrary({
         ready,
         signedIn,
@@ -852,6 +845,97 @@ export default function Ensemble() {
     // A tab with something to lose is not reloaded out from under the musician by an update
     // another tab set off (#1889); it reloads once this clears.
     const offline = useOfflineInstall(playbackActive || dirty || busy);
+    /**
+     * `offline.sounds` for the status chip. `soundsAvailableOffline` answers one yes/no about the
+     * whole set the open chart needs, so the honest count is that single requirement — verified
+     * or not — and `null` for as long as nothing has actually checked. A per-pack count would
+     * need `lib/sounds.ts` to report one; inventing numbers here would over-claim readiness,
+     * which is the exact failure this fact exists to prevent.
+     */
+    const soundsProgress: Progress =
+        soundsOffline === null
+            ? { required: null, verified: null }
+            : { required: 1, verified: soundsOffline ? 1 : 0 };
+    /**
+     * Three separate facts, never one badge (#1266). Rendered only on the MUSIC STAND, and only
+     * for a device with an account.
+     *
+     * Not on the songbook page: with no chart open, `savedRevision`, the open chart's sounds and
+     * the cloud observation are all genuinely unobserved, so the chip there was three permanent
+     * "we haven't checked" lines — an honest projection of nothing, which reads as a broken
+     * badge rather than as a fact.
+     *
+     * `expired` is included alongside `signedIn` deliberately: that is precisely when the loop's
+     * "sign in again to upload it" sentence is true, and unmounting the chip on the state change
+     * that produces it would make the sentence unreachable.
+     */
+    /**
+     * #1460 — hoisted out of the JSX so `syncFailureNotice` (the stand's own persistent notice,
+     * without opening Song actions) reads the exact same facts `<SyncStatus>` renders inside the
+     * menu. One object, two consumers, never two derivations that could disagree.
+     */
+    const syncStatusProps: SyncStatusProps | null =
+        current && (signedIn || expiredSession)
+            ? {
+                  savedRevision: saved ? saved.revision : null,
+                  editing: dirty ? 'dirty' : 'clean',
+                  lastSave: saveFailed ? 'failed' : 'idle',
+                  recovery: !dirty ? 'none' : recoveryHealthy ? 'confirmed' : 'failed',
+                  shell: offline.shell,
+                  sounds: soundsProgress,
+                  // #1311 — outranks every other cloud reading: the loop can only watch this
+                  // document id in the account that IS attached, which has never held it, so
+                  // without this the chip would read "Not in your account yet" about a song that
+                  // is fully saved in somebody else's library.
+                  foreign: standMismatch,
+                  // #1362 — the same value the stand's banner reads, so the chip and the banner
+                  // can never disagree about which candidate (if any) describes this chart.
+                  candidateKind: standCandidate?.kind ?? null,
+                  sync,
+              }
+            : null;
+    // #1460 — moved from the footer into Song actions's own "Status" section.
+    const syncStatus = syncStatusProps && <SyncStatus {...syncStatusProps} />;
+    /**
+     * #1460 acceptance, review P2 #2 — "a forced sync failure / expired session shows a
+     * persistent notice on the stand without opening the menu", but ONLY for a fact nothing else
+     * already says: a local Save failure has the top `.error-banner` (`run()`'s catch), and an
+     * expired/reauth session has `account-expired-banner` (`heldWithoutSession`) — both excluded
+     * inside `syncFailureNotice` itself, so this is retry/offline pass failures and permanent
+     * cloud refusals only. `dismissedSyncFailureKey` is the underlying FACT (a failure reason or
+     * a refused kind), never the rendered sentence (review P3): a 413 re-worded between
+     * `sync.failure`'s pass-level message and `CLOUD_REFUSAL_LABELS`'s per-document one must not
+     * reappear just because the words changed.
+     */
+    const standSyncFailure = syncStatusProps ? syncFailureNotice(syncStatusProps) : null;
+    /**
+     * Review P2 #3 — an armed `?autoplay=1` link's hint is derived from `pendingAutoplay` itself,
+     * not captured once into `message` text: the link's own note (below) still auto-dismisses
+     * after ~4s like any other `info` message, but "tap anywhere to play" must stay lit for as
+     * long as autoplay is actually armed, however long that takes.
+     */
+    const pendingAutoplayHint = pendingAutoplay ? 'tap anywhere to play' : null;
+    // #1889 — another tab installed the update; this one waits for the band or the edit.
+    const updateHint =
+        offline.update === 'deferred' && current
+            ? 'Updated in another tab · this one reloads when you stop or save'
+            : null;
+    const {
+        setMessage,
+        dismissMessage,
+        toastTone,
+        toastText,
+        messageToken,
+        setToastHeld,
+        standSyncFailureVisible,
+        dismissSyncFailure,
+    } = useStandToast({
+        busy,
+        soundProgress,
+        standSyncFailureKey: standSyncFailure?.key ?? null,
+        pendingAutoplayHint,
+        updateHint,
+    });
     // Typing on the chart (#1723) is for the editor; leaving it closes the field (what it held is
     // applied or still pending, never lost).
     const typeOnChart = editing && !!current;
@@ -1178,6 +1262,33 @@ export default function Ensemble() {
             accountDrafts.current = new Map();
         }
     }, [sync.owner]);
+    const {
+        rowMenuFor,
+        rowMenuTrigger,
+        rowMenuOpening,
+        openRowMenu,
+        closeRowMenu,
+        renameRow,
+        duplicateRow,
+        exportRow,
+        exportableRowDocument,
+    } = useRowMenu({
+        busy,
+        signedIn,
+        sync,
+        setHomeNoticeState,
+        setMessage,
+        setTitleRequest,
+        volatileDrafts,
+        readLiveSong,
+        refreshSongs,
+        run,
+        open,
+        draft,
+        showEditor,
+        storeSave,
+        retainedDraftFor,
+    });
     // Called here, where the two delete confirms' guard effects always ran (`useSongDeletes`).
     const {
         guestDeleteTarget,
@@ -1605,11 +1716,11 @@ export default function Ensemble() {
                 });
                 // #1440's per-song map, alongside this function's own single Continue-card
                 // pointer — same owner, same fence.
-                recordOpenedPreference(id, stand.ownerId);
+                recordOpened(id, stand.ownerId);
             }
         } else {
             rememberSong(id);
-            recordOpenedPreference(id, null);
+            recordOpened(id, null);
         }
     }
     /**
@@ -2268,186 +2379,6 @@ export default function Ensemble() {
         setHomeNoticeState(sentence);
     }
     /**
-     * Records this song as opened just now (#1440) — a per-song preference, alongside the
-     * existing single Continue-card pointer `rememberOpened` (below) already writes. Never a
-     * document edit: this touches neither `songs`/`operations` nor the guest `documents` store.
-     *
-     * `owner` is the STAND's resolved owner (`rememberOpened`'s own `stand.ownerId`, already
-     * checked against `standBelongsElsewhere`), not a fresh read of `sync.owner` — the two can
-     * differ for one render while an account attach is settling, and this must land in the same
-     * songbook the chart itself was just bound to, never a guess at the live one.
-     */
-    function recordOpenedPreference(id: string, owner: string | null) {
-        if (owner !== null) {
-            accountSync.recordOpened(id, owner).catch(() => {
-                /* A preference nobody can store is still a chart just opened. */
-            });
-        } else {
-            recordOpenedGuest(id);
-        }
-        setOpenedAtState((previous) => {
-            const updated = new Map(previous);
-            updated.set(id, new Date().toISOString());
-            return updated;
-        });
-    }
-    function closeRowMenu() {
-        setRowMenuFor(null);
-    }
-    /** A row's ⋯ (#1755): opens the menu at it, or closes it when it is already open there. */
-    function openRowMenu(id: string, title: string, trigger: HTMLElement) {
-        // The ⋯ is `aria-disabled` while busy rather than `disabled`, so the menu's focus can go
-        // back to it during the action it started.
-        if (busy) {
-            return;
-        }
-        if (rowMenuFor?.id === id && rowMenuTrigger.current === trigger) {
-            closeRowMenu();
-            return;
-        }
-        rowMenuTrigger.current = trigger;
-        setRowMenuOpening((n) => n + 1);
-        // The next row action starting clears whatever the LAST one said (#1440 review P2) — an
-        // Export or a Star from this new menu would otherwise leave an unrelated "Renamed to…"
-        // sitting on screen indefinitely.
-        setHomeNoticeState('');
-        setRowMenuFor({ id, title });
-    }
-    /**
-     * Renames a song by id (#1440) — never requires it to be the chart on the stand: row menus
-     * render only while `current` is null, so there is no "already open" case here (review #1440
-     * P5 — an earlier `isOpen`/`setCurrent` branch tested exactly that unreachable state).
-     *
-     * A live draft — this writer's or another's, OR this tab's own in-memory `volatileDrafts`
-     * fallback (review #1440 P4 — the earlier version consulted only `retainedDraftFor`, missing
-     * exactly the case `open()` itself also protects) — must never be silently destroyed by an
-     * in-place rename (review #1440 P1): an account Save retires every writer's older drafts, and
-     * a guest rename bumps `updatedAt`, which is what stops `recoveryFor` from ever offering that
-     * slot again. `retainedDraftFor`'s `unreadable` flag fails CLOSED here too (review #1440 P4):
-     * a draft read that FAILED is not evidence there is no draft, so it takes the same "open
-     * instead" branch as finding one, rather than gambling on an in-place rename.
-     *
-     * The song opens instead — through the normal `open()` path, which recovers whichever draft
-     * applies exactly as opening always does — and the title the musician just typed into the row
-     * menu is carried forward as a fresh edit on top of it (review #1440 P4: discarding it was the
-     * earlier version's other gap), focused in the stand's own title field, leaving the Save to
-     * the musician. Only a song with nothing at all to lose renames in place.
-     */
-    function renameRow(title: string) {
-        const target = rowMenuFor;
-        if (!target) {
-            return;
-        }
-        closeRowMenu();
-        const trimmed = title.slice(0, 150);
-        void run(async () => {
-            const document = await readLiveSong(target.id);
-            if (!document) {
-                throw new Error('Song no longer exists.');
-            }
-            const { recovery, unreadable } = await retainedDraftFor(document);
-            if (recovery || unreadable || volatileDrafts.current.has(document.id)) {
-                const opened = await open(document);
-                draft({ ...opened.current, title: trimmed }, opened.saved);
-                showEditor();
-                setTitleRequest((n) => n + 1);
-                // Re-review P3 — BOTH branches are `warning`: touch has no hover to pause an
-                // `info` message's ~4s clock, so a musician who tapped Rename and looked away for
-                // a moment would otherwise lose an important "your title is queued, Save to keep
-                // it" sentence with no way to have read it in time. `warning`-to-`warning` is
-                // always allowed to replace (unlike `info`-over-`warning`, `setMessage`'s own
-                // guard above) — load-bearing here, since `open()` just above can itself have set
-                // a `warning` ("Recovered draft is based on an older save…") that this must win
-                // over, not silently lose to.
-                if (unreadable && !recovery) {
-                    setMessage(
-                        'Couldn’t confirm whether this song has unsaved changes — opened it here instead of renaming in place. Your new title is filled in; Save to keep it.',
-                        { tone: 'warning' },
-                    );
-                } else {
-                    setMessage(
-                        'This song has unsaved changes — opened it here so renaming won’t lose them. Your new title is filled in; Save to keep it.',
-                        { tone: 'warning' },
-                    );
-                }
-                return;
-            }
-            if (signedIn) {
-                await storeSave({ ...document, title: trimmed }, document.revision, {
-                    owner: sync.owner,
-                    stand: false,
-                });
-            } else {
-                // The guest songbook's own rename (#1440) — reuses `save`'s compare-and-swap
-                // rather than a hand-rolled read-then-write here.
-                await repository.rename(target.id, trimmed);
-            }
-            await refreshSongs();
-            setHomeNoticeState(`Renamed to “${trimmed}”`);
-        });
-    }
-    /**
-     * Duplicates a song by id (#1440) — "<title> copy" under a fresh id, in whichever songbook
-     * the original lives in. `owner: null` (never `sync.owner`), like a brand-new song or an
-     * import: this mints an id nobody has claimed yet, and `storeSave`'s own note on `intent.owner`
-     * is explicit that a fresh id belongs to whichever account is live, not to a stand binding.
-     */
-    function duplicateRow() {
-        const target = rowMenuFor;
-        if (!target) {
-            return;
-        }
-        closeRowMenu();
-        void run(async () => {
-            const document = await readLiveSong(target.id);
-            if (!document) {
-                throw new Error('Song no longer exists.');
-            }
-            // `createdAt`/`updatedAt` reset to now, as `keepSharedCopy` does (review #1440 P3):
-            // the guest `repository.save` honours a brand-new row's OWN `createdAt` (deliberately,
-            // to keep an imported chart's original timestamp), so leaving the original's here would make a fresh copy
-            // sort as if it were made back when the original was.
-            const now = new Date().toISOString();
-            const copyDocument = {
-                ...document,
-                id: crypto.randomUUID(),
-                title: `${document.title.slice(0, 145)} copy`,
-                revision: 0,
-                createdAt: now,
-                updatedAt: now,
-            };
-            await storeSave(copyDocument, null, { owner: null, stand: false });
-            await refreshSongs();
-            setHomeNoticeState('Duplicated');
-        });
-    }
-    /**
-     * What a row's Export should actually write (#1440 review P3) — the retained draft, if one
-     * exists, the same as the stand's own Export always writes whatever is live on the stand
-     * rather than silently falling back to the last committed version. The committed document
-     * otherwise.
-     */
-    async function exportableRowDocument(id: string): Promise<ChartDocument | null> {
-        const document = await readLiveSong(id);
-        if (!document) {
-            return null;
-        }
-        const { recovery } = await retainedDraftFor(document);
-        return recovery?.document ?? document;
-    }
-    function exportRow() {
-        const target = rowMenuFor;
-        if (!target) {
-            return;
-        }
-        void run(async () => {
-            const document = await exportableRowDocument(target.id);
-            if (document) {
-                exportDocument(document);
-            }
-        });
-    }
-    /**
      * Commits a version and, signed in, queues those exact bytes for the owner and asks the loop
      * to send them. Save never waits for the network: an offline Save is an ordinary successful
      * Save with an upload still owed, which is the whole reason local safety and cloud
@@ -2858,97 +2789,6 @@ export default function Ensemble() {
             bars,
         };
     }, [featuredSave, current, signedIn]);
-    /**
-     * `offline.sounds` for the status chip. `soundsAvailableOffline` answers one yes/no about the
-     * whole set the open chart needs, so the honest count is that single requirement — verified
-     * or not — and `null` for as long as nothing has actually checked. A per-pack count would
-     * need `lib/sounds.ts` to report one; inventing numbers here would over-claim readiness,
-     * which is the exact failure this fact exists to prevent.
-     */
-    const soundsProgress: Progress =
-        soundsOffline === null
-            ? { required: null, verified: null }
-            : { required: 1, verified: soundsOffline ? 1 : 0 };
-    /**
-     * Three separate facts, never one badge (#1266). Rendered only on the MUSIC STAND, and only
-     * for a device with an account.
-     *
-     * Not on the songbook page: with no chart open, `savedRevision`, the open chart's sounds and
-     * the cloud observation are all genuinely unobserved, so the chip there was three permanent
-     * "we haven't checked" lines — an honest projection of nothing, which reads as a broken
-     * badge rather than as a fact.
-     *
-     * `expired` is included alongside `signedIn` deliberately: that is precisely when the loop's
-     * "sign in again to upload it" sentence is true, and unmounting the chip on the state change
-     * that produces it would make the sentence unreachable.
-     */
-    /**
-     * #1460 — hoisted out of the JSX so `syncFailureNotice` (the stand's own persistent notice,
-     * without opening Song actions) reads the exact same facts `<SyncStatus>` renders inside the
-     * menu. One object, two consumers, never two derivations that could disagree.
-     */
-    const syncStatusProps: SyncStatusProps | null =
-        current && (signedIn || expiredSession)
-            ? {
-                  savedRevision: saved ? saved.revision : null,
-                  editing: dirty ? 'dirty' : 'clean',
-                  lastSave: saveFailed ? 'failed' : 'idle',
-                  recovery: !dirty ? 'none' : recoveryHealthy ? 'confirmed' : 'failed',
-                  shell: offline.shell,
-                  sounds: soundsProgress,
-                  // #1311 — outranks every other cloud reading: the loop can only watch this
-                  // document id in the account that IS attached, which has never held it, so
-                  // without this the chip would read "Not in your account yet" about a song that
-                  // is fully saved in somebody else's library.
-                  foreign: standMismatch,
-                  // #1362 — the same value the stand's banner reads, so the chip and the banner
-                  // can never disagree about which candidate (if any) describes this chart.
-                  candidateKind: standCandidate?.kind ?? null,
-                  sync,
-              }
-            : null;
-    // #1460 — moved from the footer into Song actions's own "Status" section.
-    const syncStatus = syncStatusProps && <SyncStatus {...syncStatusProps} />;
-    /**
-     * #1460 acceptance, review P2 #2 — "a forced sync failure / expired session shows a
-     * persistent notice on the stand without opening the menu", but ONLY for a fact nothing else
-     * already says: a local Save failure has the top `.error-banner` (`run()`'s catch), and an
-     * expired/reauth session has `account-expired-banner` (`heldWithoutSession`) — both excluded
-     * inside `syncFailureNotice` itself, so this is retry/offline pass failures and permanent
-     * cloud refusals only. `dismissedSyncFailureKey` is the underlying FACT (a failure reason or
-     * a refused kind), never the rendered sentence (review P3): a 413 re-worded between
-     * `sync.failure`'s pass-level message and `CLOUD_REFUSAL_LABELS`'s per-document one must not
-     * reappear just because the words changed.
-     */
-    const standSyncFailure = syncStatusProps ? syncFailureNotice(syncStatusProps) : null;
-    /**
-     * Review P2 #3 — an armed `?autoplay=1` link's hint is derived from `pendingAutoplay` itself,
-     * not captured once into `message` text: the link's own note (below) still auto-dismisses
-     * after ~4s like any other `info` message, but "tap anywhere to play" must stay lit for as
-     * long as autoplay is actually armed, however long that takes.
-     */
-    const pendingAutoplayHint = pendingAutoplay ? 'tap anywhere to play' : null;
-    // #1889 — another tab installed the update; this one waits for the band or the edit.
-    const updateHint =
-        offline.update === 'deferred' && current
-            ? 'Updated in another tab · this one reloads when you stop or save'
-            : null;
-    const {
-        setMessage,
-        dismissMessage,
-        toastTone,
-        toastText,
-        messageToken,
-        setToastHeld,
-        standSyncFailureVisible,
-        dismissSyncFailure,
-    } = useStandToast({
-        busy,
-        soundProgress,
-        standSyncFailureKey: standSyncFailure?.key ?? null,
-        pendingAutoplayHint,
-        updateHint,
-    });
     const {
         deleteUndo,
         undoLive,
