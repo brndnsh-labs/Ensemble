@@ -408,3 +408,43 @@ button.bar-number {
         scroll-behavior: auto;
     }
 }
+/* The Following cue and the v2 stand's own bar, chord and sheet additions (#1949, moved from
+   stand-shell.css in its order). They still come after the breakpoints above, as they did there. */
+.bar.active {
+    background: var(--green-light);
+    box-shadow: inset 0 -3px var(--green);
+}
+/* Following's next-bar cue (#1458): a quiet outline, not a fill, so it reads as "coming up"
+   rather than "playing now" even where it lands on the same bar as `.active` (a one-bar chart).
+   `data-next="soon"` (the playing bar's last felt pulse) thickens and darkens the same outline —
+   ordinary React state (`nextSoon`, `app/use-playback-state.ts`), edge-triggered off a 60ms poll
+   of the engine so it flips only twice a bar, not a DOM write bypassing React. */
+.bar[data-next] {
+    box-shadow: inset 0 0 0 2px var(--bar-next);
+    border-radius: 4px;
+}
+.bar[data-next="soon"] {
+    box-shadow: inset 0 0 0 3px var(--bar-next-soon);
+}
+/* A one-bar chart loops onto itself, which makes its bar both `.active` and `[data-next]` at once; combine
+   rather than let the later rule silently win and drop the green underline. */
+.bar.active[data-next] {
+    box-shadow:
+        inset 0 -3px var(--green),
+        inset 0 0 0 2px var(--bar-next);
+}
+.bar.active[data-next="soon"] {
+    box-shadow:
+        inset 0 -3px var(--green),
+        inset 0 0 0 3px var(--bar-next-soon);
+}
+.bar {
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.chord {
+    overflow-wrap: anywhere;
+}
+.sheet {
+    min-width: 0;
+}
