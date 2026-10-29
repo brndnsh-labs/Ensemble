@@ -1,18 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccountApi, ApiResult } from '../../../web/lib/account/api.js';
 import { createAccountSession } from '../../../web/lib/account/session.js';
+import { libraryCheck, resumeDelay } from '../../../web/lib/account/sync-helpers.js';
 import {
     AccountMismatchError,
     belongsToAnotherAccount,
     createSyncLoop,
-    DELETE_MESSAGES,
-    libraryCheck,
     OWNER_MESSAGES,
-    RATE_LIMIT_RESUMES,
-    resumeDelay,
     SIGN_OUT_MESSAGES,
-    SYNC_MESSAGES,
 } from '../../../web/lib/account/sync-loop.js';
+import {
+    DELETE_MESSAGES,
+    RATE_LIMIT_RESUMES,
+    SYNC_MESSAGES,
+} from '../../../web/lib/account/sync-messages.js';
 import { backoffWait, type LibraryFacts } from '../../../web/lib/sync/download.js';
 import { MAX_PENDING_SAVES, type PreparedSave } from '../../../web/lib/sync/protocol.js';
 import { type AccountSongbook, heldByAccount } from '../../../web/lib/sync/repository.js';

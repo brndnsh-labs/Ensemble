@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccountApi, ApiResult } from '../../web/lib/account/api.js';
 import { createAccountSession } from '../../web/lib/account/session.js';
-import { COLLECTION_MESSAGES, createSyncLoop } from '../../web/lib/account/sync-loop.js';
+import { createSyncLoop } from '../../web/lib/account/sync-loop.js';
+import { COLLECTION_MESSAGES } from '../../web/lib/account/sync-messages.js';
 import {
     BuiltInCollectionError,
     type CollectionDocument,

@@ -291,7 +291,7 @@ export function deleteReply(candidate: unknown, request: PreparedDelete): Delete
  * Why the account will never accept the exact bytes at the head of a document's outbox (#1298),
  * distinct from a `'conflict'`: a conflict is a two-sided version disagreement `acknowledge`
  * resolves from a structured `SaveReply`; a refusal is a transport-level verdict about the
- * REQUEST itself (`sync-loop.ts`'s `STEP_OVER_CODES`) that no retry of the same bytes can change.
+ * REQUEST itself (`sync-helpers.ts`'s `STEP_OVER_CODES`) that no retry of the same bytes can change.
  * `'too-large'` is its own member rather than a second spelling of `'refused'` for the same
  * reason `SyncFailureReason` keeps them apart: a payload the server will not accept is fixed by
  * shrinking the chart and saving again, never by anything to do with the operation/document id.

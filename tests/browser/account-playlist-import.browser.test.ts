@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AccountApi, ApiResult } from '../../web/lib/account/api.js';
 import { createAccountSession } from '../../web/lib/account/session.js';
-import { createSyncLoop, LibraryUnverifiedError } from '../../web/lib/account/sync-loop.js';
+import { LibraryUnverifiedError } from '../../web/lib/account/sync-helpers.js';
+import { createSyncLoop } from '../../web/lib/account/sync-loop.js';
 import { type CollectionDocument, mergeSongIds, newCollection } from '../../web/lib/collections.js';
 import { ImportCapError } from '../../web/lib/sync/collections.js';
 import { runOutboxPass } from '../../web/lib/sync/drain.js';
