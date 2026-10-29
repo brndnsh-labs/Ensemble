@@ -1,0 +1,268 @@
+/* The chart: scroll box, sections, bars, chord setting, typing on the chart, and the footer.
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+.workspace-body {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    position: relative;
+}
+.chart-scroll {
+    flex: 1;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 25px 48px 40px;
+    scroll-behavior: smooth;
+}
+/* Re-review P3 — `.chart-scroll` is a `<div tabIndex={0}>` (arrow-key scrolling), not one of the
+   `button`/`a`/`input`/`select` the global `:focus-visible` rule already covers, so it fell back
+   to the browser's own default `:focus` ring on ANY focus — including the Resume-follow pill's
+   `.focus({ preventScroll: true })` after a plain pointer tap, which is not a keyboard action and
+   must not draw a ring around the whole chart. `:focus-visible` alone (never plain `:focus`) is
+   what tells the two apart: it matches a real Tab-to-focus, not a programmatic call from a click
+   handler. */
+.chart-scroll:focus {
+    outline: none;
+}
+.chart-scroll:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+.sheet {
+    max-width: 1040px;
+    margin: 0 auto;
+    position: relative;
+}
+.section {
+    margin-bottom: 29px;
+}
+.section-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    min-height: 24px;
+}
+.section-letter {
+    font: inherit;
+    font-size: 12px;
+    font-weight: 750;
+    color: inherit;
+    background: none;
+    border: 1.5px solid var(--ink);
+    border-radius: 2px;
+    min-width: 24px;
+    height: 23px;
+    display: grid;
+    place-content: center;
+    /* A named section (#1374) reads as a tag; a lone letter still sits in the 24px square. */
+    padding: 0 4px;
+    cursor: pointer;
+    /* `manipulation`, NOT `none`: the chart is scrolled with a thumb and this badge
+       sits at the top-left of every section, so opting out of browser panning here
+       would swallow a drag that merely started on it. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+}
+.section-letter:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+.bars {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 10px;
+}
+.bar {
+    min-height: 77px;
+    padding: 21px 14px 10px 17px;
+    border-left: 1px solid var(--bar-line);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 7px;
+    border-radius: 0;
+    isolation: isolate;
+}
+.bar:nth-child(4n) {
+    border-right: 1.5px solid var(--bar-line-strong);
+}
+.bar-number {
+    position: absolute;
+    top: 3px;
+    left: 9px;
+    color: var(--bar-number);
+    font-size: 9px;
+    font-family: Inter, -apple-system, sans-serif;
+    font-weight: 400;
+}
+.chord {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 30px;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    padding: 3px 2px;
+    letter-spacing: -1px;
+}
+/* Real-book chord setting (#1700, `chordSymbol`): the quality small and raised beside the root,
+   lifted by position rather than `vertical-align` so a bar's line box — and so the stand's
+   layout, which must hold still across play/pause — is the same with or without one. */
+.chord-quality {
+    /* Inline-block so the playing chord's underline stays one line under the root, instead of
+       breaking up and riding up with the raised quality. */
+    display: inline-block;
+    position: relative;
+    top: -0.5em;
+    font-size: 0.6em;
+    letter-spacing: 0;
+    margin-left: 0.03em;
+}
+.chord-bass {
+    font-size: 0.78em;
+    letter-spacing: 0;
+}
+.bar.current {
+    background: var(--bar-current);
+    border-radius: 5px;
+    border-left-color: transparent;
+    box-shadow: inset 0 -3px var(--green);
+}
+.bar.current .bar-number {
+    color: var(--green);
+}
+.bar.repeat .chord {
+    font-family: Georgia, serif;
+    color: var(--bar-repeat-ink);
+    font-size: 29px;
+}
+.bar.end {
+    border-right: 4px double var(--ink);
+}
+.bar.selected {
+    background: var(--accent-light);
+    box-shadow: inset 0 0 0 1.5px var(--accent);
+    border-radius: 5px;
+    border-left-color: transparent;
+}
+.editing .bar {
+    cursor: pointer;
+}
+.editing .bar:hover {
+    background: var(--bar-hover);
+}
+.editing .bar .chord:hover {
+    background: var(--chord-hover);
+    border-radius: 4px;
+}
+/* Typing on the chart (#1723). The bar being typed into reads as a page you write on: the
+   surface, ringed in the accent; its field is the chord text itself, with no box of its own. */
+.bar.selected.typing {
+    background: var(--surface);
+    box-shadow: inset 0 0 0 2px var(--accent);
+}
+.bar-input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    padding: 2px 0;
+    background: transparent;
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: calc(var(--chord-size, 30px) * 0.8);
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
+    caret-color: var(--accent);
+}
+.bar-input:focus-visible {
+    outline: none;
+}
+/* On a phone the bar shows what its docked field holds (#1724), set as the field sets it. */
+.bar-draft {
+    width: 100%;
+    min-width: 0;
+    color: var(--ink);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: calc(var(--chord-size, 30px) * 0.8);
+    font-weight: 500;
+    line-height: 1.2;
+    text-align: center;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+}
+/* Typed but not applied, though it reads (#1726): a repeat or ending still being built bar by
+   bar. Lightly tinted until the chart takes it, or Save says what is missing. */
+.bar.pending:not(.typing) {
+    background: var(--accent-light);
+}
+/* Chords that don't read: the bar tinted, the reason under them. Kept as typed; Save refuses. */
+.bar.unreadable,
+.bar.selected.unreadable {
+    background: var(--danger-bg);
+}
+.bar.selected.typing.unreadable {
+    box-shadow: inset 0 0 0 2px var(--danger);
+}
+.bar-problem {
+    flex-basis: 100%;
+    color: var(--danger);
+    font-size: 11px;
+    line-height: 1.25;
+    text-align: center;
+    overflow-wrap: anywhere;
+}
+/* The bar number is the keyboard's way to a bar while editing; it looks as it always does. */
+button.bar-number {
+    padding: 0;
+    line-height: inherit;
+}
+/* Changed since the chart was last kept: a small dot after the bar number. */
+.bar.edited .bar-number::after {
+    content: "";
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    margin-left: 3px;
+    border-radius: 50%;
+    background: var(--accent);
+    vertical-align: middle;
+}
+.chart-bottom {
+    border-top: 1px solid var(--line);
+    padding-top: 17px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    color: var(--muted);
+    font-size: 11px;
+    gap: 12px;
+    /* Two facts side by side; on a phone the form-length button takes the next line (#1511). */
+    flex-wrap: wrap;
+}
+/* The footer's "N bars · repeats continuously" is the form-length control (#1511): it reads
+   as the sentence it was, with a quiet outline and caret so it also reads as tappable. */
+.chart-bottom .form-length {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 32px;
+    padding: 4px 11px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--ink);
+    font: inherit;
+    text-align: left;
+    white-space: normal;
+}
+.chart-bottom .form-length::after {
+    content: "▾";
+    color: var(--muted);
+}
+.chart-bottom .form-length:hover:not([aria-disabled="true"]) {
+    border-color: var(--muted);
+}
+.chart-bottom em {
+    font-family: Georgia, serif;
+    font-size: 13px;
+}

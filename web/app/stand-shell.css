@@ -1,0 +1,148 @@
+/* Small pieces of the stand shell: the loading screen, the Following cue on a bar, the title typed
+   in the header, the recovery and offer lists, and the banners.
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+.loading {
+    max-width: 600px;
+    padding: 70px 30px;
+    margin: auto;
+}
+.loading h1 {
+    font-size: 36px;
+    letter-spacing: -1.5px;
+}
+.loading p {
+    margin-top: 15px;
+    color: var(--muted);
+}
+.bar.active {
+    background: var(--green-light);
+    box-shadow: inset 0 -3px var(--green);
+}
+/* Following's next-bar cue (#1458): a quiet outline, not a fill, so it reads as "coming up"
+   rather than "playing now" even where it lands on the same bar as `.active` (a one-bar chart).
+   `data-next="soon"` (the playing bar's last felt pulse) thickens and darkens the same outline —
+   ordinary React state (`nextSoon`, `app/use-playback-state.ts`), edge-triggered off a 60ms poll
+   of the engine so it flips only twice a bar, not a DOM write bypassing React. */
+.bar[data-next] {
+    box-shadow: inset 0 0 0 2px var(--bar-next);
+    border-radius: 4px;
+}
+.bar[data-next="soon"] {
+    box-shadow: inset 0 0 0 3px var(--bar-next-soon);
+}
+/* A one-bar chart loops onto itself, which makes its bar both `.active` and `[data-next]` at once; combine
+   rather than let the later rule silently win and drop the green underline. */
+.bar.active[data-next] {
+    box-shadow:
+        inset 0 -3px var(--green),
+        inset 0 0 0 2px var(--bar-next);
+}
+.bar.active[data-next="soon"] {
+    box-shadow:
+        inset 0 -3px var(--green),
+        inset 0 0 0 3px var(--bar-next-soon);
+}
+/* The title, typed in the header while editing (#1726): the heading's own type, with a rule
+   under it so it reads as a field. */
+.song-title-input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    border-bottom: 1px dashed var(--line);
+    border-radius: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    padding: 0 0 1px;
+}
+.song-title-input:focus-visible {
+    outline: none;
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 0;
+}
+.modal-box::backdrop {
+    background: var(--backdrop);
+}
+.dialog-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+}
+.chord-button:disabled {
+    opacity: 1;
+    cursor: default;
+}
+.bar {
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.chord {
+    overflow-wrap: anywhere;
+}
+.sheet {
+    min-width: 0;
+}
+/* Older drafts (#1756, named so since #1760), a dialog off the Song menu's More. */
+.recovery-list {
+    display: grid;
+    gap: 8px;
+    max-height: 45dvh;
+    overflow: auto;
+}
+/* #1268's offer preview: every title that is about to be copied, scrollable rather than
+   pushing the Add/Not now buttons off a phone screen on a generous guest songbook. */
+.adopt-guest-preview {
+    list-style: none;
+    margin-bottom: 17px;
+    max-height: 30dvh;
+    overflow-y: auto;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--muted);
+}
+.adopt-guest-preview li {
+    overflow-wrap: anywhere;
+}
+.error-banner {
+    background: var(--danger-bg);
+    color: var(--danger);
+    padding: 12px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    justify-content: space-between;
+}
+.error-banner button {
+    text-decoration: underline;
+    flex-shrink: 0;
+}
+/* A banner that asks for something rather than reporting a failure (#1700) — a session to renew,
+   a stand that belongs to another account. The accent "a decision is waiting" palette the warning
+   toast and the conflict banner already use; danger stays for what actually went wrong. */
+.error-banner.notice {
+    background: var(--accent-light);
+    color: var(--accent);
+}
+/* A row action's own status while browsing the songbook (#1440) — neutral, unlike `.error-banner`:
+   "Renamed to…"/"Duplicated"/"Deleted" are not faults. */
+.status-banner {
+    background: var(--chip);
+    color: var(--ink);
+    padding: 12px 20px;
+    font-size: 13px;
+    line-height: 1.6;
+}
+/* Always mounted now (#1440 review P2) so a screen reader reliably picks up the text change on a
+   row action, rather than a freshly-inserted region sometimes going unannounced — so the empty
+   state (nothing to say yet, or just cleared) has to collapse visually instead of unmounting. */
+.status-banner[data-empty="true"] {
+    padding: 0;
+    height: 0;
+    overflow: hidden;
+}
+.file-input {
+    display: none;
+}

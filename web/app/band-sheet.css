@@ -1,0 +1,151 @@
+/* The Band sheet (#1703): its dialog, panels and tabs.
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+/* The Band sheet (#1703) — its dialog, heading and grouped panels. The `feel-` names are from
+   the Feel & mix sheet (#1276) the Band sheet's Groove and Practice tabs grew out of. */
+.feel-panel {
+    width: min(480px, calc(100vw - 24px));
+    padding: 24px;
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+}
+.feel-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+.feel-heading h2 {
+    margin: 0;
+}
+.feel-heading p {
+    margin: 6px 0 16px;
+}
+.feel-groups {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+.feel-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+}
+.feel-group h3 {
+    font-size: 13px;
+    margin: 0;
+}
+.feel-group label {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    font-size: 13px;
+}
+.feel-group select {
+    width: 100%;
+    min-height: 44px;
+    font: inherit;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--surface);
+    color: var(--ink);
+}
+.feel-swing-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+    align-items: end;
+}
+.feel-group .feel-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0;
+}
+.feel-range-control {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.feel-range-control input[type="range"] {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 32px;
+}
+.feel-range-value {
+    flex: 0 0 auto;
+    width: 2.4em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+}
+.feel-group .feel-toggle {
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+}
+/* One height for every tab, so switching tabs doesn't make the sheet jump; the tab's panel
+   scrolls inside it. */
+.band-panel {
+    width: min(640px, calc(100vw - 24px));
+    height: min(680px, calc(100dvh - 32px));
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+}
+.band-panel[open] {
+    display: flex;
+}
+.band-panel .feel-heading {
+    align-items: center;
+    margin-bottom: 12px;
+}
+.band-tabs {
+    display: flex;
+    background: var(--hover);
+    padding: 3px;
+    border-radius: 8px;
+    flex-shrink: 0;
+}
+.band-tabs [role="tab"] {
+    flex: 1 1 0;
+    min-height: 36px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--muted);
+}
+.band-tabs [role="tab"][aria-selected="true"] {
+    background: var(--surface);
+    box-shadow: 0 1px 3px #0001;
+    color: var(--primary);
+    font-weight: 650;
+}
+.band-tab-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-top: 16px;
+}
+.band-panel .error-banner {
+    margin: 12px 0 0;
+}
+.band-lede,
+.band-note {
+    color: var(--muted);
+    margin: 0 0 12px;
+}
+.band-note {
+    margin: 4px 0 0;
+}
+@media (max-width: 760px) {
+    .feel-panel {
+        padding: 18px;
+    }
+    .feel-swing-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

@@ -1,0 +1,159 @@
+/* The transport's setting rows, Key button and popover (#1757), Band button and the Export rows
+   (#1756), plus the share-link and modal text rules the Export dialog shares.
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+/* Every transport setting's control row is one height (#1700) — Tempo's stepper, Key's and Feel's
+   selects, the More… button — so the columns come out equal and their labels share a line. They
+   sat at three different heights before. */
+.setting-select,
+.tempo-control,
+.band-button {
+    min-height: var(--setting-row, 32px);
+}
+.setting-select {
+    border: 0;
+    background: transparent;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--ink);
+    max-width: 125px;
+    cursor: pointer;
+}
+/* The transport's Key (#1757): reads as the select it replaced — the key in the setting's weight
+   and a small caret — and opens the Key popover. Never wider than the select was: the phone's
+   transport row has about 10px to spare on CI's WebKit. */
+.key-button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 2px;
+    white-space: nowrap;
+}
+.key-button-caret {
+    color: var(--muted);
+    font-size: 10px;
+}
+/* Opens the Band sheet (#1703) beside the style select. Bordered like the other buttons in the
+   bar: as muted text with no chrome it read as a cut-off label, not a button (UI audit). Its
+   height is the shared setting row's, above. */
+.band-button {
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 0 12px;
+    margin-left: 6px;
+    cursor: pointer;
+}
+.band-button:hover {
+    background: var(--hover);
+}
+.modal-box {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 25px;
+    /* The phone gutter every other dialog keeps (#1700): a bare `width: 100%` ran these
+       edge to edge, rounded corners against the glass. */
+    width: min(480px, calc(100vw - 32px));
+    box-shadow: var(--shadow);
+}
+/* The transport's Key popover (#1757): Key, Mode, Meter and Chord notation. The box is `<Menu>`'s
+   (`menu.css`); on a laptop each field is a label beside its select, on a phone's sheet one
+   above the other at touch size. */
+.key-popover-fields {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px 12px;
+    padding: 6px 9px;
+}
+.key-popover-fields label {
+    font-size: 12px;
+    font-weight: 650;
+    color: var(--muted);
+}
+.key-popover-fields select {
+    min-height: 32px;
+    padding: 4px 8px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+    font: inherit;
+}
+.menu-sheet .key-popover-fields {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+}
+.menu-sheet .key-popover-fields label {
+    margin-top: 8px;
+}
+.menu-sheet .key-popover-fields select {
+    min-height: 44px;
+    padding: 8px 12px;
+    /* 16px or more, or iOS zooms the page in on focus. */
+    font-size: 16px;
+}
+/* Export… (#1756): one row per format, its file type muted at the end. */
+.export-formats {
+    display: grid;
+    gap: 8px;
+}
+.export-format {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 44px;
+    text-align: left;
+}
+.export-file {
+    color: var(--muted);
+    font-size: 12px;
+}
+.modal-box .export-progress {
+    margin: 14px 0 0;
+    padding: 0;
+}
+.modal-box h2 {
+    font-family: Georgia, serif;
+    font-size: 28px;
+    font-weight: 400;
+    margin-bottom: 15px;
+}
+.modal-box p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+    margin-bottom: 17px;
+}
+.modal-box input:where(:not([type="checkbox"], [type="radio"], [type="range"])) {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--paper);
+}
+.modal-box .dialog-actions {
+    margin-top: 18px;
+}
+.share-link-fallback {
+    margin-top: 12px;
+}
+.share-link-fallback label {
+    display: block;
+    margin-bottom: 6px;
+}
+.share-link-fallback input {
+    font-family: monospace;
+    font-size: 12px;
+}
+.status-detail {
+    color: var(--muted);
+    font-size: 11px;
+    margin-top: 8px;
+    line-height: 1.6;
+}

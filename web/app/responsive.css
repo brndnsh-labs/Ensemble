@@ -1,0 +1,499 @@
+/* Dialog backdrop, actions and text fields, then the app-wide breakpoint blocks (wide, laptop,
+   phone, landscape phone, reduced motion) for the surfaces declared above.
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+dialog::backdrop {
+    background: var(--backdrop);
+    backdrop-filter: blur(3px);
+}
+dialog h2 {
+    font-family: Georgia, serif;
+    font-size: 30px;
+    font-weight: 400;
+    letter-spacing: -0.5px;
+    margin: 15px 0;
+}
+dialog p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.75;
+    margin: 12px 0;
+}
+.dialog-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 22px;
+    flex-wrap: wrap;
+}
+/* Text-entry fields only: a checkbox or a slider given `width: 100%` draws its box in the middle
+   of a full-width hit area, pushing its label to the far edge (Feel & mix's toggles did). */
+dialog input:where(:not([type="checkbox"], [type="radio"], [type="range"])),
+dialog textarea {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px;
+    background: var(--paper);
+    font-size: 14px;
+}
+dialog textarea {
+    font-family: ui-monospace, monospace;
+    min-height: 150px;
+    line-height: 1.7;
+    resize: vertical;
+}
+@media (min-width: 1450px) {
+    .chart-scroll {
+        padding-top: 36px;
+    }
+    .bar {
+        min-height: 91px;
+    }
+    .section {
+        margin-bottom: 35px;
+    }
+}
+@media (max-width: 1100px) {
+    .home {
+        padding: 34px 28px;
+    }
+    .home h1 {
+        font-size: 39px;
+    }
+    .song-header {
+        padding: 17px 22px;
+    }
+    .transport-bar {
+        padding: 12px 22px;
+        gap: 15px;
+    }
+    .band-toggle {
+        padding: 9px 7px;
+    }
+    .band-toggle svg {
+        display: none;
+    }
+    .chart-scroll {
+        padding: 23px 28px 35px;
+    }
+    .song-actions .btn {
+        padding: 9px 11px;
+    }
+    .song-title {
+        font-size: 24px;
+        max-width: 300px;
+    }
+    .chord {
+        font-size: 28px;
+    }
+    .bar {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    .home-actions .btn {
+        padding: 9px 11px;
+    }
+}
+@media (max-width: 760px) {
+    .header-right {
+        gap: 10px;
+    }
+    .account-btn {
+        font-size: 11px;
+        padding: 7px 9px;
+    }
+    .home {
+        padding: 29px 20px 24px;
+    }
+    .home h1 {
+        font-size: 38px;
+        margin-top: 8px;
+    }
+    .home-intro {
+        display: block;
+        margin-bottom: 25px;
+    }
+    .home-intro p {
+        font-size: 13px;
+        line-height: 1.6;
+    }
+    .home-actions {
+        margin-top: 19px;
+    }
+    .home-actions .btn {
+        font-size: 12px;
+    }
+    .section-heading h2 {
+        font-size: 15px;
+    }
+    .song-table th,
+    .song-table td {
+        padding-left: 5px;
+        padding-right: 5px;
+    }
+    .song-table .hide-mobile {
+        display: none;
+    }
+    .song-row td {
+        padding-top: 14px;
+        padding-bottom: 14px;
+    }
+    .song-name {
+        font-size: 13px;
+    }
+    .song-detail {
+        font-size: 10px;
+    }
+    .song-glyph {
+        width: 35px;
+        height: 38px;
+    }
+    .song-link {
+        gap: 10px;
+    }
+    .jam-tile {
+        margin-top: 7px;
+    }
+    .workspace {
+        height: calc(100dvh - 62px);
+    }
+    .song-header {
+        padding: 14px 15px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+        gap: 12px;
+    }
+    .song-heading {
+        gap: 10px;
+        flex: 1;
+        min-width: 200px;
+    }
+    /* Phone hit targets (#1700): the row has no width to spare (see the mode switch below), so
+       these grow in height only, toward the 44px a thumb needs. */
+    .back-btn {
+        width: 30px;
+        height: 40px;
+        border: 0;
+        background: none;
+    }
+    .song-title {
+        font-size: 25px;
+        max-width: 250px;
+    }
+    .song-subtitle {
+        font-size: 10px;
+        gap: 6px;
+    }
+    .song-actions {
+        gap: 5px;
+        justify-content: flex-end;
+        flex: 1;
+        min-width: 130px;
+        /* A row that doesn't fit wraps rather than run Save and the song menu off the right edge,
+           where they were reachable only by scrolling the page sideways (#1700) — "Focus chart"
+           mid-song, or "Keep a copy" on CI's WebKit, which sets text wider than local. The
+           buttons' trimmed sides below keep the common rows on one line. */
+        flex-wrap: wrap;
+    }
+    .song-actions .btn {
+        font-size: 11px;
+        padding: 8px 8px;
+        min-height: 40px;
+    }
+    .song-actions .btn svg {
+        width: 14px;
+        height: 14px;
+    }
+    .mode-switch {
+        margin-right: 0;
+    }
+    /* Chart | Neck | Edit (#1587): three modes on the phone row. 6px sides, and the row's
+       indent below trimmed, buy ~24px of slack — CI's WebKit sets text ~10px wider than local,
+       and the row fit with none before. */
+    .mode-switch button {
+        font-size: 11px;
+        padding: 8px 6px;
+        min-height: 36px;
+    }
+    /* Chart | Neck | Edit (#1587): three modes fit the phone's header row with the short label. */
+    .mode-label-long {
+        display: none;
+    }
+    .song-actions .menu-btn {
+        width: 28px;
+        height: 40px;
+    }
+    .transport-bar {
+        padding: 11px 16px;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+    .transport-cluster {
+        gap: 9px;
+    }
+    .play-button {
+        width: 41px;
+        height: 40px;
+    }
+    .tempo-control input {
+        font-size: 19px;
+        width: 38px;
+    }
+    .tempo-control .unit {
+        display: none;
+    }
+    .tempo-control .step {
+        width: 21px;
+        height: 22px;
+    }
+    .transport-bar > .divider {
+        display: none;
+    }
+    .setting-label {
+        font-size: 8px;
+    }
+    .genre-setting {
+        margin-left: auto;
+    }
+    .key-setting {
+        margin-left: 3px;
+    }
+    .band-controls {
+        width: 100%;
+        margin-left: 0;
+        justify-content: space-between;
+        gap: 5px;
+        padding-top: 10px;
+        border-top: 1px solid var(--line);
+    }
+    .band-toggle {
+        flex: 1;
+        justify-content: center;
+        font-size: 10px;
+        padding: 8px 5px;
+        gap: 4px;
+    }
+    .trade-toggle {
+        flex: 0 0 auto;
+        width: 40px;
+        min-height: 36px;
+    }
+    .chart-scroll {
+        padding: 17px 19px 32px;
+    }
+    .section {
+        margin-bottom: 27px;
+    }
+    .section-head {
+        margin-bottom: 8px;
+        gap: 7px;
+    }
+    .section-letter {
+        font-size: 11px;
+        min-width: 22px;
+        height: 21px;
+    }
+    .bars {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 9px;
+    }
+    .bar {
+        min-height: 76px;
+        padding: 22px 12px 10px;
+    }
+    .bar:nth-child(2n) {
+        border-right: 1.5px solid var(--bar-line-strong);
+    }
+    .bar.end {
+        border-right: 4px double var(--ink);
+    }
+    .chord {
+        font-size: 30px;
+    }
+    .bar-number {
+        font-size: 9px;
+    }
+    .chart-bottom {
+        font-size: 10px;
+        line-height: 1.5;
+        align-items: flex-start;
+    }
+    .stand-stack {
+        left: 16px;
+        right: 16px;
+        /* Above the bar dock while a bar is typed (#1724); the variable is unset otherwise. */
+        bottom: calc(14px + var(--bar-dock-space, 0px));
+        transform: none;
+        max-width: none;
+    }
+    .stand-toast,
+    .stand-sync-failure {
+        font-size: 11px;
+    }
+    .resume-follow-pill {
+        font-size: 12px;
+        padding: 0 14px;
+    }
+    /* Editing on a phone (#1705): the chart scrolls on its own, inside the workspace, so the bar
+       dock and the keyboard (#1724) sit below it. `clip`, not `hidden`, so no programmatic
+       scroll moves the page with it. */
+    .workspace-body.editing {
+        display: flex;
+        flex-direction: column;
+        overflow: clip;
+    }
+    .editing .chart-scroll {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow: auto;
+        padding-bottom: 16px;
+    }
+    /* Typing a bar on a phone (#1724): its field is docked on the keyboard (`bar-dock.css`), so
+       the transport row folds away while it is up and the chart keeps two or three rows above
+       it; it is back after Done. The chart's padding lets its last bar
+       scroll clear of the dock and keyboard (`--bar-dock-space`, set by the dock), and its
+       scroll padding keeps the bar being typed above them when it is scrolled into view. */
+    .workspace[data-bar-open] .transport-bar {
+        display: none;
+    }
+    .workspace[data-bar-open] .chart-scroll {
+        /* A toast rides on top of the dock, so the chart clears both (#1724 review). */
+        padding-bottom: calc(var(--bar-dock-space, 0px) + var(--stand-stack-height, 0px) + 16px);
+        scroll-padding-bottom: calc(
+            var(--bar-dock-space, 0px) +
+            var(--stand-stack-height, 0px) +
+            8px
+        );
+    }
+    .editing .bars {
+        row-gap: 9px;
+    }
+    .song-header .song-actions {
+        flex-basis: 100%;
+        justify-content: flex-start;
+        padding-left: 28px;
+    }
+    .song-actions .save-btn {
+        margin-left: auto;
+    }
+    .song-actions .menu-btn {
+        margin-left: 0;
+    }
+    .song-actions .mode-switch {
+        margin-right: auto;
+    }
+}
+@media (min-width: 761px) and (max-height: 650px) {
+    .workspace {
+        height: calc(100dvh - 54px);
+    }
+    .song-header {
+        padding-top: 9px;
+        padding-bottom: 9px;
+    }
+    .transport-bar {
+        padding-top: 7px;
+        padding-bottom: 7px;
+    }
+    .chart-scroll {
+        padding-top: 16px;
+    }
+}
+@media (max-height: 520px) and (max-width: 1000px) and (orientation: landscape) {
+    .workspace {
+        height: calc(100dvh - 44px);
+    }
+    .song-header {
+        padding: 7px 18px;
+        flex-wrap: nowrap;
+    }
+    .song-header .song-actions {
+        flex-basis: auto;
+        padding-left: 0;
+    }
+    .song-title {
+        font-size: 21px;
+    }
+    .song-subtitle {
+        display: none;
+    }
+    .song-heading {
+        min-width: 160px;
+    }
+    .transport-bar {
+        flex-wrap: nowrap;
+        padding: 7px 18px;
+        gap: 13px;
+    }
+    .band-controls {
+        width: auto;
+        margin-left: auto;
+        padding: 0;
+        border: 0;
+    }
+    .band-toggle {
+        padding: 7px 6px;
+        font-size: 9px;
+    }
+    .band-toggle .dot {
+        display: none;
+    }
+    .key-setting {
+        display: block;
+    }
+    .bars {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .bar:nth-child(2n) {
+        border-right: 0;
+    }
+    .bar:nth-child(4n) {
+        border-right: 1px solid var(--bar-line-strong);
+    }
+    .chart-scroll {
+        padding: 15px 30px 25px;
+    }
+    .bar {
+        min-height: 70px;
+    }
+    .song-actions .btn {
+        padding: 7px 8px;
+    }
+    .stand-stack {
+        bottom: 10px;
+        gap: 6px;
+    }
+    .stand-toast,
+    .stand-sync-failure {
+        padding: 8px 14px;
+        font-size: 10px;
+    }
+    .resume-follow-pill {
+        /* min-height stays 44px (acceptance: tap targets never shrink below it, even here). */
+        font-size: 11px;
+    }
+    .workspace-body.editing {
+        display: flex;
+        flex-direction: row;
+        overflow: hidden;
+    }
+    .editing .chart-scroll {
+        overflow: auto;
+    }
+    .chord {
+        font-size: 27px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    * {
+        scroll-behavior: auto;
+        transition: none;
+    }
+    /* `*` above can't reach this: `.chart-scroll { scroll-behavior: smooth }` is a class
+       selector, outranking the universal selector on specificity regardless of media query
+       membership. Repeat the override at the same specificity so source order decides it (#1458
+       patch review P1-5). Belt-and-suspenders for `Element.scrollTo`'s own JS-side
+       `behavior: 'instant'`, which does not depend on this rule but should agree with it. */
+    .chart-scroll {
+        scroll-behavior: auto;
+    }
+}

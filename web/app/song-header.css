@@ -1,0 +1,218 @@
+/* The open song's header (title, actions, Day/Stage and mode switches) and the first rows of the
+   transport bar: play, tempo and the band chips. The transport's later rules are in transport.css.
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+.workspace {
+    height: calc(100dvh - 76px);
+    display: flex;
+    flex-direction: column;
+}
+.song-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    padding: 20px 34px 17px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+    flex-shrink: 0;
+}
+.song-heading {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    min-width: 0;
+}
+.back-btn {
+    border: 1px solid var(--line);
+    background: var(--surface);
+}
+.song-title {
+    font-family: Georgia, serif;
+    font-size: 27px;
+    letter-spacing: -0.6px;
+    font-weight: 400;
+    max-width: 430px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.song-subtitle {
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    gap: 9px;
+    align-items: center;
+    margin-top: 6px;
+    flex-wrap: wrap;
+}
+.unsaved {
+    color: var(--accent);
+    font-weight: 600;
+}
+/* Still unsaved, but only how the song is practised changed: said quietly (#1706). */
+.practice-changed {
+    color: var(--ink);
+}
+.song-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.mode-switch {
+    background: var(--hover);
+    padding: 3px;
+    border-radius: 8px;
+    display: flex;
+    margin-right: 8px;
+}
+.mode-switch button {
+    white-space: nowrap;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: var(--muted);
+}
+.mode-switch button[aria-pressed="true"] {
+    background: var(--surface);
+    box-shadow: 0 1px 3px #0001;
+    color: var(--primary);
+    font-weight: 650;
+}
+.transport-bar {
+    padding: 13px 34px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+    flex-shrink: 0;
+}
+.play-button {
+    height: 43px;
+    width: 48px;
+    background: var(--primary);
+    color: var(--on-primary);
+    border-radius: 9px;
+    display: grid;
+    place-content: center;
+}
+.transport-cluster {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+}
+.setting-label {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    display: block;
+    margin-bottom: 4px;
+    font-weight: 650;
+}
+.tempo-control {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+.tempo-control input {
+    width: 43px;
+    border: 0;
+    background: none;
+    color: var(--ink);
+    font-size: 19px;
+    font-weight: 650;
+    padding: 0;
+    appearance: textfield;
+    outline-offset: 0;
+}
+.tempo-control input::-webkit-inner-spin-button {
+    appearance: none;
+}
+.tempo-control .unit {
+    font-size: 10px;
+    color: var(--muted);
+}
+.tempo-control .step {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    line-height: 1;
+    font-size: 17px;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+}
+.divider {
+    width: 1px;
+    height: 30px;
+    background: var(--line);
+}
+.band-controls {
+    margin-left: auto;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+}
+/* Band chips must read on/off at music-stand distance (#1210): a playing lane
+   is a filled green chip with a solid dot; a muted lane is hollow — dashed
+   border, hollow dot, struck and dimmed label. Same weight and padding in both
+   states so toggling never reflows the row. */
+.band-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 10px;
+    border: 1px solid var(--green);
+    background: var(--green-light);
+    color: var(--green);
+    border-radius: 7px;
+    font-size: 11px;
+    font-weight: 600;
+}
+.band-toggle svg {
+    width: 15px;
+    height: 15px;
+}
+.band-toggle .dot {
+    width: 7px;
+    height: 7px;
+    background: var(--green);
+    box-sizing: border-box;
+    flex-shrink: 0;
+}
+.band-toggle.off {
+    background: transparent;
+    color: var(--muted-soft);
+    border: 1px dashed var(--muted-soft);
+}
+.band-toggle.off .dot {
+    background: transparent;
+    border: 1.5px solid var(--muted-soft);
+}
+.band-toggle.off span.label {
+    text-decoration: line-through;
+    text-decoration-thickness: 1.5px;
+    text-decoration-color: var(--muted-soft);
+}
+/* Trade sits by the Soloist chip: hollow while off or paused (the arrow isn't a muted lane,
+   so it isn't struck through), filled with the turn length while the band trades with you.
+   One fixed width in every state, so turning it on never reflows the chips (#1210), and a
+   full tap target clear of the Soloist chip. */
+.trade-toggle {
+    flex: 0 0 auto;
+    justify-content: center;
+    width: 44px;
+    min-height: 32px;
+}
+.trade-toggle.off span.label {
+    text-decoration: none;
+}
+.trade-note {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.4;
+}

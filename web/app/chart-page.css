@@ -1,0 +1,318 @@
+/* The chart as a page: the fit steps `useChartFit` picks, reading sizes, and the form strip
+   (#1712, #1713).
+   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+/* ── The stand as a page (#1712) ──────────────────────────────────────────────
+   `useChartFit` (app/use-chart-fit.ts) picks one of these steps, largest first, and writes it
+   on the scroll box as `data-fit`; `data-page` (reading, not editing) adds the iReal-style
+   margin: each section's letter sits beside its first row instead of on a row of its own.
+   Four bars to a row at every width. Steps are fixed sizes, never a continuous scale. */
+.song-open .chart-scroll[data-fit] .sheet {
+    --row-gap: 8px;
+    --section-gap: 12px;
+    --bar-pad: 20px;
+}
+.song-open .chart-scroll[data-fit="0"] .sheet {
+    --bar-min: 150px;
+    --chord-size: 52px;
+    --row-gap: 10px;
+    --section-gap: 16px;
+    --bar-pad: 22px;
+    --section-letter-size: 18px;
+}
+.song-open .chart-scroll[data-fit="1"] .sheet {
+    --bar-min: 128px;
+    --chord-size: 46px;
+    --row-gap: 10px;
+    --section-gap: 14px;
+    --bar-pad: 22px;
+    --section-letter-size: 17px;
+}
+.song-open .chart-scroll[data-fit="2"] .sheet {
+    --bar-min: 108px;
+    --chord-size: 40px;
+    --section-gap: 14px;
+    --bar-pad: 21px;
+    --section-letter-size: 16px;
+}
+.song-open .chart-scroll[data-fit="3"] .sheet {
+    --bar-min: 92px;
+    --chord-size: 34px;
+    --bar-pad: 19px;
+    --section-letter-size: 14px;
+}
+.song-open .chart-scroll[data-fit="4"] .sheet {
+    --bar-min: 80px;
+    --chord-size: 30px;
+    --row-gap: 6px;
+    --section-gap: 10px;
+    --bar-pad: 17px;
+    --section-letter-size: 13px;
+}
+.song-open .chart-scroll[data-fit="5"] .sheet {
+    --bar-min: 68px;
+    --chord-size: 27px;
+    --row-gap: 6px;
+    --section-gap: 10px;
+    --bar-pad: 15px;
+    --section-letter-size: 12px;
+}
+.song-open .chart-scroll[data-fit="6"] .sheet {
+    --bar-min: 58px;
+    --chord-size: 24px;
+    --row-gap: 4px;
+    --section-gap: 8px;
+    --bar-pad: 14px;
+    --section-letter-size: 11px;
+}
+.song-open .chart-scroll[data-fit="7"] .sheet {
+    --bar-min: 50px;
+    --chord-size: 21px;
+    --row-gap: 4px;
+    --section-gap: 6px;
+    --bar-pad: 13px;
+    --section-letter-size: 11px;
+}
+/* The floor: chord text never goes below 18px. */
+.song-open .chart-scroll[data-fit="8"] .sheet {
+    --bar-min: 44px;
+    --chord-size: 18px;
+    --row-gap: 4px;
+    --section-gap: 6px;
+    --bar-pad: 12px;
+    --section-letter-size: 11px;
+}
+.song-open .chart-scroll[data-fit] .section {
+    margin-bottom: var(--section-gap);
+}
+.song-open .chart-scroll[data-fit] .bars {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: var(--row-gap);
+}
+.song-open .chart-scroll[data-fit] .bar {
+    min-height: var(--bar-min);
+    padding: var(--bar-pad) 8px 4px 10px;
+}
+.song-open .chart-scroll[data-fit] .bar:nth-child(2n) {
+    border-right: 0;
+}
+.song-open .chart-scroll[data-fit] .bar:nth-child(4n) {
+    border-right: 1.5px solid var(--bar-line-strong);
+}
+.song-open .chart-scroll[data-fit] .bar.end {
+    border-right: 4px double var(--ink);
+}
+.song-open .chart-scroll[data-fit] .chord,
+.song-open .chart-scroll[data-fit] .bar.repeat .chord {
+    font-size: var(--chord-size);
+}
+/* Two chords to a bar are set smaller, three or four smaller again, as a real book sets them:
+   at the floor, 15px for two and 13px for three, so a phone's quarter-width bar holds them on
+   one line. */
+.song-open .chart-scroll[data-fit] .bar.split .chord {
+    font-size: max(15px, calc(var(--chord-size) * 0.74));
+}
+.song-open .chart-scroll[data-fit] .bar.split-3 .chord {
+    font-size: max(13px, calc(var(--chord-size) * 0.6));
+}
+/* Key · meter on a section's first bar: a quarter-width bar still has room for "Ab · 4/4". */
+.song-open .chart-scroll[data-fit] .bar-context {
+    left: 22px;
+    max-width: calc(100% - 26px);
+}
+.song-open .chart-scroll[data-fit] .bar.repeat-start {
+    padding-left: 22px;
+}
+.song-open .chart-scroll[data-fit] .bar.repeat-end {
+    padding-right: 22px;
+}
+.song-open .chart-scroll[data-fit] .repeat-sign {
+    top: 50%;
+    translate: 0 -50%;
+    font-size: min(27px, calc(var(--chord-size) * 0.9));
+}
+.song-open .chart-scroll[data-fit] .repeat-sign small {
+    top: auto;
+    bottom: -12px;
+}
+.song-open .chart-scroll[data-fit] .bar.ending-start {
+    padding-top: calc(var(--bar-pad) + 13px);
+}
+.song-open .chart-scroll[data-fit] .ending-label,
+.song-open .chart-scroll[data-fit] .ending-close {
+    top: calc(var(--bar-pad) - 3px);
+}
+/* Reading: the section letter in a margin beside its first row. The margin is as wide as the
+   widest label, shared by every section (subgrid), so the bars line up down the page. */
+.song-open .chart-scroll[data-page] .sheet {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 10px;
+    align-content: start;
+}
+.song-open .chart-scroll[data-page] .section {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: start;
+}
+.song-open .chart-scroll[data-page] .section-head {
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    margin: 0;
+    min-height: 0;
+    padding-top: calc(var(--bar-pad) - 4px);
+    max-width: 5.5em;
+    text-align: center;
+}
+.song-open .chart-scroll[data-page] .section-repeat {
+    font-size: 10px;
+    line-height: 1.2;
+}
+.song-open .chart-scroll[data-page] .chart-bottom {
+    grid-column: 1 / -1;
+}
+/* A page that fits has nothing to scroll clear of the stand's toasts, which pass over it. */
+.song-open .chart-scroll[data-fits="true"] {
+    padding-bottom: 12px;
+}
+@media (max-width: 760px) {
+    .song-open .chart-scroll[data-page] .sheet {
+        column-gap: 6px;
+    }
+    .song-open .chart-scroll[data-fit] .bar {
+        padding-left: 7px;
+        padding-right: 5px;
+    }
+    .song-open .chart-scroll[data-fit] .bar-number {
+        left: 5px;
+    }
+}
+
+/* ── A chart that scrolls (#1713) ────────────────────────────────────────────
+   Both pieces show only on the reading page when it does not fit (`useChartFit`). */
+.next-chorus,
+.form-strip {
+    display: none;
+}
+/* The form's first line again after its last, faded: the next time through. */
+.song-open .chart-scroll[data-page][data-fits="false"] .next-chorus {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: subgrid;
+    align-items: start;
+    margin-bottom: var(--section-gap);
+    opacity: 0.38;
+    pointer-events: none;
+    user-select: none;
+}
+.next-chorus-head {
+    display: flex;
+    justify-content: center;
+    padding-top: calc(var(--bar-pad) - 4px);
+}
+.next-chorus-letter {
+    font-size: var(--section-letter-size, 12px);
+    font-weight: 750;
+    border: 1.5px dashed var(--ink);
+    border-radius: 2px;
+    min-width: 2em;
+    height: 1.9em;
+    display: grid;
+    place-content: center;
+    padding: 0 4px;
+}
+.next-chorus-bars {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.next-chorus-bar {
+    min-height: var(--bar-min);
+    padding: var(--bar-pad) 8px 4px 10px;
+    border-left: 1px solid var(--bar-line);
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    gap: 7px;
+    overflow: hidden;
+}
+.next-chorus-chord {
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: var(--chord-size);
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    letter-spacing: -1px;
+}
+/* Where you are in the whole form: a strip at the chart's right edge. */
+.song-open .chart-scroll[data-page][data-fits="false"] {
+    padding-right: 44px;
+}
+.song-open .chart-scroll[data-page][data-fits="false"] ~ .form-strip {
+    display: flex;
+    flex-direction: column;
+    position: absolute;
+    top: 12px;
+    bottom: 12px;
+    right: 8px;
+    width: 26px;
+    gap: 2px;
+    z-index: 2;
+}
+.form-strip-section {
+    flex-basis: 0;
+    min-height: 24px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--muted);
+    font:
+        700 10px Inter,
+        sans-serif;
+    display: grid;
+    place-content: start center;
+    padding: 4px 0 0;
+    cursor: pointer;
+    touch-action: manipulation;
+}
+.form-strip-section:hover {
+    border-color: var(--muted);
+    color: var(--ink);
+}
+.form-strip-section:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+.form-strip-view {
+    position: absolute;
+    left: -3px;
+    right: -3px;
+    border: 1.5px solid var(--ink);
+    border-radius: 5px;
+    pointer-events: none;
+    transition: top 120ms ease-out;
+}
+.form-strip-band {
+    position: absolute;
+    left: -5px;
+    right: -5px;
+    height: 3px;
+    margin-top: -1.5px;
+    background: var(--green);
+    border-radius: 2px;
+    pointer-events: none;
+}
+@media (max-width: 760px) {
+    .song-open .chart-scroll[data-page][data-fits="false"] {
+        padding-right: 36px;
+    }
+    .song-open .chart-scroll[data-page][data-fits="false"] ~ .form-strip {
+        right: 5px;
+        width: 22px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .form-strip-view {
+        transition: none;
+    }
+}
