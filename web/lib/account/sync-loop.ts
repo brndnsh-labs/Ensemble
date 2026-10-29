@@ -91,10 +91,9 @@ export { OWNER_MESSAGES, SIGN_OUT_MESSAGES } from './sync-messages';
  * queued no matter why the send failed, but it means the REASON never reaches a caller. Rather
  * than widen that contract (its narrowness is what makes "queued, never lost" easy to prove),
  * the loop wraps the transport: `capturing()` (in `sync-helpers.ts`) records the
- * `SaveTransportError.reason` on its way
- * past and rethrows it unchanged, so `sendNext` still sees exactly the rejection it expects while
- * the loop learns whether the pass stopped for a 401, a quota refusal, a back-off or a dead
- * network. The wrapper is the seam `transport.ts`'s own comment anticipated.
+ * `SaveTransportError.reason` on its way past and rethrows it unchanged, so `sendNext` still sees
+ * exactly the rejection it expects while the loop learns whether the pass stopped for a 401, a
+ * quota refusal, a back-off or a dead network. The wrapper is the seam `transport.ts`'s own comment anticipated.
  *
  * **Three facts stay three facts.** Nothing here collapses local safety, cloud confirmation and
  * offline readiness into one badge; it publishes the cloud observation and the document progress
