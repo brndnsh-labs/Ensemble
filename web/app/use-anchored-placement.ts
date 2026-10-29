@@ -1,6 +1,6 @@
 'use client';
 
-import { type RefObject, useLayoutEffect, useRef } from 'react';
+import { type RefObject, useEffectEvent, useLayoutEffect } from 'react';
 
 /** Room kept between a placed menu and its anchor, and between it and the viewport's edges. */
 const GAP = 6;
@@ -32,27 +32,27 @@ export function useAnchoredPlacement(
     anchor: () => Element | null,
     { enabled, align, onGone }: Placement,
 ): void {
-    // Read through a ref, so the listeners are added once per opening, not on every render.
-    const latest = useRef({ anchor, onGone });
-    latest.current = { anchor, onGone };
+    // An effect event, so the listeners are added once per opening, not on every render, and
+    // each placement still reads the latest anchor and `onGone`.
+    const current = useEffectEvent(() => ({ rect: anchor()?.getBoundingClientRect(), onGone }));
     useLayoutEffect(() => {
         if (!enabled) {
             return;
         }
         function place() {
             const menu = node.current;
-            const rect = latest.current.anchor()?.getBoundingClientRect();
+            const { rect, onGone: gone } = current();
             if (!menu) {
                 return;
             }
             if (!rect) {
-                latest.current.onGone?.();
+                gone?.();
                 return;
             }
             // Off the screen: a caller with `onGone` closes; one without keeps the menu placed,
             // clamped to the screen's edge, rather than frozen where the anchor last was.
-            if ((rect.bottom < 0 || rect.top > window.innerHeight) && latest.current.onGone) {
-                latest.current.onGone();
+            if ((rect.bottom < 0 || rect.top > window.innerHeight) && gone) {
+                gone();
                 return;
             }
             const width = menu.offsetWidth;
