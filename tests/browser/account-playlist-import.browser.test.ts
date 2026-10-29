@@ -3,6 +3,7 @@ import type { AccountApi, ApiResult } from '../../web/lib/account/api.js';
 import { createAccountSession } from '../../web/lib/account/session.js';
 import { createSyncLoop, LibraryUnverifiedError } from '../../web/lib/account/sync-loop.js';
 import { type CollectionDocument, mergeSongIds, newCollection } from '../../web/lib/collections.js';
+import { ImportCapError } from '../../web/lib/sync/collections.js';
 import { runOutboxPass } from '../../web/lib/sync/drain.js';
 import {
     ACCOUNT_DATABASE,
@@ -10,11 +11,7 @@ import {
     digest,
     type PreparedSave,
 } from '../../web/lib/sync/protocol.js';
-import {
-    AccountSongbook,
-    ImportCapError,
-    MAX_REMOTE_CANDIDATES,
-} from '../../web/lib/sync/repository.js';
+import { AccountSongbook, MAX_REMOTE_CANDIDATES } from '../../web/lib/sync/repository.js';
 import type { SaveTransport } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 

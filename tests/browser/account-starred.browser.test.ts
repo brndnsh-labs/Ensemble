@@ -10,13 +10,10 @@ import {
     STARRED_COLLECTION_ID,
     withSong,
 } from '../../web/lib/collections.js';
+import { CollectionCapError } from '../../web/lib/sync/collections.js';
 import { runOutboxPass } from '../../web/lib/sync/drain.js';
 import { ACCOUNT_DATABASE, type AccountScope, digest } from '../../web/lib/sync/protocol.js';
-import {
-    AccountSongbook,
-    CollectionCapError,
-    MAX_REMOTE_CANDIDATES,
-} from '../../web/lib/sync/repository.js';
+import { AccountSongbook, MAX_REMOTE_CANDIDATES } from '../../web/lib/sync/repository.js';
 import type { SaveTransport } from '../../web/lib/sync/send.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
