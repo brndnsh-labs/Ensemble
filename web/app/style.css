@@ -2381,7 +2381,7 @@ dialog textarea {
    scroll fully clear of it. Re-review P3 — 108px is the ORIGINAL floor, sized for the common
    case (the message toast, or the toast plus the pill); it does not grow just because the stack
    COULD hold a third thing. `--stand-stack-height` (set by the `ResizeObserver` in
-   `app/ensemble.tsx`) is the stack's OWN actual current height, 0 when nothing shows, so `max()`
+   `app/stand-stack.tsx`) is the stack's OWN actual current height, 0 when nothing shows, so `max()`
    only asks for more room while the stack genuinely needs it — a chart that fit before this
    story still fits, and the last row still clears the stack on the rare render where all three
    are up. */
