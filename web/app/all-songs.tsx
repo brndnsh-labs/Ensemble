@@ -238,8 +238,13 @@ export function AllSongs({
             return;
         }
         fellBackFrom.current = null;
-        onCollectionRemovalHandled();
-        const frame = requestAnimationFrame(() => allFilter.current?.focus());
+        // The marker is cleared in the same frame, after the focus: clearing it first re-renders,
+        // this effect's dependency changes, and the cleanup below would cancel the frame before
+        // the focus ever ran.
+        const frame = requestAnimationFrame(() => {
+            allFilter.current?.focus();
+            onCollectionRemovalHandled();
+        });
         return () => cancelAnimationFrame(frame);
     }, [removedCollectionId, onCollectionRemovalHandled]);
     /** The order the current view's collection keeps, id to position — null outside one. */
