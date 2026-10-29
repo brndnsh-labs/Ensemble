@@ -1,6 +1,6 @@
 'use client';
 
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useEffectEvent } from 'react';
 import { afterPress } from './after-press';
 
 /** Puts focus back on the button an anchored menu or popover opened from, if it is still there. */
@@ -27,34 +27,33 @@ export function useAnchoredDismiss(
     anchor: () => Element | null,
     close: (refocus: boolean) => void,
 ): void {
-    // Read through a ref, so the document listeners are added once per opening.
-    const latest = useRef({ inside, anchor, close });
-    latest.current = { inside, anchor, close };
+    // Effect events, so the document listeners are added once per opening and still read the
+    // latest `inside`, `anchor` and `close` when a press or a key arrives.
+    const currentAnchor = useEffectEvent(anchor);
+    const onOutside = useEffectEvent((target: Node | null) => {
+        if (inside.some((box) => box.current?.contains(target)) || anchor()?.contains(target)) {
+            return;
+        }
+        close(false);
+        afterPress(() => {
+            const active = document.activeElement;
+            if (!active || active === document.body) {
+                focusAnchor(anchor);
+            }
+        });
+    });
+    const onEscape = useEffectEvent(() => close(true));
     useEffect(() => {
-        const trigger = latest.current.anchor();
+        const trigger = currentAnchor();
         trigger?.setAttribute('aria-expanded', 'true');
         function outside(event: PointerEvent) {
-            const target = event.target instanceof Node ? event.target : null;
-            if (
-                latest.current.inside.some((box) => box.current?.contains(target)) ||
-                latest.current.anchor()?.contains(target)
-            ) {
-                return;
-            }
-            const anchor = latest.current.anchor;
-            latest.current.close(false);
-            afterPress(() => {
-                const active = document.activeElement;
-                if (!active || active === document.body) {
-                    focusAnchor(anchor);
-                }
-            });
+            onOutside(event.target instanceof Node ? event.target : null);
         }
         // Esc with focus somewhere outside the box (inside it, the box's own keys answer first).
         function escape(event: KeyboardEvent) {
             if (event.key === 'Escape') {
                 event.preventDefault();
-                latest.current.close(true);
+                onEscape();
             }
         }
         document.addEventListener('pointerdown', outside, true);
