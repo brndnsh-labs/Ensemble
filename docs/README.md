@@ -17,6 +17,7 @@ This folder groups the living documentation for Ensemble.
 
 - [`docs/design/chords-3.md`](design/chords-3.md) — keyboard/guitar player architecture, Acoustic pilot, and listening comparison.
 - [`docs/design/ensemble-v2.md`](design/ensemble-v2.md) — approved home, local-first songbook and music-stand direction; isolated preview and later account/import boundaries.
+- [`docs/design/ensemble-v2-stand-notes.md`](design/ensemble-v2-stand-notes.md) — the why, history and worked examples behind the music stand's navigation rows in `web/CLAUDE.md` (moved there in #1937); the rows keep the files and binding rules.
 - [`docs/design/ensemble-v2-charts.md`](design/ensemble-v2-charts.md) — semantic-chart/full iReal compatibility direction, the one chart schema (2) and how schema 1 was retired, live measure editor/conservative import, and remaining iReal boundaries.
 - [`docs/design/ensemble-v2-sync.md`](design/ensemble-v2-sync.md) — approved recovery direction, implemented account-local outbox, staged cloud/offline acceptance and hosting decisions (#1172).
 - [`hosting/README.md`](../hosting/README.md) — the shared test/production stack on docker04: the `ensemble-web` and `ensemble-api` images, release-by-tag from CI, and the edge config.
