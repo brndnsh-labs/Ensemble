@@ -1,6 +1,7 @@
 /* Dialog backdrop, actions and text fields, then the app-wide breakpoint blocks (laptop, phone,
    short laptop, landscape phone, reduced motion) for the surfaces declared above. Breakpoints are
-   moving into their surfaces' partials (#1949): the chart sheet's are in chart-sheet.css.
+   moving into their surfaces' partials (#1949): the chart sheet's are in chart-sheet.css, the
+   song header's and transport's in song-header.css.
    Imported from layout.tsx; its position in that import list is its place in the cascade. */
 dialog::backdrop {
     background: var(--backdrop);
@@ -48,26 +49,6 @@ dialog textarea {
     }
     .home h1 {
         font-size: 39px;
-    }
-    .song-header {
-        padding: 17px 22px;
-    }
-    .transport-bar {
-        padding: 12px 22px;
-        gap: 15px;
-    }
-    .band-toggle {
-        padding: 9px 7px;
-    }
-    .band-toggle svg {
-        display: none;
-    }
-    .song-actions .btn {
-        padding: 9px 11px;
-    }
-    .song-title {
-        font-size: 24px;
-        max-width: 300px;
     }
     .home-actions .btn {
         padding: 9px 11px;
@@ -136,127 +117,6 @@ dialog textarea {
     .workspace {
         height: calc(100dvh - 62px);
     }
-    .song-header {
-        padding: 14px 15px;
-        align-items: flex-start;
-        flex-wrap: wrap;
-        gap: 12px;
-    }
-    .song-heading {
-        gap: 10px;
-        flex: 1;
-        min-width: 200px;
-    }
-    /* Phone hit targets (#1700): the row has no width to spare (see the mode switch below), so
-       these grow in height only, toward the 44px a thumb needs. */
-    .back-btn {
-        width: 30px;
-        height: 40px;
-        border: 0;
-        background: none;
-    }
-    .song-title {
-        font-size: 25px;
-        max-width: 250px;
-    }
-    .song-subtitle {
-        font-size: 10px;
-        gap: 6px;
-    }
-    .song-actions {
-        gap: 5px;
-        justify-content: flex-end;
-        flex: 1;
-        min-width: 130px;
-        /* A row that doesn't fit wraps rather than run Save and the song menu off the right edge,
-           where they were reachable only by scrolling the page sideways (#1700) — "Focus chart"
-           mid-song, or "Keep a copy" on CI's WebKit, which sets text wider than local. The
-           buttons' trimmed sides below keep the common rows on one line. */
-        flex-wrap: wrap;
-    }
-    .song-actions .btn {
-        font-size: 11px;
-        padding: 8px 8px;
-        min-height: 40px;
-    }
-    .song-actions .btn svg {
-        width: 14px;
-        height: 14px;
-    }
-    .mode-switch {
-        margin-right: 0;
-    }
-    /* Chart | Neck | Edit (#1587): three modes on the phone row. 6px sides, and the row's
-       indent below trimmed, buy ~24px of slack — CI's WebKit sets text ~10px wider than local,
-       and the row fit with none before. */
-    .mode-switch button {
-        font-size: 11px;
-        padding: 8px 6px;
-        min-height: 36px;
-    }
-    /* Chart | Neck | Edit (#1587): three modes fit the phone's header row with the short label. */
-    .mode-label-long {
-        display: none;
-    }
-    .song-actions .menu-btn {
-        width: 28px;
-        height: 40px;
-    }
-    .transport-bar {
-        padding: 11px 16px;
-        gap: 12px;
-        flex-wrap: wrap;
-    }
-    .transport-cluster {
-        gap: 9px;
-    }
-    .play-button {
-        width: 41px;
-        height: 40px;
-    }
-    .tempo-control input {
-        font-size: 19px;
-        width: 38px;
-    }
-    .tempo-control .unit {
-        display: none;
-    }
-    .tempo-control .step {
-        width: 21px;
-        height: 22px;
-    }
-    .transport-bar > .divider {
-        display: none;
-    }
-    .setting-label {
-        font-size: 8px;
-    }
-    .genre-setting {
-        margin-left: auto;
-    }
-    .key-setting {
-        margin-left: 3px;
-    }
-    .band-controls {
-        width: 100%;
-        margin-left: 0;
-        justify-content: space-between;
-        gap: 5px;
-        padding-top: 10px;
-        border-top: 1px solid var(--line);
-    }
-    .band-toggle {
-        flex: 1;
-        justify-content: center;
-        font-size: 10px;
-        padding: 8px 5px;
-        gap: 4px;
-    }
-    .trade-toggle {
-        flex: 0 0 auto;
-        width: 40px;
-        min-height: 36px;
-    }
     .stand-stack {
         left: 16px;
         right: 16px;
@@ -273,84 +133,15 @@ dialog textarea {
         font-size: 12px;
         padding: 0 14px;
     }
-    /* Typing a bar on a phone (#1724): its field is docked on the keyboard (`bar-dock.css`), so
-       the transport row folds away while it is up and the chart keeps two or three rows above
-       it; it is back after Done. The chart's padding for the dock is in chart-sheet.css. */
-    .workspace[data-bar-open] .transport-bar {
-        display: none;
-    }
-    .song-header .song-actions {
-        flex-basis: 100%;
-        justify-content: flex-start;
-        padding-left: 28px;
-    }
-    .song-actions .save-btn {
-        margin-left: auto;
-    }
-    .song-actions .menu-btn {
-        margin-left: 0;
-    }
-    .song-actions .mode-switch {
-        margin-right: auto;
-    }
 }
 @media (min-width: 761px) and (max-height: 650px) {
     .workspace {
         height: calc(100dvh - 54px);
     }
-    .song-header {
-        padding-top: 9px;
-        padding-bottom: 9px;
-    }
-    .transport-bar {
-        padding-top: 7px;
-        padding-bottom: 7px;
-    }
 }
 @media (max-height: 520px) and (max-width: 1000px) and (orientation: landscape) {
     .workspace {
         height: calc(100dvh - 44px);
-    }
-    .song-header {
-        padding: 7px 18px;
-        flex-wrap: nowrap;
-    }
-    .song-header .song-actions {
-        flex-basis: auto;
-        padding-left: 0;
-    }
-    .song-title {
-        font-size: 21px;
-    }
-    .song-subtitle {
-        display: none;
-    }
-    .song-heading {
-        min-width: 160px;
-    }
-    .transport-bar {
-        flex-wrap: nowrap;
-        padding: 7px 18px;
-        gap: 13px;
-    }
-    .band-controls {
-        width: auto;
-        margin-left: auto;
-        padding: 0;
-        border: 0;
-    }
-    .band-toggle {
-        padding: 7px 6px;
-        font-size: 9px;
-    }
-    .band-toggle .dot {
-        display: none;
-    }
-    .key-setting {
-        display: block;
-    }
-    .song-actions .btn {
-        padding: 7px 8px;
     }
     .stand-stack {
         bottom: 10px;
