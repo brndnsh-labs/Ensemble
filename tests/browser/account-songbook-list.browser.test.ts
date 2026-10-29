@@ -4,11 +4,8 @@ import {
     AccountChangedError,
     type AccountScope,
 } from '../../web/lib/sync/protocol.js';
-import {
-    AccountSongbook,
-    DEFAULT_LIST_LIMIT,
-    MAX_LIST_LIMIT,
-} from '../../web/lib/sync/repository.js';
+import { AccountSongbook, MAX_LIST_LIMIT } from '../../web/lib/sync/repository.js';
+import { DEFAULT_LIST_LIMIT } from '../../web/lib/sync/repository-internal.js';
 import { accountChart } from '../utils/account-songbook-fixture.js';
 
 /**

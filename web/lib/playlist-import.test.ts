@@ -22,7 +22,8 @@ import {
     resolvePlaylistImport,
     songKey,
 } from './playlist-import';
-import { capRefusal, ImportCapError, MAX_REMOTE_CANDIDATES } from './sync/repository';
+import { ImportCapError } from './sync/collections';
+import { capRefusal, MAX_REMOTE_CANDIDATES } from './sync/repository';
 
 /** One open-protocol (irealbook) song's six fields. */
 function song(title: string, composer: string, body = 'T44[C   |G7   Z'): string[] {
