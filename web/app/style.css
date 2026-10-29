@@ -1751,8 +1751,8 @@ dialog textarea {
 /* Following's next-bar cue (#1458): a quiet outline, not a fill, so it reads as "coming up"
    rather than "playing now" even where it lands on the same bar as `.active` (a one-bar chart).
    `data-next="soon"` (the playing bar's last felt pulse) thickens and darkens the same outline —
-   ordinary React state (`nextSoon`, `app/ensemble.tsx`), edge-triggered off a 60ms poll of the
-   engine so it flips only twice a bar, not a DOM write bypassing React. */
+   ordinary React state (`nextSoon`, `app/use-playback-state.ts`), edge-triggered off a 60ms poll
+   of the engine so it flips only twice a bar, not a DOM write bypassing React. */
 .bar[data-next] {
     box-shadow: inset 0 0 0 2px var(--bar-next);
     border-radius: 4px;
