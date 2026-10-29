@@ -1,8 +1,9 @@
-/* Dialog backdrop, actions and text fields, then the app-wide breakpoint blocks (laptop, phone,
-   short laptop, landscape phone, reduced motion) for the surfaces declared above. Breakpoints are
+/* Dialog backdrop, actions and text fields, then the app-wide breakpoint blocks (phone, short
+   laptop, landscape phone, reduced motion) for the surfaces declared above. Breakpoints are
    moving into their surfaces' partials (#1949): the chart sheet's are in chart-sheet.css, the
-   song header's and transport's in song-header.css.
-   Imported from layout.tsx; its position in that import list is its place in the cascade. */
+   song header's and transport's in song-header.css, the songbook home's and the site header's
+   in style.css. Imported from layout.tsx; its position in that import list is its place in the
+   cascade. */
 dialog::backdrop {
     background: var(--backdrop);
     backdrop-filter: blur(3px);
@@ -43,77 +44,7 @@ dialog textarea {
     line-height: 1.7;
     resize: vertical;
 }
-@media (max-width: 1100px) {
-    .home {
-        padding: 34px 28px;
-    }
-    .home h1 {
-        font-size: 39px;
-    }
-    .home-actions .btn {
-        padding: 9px 11px;
-    }
-}
 @media (max-width: 760px) {
-    .header-right {
-        gap: 10px;
-    }
-    .account-btn {
-        font-size: 11px;
-        padding: 7px 9px;
-    }
-    .home {
-        padding: 29px 20px 24px;
-    }
-    .home h1 {
-        font-size: 38px;
-        margin-top: 8px;
-    }
-    .home-intro {
-        display: block;
-        margin-bottom: 25px;
-    }
-    .home-intro p {
-        font-size: 13px;
-        line-height: 1.6;
-    }
-    .home-actions {
-        margin-top: 19px;
-    }
-    .home-actions .btn {
-        font-size: 12px;
-    }
-    .section-heading h2 {
-        font-size: 15px;
-    }
-    .song-table th,
-    .song-table td {
-        padding-left: 5px;
-        padding-right: 5px;
-    }
-    .song-table .hide-mobile {
-        display: none;
-    }
-    .song-row td {
-        padding-top: 14px;
-        padding-bottom: 14px;
-    }
-    .song-name {
-        font-size: 13px;
-    }
-    .song-detail {
-        font-size: 10px;
-    }
-    .song-glyph {
-        width: 35px;
-        height: 38px;
-    }
-    .song-link {
-        gap: 10px;
-    }
-    .jam-tile {
-        margin-top: 7px;
-    }
     .workspace {
         height: calc(100dvh - 62px);
     }
