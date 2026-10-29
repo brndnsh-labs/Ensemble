@@ -27,6 +27,14 @@ entry here).
 
 ## Registry
 
+### 🟢 `web/checks/semantic-form-editor.spec.ts` — "a form built bar by bar applies without a refusal, saves from the hidden editor, transposes and reopen offline as four written bars"
+
+- **Class:** slow-legitimate.
+- **Symptom:** `v2-suite (3, webkit-phone)`, three times with one shape: `locator.click: Test timeout of 45000ms exceeded` on the dialog's "Per-bar markers for …" button, no failed assertion. On `main` at `a8914101` (2026-10-20, run 39485879620), on `main` at `687f2fef` (#1916, 2026-10-28, run 40787008863) and on PR #1942 (2026-10-29, run 40812119268; green on rerun). The call log each time: the locator resolved, then "waiting for element to be visible, enabled and stable" when the budget ran out.
+- **Root cause:** the test is long, not stuck. It opens the Repeats and endings dialog six times through `barForm`, and clicks inside it the moment it is visible; headless WebKit paints the first frames after a dialog opens slowly (the `foundation.spec.ts` entry below measured 0.4–1.1s a frame) and Playwright's stable-before-click wait counts those frames. Then a save with the editor hidden, a transpose, and a reload offline. Idle on `webkit-phone` it takes 17s; the file's "invalid raw form edits survive failed Save until Revert…" test builds the same form and takes 16s. Under the contention recipe (two pinned cores, three spinners on them, two workers) the two took 43.6–46.4s and failed 13 of 16 on the 45s default budget, the three passes landing at 43.6–44.9s, every failure the CI shape; the file's short test took 7–9s. The budget ran out at whichever dialog click was in flight, which is why CI's three failures all name the same button.
+- **Fix (2026-10-29, #1944):** `test.setTimeout(90_000)` on both long tests, the tightest scope that covers them, as `chart-pointer.spec.ts` does. No global change, nothing trimmed, no retries. After: 24/24 under the same contention (the two long tests at 40.7–58.0s, the short one at 6.8–9.1s); the unraised budget is the revert, red 13 of 16 above.
+- **Last seen:** 2026-10-29 (PR #1942, run 40812119268).
+
 ### 🟢 `web/checks/songbook-home.spec.ts` — "one search returns your songs and the standards, grouped"
 
 - **Class:** e2e-timing, but the race is in the **app** (the home's search box), not the test.

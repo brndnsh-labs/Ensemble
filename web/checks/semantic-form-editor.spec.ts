@@ -161,6 +161,10 @@ test('a form built bar by bar applies without a refusal, saves from the hidden e
     page,
     disconnect,
 }, info) => {
+    // Six opens of the Repeats and endings dialog, a save, a transpose and an offline reload: 17s
+    // idle on webkit-phone, 44-46s under contention, where headless WebKit paints the first
+    // frames after a dialog opens slowly and the click waits on them (#1944).
+    test.setTimeout(90_000);
     await newSong(page, 'Two ending study');
     const before = await savedDocuments(page);
     await (await barForm(page, 1)).getByLabel('Start repeat here', { exact: true }).check();
@@ -265,6 +269,9 @@ test('a form built bar by bar applies without a refusal, saves from the hidden e
 test('invalid raw form edits survive failed Save until Revert, and malformed form imports leave every saved song intact', async ({
     page,
 }) => {
+    // The same form built the same way, then the raw editor and the imports: 16s idle, 45-46s
+    // under contention (#1944).
+    test.setTimeout(90_000);
     await newSong(page, 'Protected form');
     await (await barForm(page, 1)).getByLabel('Start repeat here', { exact: true }).check();
     await closeBarMenu(page);
