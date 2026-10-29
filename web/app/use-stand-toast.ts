@@ -17,7 +17,7 @@ interface StandToastOptions {
     updateHint: string | null;
 }
 
-/** What the shell's call sites and the `.stand-stack` markup read back. */
+/** What the shell's call sites and the `StandStack` markup (`app/stand-stack.tsx`) read back. */
 interface StandToast {
     /** Says a sentence on the stand; an `info` one never replaces an undismissed `warning`. */
     setMessage: (text: string, options?: { tone?: MessageTone }) => void;
@@ -137,7 +137,7 @@ export function useStandToast({
      * close button, `'info'` auto-dismisses below. "Band is playing" and the offline label are
      * gone outright, not read here at all (acceptance: they appear nowhere on the stand). Review
      * P2 #1 — this is its OWN element now: a standing sync failure no longer masks it (see the
-     * shell's `.stand-stack` markup).
+     * `StandStack` markup, `app/stand-stack.tsx`).
      */
     const toastTone: 'busy' | 'warning' | 'info' = showBusy
         ? 'busy'
