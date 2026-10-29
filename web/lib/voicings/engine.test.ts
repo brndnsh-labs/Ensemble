@@ -11,38 +11,31 @@ import {
     taughtOptions,
 } from './fingering';
 import {
-    allPositions,
-    build,
-    fingerMoves,
     GUITAR,
-    gripMidis,
-    type InstrumentDef,
-    inHome,
-    inversionOf,
-    type Note,
-    rootMove,
-    spellDegree,
-    UKULELE,
-    type Voicing,
-    voiceChart,
-} from './index';
-import {
     GUITAR_OPEN_CHORDS,
     GUITAR_OPEN_SEVENTHS,
     GUITAR_OPEN_SUS_AFTER_PLAN,
+    UKULELE,
     UKULELE_LOW_G,
 } from './instruments';
+import { fingerMoves, rootMove } from './motion';
 import { keyRoot, SONG_SHAPES, songChart } from './test/keys';
-import { QUALITIES } from './theory';
-import type { Quality } from './types';
+import { QUALITIES, spellDegree } from './theory';
+import type { InstrumentDef, Note, Quality, Voicing } from './types';
 import {
     allowedShapes,
+    allPositions,
+    build,
     buildAt,
+    gripMidis,
+    inHome,
     inReach,
+    inversionOf,
     lessonGrip,
     oneFingerApart,
     rootFrets,
     slidFrom,
+    voiceChart,
 } from './voicing';
 
 const tab = (inst: InstrumentDef, v: Voicing) => {

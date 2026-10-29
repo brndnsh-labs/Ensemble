@@ -1,14 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import {
-    allPositions,
-    GUITAR,
-    type InstrumentDef,
-    outsideShell,
-    UKULELE,
-    type Voicing,
-} from './index';
+import { GUITAR, UKULELE } from './instruments';
 import { keyRoot } from './test/keys';
-import type { Quality } from './types';
+import { outsideShell } from './theory';
+import type { InstrumentDef, Quality, Voicing } from './types';
+import { allPositions } from './voicing';
 
 // "Show the shell" (#1853): which notes of a grip the neck dims, so the root, 3rd and 7th stand
 // out. Each case is a real grip from the voicer, read string by string.

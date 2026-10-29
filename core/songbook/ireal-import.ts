@@ -171,6 +171,7 @@ function emptyResult(input: string): IRealImportResult {
  * accompanies successes and failures; callers must keep it private and render metadata as text.
  * A score is authored data, not a playback certificate: the ordinary playback validator must
  * still check supported qualities, lane semantics, form traversal and expansion limits.
+ * @internal a test seam: only the import tests call it directly.
  */
 export function parseIRealImport(input: string): IRealImportResult {
     const result = emptyResult(input);

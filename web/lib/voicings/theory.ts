@@ -15,7 +15,10 @@ export const ordinal = (n: number): string =>
             ? 'rd'
             : 'th');
 
-/** Spell the note `interval` semitones and `step` letters above `key`, e.g. the ii of B♭ is C. */
+/**
+ * Spell the note `interval` semitones and `step` letters above `key`, e.g. the ii of B♭ is C.
+ * @internal a test seam: only the voicing tests' chart builders call it.
+ */
 export function spellFrom(key: Spelled, interval: number, step: number): Spelled {
     const letter = (key.letter + step) % 7;
     const pc = mod(key.pc + interval, 12);

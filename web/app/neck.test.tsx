@@ -7,7 +7,9 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { allPositions, build, GUITAR, type Note, UKULELE, type Voicing } from '../lib/voicings';
+import { GUITAR, UKULELE } from '../lib/voicings/instruments';
+import type { Note, Voicing } from '../lib/voicings/types';
+import { allPositions, build } from '../lib/voicings/voicing';
 import { Neck, type NeckProps } from './neck';
 import {
     boardTransform,

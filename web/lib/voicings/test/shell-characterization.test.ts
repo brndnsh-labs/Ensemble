@@ -14,9 +14,9 @@
 // The charts (`CASES`) are the input and live here; everything under `chords` is output.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { allPositions, GUITAR, inHome, UKULELE, voiceChart } from '../index';
-import { UKULELE_LOW_G } from '../instruments';
+import { GUITAR, UKULELE, UKULELE_LOW_G } from '../instruments';
 import type { InstrumentDef } from '../types';
+import { allPositions, inHome, voiceChart } from '../voicing';
 import { keyRoot, SONG_SHAPES, songChart } from './keys';
 
 const INSTRUMENTS = { guitar: GUITAR, uke: UKULELE, 'uke-low-g': UKULELE_LOW_G } satisfies Record<

@@ -161,7 +161,10 @@ export function markPackInstalled(packId: string, installed: boolean): void {
     }
 }
 
-/** Test helper: wipe the entire pack cache (and installed-set) between cases. */
+/**
+ * Test helper: wipe the entire pack cache (and installed-set) between cases.
+ * @internal a test seam.
+ */
 export function __resetPackCacheForTest(): void {
     packCache.clear();
     installedPacks.clear();

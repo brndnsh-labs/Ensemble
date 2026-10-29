@@ -183,7 +183,10 @@ export async function loadPack(
     }
 }
 
-/** Test helper: drop any in-flight load bookkeeping between cases. */
+/**
+ * Test helper: drop any in-flight load bookkeeping between cases.
+ * @internal a test seam.
+ */
 export function __resetLoaderForTest(): void {
     inFlight.clear();
     assetFetcher = undefined;

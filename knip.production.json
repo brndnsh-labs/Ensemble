@@ -8,7 +8,8 @@
                 "band/**/*.ts!",
                 "scripts/**/*.ts!",
                 "!band/**/*.test.ts!",
-                "!band/test/**!"
+                "!band/test/**!",
+                "!core/songbook/state-ownership.ts!"
             ]
         },
         "web": {
@@ -18,7 +19,8 @@
                 "lib/**/*.{ts,tsx}!",
                 "scripts/*.mjs!",
                 "!**/*.test.{ts,tsx}!",
-                "!lib/**/test/**!"
+                "!lib/**/test/**!",
+                "!app/test/**!"
             ]
         },
         "api": {

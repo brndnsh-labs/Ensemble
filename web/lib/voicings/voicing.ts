@@ -392,6 +392,7 @@ export function gripMidis(inst: InstrumentDef, v: Voicing): number[] {
  * Lowest-fret playable version of a grip, or null when the shape has none for this chord: a
  * note off the neck, or a quality the shape is not taught for (`ShapeDef.qualities`, as
  * `allowedShapes` reads it — the Fm form is no major chord).
+ * @internal a test seam: the engine tests build single grips with it.
  */
 export function build(
     inst: InstrumentDef,

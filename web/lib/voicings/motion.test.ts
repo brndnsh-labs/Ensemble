@@ -6,10 +6,11 @@
 import { parseChord } from '@band/index';
 import { describe, expect, it } from 'vitest';
 import { voicingChord } from './adapter';
-import { GUITAR, type InstrumentDef, UKULELE, type Voicing, voiceChart } from './index';
+import { GUITAR, UKULELE } from './instruments';
 import { type SharedNote, sharedNotes, spokenDegree } from './motion';
 import { DEGREES } from './theory';
-import type { Degree, HomeWindow } from './types';
+import type { Degree, HomeWindow, InstrumentDef, Voicing } from './types';
+import { voiceChart } from './voicing';
 
 const TONIC: Record<string, number> = { C: 0, 'B♭': 10 };
 const voiced = (

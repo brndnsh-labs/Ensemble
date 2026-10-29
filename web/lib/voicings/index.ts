@@ -6,7 +6,6 @@
 export type { Barre } from './fingering';
 export { barres, fingerMap } from './fingering';
 export { HOME_FRETS } from './home-window';
-export { GUITAR, UKULELE } from './instruments';
 export type { FingerMove, SharedNote } from './motion';
 export {
     COUNT_WORDS,
@@ -15,10 +14,9 @@ export {
     sharedNotes,
     spokenDegree,
 } from './motion';
-export type { NeckPrefs } from './neck-instruments';
 export { NECK_INSTRUMENTS } from './neck-instruments';
 export { DEGREES, outsideShell, spellDegree } from './theory';
 export type { Degree, HomeWindow, InstrumentDef, Note, Voicing } from './types';
 export type { VoicedBandChord } from './voice-chart';
 export { voiceBandChart } from './voice-chart';
-export { allPositions, build, gripMidis, inHome, inversionOf, voiceChart } from './voicing';
+export { gripMidis, inversionOf } from './voicing';

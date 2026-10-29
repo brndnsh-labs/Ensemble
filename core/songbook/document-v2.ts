@@ -429,10 +429,12 @@ export function isRetiredSchema(candidate: unknown): boolean {
     );
 }
 
+/** @internal a test seam: the codec tests round-trip through it. */
 export function decodeChartDocumentV2(json: string): CodecDecodeResult<ChartDocumentV2> {
     return decodeJson(json, validateChartDocumentV2);
 }
 
+/** @internal a test seam: the codec tests round-trip through it. */
 export function encodeChartDocumentV2(document: ChartDocumentV2): CodecEncodeResult {
     return encodeValidated(document, validateChartDocumentV2);
 }

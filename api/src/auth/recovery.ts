@@ -36,7 +36,7 @@ import { isMalformedCeremonyRequest } from './request-guard.js';
  * human-typo-tolerant alphabet: there is no delivery/display UI in this story's scope, and
  * inventing a display format now would be speculative.
  */
-export const RECOVERY_CODE_BYTES = 32;
+const RECOVERY_CODE_BYTES = 32;
 
 /**
  * 10 minutes (decision 7) — doing double duty as both the recovery-only session's absolute

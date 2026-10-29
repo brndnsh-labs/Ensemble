@@ -17,7 +17,7 @@
             "project": ["app/**/*.{ts,tsx}", "lib/**/*.ts", "scripts/*.mjs", "checks/**/*.ts"]
         },
         "api": {
-            "entry": ["src/db/index.ts", "src/auth/index.ts", "test/**/*.test.ts"],
+            "entry": ["src/auth/index.ts", "test/**/*.test.ts"],
             "project": ["src/**/*.ts", "test/**/*.ts"]
         }
     },

@@ -7,16 +7,12 @@ import { compileTimeline, parseChord } from '@band/index';
 import type { ScoreEvent, ScoreMeasure, SemanticScore } from '@core/songbook/score-types';
 import { describe, expect, it } from 'vitest';
 import { bandChart } from '../lib/band-chart';
-import {
-    GUITAR,
-    type InstrumentDef,
-    type NeckPrefs,
-    UKULELE,
-    type VoicedBandChord,
-    voiceBandChart,
-    voiceChart,
-} from '../lib/voicings';
+import { type VoicedBandChord, voiceBandChart } from '../lib/voicings';
 import { voicingChord } from '../lib/voicings/adapter';
+import { GUITAR, UKULELE } from '../lib/voicings/instruments';
+import type { NeckPrefs } from '../lib/voicings/neck-instruments';
+import type { InstrumentDef } from '../lib/voicings/types';
+import { voiceChart } from '../lib/voicings/voicing';
 import {
     changePosition,
     chordChanges,
