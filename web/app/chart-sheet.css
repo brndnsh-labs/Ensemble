@@ -1,4 +1,5 @@
-/* The chart: scroll box, sections, bars, chord setting, typing on the chart, and the footer.
+/* The chart: scroll box, sections, bars, chord setting, typing on the chart, and the footer, then
+   its breakpoints (#1949).
    Imported from layout.tsx; its position in that import list is its place in the cascade. */
 .workspace-body {
     display: flex;
@@ -265,4 +266,145 @@ button.bar-number {
 .chart-bottom em {
     font-family: Georgia, serif;
     font-size: 13px;
+}
+/* The chart's breakpoints (#1949), moved from responsive.css in its order: wide, laptop, phone,
+   short laptop, landscape phone, reduced motion. */
+@media (min-width: 1450px) {
+    .chart-scroll {
+        padding-top: 36px;
+    }
+    .bar {
+        min-height: 91px;
+    }
+    .section {
+        margin-bottom: 35px;
+    }
+}
+@media (max-width: 1100px) {
+    .chart-scroll {
+        padding: 23px 28px 35px;
+    }
+    .chord {
+        font-size: 28px;
+    }
+    .bar {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+}
+@media (max-width: 760px) {
+    .chart-scroll {
+        padding: 17px 19px 32px;
+    }
+    .section {
+        margin-bottom: 27px;
+    }
+    .section-head {
+        margin-bottom: 8px;
+        gap: 7px;
+    }
+    .section-letter {
+        font-size: 11px;
+        min-width: 22px;
+        height: 21px;
+    }
+    .bars {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        row-gap: 9px;
+    }
+    .bar {
+        min-height: 76px;
+        padding: 22px 12px 10px;
+    }
+    .bar:nth-child(2n) {
+        border-right: 1.5px solid var(--bar-line-strong);
+    }
+    .bar.end {
+        border-right: 4px double var(--ink);
+    }
+    .chord {
+        font-size: 30px;
+    }
+    .bar-number {
+        font-size: 9px;
+    }
+    .chart-bottom {
+        font-size: 10px;
+        line-height: 1.5;
+        align-items: flex-start;
+    }
+    /* Editing on a phone (#1705): the chart scrolls on its own, inside the workspace, so the bar
+       dock and the keyboard (#1724) sit below it. `clip`, not `hidden`, so no programmatic
+       scroll moves the page with it. */
+    .workspace-body.editing {
+        display: flex;
+        flex-direction: column;
+        overflow: clip;
+    }
+    .editing .chart-scroll {
+        flex: 1 1 0;
+        min-height: 0;
+        overflow: auto;
+        padding-bottom: 16px;
+    }
+    /* Typing a bar on a phone (#1724): its field is docked on the keyboard (`bar-dock.css`), so
+       the transport row folds away while it is up (`responsive.css`) and the chart keeps two or
+       three rows above it. The chart's padding lets its last bar scroll clear of the dock and
+       keyboard (`--bar-dock-space`, set by the dock), and its scroll padding keeps the bar being
+       typed above them when it is scrolled into view. */
+    .workspace[data-bar-open] .chart-scroll {
+        /* A toast rides on top of the dock, so the chart clears both (#1724 review). */
+        padding-bottom: calc(var(--bar-dock-space, 0px) + var(--stand-stack-height, 0px) + 16px);
+        scroll-padding-bottom: calc(
+            var(--bar-dock-space, 0px) +
+            var(--stand-stack-height, 0px) +
+            8px
+        );
+    }
+    .editing .bars {
+        row-gap: 9px;
+    }
+}
+@media (min-width: 761px) and (max-height: 650px) {
+    .chart-scroll {
+        padding-top: 16px;
+    }
+}
+@media (max-height: 520px) and (max-width: 1000px) and (orientation: landscape) {
+    .bars {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .bar:nth-child(2n) {
+        border-right: 0;
+    }
+    .bar:nth-child(4n) {
+        border-right: 1px solid var(--bar-line-strong);
+    }
+    .chart-scroll {
+        padding: 15px 30px 25px;
+    }
+    .bar {
+        min-height: 70px;
+    }
+    .workspace-body.editing {
+        display: flex;
+        flex-direction: row;
+        overflow: hidden;
+    }
+    .editing .chart-scroll {
+        overflow: auto;
+    }
+    .chord {
+        font-size: 27px;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    /* responsive.css's reduced-motion `*` can't reach this: `.chart-scroll { scroll-behavior:
+       smooth }` is a class selector, outranking the universal selector on specificity regardless
+       of media query membership. Repeat the override at the same specificity so source order
+       decides it (#1458 patch review P1-5). Belt-and-suspenders for `Element.scrollTo`'s own
+       JS-side `behavior: 'instant'`, which does not depend on this rule but should agree with it. */
+    .chart-scroll {
+        scroll-behavior: auto;
+    }
 }
