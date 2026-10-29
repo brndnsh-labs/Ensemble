@@ -545,3 +545,57 @@ exclude foreign-owner data, and avoid falsely reporting cloud-save or offline-re
 - [SimpleWebAuthn configuration](https://github.com/masterkale/simplewebauthn/blob/master/_autodocs/configuration.md),
   retrieved through Context7 on 2026-09-09. The required-verification recovery policy above is
   an approved Ensemble product policy, not a claim that copying library defaults defines a complete auth system.
+
+## Client notes moved from web/CLAUDE.md (#1937)
+
+Moved here verbatim from `web/CLAUDE.md`'s account rows (#1937, 2026-10-29), so the rows keep the map and the binding rules while the why, the history and the worked examples live here. Each heading names the row; its sentences keep their original order, and a sentence the row still holds part of appears here whole. **The code is the authority**: grep the symbol a sentence names before trusting it.
+
+### Retired text charts (#1740)
+
+Files, as the row listed them: `../core/songbook/document-v2.ts` (`isRetiredSchema`), `lib/documents.ts` (`validateDocument`, `OLD_FORMAT_REFUSAL`), `lib/repository.ts` (`list`), `lib/sync/repository.ts` (`list`, `remoteCandidates`, `drafts`, `reconcile`, `unreadableSongs`), `lib/sync/drain.ts` (`outboxPage`), `checks/old-format.spec.ts`
+
+"Upgrade old songs" (#1738) and every v1 reader went in #1740: Brandon's devices were all upgraded and `/admin` showed no schema-1 chart. One still SITTING in a store must never crash the app or stop sync, so it is stepped over where it used to decode, never thrown on: the guest and account `list` leave it out (the cursor still moves past it, and `outboxPage` bounds its merge by both pages' cursors), the home counts it unreadable, `remoteCandidates` and `drafts` leave out a text-chart candidate or draft, and `reconcile` replaces a text-chart song row with the account's newer version only when the account confirmed the row (a remote revision) and nothing is queued for it — the row then holds nothing the account lacks; otherwise it writes nothing (`'superseded'`). A sign-out or account deletion names such rows and writes them out as they are (`unreadableSongs`, `SignOutPreflight.unreadable` and `sign-out-unreadable`, the delete step's `unreadableCount` — exported `<id> (unreadable).json`) before `clearAccount` removes them; `checks/account-retired-text-chart.chromium.spec.ts`.
+
+### A sync row that will not decode (#1769)
+
+Files, as the row listed them: `lib/sync/repository.ts` (`list`'s `unreadable` rows, `prepare`, `retireQueue`, `newerSchema`, `reconcile`, `acknowledge`), `lib/sync/collections.ts` (`collectionPage`'s `unreadable` rows, `reconcileCollection`), `lib/sync/repository-internal.ts` (`readableRecord`), `lib/sync/drain.ts` (`outboxPage`), `lib/sync/download.ts` (`LocalMirror.unreadable`, `planLibraryDownload`, `LibraryDownloadResult.unreadable`), `unreadableSongsNotice` and `REMOVE_UNREADABLE_MESSAGES` in `lib/account/messages.ts` (the home and All songs), `removeUnreadable` in `lib/sync/repository.ts` and `lib/account/sync-loop.ts`, `tests/browser/account-unreadable-row.browser.test.ts`
+
+**A lost acknowledgement** (#1782): when a retired Save had been sent and committed, the re-queued one is refused as a conflict against the musician's own revision; nothing local can tell that commit was this device's (no receipt arrived, and the account replays only the retired Save's exact bytes). When the account's version reads, Keep both is the way out and loses nothing. When it does not, the step-over below applies. Once the app reads that version, the next pass meets an ordinary conflict. Until then the Save is re-sent once per pass: one request per pass per such song, which an unacknowledged frozen head already costs. Known limits: a stored key outside the identifier charset still fails its page; `listCollections` and the chart-only reads (`pending`, `save`) still refuse an unreadable queue or row; a confirmed unreadable row held by a live draft, and an unreadable collection held by its queue, are fetched again each pass
+
+### Collections (#1474), on the All songs page with Starred as one (#1477)
+
+Files, as the row listed them: `lib/collections.ts` (decoder, `isCollectionCandidate`, `resolvedSongIds`, `STARRED_COLLECTION_ID`, `mergeSongIds`), `lib/sync/protocol.ts` (`syncDocument`, `collectionSnapshot`), `lib/sync/collections.ts` (`saveCollection`/`editCollection`/`listCollections`/`deleteCollection`/`reconcileCollection`/`mergeCollectionConflicts`/`collectionOutbox`, each reached through `AccountSongbook`'s delegate in `lib/sync/repository.ts`), `lib/repository.ts` (the guest half: `editCollection`), `app/use-collections.ts` (the shell's collection state), `app/use-collection-actions.ts` (the shell's collection handlers and dialogs: starring, Add to collection…, New/Rename, the delete confirm), `app/all-songs.tsx` (the Collections filter group, and the collection bar's ⋯ `<Menu>` of Rename… and Delete…, #1760), `app/song-row-menu.tsx` ("Add to collection…", a small dialog off the row ⋯ `<Menu>`), `app/collection-dialogs.tsx` (New/Rename, Delete)
+
+The device-local stars that came before (#1440: guest `ensemble-v2-preview:starred`, account `star:` rows and their `stars-migrated:` markers) were copied in by a one-time migration, retired in #1743; they are inert and nothing reads or writes them. Only sign-out wipes them, with the rest of the account (`clearAccount`, `retiredStarPrefix`/`retiredStarsMarkerKey`); a song's delete and `purgeLocal` leave them. The sign-out preflight counts collection Saves apart from songs (`unsentCollections`, never an export target) and the sync chip shows `SyncSnapshot.collectionSaves`. When no guest SONG is left to adopt, the adoption offer still opens for guest collections the account's copies lack (`pendingGuestCollections`) and asks about them alone; its "Not now" records the answer like the song offer's.
+
+### Whole iReal playlist import (#1478)
+
+Files, as the row listed them: `lib/playlist-import.ts` (`planPlaylist`, `resolvePlaylistImport`, `collectionWrite`), `app/import-dialog.tsx` (the "Import all N as a collection" summary), `lib/repository.ts` (`importSongs`), `lib/sync/collections.ts` (`importPlaylist`, `documentCount`, `songsWaiting`, `capRefusal`/`ImportCapError`), `lib/account/sync-loop.ts` (`importPlaylist`), `lib/account/sync-loop-types.ts` (`SyncSnapshot.songsWaiting`), `lib/account/sync-helpers.ts` (`libraryCheck`), the shell's `importPlaylist` in `app/ensemble.tsx`
+
+### Account chart drafts and Continue (#1299)
+
+Files, as the row listed them: `lib/writer.ts`, `lib/sync/repository.ts` (`recover`/`drafts`/`liveDraft`/`discardDraft`/`discardDrafts`/`rememberOpened`), `lib/account/sync-loop.ts` (`recover`/`retainedDraft`/`preservedDrafts`), `app/ensemble.tsx` (`draft`/`open`)
+
+An account chart's unsaved experiment and its last-opened pointer live in the ACCOUNT database, never the guest `localStorage` namespace — so sign-out removes them and a library download's preservation rule can see them. The guest path is unchanged. Since #1743 no account path reads, counts or clears a guest slot under an account id (no build since #1299 writes one): the Older drafts menu (`recoveryOptionsFor`), the opened draft (`retainedDraftFor`), the sign-out preflight (`withLocalDrafts`), export (`latestLocalVersion`), the Continue card, Save, Keep both, adopting a remote update, sign-out and account deletion.
+
+### Deleting songs no longer in your account (#1754)
+
+Files, as the row listed them: `lib/sync/repository.ts` (`purgeLocal`; `home`'s `gone` count, `HomeSlice.gone` in `lib/home.ts`), `lib/account/sync-loop.ts` (`purgeLocal`), `app/account/purge-songs.tsx`, `useSongDeletes`'s `requestDeleteRow`/`deleteRowFromAccount`/`deleteFromAccount`/`requestPurgeGone`/`purgeConfirmed` in `app/use-song-deletes.ts`, `app/all-songs.tsx` ("Remove N songs no longer in your account"), `app/songbook.tsx` (`allSongsLabel`), `PURGE_MESSAGES` in `lib/account/messages.ts`
+
+A `#chart=` link is not auto-kept by #1707's first-change keep (only New song sets `newSongNow`), so these songs came from an explicit Save or Keep a copy
+
+### Adopting a preserved remote update (#1310)
+
+Files, as the row listed them: `lib/sync/repository.ts` (`reconcile`'s `'superseded'`, `adoptRemoteVersion`), `lib/account/sync-loop.ts` (`adoptRemoteVersion`), `lib/account/sync-loop-types.ts` (`SyncSnapshot.candidates`), `app/account/conflict.tsx`'s `candidate` shape + `app/account/adopt-remote.tsx`, the songbook row marker
+
+**Showing candidates made `reconcile`'s own preservation rule load-bearing, and it was wrong for a `version` body (patch R1): the plan base is now asked BEFORE `held`, and a body whose base no longer matches the saved record writes NOTHING and answers `'superseded'` — not a candidate, because revisions are opaque and a preserved stale body is an offer to roll the song back under an older label. `adoptRemoteVersion` re-reads the record and drops a candidate whose revision the record already holds, for devices that stored one before the fix.** The banner is non-modal because the one destructive choice opens its own confirm step with the export offered first; both it and that step branch on ONE dirtiness derivation, since a chart merely OPEN is held too and must not be told its "unsaved changes" will be discarded.
+
+### Sign-out and session expiry (#1269, #1351)
+
+Files, as the row listed them: `lib/account/sync-loop.ts` (`signOut`/`signOutPreflight`/`heldScope`/`heldOwner`), `lib/account/sync-helpers.ts` (`belongsToAnotherAccount`), `lib/sync/repository.ts` (`clearAccount`), `app/account/sign-out.tsx` (opened from the account page's Sign out, #1760), the banner's condition and copy in `app/use-held-account.ts` (`heldWithoutSession`, `banner`; rendered by `app/ensemble.tsx`)
+
+Session state alone is not enough: `expired` exists only in the page load where a live session lapsed, so a RELOAD lands on `guest` with every row still on disk, which is the likeliest form of "the device changed hands".
+
+### Server account API (stage 2, #1187+)
+
+Standalone Node service, own `package.json`/`node:sqlite` schema; ceremony (#1188), session + HTTP layer (#1189), passkey management + step-up reauth gated by one fresh-authentication predicate (#1190), and single-use recovery codes behind a restricted recovery-only session (#1191) modules live here; the client side is `web/CLAUDE.md`'s account rows
