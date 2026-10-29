@@ -137,6 +137,8 @@ interface SongbookProps {
      * `AllSongs`' own `lastRemovedId`; see its doc comment.
      */
     lastRemovedId: string | null;
+    /** Called once focus has moved for `lastRemovedId`; the shell clears the id. */
+    onRemovalHandled: () => void;
 }
 
 /**
@@ -174,14 +176,17 @@ export function Songbook(props: SongbookProps) {
     // Deleting the last song on the home turns it into the first visit, which unmounts the row
     // list — and `RecentSongs`' focus rescue with it. So the rescue for that one case lives here:
     // THIS tab's own delete emptied the songbook, and focus goes to the new page's heading
-    // instead of falling to `<body>` (#1440 review P5's `lastRemovedId` scoping, kept).
+    // instead of falling to `<body>` (#1440 review P5's `lastRemovedId` scoping, kept). The row
+    // list is gone by then and will never report the move, so this effect does, through
+    // `onRemovalHandled`.
     const wasFirstVisit = useRef(firstVisit);
     useEffect(() => {
         if (!wasFirstVisit.current && firstVisit && props.lastRemovedId !== null) {
             firstVisitHeading.current?.focus();
+            props.onRemovalHandled();
         }
         wasFirstVisit.current = firstVisit;
-    }, [firstVisit, props.lastRemovedId]);
+    }, [firstVisit, props.lastRemovedId, props.onRemovalHandled]);
     return (
         <main className="home" data-layout={firstVisit ? 'first-visit' : 'everyday'}>
             {firstVisitIntro ? (
@@ -432,6 +437,7 @@ function RecentSongs({
     onOpenAllSongs,
     allSongsEntryRef,
     lastRemovedId,
+    onRemovalHandled,
 }: SongbookProps & { home: HomeSlice; heading: RefObject<HTMLHeadingElement | null> }) {
     // A map, not `.find`, for the same reason the All songs page keeps one.
     const kinds = new Map(remoteCandidates.map((row) => [row.id, row.kind]));
@@ -439,19 +445,15 @@ function RecentSongs({
     const now = Date.now();
     // After a row delete, focus goes to the next row, or the heading if the list is now empty
     // (#1440 review P3) — the same fix and the same reasoning as `AllSongs`' own copy of this.
-    // Scoped to THIS TAB'S OWN action via `lastRemovedId` (#1440 review P5).
+    // Scoped to THIS TAB'S OWN action via `lastRemovedId` (#1440 review P5); the move is reported
+    // through `onRemovalHandled`, which has the shell clear the id so the next delete of the same
+    // id is a fresh marker (see `AllSongs`' `lastRemovedId`).
     const previousRowIds = useRef<string[]>([]);
-    const handledRemovalId = useRef<string | null>(null);
     const ids = useMemo(() => home.rows.map((song) => song.id), [home.rows]);
     useEffect(() => {
         const previousIds = previousRowIds.current;
-        if (
-            lastRemovedId &&
-            handledRemovalId.current !== lastRemovedId &&
-            previousIds.includes(lastRemovedId) &&
-            !ids.includes(lastRemovedId)
-        ) {
-            handledRemovalId.current = lastRemovedId;
+        if (lastRemovedId && previousIds.includes(lastRemovedId) && !ids.includes(lastRemovedId)) {
+            onRemovalHandled();
             const removedIndex = previousIds.indexOf(lastRemovedId);
             const nextId = ids[Math.min(removedIndex, ids.length - 1)];
             const nextRow = nextId ? rows.current.get(nextId) : undefined;
@@ -463,7 +465,7 @@ function RecentSongs({
             }
         }
         previousRowIds.current = ids;
-    }, [ids, lastRemovedId, heading]);
+    }, [ids, lastRemovedId, heading, onRemovalHandled]);
     // "Recently opened" only when it is true of every row: a songbook with songs it never opened
     // here (a downloaded library) fills the list from elsewhere (`HomeRead.fill`).
     const allOpened = home.rows.every((song) => openedAt.has(song.id));

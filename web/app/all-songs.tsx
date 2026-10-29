@@ -83,6 +83,12 @@ interface AllSongsProps {
      * A collection vanishing through a sync never steals focus.
      */
     removedCollectionId: string | null;
+    /**
+     * Called once the page has acted on `removedCollectionId`, so the shell clears it and the
+     * next delete of the same collection id (it can come back through a sync) is a fresh marker
+     * rather than a same-value set React bails out of.
+     */
+    onCollectionRemovalHandled: () => void;
     /** Per-device opened-at map (#1440), id to ISO timestamp. */
     openedAt: ReadonlyMap<string, string>;
     remoteCandidates: readonly { id: string; kind: RemoteCandidateKind }[];
@@ -105,10 +111,17 @@ interface AllSongsProps {
      * state for a mouse user who has clicked nothing since loading the page, so it fired on a
      * row disappearing for ANY reason (a sync-driven removal, another device's delete) and stole
      * focus from wherever the musician actually was. This is set only by the delete handlers in
-     * `app/use-song-deletes.ts` and cleared right after, so the effect below can require the
-     * removed row to match this specific id before it moves focus at all.
+     * `app/use-song-deletes.ts`, so the effect below can require the removed row to match this
+     * specific id before it moves focus at all. A removal arriving through a sync never matches,
+     * so it never moves focus.
      */
     lastRemovedId: string | null;
+    /**
+     * Called once the page has moved focus for `lastRemovedId`; the shell clears the id in
+     * response, so the next delete of the same id (a purged song the account still holds comes
+     * back on the next download) is a fresh marker, not a same-value set React bails out of.
+     */
+    onRemovalHandled: () => void;
     /**
      * Remove every listed song the account no longer holds (#1754), behind the shell's one
      * confirm — the ids of the rows marked "No longer in your account". Account songbook only.
@@ -151,11 +164,13 @@ export function AllSongs({
     onToggleStar,
     onOpenRowMenu,
     lastRemovedId,
+    onRemovalHandled,
     collections,
     onNewCollection,
     onRenameCollection,
     onDeleteCollection,
     removedCollectionId,
+    onCollectionRemovalHandled,
     onRemoveGone,
     onExportUnreadable,
     onRemoveUnreadable,
@@ -211,13 +226,22 @@ export function AllSongs({
     // the All songs filter — its Delete… button, where the dialog would return focus, is gone.
     // A frame later, so the confirm dialog has closed: a modal makes everything outside it inert.
     useEffect(() => {
-        if (removedCollectionId === null || fellBackFrom.current !== removedCollectionId) {
+        if (removedCollectionId === null) {
+            return;
+        }
+        if (fellBackFrom.current !== removedCollectionId) {
+            // It was not the view when it went, so there is nothing to move. `collections.remove`
+            // reloads the list before the id is named, so the fallback above has already run if
+            // it was going to; the marker is spent either way, and is cleared so a later delete
+            // of the same id is a fresh one.
+            onCollectionRemovalHandled();
             return;
         }
         fellBackFrom.current = null;
+        onCollectionRemovalHandled();
         const frame = requestAnimationFrame(() => allFilter.current?.focus());
         return () => cancelAnimationFrame(frame);
-    }, [removedCollectionId]);
+    }, [removedCollectionId, onCollectionRemovalHandled]);
     /** The order the current view's collection keeps, id to position — null outside one. */
     const collectionOrder = useMemo(() => {
         const ids =
@@ -366,21 +390,21 @@ export function AllSongs({
     // `document.activeElement === document.body` guard is also the ordinary resting state for a
     // mouse user who hasn't clicked anything, so it fired for a row vanishing for ANY reason
     // (another device's delete arriving mid-sync, `songbookLoading` flipping the list) and stole
-    // focus from wherever the musician actually was. `handledRemovalId` makes the move fire once
-    // per removal even though `sorted` can re-run this effect again before `lastRemovedId` is
-    // cleared (e.g. a sync refresh right after the delete).
+    // focus from wherever the musician actually was. The id is set by the delete handlers in
+    // `app/use-song-deletes.ts` and cleared by the shell when this effect reports the move through
+    // `onRemovalHandled`, so each delete is a fresh marker; a re-run before then (a sync refresh
+    // right after the delete) finds the row already absent from `previousRowIds`, so it cannot
+    // fire twice.
     const previousRowIds = useRef<string[]>([]);
-    const handledRemovalId = useRef<string | null>(null);
     useEffect(() => {
         const previousIds = previousRowIds.current;
         const currentIds = sorted.map((song) => song.id);
         if (
             lastRemovedId &&
-            handledRemovalId.current !== lastRemovedId &&
             previousIds.includes(lastRemovedId) &&
             !currentIds.includes(lastRemovedId)
         ) {
-            handledRemovalId.current = lastRemovedId;
+            onRemovalHandled();
             const removedIndex = previousIds.indexOf(lastRemovedId);
             const nextId = currentIds[Math.min(removedIndex, currentIds.length - 1)];
             const nextRow = nextId ? rows.current.get(nextId) : undefined;
@@ -392,7 +416,7 @@ export function AllSongs({
             }
         }
         previousRowIds.current = currentIds;
-    }, [sorted, lastRemovedId]);
+    }, [sorted, lastRemovedId, onRemovalHandled]);
 
     const showAzIndex = sort === 'title' || sort === 'composer';
 
