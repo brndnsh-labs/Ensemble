@@ -63,7 +63,6 @@ export const ALIASES: Readonly<Record<string, string>> = {
 
 /** Band spelling → a dictionary chord plus the intervals the symbol names on top of it. */
 export const COMPOSED: Readonly<Record<string, readonly [base: string, ...added: string[]]>> = {
-    maj11: ['maj9', '11P'],
     ma11: ['maj9', '11P'],
     'maj7#9': ['maj7', '9A'],
     'maj(add4)': ['M', '4P'],

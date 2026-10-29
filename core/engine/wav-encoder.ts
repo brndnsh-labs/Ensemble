@@ -63,9 +63,9 @@ export function encodeWav(channels: Float32Array[], sampleRate: number): ArrayBu
     for (let i = 0; i < numSamples; i++) {
         for (let ch = 0; ch < numChannels; ch++) {
             const raw = channels[ch][i];
-            const clamped = raw < -1 ? -1 : raw > 1 ? 1 : raw;
+            const clamped = Math.min(1, Math.max(-1, raw));
             const quantized = Math.round(clamped * 0x8000);
-            view.setInt16(offset, quantized > 0x7fff ? 0x7fff : quantized, true);
+            view.setInt16(offset, Math.min(quantized, 0x7fff), true);
             offset += 2;
         }
     }

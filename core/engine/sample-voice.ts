@@ -556,7 +556,7 @@ function scheduleSampleBend(
     hold: number,
 ): void {
     const ratioAt = (semis: number) => baseRate * 2 ** (semis / 12);
-    const dur = hold > 0 ? hold : 0;
+    const dur = Math.max(hold, 0);
 
     // Bend-IN: start off-target and ramp to the written pitch over a short, fixed
     // glide (matches the synth voice's `min(0.1, dur*0.5)`); else anchor at base.
