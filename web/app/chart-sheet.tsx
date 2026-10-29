@@ -164,7 +164,7 @@ interface ChartSheetProps {
      * own loop — see `useChartView`'s `displayNext`. Null while
      * stopped, or when the chart has nothing after `displayActive` to point at. */
     displayNext: number | null;
-    /** Following's look-ahead scroll (`app/ensemble.tsx`) is in the playing bar's last beat —
+    /** Playback is in the playing bar's last beat (`app/use-playback-state.ts`'s poll) —
      * strengthens the next-bar cue from a quiet outline to a stronger one. */
     nextSoon: boolean;
     /** The performed event under the playhead, in steps. */

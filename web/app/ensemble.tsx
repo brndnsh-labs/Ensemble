@@ -6,7 +6,6 @@ import type { SemanticScore } from '@core/songbook/score-types';
 import type { InstrumentVoice } from '@core/types';
 import { keyDistance } from '@core/utils';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
 import { libraryDownloaded } from '../lib/account/adopt-guest';
 import { heldAccountBanner } from '../lib/account/messages';
 import {
@@ -103,6 +102,7 @@ import { useModalDialog } from './use-modal-dialog';
 import { useNeckPrefs } from './use-neck-prefs';
 import { useOfflineInstall } from './use-offline-install';
 import { usePalette } from './use-palette';
+import { usePlaybackState } from './use-playback-state';
 import { useSongDeletes } from './use-song-deletes';
 import { useStageTheme } from './use-stage-theme';
 import { useStandConflict } from './use-stand-conflict';
@@ -358,10 +358,6 @@ export default function Ensemble() {
     // true when what it waited behind was refused.
     const waiting = useRef<Promise<boolean> | null>(null);
     const [error, setError] = useState('');
-    // An audition/share link's `?autoplay=1` (#1382): browsers block audio before a gesture,
-    // so this arms one instead of playing immediately — the shared-link effect sets it, and
-    // the gesture effect below clears it on the first pointer or key event anywhere on the page.
-    const [pendingAutoplay, setPendingAutoplay] = useState(false);
     const [editing, setEditing] = useState(false);
     // The stand's remembered mode (#1587): Neck instead of Chart. Editing never touches it — the
     // editor overlays whichever mode it is, and leaving the editor by any path lands back on it.
@@ -394,23 +390,21 @@ export default function Ensemble() {
     const [titleRequest, setTitleRequest] = useState(0);
     const focusedTitleRequest = useRef(0);
     const [search, setSearch] = useState('');
-    const [playing, setPlaying] = useState(false);
-    const [playbackPending, setPlaybackPending] = useState(false);
-    const [active, setActive] = useState<number | null>(null);
-    // The count-in beat sounding now (0-based), or null when not counting in (#1422) — cheap
-    // enough to ride the same 60ms poll `playing`/`active` already use, no new interval.
-    const [countInBeat, setCountInBeat] = useState<number | null>(null);
-    // #1458 — is playback in the ACTIVE bar's last FELT pulse right now? Strengthens the next-bar
-    // cue and gates the Following look-ahead's jump-ahead scroll. Edge-triggered off the same
-    // 60ms poll below (`runtime.inLastBeat()`, a pure engine read off the song tick the active slot
-    // is read from, #1506 — never the chart's own `active` state, which the poll that publishes
-    // it can still be a tick behind) rather than a new interval — it only flips twice a bar,
-    // nowhere near "per frame".
-    const [nextSoon, setNextSoon] = useState(false);
-    // #1590 — the neck's own cue: the last felt pulse before the ACTIVE SLOT ends, which in a
-    // two-chord bar is mid-bar, where `nextSoon` (the barline's) never fires. Same poll, same
-    // tick; it flips twice a chord.
-    const [changeSoon, setChangeSoon] = useState(false);
+    // The playback poll's state and the armed `?autoplay=1` link (`usePlaybackState`): read
+    // during render from here on (`useChartView` below, the JSX), so it is called here.
+    const {
+        playing,
+        setPlaying,
+        playbackPending,
+        setPlaybackPending,
+        active,
+        setActive,
+        countInBeat,
+        nextSoon,
+        changeSoon,
+        pendingAutoplay,
+        setPendingAutoplay,
+    } = usePlaybackState({ startPlayback });
     const { theme, stage, chooseTheme, toggleTheme } = useStageTheme();
     const { palette, choosePalette } = usePalette();
     // Settings (#1783): per-device preferences, on the songbook and on a chart.
@@ -946,48 +940,7 @@ export default function Ensemble() {
                     setError(String(e.message || e));
                 }
             });
-        // The stand follows the performance every animation frame while it plays (#1240), reading
-        // the playhead straight off the engine: a fixed-period sample of it could step over a
-        // chord shorter than the period (a sixteenth at 240 bpm is 62.5ms). Stopped, a 60ms
-        // check notices playback started anywhere else — the lock screen's media controls. A
-        // hidden page gets no frames, so a slower timer still notices playback stopping there.
-        let frame = 0;
-        let idle = 0;
-        // A frame's paint is committed inside that frame (`flushSync`, #1693). State set in an
-        // animation frame is otherwise committed in a later task, and on a busy main thread the
-        // next frame can run first: it sets the next chord, and the one this frame read is never
-        // shown although a frame saw it. The first call runs inside this effect, where React is
-        // already committing and a nested flush is refused, so it commits the ordinary way.
-        const follow = (commit: (paint: () => void) => void) => {
-            window.cancelAnimationFrame(frame);
-            window.clearTimeout(idle);
-            const playingNow = runtime.state().playback.isPlaying;
-            // ONE read of the band's clock for the whole paint (#1506): the audio clock can cross
-            // a barline between two reads in this one task, and the active bar and the cue below
-            // read separately once showed the bar just left with the new bar's cue.
-            const tick = playingNow ? runtime.songTick() : null;
-            const slot = runtime.playheadSlot(tick);
-            commit(() => {
-                setPlaying(playingNow);
-                // No slot while counting in or between two queued segments: the pointer holds.
-                setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
-                setCountInBeat(runtime.countInBeat());
-                // #1458 — a pure engine read off the live song tick, not the ACTIVE bar's rendered
-                // DOM node: React hasn't necessarily committed `active`'s new value yet on the very
-                // frame playback crosses a barline, so reading the OLD bar's DOM attributes here
-                // would still see the bar just left after the engine had already moved on.
-                setNextSoon(runtime.inLastBeat(tick));
-                // The slot this same tick is in, never `active`'s committed value, for the reason
-                // above — and off any slot (-1) there is no chord to be leaving.
-                setChangeSoon(runtime.inLastBeatOfSlot(tick, slot));
-            });
-            if (playingNow) {
-                frame = window.requestAnimationFrame(inFrame);
-            }
-            idle = window.setTimeout(inFrame, playingNow ? 250 : 60);
-        };
-        const inFrame = () => follow(flushSync);
-        follow((paint) => paint());
+        // The playback poll that ran here is `usePlaybackState`'s (#1920).
         const preventLoss = (event: BeforeUnloadEvent) => {
             if (volatileDrafts.current.size || pendingText.current) {
                 event.preventDefault();
@@ -997,8 +950,6 @@ export default function Ensemble() {
         window.addEventListener('beforeunload', preventLoss);
         return () => {
             alive = false;
-            window.cancelAnimationFrame(frame);
-            window.clearTimeout(idle);
             window.removeEventListener('beforeunload', preventLoss);
         };
     }, []);
@@ -1173,51 +1124,6 @@ export default function Ensemble() {
             }
         };
     }, [newSongDraft, busy, current]);
-    // `startPlayback` is a component-scope function declaration, a new reference every render;
-    // listing it would re-arm the listeners on every render while a link's autoplay is
-    // pending, the same convention the shared-link effect above documents for `openSharedDraft`.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: see above.
-    useEffect(() => {
-        // An armed `?autoplay=1` link (#1382): browsers block audio before a user gesture, so
-        // this waits for the first one anywhere on the page — a click/tap or a key press,
-        // exactly what pressing Play itself would supply — then starts the band the same way
-        // Play does and disarms itself. `{ once: true }` on each listener means whichever
-        // fires first already removed itself; the cleanup below catches the other.
-        if (!pendingAutoplay) {
-            return;
-        }
-        const start = (event: Event) => {
-            setPendingAutoplay(false);
-            const target = event.target;
-            // The gesture landed on Play itself (`data-play-toggle`, `transport-bar.tsx`):
-            // disarm and let the button's OWN `onClick` start playback. Calling
-            // `startPlayback()` here too raced that click — `runtime.toggle()` can resolve
-            // inside the ~100ms between a tap's `pointerdown` and its `click`, so by the time
-            // `onPlayToggle` ran `isPlaying` already read true and it called `runtime.stop()`,
-            // starting and immediately stopping the band on the very tap meant to start it.
-            if (target instanceof Element && target.closest('[data-play-toggle]')) {
-                return;
-            }
-            startPlayback();
-        };
-        // `capture: true` so a nested handler's `stopPropagation` on the way up can't
-        // swallow the gesture before this sees it — this listener only ever reads the
-        // event, never acts on behalf of whatever it landed on.
-        window.addEventListener('pointerdown', start, { once: true, capture: true });
-        window.addEventListener('keydown', start, { once: true, capture: true });
-        return () => {
-            window.removeEventListener('pointerdown', start, { capture: true });
-            window.removeEventListener('keydown', start, { capture: true });
-        };
-    }, [pendingAutoplay]);
-    // Disarms autoplay the moment the band is playing by ANY means — including the Play
-    // button's own click a moment after the branch above deferred to it — so a later stray
-    // tap/key elsewhere on the page can never reach `startPlayback()` a second time.
-    useEffect(() => {
-        if (playing) {
-            setPendingAutoplay(false);
-        }
-    }, [playing]);
     // Into the editor for a row-menu Rename (#1440), the title takes focus (#1235). Nothing else
     // does (#1726): bars are typed where they are read, opened by a press on one.
     useEffect(() => {

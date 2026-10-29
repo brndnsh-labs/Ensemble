@@ -19,7 +19,7 @@ import {
 /**
  * Following's look-ahead scroll (#1458): a look-ahead row scroll, a next-bar cue that strengthens
  * on the playing bar's last FELT beat, and a jump-ahead scroll across a repeat or the form's own
- * wrap. `app/ensemble.tsx`'s Following effects, `app/chart-sheet.tsx`'s `data-next`, and
+ * wrap. `app/use-follow-scroll.ts`'s Following effects, `app/chart-sheet.tsx`'s `data-next`, and
  * `app/use-chart-view.ts`'s `displayNext` are the surfaces under test; `lib/band-chart.ts`'s
  * `BandChart.bars` and `lib/runtime.ts`'s `inLastBeat()` are the engine reads behind it.
  */
