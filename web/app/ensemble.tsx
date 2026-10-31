@@ -51,6 +51,7 @@ import { AdoptRemoteDialog } from './account/adopt-remote';
 import { ConflictBanner } from './account/conflict';
 import { DeleteSongDialog } from './account/delete-song';
 import {
+    headerCloudLabel,
     SyncStatus,
     type SyncStatusProps,
     syncFailureNotice,
@@ -804,6 +805,8 @@ export default function Ensemble() {
             : null;
     // #1460 — moved from the footer into Song actions's own "Status" section.
     const syncStatus = syncStatusProps && <SyncStatus {...syncStatusProps} />;
+    // #1972 — the header says where a clean account song is saved, from the menu's derivation.
+    const cloudSaved = syncStatusProps && headerCloudLabel(syncStatusProps);
     /**
      * #1460 acceptance, review P2 #2 — "a forced sync failure / expired session shows a
      * persistent notice on the stand without opening the menu", but ONLY for a fact nothing else
@@ -2491,7 +2494,8 @@ export default function Ensemble() {
         rememberOpened(result.id);
         volatileDrafts.current.delete(current.id);
         setRecoveryHealthy(true);
-        if (currentStore.current?.store === 'account') {
+        const account = currentStore.current?.store === 'account';
+        if (account) {
             accountDrafts.current.delete(current.id);
             // This writer's row only, exactly like `clearOwnRecovery` below: another tab editing
             // this song holds its own live experiment, and this Save does not speak for it (#1299).
@@ -2511,7 +2515,11 @@ export default function Ensemble() {
         setMessage(
             copy
                 ? `Duplicated as “${next.title}” · you’re on the copy now`
-                : 'Saved on this device',
+                : account
+                  ? // Queued, not "saved to your account": only the loop's confirmation says
+                    // that, and the header shows it when it comes (#1972).
+                    'Saved · queued for your account'
+                  : 'Saved on this device',
         );
         closeSongMenus();
     }
@@ -3159,6 +3167,7 @@ export default function Ensemble() {
                         practiceOnly={practiceOnly}
                         recoveryHealthy={recoveryHealthy}
                         totalBars={totalBars}
+                        cloudSaved={cloudSaved}
                         stage={stage}
                         editing={editing}
                         neck={neck}

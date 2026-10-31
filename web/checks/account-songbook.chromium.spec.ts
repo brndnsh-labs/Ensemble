@@ -127,6 +127,11 @@ test('an offline Save is safe here and confirms on reconnect; a refusal arrives 
     // and it does not pretend the cloud has it.
     await page.context().setOffline(true);
     await saveAs(page, 'Road take two');
+    // #1972 — the header says where the song is, from the menu's own derivation: queued, never
+    // "Saved on this device" alone and never "Saved to your account" before the cloud has it.
+    await expect(page.getByTestId('stand-toast')).toContainText('Saved · queued for your account');
+    const subtitle = page.locator('.song-subtitle > span').first();
+    await expect(subtitle).toHaveText('Waiting to upload to your account');
 
     // #1460 acceptance — the SAME retry failure is a persistent notice on the stand, readable
     // without opening Song actions at all, in its own element (review P2 #1) so a standing
@@ -182,6 +187,7 @@ test('an offline Save is safe here and confirms on reconnect; a refusal arrives 
     // Reconnecting is one of the four triggers. Nothing polled for this.
     await page.context().setOffline(false);
     await expect(page.getByTestId('sync-cloud')).toHaveText('Saved to your account');
+    await expect(subtitle).toHaveText('Saved to your account');
     await expect(failure).toHaveCount(0);
     await closeSongActions(page);
     // The stand's own notice is gone the moment the underlying fact is, menu open or not.

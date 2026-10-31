@@ -15,6 +15,8 @@ interface SongHeaderProps {
     practiceOnly: boolean;
     recoveryHealthy: boolean;
     totalBars: number;
+    /** An account song's cloud fact when it is a routine one (`headerCloudLabel`), else null. */
+    cloudSaved: string | null;
     stage: boolean;
     editing: boolean;
     /** The remembered stand mode is Neck (#1587); the neck shows while not `editing`. */
@@ -46,6 +48,7 @@ export function SongHeader({
     practiceOnly,
     recoveryHealthy,
     totalBars,
+    cloudSaved,
     stage,
     editing,
     neck,
@@ -113,7 +116,7 @@ export function SongHeader({
                                         ? recoveryHealthy
                                             ? 'Unsaved changes · locally recovered'
                                             : 'Unsaved changes · this tab only'
-                                        : 'Saved on this device'}
+                                        : (cloudSaved ?? 'Saved on this device')}
                         </span>
                         <span>{totalBars} bars</span>
                         <span>{current.chart.score.meter}</span>
