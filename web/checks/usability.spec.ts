@@ -390,23 +390,13 @@ test('Edit chart, a bar and the section menu are in reach across laptop, phone a
     }
 });
 
-test('the stand scales to its screen, holds still across play/pause and keeps mute state readable', async ({
-    page,
-}, info) => {
+test('the stand scales to its screen and keeps mute state readable', async ({ page }, info) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await page.waitForSelector('.bar');
-    // #1186 pinned a playing-only scale larger than idle; that made every play/pause
-    // toggle reflow bar height, chord size and section letters at once, which read
-    // as the chart jumping around. One scale now covers both states — toggling
-    // performance-focus must not change any of these measurements.
-    const measure = (focused: boolean) =>
-        page.evaluate(async (f) => {
-            document.querySelector('.app-shell')!.classList.toggle('performance-focus', f);
-            // Past the resize the hidden controls cause, so a re-fit on it would show (#1712).
-            for (let i = 0; i < 3; i++) {
-                await new Promise(requestAnimationFrame);
-            }
+    // Play/pause holding the chart still is `chart-fit.spec.ts`'s, on real playback.
+    const measure = () =>
+        page.evaluate(() => {
             const px = (selector: string, property: 'minHeight' | 'fontSize') =>
                 Number.parseFloat(
                     getComputedStyle(document.querySelector(selector) as HTMLElement)[property],
@@ -417,7 +407,7 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
                 letter: px('.section-letter', 'fontSize'),
                 noOverflow: document.documentElement.scrollWidth <= innerWidth,
             };
-        }, focused);
+        });
     // The stand is a page (#1712): a 12-bar blues takes a step that fills the screen it is on,
     // four bars to a row everywhere, never under the 18px floor, and a bigger screen never sets
     // it smaller.
@@ -431,7 +421,7 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
     ]) {
         await page.setViewportSize({ width: at.width, height: at.height });
         await expect(page.locator('.chart-scroll[data-fits="true"]')).toBeVisible();
-        const idle = await measure(false);
+        const idle = await measure();
         expect(idle.chord, `chord @${at.width}x${at.height}`).toBeGreaterThanOrEqual(18);
         expect(idle.letter).toBeGreaterThanOrEqual(11);
         expect(idle.noOverflow).toBe(true);
@@ -442,12 +432,6 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
             );
         }
         previous = { area, chord: idle.chord };
-        const playing = await measure(true);
-        expect(playing.bar, `play/pause jump @${at.width}x${at.height}`).toBe(idle.bar);
-        expect(playing.chord, `play/pause jump @${at.width}x${at.height}`).toBe(idle.chord);
-        expect(playing.letter, `play/pause jump @${at.width}x${at.height}`).toBe(idle.letter);
-        expect(playing.noOverflow).toBe(true);
-        await measure(false);
         await page.screenshot({
             path: info.outputPath(`stand-${at.width}x${at.height}.png`),
         });
@@ -464,9 +448,6 @@ test('the stand scales to its screen, holds still across play/pause and keeps mu
     // stylesheet but was unreachable: the button emitted no `off` class and rendered
     // a bare text node with no `span.label` to match.
     await page.setViewportSize({ width: 1300, height: 940 });
-    await page.evaluate(() =>
-        document.querySelector('.app-shell')!.classList.remove('performance-focus'),
-    );
     const drums = page.getByRole('button', { name: 'Drums' });
     const chrome = () =>
         drums.evaluate((element) => {
@@ -546,15 +527,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
     expect(luminance(stage.chord)).toBeGreaterThan(0.8);
     expect(contrast(stage.chord, stage.paper)).toBeGreaterThan(12);
     expect(contrast(stage.chord, stage.activeBar)).toBeGreaterThan(4.5);
-    await page.evaluate(() =>
-        document.querySelector('.app-shell')!.classList.add('performance-focus'),
-    );
-    // The toggle stays reachable while the chart is focused for playback.
-    await expect(stageButton).toBeVisible();
     await page.screenshot({ path: info.outputPath('stage-mode.png') });
-    await page.evaluate(() =>
-        document.querySelector('.app-shell')!.classList.remove('performance-focus'),
-    );
 
     // The choice is a per-device preference: it survives reload and is applied
     // before hydration, and it is not written into the saved document.

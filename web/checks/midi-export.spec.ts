@@ -215,12 +215,6 @@ test('Export MIDI during playback does not stop or glitch the band', async ({ pa
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
 
-    // Starting playback enters performance-focus mode (`app/ensemble.tsx`'s
-    // `focused`), which hides the header chrome including "Song actions"
-    // (`.performance-focus .menu-btn` in app/style.css) — deliberate decluttering
-    // for the music stand, not a bug. Exit it via the same toggle a musician
-    // would use before opening the menu mid-song.
-    await page.getByRole('button', { name: 'Show controls' }).click();
     const download = page.waitForEvent('download');
     await exportAs(page, 'MIDI');
     await download;

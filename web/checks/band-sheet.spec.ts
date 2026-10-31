@@ -247,9 +247,6 @@ test('changing swing during playback does not stop the band', async ({ page }) =
     await songLink(page, 'Blue pocket', 'Blues').click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
-    // Playback auto-focuses the chart and hides the header chrome, Band… included
-    // (`foundation.spec.ts`'s focused-mode test) — reveal it first.
-    await page.getByRole('button', { name: 'Show controls' }).click();
 
     await openBand(page, 'Groove');
     await setRange(page, 'Swing', 60);

@@ -19,8 +19,7 @@ import { type RefObject, useLayoutEffect } from 'react';
  *
  * The step is chosen again when the box changes size or the chart changes, never on play/stop:
  * the "Tap a chord" line under the chart hides while playing, so the room it took when last
- * shown is held back for it ({@link bottomReserve}), and the height the hidden controls give the
- * chart while playing is not used, so the chart holds still across play/pause.
+ * shown is held back for it ({@link bottomReserve}), so the chart holds still across play/pause.
  */
 const FIT_STEPS = 9;
 /** The largest step a chart that scrolls is shown at. */
@@ -51,14 +50,10 @@ export function useChartFit(
         let width = box.clientWidth;
         let height = box.clientHeight;
         const observer = new ResizeObserver(() => {
-            const heightOnly = box.clientWidth === width && box.clientHeight !== height;
             const changed = box.clientWidth !== width || box.clientHeight !== height;
             width = box.clientWidth;
             height = box.clientHeight;
-            // Playing hides the stand's controls (`.performance-focus`), which gives the chart
-            // more height; taking a bigger step there would jump the chart on every play/stop.
-            // The step stays the one chosen with the controls showing.
-            if (changed && !(heightOnly && box.closest('.performance-focus'))) {
+            if (changed) {
                 fit();
             }
         });

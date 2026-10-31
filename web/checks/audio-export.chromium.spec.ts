@@ -98,9 +98,6 @@ test('Export → Audio during playback does not stop or glitch the band', async 
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
 
-    // Same performance-focus chrome hide as `checks/midi-export.spec.ts` — exit
-    // it to reach "Song actions" mid-song.
-    await page.getByRole('button', { name: 'Show controls' }).click();
     const download = page.waitForEvent('download', { timeout: 100_000 });
     await exportAs(page, 'Audio (mix)');
     await download;

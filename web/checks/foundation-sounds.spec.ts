@@ -437,7 +437,6 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
     await hold();
     await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
     await held();
-    await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     expect((await page.locator('.chart-scroll').boundingBox())!.y).toBe(chartTop);
     // #1185 — the band keeps playing *through* preparation rather than being torn
