@@ -396,7 +396,12 @@ test('the stand scales to its screen and keeps mute state readable', async ({ pa
     await page.waitForSelector('.bar');
     // Play/pause holding the chart still is `chart-fit.spec.ts`'s, on real playback.
     const measure = () =>
-        page.evaluate(() => {
+        page.evaluate(async () => {
+            // Past the re-fit a viewport resize sets off (`useChartFit`'s ResizeObserver, #1712):
+            // `data-fits` is still the last size's until it runs, so it can't be waited on.
+            for (let i = 0; i < 3; i++) {
+                await new Promise(requestAnimationFrame);
+            }
             const px = (selector: string, property: 'minHeight' | 'fontSize') =>
                 Number.parseFloat(
                     getComputedStyle(document.querySelector(selector) as HTMLElement)[property],
