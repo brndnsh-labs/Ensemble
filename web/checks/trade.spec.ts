@@ -43,7 +43,7 @@ test('trading with the soloist is chosen by the soloist, saved with the chart an
         'true',
     );
     const trade = page.getByRole('button', { name: 'Trade: 2 bars with the soloist' });
-    await expect(trade).toHaveText('⇄ 2s');
+    await expect(trade).toHaveText('⇄ 2');
 
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -97,7 +97,7 @@ test('a jazz band offers trading with the drummer, and starts cleanly with it se
     await sheet.getByLabel('Trade with').selectOption('drums');
     await sheet.getByRole('button', { name: 'Close band' }).click();
     await expect(page.getByRole('button', { name: 'Trade: 4 bars with the drummer' })).toHaveText(
-        '⇄ 4s',
+        '⇄ 4',
     );
 
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
