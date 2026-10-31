@@ -281,6 +281,27 @@ export function syncFailureNotice(props: SyncStatusProps): StandSyncFailure | nu
     return null;
 }
 
+/**
+ * #1972 — the song header's "saved" phrase for an account song: the menu's own cloud label, from
+ * the same derivation, but only for the three routine readings (confirmed, queued, sending).
+ * Anything else (a conflict, a song gone from the account, another account's song, not checked
+ * yet) has its own banner or lives in the menu, so it returns null and the header keeps the
+ * device fact. So does a device whose own Save does not stand (`view.local.status` not
+ * `'saved'`: a failed Save the musician reverted, an unknown revision). Compared against the
+ * routine label itself, so the `'deleted'`-candidate correction above can never read as "Saved
+ * to your account".
+ */
+export function headerCloudLabel(props: SyncStatusProps): string | null {
+    const { view, cloudLabel } = deriveSyncView(props);
+    const status = view.cloud.status;
+    const routine = status === 'confirmed' || status === 'queued' || status === 'sending';
+    // A Save that failed here (then reverted to clean) is the menu's "Save failed on this
+    // device": the header must not say the account has it while the menu says that.
+    return view.local.status === 'saved' && routine && cloudLabel === CLOUD_LABELS[status]
+        ? cloudLabel
+        : null;
+}
+
 export function SyncStatus(props: SyncStatusProps) {
     const { view, cloudLabel } = deriveSyncView(props);
     const { sync } = props;
