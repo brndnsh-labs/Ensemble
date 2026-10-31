@@ -195,7 +195,7 @@ export function TransportBar({
                                 onClick={onTrade}
                             >
                                 <span className="label">
-                                    {trade === 'off' ? '⇄' : `⇄ ${tradeBars}s`}
+                                    {trade === 'off' ? '⇄' : `⇄ ${tradeBars}`}
                                 </span>
                             </button>
                         )}
