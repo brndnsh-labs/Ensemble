@@ -2,9 +2,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 /**
  * Opens a `node:sqlite` connection and sets the three pragmas this service
- * depends on. All three are load-bearing and must be set explicitly at open
- * — see web/CLAUDE.md's "Connection module" section for the
- * verified rationale/measurements behind each one:
+ * depends on. All three are load-bearing and must be set explicitly at open:
  *
  * - `journal_mode = WAL`: required for the WAL-safe `backup` path landing in
  *   a later stage. Note this has no effect on an in-memory (`:memory:`)

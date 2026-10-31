@@ -799,7 +799,9 @@ read a newer schema. No live database migration or deployment is part of buildin
 ## Why `node:sqlite`, not `better-sqlite3`
 
 Node 26 ships SQLite in core, including the `backup` API a later stage needs for WAL-safe
-snapshots. See the [ratified topology](../docs/design/ensemble-v2-sync.md#ratified-topology-decision-2026-09-10)
-and [`web/CLAUDE.md`](../web/CLAUDE.md) for the full rationale, including the verified
-gaps in the stock API this project works around (no `db.transaction()`, `busy_timeout` defaults
-to 0, rows come back `[Object: null prototype]`).
+snapshots. The full rationale is decision 4 of the
+[ratified topology](../docs/design/ensemble-v2-sync.md#ratified-topology-decision-2026-09-10).
+The verified gaps in the stock API this project works around are each documented where they
+are handled: no `db.transaction()` (`src/db/transaction.ts`), `busy_timeout` defaults to 0
+(`src/db/connection.ts`), rows come back `[Object: null prototype]`
+(`test/db/schema.test.ts`).
