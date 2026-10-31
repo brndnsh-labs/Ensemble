@@ -265,8 +265,8 @@
         flex: 1;
         min-width: 130px;
         /* A row that doesn't fit wraps rather than run Save and the song menu off the right edge,
-           where they were reachable only by scrolling the page sideways (#1700) — "Focus chart"
-           mid-song, or "Keep a copy" on CI's WebKit, which sets text wider than local. The
+           where they were reachable only by scrolling the page sideways (#1700) — "Keep a copy"
+           on CI's WebKit, which sets text wider than local. The
            buttons' trimmed sides below keep the common rows on one line. */
         flex-wrap: wrap;
     }

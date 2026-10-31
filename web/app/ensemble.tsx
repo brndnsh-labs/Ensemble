@@ -363,7 +363,6 @@ export default function Ensemble() {
     // opens. (Energy is the chart's own, `performance.energy`; `bandIntensity` rides along only
     // for the slider's resting position while it is on auto.)
     const [feel, setFeel] = useState<FeelSnapshot>(() => feelSnapshot());
-    const [showControls, setShowControls] = useState(false);
     const [pendingSound, setPendingSound] = useState<{ lane: string; value: string } | null>(null);
     // #1278 — a distinct busy flag from `busy` (which `run()` sets for every
     // action) so the audio-export Cancel button in `ExportDialog` stays clickable
@@ -880,7 +879,6 @@ export default function Ensemble() {
         () => (liveScore ? barFields(liveScore, barDrafts.drafts) : new Map()),
         [liveScore, barDrafts.drafts],
     );
-    const focused = playbackActive && !showControls && !editing;
 
     useEffect(() => {
         setNeck(standMode() === 'neck');
@@ -1503,7 +1501,6 @@ export default function Ensemble() {
             setFollowing(true);
             const next = updateChart();
             setEditing(false);
-            setShowControls(false);
             setBandTab(null);
             await runtime.toggle(setSoundProgress);
             setPlaying(runtime.state().playback.isPlaying);
@@ -2772,9 +2769,7 @@ export default function Ensemble() {
     const homeView = ready && !current && browse.view === 'home';
 
     return (
-        <div
-            className={`app-shell ${current ? 'song-open' : ''} ${focused ? 'performance-focus' : ''}`}
-        >
+        <div className={`app-shell ${current ? 'song-open' : ''}`}>
             <header className="site-header" hidden={!!current} data-home={homeView}>
                 <button
                     className="brand"
@@ -3148,7 +3143,6 @@ export default function Ensemble() {
             ) : (
                 <main
                     className="workspace"
-                    data-focused={focused}
                     // A bar's field is open on the chart. At phone width that is the dock on the
                     // keyboard (#1724), and the transport folds away so the chart keeps its rows
                     // above it (`song-header.css`).
@@ -3166,15 +3160,12 @@ export default function Ensemble() {
                         recoveryHealthy={recoveryHealthy}
                         totalBars={totalBars}
                         stage={stage}
-                        playbackActive={playbackActive}
-                        focused={focused}
                         editing={editing}
                         neck={neck}
                         onHome={goHome}
                         onToggleTheme={toggleTheme}
                         onOpenSettings={() => setSettingsOpen(true)}
                         settingsOpen={settingsOpen}
-                        onToggleControls={() => setShowControls(!showControls)}
                         onShowChart={() => showStand('chart')}
                         onShowNeck={() => showStand('neck')}
                         onEditChart={editChart}

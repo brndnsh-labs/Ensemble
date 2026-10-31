@@ -77,7 +77,7 @@ test('a bigger window takes a bigger step; playing never changes it', async ({
     expect(large).toMatchObject({ fits: 'true', scrolls: false });
 
     // The line under the chart hides while playing; its room is held, so nothing moves.
-    // Measured inside the chart's box: playing shortens the header, which moves the box itself.
+    // Measured inside the chart's box, so only the chart's own layout counts.
     const lastBar = () =>
         page.evaluate(() => {
             const box = document.querySelector('.chart-scroll')!.getBoundingClientRect();
@@ -90,14 +90,9 @@ test('a bigger window takes a bigger step; playing never changes it', async ({
     await expect(page.locator('.chart-bottom')).toBeHidden();
     expect((await layout(page)).step).toBe(large.step);
     expect(await lastBar()).toEqual(before);
-    // Playing hides the controls, and the height that frees is never spent on a bigger step:
-    // more height while playing (as the hidden controls give) keeps the step until it stops.
-    await expect(page.locator('.app-shell.performance-focus')).toHaveCount(1);
-    await page.setViewportSize({ width: 1920, height: 1600 });
-    await page.evaluate(() => new Promise((done) => setTimeout(done, 200)));
-    expect((await layout(page)).step).toBe(large.step);
     await page.getByRole('button', { name: 'Stop playback' }).click();
-    await expect.poll(async () => (await layout(page)).step).toBeLessThan(large.step);
+    await expect(page.locator('.chart-bottom')).toBeVisible();
+    expect((await layout(page)).step).toBe(large.step);
 });
 
 test('editing leaves the page: section heads above their bars, still four to a row', async ({

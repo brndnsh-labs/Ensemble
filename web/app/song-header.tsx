@@ -16,8 +16,6 @@ interface SongHeaderProps {
     recoveryHealthy: boolean;
     totalBars: number;
     stage: boolean;
-    playbackActive: boolean;
-    focused: boolean;
     editing: boolean;
     /** The remembered stand mode is Neck (#1587); the neck shows while not `editing`. */
     neck: boolean;
@@ -25,7 +23,6 @@ interface SongHeaderProps {
     onToggleTheme: () => void;
     onOpenSettings: () => void;
     settingsOpen: boolean;
-    onToggleControls: () => void;
     onShowChart: () => void;
     onShowNeck: () => void;
     onEditChart: () => void;
@@ -50,15 +47,12 @@ export function SongHeader({
     recoveryHealthy,
     totalBars,
     stage,
-    playbackActive,
-    focused,
     editing,
     neck,
     onHome,
     onToggleTheme,
     onOpenSettings,
     settingsOpen,
-    onToggleControls,
     onShowChart,
     onShowNeck,
     onEditChart,
@@ -149,15 +143,6 @@ export function SongHeader({
                     </span>
                     <span className="theme-label">Stage</span>
                 </button>
-                {playbackActive && (
-                    <button
-                        className="btn focus-toggle"
-                        aria-pressed={focused}
-                        onClick={onToggleControls}
-                    >
-                        {focused ? 'Show controls' : 'Focus chart'}
-                    </button>
-                )}
                 {/* The current mode is said with `aria-pressed`, not colour alone (#1760). */}
                 <div className="mode-switch" role="group" aria-label="Stand mode">
                     <button aria-pressed={!editing && !neck} onClick={onShowChart}>

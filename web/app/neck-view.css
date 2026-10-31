@@ -121,11 +121,3 @@
         gap: 8px 16px;
     }
 }
-/* Focus chart: the neck keeps its names and grips and loses its words and settings, like the
-   header's controls. */
-.performance-focus .neck-settings,
-.performance-focus .neck-step,
-.performance-focus .neck-headline,
-.performance-focus .neck-fingers {
-    display: none;
-}

@@ -140,18 +140,18 @@ network-disconnection harness is local-only.
   authenticated cloud sync, sharing, admin, remaining iReal semantics, chord discovery,
   full settings inventory, section-practice controls and visualizer are later work. A feel
   change during playback verifies (and downloads) its sounds while the band keeps playing, then
-  swaps in at the next bar using the engine's own staged-feel path, without expanding the focused
-  chart; the stand's toast reports preparation and the pending bar honestly. A failed change stops,
+  swaps in at the next bar using the engine's own staged-feel path; the
+  stand's toast reports preparation and the pending bar honestly. A failed change stops,
   restores the previous setup and resumes only if that setup's sounds are still verified; Stop
   cancels a pending restart. Do not use this as the only copy of important writing yet.
 - Four bars per laptop/tablet row, two per portrait phone row, scrolling rather than pagination.
   The open song replaces the branding header; Sounds opens over the score without displacing it.
-  Playback automatically focuses the chart, hiding editing/save chrome while leaving transport,
-  tempo, key, feel and mutes visible. Show controls restores the setup actions without stopping.
+  Playback hides nothing: the header's controls stay put, so Save, export and Band… are one
+  press away mid-song.
   Playback highlights follow the band host's own clock (`lib/band-host.ts`); manual
   wheel/touch/keyboard browsing suspends following until explicitly resumed.
-- Stage mode (#1208) is the dark music-stand theme: the Stage button in the song header stays
-  reachable while the chart is focused. The palette is one set of `light-dark()` tokens picked
+- Stage mode (#1208) is the dark music-stand theme: a tap on the song header's Stage button.
+  The palette is one set of `light-dark()` tokens picked
   by `color-scheme`; unset follows the system, a tap stores `ensemble-v2-preview:theme` as a
   per-device convenience (never a document field) and is applied before hydration. Band chips
   (#1210) read on/off at a distance — filled green versus dashed/hollow/struck — and toggling

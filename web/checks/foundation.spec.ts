@@ -132,19 +132,18 @@ for (const [width, height] of [
         await closeSounds(page);
         await expect(page.getByRole('button', { name: 'Band…' })).toBeFocused();
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-        await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
-        await expect(page.getByRole('button', { name: 'Edit chart', exact: true })).toBeHidden();
-        await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeHidden();
+        // Playing hides nothing: the header's controls stay where they were (#1969).
+        for (const name of ['Edit chart', 'Save', 'Band…']) {
+            await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+        }
         for (const label of ['Tempo', 'Style']) {
             await expect(page.getByLabel(label, { exact: true })).toBeVisible();
         }
         await expect(keyButton(page)).toBeVisible();
         await expect(page.getByRole('button', { name: 'Bass', exact: true })).toBeVisible();
-        const focusedChart = await page.locator('.chart-scroll').boundingBox();
-        expect(focusedChart!.height).toBeGreaterThan(height * 0.5);
-        await page.screenshot({ path: `test-results/focused-${width}.png` });
-        await page.getByRole('button', { name: 'Show controls' }).click();
-        await expect(page.getByRole('button', { name: 'Band…' })).toBeVisible();
+        const playingChart = await page.locator('.chart-scroll').boundingBox();
+        expect(playingChart!.height).toBeGreaterThan(height * 0.5);
+        await page.screenshot({ path: `test-results/playing-${width}.png` });
         await page.getByRole('button', { name: 'Stop playback' }).click();
         await page.screenshot({ path: `test-results/chart-${width}.png` });
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
@@ -155,9 +154,6 @@ for (const [width, height] of [
         await closeBarDock(page);
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
         await expect(page.locator('.bar-input, .bar-dock')).toHaveCount(0);
-        // Playing folds the controls away (focus mode), as above.
-        await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
-        await page.getByRole('button', { name: 'Show controls' }).click();
         await page.getByRole('button', { name: 'Stop playback' }).click();
         await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
         await expect(await openBar(page, 1)).toHaveValue(typed);

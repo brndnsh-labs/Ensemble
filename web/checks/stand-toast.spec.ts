@@ -28,10 +28,9 @@ test('no footer in either playback state, and the chart keeps the height back', 
     const playing = await page.locator('.chart-scroll').boundingBox();
     expect(playing).not.toBeNull();
     // A bar that comes and goes on Play/Stop would shift `.chart-scroll`'s own box (Touches #1);
-    // with no footer at all in either state, its height cannot SHRINK between the two (playing
-    // mode's own `.performance-focus` chrome hides a few more header controls, which can only
-    // ever grow it further — never a like-for-like px match).
-    expect(playing!.height).toBeGreaterThanOrEqual(stopped!.height);
+    // with no footer in either state and nothing in the header hidden for playing (#1969), the
+    // box is the same in both.
+    expect(playing).toEqual(stopped);
     await page.getByRole('button', { name: 'Stop playback' }).click();
 });
 

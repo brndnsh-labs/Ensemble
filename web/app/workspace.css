@@ -76,20 +76,11 @@
     min-width: 2em;
     height: 1.9em;
 }
-.performance-focus .song-subtitle,
-.performance-focus .mode-switch,
-.performance-focus .save-btn,
-.performance-focus .menu-btn,
-.performance-focus .band-button {
-    display: none;
-}
 /* One size for idle and playing: a second, larger playing-only scale used to
    reflow every bar/chord/section-letter the instant playback started or
    stopped, which read as the chart jumping around rather than settling. The
    idle scale above already uses the available space well, so the modest extra
-   size playing used to add (#1186) wasn't worth that jump. Chrome (Edit/Save/
-   genre controls) still hides via the rules above; only typography stopped
-   changing. */
+   size playing used to add (#1186) wasn't worth that jump. */
 /* Phone portrait already reads well at playing distance and is the reference
    layout (#1186); only section identity grows here. */
 @media (max-width: 760px) {
@@ -150,12 +141,6 @@
     }
     .song-open .band-toggle {
         min-height: 36px;
-    }
-    .performance-focus .song-heading {
-        flex-basis: 0;
-    }
-    .performance-focus .song-title {
-        max-width: calc(100vw - 185px);
     }
 }
 /* Explicit Day/Stage choice (#1208) overrides the system preference by picking

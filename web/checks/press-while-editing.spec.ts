@@ -61,8 +61,11 @@ test('Play pressed with a bar open applies the bar and plays (#1733)', async ({ 
     await editBluePocket(page);
     await shiftOnChange(page);
     await press(page, 'Start playback');
-    await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
-    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeAttached();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Edit chart' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+    );
     await expect(page.locator('.bar-input')).toHaveCount(0);
     await expect(page.locator('.sheet .bar').first()).toContainText('Dm');
 });
@@ -96,7 +99,11 @@ test('Play pressed with a tempo typed takes the tempo and plays (#1733)', async 
     await page.getByLabel('Tempo', { exact: true }).fill('132');
     await shiftOnChange(page);
     await press(page, 'Start playback');
-    await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Edit chart' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+    );
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('132');
 });
 
@@ -120,7 +127,11 @@ test('Play pressed with the bar menu open applies the bar and plays (#1733)', as
     await expect(page.getByRole('dialog', { name: 'Bar 1 menu' })).toBeVisible();
     await shiftOnChange(page);
     await press(page, 'Start playback');
-    await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Edit chart' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+    );
     await expect(page.locator('.sheet .bar').first()).toContainText('Dm');
 });
 
@@ -134,6 +145,10 @@ test('Play pressed with a section name typed renames it and plays (#1733)', asyn
     await menu.getByLabel('Section name', { exact: true }).fill('Head');
     await shiftOnChange(page);
     await press(page, 'Start playback');
-    await expect(page.locator('.workspace')).toHaveAttribute('data-focused', 'true');
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    await expect(page.getByRole('button', { name: 'Edit chart' })).toHaveAttribute(
+        'aria-pressed',
+        'false',
+    );
     await expect(page.getByRole('button', { name: 'Section Head', exact: true })).toBeAttached();
 });
