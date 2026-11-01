@@ -86,7 +86,10 @@ export interface Idiom<E, M> {
     rebase?(memory: M, ticks: number): M;
 }
 
-export type DrumIdiom = Idiom<DrumHit, any>;
+export type DrumIdiom = Idiom<DrumHit, any> & {
+    /** @internal a test seam: the step this bar's fill starts at, or null (`fillStart`). */
+    fillStart(ctx: BarContext): number | null;
+};
 export type PitchedIdiom = Idiom<PitchedNote, any>;
 
 export interface Feel {
