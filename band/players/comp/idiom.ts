@@ -162,16 +162,20 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 hit?: { stroke?: 'down' | 'up'; muted?: boolean; palm?: boolean },
                 chord?: ChordFacts,
             ) => {
-                const sounded = chord
-                    ? leaveTheLeadItsNote(
-                          midi,
-                          chord,
-                          ctx.heard.lead,
-                          at(bar, step),
-                          at(bar, step) + length * STEP,
-                          !!hit?.stroke,
-                      )
-                    : midi;
+                // An organ holds its chord and presses the same shape again (`again`): a voice
+                // left out of one press and back in the next would blink, so it keeps them all.
+                const holds = ctx.instrument.legato && !book.percussive;
+                const sounded =
+                    chord && !holds
+                        ? leaveTheLeadItsNote(
+                              midi,
+                              chord,
+                              ctx.heard.lead,
+                              at(bar, step),
+                              at(bar, step) + length * STEP,
+                              { stroked: !!hit?.stroke, topOnly: !!shape?.openPosition },
+                          )
+                        : midi;
                 for (const m of sounded) {
                     const note: PitchedNote = {
                         lane: 'comp',
@@ -476,7 +480,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
  * them; this takes what it couldn't, when the line moves too much under one chord to clear.
  * A guide tone stays (the chord must still name itself), as does the bottom voice, and at
  * least two voices sound. A guitar just doesn't sound that string: a grip less a string is
- * still a grip.
+ * still a grip — but a strummed open-position chord rings as its shape, so only its top
+ * string gives way. (An organ, which holds, keeps every voice: see the caller.)
  *
  * One exception, on a stroked guitar: a three-string chord whose guide tone the lead holds
  * right through the strike becomes a double-stop of the other two, provided they keep the
@@ -490,7 +495,7 @@ function leaveTheLeadItsNote(
     lead: readonly PitchedNote[],
     from: number,
     to: number,
-    stroked: boolean,
+    { stroked, topOnly }: { stroked: boolean; topOnly: boolean },
 ): number[] {
     if (!lead.length || notes.length <= 2) {
         return notes;
@@ -509,7 +514,12 @@ function leaveTheLeadItsNote(
     let kept = notes;
     // Top voice first: the one most in the lead's way.
     for (const m of [...notes].sort((a, b) => b - a)) {
-        if (kept.length <= 2 || m === bottom || guides.has(mod12(m))) {
+        if (
+            kept.length <= 2 ||
+            m === bottom ||
+            guides.has(mod12(m)) ||
+            (topOnly && m !== Math.max(...notes))
+        ) {
             continue;
         }
         const unison = unisonOn(m);
@@ -520,7 +530,7 @@ function leaveTheLeadItsNote(
             kept = kept.filter((k) => k !== m);
         }
     }
-    if (stroked && kept.length === 3) {
+    if (stroked && !topOnly && kept.length === 3) {
         const held = kept.find((m) => guides.has(mod12(m)) && unisonOn(m) >= to - from);
         const pair = kept.filter((m) => m !== held);
         if (held !== undefined && pair.some((m) => guides.has(mod12(m)))) {
