@@ -9,6 +9,10 @@ interface SongHeaderProps {
     sharedDraft: boolean;
     /** The draft came from the standards catalog, not a shared link (#1700). */
     standardDraft: boolean;
+    /** The standard or shared link changed since it opened, kept on this device (#1979). */
+    sharedChanged: boolean;
+    /** The changes have a device draft to go to (#1979); without one they are this tab's only. */
+    sharedKept: boolean;
     /** The draft is a brand-new song, kept on its first change (#1707). */
     newSongDraft: boolean;
     /** Only practice settings (tempo, style, energy, mix) differ from the saved version (#1706). */
@@ -44,6 +48,8 @@ export function SongHeader({
     hasPendingText,
     sharedDraft,
     standardDraft,
+    sharedChanged,
+    sharedKept,
     newSongDraft,
     practiceOnly,
     recoveryHealthy,
@@ -105,9 +111,13 @@ export function SongHeader({
                                 : newSongDraft
                                   ? 'New song · kept once you change it'
                                   : sharedDraft
-                                    ? standardDraft
-                                        ? 'From the standards · not saved'
-                                        : 'Opened from a shared link · not saved'
+                                    ? sharedChanged
+                                        ? recoveryHealthy && sharedKept
+                                            ? 'Changed · Keep a copy'
+                                            : 'Changed · this tab only'
+                                        : standardDraft
+                                          ? 'From the standards · not saved'
+                                          : 'Opened from a shared link · not saved'
                                     : practiceOnly
                                       ? recoveryHealthy
                                           ? 'Practice settings changed · Save to keep'

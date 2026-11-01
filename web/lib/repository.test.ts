@@ -13,7 +13,22 @@ import type { ChartDocumentV2 } from '@core/songbook/score-types';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { type FakeIndexedDB, installFakeIndexedDB } from '../../tests/utils/fake-indexeddb';
 import { homeRequest } from './home';
-import { get, home, list, recoverySlotCount, remove, rename, save } from './repository';
+import {
+    clearSharedDraft,
+    get,
+    home,
+    keepSharedDraft,
+    list,
+    recoveriesFor,
+    recoverySlotCount,
+    remove,
+    rename,
+    SHARED_DRAFT_LIMIT,
+    save,
+    sharedDraftFor,
+    sharedLinkDraftKey,
+    standardDraftKey,
+} from './repository';
 import { buildStandardDocument, standardFor } from './standards';
 
 const localStore = new Map<string, string>();
@@ -297,5 +312,140 @@ describe('a text chart left in the guest songbook (schema 1, retired in #1740)',
         expect(slice.continued).toBeNull();
         expect(slice.count).toBe(1);
         expect(slice.unreadable).toBeGreaterThan(0);
+    });
+});
+
+describe('shared drafts: a standard or a shared link keeps its changes (#1979)', () => {
+    const standard = () => buildStandardDocument(standardFor('standard-12-bar-blues')!);
+
+    it('keeps the changes under the draft key and reads them back', () => {
+        const base = standard();
+        const changed = {
+            ...base,
+            chart: { ...base.chart, performance: { ...base.chart.performance, bpm: 150 } },
+        };
+        const key = standardDraftKey('standard-12-bar-blues');
+        expect(sharedDraftFor(key, base.id)).toBeNull();
+        keepSharedDraft(key, base, changed);
+        const kept = sharedDraftFor(key, base.id);
+        expect(kept?.document.chart.performance.bpm).toBe(150);
+        // The base is kept with it, bar ids and all: a rebuilt standard has new ones.
+        expect(kept?.base).toEqual(base);
+        clearSharedDraft(key);
+        expect(sharedDraftFor(key, base.id)).toBeNull();
+    });
+
+    it("never lands in a song's recovery slots, so a song with the same id is not offered it", () => {
+        const base = standard();
+        keepSharedDraft('link:abc', base, base);
+        expect(recoverySlotCount(base.id)).toBe(0);
+        expect(recoveriesFor(base)).toEqual([]);
+        expect(
+            [...localStore.keys()].some((k) => k.startsWith('ensemble-v2-preview:recovery:')),
+        ).toBe(false);
+    });
+
+    it('refuses a slot whose chart is not the one it is keyed for', () => {
+        const base = standard();
+        keepSharedDraft('link:abc', base, base);
+        expect(sharedDraftFor('link:abc', 'some-other-id')).toBeNull();
+        expect(sharedDraftFor('link:abcd', base.id)).toBeNull();
+    });
+
+    it('reads the newest of several writers', () => {
+        const base = standard();
+        const older = { ...base, title: 'Older' };
+        const newer = { ...base, title: 'Newer' };
+        localStore.set(
+            'ensemble-v2-preview:shared-draft:writer-a:standard:x',
+            JSON.stringify({ capturedAt: '2020-01-01T00:00:00.000Z', base, document: older }),
+        );
+        localStore.set(
+            'ensemble-v2-preview:shared-draft:writer-b:standard:x',
+            JSON.stringify({ capturedAt: '2021-01-01T00:00:00.000Z', base, document: newer }),
+        );
+        expect(sharedDraftFor('standard:x', base.id)?.document.title).toBe('Newer');
+        // This tab's write supersedes the other writers' slots for the same draft.
+        keepSharedDraft('standard:x', base, { ...base, title: 'Mine' });
+        expect([...localStore.keys()].filter((k) => k.endsWith(':standard:x'))).toHaveLength(1);
+        expect(sharedDraftFor('standard:x', base.id)?.document.title).toBe('Mine');
+        clearSharedDraft('standard:x');
+        expect(localStore.size).toBe(0);
+    });
+
+    it(`keeps at most ${SHARED_DRAFT_LIMIT}, letting the oldest go`, () => {
+        const base = standard();
+        for (let i = 0; i < SHARED_DRAFT_LIMIT + 3; i++) {
+            localStore.set(
+                `ensemble-v2-preview:shared-draft:writer-a:link:${i}`,
+                JSON.stringify({
+                    capturedAt: new Date(Date.UTC(2020, 0, 1 + i)).toISOString(),
+                    base,
+                    document: base,
+                }),
+            );
+        }
+        keepSharedDraft('link:fresh', base, base);
+        const left = [...localStore.keys()];
+        expect(left).toHaveLength(SHARED_DRAFT_LIMIT);
+        expect(left).toContain('ensemble-v2-preview:shared-draft:writer-a:link:26');
+        expect(left).not.toContain('ensemble-v2-preview:shared-draft:writer-a:link:0');
+        expect(sharedDraftFor('link:fresh', base.id)).not.toBeNull();
+    });
+
+    it("a link's key is its chart's digest: the same chart the same key, another chart another", async () => {
+        const base = standard();
+        const a = await sharedLinkDraftKey(base);
+        expect(a).toMatch(/^link:[0-9a-f]{64}$/);
+        expect(await sharedLinkDraftKey(structuredClone(base))).toBe(a);
+        expect(await sharedLinkDraftKey({ ...base, title: 'Other' })).not.toBe(a);
+    });
+
+    it('makes room by letting the oldest other shared drafts go when storage is full', () => {
+        const base = standard();
+        for (const i of [1, 2]) {
+            localStore.set(
+                `ensemble-v2-preview:shared-draft:writer-a:link:${i}`,
+                JSON.stringify({ capturedAt: `202${i}-01-01T00:00:00.000Z`, base, document: base }),
+            );
+        }
+        localStore.set('ensemble-v2-preview:recovery:writer-a:song', 'a song draft');
+        const storage = window.localStorage as Storage;
+        const setItem = storage.setItem;
+        let refusals = 1;
+        storage.setItem = (key: string, value: string) => {
+            if (refusals-- > 0) {
+                throw new DOMException('full', 'QuotaExceededError');
+            }
+            setItem(key, value);
+        };
+        try {
+            keepSharedDraft('link:new', base, base);
+        } finally {
+            storage.setItem = setItem;
+        }
+        expect(localStore.has('ensemble-v2-preview:shared-draft:writer-a:link:1')).toBe(false);
+        expect(localStore.has('ensemble-v2-preview:shared-draft:writer-a:link:2')).toBe(true);
+        expect(localStore.has('ensemble-v2-preview:recovery:writer-a:song')).toBe(true);
+        expect(sharedDraftFor('link:new', base.id)).not.toBeNull();
+    });
+
+    it('blocked storage is not full storage: no other draft goes', () => {
+        const base = standard();
+        localStore.set(
+            'ensemble-v2-preview:shared-draft:writer-a:link:1',
+            JSON.stringify({ capturedAt: '2021-01-01T00:00:00.000Z', base, document: base }),
+        );
+        const storage = window.localStorage as Storage;
+        const setItem = storage.setItem;
+        storage.setItem = () => {
+            throw new DOMException('blocked', 'SecurityError');
+        };
+        try {
+            expect(() => keepSharedDraft('link:new', base, base)).toThrow('blocked');
+        } finally {
+            storage.setItem = setItem;
+        }
+        expect(localStore.has('ensemble-v2-preview:shared-draft:writer-a:link:1')).toBe(true);
     });
 });

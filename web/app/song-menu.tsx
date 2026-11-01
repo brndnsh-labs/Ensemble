@@ -21,6 +21,11 @@ interface SongMenuProps {
     saved: ChartDocument | null;
     busy: boolean;
     dirty: boolean;
+    /**
+     * What Revert goes back to: the saved song, a changed standard's or shared link's chart as it
+     * came (#1979), or nothing to revert to.
+     */
+    revertTo: 'saved' | 'original' | null;
     /** Whether the song on the stand can be deleted: a saved song, guest or account. */
     canDelete: boolean;
     recoveryOptions: Recovery[];
@@ -64,7 +69,8 @@ function useModal(open: boolean) {
  * fields and no help text: anything that needs more than a pick opens its own small dialog
  * (Export… is the shell's `ExportDialog`).
  *
- * More opens a second `<Menu>` in place of the first, at the same •••: Revert to saved and
+ * More opens a second `<Menu>` in place of the first, at the same •••: Revert to saved (to
+ * original, on a changed standard or shared link) and
  * Older drafts… (when this device holds any). A submenu beside the first would be a second
  * list to aim at on a laptop and makes no sense in a phone's sheet; swapping the list keeps one
  * menu on screen, and Esc still lands back on the •••.
@@ -79,6 +85,7 @@ export function SongMenu({
     saved,
     busy,
     dirty,
+    revertTo,
     canDelete,
     recoveryOptions,
     syncStatus,
@@ -141,9 +148,9 @@ export function SongMenu({
     const more: MenuItem[] = [
         {
             id: 'revert',
-            label: 'Revert to saved',
+            label: revertTo === 'original' ? 'Revert to original' : 'Revert to saved',
             testId: 'song-menu-revert',
-            disabled: busy || !dirty || !saved,
+            disabled: busy || !dirty || revertTo === null,
             onSelect: done(onRevert),
         },
         ...(recoveryOptions.length > 0

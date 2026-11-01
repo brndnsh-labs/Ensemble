@@ -63,9 +63,9 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
 
 /**
  * The same recovery-storage leak `standards-catalog.spec.ts` guards for a standard: a shared
- * `#chart=` draft belongs to no songbook yet (`landDraftOnStand`'s own doc comment says "no
- * recovery-storage write"), so editing it before "Keep a copy" must not write a slot under the
- * link's random id that nothing but a Save ever clears.
+ * `#chart=` draft belongs to no songbook yet, so editing it before "Keep a copy" must not write a
+ * song recovery slot under the link's song id that nothing but a Save ever clears. Its changes
+ * are kept under a draft key of their own (#1979), below.
  */
 test('editing an opened share link before Keep a copy writes nothing to recovery storage', async ({
     page,
@@ -101,6 +101,49 @@ test('editing an opened share link before Keep a copy writes nothing to recovery
     await songMenuAction(fresh, 'More');
     await expect(songMenu(fresh, 'more')).toBeVisible();
     await expect(fresh.getByText(/Older drafts \(/)).toHaveCount(0);
+});
+
+/**
+ * Opening the same link again lands the changes it was left with (#1979), marked "Changed"; the
+ * sender's own song, with the same id, is untouched by them.
+ */
+test('the same share link opened again keeps its changes, marked (#1979)', async ({
+    page,
+    context,
+}) => {
+    await withoutClipboard(page);
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await songMenuAction(page, 'Copy link');
+    const link = await page.getByTestId('share-link-fallback').inputValue();
+    await page.getByRole('button', { name: 'Close', exact: true }).click();
+    const sentTempo = await page.getByLabel('Tempo', { exact: true }).inputValue();
+    expect(sentTempo).not.toBe('137');
+
+    const fresh = await context.newPage();
+    await withoutClipboard(fresh);
+    await fresh.goto(link);
+    await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
+    const tempo = fresh.getByLabel('Tempo', { exact: true });
+    await tempo.fill('137');
+    await tempo.press('Enter');
+    await expect(fresh.locator('.song-subtitle')).toContainText('Changed · Keep a copy');
+    await fresh.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(fresh.locator('main.home')).toBeVisible();
+
+    // A new page load (only the fragment differs, so `goto` alone would stay in this document).
+    await fresh.goto('about:blank');
+    await fresh.goto(link);
+    await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
+    await expect(tempo).toHaveValue('137');
+    await expect(fresh.locator('.song-subtitle')).toContainText('Changed · Keep a copy');
+
+    // The song the link was made from opens as it was saved.
+    await fresh.getByRole('button', { name: 'Back to songbook' }).click();
+    await songLink(fresh, 'Blue pocket', 'Blues').click();
+    await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
+    await expect(tempo).toHaveValue(sentTempo);
+    await expect(fresh.locator('.song-subtitle')).toContainText('Saved on this device');
 });
 
 test('a share link too long to play is refused with the reason, not silently (#1632)', async ({

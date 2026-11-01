@@ -132,26 +132,25 @@ test('Back from a shared link lands on the songbook with the link consumed', asy
     expect(new URL(page.url()).hash).toBe('');
 });
 
-test('Back on an edited standard says it is unsaved once; the next Back leaves it', async ({
-    page,
-}) => {
+test('Back on an edited standard leaves at once and keeps the change (#1979)', async ({ page }) => {
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Browse all →' }).click();
     const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
     await row.getByRole('button', { name: 'Open' }).click();
     await onSong(page, '12-Bar Blues');
-    // An untouched standard leaves on the first Back…
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    const before = await tempo.inputValue();
+    await page.getByRole('button', { name: 'Faster' }).click();
+    await expect(tempo).not.toHaveValue(before);
+    const changed = await tempo.inputValue();
+    // No question on the way out: the change is kept on this device…
     await page.goBack();
     await expect(page.locator('main.standards-browser')).toBeVisible();
+    // …and Forward (which rebuilds the standard) lands it, marked.
     await page.goForward();
     await onSong(page, '12-Bar Blues');
-    // …an edited one is held once, with the reason.
-    await page.getByRole('button', { name: 'Faster' }).click();
-    await page.goBack();
-    await onSong(page, '12-Bar Blues');
-    await expect(page.getByTestId('stand-toast')).toContainText("This draft isn't saved");
-    await page.goBack();
-    await expect(page.locator('main.standards-browser')).toBeVisible();
+    await expect(tempo).toHaveValue(changed);
+    await expect(page.locator('.song-subtitle')).toContainText('Changed · Keep a copy');
 });
 
 test('Back with a dialog open keeps Forward intact', async ({ page }) => {
