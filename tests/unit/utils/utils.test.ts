@@ -6,7 +6,9 @@ import {
     getFrequency,
     getMidi,
     keyDistance,
+    keyNamesFor,
     normalizeKey,
+    respellKeyForMode,
     transposeKeyName,
 } from '../../../core/utils.js';
 
@@ -93,6 +95,33 @@ describe('Utility Functions', () => {
         it('moves nothing for a key it cannot place', () => {
             expect(keyDistance('H', 'G')).toBe(0);
             expect(keyDistance('C', '')).toBe(0);
+        });
+    });
+
+    describe('key names by mode', () => {
+        it('offers each key the way it is usually written, 12 distinct pitch classes', () => {
+            const major = keyNamesFor(false);
+            const minor = keyNamesFor(true);
+            expect(major).toContain('F#');
+            expect(major).not.toContain('Gb');
+            expect(minor).toEqual(expect.arrayContaining(['C#', 'F#', 'G#']));
+            expect(minor).not.toContain('Db');
+            expect(minor).not.toContain('Gb');
+            expect(minor).not.toContain('Ab');
+            for (const names of [major, minor]) {
+                expect(new Set(names.map((name) => normalizeKey(name))).size).toBe(12);
+            }
+        });
+
+        it('respells a key for the mode it turns to, and leaves a listed key alone', () => {
+            expect(respellKeyForMode('Gb', true)).toBe('F#');
+            expect(respellKeyForMode('Db', true)).toBe('C#');
+            expect(respellKeyForMode('Ab', true)).toBe('G#');
+            expect(respellKeyForMode('C#', false)).toBe('Db');
+            expect(respellKeyForMode('F#', false)).toBe('F#');
+            expect(respellKeyForMode('F#', true)).toBe('F#');
+            expect(respellKeyForMode('Bb', true)).toBe('Bb');
+            expect(respellKeyForMode('H', true)).toBe('H');
         });
     });
 

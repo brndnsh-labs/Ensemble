@@ -1,4 +1,4 @@
-import { ENHARMONIC_MAP, KEY_ORDER } from './config.js';
+import { ENHARMONIC_MAP, KEY_ORDER, MAJOR_KEY_NAMES, MINOR_KEY_NAMES } from './config.js';
 
 /**
  * utils.ts — shared musical/math primitives, DOM- and Web-Audio-free.
@@ -40,6 +40,26 @@ export function clamp01(x: number): number {
  */
 export function normalizeKey(k: string): string {
     return Object.hasOwn(ENHARMONIC_MAP, k) ? (ENHARMONIC_MAP as Record<string, string>)[k] : k;
+}
+
+/** The key names the picker offers in a mode (`F#` minor, `Db` major; never `Gb` minor). */
+export function keyNamesFor(isMinor: boolean): readonly string[] {
+    return isMinor ? MINOR_KEY_NAMES : MAJOR_KEY_NAMES;
+}
+
+/**
+ * The same key spelled the way it is usually written in `isMinor`'s mode: `Gb` becomes `F#` when
+ * the song turns minor, `C#` becomes `Db` when it turns major. A key already on the mode's list,
+ * is returned as it was; any other spelling (`D#`) lands on the list's name for that pitch class.
+ * An unknown key is returned as it was.
+ */
+export function respellKeyForMode(key: string, isMinor: boolean): string {
+    const names = keyNamesFor(isMinor);
+    if (names.includes(key)) {
+        return key;
+    }
+    const pitchClass = KEY_ORDER.indexOf(normalizeKey(key));
+    return pitchClass === -1 ? key : names[pitchClass];
 }
 
 /**

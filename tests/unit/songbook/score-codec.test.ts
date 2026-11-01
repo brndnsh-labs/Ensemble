@@ -568,3 +568,14 @@ describe('chorus count and last-chorus codas (#1472)', () => {
         expect(issue(score)).toMatchObject({ message });
     });
 });
+
+describe('score key spellings', () => {
+    it.each(['F#', 'C#', 'G#', 'Gb', 'Db', 'Ab'])('%s minor is a valid stored key', (key) => {
+        const fixture = scoreFixture();
+        fixture.key = key;
+        fixture.isMinor = true;
+        const result = validateSemanticScore(JSON.parse(JSON.stringify(fixture)));
+        expect(result.kind).toBe('ok');
+        expect(result.kind === 'ok' && result.value.key).toBe(key);
+    });
+});

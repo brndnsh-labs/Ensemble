@@ -1,4 +1,4 @@
-export { KEY_ORDER } from './data/note-names.js';
+export { KEY_ORDER, MAJOR_KEY_NAMES, MINOR_KEY_NAMES } from './data/note-names.js';
 export const ENHARMONIC_MAP = {
     // Standard sharp→flat equivalents (the 5 chromatic sharps)
     'C#': 'Db',
