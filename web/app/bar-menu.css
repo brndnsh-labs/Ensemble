@@ -170,6 +170,29 @@
     font: inherit;
     font-size: 13px;
 }
+.section-lanes {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: 12px;
+    color: var(--muted);
+}
+.bar-menu-fields .section-lane {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 44px;
+    font-size: 14px;
+    color: var(--ink);
+}
+.bar-menu-fields .section-lane input {
+    width: auto;
+    min-height: 0;
+}
 .bar-menu-sheet .bar-menu-fields select,
 .bar-menu-sheet .bar-menu-fields input {
     min-height: 44px;

@@ -21,6 +21,7 @@ import { BarMenu, type BarMenuBar } from './bar-menu';
 import { BarSplits } from './bar-splits';
 import { eventText } from './chord-text';
 import { Menu } from './menu';
+import { sectionMarks } from './section-band-fields';
 import { SectionMenu } from './section-menu';
 import type { BarDraft } from './use-bar-drafts';
 
@@ -245,6 +246,12 @@ export function ChartSheet({
     useEffect(() => {
         setSectionMenu(null);
     }, [editingSections]);
+
+    /** The section letter's quiet hint (#2021): a role its name doesn't spell, lanes left out. */
+    function marksOf(id: string | undefined): string {
+        const section = current.chart.score.sections.find((s) => s.id === id);
+        return section ? sectionMarks(section) : '';
+    }
 
     function openSectionMenu(event: ReactMouseEvent<HTMLButtonElement>, block: ChartBlock) {
         if (!block.id) {
@@ -484,6 +491,9 @@ export function ChartSheet({
                         >
                             {block.label || 'A'}
                         </button>
+                        {marksOf(block.id) && (
+                            <span className="section-marks">{marksOf(block.id)}</span>
+                        )}
                         {(current.chart.score.sections.find((s) => s.id === block.id)?.repeat ??
                             1) > 1 && (
                             <span className="section-repeat">

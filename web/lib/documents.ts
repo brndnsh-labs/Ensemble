@@ -417,7 +417,12 @@ export type SectionChange =
     | { key: string | null }
     | { isMinor: boolean | null }
     | { meter: string | null }
-    | { grouping: number[] | null };
+    | { grouping: number[] | null }
+    /** A lane off for this section (`false`), or back to the band's own say (`null`) (#2021). */
+    | { lane: SectionLane; on: false | null };
+
+/** The lanes a section can silence: the score's own `instruments` keys the band reads. */
+export type SectionLane = 'groove' | 'bass' | 'chords' | 'soloist';
 
 export type SectionChangeResult =
     | { kind: 'ok'; score: SemanticScore }
@@ -465,6 +470,20 @@ export function withSectionSettings(
             delete section.key;
         } else {
             section.key = change.key;
+        }
+    } else if ('lane' in change) {
+        // The band reads only a `false` (`SectionVisit.lanes`): lane power AND the section not
+        // muting it. So the stand writes "off" or nothing; a stored `true` is left as it is.
+        const instruments = { ...section.instruments };
+        if (change.on === false) {
+            instruments[change.lane] = false;
+        } else if (instruments[change.lane] === false) {
+            delete instruments[change.lane];
+        }
+        if (Object.keys(instruments).length === 0) {
+            delete section.instruments;
+        } else {
+            section.instruments = instruments;
         }
     } else if ('grouping' in change) {
         // Offered only from `groupingsFor` the section's meter; the codec re-checks the sum.

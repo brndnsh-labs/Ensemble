@@ -6,6 +6,7 @@ import type { SectionChange } from '../lib/documents';
 import './bar-menu.css';
 // The phone sheet's slide and backdrop are `<Menu>`'s (#1755), the one copy of that motion.
 import './menu.css';
+import { SectionBandFields, sectionMarks } from './section-band-fields';
 import { type SectionField, SectionNameFields, SectionSelects } from './section-settings';
 import { useAnchoredPlacement } from './use-anchored-placement';
 
@@ -270,6 +271,26 @@ export function SectionMenu({
                         A bar with its own key or meter keeps it. Changing the section's meter
                         re-fits bars of equal lengths and resets its beat grouping; chord names are
                         not transposed.
+                    </p>
+                </details>
+                <details className="bar-menu-details section-menu-band">
+                    <summary className="bar-menu-item">
+                        Role and players
+                        <span>{sectionMarks(section) || 'Default'}</span>
+                    </summary>
+                    <div className="bar-menu-fields">
+                        <SectionBandFields
+                            score={score}
+                            section={section}
+                            disabled={busy}
+                            onChange={(change) => onChange([change])}
+                        />
+                    </div>
+                    <p className="bar-menu-caption">
+                        The role is read from the section's name: an Intro or Break plays lighter, a
+                        Chorus fuller. A first Intro plays the first time through only, and a last
+                        Outro the last time only. An unticked player sits this section out; your own
+                        instrument is set separately.
                     </p>
                 </details>
                 <button

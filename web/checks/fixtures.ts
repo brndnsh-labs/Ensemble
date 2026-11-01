@@ -388,6 +388,11 @@ export async function openSectionNames(menu: Locator): Promise<void> {
     await unfold(menu.locator('details.section-menu-names'));
 }
 
+/** The section menu's "Role and players" group, unfolded (#2021). */
+export async function openSectionBand(menu: Locator): Promise<void> {
+    await unfold(menu.locator('details.section-menu-band'));
+}
+
 async function unfold(details: Locator): Promise<void> {
     if (!(await details.evaluate((node: HTMLDetailsElement) => node.open))) {
         await details.locator('summary').click();
