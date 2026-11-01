@@ -5,6 +5,8 @@ export const blues = defineClaims({
         {
             take: {},
             claims: [
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (150, about half the 301 measured; a lead-in is a note within a beat of the change).
+                ['bassApproachCount', 150, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.95, 1, 'the backbeat on 2 and 4, every bar'],
                 ['kickOnOneAndThree', 0.95, 1, 'the kick grounds 1 and 3'],
@@ -100,12 +102,16 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.134; development off 0.061, #2012's bar fix reverted 0.071; always develops 0.40.
+                // Floor sits between the bar fix reverted (0.071) and shipped: it guards #2012's bar fix and development off (0.061).
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.085,
-                    0.4,
+                    0.1,
+                    0.27,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 120, 10000, 'enough phrase openings to judge the rate on'],
                 // 1.0 is no response (the comp as busy in the breaths as under the line), so the floor
                 // sits above it: breath density 1.29 (0.94 with the answer off), line density 0.138
                 // (0.165).

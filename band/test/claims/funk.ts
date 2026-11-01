@@ -5,8 +5,11 @@ export const funk = defineClaims({
         {
             take: {},
             claims: [
-                // 0.08, not 0.05: measured .041, a residual octave arrival; no headroom at 0.05.
-                ['bassApproachLeap', 0, 0.08, 'a lead-in stays beside the note it leads to'],
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (18, about half the 37 measured; a lead-in is a note within a beat of the change).
+                ['bassApproachCount', 18, 10000, 'it does play half-step lead-ins into changes'],
+                // Measured 0.108 (4 of 37): riff 2's 5 on step 14 drops a major seventh into the change
+                // (Em9's B2 falling to C2), an engine follow-up; 0.15 leaves headroom over it.
+                ['bassApproachLeap', 0, 0.15, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.9, 1, 'the backbeat is hit hard'],
                 ['kickOnOne', 0.95, 1, 'on the One'],
                 ['ghostsPerBar', 1, 5, 'ghost notes around the backbeat'],
@@ -44,12 +47,16 @@ export const funk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.159; development off 0.039, #2012's bar fix reverted 0.142; always develops 0.37.
+                // Floor guards development off (0.039) only; this style barely sees the bar fix (0.142 vs 0.159), which blues, disco and rock guard.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.15,
-                    0.4,
+                    0.1,
+                    0.27,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 130, 10000, 'enough phrase openings to judge the rate on'],
                 // Measured 0.87 either way: the funk comp is a groove, not a conversation.
                 ['compBreathDensity', 0.7, 1.0, 'the groove keeps its figure under the lead'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],

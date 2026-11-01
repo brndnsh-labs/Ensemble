@@ -10,6 +10,9 @@ export const jazz = defineClaims({
                 ['bassNotesPerBeat', 0.85, 1.05, 'a walking line: one note per beat'],
                 ['bassArrivesOnBass', 0.75, 1, 'the walk lands on the chord (a 3rd now and then)'],
                 ['bassChromaticApproach', 0.3, 0.8, 'half-step approaches lead into changes'],
+                // The walk's approaches are lead-ins too: 585 measured, none leaping past a fifth.
+                ['bassApproachCount', 290, 10000, 'it does play half-step lead-ins into changes'],
+                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['bassRepeatedNotes', 0, 0.02, 'the walk keeps moving: no repeated pitches'],
                 ['bassMeanLeap', 1.5, 4.5, 'mostly stepwise, not arpeggio leaps'],
                 // Measured 0.033 today; 0.016 with the push off (the chance level: a Charleston hit
@@ -99,12 +102,16 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.118; development off 0.026, #2012's bar fix reverted 0.106; always develops 0.32.
+                // Floor guards development off (0.026) only; this style barely sees the bar fix (0.106 vs 0.118), which blues, disco and rock guard.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.115,
-                    0.4,
+                    0.07,
+                    0.22,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 115, 10000, 'enough phrase openings to judge the rate on'],
                 // Ablations measured on the solo take (answer off / no lay-out / no fill / no
                 // floor): thin bars 0.19 (0.23 / 0.19 / 0.23 / 0.39), breath density 1.15 (0.87 /
                 // 1.10 / 0.91 / 1.36), answers 0.48 (0.28 / 0.51 / 0.25 / 0.48), lift +3.1

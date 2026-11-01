@@ -20,6 +20,8 @@ export const country = defineClaims({
         {
             take: {},
             claims: [
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (85, about half the 173 measured).
+                ['bassApproachCount', 85, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 [
                     'snareBackbeat',
@@ -113,6 +115,16 @@ export const country = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.130; development off 0.070, #2012's bar fix reverted 0.080; always develops 0.39.
+                // Floor is midway between development off (0.070) and shipped: it guards development off. The bar fix (0.080 vs 0.130) is within about 2 sd here; blues, disco and rock guard it.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
+                [
+                    'leadMotifDevelopment',
+                    0.1,
+                    0.26,
+                    "a phrase now and then says the last one's opening again",
+                ],
+                ['leadMotifOpenings', 110, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.15, 0.45, 'the solo breathes'],
                 [
