@@ -12,6 +12,61 @@ export const allSoundsSizeMB = SOUND_PACKS.reduce((total, pack) => total + pack.
 // must not change: it is what installed browsers already hold, so a new name silently orphans
 // every downloaded pack and makes the musician download them all again.
 const CACHE = 'ensemble-v2-sounds-v1';
+
+/** What a sound download that never reached the network is told (#1985). */
+export const DOWNLOAD_FAILED = "Couldn't download the sounds. Check your connection and try again.";
+
+/**
+ * Whether a thrown fetch failure is the network's: Chromium says "Failed to fetch", WebKit "Load
+ * failed", Firefox "NetworkError when attempting to fetch resource", and a timed-out request is
+ * a timeout. None of them tells a musician anything; the server's own refusals have their own
+ * sentences already.
+ */
+export function isNetworkFailure(error: unknown): boolean {
+    if (error instanceof DOMException) {
+        return error.name === 'TimeoutError';
+    }
+    return (
+        error instanceof TypeError &&
+        /failed to fetch|load failed|networkerror|network request failed/i.test(error.message)
+    );
+}
+
+/** `fetch`, with a network failure said plainly. */
+async function fetchSound(input: string, init: RequestInit): Promise<Response> {
+    try {
+        return await fetch(input, init);
+    } catch (error) {
+        throw isNetworkFailure(error) ? new Error(DOWNLOAD_FAILED) : error;
+    }
+}
+
+/** A progress sink: the sentence, and how far along (0..1) when it is a file count. */
+export type SoundProgress = (text: string, fraction?: number) => void;
+
+/**
+ * A sound install reports every file it settles, about 220 for the whole set in two seconds, and
+ * each report rewrote a live region a screen reader reads aloud (#1985). This lets a fractional
+ * report through only when it enters a new quarter (25, 50, 75%): the 100% mark is the finish,
+ * which the shell says on its own. A sentence with no fraction (a plain milestone) always passes.
+ * One gate per operation, so a later pack's own 0..1 run never repeats a quarter already said.
+ */
+export function quarterGate(emit: (text: string) => void): SoundProgress {
+    let said = -1;
+    return (text, fraction) => {
+        if (fraction === undefined) {
+            emit(text);
+            return;
+        }
+        // Quarter 0 is the opening line ("Preparing …"), said once; 4 is the finish.
+        const quarter = Math.floor(fraction * 4);
+        if (quarter > said && quarter < 4) {
+            said = quarter;
+            emit(text);
+        }
+    };
+}
+
 let index: Promise<Record<string, string>> | undefined;
 const digest = async (bytes: ArrayBuffer) =>
     Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (b) =>
@@ -20,7 +75,7 @@ const digest = async (bytes: ArrayBuffer) =>
 
 async function files(): Promise<Record<string, string>> {
     if (!index) {
-        index = fetch('/pack-files.json', { signal: AbortSignal.timeout(20_000) })
+        index = fetchSound('/pack-files.json', { signal: AbortSignal.timeout(20_000) })
             .then(async (response) => {
                 if (!response.ok) {
                     throw new Error('Sound catalog unavailable. Reconnect and retry.');
@@ -55,7 +110,10 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
     if (cachedOnly) {
         throw new Error('Sound download is incomplete. Reconnect and retry.');
     }
-    const response = await fetch(key, { cache: 'no-store', signal: AbortSignal.timeout(20_000) });
+    const response = await fetchSound(key, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(20_000),
+    });
     if (!response.ok || (await digest(await response.clone().arrayBuffer())) !== hash) {
         throw new Error('Sound download could not be verified. Reconnect and retry.');
     }
@@ -209,14 +267,14 @@ async function fetchAssets(
 
 export async function prepareSound(
     id: string,
-    progress: (text: string) => void,
+    progress: SoundProgress,
     concurrency = 1,
 ): Promise<void> {
     const pack = SOUND_PACKS.find((p) => p.id === id);
     if (!pack) {
         throw new Error('Unknown sound pack.');
     }
-    progress(`Preparing ${pack.name}…`);
+    progress(`Preparing ${pack.name}…`, 0);
     const manifest = await manifestFor(id, false);
     const urls = sampleUrls(manifest);
     await fetchAssets(
@@ -224,39 +282,47 @@ export async function prepareSound(
         revForPack(id),
         false,
         (done) => {
-            progress(`${pack.name} · ${done}/${urls.length} files`);
+            progress(`${pack.name} · ${done}/${urls.length} files`, done / urls.length);
         },
         concurrency,
     );
-    progress(`Loading ${pack.name}…`);
     await ensurePackLoaded(new OfflineAudioContext(1, 1, 44100), id);
     // The old runtime intentionally swallows decode failures; this UI must not.
     if (!isPackLoaded(id)) {
         throw new Error(`${pack.name} could not be decoded by this browser.`);
     }
-    progress(`${pack.name} ready offline`);
 }
 
 export async function prepareSounds(
     chart: Pick<ChartSettings, 'band'>,
-    progress: (text: string) => void,
+    progress: SoundProgress,
 ): Promise<void> {
     const ids = new Set(
         Object.values(chart.band)
             .map((lane) => packIdFromVoice(lane.voice))
             .filter(Boolean),
     );
+    let index = 0;
     for (const id of ids) {
-        await prepareSound(id!, progress);
+        // The fraction is the whole preparation's, so the shell's quarter-gate counts it once.
+        const at = index++;
+        await prepareSound(id!, (text, fraction) =>
+            progress(text, fraction === undefined ? undefined : (at + fraction) / ids.size),
+        );
     }
 }
 
 /** One explicit install gesture; partial success is reusable but never earns "all ready". */
-export async function installAllSounds(progress: (text: string) => void): Promise<void> {
+export async function installAllSounds(progress: SoundProgress): Promise<void> {
     for (const [i, pack] of SOUND_PACKS.entries()) {
         await prepareSound(
             pack.id,
-            (text) => progress(`${i + 1}/${SOUND_PACKS.length} · ${text}`),
+            // The fraction is the whole install's, so the shell's quarter-gate counts it once.
+            (text, fraction) =>
+                progress(
+                    `${i + 1}/${SOUND_PACKS.length} · ${text}`,
+                    fraction === undefined ? undefined : (i + fraction) / SOUND_PACKS.length,
+                ),
             FETCH_CONCURRENCY,
         );
     }

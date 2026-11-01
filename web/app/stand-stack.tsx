@@ -11,6 +11,7 @@ export function StandStack({
     toastTone,
     toastText,
     messageToken,
+    announcement,
     setToastHeld,
     dismissMessage,
     undoLive,
@@ -25,6 +26,8 @@ export function StandStack({
     toastTone: 'busy' | 'warning' | 'info';
     toastText: string | null;
     messageToken: number;
+    /** Screen-reader-only text for the toast's live region (`useStandToast`'s `announce`). */
+    announcement: { text: string; token: number };
     setToastHeld: (held: boolean) => void;
     dismissMessage: () => void;
     undoLive: boolean;
@@ -111,6 +114,10 @@ export function StandStack({
                  * genuinely announced, nothing extra ever read.
                  */}
                 <span key={messageToken}>{toastText}</span>
+                {/* #1985 — an opened song, said to a screen reader inside this same region. */}
+                <span className="sr-only" key={`announce-${announcement.token}`}>
+                    {announcement.text}
+                </span>
                 {toastTone === 'warning' && (
                     <button className="toast-close" aria-label="Dismiss" onClick={dismissMessage}>
                         ×
