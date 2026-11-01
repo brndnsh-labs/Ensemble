@@ -237,10 +237,11 @@ export const neosoul = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 // Measured 0.144; development off 0.016, #2012's bar fix reverted 0.103; always develops 0.43.
-                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
+                // Floor is midway between development off (0.016) and shipped: it guards development off. The bar fix (0.103 vs 0.144) is within about 2 sd here; blues, disco and rock guard it.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.12,
+                    0.08,
                     0.29,
                     "a phrase now and then says the last one's opening again",
                 ],

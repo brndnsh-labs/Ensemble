@@ -172,8 +172,8 @@ export const hiphop = defineClaims({
         {
             take: {},
             claims: [
-                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (45, about half the measured).
-                ['bassApproachCount', 45, 10000, 'it does play half-step lead-ins into changes'],
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (47, about half the 94 measured; a lead-in is a note within a beat of the change).
+                ['bassApproachCount', 47, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.95, 1, 'a hard snare on 2 and 4, every bar'],
                 ['kickOnOne', 0.95, 1, 'the kick owns the One'],
@@ -234,7 +234,8 @@ export const hiphop = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 // Measured 0.305; development off 0.211, #2012's bar fix reverted 0.310; always develops 0.55.
-                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
+                // Floor guards development off (0.211) only; this style barely sees the bar fix (0.310 vs 0.305), which blues, disco and rock guard.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
                     0.26,

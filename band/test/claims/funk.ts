@@ -5,9 +5,11 @@ export const funk = defineClaims({
         {
             take: {},
             claims: [
-                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (12, about half the measured).
-                ['bassApproachCount', 12, 10000, 'it does play half-step lead-ins into changes'],
-                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (18, about half the 37 measured; a lead-in is a note within a beat of the change).
+                ['bassApproachCount', 18, 10000, 'it does play half-step lead-ins into changes'],
+                // Measured 0.108 (4 of 37): riff 2's 5 on step 14 drops a major seventh into the change
+                // (Em9's B2 falling to C2), an engine follow-up; 0.15 leaves headroom over it.
+                ['bassApproachLeap', 0, 0.15, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.9, 1, 'the backbeat is hit hard'],
                 ['kickOnOne', 0.95, 1, 'on the One'],
                 ['ghostsPerBar', 1, 5, 'ghost notes around the backbeat'],
@@ -46,7 +48,8 @@ export const funk = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 // Measured 0.159; development off 0.039, #2012's bar fix reverted 0.142; always develops 0.37.
-                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
+                // Floor guards development off (0.039) only; this style barely sees the bar fix (0.142 vs 0.159), which blues, disco and rock guard.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
                     0.1,

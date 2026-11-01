@@ -315,14 +315,11 @@ function approachTally(takes: Take[]): { n: number; hit: number } {
                 continue;
             }
             const pc = mod12(bass[i].midi - bass[i - 1].midi);
-            // (The old chord's own bass note or fifth, an octave away or not, is its pump or its
-            // fifth, no lead-in: funk's B2 on an E chord is E's fifth that happens to sit a half
-            // step under the C it falls to.)
-            const prevPc = mod12(bass[i - 1].midi);
-            const pump = prevPc === before.bass || prevPc === mod12(before.root + fifthOf(before));
+            // (The old chord's own bass note, an octave away or not, is its pump, no lead-in.)
+            const pump = mod12(bass[i - 1].midi) === before.bass;
             if (
                 pump ||
-                bass[i].tick - bass[i - 1].tick > STEP * 2 ||
+                bass[i].tick - bass[i - 1].tick > STEP * 4 ||
                 pc === 0 ||
                 (pc > 1 && pc < 11)
             ) {
@@ -770,13 +767,12 @@ export const METRICS = {
         return ratio(hit, n);
     },
     /**
-     * At each real chord change, among the notes in the last two steps before it that are a half step (by
+     * At each real chord change, among the notes in the last beat before it that are a half step (by
      * pitch class) from the arrival and not the old chord's own bass note, the share that sit more than a fifth from it: a half-step
      * lead-in an octave away reads as a wrong note, not an approach. An octave pop on the way
      * in (the same pitch class an octave up) is no lead-in and is not counted here.
-     * (The exclusion of the old chord's root and fifth only bites when that note sits a half step
-     * from the new root: the old root (C to Db) is the pump, the old fifth (Em's B before a C) is a
-     * chord tone, neither a lead-in. A style that plays no such lead-in reads 0 here: pair the
+     * (The exclusion only bites when the two roots are a half step apart, C to Db: the old root
+     * is then the pump, not a lead-in. A style that plays no such lead-in reads 0 here: pair the
      * ceiling with `bassApproachCount`.)
      */
     bassApproachLeap: (takes) => {

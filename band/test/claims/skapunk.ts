@@ -523,7 +523,8 @@ export const skapunk = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 // Measured 0.114; development off 0.024, #2012's bar fix reverted 0.103; always develops 0.39.
-                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
+                // Floor guards development off (0.024) only; this style barely sees the bar fix (0.103 vs 0.114), which blues, disco and rock guard.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
                     0.07,

@@ -448,10 +448,11 @@ export const metal = defineClaims({
             take: { lead: 'solo' },
             claims: [
                 // Measured 0.200; development off 0.023, #2012's bar fix reverted 0.147; always develops 0.41.
-                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
+                // Floor is midway between development off (0.023) and shipped: it guards development off. The bar fix (0.147 vs 0.200) is within about 2 sd here; blues, disco and rock guard it.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.17,
+                    0.11,
                     0.3,
                     "a phrase now and then says the last one's opening again",
                 ],
