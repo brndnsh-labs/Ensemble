@@ -1947,7 +1947,7 @@ export default function Ensemble() {
                 (now !== undo.after && !keptAs(undo.after, now)) ||
                 barDrafts.latest().size > 0
             ) {
-                throw new Error('The chart has changed since the delete, so it can’t be undone.');
+                throw new Error('The chart has changed since then, so it can’t be undone.');
             }
             // Kept since the snapshot (a new song's first change): the chart goes back, at the
             // revision the songbook now holds.
@@ -2775,13 +2775,15 @@ export default function Ensemble() {
         return {
             id: resolved.id,
             title: resolved.title,
+            // Unsaved by the header's own test (`dirty`): the draft differs from the saved song.
+            unsaved: current?.id === featuredSave.id ? dirty : !same(resolved, featuredSave),
             genre: genreOf(resolved),
             bpm: resolved.chart.performance.bpm,
             key: resolved.chart.score.key,
             isMinor: resolved.chart.score.isMinor,
             bars,
         };
-    }, [featuredSave, current, signedIn]);
+    }, [featuredSave, current, signedIn, dirty]);
     const {
         deleteUndo,
         undoLive,
@@ -3584,7 +3586,13 @@ export default function Ensemble() {
                 onCloseShareLink={() => setShareLinkFallback(null)}
                 onRevert={() =>
                     void run(() => {
+                        // Taken before anything is dropped, so Undo puts the edits back, pending
+                        // bars and all (the delete toast's own Undo, #1758).
+                        const before = currentNow.current;
+                        const drafts = barDrafts.latest();
+                        const at = measureIdNow.current;
                         const original = draftBaseline.current;
+                        let text: string;
                         if (!saved && sharedDraftNow.current && original) {
                             // Back to the standard or link as it came; `draft` sees it is and
                             // lets its device draft go (#1979).
@@ -3594,19 +3602,30 @@ export default function Ensemble() {
                             clearBuffers();
                             draft(reverted);
                             selectSection(original);
+                            text = 'Reverted to original';
+                        } else if (saved) {
+                            runtime.load(saved);
+                            // Re-resolved on this device (#1405): Install all may have run since
+                            // open, or `saved` came in under a draft and was never resolved.
+                            const reverted = runtime.withLoadedSounds(saved);
+                            setSaved(reverted);
+                            draft(reverted, reverted);
+                            clearBuffers();
+                            selectSection(saved);
+                            text = 'Reverted to saved';
+                        } else {
                             return;
                         }
-                        if (!saved) {
-                            return;
+                        if (before) {
+                            offerUndo({
+                                text,
+                                before,
+                                drafts,
+                                measureId: at,
+                                sectionId: '',
+                                reopen: null,
+                            });
                         }
-                        runtime.load(saved);
-                        // Re-resolved on this device (#1405): Install all may have run since
-                        // open, or `saved` came in under a draft and was never resolved.
-                        const reverted = runtime.withLoadedSounds(saved);
-                        setSaved(reverted);
-                        draft(reverted, reverted);
-                        clearBuffers();
-                        selectSection(saved);
                     })
                 }
                 onOpenRecovery={(record) =>

@@ -21,6 +21,8 @@ import {
 export interface FeaturedSummary {
     id: string;
     title: string;
+    /** The card shows a draft that differs from the saved song (the header's unsaved test). */
+    unsaved: boolean;
     genre: string;
     bpm: number;
     key: string;
@@ -352,6 +354,11 @@ function ContinueCard({
         >
             <div className="continue-copy">
                 <h2 id="continue-title">{featured.title}</h2>
+                {featured.unsaved && (
+                    <span className="song-marker" data-testid="continue-unsaved">
+                        Unsaved changes
+                    </span>
+                )}
                 <p className="continue-meta">
                     {continued ? 'Pick up where you left off' : 'From your songbook'} ·{' '}
                     {featured.genre} · {featured.bpm} BPM · {featured.key}

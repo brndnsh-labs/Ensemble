@@ -146,13 +146,6 @@ export function SongMenu({
         },
     ];
     const more: MenuItem[] = [
-        {
-            id: 'revert',
-            label: revertTo === 'original' ? 'Revert to original' : 'Revert to saved',
-            testId: 'song-menu-revert',
-            disabled: busy || !dirty || revertTo === null,
-            onSelect: done(onRevert),
-        },
         ...(recoveryOptions.length > 0
             ? [
                   {
@@ -164,6 +157,13 @@ export function SongMenu({
                   },
               ]
             : []),
+        {
+            id: 'revert',
+            label: revertTo === 'original' ? 'Revert to original' : 'Revert to saved',
+            testId: 'song-menu-revert',
+            disabled: busy || !dirty || revertTo === null,
+            onSelect: done(onRevert),
+        },
     ];
     return (
         <>
