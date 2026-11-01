@@ -103,12 +103,17 @@ test('what folded is in the Song menu, and it works (#1993)', async ({ page }, t
     await expect(page.getByRole('dialog', { name: /settings/i })).toBeVisible();
 });
 
-test('stopped, the Song menu is the five actions only (#1993)', async ({ page }) => {
+test('stopped, the Song menu is the five actions and Intensity only (#1993, #1994)', async ({
+    page,
+}) => {
     await open(page);
     await page.getByRole('button', { name: 'Song actions' }).click();
     const menu = page.getByRole('menu', { name: 'Song actions' });
     await expect(menu.getByRole('menuitem', { name: 'Settings…' })).toHaveCount(0);
-    await expect(menu.getByRole('menuitem')).toHaveCount(5);
+    // A phone's Song menu also carries the band's intensity (#1994), the transport having no room.
+    const phone = (page.viewportSize()?.width ?? 0) <= 760;
+    await expect(menu.getByRole('menuitem')).toHaveCount(phone ? 6 : 5);
+    await expect(menu.getByRole('menuitem', { name: /^Intensity/ })).toHaveCount(phone ? 1 : 0);
 });
 
 for (const [width, height, limit] of [

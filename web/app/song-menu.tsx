@@ -11,7 +11,23 @@ type Recovery = { document: ChartDocument; capturedAt: string };
  * small dialogs a More item opens. The shell holds it, so an action that fails (a bar that will
  * not fit a new meter) can close whatever is open.
  */
-export type SongMenuView = 'actions' | 'more' | 'drafts';
+export type SongMenuView = 'actions' | 'more' | 'drafts' | 'intensity';
+
+/** A phone's intensity choices (#1994): Auto, then three fixed levels (0-1). */
+const INTENSITY_STEPS: { id: string; label: string; level: number | 'auto' }[] = [
+    { id: 'auto', label: 'Auto', level: 'auto' },
+    { id: 'low', label: 'Low', level: 0.25 },
+    { id: 'mid', label: 'Mid', level: 0.5 },
+    { id: 'high', label: 'High', level: 0.8 },
+];
+
+/** The step a chart's energy reads as: Auto, else the nearest level. */
+function intensityStep(energy: 'auto' | number): string {
+    if (energy === 'auto') {
+        return 'auto';
+    }
+    return energy < 0.375 ? 'low' : energy < 0.65 ? 'mid' : 'high';
+}
 
 interface SongMenuProps {
     view: SongMenuView | null;
@@ -43,6 +59,11 @@ interface SongMenuProps {
      * while the band plays: rows ahead of the five actions. Empty everywhere else.
      */
     foldedItems: readonly MenuItem[];
+    /**
+     * #1994 — the band's intensity on a phone, where the transport has no room for its slider:
+     * the chart's own energy and how to change it. Null above phone width.
+     */
+    intensity: { energy: 'auto' | number; onChange: (intensity: 'auto' | number) => void } | null;
     onView: (view: SongMenuView | null) => void;
     onShare: () => void;
     onDuplicate: () => void;
@@ -96,6 +117,7 @@ export function SongMenu({
     syncStatus,
     shareLinkFallback,
     foldedItems,
+    intensity,
     onView,
     onShare,
     onDuplicate,
@@ -115,6 +137,27 @@ export function SongMenu({
     };
     const actions: MenuItem[] = [
         ...foldedItems,
+        ...(intensity
+            ? [
+                  {
+                      id: 'intensity',
+                      label: 'Intensity',
+                      hint: (
+                          <span>
+                              {
+                                  INTENSITY_STEPS.find(
+                                      (step) => step.id === intensityStep(intensity.energy),
+                                  )?.label
+                              }{' '}
+                              <span aria-hidden="true">▸</span>
+                          </span>
+                      ),
+                      testId: 'song-menu-intensity',
+                      disabled: busy,
+                      onSelect: () => onView('intensity'),
+                  },
+              ]
+            : []),
         {
             id: 'share',
             label: 'Copy link',
@@ -152,6 +195,16 @@ export function SongMenu({
             onSelect: done(onDelete),
         },
     ];
+    const levels: MenuItem[] = intensity
+        ? INTENSITY_STEPS.map((step) => ({
+              id: step.id,
+              label: step.label,
+              testId: `song-menu-intensity-${step.id}`,
+              checked: step.id === intensityStep(intensity.energy),
+              disabled: busy,
+              onSelect: done(() => intensity.onChange(step.level)),
+          }))
+        : [];
     const more: MenuItem[] = [
         ...(recoveryOptions.length > 0
             ? [
@@ -174,17 +227,29 @@ export function SongMenu({
     ];
     return (
         <>
-            {current && (view === 'actions' || view === 'more') && (
+            {current && (view === 'actions' || view === 'more' || view === 'intensity') && (
                 <Menu
                     // A new list is a new menu: its own focus on the first row.
                     key={view}
-                    label={view === 'more' ? 'More song actions' : 'Song actions'}
-                    title={view === 'more' ? `${current.title} · More` : current.title}
+                    label={
+                        view === 'more'
+                            ? 'More song actions'
+                            : view === 'intensity'
+                              ? 'Band intensity'
+                              : 'Song actions'
+                    }
+                    title={
+                        view === 'more'
+                            ? `${current.title} · More`
+                            : view === 'intensity'
+                              ? `${current.title} · Intensity`
+                              : current.title
+                    }
                     anchor={anchor}
                     align="end"
                     header={view === 'actions' ? syncStatus : undefined}
                     className="song-menu"
-                    items={view === 'more' ? more : actions}
+                    items={view === 'more' ? more : view === 'intensity' ? levels : actions}
                     onClose={close}
                 />
             )}

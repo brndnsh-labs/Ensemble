@@ -1988,6 +1988,21 @@ export default function Ensemble() {
             draft(runtime.captureDocument(next));
         });
     }
+    /** The band's intensity from the transport's slider or a phone's Song menu (#1994): the
+     * Groove tab's own path, Auto or off Auto onto a level. */
+    function changeIntensity(intensity: 'auto' | number) {
+        change(() => {
+            if (intensity === 'auto') {
+                runtime.setAutoIntensity(true);
+                return;
+            }
+            if ((current?.chart.performance.energy ?? 'auto') === 'auto') {
+                runtime.setAutoIntensity(false);
+            }
+            runtime.setBandIntensity(intensity);
+            setFeel((f) => ({ ...f, bandIntensity: intensity }));
+        });
+    }
     function clearBuffers() {
         pendingText.current = false;
         setPendingMeasures(false);
@@ -2637,7 +2652,7 @@ export default function Ensemble() {
         if (busy || !current) {
             return;
         }
-        if (songMenu === 'actions' || songMenu === 'more') {
+        if (songMenu === 'actions' || songMenu === 'more' || songMenu === 'intensity') {
             setSongMenu(null);
             return;
         }
@@ -3637,6 +3652,7 @@ export default function Ensemble() {
                             }, true)
                         }
                         onToggleLane={toggleLane}
+                        onIntensity={changeIntensity}
                         onTrade={() => openBand('trade')}
                         tradeBlocked={runtime.tradeBlocked()}
                         player={
@@ -3914,6 +3930,15 @@ export default function Ensemble() {
                 syncStatus={syncStatus}
                 shareLinkFallback={shareLinkFallback}
                 foldedItems={foldedItems}
+                // A phone has no room for the transport's slider (#1994): the menu carries it.
+                intensity={
+                    phoneWidth
+                        ? {
+                              energy: current?.chart.performance.energy ?? 'auto',
+                              onChange: changeIntensity,
+                          }
+                        : null
+                }
                 onView={setSongMenu}
                 onShare={() => void run(shareChartLink)}
                 onDuplicate={() => void run(() => save(true))}

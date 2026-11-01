@@ -27,6 +27,14 @@
     padding: 8px 24px;
     gap: 16px;
 }
+/* A portrait tablet's transport (#1994): the intensity slider joins the row, so it is spaced
+   tighter at 768-820px. */
+@media (min-width: 761px) and (max-width: 820px) {
+    .song-open .transport-bar {
+        padding: 8px 18px;
+        gap: 11px;
+    }
+}
 /* #1460 — the bottom padding clears the fixed `.stand-stack` (it no longer claims any of
    `.chart-scroll`'s own flow height the way the removed footer did): the last row can still
    scroll fully clear of it. Re-review P3 — 108px is the ORIGINAL floor, sized for the common

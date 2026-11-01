@@ -1,10 +1,11 @@
 import type { ChartNotation } from '@core/songbook/types';
-import { Fragment, useRef } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { genreOf } from '../lib/documents';
 import { type ChartDocument, GENRE_NAMES, type PerformancePlace } from '../lib/runtime';
 import { type Lane, visibleLanes } from './band-lanes';
 import { KeyPopover, songKeyLabel } from './key-popover';
 import { TempoControl } from './tempo-control';
+import { useRangeCommit } from './use-range-commit';
 
 interface TransportBarProps {
     current: ChartDocument;
@@ -52,6 +53,10 @@ interface TransportBarProps {
      */
     player: { label: string; tag: string; note: string | null; lane: Lane | null } | null;
     onPlayer: () => void;
+    /** The band's intensity (#1994): one gesture, at tablet width and up. `'auto'` is the slider's
+     * left stop; a level (0-1) is anywhere right of it. Lands at the next barline, as the
+     * Groove tab's does. */
+    onIntensity: (intensity: 'auto' | number) => void;
 }
 
 export function TransportBar({
@@ -79,6 +84,7 @@ export function TransportBar({
     tradeBlocked,
     player,
     onPlayer,
+    onIntensity,
 }: TransportBarProps) {
     const trade = current.chart.band.soloist.tradeWith ?? 'off';
     const tradeBars = current.chart.band.soloist.tradeBars ?? 4;
@@ -198,6 +204,13 @@ export function TransportBar({
                     Band…
                 </button>
             </div>
+            <IntensityControl
+                // Re-keyed by chart, so a different song's energy never reads as this one's.
+                key={current.id}
+                energy={current.chart.performance.energy ?? 'auto'}
+                disabled={busy}
+                onCommit={onIntensity}
+            />
             <div className="band-controls" aria-label="Band instruments">
                 {player && (
                     <button
@@ -266,6 +279,65 @@ export function TransportBar({
                     );
                 })}
             </div>
+        </div>
+    );
+}
+
+/** The slider's stops: 0 is Auto, 1-100 is the fixed level as a percent. */
+const AUTO_STOP = 0;
+function stopOf(energy: 'auto' | number): number {
+    return energy === 'auto' ? AUTO_STOP : Math.max(1, Math.round(energy * 100));
+}
+
+/**
+ * The band's intensity on the transport (#1994), so it can change with the chart in view. The
+ * chart's own energy (`performance.energy`, the Groove tab's field): the left stop is Auto, the
+ * rest a fixed level. Commits once per gesture, like every range here. Hidden below tablet width
+ * (CSS), where the Groove tab keeps it.
+ */
+function IntensityControl({
+    energy,
+    disabled,
+    onCommit,
+}: {
+    energy: 'auto' | number;
+    disabled: boolean;
+    onCommit: (intensity: 'auto' | number) => void;
+}) {
+    const [local, setLocal] = useState(stopOf(energy));
+    useEffect(() => {
+        setLocal(stopOf(energy));
+    }, [energy]);
+    const range = useRangeCommit((stop) => {
+        if (stop !== stopOf(energy)) {
+            onCommit(stop === AUTO_STOP ? 'auto' : stop / 100);
+        }
+    });
+    const shown = local === AUTO_STOP ? 'Auto' : `${local}`;
+    return (
+        <div className="intensity-setting">
+            <label className="setting-label" htmlFor="intensity">
+                Intensity
+            </label>
+            <span className="intensity-control">
+                <input
+                    id="intensity"
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={local}
+                    disabled={disabled}
+                    aria-valuetext={shown}
+                    ref={range.ref}
+                    onChange={(event) => {
+                        range.edited();
+                        setLocal(Number(event.target.value));
+                    }}
+                    {...range.handlers}
+                />
+                <span className="intensity-value">{shown}</span>
+            </span>
         </div>
     );
 }
