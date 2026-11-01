@@ -49,12 +49,15 @@ export const bossa = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.135; development off 0.040, #2012's bar fix reverted 0.079; always develops: too few openings.
+                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.08,
-                    0.4,
+                    0.105,
+                    0.25,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 80, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.15, 0.45, 'cool is spare: the solo leaves air'],
                 [

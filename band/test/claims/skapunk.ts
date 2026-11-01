@@ -522,12 +522,15 @@ export const skapunk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.114; development off 0.024, #2012's bar fix reverted 0.103; always develops 0.39.
+                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.108,
-                    0.4,
+                    0.07,
+                    0.25,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 100, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.1, 0.35, 'urgent: less room than a roots or hip hop lead'],
                 ['leadShortShare', 0.72, 0.95, 'tongued short, even at the peak'],

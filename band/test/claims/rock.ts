@@ -20,6 +20,8 @@ export const rock = defineClaims({
         {
             take: {},
             claims: [
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (65, about half the measured).
+                ['bassApproachCount', 65, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.9, 1, 'the backbeat is the song'],
                 ['kickOnOne', 0.95, 1, 'the kick owns the one'],
@@ -61,12 +63,15 @@ export const rock = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.149; development off 0.040, #2012's bar fix reverted 0.067; always develops 0.26.
+                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.08,
-                    0.4,
+                    0.105,
+                    0.21,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 100, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes'],
                 ['leadChordToneOnBeats', 0.8, 1, 'pentatonic lines land on the chord'],

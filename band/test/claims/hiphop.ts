@@ -172,8 +172,9 @@ export const hiphop = defineClaims({
         {
             take: {},
             claims: [
-                // 0.08, not 0.05: measured .048 (code untouched); no headroom at 0.05.
-                ['bassApproachLeap', 0, 0.08, 'a lead-in stays beside the note it leads to'],
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (45, about half the measured).
+                ['bassApproachCount', 45, 10000, 'it does play half-step lead-ins into changes'],
+                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.95, 1, 'a hard snare on 2 and 4, every bar'],
                 ['kickOnOne', 0.95, 1, 'the kick owns the One'],
                 [
@@ -232,6 +233,15 @@ export const hiphop = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.305; development off 0.211, #2012's bar fix reverted 0.310; always develops 0.55.
+                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
+                [
+                    'leadMotifDevelopment',
+                    0.26,
+                    0.43,
+                    "a phrase now and then says the last one's opening again",
+                ],
+                ['leadMotifOpenings', 120, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 // Funk and rock riff at ~0.2 by this measure; the loop can only come round
                 // between two line bars of a phrase, so hip hop's ceiling is near 0.3.

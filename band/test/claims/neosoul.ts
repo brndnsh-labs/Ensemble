@@ -98,13 +98,15 @@ export const neosoul = defineClaims({
                 ['bassSilence', 0.15, 0.45, 'rests are part of the line'],
                 ['bassMeanPitch', 31, 38, 'a deep line, at the bottom of the neck'],
                 ['bassArrivesOnBass', 0.95, 1, 'the chord tone on every change: its bass note'],
-                // Measured 0.356 before #2007, 0.29 after (A2 shares the A's riff pick). Against jazz walking's ~0.68: a half step into a change is a
-                // choice here (half the sections, every phrase turn), not every change's habit;
-                // at 0.76 it was a mannerism that wrote over the riffs' own endings.
+                // Measured 0.356 before #2007, 0.29 after. Not a regression: A2 sharing the A's riff
+                // pick leaves fewer independent draws, so the four-seed mean swings with the seeds:
+                // 0.33 to 0.44 over four other four-seed sets, 0.385 over sixteen seeds. The floor
+                // sits under that spread; the lead-in switched off reads 0.205. Against jazz
+                // walking's ~0.68: a half step into a change is a choice here (half the sections,
+                // every phrase turn), not every change's habit; at 0.76 it was a mannerism that
+                // wrote over the riffs' own endings.
                 [
                     'bassChromaticApproach',
-                    // 0.3 before #2007: a repeated letter (A2) now shares the A's riff pick, so
-                    // the corpus holds fewer independent draws and lands at 0.29 on these seeds.
                     0.25,
                     0.6,
                     'some changes are led into by a half step; many are carried by the riff',
@@ -234,12 +236,15 @@ export const neosoul = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.144; development off 0.016, #2012's bar fix reverted 0.103; always develops 0.43.
+                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.115,
-                    0.4,
+                    0.12,
+                    0.29,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 100, 10000, 'enough phrase openings to judge the rate on'],
                 // Answer off / no lay-out: breath density 1.19 (0.92 / 0.93), lift +4.0 (-3.2 /
                 // -; -2.0 with no lift), line density 0.134 (0.172 / 0.172).
                 ['compBreathDensity', 1.05, 2, 'the Rhodes leans back under the line'],

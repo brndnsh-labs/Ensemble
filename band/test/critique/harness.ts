@@ -299,6 +299,80 @@ function answerStrikes({ timeline: t, events }: Take): PitchedNote[] {
     return [...chosen];
 }
 
+/** The half-step lead-ins into real chord changes: how many (`n`), and how many leap past a fifth (`hit`). */
+function approachTally(takes: Take[]): { n: number; hit: number } {
+    let n = 0;
+    let hit = 0;
+    for (const { timeline: t, events } of takes) {
+        const bass = events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
+        for (const [k, span] of t.spans.entries()) {
+            const before = t.spans[k - 1]?.chord;
+            if (!span.chord || !before || before.bass === span.chord.bass) {
+                continue;
+            }
+            const i = bass.findIndex((e) => Math.abs(e.tick - span.start) < 1);
+            if (i < 1) {
+                continue;
+            }
+            const pc = mod12(bass[i].midi - bass[i - 1].midi);
+            // (The old chord's own bass note or fifth, an octave away or not, is its pump or its
+            // fifth, no lead-in: funk's B2 on an E chord is E's fifth that happens to sit a half
+            // step under the C it falls to.)
+            const prevPc = mod12(bass[i - 1].midi);
+            const pump = prevPc === before.bass || prevPc === mod12(before.root + fifthOf(before));
+            if (
+                pump ||
+                bass[i].tick - bass[i - 1].tick > STEP * 2 ||
+                pc === 0 ||
+                (pc > 1 && pc < 11)
+            ) {
+                continue;
+            }
+            n++;
+            hit += Math.abs(bass[i].midi - bass[i - 1].midi) > 7 ? 1 : 0;
+        }
+    }
+    return { n, hit };
+}
+
+/** The lead's phrase openings that had an earlier one to say again (`n`), and those that did (`hit`). */
+function motifTally(takes: Take[]): { n: number; hit: number } {
+    let n = 0;
+    let hit = 0;
+    let last: { timeline: Timeline; pass?: number; recent: string[] } | null = null;
+    for (const take of takes) {
+        const { timeline: t, events } = take;
+        // A pass continues the last one's memory; a new song or seed starts clean.
+        if (last && (last.timeline !== t || take.pass !== (last.pass ?? 0) + 1)) {
+            last = null;
+        }
+        const notes = leadNotes(events);
+        const played = new Set(notes.map((l) => l.bar));
+        const recent: string[] = last?.recent ?? [];
+        for (const index of [...played].sort((a, b) => a - b)) {
+            if (played.has(index - 1)) {
+                continue;
+            }
+            const bar = notes.filter((l) => l.bar === index).sort((a, b) => a.tick - b.tick);
+            if (bar.length < 3) {
+                continue;
+            }
+            const opening = `${bar.map((l) => stepOf(t, l)).join(',')}|${bar
+                .slice(1)
+                .map((l, i) => Math.sign(l.midi - bar[i].midi))
+                .join('')}`;
+            if (recent.length) {
+                n++;
+                hit += recent.includes(opening) ? 1 : 0;
+            }
+            recent.push(opening);
+            recent.splice(0, recent.length - 3);
+        }
+        last = recent.length ? { timeline: t, pass: take.pass, recent } : null;
+    }
+    return { n, hit };
+}
+
 export const METRICS = {
     /**
      * Share of the drummer's bars in a chorus of fours in which nothing but the drums sounds:
@@ -700,40 +774,20 @@ export const METRICS = {
      * pitch class) from the arrival and not the old chord's own bass note, the share that sit more than a fifth from it: a half-step
      * lead-in an octave away reads as a wrong note, not an approach. An octave pop on the way
      * in (the same pitch class an octave up) is no lead-in and is not counted here.
-     * (The exclusion only bites when the two roots are a half step apart, C to Db: the old root
-     * is then the pump, not a lead-in. A style that plays no such lead-in reads 0 here.)
+     * (The exclusion of the old chord's root and fifth only bites when that note sits a half step
+     * from the new root: the old root (C to Db) is the pump, the old fifth (Em's B before a C) is a
+     * chord tone, neither a lead-in. A style that plays no such lead-in reads 0 here: pair the
+     * ceiling with `bassApproachCount`.)
      */
     bassApproachLeap: (takes) => {
-        let n = 0;
-        let hit = 0;
-        for (const { timeline: t, events } of takes) {
-            const bass = events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
-            for (const [k, span] of t.spans.entries()) {
-                const before = t.spans[k - 1]?.chord;
-                if (!span.chord || !before || before.bass === span.chord.bass) {
-                    continue;
-                }
-                const i = bass.findIndex((e) => Math.abs(e.tick - span.start) < 1);
-                if (i < 1) {
-                    continue;
-                }
-                const pc = mod12(bass[i].midi - bass[i - 1].midi);
-                // (The old chord's own bass note, an octave away or not, is its pump, no lead-in.)
-                const pump = mod12(bass[i - 1].midi) === before.bass;
-                if (
-                    pump ||
-                    bass[i].tick - bass[i - 1].tick > STEP * 2 ||
-                    pc === 0 ||
-                    (pc > 1 && pc < 11)
-                ) {
-                    continue;
-                }
-                n++;
-                hit += Math.abs(bass[i].midi - bass[i - 1].midi) > 7 ? 1 : 0;
-            }
-        }
+        const { n, hit } = approachTally(takes);
         return ratio(hit, n);
     },
+    /**
+     * How many half-step lead-ins `bassApproachLeap` judged. A style that plays none reads 0 there,
+     * which passes any ceiling; a claim that its lead-ins stay close pairs with a floor on this.
+     */
+    bassApproachCount: (takes) => approachTally(takes).n,
     /** Share of consecutive bass notes that repeat a pitch (a walking line keeps moving). */
     bassRepeatedNotes: (takes) => {
         let n = 0;
@@ -1654,47 +1708,18 @@ export const METRICS = {
      * before; three notes or more), the share that say the previous opening again: the same
      * onsets and the same up/down shape. The lead asks for it in about 28% of its phrases (a
      * 0.4 chance to develop, 0.7 of those not displaced); a bar whose rhythm came back with
-     * new intervals is a different idea and does not count. The claims' floors are measured, not the 28%: the match
+     * new intervals is a different idea and does not count. The claims' bounds are measured, not the 28%: the match
      * misses a motif the chord moved (the sign shape holds, the rest may not) and the peak and
-     * wind-down phrases never develop. Each floor sits midway between the rate with the fix
-     * reverted and with the fix in place; development off reads 0.02 to 0.07.
+     * wind-down phrases never develop. Each claim's comment lists the rate with development
+     * off, with #2012's bar fix reverted, as shipped, and with every phrase developing; the
+     * floor and ceiling sit between them. `leadMotifOpenings` is the sample under the rate.
      */
     leadMotifDevelopment: (takes) => {
-        let n = 0;
-        let hit = 0;
-        let last: { timeline: Timeline; pass?: number; recent: string[] } | null = null;
-        for (const take of takes) {
-            const { timeline: t, events } = take;
-            // A pass continues the last one's memory; a new song or seed starts clean.
-            if (last && (last.timeline !== t || take.pass !== (last.pass ?? 0) + 1)) {
-                last = null;
-            }
-            const notes = leadNotes(events);
-            const played = new Set(notes.map((l) => l.bar));
-            const recent: string[] = last?.recent ?? [];
-            for (const index of [...played].sort((a, b) => a - b)) {
-                if (played.has(index - 1)) {
-                    continue;
-                }
-                const bar = notes.filter((l) => l.bar === index).sort((a, b) => a.tick - b.tick);
-                if (bar.length < 3) {
-                    continue;
-                }
-                const opening = `${bar.map((l) => stepOf(t, l)).join(',')}|${bar
-                    .slice(1)
-                    .map((l, i) => Math.sign(l.midi - bar[i].midi))
-                    .join('')}`;
-                if (recent.length) {
-                    n++;
-                    hit += recent.includes(opening) ? 1 : 0;
-                }
-                recent.push(opening);
-                recent.splice(0, recent.length - 3);
-            }
-            last = recent.length ? { timeline: t, pass: take.pass, recent } : null;
-        }
+        const { n, hit } = motifTally(takes);
         return ratio(hit, n);
     },
+    /** How many openings `leadMotifDevelopment` judged: the sample under its rate. */
+    leadMotifOpenings: (takes) => motifTally(takes).n,
     /** Share of lead notes on a beat that are tones of the chord sounding. */
     leadChordToneOnBeats: (takes) => {
         let n = 0;

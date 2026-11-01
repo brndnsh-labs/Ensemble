@@ -447,12 +447,15 @@ export const metal = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.200; development off 0.023, #2012's bar fix reverted 0.147; always develops 0.41.
+                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.165,
-                    0.4,
+                    0.17,
+                    0.3,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 100, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.1, 0.2, 'relentless: less room than any other lead'],
                 ['leadNotesPerBar', 4.5, 9, 'shred: the busiest solo in the band'],

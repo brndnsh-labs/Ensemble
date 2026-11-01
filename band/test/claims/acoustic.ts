@@ -422,7 +422,9 @@ export const acoustic = defineClaims({
         {
             take: {},
             claims: [
-                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
+                // This bass plays no half-step lead-in, so a leap ceiling here would pass on nothing.
+                // Pinning the count at 0 fails when one appears, and then wants a real leap claim.
+                ['bassApproachCount', 0, 0, 'no half-step lead-ins'],
                 ['kickOnOne', 0.95, 1, 'a soft kick states the One'],
                 ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its bass note'],
                 [
@@ -459,10 +461,12 @@ export const acoustic = defineClaims({
                 ['fullSnareBackbeat', 0, 0.02, 'no full snare when quiet: cross-stick or nothing'],
                 ['bassPassingShare', 0, 0.01, 'a ballad bass holds its roots and fifths'],
                 ['bassMeanSteps', 7, 16, 'long notes: half notes and whole notes'],
+                // Measured 0.525 (0.6 before #2007): which sections break the chord and which lay it
+                // on the beat is one draw per section, and A2 now shares the A's draw. Four other
+                // four-seed sets read 0.66 to 0.92, so it is the default seeds that sit low, not
+                // the engine. All sections laying the chord on the beat reads 0, all breaking 1.0.
                 [
                     'compSingleNoteShare',
-                    // 0.6 before #2007: A2 now repeats the A's pattern, so fewer independent
-                    // draws; it measures 0.525 on these seeds. Still a majority of onsets.
                     0.5,
                     0.95,
                     'the piano breaks the chord into eighths in most quiet sections',
@@ -604,12 +608,15 @@ export const acoustic = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.091; development off 0.037, #2012's bar fix reverted 0.050; always develops 0.47.
+                // Floor and ceiling sit between those; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.065,
-                    0.4,
+                    0.07,
+                    0.28,
                     "a phrase now and then says the last one's opening again",
                 ],
+                ['leadMotifOpenings', 120, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.15, 0.45, 'room to breathe, as a singer takes'],
                 ['leadShortShare', 0.4, 0.7, 'an eighth-note melody, never sixteenth flurries'],
