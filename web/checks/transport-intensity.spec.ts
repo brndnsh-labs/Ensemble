@@ -90,11 +90,35 @@ test('a tablet’s transport holds the slider on one row, and Play does not move
     await expect(page.locator('.intensity-value')).toHaveText('40');
 });
 
-test('a phone has no slider on the transport: the Groove tab keeps intensity', async ({
+test('a phone has no slider on the transport: the Song menu carries intensity', async ({
     page,
 }, info) => {
     test.skip(info.project.name !== 'webkit-phone', 'phone only');
     await seedStarters(page);
     await songLink(page, 'Blue pocket').first().click();
     await expect(page.getByLabel('Intensity', { exact: true })).toBeHidden();
+
+    const save = page.getByRole('button', { name: 'Save', exact: true });
+    await expect(save).toBeDisabled();
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    const row = page.getByRole('menuitem', { name: /^Intensity/ });
+    await expect(row).toContainText('Auto');
+    await row.click();
+    await page.getByRole('menuitemradio', { name: 'High', exact: true }).click();
+    // The chart is still there, and edited: energy is the chart's own.
+    await expect(page.getByRole('menu')).toHaveCount(0);
+    await expect(save).toBeEnabled();
+
+    // The Groove tab agrees.
+    await openBand(page, 'Groove');
+    await expect(page.getByLabel('Auto intensity', { exact: true })).not.toBeChecked();
+    await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('80');
+    await page.getByRole('button', { name: 'Close band' }).click();
+
+    // And back to Auto from the menu: the chart reads unedited again.
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await expect(page.getByRole('menuitem', { name: /^Intensity/ })).toContainText('High');
+    await page.getByRole('menuitem', { name: /^Intensity/ }).click();
+    await page.getByRole('menuitemradio', { name: 'Auto', exact: true }).click();
+    await expect(save).toBeDisabled();
 });
