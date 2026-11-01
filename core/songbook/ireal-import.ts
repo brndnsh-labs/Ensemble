@@ -1,5 +1,6 @@
 import { decodeIRealInput, decodeIRealMusic } from './ireal-decode.js';
 import { scoreFromIRealBody } from './ireal-score.js';
+import { defaultTempoForIRealStyle, genreForIRealStyle, writtenIRealTempo } from './ireal-style.js';
 import type { SemanticScore } from './score-types.js';
 
 export interface IRealImportDiagnostic {
@@ -12,6 +13,16 @@ export interface IRealImportSong {
     title: string;
     composer?: string;
     style?: string;
+    /**
+     * The canon genre the export's style maps to (#2004), or null when Ensemble has no equivalent
+     * it trusts: the importer then keeps the musician's current band.
+     */
+    genre?: string | null;
+    /**
+     * The starting tempo the import proposes (#2004): the export's own when it writes one, else
+     * iReal's default for the style. Absent when neither is known; the current tempo is kept.
+     */
+    tempo?: { bpm: number; from: 'export' | 'style' };
     score?: SemanticScore;
     metadata: { key: string; transpose: string; tempo: string; repeats: string; fields: string[] };
     diagnostics: IRealImportDiagnostic[];
@@ -89,12 +100,26 @@ function importSong(fields: string[], modern: boolean, index: number): IRealImpo
         for (const note of built.notes) {
             song.diagnostics.push({ severity: 'warning', message: note });
         }
+        song.genre = genreForIRealStyle(song.style);
+        const written = modern ? writtenIRealTempo(fields[8]) : null;
+        const fallback = defaultTempoForIRealStyle(song.style);
+        if (written !== null) {
+            song.tempo = { bpm: written, from: 'export' };
+        } else if (fallback !== null) {
+            song.tempo = { bpm: fallback, from: 'style' };
+        }
         song.diagnostics.push({
             severity: 'warning',
             message: modern
-                ? 'Stored key is used without transposition. iReal style, transpose, tempo and player repetitions are preserved as raw metadata, not applied as Ensemble settings.'
-                : 'The stored key is used. iReal style is preserved as text, not applied as an Ensemble genre.',
+                ? 'Stored key is used without transposition. iReal transpose and player repetitions are preserved as raw metadata, not applied as Ensemble settings.'
+                : 'The stored key is used.',
         });
+        if (song.style && song.genre === null) {
+            song.diagnostics.push({
+                severity: 'warning',
+                message: `iReal style "${song.style}" has no Ensemble equivalent, so your current band style is kept.`,
+            });
+        }
     } catch (error) {
         delete song.score;
         song.diagnostics.push({
