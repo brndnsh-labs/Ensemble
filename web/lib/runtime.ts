@@ -1563,9 +1563,11 @@ function apply(content: Session, compiled?: Timeline): void {
 }
 
 /**
- * `opened` marks a chart the musician has just opened (from the songbook, a link, a standard, a
- * new song): its own lane starts muted again (#1992). Every other load is the same chart again —
- * an edit, an Undo, a Revert, a Duplicate's copy — and keeps what the musician chose on it.
+ * `opened` marks a chart the musician has just put on the stand through the shell's `open()` or
+ * `landDraftOnStand` (the songbook, a link, a standard, a new song, a kept or recovered copy): its
+ * own lane starts muted again (#1992). Every other load is the chart already on the stand — an
+ * edit, an Undo, a Revert, the chart after a Duplicate or Keep both re-points it — and keeps what
+ * the musician chose on it.
  */
 export function load(document: ChartDocument, opened = false): void {
     const checked = validateDocument(document);
@@ -1784,13 +1786,15 @@ export function setEnabled(module: InstrumentModule, enabled: boolean): void {
         if (enabled && !getState()[module].enabled) {
             playerLaneWroteChart = true;
             togglePower(module); // its dispatch syncs the band
-        } else if (!enabled && playerLaneWroteChart) {
+        } else if (!enabled && playerLaneWroteChart && getState()[module].enabled) {
             // Off again: the chart goes back to the off it had (its dispatch syncs the band).
             playerLaneWroteChart = false;
             togglePower(module);
         } else {
+            playerLaneWroteChart = false;
             if (!enabled && module !== 'groove') {
-                // Silenced now, as any lane's mute is, not at the band's next barline.
+                // What rings now stops now, as any lane's mute does; the host drops the lane's
+                // notes still to come (`BandHost.sound`).
                 flushBuffer(module);
             }
             band?.update(bandSettings());

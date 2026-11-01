@@ -1066,6 +1066,12 @@ export class BandHost {
     }
 
     private sound(state: EnsembleState, segment: Segment, event: BandEvent, time: number): void {
+        // The musician's own lane, muted (#1992): a segment generated before the mute still
+        // holds its notes until the band regenerates at a barline, and the lane's bus stays open
+        // (the chart has it on), so they are left out here, from the moment the mute lands.
+        if (event.lane === this.settings?.you) {
+            return;
+        }
         const durationSeconds =
             event.lane === 'drums'
                 ? 0

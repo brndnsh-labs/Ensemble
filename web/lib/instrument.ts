@@ -97,8 +97,3 @@ export const INSTRUMENT_ROLES: Record<PlayerInstrument, InstrumentRole> = {
 export function instrumentLane(instrument: PlayerInstrument | null): InstrumentModule | null {
     return instrument ? INSTRUMENT_ROLES[instrument].lane : null;
 }
-
-/** How far the stand's chord symbols move for this instrument (0 for none chosen). */
-export function instrumentShift(instrument: PlayerInstrument | null): number {
-    return instrument ? INSTRUMENT_ROLES[instrument].shift : 0;
-}

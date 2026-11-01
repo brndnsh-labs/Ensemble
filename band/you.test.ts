@@ -102,6 +102,16 @@ describe('the hole holds on every path a pass takes', () => {
                     );
                     expect(holed.events).toEqual(full.events.filter((e) => e.lane !== you));
                     expect(holed.memory).toEqual(full.memory);
+                    if (name === 'sectionMute') {
+                        // The bridge (section 1) really has no bass, for the band and the phantom.
+                        const bridge = new Set(
+                            tl.bars.filter((b) => b.visit.sectionIndex === 1).map((b) => b.index),
+                        );
+                        expect(bridge.size).toBeGreaterThan(0);
+                        expect(
+                            full.events.some((e) => e.lane === 'bass' && bridge.has(e.bar)),
+                        ).toBe(false);
+                    }
                     // A chunk resumed at a barline from its snapshot (a settings change, #1665).
                     const from = Math.min(3, tl.bars.length - 1);
                     const window = { from, to: tl.bars.length, origin: 0 };
@@ -109,6 +119,7 @@ describe('the hole holds on every path a pass takes', () => {
                     const chunk = (s: BandSettings, memory: typeof full.memory) =>
                         performPass(tl, s, { pass: 0, looping: true, memory, window, until });
                     const fullChunk = chunk(settings, full.snapshots[from]);
+                    expect(fullChunk.events.length).toBeGreaterThan(0);
                     const holedChunk = chunk({ ...settings, you }, holed.snapshots[from]);
                     expect(holedChunk.events).toEqual(
                         fullChunk.events.filter((e) => e.lane !== you),
