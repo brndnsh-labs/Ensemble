@@ -22,10 +22,13 @@ import {
     barAtTick,
     compileTimeline,
     type DrumPiece,
+    type LeadRole,
+    leadRoleAt,
     type PassMemory,
     type PassWindow,
     PPQ,
     performPass,
+    STYLES,
     secondsAt,
     type Timeline,
 } from '@band/index';
@@ -526,6 +529,51 @@ export class BandHost {
         const now = audio.currentTime;
         const segment = this.segments.find((s) => s.start <= now && now < this.endTime(s));
         return segment ? this.tickAt(segment, now) : null;
+    }
+
+    /**
+     * Which time through the song the bar sounding at `tick` is in, and that bar's index: the
+     * playing segment's pass plus the bar's chorus, the number the plan keys the head, the solos
+     * and the trade on (`planBars`' `passAt`). Null while stopped, or `tick` is outside the
+     * segment sounding now. Pass the tick `songTick()` just read, so one paint asks one clock.
+     */
+    placeAt(tick: number): { bar: number; pass: number } | null {
+        const audio = this.audio;
+        const bar = this.barContaining(tick);
+        if (!audio || !this.playing || !bar) {
+            return null;
+        }
+        const now = audio.currentTime;
+        const segment = this.segments.find((s) => s.start <= now && now < this.endTime(s));
+        if (!segment || tick < segment.from || tick >= segment.to) {
+            return null;
+        }
+        return { bar: bar.index, pass: segment.pass + bar.visit.chorus };
+    }
+
+    /** What the band's trade is now (partner, turn length, lanes), to tell when a turn plan changed. */
+    tradeKey(): string {
+        const s = this.settings;
+        return s ? JSON.stringify([s.trade ?? null, s.lanes.lead, s.lanes.drums]) : '';
+    }
+
+    /** Which chorus of a counted performance performed bar `index` is in (0 when uncounted). */
+    chorusOf(index: number): number {
+        return this.timeline?.bars[index]?.visit.chorus ?? 0;
+    }
+
+    /** The lead's job at performed bar `index` of the band's `pass`: the plan's own answer. */
+    roleAt(index: number, pass: number): LeadRole | null {
+        const { timeline, settings } = this;
+        return timeline && settings
+            ? leadRoleAt(
+                  timeline,
+                  settings,
+                  Boolean(STYLES[settings.style].drums.solos),
+                  index,
+                  pass,
+              )
+            : null;
     }
 
     /**

@@ -394,6 +394,106 @@ export function playheadSlot(tick: number | null): number {
     return tick == null || !view ? -1 : slotAt(view, tick);
 }
 
+/** Where the performance is, for the transport's readout and the chart's trade turns (#1990). */
+export interface PerformancePlace {
+    /** Which time through the song, from 1: a looping chart's laps, a counted one's choruses. */
+    chorus: number;
+    /** How many times through the song ends on its own; null when it repeats continuously. */
+    of: number | null;
+    /** What the lead is doing in a counted performance ("Head", "Solo 2", "Out"), else null. */
+    part: string | null;
+    /** The band's pass, and the bar's chorus: with them `tradeTurns` reads the same plan. */
+    pass: number;
+    barChorus: number;
+    /** The performed bar sounding, so a bar played twice shows the turn of the visit heard. */
+    bar: number;
+    /** The band's trade settings now: a change mid-play replans the turns. */
+    tradeKey: string;
+    /** The bar sounding is in a traded stretch. */
+    trading: boolean;
+}
+
+/**
+ * Where the band is at `tick` (the one `songTick()` read for this paint, as `playheadSlot` is):
+ * read off the host's playing segment and the plan's own `leadRole`, never a UI timer. Null
+ * while stopped, counting in, or between two queued segments.
+ */
+export function performancePlace(tick: number | null): PerformancePlace | null {
+    const view = playedView();
+    const at = tick == null ? null : (band?.placeAt(tick) ?? null);
+    if (!band || !view || !at) {
+        return null;
+    }
+    const role = band.roleAt(at.bar, at.pass);
+    const of = songPlan?.choruses ?? currentScore?.choruses ?? null;
+    const barChorus = band.chorusOf(at.bar);
+    let part: string | null = null;
+    if (of !== null && of > 1 && role && getState().soloist.enabled) {
+        if (role.kind === 'head') {
+            part = barChorus === of - 1 ? 'Out' : 'Head';
+        } else if (role.kind === 'solo') {
+            part = `Solo ${role.chorus}`;
+        }
+    }
+    return {
+        chorus: at.pass + 1,
+        of,
+        part,
+        pass: at.pass,
+        barChorus,
+        bar: at.bar,
+        tradeKey: band.tradeKey(),
+        trading: role?.kind === 'trade',
+    };
+}
+
+/** One written bar's place in a trade: whose turn it is, and whether the turn opens on it. */
+export interface TradeTurn {
+    turn: 'you' | 'band';
+    /** "You", or the partner who answers: "Drums" or "Soloist". */
+    label: string;
+    first: boolean;
+}
+
+/**
+ * The turns of the chorus `place` is in, keyed by the first chord's `globalIndex` of each written
+ * bar (the chart sheet's bar). Derived from `BandHost.roleAt`, the plan's own `leadRole`: the
+ * stand tints exactly the bars the band leaves to the player. A bar written once but played twice
+ * in a chorus (a repeat) shows the turn of the visit at or after the bar sounding, else its first.
+ */
+export function tradeTurns(place: PerformancePlace): Map<number, TradeTurn> {
+    const turns = new Map<number, TradeTurn>();
+    const view = playedView();
+    if (!band || !view) {
+        return turns;
+    }
+    // Slots run in performance order, so a visit already passed is replaced by the next one
+    // once the playhead is past it: the first visit at or after `place.bar` wins.
+    const settled = new Set<number>();
+    for (const slot of view.slots) {
+        const chord = view.chords[slot.display];
+        if (
+            !chord ||
+            settled.has(chord.globalIndex) ||
+            band.chorusOf(slot.bar) !== place.barChorus
+        ) {
+            continue;
+        }
+        if (slot.bar >= place.bar) {
+            settled.add(chord.globalIndex);
+        }
+        const role = band.roleAt(slot.bar, place.pass);
+        if (role?.kind === 'trade') {
+            turns.set(chord.globalIndex, {
+                turn: role.turn,
+                label: role.turn === 'you' ? 'You' : role.with === 'drums' ? 'Drums' : 'Soloist',
+                first: role.at === 0,
+            });
+        }
+    }
+    return turns;
+}
+
 /** The count-in beat sounding now (0 is "1"), or null when no count-in is. */
 export function countInBeat(): number | null {
     return band?.countingInBeat() ?? null;

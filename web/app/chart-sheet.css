@@ -405,6 +405,37 @@ button.bar-number {
         scroll-behavior: auto;
     }
 }
+/* Trading (#1990): while the band trades, a bar of the player's turn is tinted and every traded
+   bar carries a strip along its top, so the turns read at a glance; the turn's first bar names
+   whose it is. Before `.bar.active` below, so the playhead's green still wins the fill. */
+.bar[data-turn]::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: var(--line);
+    z-index: -1;
+}
+.bar[data-turn="you"] {
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.bar[data-turn="you"]::before {
+    background: var(--primary);
+}
+.bar-turn {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    font-size: 9px;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    pointer-events: none;
+}
+.bar[data-turn="you"] .bar-turn {
+    color: var(--primary);
+}
 /* The Following cue and the v2 stand's own bar, chord and sheet additions (#1949, moved from
    stand-shell.css in its order). They still come after the breakpoints above, as they did there. */
 .bar.active {

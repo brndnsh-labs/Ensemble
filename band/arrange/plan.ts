@@ -5,7 +5,7 @@
  * never a value that drifts while the song plays.
  */
 
-import type { BandSettings, Lane } from '../core/types.js';
+import type { BandSettings, Lane, TradeSettings } from '../core/types.js';
 import { type Bar, chorusBars, type Timeline } from '../form/timeline.js';
 import { type LeadRole, leadRole } from './cycle.js';
 
@@ -245,6 +245,34 @@ export function fullWindow(timeline: Timeline): PassWindow {
 }
 
 /**
+ * The trade the band really plays: the one asked for (`BandSettings.trade`), when its partner is
+ * there to take a turn. Trading with the soloist needs the lead on; trading with the drummer
+ * needs the drums on and a drummer who can solo in this style.
+ */
+function tradeThatHappens(settings: BandSettings, drumSolos: boolean): TradeSettings | null {
+    const wanted = settings.trade ?? null;
+    return wanted &&
+        (wanted.with === 'lead' ? settings.lanes.lead : settings.lanes.drums && drumSolos)
+        ? wanted
+        : null;
+}
+
+/**
+ * The lead's job at performed bar `index` of the band's `pass` (the segment's pass plus the
+ * bar's chorus), as the plan gives it: the same `leadRole` and the same trade rule `planBars`
+ * uses, so a host that shows whose turn it is can never disagree with what the band plays.
+ */
+export function leadRoleAt(
+    timeline: Timeline,
+    settings: BandSettings,
+    drumSolos: boolean,
+    index: number,
+    pass: number,
+): LeadRole {
+    return leadRole(timeline, index, pass, tradeThatHappens(settings, drumSolos));
+}
+
+/**
  * Plans for the bars in `window`, indexed by bar index (bars outside it are absent).
  * `next` is resolved in performance order: a looping pass's last bar leads back to the top of
  * the song. `planned` stops planning there (a chunk
@@ -294,12 +322,7 @@ export function planBars(
     // Trading with the soloist needs it on; trading with the
     // drummer needs the drums on and a drummer who can solo in this style.
     const wanted = settings.trade ?? null;
-    const trade =
-        wanted &&
-        window.to === bars.length &&
-        (wanted.with === 'lead' ? settings.lanes.lead : settings.lanes.drums && drumSolos)
-            ? wanted
-            : null;
+    const trade = window.to === bars.length ? tradeThatHappens(settings, drumSolos) : null;
     // Whether the drummer has bar `index` of `pass` to himself: his turn in a trade.
     const drummerAlone = (index: number, onPass: number) => {
         const role = leadRole(timeline, index, passAt(index, onPass), trade);

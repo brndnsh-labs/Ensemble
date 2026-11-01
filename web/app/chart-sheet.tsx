@@ -13,8 +13,9 @@ import {
 import { flushSync } from 'react-dom';
 import type { SectionChange } from '../lib/documents';
 import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
-import type { ChartDocument } from '../lib/runtime';
+import type { ChartDocument, TradeTurn } from '../lib/runtime';
 import { directionLabel } from '../lib/score-labels';
+import { songPlanText } from '../lib/song-mode';
 import { afterPress } from './after-press';
 import { BarDock, usePhoneWidth } from './bar-dock';
 import { BarMenu, type BarMenuBar } from './bar-menu';
@@ -32,10 +33,15 @@ type WrittenBar = WrittenSection['measures'][number];
  */
 const STAND_CHORUS_COUNTS = [1, 2, 3, 4, 6, 8, 12, 16];
 
-/** What the footer says the band does with the form: the count, or the loop when there is none. */
-function formLengthText(choruses: number | undefined): string {
+type SongReadout = { choruses: number; seconds: number } | null;
+
+/**
+ * What the footer says the band does with the form: the chart's own count, else the device's
+ * Song length (#1784) as the same readout the Practice tab gives, else the loop.
+ */
+function formLengthText(choruses: number | undefined, song: SongReadout): string {
     if (choruses === undefined) {
-        return 'repeats continuously';
+        return song ? songPlanText(song) : 'repeats continuously';
     }
     return choruses === 1 ? 'plays once, then ends' : `plays ${choruses} times, then ends`;
 }
@@ -191,6 +197,13 @@ interface ChartSheetProps {
     /** Set while editing a measure chart (#1726); null otherwise. */
     sectionEdit: SectionEditing | null;
     onAudition: (globalIndex: number) => void;
+    /**
+     * Whose turn each written bar is while the band trades (#1990), keyed by the bar's first
+     * chord's `globalIndex`; null when it is not trading.
+     */
+    turns: Map<number, TradeTurn> | null;
+    /** What Song length would play (`runtime.songModeReadout`), null when off or not looping. */
+    songReadout: SongReadout;
     /** How many times the band plays the form, then stops (#1511, the footer's menu);
      * `undefined` repeats it continuously. */
     onChoruses: (choruses: number | undefined) => void;
@@ -219,6 +232,8 @@ export function ChartSheet({
     barEdit,
     sectionEdit,
     onAudition,
+    turns,
+    songReadout,
     onChoruses,
 }: ChartSheetProps) {
     // A tap on a section letter opens its menu (#1422): outside Edit a `<Menu>` holding Start
@@ -560,6 +575,7 @@ export function ChartSheet({
                             const problem = barEdit?.problem(measureId) ?? null;
                             const edited = barEdit?.edited(measureId) ?? false;
                             const pending = !problem && (barEdit?.pending(measureId) ?? false);
+                            const turn = turns?.get(measure.chords[0]?.globalIndex ?? -1);
                             return (
                                 <div
                                     className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selected ? 'selected' : ''}${typing ? ' typing' : ''}${problem ? ' unreadable' : ''}${pending ? ' pending' : ''}${edited ? ' edited' : ''}${measureRepeat ? '' : splitClass(measure.chords.length)}`}
@@ -568,6 +584,8 @@ export function ChartSheet({
                                         (c) => c.globalIndex === displayActive,
                                     )}
                                     data-next={isNext ? (nextSoon ? 'soon' : 'true') : undefined}
+                                    data-turn={turn?.turn}
+                                    data-turn-label={turn?.label}
                                     key={measure.chords[0]?.globalIndex}
                                     // While editing a measure chart the whole bar is the target
                                     // (#1700, #1723): a press anywhere on it selects it and opens
@@ -612,6 +630,18 @@ export function ChartSheet({
                                             : undefined
                                     }
                                 >
+                                    {turn && !turn.first && (
+                                        <span className="sr-only">
+                                            {turn.turn === 'you'
+                                                ? 'Your turn'
+                                                : `${turn.label}'s turn`}
+                                        </span>
+                                    )}
+                                    {turn?.first && (
+                                        <span className="bar-turn" data-turn-label={turn.turn}>
+                                            {turn.label}
+                                        </span>
+                                    )}
                                     {barEdit ? (
                                         // The keyboard's way to a bar, one stop per bar.
                                         <button
@@ -909,7 +939,7 @@ export function ChartSheet({
                     aria-disabled={busy || undefined}
                     onClick={() => !busy && setFormMenu((was) => !was)}
                 >
-                    {totalBars} bars · {formLengthText(choruses)}
+                    {totalBars} bars · {formLengthText(choruses, songReadout)}
                 </button>
             </div>
             {formMenuOpen && (

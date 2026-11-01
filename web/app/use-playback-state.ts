@@ -27,6 +27,8 @@ interface PlaybackState {
     setActive: Dispatch<SetStateAction<number | null>>;
     /** The count-in beat sounding now (0-based), or null. */
     countInBeat: number | null;
+    /** Which chorus the band is in, and its part (#1990); null when stopped. */
+    place: runtime.PerformancePlace | null;
     /** In the active bar's last felt pulse: the chart sheet's next-bar cue. */
     nextSoon: boolean;
     /** In the active slot's last felt pulse: the neck's chord-change cue. */
@@ -35,6 +37,19 @@ interface PlaybackState {
     pendingAutoplay: boolean;
     /** The shared-link effect arms it. */
     setPendingAutoplay: Dispatch<SetStateAction<boolean>>;
+}
+
+function samePlace(a: runtime.PerformancePlace, b: runtime.PerformancePlace): boolean {
+    return (
+        a.chorus === b.chorus &&
+        a.of === b.of &&
+        a.part === b.part &&
+        a.pass === b.pass &&
+        a.barChorus === b.barChorus &&
+        a.bar === b.bar &&
+        a.tradeKey === b.tradeKey &&
+        a.trading === b.trading
+    );
 }
 
 /**
@@ -68,6 +83,9 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
     // two-chord bar is mid-bar, where `nextSoon` (the barline's) never fires. Same poll, same
     // tick; it flips twice a chord.
     const [changeSoon, setChangeSoon] = useState(false);
+    // #1990 — which chorus, and whose turn: read off the same tick as the slot, and set only
+    // when it changes (a few times a minute), so it costs a frame nothing.
+    const [place, setPlace] = useState<runtime.PerformancePlace | null>(null);
 
     useEffect(() => {
         // The stand follows the performance every animation frame while it plays (#1240), reading
@@ -104,6 +122,12 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
                 // The slot this same tick is in, never `active`'s committed value, for the reason
                 // above — and off any slot (-1) there is no chord to be leaving.
                 setChangeSoon(runtime.inLastBeatOfSlot(tick, slot));
+                // Held across the count-in and a seam between two queued segments (null tick).
+                const here = runtime.performancePlace(tick);
+                setPlace((previous) => {
+                    const next = !playingNow ? null : (here ?? previous);
+                    return previous && next && samePlace(previous, next) ? previous : next;
+                });
             });
             if (playingNow) {
                 frame = window.requestAnimationFrame(inFrame);
@@ -171,6 +195,7 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
         active,
         setActive,
         countInBeat,
+        place,
         nextSoon,
         changeSoon,
         pendingAutoplay,
