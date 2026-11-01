@@ -1,7 +1,7 @@
 import type { ChartNotation } from '@core/songbook/types';
 import { Fragment, useRef } from 'react';
 import { genreOf } from '../lib/documents';
-import { type ChartDocument, GENRE_NAMES } from '../lib/runtime';
+import { type ChartDocument, GENRE_NAMES, type PerformancePlace } from '../lib/runtime';
 import { type Lane, visibleLanes } from './band-lanes';
 import { KeyPopover, songKeyLabel } from './key-popover';
 import { TempoControl } from './tempo-control';
@@ -13,6 +13,8 @@ interface TransportBarProps {
     /** The count-in beat sounding now (0-based: 0 shows "1"), or null when not counting in
      * (#1422). The chart itself doesn't move during this window; the play button does. */
     countInBeat: number | null;
+    /** Which chorus the band is in (#1990), or null when stopped. */
+    place: PerformancePlace | null;
     onPlayToggle: () => void;
     onTempo: (bpm: number) => void;
     /** Whether the Key popover (#1757) is open. The shell holds it, so a refused meter can
@@ -45,6 +47,7 @@ export function TransportBar({
     busy,
     playbackActive,
     countInBeat,
+    place,
     onPlayToggle,
     onTempo,
     keyOpen,
@@ -95,6 +98,7 @@ export function TransportBar({
                     disabled={busy}
                     onCommit={onTempo}
                 />
+                {place && <ChorusCounter place={place} />}
             </div>
             {/* The song's key, mode, meter and chord notation, one popover (#1757). The small
                 label above is the column's, as Tempo's and Style's are; the button's own name
@@ -203,5 +207,21 @@ export function TransportBar({
                 ))}
             </div>
         </div>
+    );
+}
+
+/**
+ * Where the band is in the song (#1990): "Chorus 2 / 3" when the song ends on its own, "Chorus 2"
+ * when it repeats continuously, with the lead's part ("Head", "Solo 2", "Out") after it in a
+ * counted performance. Read off the band's clock (`runtime.performancePlace`), set only when it
+ * changes, so it is not a live region: a screen reader finds it by reading the bar.
+ */
+function ChorusCounter({ place }: { place: PerformancePlace }) {
+    const count = place.of === null ? `${place.chorus}` : `${place.chorus} / ${place.of}`;
+    return (
+        <span className="chorus-counter" data-testid="chorus-counter">
+            <span className="chorus-count">Chorus {count}</span>
+            {place.part && <span className="chorus-part">{place.part}</span>}
+        </span>
     );
 }

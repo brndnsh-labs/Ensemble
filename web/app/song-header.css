@@ -101,6 +101,27 @@
     align-items: center;
     gap: 11px;
 }
+/* Where the band is (#1990): small, in the bar's top padding, only while it plays. It takes no
+   room of its own, so showing and hiding it never moves the chart's fit. No animation. */
+.transport-bar {
+    position: relative;
+}
+.chorus-counter {
+    position: absolute;
+    top: 0;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    font-size: 10px;
+    line-height: 12px;
+    font-weight: 650;
+    color: var(--muted);
+    white-space: nowrap;
+    pointer-events: none;
+}
+.chorus-part {
+    font-weight: 500;
+}
 .setting-label {
     font-size: 9px;
     text-transform: uppercase;

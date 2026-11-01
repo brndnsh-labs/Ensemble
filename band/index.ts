@@ -3,7 +3,9 @@
  * from here; nothing outside `band/` reaches into its modules.
  */
 
+export type { LeadRole } from './arrange/cycle.js';
 export type { PassWindow } from './arrange/plan.js';
+export { leadRoleAt } from './arrange/plan.js';
 export type {
     BandEvent,
     BandSettings,

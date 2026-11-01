@@ -341,6 +341,7 @@ export default function Ensemble() {
         active,
         setActive,
         countInBeat,
+        place,
         nextSoon,
         changeSoon,
         pendingAutoplay,
@@ -751,10 +752,25 @@ export default function Ensemble() {
     // Song mode's readout (#1784): what the band plays now, or would at Play. Stopped, reading it
     // compiles the chart a few times, so it is read again only when the chart (its tempo
     // included), the setting or the transport changes, and only while the Practice tab shows it.
+    // The chart footer says the same thing while stopped (#1990): a looping chart under a Song
+    // length plays that many choruses, so "repeats continuously" would be untrue.
+    // The runtime's own value, not `feel`'s: that snapshot is taken when the Band sheet opens, so
+    // after a reload it is stale until then.
+    const songMinutes = runtime.songMode();
     // biome-ignore lint/correctness/useExhaustiveDependencies: `current`, `songMinutes` and `playing` are re-read triggers.
     const songReadout = useMemo(
-        () => (current && bandTab === 'practice' ? runtime.songModeReadout() : null),
-        [current, feel.songMinutes, playing, bandTab],
+        () =>
+            current && (bandTab === 'practice' || (songMinutes !== null && !playing))
+                ? runtime.songModeReadout()
+                : null,
+        [current, songMinutes, feel.songMinutes, playing, bandTab],
+    );
+    // Whose turn each bar is while the band trades (#1990), from the plan's own `leadRole`:
+    // recomputed when the pass or chorus changes, not per frame.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `place.pass` and `place.barChorus` are the triggers; `place` is a new object per change.
+    const turns = useMemo(
+        () => (place?.trading ? runtime.tradeTurns(place) : null),
+        [place?.trading, place?.pass, place?.barChorus, current],
     );
     const neckShowing = neck && !editing;
     const neckPrefs = useNeckPrefs();
@@ -3388,6 +3404,7 @@ export default function Ensemble() {
                         busy={busy}
                         playbackActive={playbackActive}
                         countInBeat={countInBeat}
+                        place={place}
                         onPlayToggle={togglePlayback}
                         onBand={() => openBand(lastBandTab.current)}
                         bandTab={bandTab}
@@ -3588,6 +3605,8 @@ export default function Ensemble() {
                                         playing={playing}
                                         playbackActive={playbackActive}
                                         totalBars={totalBars}
+                                        turns={turns}
+                                        songReadout={songReadout}
                                         onStartHere={(id) => startHereSection(id)}
                                         barEdit={barEditing()}
                                         sectionEdit={sectionEditing()}
