@@ -26,6 +26,7 @@ import { blankSong, genreOf, OLD_FORMAT_REFUSAL, type SectionChange } from '../l
 import { exportDocument } from '../lib/download';
 import { checkPlayable } from '../lib/engine-mode';
 import { firstBars } from '../lib/first-bars';
+import type { HomeSlice } from '../lib/home';
 import { type NavEntry, type NavView, navKey } from '../lib/navigation';
 import { collectionWrite, framePace, type PlaylistImport } from '../lib/playlist-import';
 import * as repository from '../lib/repository';
@@ -252,7 +253,9 @@ export default function Ensemble() {
     const [standStore, setStandStore] = useState<StandStore | null>(null);
     const [ready, setReady] = useState(false);
     // The songbook could not be read at boot (storage blocked): standards still play (#1982).
-    const [savingOff, setSavingOff] = useState(false);
+    // Held as the empty slice boot fell back to, so the notice ends the moment a later read of the
+    // songbook succeeds (its slice is a different object) rather than outliving the fault.
+    const [savingOffHome, setSavingOffHome] = useState<HomeSlice | null>(null);
     const [busy, setBusy] = useState(false);
     const volatileDrafts = useRef(new Map<string, ChartDocument>());
     /**
@@ -668,6 +671,7 @@ export default function Ensemble() {
         setError,
         setBrowse,
     });
+    const savingOff = savingOffHome !== null && guestHome === savingOffHome;
     // #1478 — how much room the signed-in account has, by this device's VERIFIED copy of it, for
     // the import's cap line (review R1: or why that can't be told yet). Stable per owner, so the
     // dialog reads it once per playlist and again only as the library download moves.
@@ -914,7 +918,7 @@ export default function Ensemble() {
             .then((result) => {
                 if (alive) {
                     setGuestHome(result.home);
-                    setSavingOff(result.savingOff);
+                    setSavingOffHome(result.savingOff ? result.home : null);
                     bootHomeFresh.current = true;
                     setReady(true);
                 }
