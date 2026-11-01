@@ -32,6 +32,19 @@ export function isNetworkFailure(error: unknown): boolean {
     );
 }
 
+/**
+ * A response body's bytes, with a read that dies mid-download said plainly: the browser's own
+ * `TypeError` ("Load failed", "network error") means nothing to a musician.
+ */
+/** @internal a test seam: the unit test reads it directly; `asset()` is its only caller. */
+export async function bytesOf(response: Response): Promise<ArrayBuffer> {
+    try {
+        return await response.clone().arrayBuffer();
+    } catch {
+        throw new Error(DOWNLOAD_FAILED);
+    }
+}
+
 /** `fetch`, with a network failure said plainly. */
 async function fetchSound(input: string, init: RequestInit): Promise<Response> {
     try {
@@ -104,7 +117,7 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
     const key = `${url.pathname}?asset=${hash}`;
     const cache = await caches.open(CACHE);
     const cached = await cache.match(key);
-    if (cached && (await digest(await cached.clone().arrayBuffer())) === hash) {
+    if (cached && (await digest(await bytesOf(cached))) === hash) {
         return cached;
     }
     if (cachedOnly) {
@@ -114,13 +127,13 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
         cache: 'no-store',
         signal: AbortSignal.timeout(20_000),
     });
-    if (!response.ok || (await digest(await response.clone().arrayBuffer())) !== hash) {
+    if (!response.ok || (await digest(await bytesOf(response))) !== hash) {
         throw new Error('Sound download could not be verified. Reconnect and retry.');
     }
     await cache.put(key, response.clone());
     // Do not promise persistence if a browser failed to retain the write.
     const stored = await cache.match(key);
-    if (!stored || (await digest(await stored.clone().arrayBuffer())) !== hash) {
+    if (!stored || (await digest(await bytesOf(stored))) !== hash) {
         throw new Error('Sound storage is unavailable. Your previous sound is unchanged.');
     }
     return response;

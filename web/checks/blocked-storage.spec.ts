@@ -39,6 +39,15 @@ test.describe('storage blocked', () => {
         await page.getByRole('button', { name: 'Stop playback' }).click();
     });
 
+    test('back on the home there is one storage banner, in plain words', async ({ page }) => {
+        await openBlues(page);
+        await page.getByRole('button', { name: 'Back to songbook' }).click();
+        await expect(page.getByTestId('saving-off-banner')).toBeVisible();
+        await expect(page.locator('.error-banner')).toHaveCount(1);
+        await expect(page.locator('body')).not.toContainText('SecurityError');
+        await expect(page.locator('body')).not.toContainText('insecure');
+    });
+
     test('Keep a copy refuses in plain words instead of throwing', async ({ page }) => {
         await openBlues(page);
         await page.getByRole('button', { name: 'Keep a copy', exact: true }).click();

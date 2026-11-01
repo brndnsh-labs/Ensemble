@@ -42,6 +42,12 @@ interface SongbookLibraryOptions {
     onStand: boolean;
     /** The shell's error line. */
     setError: Dispatch<SetStateAction<string>>;
+    /**
+     * Whether the boot found storage blocked. The guest songbook's re-read then fails for the
+     * same reason the standing "Saving is off" notice already gives, so it stays quiet rather
+     * than stacking a red banner over it (#2067).
+     */
+    savingOff: RefObject<boolean>;
     /** Opens the All songs page (`openAllSongs`), on a collection or on All songs itself. */
     setBrowse: Dispatch<SetStateAction<Browse>>;
 }
@@ -109,6 +115,7 @@ export function useSongbookLibrary({
     sync,
     onStand,
     setError,
+    savingOff,
     setBrowse,
 }: SongbookLibraryOptions): SongbookLibrary {
     // Two songbooks, never merged and never switched between by a control (#1266, rollout
@@ -267,6 +274,9 @@ export function useSongbookLibrary({
         let alive = true;
         const fail = (failure: unknown) => {
             if (alive && !(failure instanceof AccountMismatchError)) {
+                if (!signedIn && savingOff.current) {
+                    return;
+                }
                 setError(failure instanceof Error ? failure.message : String(failure));
             }
         };
@@ -290,7 +300,16 @@ export function useSongbookLibrary({
         return () => {
             alive = false;
         };
-    }, [ready, onStand, signedIn, sync.owner, sessionOwner, sync.libraryVersion, setError]);
+    }, [
+        ready,
+        onStand,
+        signedIn,
+        sync.owner,
+        sessionOwner,
+        sync.libraryVersion,
+        setError,
+        savingOff,
+    ]);
     /**
      * Re-reads whichever songbook this device is playing from. Signed in that is the account
      * library (#1266); signed out it is the guest one. The two are never merged and never
