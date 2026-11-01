@@ -268,6 +268,7 @@ export default function Ensemble() {
     // Held as the empty slice boot fell back to, so the notice ends the moment a later read of the
     // songbook succeeds (its slice is a different object) rather than outliving the fault.
     const [savingOffHome, setSavingOffHome] = useState<HomeSlice | null>(null);
+    const savingOffRef = useRef(false);
     const [busy, setBusy] = useState(false);
     const volatileDrafts = useRef(new Map<string, ChartDocument>());
     /**
@@ -736,6 +737,7 @@ export default function Ensemble() {
         sync,
         onStand,
         setError,
+        savingOff: savingOffRef,
         setBrowse,
     });
     const savingOff = savingOffHome !== null && guestHome === savingOffHome;
@@ -1035,6 +1037,7 @@ export default function Ensemble() {
             .then((result) => {
                 if (alive) {
                     setGuestHome(result.home);
+                    savingOffRef.current = result.savingOff;
                     setSavingOffHome(result.savingOff ? result.home : null);
                     bootHomeFresh.current = true;
                     setReady(true);
@@ -2884,7 +2887,8 @@ export default function Ensemble() {
         setError('');
         try {
             const candidate = updateChart();
-            await runtime.exportAudio(kind, candidate.title, setExportAudioProgress);
+            // A render reports every file it settles into a live region; say a quarter at a time.
+            await runtime.exportAudio(kind, candidate.title, quarterGate(setExportAudioProgress));
         } catch (e) {
             setError(e instanceof Error ? e.message : String(e));
         } finally {

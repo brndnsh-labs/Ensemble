@@ -3,7 +3,7 @@
  * imports: the v2 build typechecks this file without the root config's Vitest globals.
  */
 import { describe, expect, it } from 'vitest';
-import { DOWNLOAD_FAILED, isNetworkFailure, quarterGate } from './sounds';
+import { bytesOf, DOWNLOAD_FAILED, isNetworkFailure, quarterGate } from './sounds';
 
 describe('isNetworkFailure', () => {
     it.each([
@@ -66,5 +66,22 @@ describe('quarterGate', () => {
         gate('Switching style at the next bar…');
         gate('Rendering mix…');
         expect(said).toHaveLength(2);
+    });
+});
+
+describe('bytesOf', () => {
+    it('reads a body', async () => {
+        expect((await bytesOf(new Response('abc'))).byteLength).toBe(3);
+    });
+
+    it('says a mid-download failure plainly, not as the browser’s TypeError', async () => {
+        const dying = new Response(
+            new ReadableStream({
+                pull() {
+                    throw new TypeError('network error');
+                },
+            }),
+        );
+        await expect(bytesOf(dying)).rejects.toThrow(DOWNLOAD_FAILED);
     });
 });
