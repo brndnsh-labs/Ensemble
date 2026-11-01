@@ -1,5 +1,6 @@
 import { KEY_ORDER } from '../config.js';
 import { normalizeKey } from '../utils.js';
+import { spellPitchClass } from './note-spelling.js';
 
 /**
  * The single source of truth for transposing chord text: `runtime.transpose` (the Key popover)
@@ -25,8 +26,16 @@ const mod12 = (n: number): number => ((n % 12) + 12) % 12;
 /**
  * Moves every note-name root and slash bass by `semitoneShift`. Roman and Nashville numerals are
  * key-relative, so they pass through unchanged: the key label moves instead.
+ *
+ * `target` is the key the text lands in (its bare tonic, as `transposeKeyName` returns it, and
+ * whether it is minor): roots and slash basses are then spelled the way that key reads
+ * (`spellPitchClass`), so E minor shows `F#m7b5`, not `Gbm7b5`. Without it every note is flat.
  */
-export function transposeChordText(input: string, semitoneShift: number): string {
+export function transposeChordText(
+    input: string,
+    semitoneShift: number,
+    target?: { key: string; isMinor: boolean },
+): string {
     const parts = input.split(SPLIT_PATTERN);
     const transformed = parts.map((part) => {
         if (!part.trim() || part === '|' || part === '/' || part === ',' || part === '-') {
@@ -49,7 +58,8 @@ export function transposeChordText(input: string, semitoneShift: number): string
             const suffix = part.slice(noteMatch[0].length);
             const originalIndex = KEY_ORDER.indexOf(root);
             if (originalIndex !== -1) {
-                return KEY_ORDER[mod12(originalIndex + semitoneShift)] + suffix;
+                const pc = mod12(originalIndex + semitoneShift);
+                return spellPitchClass(pc, target?.key ?? '', '', '', target?.isMinor) + suffix;
             }
         }
 

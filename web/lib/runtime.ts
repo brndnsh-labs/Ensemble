@@ -1257,6 +1257,8 @@ export function setEnabled(module: InstrumentModule, enabled: boolean): void {
 export function transpose(delta: number): void {
     const score = clone(scoreForBand());
     score.key = transposeKeyName(score.key, delta);
+    // Chords are spelled from the key they land in (sharps in E minor, flats in F minor).
+    const target = { key: score.key, isMinor: score.isMinor === true };
     for (const section of score.sections) {
         if (section.key) {
             section.key = transposeKeyName(section.key, delta);
@@ -1268,10 +1270,10 @@ export function transpose(delta: number): void {
             if (measure.content.kind === 'events') {
                 for (const event of measure.content.events) {
                     if (event.kind === 'chord') {
-                        event.symbol = transposeChordText(event.symbol, delta);
+                        event.symbol = transposeChordText(event.symbol, delta, target);
                         if (event.alternates) {
                             event.alternates = event.alternates.map((symbol) =>
-                                transposeChordText(symbol, delta),
+                                transposeChordText(symbol, delta, target),
                             );
                         }
                     }

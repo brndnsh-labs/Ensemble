@@ -40,6 +40,38 @@ describe('transposeChordText — transpose', () => {
     });
 });
 
+describe('transposeChordText — spelling from the target key (#1977)', () => {
+    const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+    // The key picker is all-flat, so a sharp minor like F# minor arrives as Gb and spells flat.
+    const SHARP_MAJOR = new Set(['G', 'D', 'A', 'E', 'B']);
+    const SHARP_MINOR = new Set(['E', 'B']);
+    const every = KEYS.map((r) => `${r}m7/${r}`).join(' ');
+
+    for (const isMinor of [false, true]) {
+        for (const key of KEYS) {
+            const sharp = (isMinor ? SHARP_MINOR : SHARP_MAJOR).has(key);
+            it(`${key}${isMinor ? ' minor' : ''}: no ${sharp ? 'flat' : 'sharp'} roots or basses`, () => {
+                const out = transposeChordText(every, 0, { key, isMinor });
+                expect(out).not.toMatch(sharp ? /[A-G]b/ : /[A-G]#/);
+            });
+        }
+    }
+
+    it('Autumn Leaves in E minor reads F#m7b5 B7b9 Em', () => {
+        expect(transposeChordText('Am7b5 D7b9 Gm', 9, { key: 'E', isMinor: true })).toBe(
+            'F#m7b5 B7b9 Em',
+        );
+    });
+    it('Autumn Leaves in F minor reads Gm7b5 C7b9 Fm', () => {
+        expect(transposeChordText('Am7b5 D7b9 Gm', 10, { key: 'F', isMinor: true })).toBe(
+            'Gm7b5 C7b9 Fm',
+        );
+    });
+    it('spells a slash bass from the target key too', () => {
+        expect(transposeChordText('C/E', 2, { key: 'D', isMinor: false })).toBe('D/F#');
+    });
+});
+
 describe('transposeChordText — round-trip', () => {
     it('round-trips +n then -n back to the original (flat-canonical input)', () => {
         const fixture = 'C/E F | Am7/G | Dmaj7';
