@@ -146,7 +146,7 @@ test('an offline Save is safe here and confirms on reconnect; a refusal arrives 
     // needs both showing at once: start playback and scroll away.
     // The pill needs the playing row scrolled out of view (#1986), so squeeze the window until
     // this new song's few bars overflow it.
-    await page.setViewportSize({ width: 340, height: 330 });
+    await page.setViewportSize({ width: 340, height: 250 });
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await page.locator('.chart-scroll').press('PageDown');
