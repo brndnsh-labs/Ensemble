@@ -2528,27 +2528,42 @@ export default function Ensemble() {
      */
     function openStandard(id: string, onMissing?: () => void) {
         void run(async () => {
-            const entry = standardFor(id);
-            if (!entry) {
-                onMissing?.();
-                throw new Error('Standard no longer exists.');
-            }
-            const document = buildStandardDocument(entry);
-            // Changes left on it last time land again, the fresh build their baseline (#1979).
-            const draftKey = repository.standardDraftKey(id);
-            const kept = repository.sharedDraftFor(draftKey, document.id);
-            // No toast for a plain open: the header already says "From the standards · not
-            // saved" (UI audit). A recovered one says so, as a song's recovery does.
-            landDraftOnStand(
-                document,
-                kept ? 'Recovered your unsaved changes' : '',
-                draftKey,
-                kept,
-            );
-            standardOnStand.current = { documentId: document.id, standardId: id };
-            setStandardDraft(true);
-            setBrowse({ view: 'home' });
-            track('chart_opened', { source: 'standard' });
+            landStandard(id, onMissing);
+        });
+    }
+    /** `openStandard`'s landing, shared with `playStandard` so the two cannot drift apart. */
+    function landStandard(id: string, onMissing?: () => void): ChartDocument {
+        const entry = standardFor(id);
+        if (!entry) {
+            onMissing?.();
+            throw new Error('Standard no longer exists.');
+        }
+        const document = buildStandardDocument(entry);
+        // Changes left on it last time land again, the fresh build their baseline (#1979).
+        const draftKey = repository.standardDraftKey(id);
+        const kept = repository.sharedDraftFor(draftKey, document.id);
+        // No toast for a plain open: the header already says "From the standards · not
+        // saved" (UI audit). A recovered one says so, as a song's recovery does.
+        landDraftOnStand(document, kept ? 'Recovered your unsaved changes' : '', draftKey, kept);
+        standardOnStand.current = { documentId: document.id, standardId: id };
+        setStandardDraft(true);
+        setBrowse({ view: 'home' });
+        track('chart_opened', { source: 'standard' });
+        return kept?.document ?? document;
+    }
+    /**
+     * A standard's ▶ Play (#1987): `openStandard`'s landing, then the band — the same open-and-play
+     * as the Continue card's. One `run()` for the reasons `playSong` gives, and `warmAudio` first,
+     * synchronously, while this is still the tap's own call stack.
+     */
+    function playStandard(id: string) {
+        runtime.warmAudio();
+        void run(async () => {
+            const landed = landStandard(id);
+            await runtime.toggle(setSoundProgress);
+            setPlaying(runtime.state().playback.isPlaying);
+            setSoundsOffline(await soundsAvailableOffline(landed.chart));
+            setSoundProgress('');
         });
     }
     /**
@@ -3179,6 +3194,7 @@ export default function Ensemble() {
                     initialShelf={standardsEntry === 'all' ? null : standardsEntry}
                     onBack={() => setBrowse({ view: 'home' })}
                     onOpen={openStandard}
+                    onPlay={playStandard}
                 />
             ) : !current && browse.view === 'all' ? (
                 <AllSongs
@@ -3233,6 +3249,7 @@ export default function Ensemble() {
                     openedAt={openedAt}
                     onPlaySong={playSong}
                     onOpenStandard={openStandard}
+                    onPlayStandard={playStandard}
                     onBrowseStandards={(entry) => {
                         setStandardsEntry(entry);
                         setBrowse({ view: 'standards' });

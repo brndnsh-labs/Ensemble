@@ -11,6 +11,8 @@ interface StandardsBrowserProps {
     initialShelf: StandardShelf | null;
     onBack: () => void;
     onOpen: (id: string) => void;
+    /** Opens it and starts the band (#1987): the ▶, the same as everywhere on home. */
+    onPlay: (id: string) => void;
 }
 
 const SHELVES: Array<StandardShelf | 'all'> = ['all', 'blues', 'jazz', 'grooves'];
@@ -23,7 +25,7 @@ const SHELVES: Array<StandardShelf | 'all'> = ['all', 'blues', 'jazz', 'grooves'
  * nothing here ever writes storage. Its home-page entry points are the songbook's standards shelf
  * (`app/songbook.tsx`, #1441): "Browse all →", and on a first visit each shelf's own link.
  */
-export function StandardsBrowser({ initialShelf, onBack, onOpen }: StandardsBrowserProps) {
+export function StandardsBrowser({ initialShelf, onBack, onOpen, onPlay }: StandardsBrowserProps) {
     const [shelf, setShelf] = useState<StandardShelf | 'all'>(initialShelf ?? 'all');
     const entries = STANDARDS.filter((entry) => shelf === 'all' || entry.shelf === shelf);
     const heading = useRef<HTMLHeadingElement>(null);
@@ -101,6 +103,13 @@ export function StandardsBrowser({ initialShelf, onBack, onOpen }: StandardsBrow
                             <td>{entry.genre}</td>
                             <td className="hide-mobile">{entry.bpm}</td>
                             <td>
+                                <button
+                                    className="btn"
+                                    aria-label={`Play ${entry.title}`}
+                                    onClick={() => onPlay(entry.id)}
+                                >
+                                    ▶
+                                </button>{' '}
                                 <button
                                     className="btn"
                                     aria-label={`Open ${entry.title}`}

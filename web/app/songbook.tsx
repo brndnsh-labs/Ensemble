@@ -99,6 +99,8 @@ interface SongbookProps {
     onOpenSong: (id: string) => void;
     /** Opens a standards-catalog entry as an unsaved draft (#1439). */
     onOpenStandard: (id: string) => void;
+    /** Opens a standard and starts the band (#1987): the standard's ▶, as the Continue card's. */
+    onPlayStandard: (id: string) => void;
     /** Opens #1439's browse view, filtered to one shelf or showing all of them. */
     onBrowseStandards: (entry: StandardsEntry) => void;
     /**
@@ -273,6 +275,7 @@ export function Songbook(props: SongbookProps) {
                     busy={busy}
                     onOpenSong={props.onOpenSong}
                     onOpenStandard={props.onOpenStandard}
+                    onPlayStandard={props.onPlayStandard}
                 />
             ) : firstVisit ? (
                 <FirstVisit {...props} />
@@ -612,6 +615,7 @@ function StandardsShelf({
     firstVisit,
     busy,
     onOpenStandard,
+    onPlayStandard,
     onBrowseStandards,
     standardsEntry,
     standardsEntryRef,
@@ -632,8 +636,8 @@ function StandardsShelf({
                 </button>
             </div>
             <p className="section-sub">
-                {STANDARDS.length} charts that come with Ensemble. Open one to play; Save keeps your
-                own copy.
+                {STANDARDS.length} charts that come with Ensemble. Tap ▶ to play one, or the title
+                to open it; Save keeps your own copy.
             </p>
             <div className="shelf-columns">
                 {SHELF_ORDER.map((shelf) => {
@@ -648,6 +652,7 @@ function StandardsShelf({
                                             entry={entry}
                                             busy={busy}
                                             onOpen={onOpenStandard}
+                                            onPlay={onPlayStandard}
                                         />
                                     </li>
                                 ))}
@@ -675,28 +680,38 @@ function StandardItem({
     entry,
     busy,
     onOpen,
+    onPlay,
 }: {
     entry: StandardEntry;
     busy: boolean;
     onOpen: (id: string) => void;
+    onPlay: (id: string) => void;
 }) {
+    // Two buttons, never nested (#1987): the ▶ opens and plays; the rest of the row only opens.
     return (
-        <button
-            className="standard-item"
-            aria-label={`Open ${entry.title}`}
-            disabled={busy}
-            onClick={() => onOpen(entry.id)}
-        >
-            <span className="play-circle" aria-hidden="true">
+        <div className="standard-item">
+            <button
+                className="play-circle"
+                aria-label={`Play ${entry.title}`}
+                disabled={busy}
+                onClick={() => onPlay(entry.id)}
+            >
                 ▶
-            </span>
-            <span className="standard-copy">
-                <span className="standard-title">{entry.title}</span>
-                <span className="standard-meta">
-                    {entry.genre} · {entry.bpm} BPM
+            </button>
+            <button
+                className="standard-open"
+                aria-label={`Open ${entry.title}`}
+                disabled={busy}
+                onClick={() => onOpen(entry.id)}
+            >
+                <span className="standard-copy">
+                    <span className="standard-title">{entry.title}</span>
+                    <span className="standard-meta">
+                        {entry.genre} · {entry.bpm} BPM
+                    </span>
                 </span>
-            </span>
-        </button>
+            </button>
+        </div>
     );
 }
 
@@ -741,6 +756,7 @@ function SearchResults({
     busy,
     onOpenSong,
     onOpenStandard,
+    onPlayStandard,
 }: {
     query: string;
     library: ChartDocument[] | null;
@@ -748,6 +764,7 @@ function SearchResults({
     busy: boolean;
     onOpenSong: (id: string) => void;
     onOpenStandard: (id: string) => void;
+    onPlayStandard: (id: string) => void;
 }) {
     const songs = useMemo(
         () =>
@@ -804,7 +821,12 @@ function SearchResults({
                     <ul className="search-list">
                         {standards.map((entry) => (
                             <li key={entry.id}>
-                                <StandardItem entry={entry} busy={busy} onOpen={onOpenStandard} />
+                                <StandardItem
+                                    entry={entry}
+                                    busy={busy}
+                                    onOpen={onOpenStandard}
+                                    onPlay={onPlayStandard}
+                                />
                             </li>
                         ))}
                     </ul>

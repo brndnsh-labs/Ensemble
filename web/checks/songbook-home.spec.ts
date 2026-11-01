@@ -333,3 +333,27 @@ for (const theme of ['light', 'dark'] as const) {
         }
     });
 }
+
+test('a standard’s ▶ opens and plays; its row only opens (#1987)', async ({ page }) => {
+    await page.goto(appUrl());
+    const shelf = page.locator('.standards-shelf');
+    // The row opens the chart and leaves the band stopped.
+    await shelf.getByRole('button', { name: 'Open 12-Bar Blues' }).click();
+    await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    // The ▶ is named for what it does, and opens and plays.
+    await shelf.getByRole('button', { name: 'Play 12-Bar Blues' }).click();
+    await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
+    await page.getByRole('button', { name: 'Stop playback' }).click();
+});
+
+test('the Standards browser’s ▶ opens and plays (#1987)', async ({ page }) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Browse all →' }).click();
+    await page.getByRole('button', { name: 'Play 12-Bar Blues' }).click();
+    await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
+    await page.getByRole('button', { name: 'Stop playback' }).click();
+});
