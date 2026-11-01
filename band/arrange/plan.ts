@@ -17,6 +17,13 @@ export interface BarPlan {
     lanes: Record<Lane, boolean>;
     /** The drummer's job at the end of this bar. */
     fill: Fill;
+    /**
+     * Which of its kind this bar's fill is, counting a short loop's laps (`lapFill`): 0 for the
+     * first small fill (or first section fill) of the loop, 1 for the next. The drummer alternates
+     * the fill's size on it so consecutive laps don't play the same fill (#2009). Always 0 off a
+     * short loop, whose fills are not repeats of one another.
+     */
+    fillOrdinal: number;
     /** Crash on this bar's downbeat: a new section, or the downbeat after a phrase fill. */
     crash: boolean;
     /** The final bar of a performance that does not loop: play a held ending. */
@@ -50,6 +57,49 @@ function sectionEnergy(bar: Bar): number {
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+/**
+ * A looping form shorter than this (under 8 bars; an 8-bar form already carries the 8-bar period
+ * on its own wrap) is a vamp, not a song: its wrap back to the top is a lap of
+ * the loop, not a section arriving, so its fills and crashes are counted in laps toward the
+ * 8- and 16-bar periods a band phrases in (`lapFill`).
+ */
+const SHORT_FORM = 8;
+
+/**
+ * The fill a short form's wrap gets, by how many bars have gone by once the lap ends: a small
+ * fill at each 8 bars, a section fill (and the crash after it) at each 16. why: a drummer
+ * vamping a 4-bar groove marks the 8-bar phrase and the 16-bar period, not every lap — a fill
+ * and a crash every 4 bars, the same each time, is a loop, not a band (#2009).
+ */
+function lapFill(lap: number, length: number): Fill {
+    // The lap whose end crosses a 16- or 8-bar line, whatever the loop's length (a 7-bar vamp
+    // still fills about every 8 bars played, not once in 56).
+    const crosses = (period: number) =>
+        Math.floor(((lap + 1) * length) / period) > Math.floor((lap * length) / period);
+    return crosses(16) ? 'section' : crosses(8) ? 'phrase' : 'none';
+}
+
+/** Which small fill or section fill of a short loop lap `lap` ends in (0 for the first). */
+function lapFillOrdinal(lap: number, length: number): number {
+    const played = (lap + 1) * length;
+    return lapFill(lap, length) === 'section'
+        ? Math.floor(played / 16) - 1
+        : Math.floor((Math.floor(played / 8) - 1) / 2);
+}
+
+const TIER_ORDER: readonly EnergyTier[] = ['low', 'mid', 'high'];
+
+/**
+ * The tier a fill is sized by: the bigger of the bar it starts in and the bar it leads into. A
+ * fill is the drummer announcing where the music is going, so the fill into a chorus is the
+ * chorus's size, not the quieter verse's one beat (#2009).
+ */
+export function fillTier(here: number, there: number | null): EnergyTier {
+    const a = energyTier(here);
+    const b = there === null ? a : energyTier(there);
+    return TIER_ORDER.indexOf(b) > TIER_ORDER.indexOf(a) ? b : a;
+}
 
 export type EnergyTier = 'low' | 'mid' | 'high';
 
@@ -259,6 +309,14 @@ export function planBars(
     // rule for a bar inside this call's own window (bar `i`, in the loop below) and one
     // outside it (its predecessor, when a resumed pass or a fresh pass's own origin needs it),
     // so the two can't drift apart. "Last bar" is window-relative (`window.to - 1`).
+    // A short single-section, uncounted form: each lap's wrap is counted (`lapFill`), not
+    // filled. A counted chart's choruses and a form with real section seams keep the section
+    // fill. `shortForm` is the form alone (the previous lap of a final, non-looping pass is
+    // still a lap of the loop); `shortLoop` is whether this call's pass wraps into another.
+    const shortForm =
+        bars.length < SHORT_FORM &&
+        bars.every((b) => b.visit.chorus === 0 && b.visit.ordinal === bars[0].visit.ordinal);
+    const shortLoop = looping && shortForm;
     const fillAt = (index: number, onPass: number): Fill => {
         const bar = bars[index];
         const isLast = index === window.to - 1;
@@ -270,6 +328,10 @@ export function planBars(
         }
         const next = isLast ? (looping ? bars[0] : null) : bars[index + 1];
         const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
+        if (isLast && looping && shortLoop) {
+            // The loop's wrap is a lap, counted toward the 8- and 16-bar periods.
+            return lapFill(onPass, bars.length);
+        }
         // A counted chart's chorus ends into its next chorus the way a looping song's last
         // bar wraps to the top: a section fill, even out of a seamless section.
         const wraps =
@@ -363,6 +425,9 @@ export function planBars(
         // The drummer's own turn opens with the kick under his statement, not a crash: the
         // crash is the band coming back in.
         const arrival = bar.barInVisit === 0 && !bar.visit.seamless && !first && !drumsTurn;
+        // The top of a short loop's next lap is no new section: it crashes only after the
+        // lap's section fill (`lapFill`), so a 4-bar loop crashes every 16 bars, not every 4.
+        const lapTop = shortForm && i === 0 && pass > 0;
         // A crash marks an arrival: a new section, or the downbeat after a phrase fill once the
         // band is past quiet energy — the previous bar's fill, in performance order. Past the
         // origin, that's bar `i - 1` on this same pass, read from the form (`fillAt`) rather
@@ -371,12 +436,20 @@ export function planBars(
         // one inside the window has no `plans` entry yet the first time the loop reaches it. AT
         // the origin: on pass 0 nothing played before it; on a later pass, the bar that played
         // right before it is the PREVIOUS pass's own last bar, which — having looped to reach
-        // this pass at all — `fillAt` always answers 'section' for (`isLast && looping` alone
-        // forces it, before phrase parity is even asked), so it can never afterFill. Hardcoded
-        // rather than asked, since the current call's own `looping` (which could by now be
-        // false, the render's own final pass) isn't the previous pass's.
-        const priorFill: Fill = i > origin ? fillAt(i - 1, pass) : pass === 0 ? 'none' : 'section';
-        const afterFill = priorFill === 'phrase' && energy >= 0.5;
+        // this pass at all — is a section fill (`isLast && looping` alone forces it, before
+        // phrase parity is even asked), so it can never afterFill; a short loop's lap
+        // answers by its own count (`lapFill`). Not asked of `fillAt`, since the current call's
+        // own `looping` (which could by now be false, the render's own final pass) isn't the
+        // previous pass's.
+        const priorFill: Fill =
+            i > origin
+                ? fillAt(i - 1, pass)
+                : pass === 0
+                  ? 'none'
+                  : shortForm
+                    ? lapFill(pass - 1, bars.length)
+                    : 'section';
+        const afterFill = priorFill === 'phrase' && energy >= 0.5 && !lapTop;
         // The band comes back in on a crash after the drummer's four. Read from the form, not
         // the previous plan, so a pass resumed here still crashes; the same origin rule as
         // `first`/`priorFill` above governs what "before" means at the start of this call.
@@ -389,7 +462,13 @@ export function planBars(
             energy,
             lanes,
             fill,
-            crash: arrival || afterFill || afterDrums || ending,
+            fillOrdinal:
+                fill !== 'none' && shortLoop && isLast ? lapFillOrdinal(pass, bars.length) : 0,
+            crash:
+                (arrival && !(lapTop && priorFill !== 'section')) ||
+                afterFill ||
+                afterDrums ||
+                ending,
             ending,
             lead,
         };

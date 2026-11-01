@@ -182,7 +182,18 @@ export function performPass(
             fill: 'none',
         };
         const nextPlan =
-            last && wrapPlan ? { ...wrapped, lanes: wrapPlan.lanes, lead: wrapPlan.lead } : wrapped;
+            last && wrapPlan
+                ? {
+                      ...wrapped,
+                      lanes: wrapPlan.lanes,
+                      lead: wrapPlan.lead,
+                      // The fill into the next lap is sized by that lap's own energy, so a
+                      // pass resumed here (whose window has no bar 0 to read) sizes it alike.
+                      energy: wrapPlan.energy,
+                      // And it crashes, or not, as the next lap's top does (`lapFill`).
+                      crash: wrapPlan.crash,
+                  }
+                : wrapped;
         const heard: BarContext['heard'] = { drums: [], bass: [], lead: [] };
         const barFirst = events.length;
         const context = (lane: Lane): BarContext => ({

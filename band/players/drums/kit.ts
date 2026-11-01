@@ -4,7 +4,7 @@
  * same way for every style: meter fitting, fills replacing the time, crashes on arrivals,
  * the ending, and dynamics.
  */
-import { type EnergyTier, energyTier } from '../../arrange/plan.js';
+import { type EnergyTier, energyTier, fillTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { DrumHit, DrumPiece } from '../../core/types.js';
 import type { BarContext, DrumIdiom } from '../../styles/types.js';
@@ -66,7 +66,12 @@ export function fillStart(ctx: BarContext, book: DrumBook): number | null {
         return null;
     }
     const total = barSteps(bar);
-    const length = Math.min(book.fillLength[plan.fill][energyTier(plan.energy)], total - 4);
+    // Sized by where the music is going: the bigger tier of this bar and the one it leads into.
+    const tier = fillTier(plan.energy, ctx.next?.plan.energy ?? null);
+    const sized = Math.min(book.fillLength[plan.fill][tier], total - 4);
+    // A short loop's next fill of a kind is the shorter pickup, then the full one again: a
+    // drummer vamping four bars doesn't play the same run each time (#2009).
+    const length = plan.fillOrdinal % 2 === 1 && sized >= 4 ? sized / 2 : sized;
     return length > 0 ? total - length : null;
 }
 
