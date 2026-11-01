@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useEffectEvent } from 'react';
+import { type RefObject, useEffect, useEffectEvent, useRef } from 'react';
 import type { ChartDocument } from '../lib/runtime';
 
 /** What the shell hands `useStandKeys`: exactly what the key handler reads. */
@@ -32,9 +32,10 @@ export function useStandKeys({
     togglePlayback,
     setFollowing,
 }: StandKeysOptions) {
+    const pointerFocused = useRef<Element | null>(null);
     // Keys on the stand (UI audit): Space plays and stops, and PageDown/PageUp step through the
     // chart a section at a time — what a page-turn pedal sends. Only on the stand's chart, with no
-    // sheet or dialog open, and never while typing: Space on a focused button or control is that
+    // sheet or dialog open, and never while typing: Space on a control the keyboard focused is that
     // control's own, so it is left alone. An effect event, so the listener, added once, always
     // sees the latest render's state.
     const onStandKey = useEffectEvent((event: KeyboardEvent) => {
@@ -49,7 +50,15 @@ export function useStandKeys({
             return;
         }
         if (event.key === ' ') {
-            if (target?.closest('button, a, [role="button"], [role="tab"], [role="menuitem"]')) {
+            // A control the keyboard focused keeps its Space. One the pointer focused (a mute chip
+            // just clicked) does not: the musician's next Space means "play", not "toggle it again".
+            const control = target?.closest(
+                'button, a, [role="button"], [role="tab"], [role="menuitem"]',
+            );
+            if (
+                control &&
+                !(control === pointerFocused.current && document.activeElement === control)
+            ) {
                 return;
             }
             event.preventDefault();
@@ -98,8 +107,28 @@ export function useStandKeys({
         }
     });
     useEffect(() => {
-        const onKey = (event: KeyboardEvent) => onStandKey(event);
+        const onKey = (event: KeyboardEvent) => {
+            onStandKey(event);
+            // Tab is the keyboard taking focus over from the pointer.
+            if (event.key === 'Tab') {
+                pointerFocused.current = null;
+            }
+        };
+        // Which control the pointer last pressed. `:focus-visible` cannot say: Chromium counts
+        // the Space itself as keyboard use and reports a just-clicked button as keyboard-focused.
+        const onPress = (event: PointerEvent) => {
+            pointerFocused.current =
+                event.target instanceof Element
+                    ? event.target.closest(
+                          'button, a, [role="button"], [role="tab"], [role="menuitem"]',
+                      )
+                    : null;
+        };
         window.addEventListener('keydown', onKey);
-        return () => window.removeEventListener('keydown', onKey);
+        window.addEventListener('pointerdown', onPress, true);
+        return () => {
+            window.removeEventListener('keydown', onKey);
+            window.removeEventListener('pointerdown', onPress, true);
+        };
     }, []);
 }
