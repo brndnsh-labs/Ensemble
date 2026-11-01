@@ -452,6 +452,27 @@ describe('withSectionSettings', () => {
         expect(cleared.kind === 'ok' && cleared.score.sections[0].isMinor).toBe(true);
     });
 
+    it('silences a lane for one section and gives it back (#2021)', () => {
+        const off = apply({ lane: 'bass', on: false });
+        expect(off.instruments).toEqual({ bass: false });
+        const both = withSectionSettings(
+            song([section('b', [bar('b1')], { instruments: { bass: false } })]),
+            'b',
+            { lane: 'groove', on: false },
+        );
+        expect(both.kind === 'ok' && both.score.sections[0].instruments).toEqual({
+            bass: false,
+            groove: false,
+        });
+        const back = withSectionSettings(
+            song([section('b', [bar('b1')], { instruments: { bass: false } })]),
+            'b',
+            { lane: 'bass', on: null },
+        );
+        expect(back.kind === 'ok' && back.score.sections[0]).not.toHaveProperty('instruments');
+        expect(back.kind === 'ok' && validateSemanticScore(back.score).kind).toBe('ok');
+    });
+
     it('writes and clears a section grouping (#1376)', () => {
         const fives = song([section('a', [bar('a1', {}, 5)], { meter: '5/4' })]);
         const set = withSectionSettings(fives, 'a', { grouping: [2, 3] });

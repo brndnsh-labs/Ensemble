@@ -35,17 +35,27 @@ export interface BarPlan {
     lead: LeadRole;
 }
 
-// Section roles by label. Unknown labels (A, B, Head…) sit at the middle.
-const ROLE_ENERGY: readonly [RegExp, number][] = [
-    [/^intro/i, 0.35],
-    [/^(verse|v\d*$)/i, 0.5],
-    [/^pre/i, 0.6],
-    [/^(chorus|hook|refrain)/i, 0.75],
-    [/^(bridge|b$)/i, 0.6],
-    [/^solo/i, 0.65],
-    [/^(break|breakdown)/i, 0.3],
-    [/^(outro|coda|ending|tag)/i, 0.45],
+/**
+ * The section roles the band knows, read off a section's label (there is no separate role field):
+ * the name the stand offers, the label pattern the band matches, and the energy it plays at.
+ * Unknown labels (A, B, Head...) have no role and sit at the middle.
+ */
+export const SECTION_ROLES: readonly { name: string; pattern: RegExp; energy: number }[] = [
+    { name: 'Intro', pattern: /^intro/i, energy: 0.35 },
+    { name: 'Verse', pattern: /^(verse|v\d*$)/i, energy: 0.5 },
+    { name: 'Pre-chorus', pattern: /^pre/i, energy: 0.6 },
+    { name: 'Chorus', pattern: /^(chorus|hook|refrain)/i, energy: 0.75 },
+    { name: 'Bridge', pattern: /^(bridge|b$)/i, energy: 0.6 },
+    { name: 'Solo', pattern: /^solo/i, energy: 0.65 },
+    { name: 'Break', pattern: /^(break|breakdown)/i, energy: 0.3 },
+    { name: 'Outro', pattern: /^(outro|coda|ending|tag)/i, energy: 0.45 },
 ];
+
+/** The role the band reads from a section label, or null for one it has no role for. */
+export function sectionRoleOf(label: string): string | null {
+    const text = label.trim();
+    return SECTION_ROLES.find((role) => role.pattern.test(text))?.name ?? null;
+}
 const DEFAULT_ENERGY = 0.55;
 
 function sectionEnergy(bar: Bar): number {
@@ -53,7 +63,7 @@ function sectionEnergy(bar: Bar): number {
         return bar.visit.targetIntensity;
     }
     const label = bar.visit.label.trim();
-    return ROLE_ENERGY.find(([pattern]) => pattern.test(label))?.[1] ?? DEFAULT_ENERGY;
+    return SECTION_ROLES.find((role) => role.pattern.test(label))?.energy ?? DEFAULT_ENERGY;
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
