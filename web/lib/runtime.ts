@@ -3,6 +3,7 @@ import {
     barAtTick,
     compileTimeline,
     DEFAULT_SETTINGS,
+    type Lane,
     type LeadInstrument,
     PPQ,
     STYLE_IDS,
@@ -11,7 +12,7 @@ import {
     type Timeline,
     toMidi,
 } from '@band/index';
-import { flushBuffers, togglePower } from '@core/controllers/instrument-controller';
+import { flushBuffer, flushBuffers, togglePower } from '@core/controllers/instrument-controller';
 import { autoVoiceForGenre } from '@core/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@core/data/smart-genres';
 import {
@@ -184,6 +185,33 @@ let bandView: BandChart | null = null;
  */
 let songMinutes: SongMinutes | null = null;
 /**
+ * The lane that is the musician's own (#1992, `lib/instrument.ts`), or null. A device
+ * preference the shell owns and hands over (`setPlayerLane`), never a state field or a chart
+ * field: it composes with the chart's lane power at read time (`laneHeard`, `bandSettings`), so
+ * the chart's own `enabled` is never written for it.
+ */
+let playerLane: InstrumentModule | null = null;
+/**
+ * Whether the musician has turned their own lane on for the chart open now. Every chart opens
+ * with it off — the instrument's default mute — and that mute is a hole the band leaves for them
+ * (`BandSettings.you`). Session-only: reset when a chart is opened (`load(…, true)`) or the
+ * instrument changes — never by the reloads an edit, an Undo or a Duplicate make of the same chart.
+ */
+let playerLaneHeard = false;
+/**
+ * Set while turning the musician's own lane on had to switch the CHART's lane on too (the chart
+ * had it off): muting it again takes that write back, so the chart says what the musician last
+ * chose. Cleared with `playerLaneHeard`.
+ */
+let playerLaneWroteChart = false;
+/** The band engine's name for each state lane. */
+const BAND_LANE: Record<InstrumentModule, Lane> = {
+    groove: 'drums',
+    bass: 'bass',
+    chords: 'comp',
+    soloist: 'lead',
+};
+/**
  * The performance song mode planned for the band now playing: the open score counted to the
  * chosen number of choruses, its timeline, and the chart sheet's view of it. Null while stopped,
  * and while the band plays the chart as written.
@@ -292,17 +320,36 @@ function bandStyle(): StyleId {
     return styleForGenre(getState().groove.lastSmartGenre);
 }
 
+/**
+ * Whether `module` sounds: the chart's lane power, and for the musician's own lane (#1992) also
+ * whether they have turned it on for this chart. What the mute chips and the Band sheet show.
+ */
+export function laneHeard(module: InstrumentModule): boolean {
+    const on = getState()[module].enabled;
+    return module === playerLane ? on && playerLaneHeard : on;
+}
+
+/** The musician's own lane while it is muted (#1992): the hole the band leaves for them. */
+function playerHole(): InstrumentModule | null {
+    return playerLane && !laneHeard(playerLane) ? playerLane : null;
+}
+
 function bandSettings(): BandSettings {
     const { groove, bass, chords, soloist, playback } = getState();
     const style = bandStyle();
+    // The musician's own lane, muted, is a hole (#1992): the band plays it — so every other
+    // player hears a bassist, a comper, a soloist there — and leaves its notes out
+    // (`BandSettings.you`). Any other lane switched off is a band without that player, as ever.
+    const hole = playerHole();
     return {
         style,
         lanes: {
-            drums: groove.enabled,
-            bass: bass.enabled,
-            comp: chords.enabled,
-            lead: soloist.enabled,
+            drums: groove.enabled || hole === 'groove',
+            bass: bass.enabled || hole === 'bass',
+            comp: chords.enabled || hole === 'chords',
+            lead: soloist.enabled || hole === 'soloist',
         },
+        you: hole && BAND_LANE[hole],
         comp: compForChordsLane(chords, STYLES[style].prefers),
         lead: bandLead(style),
         intensity: playback.autoIntensity ? null : playback.bandIntensity,
@@ -482,7 +529,14 @@ export function performancePlace(tick: number | null): PerformancePlace | null {
     const of = lap ? null : (songPlan?.choruses ?? currentScore?.choruses ?? null);
     const barChorus = band.chorusOf(at.bar);
     let part: string | null = null;
-    if (of !== null && of > 1 && role && getState().soloist.enabled) {
+    // The lead's parts are named for a soloist the band has — or for you, when the lead is your
+    // own lane (#1992): Head, Solo 1… is then when to play what.
+    if (
+        of !== null &&
+        of > 1 &&
+        role &&
+        (getState().soloist.enabled || playerHole() === 'soloist')
+    ) {
         if (role.kind === 'head') {
             part = barChorus === of - 1 ? 'Out' : 'Head';
         } else if (role.kind === 'solo') {
@@ -1197,8 +1251,8 @@ export function setTrade(
     param('soloist', 'tradeBars', bars);
     param('soloist', 'tradeChoruses', choruses);
     param('soloist', 'tradeWith', tradeWith);
-    if (tradeWith === 'soloist' && !getState().soloist.enabled) {
-        togglePower('soloist');
+    if (tradeWith === 'soloist' && !laneHeard('soloist')) {
+        setEnabled('soloist', true);
     }
 }
 
@@ -1216,12 +1270,18 @@ export function tradePartners(): { soloist: boolean; drums: boolean } {
  * trade the band won't play.
  */
 export function tradeBlocked(): 'soloist-off' | 'drums-off' | 'drummer-no-solo' | null {
-    const { soloist, groove } = getState();
+    // Read through `laneHeard`: your own lane muted is a hole, and the band never trades with
+    // it (`tradeThatHappens`, #1992).
+    const { soloist } = getState();
     if (soloist.tradeWith === 'soloist') {
-        return soloist.enabled ? null : 'soloist-off';
+        return laneHeard('soloist') ? null : 'soloist-off';
     }
     if (soloist.tradeWith === 'drums') {
-        return !groove.enabled ? 'drums-off' : tradePartners().drums ? null : 'drummer-no-solo';
+        return !laneHeard('groove')
+            ? 'drums-off'
+            : tradePartners().drums
+              ? null
+              : 'drummer-no-solo';
     }
     return null;
 }
@@ -1502,7 +1562,14 @@ function apply(content: Session, compiled?: Timeline): void {
     dispatch(ACTIONS.SET_START_STEP, 0);
 }
 
-export function load(document: ChartDocument): void {
+/**
+ * `opened` marks a chart the musician has just put on the stand through the shell's `open()` or
+ * `landDraftOnStand` (the songbook, a link, a standard, a new song, a kept or recovered copy): its
+ * own lane starts muted again (#1992). Every other load is the chart already on the stand — an
+ * edit, an Undo, a Revert, the chart after a Duplicate or Keep both re-points it — and keeps what
+ * the musician chose on it.
+ */
+export function load(document: ChartDocument, opened = false): void {
     const checked = validateDocument(document);
     const timeline = checkPlayable(checked.chart.score);
     stop();
@@ -1523,6 +1590,11 @@ export function load(document: ChartDocument): void {
         throw error;
     } finally {
         loading = false;
+    }
+    if (opened) {
+        // Each chart opens with the musician's own lane muted (#1992).
+        playerLaneHeard = false;
+        playerLaneWroteChart = false;
     }
 }
 
@@ -1702,10 +1774,55 @@ const TELEMETRY_PART: Record<InstrumentModule, 'drums' | 'bass' | 'chords' | 'so
 };
 
 export function setEnabled(module: InstrumentModule, enabled: boolean): void {
+    if (module === playerLane) {
+        // Your own lane (#1992): muting it is the instrument's default, not a chart edit, so it
+        // never writes the chart's `enabled`. Turning it on does only where the chart itself has
+        // the lane off — that is a choice about this song, and Save keeps it.
+        if (playerLaneHeard === enabled && laneHeard(module) === enabled) {
+            return;
+        }
+        playerLaneHeard = enabled;
+        track('part_toggled', { part: TELEMETRY_PART[module] });
+        if (enabled && !getState()[module].enabled) {
+            playerLaneWroteChart = true;
+            togglePower(module); // its dispatch syncs the band
+        } else if (!enabled && playerLaneWroteChart && getState()[module].enabled) {
+            // Off again: the chart goes back to the off it had (its dispatch syncs the band).
+            playerLaneWroteChart = false;
+            togglePower(module);
+        } else {
+            playerLaneWroteChart = false;
+            if (!enabled && module !== 'groove') {
+                // What rings now stops now, as any lane's mute does; the host drops the lane's
+                // notes still to come (`BandHost.sound`).
+                flushBuffer(module);
+            }
+            band?.update(bandSettings());
+        }
+        return;
+    }
     if (getState()[module].enabled !== enabled) {
         togglePower(module);
         track('part_toggled', { part: TELEMETRY_PART[module] });
     }
+}
+
+/**
+ * The musician's own lane (#1992), from the shell's "What do you play?" preference; null for
+ * none. A change mutes the new lane at once, as opening a chart does.
+ */
+export function setPlayerLane(module: InstrumentModule | null): void {
+    if (module === playerLane) {
+        return;
+    }
+    playerLane = module;
+    playerLaneHeard = false;
+    playerLaneWroteChart = false;
+    band?.update(bandSettings());
+}
+
+export function playerLaneModule(): InstrumentModule | null {
+    return playerLane;
 }
 /**
  * Moves the song by `delta` semitones. `key` is the name the key picker chose (`F#`, not `Gb`),
@@ -1963,6 +2080,8 @@ export async function exportAudio(
     const { events, timeline } = await host.render({
         ...exportSettings(plan),
         lanes: { drums: true, bass: true, comp: true, lead: true },
+        // Every stem, your own lane's included (#1992).
+        you: null,
     });
     if (intent !== exportIntent) {
         return;

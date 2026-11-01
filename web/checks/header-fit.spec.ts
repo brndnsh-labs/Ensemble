@@ -65,7 +65,36 @@ test('every mute chip is inside the screen at 320x256', async ({ page }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket').first().click();
     const chips = page.locator('.band-controls .band-toggle');
+    await expect(chips.first()).toBeVisible();
     expect(await chips.count()).toBeGreaterThan(2);
+    const boxes = await chips.evaluateAll((els) =>
+        els.map((el) => {
+            const box = el.getBoundingClientRect();
+            return { left: box.left, right: box.right };
+        }),
+    );
+    for (const box of boxes) {
+        expect(box.left).toBeGreaterThanOrEqual(0);
+        expect(box.right).toBeLessThanOrEqual(320.5);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+    );
+});
+
+test('what you play adds a chip that is inside the screen at 320x256 too (#1992)', async ({
+    page,
+}) => {
+    // A B♭ horn: the instrument chip plus its own lane (the soloist) muted for it.
+    await page.addInitScript(() => {
+        localStorage.setItem('ensemble-v2-preview:player-instrument', 'horn-bb');
+    });
+    await page.setViewportSize({ width: 320, height: 256 });
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket').first().click();
+    await expect(page.getByRole('button', { name: /^You play: B♭ horn/ })).toBeVisible();
+    const chips = page.locator('.band-controls .band-toggle');
+    expect(await chips.count()).toBeGreaterThan(3);
     const boxes = await chips.evaluateAll((els) =>
         els.map((el) => {
             const box = el.getBoundingClientRect();

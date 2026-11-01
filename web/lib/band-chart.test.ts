@@ -6,7 +6,15 @@
 import { compileTimeline, PPQ } from '@band/index';
 import type { ScoreEvent, ScoreMeasure, SemanticScore } from '@core/songbook/score-types';
 import { describe, expect, it } from 'vitest';
-import { auditionMidis, bandChart, chordNames, sectionSteps, slotAt } from './band-chart';
+import {
+    auditionMidis,
+    bandChart,
+    chordNames,
+    sectionSteps,
+    shiftedBlocks,
+    shiftedChord,
+    slotAt,
+} from './band-chart';
 
 const chord = (symbol: string, n: number, d = 1, fermata = false): ScoreEvent => ({
     kind: 'chord',
@@ -289,5 +297,66 @@ describe('auditionMidis', () => {
         expect(slash.absName).toBe('C/E');
         expect(onE[0] % 12).toBe(4);
         expect(onE[0]).toBeLessThan(onE[1]);
+    });
+});
+
+describe('the chords a transposing instrument reads (#1992)', () => {
+    const read = (symbol: string, key: string, isMinor: boolean, shift: number) => {
+        const chord = {
+            globalIndex: 0,
+            start: 0,
+            end: 16,
+            key,
+            keyIsMinor: isMinor,
+            timeSignature: '4/4',
+            kind: 'chord' as const,
+            ...chordNames(symbol, key, isMinor),
+        };
+        return shiftedChord(chord, shift);
+    };
+    const name = (symbol: string, key: string, isMinor: boolean, shift: number) =>
+        read(symbol, key, isMinor, shift).absName;
+
+    it('a B♭ instrument reads a whole step up, an E♭ one a major sixth up', () => {
+        expect(name('C^7', 'C', false, 2)).toBe('D^7');
+        expect(name('Dm7', 'C', false, 2)).toBe('Em7');
+        expect(name('G7', 'C', false, 2)).toBe('A7');
+        expect(name('C^7', 'C', false, 9)).toBe('A^7');
+        expect(name('G7', 'C', false, 9)).toBe('E7');
+    });
+
+    it('spells from the key the part lands in', () => {
+        // Concert E minor on a B♭ horn is F# minor: sharps, never Gb.
+        expect(name('Em7', 'E', true, 2)).toBe('F#m7');
+        expect(name('B7', 'E', true, 2)).toBe('C#7');
+        // Concert F on a B♭ horn is G; on an E♭ horn, D. Concert Bb on E♭ is G.
+        expect(name('Bb7', 'F', false, 2)).toBe('C7');
+        expect(name('Eb^7', 'Bb', false, 9)).toBe('C^7');
+        // Concert Ab major on a B♭ horn is Bb major: flats.
+        expect(name('Db^7', 'Ab', false, 2)).toBe('Eb^7');
+        // Outside the key, in a sharp key: concert E's secondary dominant G#7 is A#7 in F#.
+        expect(name('G#7', 'E', false, 2)).toBe('A#7');
+        expect(name('C#7', 'E', false, 2)).toBe('D#7');
+        // A borrowed chord in a flat key stays flat: concert C's Ab^7 on an E♭ horn (A) is F^7.
+        expect(name('Ab^7', 'C', false, 9)).toBe('F^7');
+    });
+
+    it('moves a slash bass with its chord and the key with them', () => {
+        const chord = read('C/E', 'C', false, 2);
+        expect(chord.absName).toBe('D/F#');
+        expect(chord.display?.name.bass).toBe('F#');
+        expect(chord.key).toBe('D');
+    });
+
+    it('leaves numerals, holds and a concert instrument as they are', () => {
+        const chord = read('G7', 'C', false, 2);
+        expect(chord.display?.roman).toEqual(read('G7', 'C', false, 0).display?.roman);
+        expect(chord.display?.nns).toEqual(read('G7', 'C', false, 0).display?.nns);
+        const plain = read('G7', 'C', false, 0);
+        expect(shiftedChord(plain, 0)).toBe(plain);
+        const hold = { ...plain, kind: 'hold' as const };
+        expect(shiftedChord(hold, 2)).toBe(hold);
+        const blocks = [{ measures: [] }];
+        expect(shiftedBlocks(blocks, 12)).toBe(blocks);
     });
 });

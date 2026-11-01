@@ -643,10 +643,15 @@ export class BandHost {
         return bar && { bar: bar.index, pass: segment.pass + bar.visit.chorus };
     }
 
-    /** What the band's trade is now (partner, turn length, lanes), to tell when a turn plan changed. */
+    /**
+     * What the band's trade is now (partner, turn length, lanes, and which lane is the
+     * musician's own hole, #1992), to tell when a turn plan changed.
+     */
     tradeKey(): string {
         const s = this.settings;
-        return s ? JSON.stringify([s.trade ?? null, s.lanes.lead, s.lanes.drums]) : '';
+        return s
+            ? JSON.stringify([s.trade ?? null, s.lanes.lead, s.lanes.drums, s.you ?? null])
+            : '';
     }
 
     /** Which chorus of a counted performance performed bar `index` is in (0 when uncounted). */
@@ -1061,6 +1066,12 @@ export class BandHost {
     }
 
     private sound(state: EnsembleState, segment: Segment, event: BandEvent, time: number): void {
+        // The musician's own lane, muted (#1992): a segment generated before the mute still
+        // holds its notes until the band regenerates at a barline, and the lane's bus stays open
+        // (the chart has it on), so they are left out here, from the moment the mute lands.
+        if (event.lane === this.settings?.you) {
+            return;
+        }
         const durationSeconds =
             event.lane === 'drums'
                 ? 0

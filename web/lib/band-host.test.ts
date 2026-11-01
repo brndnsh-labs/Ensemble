@@ -1070,3 +1070,54 @@ describe('BandHost.inLastPulseBefore: the last beat before a chord gives way (#1
         expect(host.inLastPulseBefore(8 * PPQ, 12 * PPQ, 0)).toBe(false);
     });
 });
+
+describe('your own lane muted mid-bar (#1992)', () => {
+    // The band takes the new settings at a barline; until then the segment it generated before
+    // the mute still holds the lane's notes, and the lane's bus is open (the chart has it on).
+    const bassNotesAfterAMuteAt = (mute: boolean) => {
+        const audio = fakeAudioContext(0);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        host.setScore(twoBars);
+        const settings: BandSettings = {
+            ...DEFAULT_SETTINGS,
+            style: 'rock',
+            lanes: { drums: true, bass: true, comp: false, lead: false },
+        };
+        host.start(settings, 60, 0);
+        run(host, audio, 0, 0.3);
+        if (mute) {
+            host.update({ ...settings, you: 'bass' });
+        }
+        vi.mocked(playBassNote).mockClear();
+        // The rest of the first bar (4 s at 60 bpm), before the barline the band regenerates at.
+        run(host, audio, 0.3, 3.5);
+        host.stop();
+        return vi.mocked(playBassNote).mock.calls.length;
+    };
+
+    it('stops sounding at once, not at the next barline', () => {
+        expect(bassNotesAfterAMuteAt(false)).toBeGreaterThan(0);
+        expect(bassNotesAfterAMuteAt(true)).toBe(0);
+    });
+});
+
+describe('BandHost.tradeKey', () => {
+    it('changes when the musician’s own lane becomes a hole or is heard again (#1992)', () => {
+        const state = fakeState(fakeAudioContext(0));
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        const heard: BandSettings = {
+            ...DEFAULT_SETTINGS,
+            lanes: { drums: true, bass: true, comp: true, lead: true },
+            trade: { with: 'lead', bars: 4, choruses: null },
+        };
+        host.update(heard);
+        const before = host.tradeKey();
+        // The lanes read the same either way: only `you` says the lead is now a hole, and the
+        // band no longer trades with it.
+        host.update({ ...heard, you: 'lead' });
+        expect(host.tradeKey()).not.toBe(before);
+        host.update({ ...heard, you: null });
+        expect(host.tradeKey()).toBe(before);
+    });
+});

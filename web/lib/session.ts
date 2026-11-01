@@ -1,5 +1,6 @@
 // Leaf modules, not the `./voicings` barrel: the barrel would pull the whole voicer into every
 // page that reads a setting (#1877).
+import { PLAYER_INSTRUMENTS, type PlayerInstrument } from './instrument';
 import { HOME_FRETS } from './voicings/home-window';
 import { NECK_INSTRUMENTS, type NeckPrefs } from './voicings/neck-instruments';
 import type { HomeWindow } from './voicings/types';
@@ -468,5 +469,30 @@ export function rememberSongMode(minutes: SongMinutes | null): void {
         }
     } catch {
         // The live setting still applies for this session; only the memory is lost.
+    }
+}
+
+const PLAYER_INSTRUMENT = 'ensemble-v2-preview:player-instrument';
+
+/**
+ * What the musician at this device plays (#1992, `lib/instrument.ts`), or null when they have
+ * never answered — which is what puts the stand's one-time "What do you play?" question up. Read
+ * strictly: storage is untrusted, so anything but an offered id is unanswered. A per-device
+ * habit like `songModePreference`, never written to a chart and never synced.
+ */
+export function playerInstrument(): PlayerInstrument | null {
+    try {
+        const stored = localStorage.getItem(PLAYER_INSTRUMENT);
+        return PLAYER_INSTRUMENTS.find((id) => id === stored) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export function rememberPlayerInstrument(instrument: PlayerInstrument): void {
+    try {
+        localStorage.setItem(PLAYER_INSTRUMENT, instrument);
+    } catch {
+        // The choice still applies for this page; only the memory is lost.
     }
 }

@@ -44,6 +44,14 @@ interface TransportBarProps {
     onTrade: () => void;
     /** Set when the chart asks to trade but the band can't right now (`runtime.tradeBlocked`). */
     tradeBlocked: string | null;
+    /**
+     * What the musician plays (#1992), shown as the first chip: `label` names it, `note` says how
+     * the chords read for it ("B♭ chords"), `tag` is the one word a phone has room for, and
+     * `lane` is the lane that is theirs. Null before
+     * they have answered. Its press opens Settings.
+     */
+    player: { label: string; tag: string; note: string | null; lane: Lane | null } | null;
+    onPlayer: () => void;
 }
 
 export function TransportBar({
@@ -69,6 +77,8 @@ export function TransportBar({
     onToggleLane,
     onTrade,
     tradeBlocked,
+    player,
+    onPlayer,
 }: TransportBarProps) {
     const trade = current.chart.band.soloist.tradeWith ?? 'off';
     const tradeBars = current.chart.band.soloist.tradeBars ?? 4;
@@ -189,43 +199,72 @@ export function TransportBar({
                 </button>
             </div>
             <div className="band-controls" aria-label="Band instruments">
-                {visibleLanes.map(([key, label]) => (
-                    <Fragment key={key}>
-                        <button
-                            className={`band-toggle ${current.chart.band[key].enabled ? 'on' : 'off'}`}
-                            disabled={busy}
-                            aria-pressed={current.chart.band[key].enabled}
-                            onClick={() => onToggleLane(key)}
-                        >
-                            <span className="dot" />
-                            <span className="label">{label}</span>
-                        </button>
-                        {/* Trading sits by the soloist it's about; it shows the turn length
-                            while on, so a musician can see the band will leave them room. */}
-                        {key === 'soloist' && (
+                {player && (
+                    <button
+                        type="button"
+                        className="band-toggle player-chip"
+                        aria-label={`You play: ${player.label}${player.note ? `, ${player.note}` : ''}. Change`}
+                        title="What you play — change it in Settings"
+                        onClick={onPlayer}
+                    >
+                        {/* A phone's row of chips has room for a word: the tag. */}
+                        <span className="label player-long" aria-hidden="true">
+                            {player.label}
+                            {player.note && <span className="player-note"> · {player.note}</span>}
+                        </span>
+                        <span className="label player-short" aria-hidden="true">
+                            {player.tag}
+                        </span>
+                    </button>
+                )}
+                {visibleLanes.map(([key, label]) => {
+                    const on = current.chart.band[key].enabled;
+                    // Your own lane, muted, is a hole the band leaves for you (#1992).
+                    const yours = player?.lane === key;
+                    return (
+                        <Fragment key={key}>
                             <button
-                                type="button"
-                                className={`band-toggle trade-toggle ${trading ? 'on' : 'off'}`}
+                                className={`band-toggle ${on ? 'on' : 'off'}${yours ? ' yours' : ''}`}
                                 disabled={busy}
-                                aria-haspopup="dialog"
-                                aria-expanded={bandTab === 'trade'}
-                                aria-label={
-                                    trade === 'off'
-                                        ? 'Trade'
-                                        : trading
-                                          ? `Trade: ${tradeBars} bars with the ${partner}`
-                                          : `Trade: ${tradeBars} bars with the ${partner}, paused`
+                                aria-pressed={on}
+                                title={
+                                    yours && !on
+                                        ? 'Yours: the band leaves room for your part'
+                                        : undefined
                                 }
-                                title="Trade with the band"
-                                onClick={onTrade}
+                                onClick={() => onToggleLane(key)}
                             >
-                                <span className="label">
-                                    {trade === 'off' ? '⇄' : `⇄ ${tradeBars}`}
-                                </span>
+                                <span className="dot" />
+                                <span className="label">{label}</span>
+                                {yours && !on && <span className="yours-mark"> · you</span>}
                             </button>
-                        )}
-                    </Fragment>
-                ))}
+                            {/* Trading sits by the soloist it's about; it shows the turn length
+                            while on, so a musician can see the band will leave them room. */}
+                            {key === 'soloist' && (
+                                <button
+                                    type="button"
+                                    className={`band-toggle trade-toggle ${trading ? 'on' : 'off'}`}
+                                    disabled={busy}
+                                    aria-haspopup="dialog"
+                                    aria-expanded={bandTab === 'trade'}
+                                    aria-label={
+                                        trade === 'off'
+                                            ? 'Trade'
+                                            : trading
+                                              ? `Trade: ${tradeBars} bars with the ${partner}`
+                                              : `Trade: ${tradeBars} bars with the ${partner}, paused`
+                                    }
+                                    title="Trade with the band"
+                                    onClick={onTrade}
+                                >
+                                    <span className="label">
+                                        {trade === 'off' ? '⇄' : `⇄ ${tradeBars}`}
+                                    </span>
+                                </button>
+                            )}
+                        </Fragment>
+                    );
+                })}
             </div>
         </div>
     );

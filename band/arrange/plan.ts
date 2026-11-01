@@ -251,8 +251,13 @@ export function fullWindow(timeline: Timeline): PassWindow {
  */
 function tradeThatHappens(settings: BandSettings, drumSolos: boolean): TradeSettings | null {
     const wanted = settings.trade ?? null;
+    // The musician's own lane (`BandSettings.you`, #1992) is a hole, not a partner: its turns
+    // would be silence.
+    const you = settings.you ?? null;
     return wanted &&
-        (wanted.with === 'lead' ? settings.lanes.lead : settings.lanes.drums && drumSolos)
+        (wanted.with === 'lead'
+            ? settings.lanes.lead && you !== 'lead'
+            : settings.lanes.drums && you !== 'drums' && drumSolos)
         ? wanted
         : null;
 }

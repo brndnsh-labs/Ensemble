@@ -1,0 +1,40 @@
+/* "What do you play?" (#1992): a quiet row under the transport, asked once. Never a modal. */
+.player-prompt {
+    margin: 8px 18px 0;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--paper);
+}
+.player-prompt-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+}
+.player-prompt-note {
+    margin: 2px 0 8px;
+    font-size: 12px;
+}
+.player-prompt-choices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+.player-prompt-choice {
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    background: transparent;
+    color: var(--ink);
+    font-size: 13px;
+}
+.player-prompt-choice.quiet {
+    color: var(--muted);
+    border-style: dashed;
+}
+@media (max-width: 760px) {
+    .player-prompt {
+        margin: 6px 12px 0;
+    }
+}

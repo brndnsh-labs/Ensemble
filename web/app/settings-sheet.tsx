@@ -1,4 +1,5 @@
 import type { RefObject } from 'react';
+import { INSTRUMENT_ROLES, PLAYER_INSTRUMENTS, type PlayerInstrument } from '../lib/instrument';
 import type { Palette, ThemeChoice } from '../lib/session';
 import { dialogRule } from './dialog-close';
 import './settings-sheet.css';
@@ -26,8 +27,24 @@ interface SettingsSheetProps {
     onTheme: (theme: ThemeChoice | null) => void;
     palette: Palette;
     onPalette: (palette: Palette) => void;
+    /** What the musician plays (#1992); null until they have answered. */
+    instrument: PlayerInstrument | null;
+    onInstrument: (instrument: PlayerInstrument) => void;
     onClose: () => void;
 }
+
+/** What each answer does on the stand, said once beside it (#1992). */
+const INSTRUMENT_HINTS: Record<PlayerInstrument, string> = {
+    'guitar-rhythm': 'Band chords off for you · Neck view',
+    'guitar-lead': 'Soloist off for you · Neck view',
+    bass: 'Band bass off for you',
+    keys: 'Band chords off for you',
+    drums: 'Drums off for you',
+    'horn-bb': 'Soloist off · chords shown a whole step up',
+    'horn-eb': 'Soloist off · chords shown a major sixth up',
+    voice: 'Soloist off for you',
+    listening: 'Nothing changes',
+};
 
 /**
  * Per-device settings (#1783) — never a document field. Appearance is the first section: System
@@ -42,6 +59,8 @@ export function SettingsSheet({
     onTheme,
     palette,
     onPalette,
+    instrument,
+    onInstrument,
     onClose,
 }: SettingsSheetProps) {
     const chosen = theme ?? 'system';
@@ -58,6 +77,29 @@ export function SettingsSheet({
                     ✕
                 </button>
             </div>
+            {/* First: it changes what the band plays, not just how the page looks (#1992). */}
+            <fieldset className="settings-group">
+                <legend>What do you play?</legend>
+                {PLAYER_INSTRUMENTS.map((id) => (
+                    <label key={id} className="settings-choice">
+                        <input
+                            type="radio"
+                            name="player-instrument"
+                            value={id}
+                            checked={instrument === id}
+                            onChange={() => onInstrument(id)}
+                        />
+                        <span>
+                            {INSTRUMENT_ROLES[id].label}
+                            <span className="muted settings-hint"> · {INSTRUMENT_HINTS[id]}</span>
+                        </span>
+                    </label>
+                ))}
+                <p className="muted settings-hint settings-group-note">
+                    Your part is muted when a song opens and the band leaves room for it. Turn it on
+                    any time for that song.
+                </p>
+            </fieldset>
             <fieldset className="settings-group">
                 <legend>Appearance</legend>
                 {APPEARANCE.map((entry) => (

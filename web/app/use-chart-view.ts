@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { BandChart } from '../lib/band-chart';
+import { type BandChart, shiftedBlocks } from '../lib/band-chart';
 import type { ChartBlock } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
@@ -47,6 +47,8 @@ export function useChartView(
     playing: boolean,
     countInSlot: number | null = null,
     polledView: BandChart | null = null,
+    /** Semitones a transposing instrument reads the chords up (#1992); 0 is concert. */
+    shift = 0,
 ) {
     // Read again whenever the open document changes (`runtime.load`/`editScore` rebuild the
     // view), and when playback starts or stops: a song-mode performance (#1784) is drawn from its
@@ -58,7 +60,11 @@ export function useChartView(
         (): BandChart | null => (current ? runtime.bandChartView() : null),
         [current, playing, polledView],
     );
-    const blocks = band?.blocks ?? NO_BLOCKS;
+    // Display only: the band, the slots and every written bar stay in concert.
+    const blocks = useMemo(
+        () => (band ? shiftedBlocks(band.blocks, shift) : NO_BLOCKS),
+        [band, shift],
+    );
     const displayActive = active === null ? null : (band?.slots[active]?.display ?? active);
     /**
      * The next performed bar's display index (#1458's next-bar cue), skipping past any further

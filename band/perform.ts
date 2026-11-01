@@ -319,18 +319,23 @@ export function performPass(
         strumMs: instrument.strumMs,
     });
     felt.sort((a, b) => a.tick - b.tick || laneOrder(a) - laneOrder(b));
+    // The musician's own lane (`BandSettings.you`, #1992) was played above like any other, so
+    // every lane after it heard it and the band played as if its player were there; only here,
+    // with all of that decided, is it left out — the hole the musician fills.
+    const you = settings.you ?? null;
+    const sounded = you ? felt.filter((e) => e.lane !== you) : felt;
     const lastSnapshot = snapshots[until];
     if (through > until) {
         // The look across the barline is dropped: the next chunk plays that bar itself, from
         // the memory before it.
         snapshots.length = until;
         return {
-            events: felt.filter((e) => e.bar < until),
+            events: sounded.filter((e) => e.bar < until),
             memory: lastSnapshot,
             snapshots,
         };
     }
-    return { events: felt, memory, snapshots };
+    return { events: sounded, memory, snapshots };
 }
 
 /**
