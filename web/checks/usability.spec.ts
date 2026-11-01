@@ -507,11 +507,14 @@ test('stage mode darkens the stand, persists per device and follows the system w
             const bar = document.querySelector('.bar') as HTMLElement;
             bar.classList.add('active');
             const activeBar = getComputedStyle(bar).backgroundColor;
+            // The playing bar is a solid fill with its own text colour (#1991).
+            const activeChord = getComputedStyle(bar.querySelector('.chord') as HTMLElement).color;
             bar.classList.remove('active');
             return {
                 paper: style('html').backgroundColor,
                 chord: style('.chord').color,
                 activeBar,
+                activeChord,
                 theme: document.documentElement.dataset.theme ?? null,
             };
         });
@@ -531,7 +534,7 @@ test('stage mode darkens the stand, persists per device and follows the system w
     expect(luminance(stage.paper)).toBeLessThan(0.02);
     expect(luminance(stage.chord)).toBeGreaterThan(0.8);
     expect(contrast(stage.chord, stage.paper)).toBeGreaterThan(12);
-    expect(contrast(stage.chord, stage.activeBar)).toBeGreaterThan(4.5);
+    expect(contrast(stage.activeChord, stage.activeBar)).toBeGreaterThan(4.5);
     await page.screenshot({ path: info.outputPath('stage-mode.png') });
 
     // The choice is a per-device preference: it survives reload and is applied
