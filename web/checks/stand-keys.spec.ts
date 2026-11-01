@@ -63,3 +63,30 @@ test('PageDown and PageUp step a scrolling chart a section at a time', async ({
     await expect.poll(() => sectionTop(1)).toBeLessThan(40);
     await expect.poll(() => sectionTop(1)).toBeGreaterThan(-10);
 });
+
+test('Space after a mouse click on a mute chip plays; after the keyboard it toggles the chip', async ({
+    page,
+}, testInfo) => {
+    test.skip(testInfo.project.name !== 'laptop', 'a hardware keyboard');
+    await openStandard(page, 'Autumn Leaves');
+    const chip = page.getByLabel('Band instruments').getByRole('button').first();
+    const before = (await chip.getAttribute('aria-pressed')) as string;
+    const after = before === 'true' ? 'false' : 'true';
+
+    // Pointer-focused: Space starts the band and the chip keeps its state.
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', after);
+    await page.keyboard.press(' ');
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
+    await expect(chip).toHaveAttribute('aria-pressed', after);
+    await page.keyboard.press(' ');
+    await expect(page.getByRole('button', { name: 'Start playback' })).toBeVisible();
+
+    // Keyboard-focused (Tab away and back): Space is the chip's own.
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Shift+Tab');
+    await expect(chip).toBeFocused();
+    await page.keyboard.press(' ');
+    await expect(chip).toHaveAttribute('aria-pressed', before);
+    await expect(page.getByRole('button', { name: 'Start playback' })).toBeVisible();
+});
