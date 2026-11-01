@@ -193,6 +193,72 @@ export function isScoreChord(symbol: string): boolean {
     return bass.length > 0 && bass.match(ROOT)?.[0] === bass;
 }
 
+/**
+ * Everyday spellings the musician types that the house spelling does not list (#1978). Each
+ * rewrites to the house form in `QUALITIES` and only runs on a quality that is NOT already
+ * accepted, so a symbol that parsed before is never touched. A rewrite counts only when its
+ * result is itself a recognised chord; otherwise the symbol stays refused.
+ */
+function houseQuality(quality: string): string | null {
+    const candidates: string[] = [];
+    // Minor-major seventh: Cm(maj7), CmM7, Cmin(maj7), C-(maj7) → CmMaj7 (the seventh is required).
+    if (/^(?:m|min|-)(?:\((?:maj|Maj|MAJ|M|Δ|△|\^)7\)|(?:maj|Maj|MAJ|M|Δ|△|\^)7)$/.test(quality)) {
+        candidates.push('mMaj7');
+    }
+    const spelled = quality
+        .replace(/^(?:min|Min|MIN|mi)(?=[^a-z]|$)/, 'm')
+        .replace(/^(?:Maj|MAJ|MA|Ma)(?![a-z])/, 'maj')
+        .replace(/^(?:Δ|△)(?=\d)/, 'maj')
+        .replace(/^M(?=\d)/, 'maj')
+        .replace(/(\d)\+(?=\d)/g, '$1#');
+    candidates.push(spelled);
+    // Alterations may be parenthesised after the stem: C7(#9) reads as C7#9, but maj(add4) stays.
+    candidates.push(spelled.replace(/\((?!add)([#b]\d+)\)/g, '$1'));
+    return candidates.find((candidate) => QUALITIES.has(candidate)) ?? null;
+}
+
+/** The house spelling of a chord symbol: itself when accepted, else a known everyday alias. */
+function houseChord(symbol: string): string | null {
+    if (isScoreChord(symbol)) {
+        return symbol;
+    }
+    if (symbol.length > 80) {
+        return null;
+    }
+    const normalized = symbol.replaceAll('♭', 'b').replaceAll('♯', '#');
+    const root = normalized.match(ROOT)?.[0];
+    if (!root) {
+        return null;
+    }
+    const tail = normalized.slice(root.length);
+    const slash = tail.lastIndexOf('/');
+    const quality = slash < 0 ? tail : tail.slice(0, slash);
+    const bass = slash < 0 ? '' : tail.slice(slash);
+    const house = houseQuality(quality);
+    const rewritten = house === null ? null : `${root}${house}${bass}`;
+    return rewritten !== null && isScoreChord(rewritten) ? rewritten : null;
+}
+
+/** Spellings of "no chord" a musician types, all stored as `N.C.`. */
+const NO_CHORD_ALIASES = /^(?:n\.?c\.?|n\/c)$/i;
+
+/**
+ * The nearest spelling the bar field would accept for a refused one: its longest readable
+ * start, with everyday aliases rewritten (`D7x` → `D7`). Null when nothing near it reads.
+ */
+function suggestChordSpelling(written: string): string | null {
+    const rootLength = written.match(ROOT)?.[0].length ?? written.length;
+    for (let end = written.length - 1; end > rootLength; end--) {
+        const house = houseChord(written.slice(0, end));
+        // Cutting off a digit, alteration, paren or alternate list would suggest a different
+        // chord than the one meant (Cmja7 → Cm), so only stray letters may be dropped.
+        if (house !== null && !/[\d#b(+[\]]/.test(written.slice(end))) {
+            return house;
+        }
+    }
+    return null;
+}
+
 function countsFromText(text: string): ScoreDuration {
     if (/^\d{1,6}\/\d{1,6}$/.test(text)) {
         const [n, d] = text.split('/').map(Number);
@@ -231,21 +297,29 @@ export function parseChordBar(text: string, meter: string): CodecDecodeResult<Sc
                 throw new Error('Chord lengths must be positive.');
             }
             const written = parts[0];
-            if (written === 'N.C.' || written === '/') {
-                return { kind: written === '/' ? 'hold' : 'no-chord', duration };
+            if (written === '/') {
+                return { kind: 'hold', duration };
+            }
+            if (written === 'N.C.' || NO_CHORD_ALIASES.test(written)) {
+                return { kind: 'no-chord', duration };
             }
             // Alternate chords use square brackets, leaving qualities such as maj(add4) intact.
             const match = /^([^[\]]+)(?:\[([^[\]]+)\])?$/.exec(written);
-            const symbol = match?.[1];
-            const alternates = match?.[2]?.split(',');
-            if (
-                !symbol ||
-                !isScoreChord(symbol) ||
-                (alternates && (alternates.length > 8 || !alternates.every(isScoreChord)))
-            ) {
-                throw new Error(`Unsupported chord spelling “${written.slice(0, 80)}”.`);
+            const symbol = match?.[1] ? houseChord(match[1]) : null;
+            const alternates = match?.[2]?.split(',').map(houseChord);
+            if (!symbol || (alternates && (alternates.length > 8 || alternates.includes(null)))) {
+                const shown = written.slice(0, 80);
+                const near = suggestChordSpelling(shown);
+                throw new Error(
+                    `Unsupported chord spelling “${shown}”.${near ? ` Try ${near}.` : ''}`,
+                );
             }
-            return { kind: 'chord', symbol, duration, ...(alternates ? { alternates } : {}) };
+            return {
+                kind: 'chord',
+                symbol,
+                duration,
+                ...(alternates ? { alternates: alternates as string[] } : {}),
+            };
         });
         const total = events.reduce((sum, event) => addScoreDurations(sum, event.duration), [
             0, 1,

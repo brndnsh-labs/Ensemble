@@ -6,8 +6,14 @@ import {
     scoreDuration,
     scoreMeter,
 } from '../../../core/songbook/score-duration.js';
-import { parseChordBar, printChordBar } from '../../../core/songbook/score-text.js';
+import {
+    isScoreChord,
+    parseChordBar,
+    printChordBar,
+    SCORE_CHORD_QUALITIES,
+} from '../../../core/songbook/score-text.js';
 import type { ScoreEvent } from '../../../core/songbook/score-types.js';
+import { STANDARDS } from '../../../web/lib/standards.js';
 
 function expectBar(text: string, meter: string, expected: ScoreEvent[]): void {
     expect(parseChordBar(text, meter)).toEqual({ kind: 'ok', value: expected });
@@ -192,5 +198,101 @@ describe('semantic score chord-bar text', () => {
             },
         ];
         expect(() => printChordBar(events, '4/4')).toThrow(/fermata/i);
+    });
+});
+
+// cspell:ignore Cmaj Dmaj
+describe('everyday chord spellings are stored in the house spelling (#1978)', () => {
+    it.each([
+        ['Cmin7', 'Cm7'],
+        ['CMaj7', 'Cmaj7'],
+        ['CMA7', 'Cmaj7'],
+        ['Cm(maj7)', 'CmMaj7'],
+        ['CmM7', 'CmMaj7'],
+        ['C7(#9)', 'C7#9'],
+        ['Cm7(b5)', 'Cm7b5'],
+        ['CΔ9', 'Cmaj9'],
+        ['C7+5', 'C7#5'],
+        ['Bb7(b9)/D', 'Bb7b9/D'],
+        ['Fmin7/Eb', 'Fm7/Eb'],
+        ['CMaj', 'Cmaj'],
+    ])('%s is stored as %s', (written, house) => {
+        expectBar(written, '4/4', [{ kind: 'chord', symbol: house, duration: [4, 1] }]);
+    });
+
+    it.each(['NC', 'N/C', 'nc', 'N.C', 'n.c.'])('%s is stored as no chord', (written) => {
+        expectBar(written, '4/4', [{ kind: 'no-chord', duration: [4, 1] }]);
+    });
+
+    it('rewrites an alternate chord too', () => {
+        expectBar('Cmin7[CMaj7]', '4/4', [
+            { kind: 'chord', symbol: 'Cm7', alternates: ['Cmaj7'], duration: [4, 1] },
+        ]);
+    });
+
+    it.each(['Cmin7xyz', 'Cnope', 'Cmin(', 'N/Cx', 'Cm(maj'])('still refuses %s', (text) => {
+        expectInvalidBar(text);
+    });
+
+    it('suggests the nearest readable spelling when it refuses', () => {
+        const refused = parseChordBar('D7x', '4/4');
+        expect(refused.kind === 'invalid' && refused.issues[0].message).toBe(
+            'Unsupported chord spelling “D7x”. Try D7.',
+        );
+        // A cut that would drop a digit or alteration is a different chord, not a suggestion.
+        const dropped = parseChordBar('Cmja7', '4/4');
+        expect(dropped.kind === 'invalid' && dropped.issues[0].message).toBe(
+            'Unsupported chord spelling “Cmja7”.',
+        );
+        const none = parseChordBar('Zz', '4/4');
+        expect(none.kind === 'invalid' && none.issues[0].message).toBe(
+            'Unsupported chord spelling “Zz”.',
+        );
+    });
+});
+
+describe('old-vs-new differential: every accepted spelling parses to itself (#1978)', () => {
+    const ROOTS = ['C', 'F#', 'Bb', 'e', 'IV', 'bVII', '3'];
+
+    it('keeps every accepted quality spelling, bare and over a slash bass', () => {
+        for (const quality of SCORE_CHORD_QUALITIES) {
+            for (const root of ROOTS) {
+                for (const symbol of [`${root}${quality}`, `${root}${quality}/G`]) {
+                    expect(isScoreChord(symbol)).toBe(true);
+                    expectBar(symbol, '4/4', [{ kind: 'chord', symbol, duration: [4, 1] }]);
+                }
+            }
+        }
+    });
+
+    it('keeps every bar of the shipped standards byte-identical', () => {
+        let bars = 0;
+        for (const entry of STANDARDS) {
+            for (const section of entry.sections) {
+                for (const bar of section.bars) {
+                    bars++;
+                    const parsed = parseChordBar(bar, entry.meter ?? '4/4');
+                    expect(parsed.kind).toBe('ok');
+                    if (parsed.kind !== 'ok') {
+                        continue;
+                    }
+                    // The old parser stored each written token as-is (or `N.C.` / hold).
+                    const tokens = bar
+                        .trim()
+                        .split(/\s+/)
+                        .map((t) => t.split(':')[0]);
+                    const stored = parsed.value.map((event) =>
+                        event.kind === 'chord'
+                            ? event.symbol +
+                              (event.alternates ? `[${event.alternates.join(',')}]` : '')
+                            : event.kind === 'hold'
+                              ? '/'
+                              : 'N.C.',
+                    );
+                    expect(stored).toEqual(tokens);
+                }
+            }
+        }
+        expect(bars).toBeGreaterThan(100);
     });
 });

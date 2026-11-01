@@ -124,7 +124,7 @@ test('chords that do not read stay on their bar, and Save refuses them and lands
     await bars.nth(2).click();
     await field(page, 3).fill('D7x');
     await expect(bars.nth(2)).toHaveClass(/\bunreadable\b/);
-    await expect(bars.nth(2).locator('.bar-problem')).toHaveText('Can’t read “D7x”');
+    await expect(bars.nth(2).locator('.bar-problem')).toHaveText('Can’t read “D7x”, try D7');
 
     // Leaving is still allowed; the bar keeps the text and its tint, the chart its old chord.
     await page.keyboard.press('Tab');
