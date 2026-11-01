@@ -81,9 +81,12 @@ export function ImportDialog({
     const [result, setResult] = useState<IRealImportResult | null>(null);
     const [native, setNative] = useState<ChartDocument | null>(null);
     const [selected, setSelected] = useState(0);
-    const [tempo, setTempo] = useState(String(base.chart.performance.bpm));
+    // What the musician typed or chose for the song under review, tagged with that song. The
+    // field shows the song's own proposal until then, so a new song starts over from its own with
+    // no effect that could reset a value typed in the window before the effect ran (#2076).
+    const [tempoEdit, setTempoEdit] = useState<{ song: unknown; value: string } | null>(null);
     // The band style the song plays in: '' keeps this device's current setup (#2004).
-    const [genre, setGenre] = useState('');
+    const [genreEdit, setGenreEdit] = useState<{ song: unknown; value: string } | null>(null);
     // A tempo for every song in a playlist; empty lets each keep its own (#2004).
     const [tempoAll, setTempoAll] = useState('');
     const [error, setError] = useState('');
@@ -281,13 +284,11 @@ export function ImportDialog({
 
     const song = whole ? undefined : result?.songs[selected];
     // A song proposes its own style and tempo (#2004); choosing another song starts over from its.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `song` is the trigger; the setup is read when it changes.
-    useEffect(() => {
-        if (song) {
-            setTempo(String(song.tempo?.bpm ?? base.chart.performance.bpm));
-            setGenre(song.genre ?? '');
-        }
-    }, [song]);
+    const tempo =
+        tempoEdit && tempoEdit.song === song
+            ? tempoEdit.value
+            : String(song?.tempo?.bpm ?? base.chart.performance.bpm);
+    const genre = genreEdit && genreEdit.song === song ? genreEdit.value : (song?.genre ?? '');
     const diagnostics = [...(result?.diagnostics ?? []), ...(song?.diagnostics ?? [])];
     const previewScore = song?.score ?? native?.chart.score;
     const ignoredSentence = useMemo(
@@ -745,7 +746,9 @@ export function ImportDialog({
                                     aria-label="Import style"
                                     value={genre}
                                     disabled={busy}
-                                    onChange={(event) => setGenre(event.target.value)}
+                                    onChange={(event) =>
+                                        setGenreEdit({ song, value: event.target.value })
+                                    }
                                 >
                                     <option value="">
                                         Keep my current style ({base.chart.band.groove.genre})
@@ -766,7 +769,9 @@ export function ImportDialog({
                                     max={240}
                                     value={tempo}
                                     disabled={busy}
-                                    onChange={(event) => setTempo(event.target.value)}
+                                    onChange={(event) =>
+                                        setTempoEdit({ song, value: event.target.value })
+                                    }
                                 />
                             </label>
                             <p data-testid="import-style-note">
