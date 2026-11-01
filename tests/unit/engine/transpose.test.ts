@@ -83,3 +83,16 @@ describe('transposeChordText — round-trip', () => {
         expect(transposeChordText(fixture, 12)).toBe(fixture);
     });
 });
+
+describe('transposeChordText — sharp minor targets', () => {
+    it('spells Autumn Leaves in F# minor with sharps', () => {
+        const target = { key: 'F#', isMinor: true };
+        expect(transposeChordText('Am7b5', -1, target)).toBe('G#m7b5');
+        expect(transposeChordText('D7b9', -1, target)).toBe('C#7b9');
+        expect(transposeChordText('Gm', -1, target)).toBe('F#m');
+    });
+
+    it('a flat-named key of the same pitch class still spells in flats', () => {
+        expect(transposeChordText('Gm', -1, { key: 'Gb', isMinor: true })).toBe('Gbm');
+    });
+});

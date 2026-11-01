@@ -56,7 +56,7 @@ import {
     type ParamSlices,
     type SwingSub,
 } from '@core/types';
-import { getFrequency, transposeKeyName } from '@core/utils';
+import { getFrequency, respellKeyForMode, transposeKeyName } from '@core/utils';
 import { auditionMidis, type BandChart, bandChart, sectionSteps, slotAt } from './band-chart';
 import {
     downloadExportResult,
@@ -1254,9 +1254,14 @@ export function setEnabled(module: InstrumentModule, enabled: boolean): void {
         track('part_toggled', { part: TELEMETRY_PART[module] });
     }
 }
-export function transpose(delta: number): void {
+/**
+ * Moves the song by `delta` semitones. `key` is the name the key picker chose (`F#`, not `Gb`),
+ * stored as the song's key so its chords spell the way that key reads; without it the key is the
+ * flat pitch-class name.
+ */
+export function transpose(delta: number, key?: string): void {
     const score = clone(scoreForBand());
-    score.key = transposeKeyName(score.key, delta);
+    score.key = key ?? transposeKeyName(score.key, delta);
     // Chords are spelled from the key they land in (sharps in E minor, flats in F minor).
     const target = { key: score.key, isMinor: score.isMinor === true };
     for (const section of score.sections) {
@@ -1301,7 +1306,12 @@ export function setMode(isMinor: boolean): void {
         return;
     }
     const wasPlaying = getState().playback.isPlaying;
-    editScore({ ...clone(currentScore), isMinor });
+    // The key is respelled for the new mode (Gb major turns F# minor, not 9-flat Gb minor).
+    editScore({
+        ...clone(currentScore),
+        isMinor,
+        key: respellKeyForMode(currentScore.key, isMinor),
+    });
     if (wasPlaying) {
         startBand();
     }

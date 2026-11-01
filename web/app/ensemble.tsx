@@ -3210,7 +3210,11 @@ export default function Ensemble() {
                         onKeyClose={() => setKeyOpen(false)}
                         onKey={(key) =>
                             change(
-                                () => runtime.transpose(keyDistance(current.chart.score.key, key)),
+                                () =>
+                                    runtime.transpose(
+                                        keyDistance(current.chart.score.key, key),
+                                        key,
+                                    ),
                                 true,
                             )
                         }

@@ -152,3 +152,28 @@ test('focus moving elsewhere on the page closes it; focus going nowhere does not
     await expect(popover).toHaveCount(0);
     await expect(page.getByLabel('Tempo', { exact: true })).toBeFocused();
 });
+
+test('the picker names each key by its mode: F♯, C♯ and G♯ minor, F♯ major, and spells chords in sharps', async ({
+    page,
+}) => {
+    await openBlue(page);
+    const popover = await openKeyPopover(page);
+    const key = popover.getByLabel('Key', { exact: true });
+    const labels = () => key.locator('option').allTextContents();
+
+    expect(await labels()).toContain('F♯');
+    expect(await labels()).not.toContain('G♭');
+    await popover.getByLabel('Mode', { exact: true }).selectOption('minor');
+    const minor = await labels();
+    for (const name of ['C♯', 'F♯', 'G♯']) {
+        expect(minor).toContain(name);
+    }
+    for (const name of ['D♭', 'G♭', 'A♭']) {
+        expect(minor).not.toContain(name);
+    }
+
+    await key.selectOption('F#');
+    await expect(keyButton(page)).toHaveAccessibleName('Key: F♯m');
+    await expect(page.locator('.chord-button').first()).toHaveText('F#7');
+    await expect(key).toHaveValue('F#');
+});

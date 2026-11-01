@@ -1,8 +1,8 @@
 'use client';
 
-import { KEY_ORDER, TIME_SIGNATURES } from '@core/config';
+import { TIME_SIGNATURES } from '@core/config';
 import type { ChartNotation } from '@core/songbook/types';
-import { normalizeKey } from '@core/utils';
+import { keyNamesFor, normalizeKey } from '@core/utils';
 import { type KeyboardEvent as ReactKeyboardEvent, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { ChartDocument } from '../lib/runtime';
@@ -17,15 +17,25 @@ const NOTATION_OPTIONS: { value: ChartNotation; label: string }[] = [
     { value: 'nns', label: 'Nashville Numbers (1, 6-, 4)' },
 ];
 
-/** A key as a musician reads it: `Bb` is B♭. The picker lists flat spellings only. */
+/** A key as a musician reads it: `Bb` is B♭, `F#` is F♯. */
 function keyLabel(key: string): string {
     return key.replace(/^([A-G])b/, '$1♭').replace(/^([A-G])#/, '$1♯');
 }
 
-/** The song's key as the transport shows it: B♭, or B♭m in a minor song. */
+/**
+ * The key name the picker shows selected. The song's own spelling when the mode's list has it
+ * (`F#` in minor); else the list's name when a stray spelling normalizes onto it (`D#` shows E♭);
+ * else its own (a saved `Gb` minor stays G♭ minor, until the musician picks another key).
+ */
+function shownKey(key: string, isMinor: boolean): string {
+    const names = keyNamesFor(isMinor);
+    return names.includes(key) || !names.includes(normalizeKey(key)) ? key : normalizeKey(key);
+}
+
+/** The song's key as the transport shows it: B♭, or F♯m in a minor song. */
 export function songKeyLabel(current: ChartDocument): string {
     const { key, isMinor } = current.chart.score;
-    return `${keyLabel(normalizeKey(key))}${isMinor ? 'm' : ''}`;
+    return `${keyLabel(shownKey(key, isMinor === true))}${isMinor ? 'm' : ''}`;
 }
 
 /** Frames to wait for the selected bar's number to be enabled again once the change settles. */
@@ -177,6 +187,8 @@ export function KeyPopover({
     }
 
     const score = current.chart.score;
+    const shown = shownKey(score.key, score.isMinor === true);
+    const keyNames = keyNamesFor(score.isMinor === true);
     return createPortal(
         <>
             {sheet && (
@@ -223,10 +235,10 @@ export function KeyPopover({
                     <select
                         id="song-key"
                         disabled={busy}
-                        value={normalizeKey(score.key)}
+                        value={shown}
                         onChange={(event) => onKey(event.target.value)}
                     >
-                        {KEY_ORDER.map((key) => (
+                        {[...new Set([...keyNames, shown])].map((key) => (
                             <option key={key} value={key}>
                                 {keyLabel(key)}
                             </option>
