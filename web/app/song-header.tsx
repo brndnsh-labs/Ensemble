@@ -22,6 +22,12 @@ interface SongHeaderProps {
     /** An account song's cloud fact when it is a routine one (`headerCloudLabel`), else null. */
     cloudSaved: string | null;
     stage: boolean;
+    /**
+     * A phone while the band plays (#1993): the second row (Settings, Stage, the mode switch,
+     * Save) folds away and the Song menu carries it (`SongMenu`'s `foldedItems`). CSS hides it,
+     * so the buttons stay in the tree.
+     */
+    folded: boolean;
     editing: boolean;
     /** The remembered stand mode is Neck (#1587); the neck shows while not `editing`. */
     neck: boolean;
@@ -56,6 +62,7 @@ export function SongHeader({
     totalBars,
     cloudSaved,
     stage,
+    folded,
     editing,
     neck,
     onHome,
@@ -71,7 +78,7 @@ export function SongHeader({
     onTitle,
 }: SongHeaderProps) {
     return (
-        <div className="song-header">
+        <div className="song-header" data-folded={folded ? '' : undefined}>
             <div className="song-heading">
                 <button
                     className="icon-button back-btn"

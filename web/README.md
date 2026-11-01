@@ -148,8 +148,8 @@ network-disconnection harness is local-only.
   cancels a pending restart. Do not use this as the only copy of important writing yet.
 - Four bars per laptop/tablet row, two per portrait phone row, scrolling rather than pagination.
   The open song replaces the branding header; Sounds opens over the score without displacing it.
-  Playback hides nothing: the header's controls stay put, so Save, export and Band… are one
-  press away mid-song.
+  Playback hides nothing on a laptop or tablet: the header's controls stay put. On a phone the
+  header's second row and Band… fold into the ••• while the band plays (#1993), one press away.
   Playback highlights follow the band host's own clock (`lib/band-host.ts`); manual
   wheel/touch/keyboard browsing suspends following until explicitly resumed.
 - Stage mode (#1208) is the dark music-stand theme: a tap on the song header's Stage button.

@@ -811,7 +811,14 @@ test('the next-bar cue reads distinctly in both themes (screenshots for review)'
     await waitForActiveNext(page, 'A2', 'A3');
     await expect(page.locator('.bar[data-next]')).toHaveCount(1);
     await page.screenshot({ path: testInfo.outputPath('next-cue-day.png') });
-    await page.getByRole('button', { name: 'Stage', exact: true }).click();
+    const stage = page.getByRole('button', { name: 'Stage', exact: true });
+    if (await stage.isVisible()) {
+        await stage.click();
+    } else {
+        // A phone folds the header row into the Song menu while the band plays (#1993).
+        await page.getByRole('button', { name: 'Song actions' }).click();
+        await page.getByRole('menuitem', { name: 'Switch to stage mode', exact: true }).click();
+    }
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'stage');
     await page.screenshot({ path: testInfo.outputPath('next-cue-stage.png') });
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();

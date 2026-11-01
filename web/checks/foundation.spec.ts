@@ -133,8 +133,16 @@ for (const [width, height] of [
         await expect(page.getByRole('button', { name: 'Band…' })).toBeFocused();
         await page.getByRole('button', { name: 'Start playback', exact: true }).click();
         // Playing hides nothing: the header's controls stay where they were (#1969).
-        for (const name of ['Edit chart', 'Save', 'Band…']) {
-            await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+        if (width <= 760) {
+            // On a phone the header's second row and Band… fold into ••• while playing (#1993).
+            await expect(page.getByRole('button', { name: 'Song actions' })).toBeVisible();
+            for (const name of ['Edit chart', 'Save', 'Band…']) {
+                await expect(page.getByRole('button', { name, exact: true })).toBeHidden();
+            }
+        } else {
+            for (const name of ['Edit chart', 'Save', 'Band…']) {
+                await expect(page.getByRole('button', { name, exact: true })).toBeVisible();
+            }
         }
         for (const label of ['Tempo', 'Style']) {
             await expect(page.getByLabel(label, { exact: true })).toBeVisible();

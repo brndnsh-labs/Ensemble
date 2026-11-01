@@ -38,6 +38,11 @@ interface SongMenuProps {
     syncStatus: ReactNode;
     /** The link Copy link could not put on the clipboard, shown to copy by hand; else null. */
     shareLinkFallback: string | null;
+    /**
+     * #1993 — what a phone's folded header row (Settings, Stage, Chart/Neck/Edit, Save) becomes
+     * while the band plays: rows ahead of the five actions. Empty everywhere else.
+     */
+    foldedItems: readonly MenuItem[];
     onView: (view: SongMenuView | null) => void;
     onShare: () => void;
     onDuplicate: () => void;
@@ -90,6 +95,7 @@ export function SongMenu({
     recoveryOptions,
     syncStatus,
     shareLinkFallback,
+    foldedItems,
     onView,
     onShare,
     onDuplicate,
@@ -108,6 +114,7 @@ export function SongMenu({
         action();
     };
     const actions: MenuItem[] = [
+        ...foldedItems,
         {
             id: 'share',
             label: 'Copy link',

@@ -38,7 +38,14 @@ test('no footer in either playback state, and the chart keeps the height back', 
     // A bar that comes and goes on Play/Stop would shift `.chart-scroll`'s own box (Touches #1);
     // with no footer in either state and nothing in the header hidden for playing (#1969), the
     // box is the same in both.
-    expect(playing).toEqual(stopped);
+    // On a phone, though, the header's second row folds into ••• while playing (#1993), so the
+    // chart is taller by what that row held and nothing else moves.
+    if (page.viewportSize()!.width <= 760) {
+        expect(playing!.height).toBeGreaterThan(stopped!.height);
+        expect(playing!.y + playing!.height).toBeCloseTo(stopped!.y + stopped!.height, 0);
+    } else {
+        expect(playing).toEqual(stopped);
+    }
     await page.getByRole('button', { name: 'Stop playback' }).click();
 });
 

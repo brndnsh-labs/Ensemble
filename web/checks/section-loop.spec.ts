@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test';
-import { expect, measureSong, seedGuestDocuments, songLink, test } from './fixtures';
+import {
+    expect,
+    expectSaveDisabled,
+    measureSong,
+    seedGuestDocuments,
+    songLink,
+    test,
+} from './fixtures';
 
 /**
  * Looping a section (#1989): "Loop" in the section letter's menu plays just that section, over
@@ -113,7 +120,7 @@ test('another song opens without the loop, and the loop is never saved', async (
     await loopB(page);
     await expect(active(page)).toHaveText('Dm7', { timeout: 10_000 });
     // Looping changes nothing in the chart: there is nothing to save.
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await expectSaveDisabled(page);
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await songLink(page, 'Other song').first().click();
     await expect(chip(page)).toHaveCount(0);
