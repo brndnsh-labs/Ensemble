@@ -1,6 +1,7 @@
 import type { BarSplit } from '@core/songbook/score-text';
 import type { SemanticScore } from '@core/songbook/score-types';
 import {
+    Fragment,
     type FocusEvent as ReactFocusEvent,
     type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
@@ -12,7 +13,7 @@ import { flushSync } from 'react-dom';
 import type { SectionChange } from '../lib/documents';
 import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
 import type { ChartDocument, TradeTurn } from '../lib/runtime';
-import { directionLabel } from '../lib/score-labels';
+import { directionLabel, IGNORED_SIGN_TITLE, signIsIgnored } from '../lib/score-labels';
 import { songPlanText } from '../lib/song-mode';
 import { afterPress } from './after-press';
 import { BarDock, usePhoneWidth } from './bar-dock';
@@ -258,6 +259,8 @@ export function ChartSheet({
     // The footer's form-length menu (#1511): how many times the band plays the form, a `<Menu>`
     // at the footer button (#1755).
     const choruses = current.chart.score.choruses;
+    // Signs the band never takes (#2005) are drawn greyed, so the page doesn't promise a jump.
+    const signIgnored = signIsIgnored(current.chart.score);
     const [formMenu, setFormMenu] = useState(false);
     const formMenuTrigger = useRef<HTMLButtonElement>(null);
     // The menu closes with the footer: playback hides it, and so does a busy shell.
@@ -620,7 +623,36 @@ export function ChartSheet({
                                     )}
                                     {navigation.length > 0 && (
                                         <span className="bar-navigation">
-                                            {navigation.map(directionLabel).join(' · ')}
+                                            {navigation.map((mark, markIndex) => {
+                                                const ignoredMark = signIgnored(mark);
+                                                return (
+                                                    // biome-ignore lint/suspicious/noArrayIndexKey: a bar's marks are a fixed ordered list.
+                                                    <Fragment key={markIndex}>
+                                                        {markIndex > 0 && ' · '}
+                                                        <span
+                                                            className={
+                                                                ignoredMark
+                                                                    ? 'sign-ignored'
+                                                                    : undefined
+                                                            }
+                                                            title={
+                                                                ignoredMark
+                                                                    ? IGNORED_SIGN_TITLE
+                                                                    : undefined
+                                                            }
+                                                        >
+                                                            {directionLabel(mark)}
+                                                            {ignoredMark && (
+                                                                <span className="sr-only">
+                                                                    {' '}
+                                                                    (the band does not take this
+                                                                    sign)
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    </Fragment>
+                                                );
+                                            })}
                                         </span>
                                     )}
                                     {endingStart && (

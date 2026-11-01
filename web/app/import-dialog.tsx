@@ -16,7 +16,7 @@ import {
     resolvePlaylistImport,
 } from '../lib/playlist-import';
 import { GENRE_NAMES } from '../lib/runtime';
-import { directionLabel } from '../lib/score-labels';
+import { directionLabel, ignoredSignsSentence } from '../lib/score-labels';
 import { capRefusal, MAX_REMOTE_CANDIDATES } from '../lib/sync/repository';
 import { closeDialog, dialogRule } from './dialog-close';
 import './import-dialog.css';
@@ -289,6 +289,11 @@ export function ImportDialog({
         }
     }, [song]);
     const diagnostics = [...(result?.diagnostics ?? []), ...(song?.diagnostics ?? [])];
+    const previewScore = song?.score ?? native?.chart.score;
+    const ignoredSentence = useMemo(
+        () => (previewScore ? ignoredSignsSentence(previewScore) : null),
+        [previewScore],
+    );
     // Playback updates the parent frequently. Only recheck a newly selected score.
     const capability = useMemo(() => {
         if (
@@ -688,6 +693,11 @@ export function ImportDialog({
             {(song || native) && (
                 <section className="import-summary" aria-label="Import preview">
                     <h3>{song?.title ?? native?.title}</h3>
+                    {ignoredSentence && (
+                        <p className="import-ignored-signs" data-testid="import-ignored-signs">
+                            {ignoredSentence}
+                        </p>
+                    )}
                     {song?.score && (
                         <>
                             <p>
