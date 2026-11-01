@@ -46,7 +46,19 @@ export function validated(candidate: unknown): ChartDocument {
 function open(): Promise<IDBDatabase> {
     if (!database) {
         const opening = new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open(DATABASE, 1);
+            // A browser with storage blocked can throw here, or have no `indexedDB` at all: the
+            // same plain refusal as a failed open, not the engine's own wording (#1982).
+            let request: IDBOpenDBRequest;
+            try {
+                request = indexedDB.open(DATABASE, 1);
+            } catch {
+                reject(
+                    new Error(
+                        'Local songbook storage is unavailable. Your current chart remains open.',
+                    ),
+                );
+                return;
+            }
             request.onupgradeneeded = () =>
                 request.result.createObjectStore(STORE, { keyPath: 'id' });
             request.onerror = () =>
@@ -652,7 +664,13 @@ let collectionsDatabase: Promise<IDBDatabase> | undefined;
 function openCollections(): Promise<IDBDatabase> {
     if (!collectionsDatabase) {
         const opening = new Promise<IDBDatabase>((resolve, reject) => {
-            const request = indexedDB.open(COLLECTIONS_DATABASE, 1);
+            let request: IDBOpenDBRequest;
+            try {
+                request = indexedDB.open(COLLECTIONS_DATABASE, 1);
+            } catch {
+                reject(new Error('Collection storage is unavailable. Your songs are unaffected.'));
+                return;
+            }
             request.onupgradeneeded = () =>
                 request.result.createObjectStore(COLLECTIONS, { keyPath: 'id' });
             request.onerror = () =>

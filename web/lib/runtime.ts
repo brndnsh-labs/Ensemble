@@ -683,7 +683,7 @@ export async function startSection(
         startBand();
         return true;
     }
-    initAudio(getState());
+    bringUpAudio();
     const intent = ++playIntent;
     await prepareSounds(captureContent(), progress);
     if (intent !== playIntent) {
@@ -704,13 +704,29 @@ export async function toggle(progress: (text: string) => void): Promise<void> {
         return;
     }
     // Keep AudioContext creation on the gesture stack for mobile Safari.
-    initAudio(getState());
+    bringUpAudio();
     const intent = ++playIntent;
     await prepareSounds(captureContent(), progress);
     if (intent !== playIntent) {
         return;
     }
     startBand(true);
+}
+
+/** What a browser without Web Audio (or one that refuses to start it) is told, in one sentence. */
+export const AUDIO_UNAVAILABLE = "This browser can't play audio.";
+
+/**
+ * `initAudio`, with its failure said plainly: a missing or refusing `AudioContext` surfaces from
+ * the engine as "AudioContextClass is not a constructor" or a DOMException, neither of which tells
+ * a musician anything (#1982).
+ */
+function bringUpAudio(): void {
+    try {
+        initAudio(getState());
+    } catch {
+        throw new Error(AUDIO_UNAVAILABLE);
+    }
 }
 
 /**
@@ -723,7 +739,13 @@ export async function toggle(progress: (text: string) => void): Promise<void> {
  * repeats the first two harmlessly.
  */
 export function warmAudio(): void {
-    initAudio(getState());
+    // Outside `run()`'s catch, so a browser without Web Audio is not said here: the press's own
+    // `toggle`/`startSection` runs the same call inside `run()` and says it (#1982).
+    try {
+        bringUpAudio();
+    } catch {
+        return;
+    }
     const audio = getState().playback.audio;
     if (audio?.state === 'suspended') {
         void audio.resume().catch(() => {});
@@ -1370,7 +1392,12 @@ function sound(
     if (getState().playback.isPlaying) {
         return;
     }
-    initAudio(getState());
+    try {
+        bringUpAudio();
+    } catch {
+        // An audition is a nicety; Play is where a browser without audio is told.
+        return;
+    }
     const state = getState();
     const notes = freqs(state);
     if (!notes || !state.playback.audio) {

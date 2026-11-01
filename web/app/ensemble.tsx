@@ -251,6 +251,8 @@ export default function Ensemble() {
     const currentStore = useRef<StandStore | null>(null);
     const [standStore, setStandStore] = useState<StandStore | null>(null);
     const [ready, setReady] = useState(false);
+    // The songbook could not be read at boot (storage blocked): standards still play (#1982).
+    const [savingOff, setSavingOff] = useState(false);
     const [busy, setBusy] = useState(false);
     const volatileDrafts = useRef(new Map<string, ChartDocument>());
     /**
@@ -911,7 +913,8 @@ export default function Ensemble() {
         start()
             .then((result) => {
                 if (alive) {
-                    setGuestHome(result);
+                    setGuestHome(result.home);
+                    setSavingOff(result.savingOff);
                     bootHomeFresh.current = true;
                     setReady(true);
                 }
@@ -3056,6 +3059,14 @@ export default function Ensemble() {
                     onKeepBoth={keepBothVersions}
                     onUseAccountVersion={offerAdoptRemote}
                 />
+            )}
+            {savingOff && (
+                <div className="error-banner notice" role="status" data-testid="saving-off-banner">
+                    <span>
+                        Saving is off in this browser. You can still open standards and play them;
+                        changes can't be kept here.
+                    </span>
+                </div>
             )}
             {volatileDrafts.current.size > 0 && (
                 <div className="error-banner" role="status">
