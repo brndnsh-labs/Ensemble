@@ -2,7 +2,9 @@
  * BandEvent[] → Standard MIDI File (type 1). The same events the live host plays, so a
  * `.mid` is a faithful record of the performance, not a re-interpretation of it.
  * Micro-timing (lean + character) is baked into tick positions at the given tempo; bar
- * meters and fermata stretches are written as meta events so a DAW's grid lines up.
+ * meters and fermata stretches are written as meta events so a DAW's grid lines up, and the
+ * conductor track carries the chart's own words for a producer: a Marker per section visit,
+ * the chord symbols as Text, and the Key Signature.
  */
 import {
     type BandEvent,
@@ -33,6 +35,14 @@ export const GM_DRUMS: Record<DrumPiece, number> = {
     shaker: 70,
 };
 const DRUM_LENGTH = PPQ / 8;
+
+/**
+ * Key Signature `sf` (sharps positive, flats negative) by tonic pitch class. A pitch class does
+ * not say how the chart spelled its key, so the ambiguous ones take the usual choice: Db, Eb,
+ * Ab, Bb major but F# (not Gb); C#, F#, G# minor but Eb (not D#) and Bb minor.
+ */
+const SIGNATURE_MAJOR = [0, -5, 2, -3, 4, -1, 6, 1, -4, 3, -2, 5];
+const SIGNATURE_MINOR = [-3, 4, -1, -6, 1, -4, 3, -2, 5, 0, -5, 2];
 
 function vlq(n: number): number[] {
     const bytes = [n & 0x7f];
@@ -117,6 +127,42 @@ export function toMidi(
                 tick: bar.start,
                 order: 2,
                 data: [0xff, 0x58, 4, bar.meter.counts, Math.log2(bar.meter.unit), 24, 8],
+            });
+        }
+    }
+    // Section markers: one per visit, so a repeated section reads A, B, A2, B2.
+    const seen = new Map<string, number>();
+    for (const visit of timeline.visits) {
+        const times = (seen.get(visit.label) ?? 0) + 1;
+        seen.set(visit.label, times);
+        const start = timeline.bars[visit.firstBar]?.start ?? 0;
+        const label = times > 1 ? `${visit.label}${times}` : visit.label;
+        conductor.push({ tick: start, order: 3, data: text(0x06, label) });
+    }
+    // Key Signature wherever the key changes (the first bar always).
+    let keyName = '';
+    for (const bar of timeline.bars) {
+        const { tonic, minor } = bar.key;
+        const name = `${tonic}${minor}`;
+        if (name !== keyName) {
+            keyName = name;
+            const sf = (minor ? SIGNATURE_MINOR : SIGNATURE_MAJOR)[((tonic % 12) + 12) % 12];
+            conductor.push({
+                tick: bar.start,
+                order: 2,
+                data: [0xff, 0x59, 2, sf & 255, minor ? 1 : 0],
+            });
+        }
+    }
+    // Chord names as Text (FF 01), not Lyric (FF 05): a karaoke-style player shows lyrics as
+    // words to sing, and Text is what DAWs list as plain annotations on the conductor track.
+    // One per written chord at the tick it sounds; a hold under a fermata is not a new chord.
+    for (const span of timeline.spans) {
+        if (!span.tied) {
+            conductor.push({
+                tick: span.start,
+                order: 4,
+                data: text(0x01, span.chord?.symbol ?? 'N.C.'),
             });
         }
     }

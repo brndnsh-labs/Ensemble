@@ -1,8 +1,8 @@
-import { DEFAULT_SETTINGS } from '../core/types.js';
+import { DEFAULT_SETTINGS, PPQ } from '../core/types.js';
 import { compileTimeline } from '../form/timeline.js';
 import { performPass } from '../perform.js';
 import { STYLE_IDS } from '../styles/index.js';
-import { FIXTURES } from '../test/scores.js';
+import { FIXTURES, score } from '../test/scores.js';
 import { toMidi } from './midi.js';
 
 /** Read back what `toMidi` writes (no running status): per track, [tick, status, data1]. */
@@ -86,4 +86,85 @@ describe('toMidi', () => {
             expect(notes).toBe(events.length);
         },
     );
+});
+
+/** The conductor track's meta events: [tick, type, data bytes]. */
+function conductorMeta(bytes: Uint8Array): [number, number, number[]][] {
+    const out: [number, number, number[]][] = [];
+    let i = 22;
+    const end = i + ((bytes[18] << 24) | (bytes[19] << 16) | (bytes[20] << 8) | bytes[21]);
+    let tick = 0;
+    const vl = () => {
+        let n = 0;
+        let b: number;
+        do {
+            b = bytes[i++];
+            n = (n << 7) | (b & 0x7f);
+        } while (b & 0x80);
+        return n;
+    };
+    while (i < end) {
+        tick += vl();
+        expect(bytes[i++]).toBe(0xff);
+        const type = bytes[i++];
+        const len = vl();
+        out.push([tick, type, [...bytes.slice(i, i + len)]]);
+        i += len;
+    }
+    return out;
+}
+
+const words = (data: number[]) => String.fromCharCode(...data);
+
+describe('toMidi conductor track', () => {
+    const autumn = score(
+        [
+            { label: 'A', bars: 'Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm7 | Gm7' },
+            { label: 'A', bars: 'Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm7 | Gm7' },
+            { label: 'B', bars: 'Am7b5 | D7 | Gm7 | Gm7 | Cm7 | F7 | Bbmaj7 | Ebmaj7' },
+            { label: 'C', bars: 'Am7b5 | D7 | Gm7 Gb7 | Fm7 E7 | Ebmaj7 | Am7b5 D7 | Gm7 | Gm7' },
+        ],
+        { key: 'G', isMinor: true },
+    );
+
+    it('Autumn Leaves: section markers, every chord at its tick, the key signature', () => {
+        const timeline = compileTimeline(autumn);
+        const { events } = performPass(timeline, DEFAULT_SETTINGS, { pass: 0, looping: false });
+        const meta = conductorMeta(toMidi(events, timeline, { bpm: 140 }));
+
+        const markers = meta.filter(([, type]) => type === 0x06);
+        expect(markers.map(([tick, , data]) => [tick, words(data)])).toEqual(
+            ['A', 'A2', 'B', 'C'].map((label, v) => [
+                timeline.bars[timeline.visits[v].firstBar].start,
+                label,
+            ]),
+        );
+
+        const chords = meta.filter(([, type]) => type === 0x01).map(([t, , d]) => [t, words(d)]);
+        expect(chords).toEqual(timeline.spans.map((span) => [span.start, span.chord?.symbol]));
+        expect(chords).toHaveLength(35);
+        expect(chords.slice(0, 3)).toEqual([
+            [0, 'Cm7'],
+            [PPQ * 4, 'F7'],
+            [PPQ * 8, 'Bbmaj7'],
+        ]);
+
+        // G minor: two flats, minor flag set.
+        expect(meta.filter(([, type]) => type === 0x59)).toEqual([[0, 0x59, [254, 1]]]);
+    });
+
+    it('a repeated section sounds each chord at the tick it plays', () => {
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'D | G', repeat: 2 }], { key: 'D' }),
+        );
+        const meta = conductorMeta(toMidi([], timeline, { bpm: 120 }));
+        const chords = meta.filter(([, type]) => type === 0x01).map(([t, , d]) => [t, words(d)]);
+        expect(chords).toEqual([
+            [0, 'D'],
+            [PPQ * 4, 'G'],
+            [PPQ * 8, 'D'],
+            [PPQ * 12, 'G'],
+        ]);
+        expect(meta.find(([, type]) => type === 0x59)?.[2]).toEqual([2, 0]);
+    });
 });
