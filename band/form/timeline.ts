@@ -62,6 +62,20 @@ export interface SectionVisit {
     lanes: Partial<Record<Lane, boolean>>;
 }
 
+/**
+ * What a section *is*, for every choice the band keeps per section: its label with the repeat
+ * mark stripped (A, A2, A3, A′ all read "a"; "Intro", "Bridge" stay whole words), lower-cased.
+ * A section with no letter left (unlabelled, or only digits) is told apart by its position.
+ * A2 is the A again, so it gets the A's groove and the A's tune.
+ */
+export function sectionKey(visit: Pick<SectionVisit, 'label' | 'sectionIndex'>): string {
+    const letter = visit.label
+        .trim()
+        .toLowerCase()
+        .replace(/[\d\s'\u2032\u2019\u02b9]+$/u, '');
+    return letter || `#${visit.sectionIndex}`;
+}
+
 export interface Bar {
     index: number;
     start: number;

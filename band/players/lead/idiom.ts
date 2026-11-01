@@ -8,7 +8,7 @@ import type { LeadRole } from '../../arrange/cycle.js';
 import { energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { PitchedNote } from '../../core/types.js';
-import { type Bar, chordAt, chorusBars, spanIndexAt } from '../../form/timeline.js';
+import { type Bar, chordAt, chorusBars, sectionKey, spanIndexAt } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
@@ -257,9 +257,9 @@ function homeOf(ctx: BarContext, book: LeadBook): number {
     return Math.min(hi - 7, Math.max(lo + 5, ctx.lead.home + (book.register ?? 0)));
 }
 
-/** A section's tune is keyed on its label, so a written-out last A plays the first A's tune. */
+/** A section's tune is keyed on its letter, so a written-out A2 or last A plays the first A's tune. */
 function headKey(bar: Bar): string {
-    return `head:${bar.visit.label.trim().toLowerCase() || bar.visit.sectionIndex}`;
+    return `head:${sectionKey(bar.visit)}`;
 }
 
 function headPlan(ctx: BarContext, book: LeadBook, slotStart: number): SlotPlan {

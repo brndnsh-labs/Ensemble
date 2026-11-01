@@ -438,7 +438,9 @@ export const acoustic = defineClaims({
                 ['bassMeanSteps', 7, 16, 'long notes: half notes and whole notes'],
                 [
                     'compSingleNoteShare',
-                    0.6,
+                    // 0.6 before #2007: A2 now repeats the A's pattern, so fewer independent
+                    // draws; it measures 0.525 on these seeds. Still a majority of onsets.
+                    0.5,
                     0.95,
                     'the piano breaks the chord into eighths in most quiet sections',
                 ],
