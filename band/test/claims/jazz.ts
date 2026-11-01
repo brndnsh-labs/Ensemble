@@ -12,7 +12,15 @@ export const jazz = defineClaims({
                 ['bassChromaticApproach', 0.3, 0.8, 'half-step approaches lead into changes'],
                 ['bassRepeatedNotes', 0, 0.02, 'the walk keeps moving: no repeated pitches'],
                 ['bassMeanLeap', 1.5, 4.5, 'mostly stepwise, not arpeggio leaps'],
-                ['compOffbeatShare', 0.4, 1, 'comping pushes on the "and"s'],
+                // Measured 0.033 today; 0.016 with the push off (the chance level: a Charleston hit
+                // that happens to carry both guide tones). The floor sits between them: a guard
+                // that the push exists, not a target (#2015 raises the real rate).
+                [
+                    'compAnticipatesChange',
+                    0.025,
+                    0.5,
+                    'a comp hit an eighth before a change already plays the new chord',
+                ],
                 ['compColour', 0.6, 1, 'rootless voicings carry 9ths and 13ths'],
                 ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
             ],
@@ -91,6 +99,12 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                [
+                    'leadMotifDevelopment',
+                    0.115,
+                    0.4,
+                    "a phrase now and then says the last one's opening again",
+                ],
                 // Ablations measured on the solo take (answer off / no lay-out / no fill / no
                 // floor): thin bars 0.19 (0.23 / 0.19 / 0.23 / 0.39), breath density 1.15 (0.87 /
                 // 1.10 / 0.91 / 1.36), answers 0.48 (0.28 / 0.51 / 0.25 / 0.48), lift +3.1
