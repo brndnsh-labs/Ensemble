@@ -55,3 +55,47 @@ test('the header action row is one row inside the screen with Keep a copy showin
         noSideScroll: true,
     });
 });
+
+/**
+ * #1986 - at 400% zoom (320x256 CSS px, a landscape-short window) the transport wraps instead of
+ * running past the edge, so every mute chip can be reached; the page never scrolls sideways.
+ */
+test('every mute chip is inside the screen at 320x256', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 256 });
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket').first().click();
+    const chips = page.locator('.band-controls .band-toggle');
+    expect(await chips.count()).toBeGreaterThan(2);
+    const boxes = await chips.evaluateAll((els) =>
+        els.map((el) => {
+            const box = el.getBoundingClientRect();
+            return { left: box.left, right: box.right };
+        }),
+    );
+    for (const box of boxes) {
+        expect(box.left).toBeGreaterThanOrEqual(0);
+        expect(box.right).toBeLessThanOrEqual(320.5);
+    }
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+    );
+});
+
+test('a landscape phone keeps the transport on one row (#1986)', async ({ page }) => {
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket').first().click();
+    for (const size of [
+        { width: 844, height: 390 },
+        { width: 740, height: 360 },
+    ]) {
+        await page.setViewportSize(size);
+        const tops = await page
+            .locator('.transport-bar > *')
+            .evaluateAll((els) =>
+                els
+                    .filter((el) => (el as HTMLElement).offsetParent !== null)
+                    .map((el) => Math.round(el.getBoundingClientRect().top)),
+            );
+        expect(Math.max(...tops) - Math.min(...tops)).toBeLessThanOrEqual(12);
+    }
+});

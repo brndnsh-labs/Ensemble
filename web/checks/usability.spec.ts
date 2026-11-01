@@ -110,7 +110,7 @@ test('a practice nudge is said apart from a chart change, and both wait for Save
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     const before = (await keyButton(page).getAttribute('aria-label'))?.replace('Key: ', '');
     await pickSongKey(page, before === 'D' ? 'E' : 'D');
-    await expect(status).toHaveText('Unsaved changes · locally recovered');
+    await expect(status).toHaveText('Unsaved changes on this device');
     await expect(status).toHaveClass('unsaved');
 
     // Nothing was written until Save, which keeps both.

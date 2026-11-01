@@ -124,7 +124,7 @@ export function SongHeader({
                                           : 'Practice settings changed · this tab only'
                                       : dirty
                                         ? recoveryHealthy
-                                            ? 'Unsaved changes · locally recovered'
+                                            ? 'Unsaved changes on this device'
                                             : 'Unsaved changes · this tab only'
                                         : (cloudSaved ?? 'Saved on this device')}
                         </span>

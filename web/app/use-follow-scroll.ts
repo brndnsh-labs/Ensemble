@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 
 // ---------------------------------------------------------------- #1458 Following look-ahead
 //
@@ -232,4 +232,39 @@ export function useFollowScroll(
         followJumpedFor.current = activeBar;
         scrollForJump(scrollEl, activeEl, targetEl);
     }, [scroll, nextSoon, following, activeBar]);
+}
+
+/**
+ * Whether the playing row is out of `.chart-scroll`'s view (#1986): "Resume follow" has something
+ * to resume TO only then. A chart that fits has nothing to scroll, so a wheel or PageDown over
+ * it leaves the playing row on screen and no pill is owed. Measured on scroll and on every
+ * active-bar change, and only while Following is off (while on, the look-ahead keeps it in view).
+ */
+export function usePlayingRowAway(
+    scroll: RefObject<HTMLDivElement | null>,
+    { following, active, remount }: { following: boolean; active: number | null; remount: boolean },
+): boolean {
+    const [away, setAway] = useState(false);
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `active` re-measures when the playing bar moves and `remount` when the neck swaps the scroller; the body reads the DOM, not the values.
+    useEffect(() => {
+        const scrollEl = scroll.current;
+        if (following || !scrollEl) {
+            setAway(false);
+            return;
+        }
+        const measure = () => {
+            const activeEl = scrollEl.querySelector<HTMLElement>('[data-active="true"]');
+            if (!activeEl) {
+                setAway(false);
+                return;
+            }
+            const box = scrollEl.getBoundingClientRect();
+            const row = activeEl.getBoundingClientRect();
+            setAway(row.bottom <= box.top || row.top >= box.bottom);
+        };
+        measure();
+        scrollEl.addEventListener('scroll', measure, { passive: true });
+        return () => scrollEl.removeEventListener('scroll', measure);
+    }, [scroll, following, active, remount]);
+    return away;
 }

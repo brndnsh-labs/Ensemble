@@ -178,7 +178,7 @@
 }
 .az-index button {
     width: 22px;
-    height: 18px;
+    height: 24px;
     font-size: 10px;
     color: var(--muted-soft);
     border-radius: 4px;
@@ -673,4 +673,9 @@
         grid-template-columns: minmax(0, 1fr);
         gap: 24px;
     }
+}
+/* The eyebrow under the back link is its own line (#1986): both are inline, so "← Songbook" ran
+   into "READ-ONLY, NEVER SAVED". */
+.page-back + .eyebrow {
+    display: block;
 }

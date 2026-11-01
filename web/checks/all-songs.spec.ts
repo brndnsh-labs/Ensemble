@@ -565,3 +565,15 @@ test('after a row delete, focus goes to the next row, or the heading once the li
     await expect(page.locator('.all-songs-empty')).toBeVisible();
     await expect(page.getByRole('heading', { name: /All songs/ })).toBeFocused();
 });
+
+test('the A–Z index buttons are at least 24px tall (#1986)', async ({ page }) => {
+    await seedStarters(page);
+    await page.getByTestId('all-songs-link').click();
+    const buttons = page.locator('.az-index button');
+    await expect(buttons.first()).toBeVisible();
+    for (const height of await buttons.evaluateAll((els) =>
+        els.map((el) => el.getBoundingClientRect().height),
+    )) {
+        expect(height).toBeGreaterThanOrEqual(24);
+    }
+});
