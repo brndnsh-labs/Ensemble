@@ -120,8 +120,13 @@ for (const [width, height, limit] of [
     }, testInfo) => {
         test.skip(testInfo.project.name !== 'webkit-phone', 'the fold is a phone layout');
         test.setTimeout(60_000);
+        // A B♭ horn: the instrument chip (#1992) joins the row the fold keeps (#2063).
+        await page.addInitScript(() => {
+            localStorage.setItem('ensemble-v2-preview:player-instrument', 'horn-bb');
+        });
         await page.setViewportSize({ width, height });
         await open(page);
+        await expect(page.getByRole('button', { name: /^You play: B♭ horn/ })).toBeVisible();
         const before = await controls(page);
         await play(page);
         await expect(
