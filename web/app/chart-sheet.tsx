@@ -630,6 +630,13 @@ export function ChartSheet({
                                             : undefined
                                     }
                                 >
+                                    {turn && !turn.first && (
+                                        <span className="sr-only">
+                                            {turn.turn === 'you'
+                                                ? 'Your turn'
+                                                : `${turn.label}'s turn`}
+                                        </span>
+                                    )}
                                     {turn?.first && (
                                         <span className="bar-turn" data-turn-label={turn.turn}>
                                             {turn.label}

@@ -551,6 +551,12 @@ export class BandHost {
         return { bar: bar.index, pass: segment.pass + bar.visit.chorus };
     }
 
+    /** What the band's trade is now (partner, turn length, lanes), to tell when a turn plan changed. */
+    tradeKey(): string {
+        const s = this.settings;
+        return s ? JSON.stringify([s.trade ?? null, s.lanes.lead, s.lanes.drums]) : '';
+    }
+
     /** Which chorus of a counted performance performed bar `index` is in (0 when uncounted). */
     chorusOf(index: number): number {
         return this.timeline?.bars[index]?.visit.chorus ?? 0;

@@ -46,6 +46,8 @@ function samePlace(a: runtime.PerformancePlace, b: runtime.PerformancePlace): bo
         a.part === b.part &&
         a.pass === b.pass &&
         a.barChorus === b.barChorus &&
+        a.bar === b.bar &&
+        a.tradeKey === b.tradeKey &&
         a.trading === b.trading
     );
 }

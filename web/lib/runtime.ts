@@ -405,6 +405,10 @@ export interface PerformancePlace {
     /** The band's pass, and the bar's chorus: with them `tradeTurns` reads the same plan. */
     pass: number;
     barChorus: number;
+    /** The performed bar sounding, so a bar played twice shows the turn of the visit heard. */
+    bar: number;
+    /** The band's trade settings now: a change mid-play replans the turns. */
+    tradeKey: string;
     /** The bar sounding is in a traded stretch. */
     trading: boolean;
 }
@@ -437,6 +441,8 @@ export function performancePlace(tick: number | null): PerformancePlace | null {
         part,
         pass: at.pass,
         barChorus,
+        bar: at.bar,
+        tradeKey: band.tradeKey(),
         trading: role?.kind === 'trade',
     };
 }
@@ -453,7 +459,7 @@ export interface TradeTurn {
  * The turns of the chorus `place` is in, keyed by the first chord's `globalIndex` of each written
  * bar (the chart sheet's bar). Derived from `BandHost.roleAt`, the plan's own `leadRole`: the
  * stand tints exactly the bars the band leaves to the player. A bar written once but played twice
- * in a chorus (a repeat) shows its first visit's turn.
+ * in a chorus (a repeat) shows the turn of the visit at or after the bar sounding, else its first.
  */
 export function tradeTurns(place: PerformancePlace): Map<number, TradeTurn> {
     const turns = new Map<number, TradeTurn>();
@@ -461,10 +467,20 @@ export function tradeTurns(place: PerformancePlace): Map<number, TradeTurn> {
     if (!band || !view) {
         return turns;
     }
+    // Slots run in performance order, so a visit already passed is replaced by the next one
+    // once the playhead is past it: the first visit at or after `place.bar` wins.
+    const settled = new Set<number>();
     for (const slot of view.slots) {
         const chord = view.chords[slot.display];
-        if (!chord || turns.has(chord.globalIndex) || band.chorusOf(slot.bar) !== place.barChorus) {
+        if (
+            !chord ||
+            settled.has(chord.globalIndex) ||
+            band.chorusOf(slot.bar) !== place.barChorus
+        ) {
             continue;
+        }
+        if (slot.bar >= place.bar) {
+            settled.add(chord.globalIndex);
         }
         const role = band.roleAt(slot.bar, place.pass);
         if (role?.kind === 'trade') {

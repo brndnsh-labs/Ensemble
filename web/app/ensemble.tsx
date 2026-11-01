@@ -760,7 +760,7 @@ export default function Ensemble() {
     // biome-ignore lint/correctness/useExhaustiveDependencies: `current`, `songMinutes` and `playing` are re-read triggers.
     const songReadout = useMemo(
         () =>
-            current && (bandTab === 'practice' || (songMinutes !== null && !playing))
+            current && (bandTab === 'practice' || songMinutes !== null)
                 ? runtime.songModeReadout()
                 : null,
         [current, songMinutes, feel.songMinutes, playing, bandTab],
@@ -770,7 +770,7 @@ export default function Ensemble() {
     // biome-ignore lint/correctness/useExhaustiveDependencies: `place.pass` and `place.barChorus` are the triggers; `place` is a new object per change.
     const turns = useMemo(
         () => (place?.trading ? runtime.tradeTurns(place) : null),
-        [place?.trading, place?.pass, place?.barChorus, current],
+        [place?.trading, place?.pass, place?.barChorus, place?.bar, place?.tradeKey, current],
     );
     const neckShowing = neck && !editing;
     const neckPrefs = useNeckPrefs();
