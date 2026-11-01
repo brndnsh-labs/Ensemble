@@ -1,4 +1,4 @@
-import { type RefObject, useLayoutEffect } from 'react';
+import { type RefObject, useLayoutEffect, useRef } from 'react';
 
 /**
  * The stand as a page (#1712): a 32–36 bar chart reads on one screen, the way iReal Pro shows it.
@@ -20,6 +20,9 @@ import { type RefObject, useLayoutEffect } from 'react';
  * The step is chosen again when the box changes size or the chart changes, never on play/stop:
  * the "Tap a chord" line under the chart hides while playing, so the room it took when last
  * shown is held back for it ({@link bottomReserve}), so the chart holds still across play/pause.
+ * Nor does it re-choose when `folded` flips (a phone's header row folding away for play, #1993):
+ * the room that frees is the same kind of play/stop change, so the step holds (#1784) and the
+ * chart just shows more of itself. A real resize — a rotation, a window — still fits again.
  */
 const FIT_STEPS = 9;
 /** The largest step a chart that scrolls is shown at. */
@@ -39,7 +42,10 @@ export function useChartFit(
     scroll: RefObject<HTMLElement | null>,
     mode: ChartFitMode,
     content: unknown,
+    folded = false,
 ): void {
+    // The box's size as last fitted, which the fold's height change is absorbed into.
+    const seen = useRef({ width: 0, height: 0 });
     useLayoutEffect(() => {
         const box = scroll.current;
         if (!box || !mode || content === undefined) {
@@ -47,12 +53,11 @@ export function useChartFit(
         }
         const fit = () => chooseStep(box, mode);
         fit();
-        let width = box.clientWidth;
-        let height = box.clientHeight;
+        seen.current = { width: box.clientWidth, height: box.clientHeight };
         const observer = new ResizeObserver(() => {
-            const changed = box.clientWidth !== width || box.clientHeight !== height;
-            width = box.clientWidth;
-            height = box.clientHeight;
+            const changed =
+                box.clientWidth !== seen.current.width || box.clientHeight !== seen.current.height;
+            seen.current = { width: box.clientWidth, height: box.clientHeight };
             if (changed) {
                 fit();
             }
@@ -69,6 +74,16 @@ export function useChartFit(
             delete box.dataset.page;
         };
     }, [scroll, mode, content]);
+    // The fold flipped in this commit, so the box already has its new height: take it as the
+    // fitted one, so the observer sees no change. Only a height change that leaves the width alone
+    // is absorbed; a width change is a real resize, and the observer still fits it.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `folded` flipping is the trigger.
+    useLayoutEffect(() => {
+        const box = scroll.current;
+        if (box && box.clientWidth === seen.current.width) {
+            seen.current.height = box.clientHeight;
+        }
+    }, [scroll, folded]);
 }
 
 function chooseStep(box: HTMLElement, mode: 'page' | 'edit') {

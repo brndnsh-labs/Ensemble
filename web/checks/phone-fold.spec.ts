@@ -159,3 +159,51 @@ test('landscape phone: mute chips are 12px and inside the screen (#1993)', async
         844,
     );
 });
+
+/**
+ * #1784 holds through the fold: the room the header's second row frees while the band plays is not
+ * a resize of the stand, so the chart's step (`data-fit`) is the same stopped, playing and
+ * stopped again. Swept over heights so some window sits on a step's edge whatever the fonts:
+ * without the hold, the ~55px the fold frees tips a step at one of them.
+ */
+test('the chart keeps its step through the fold at every phone height (#1784, #1993)', async ({
+    page,
+}) => {
+    test.setTimeout(180_000);
+    const long = measureSong([
+        'fold-long',
+        'Fold long',
+        'Rock',
+        'C',
+        'C|G|Am|F|C|G|Am|F|Dm|G|C|Am|Dm|G|C|C|C|G|Am|F|C|G|Am|F|Dm|G|C|Am|Dm|G|C|C',
+        90,
+    ]);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedGuestDocuments(page, [long]);
+    await songLink(page, 'Fold long').first().click();
+    const scroll = page.locator('.chart-scroll[data-fit]');
+    await expect(scroll).toBeVisible();
+    const fit = () => scroll.getAttribute('data-fit');
+    const steps = new Set<string | null>();
+    for (let height = 520; height <= 900; height += 20) {
+        await page.setViewportSize({ width: 390, height });
+        // A real resize re-fits; let it settle before taking the stopped step.
+        await page.waitForTimeout(250);
+        const stopped = await fit();
+        steps.add(stopped);
+        await play(page);
+        await expect(
+            page.getByRole('button', { name: 'Stop playback', exact: true }),
+        ).toBeVisible();
+        await page.waitForTimeout(250);
+        expect(await fit(), `playing at ${height}`).toBe(stopped);
+        await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+        await expect(
+            page.getByRole('button', { name: 'Start playback', exact: true }),
+        ).toBeVisible();
+        await page.waitForTimeout(250);
+        expect(await fit(), `stopped again at ${height}`).toBe(stopped);
+    }
+    // The sweep crossed at least one step edge, or it proved nothing.
+    expect(steps.size).toBeGreaterThan(1);
+});

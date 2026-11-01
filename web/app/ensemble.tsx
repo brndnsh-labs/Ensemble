@@ -859,8 +859,19 @@ export default function Ensemble() {
     const neckShowing = neck && !editing;
     const playingRowAway = usePlayingRowAway(scroll, { following, active, remount: neckShowing });
     const neckPrefs = useNeckPrefs();
+    // #1993 — on a phone, while the band plays, the header's second row folds into the ••• (the
+    // Song menu carries it, ahead of its own actions; `song-header.css`). Laptop and tablet keep
+    // the row (#1969).
+    const phoneWidth = usePhoneWidth();
+    const foldHeader = !!current && phoneWidth && (playing || playbackPending);
     // The chart reads as one page where it can (#1712); editing, it scrolls at a reading size.
-    useChartFit(scroll, !current || neckShowing ? null : editing ? 'edit' : 'page', blocks);
+    // The fold's height is not a resize of the stand: the step holds across it (#1784).
+    useChartFit(
+        scroll,
+        !current || neckShowing ? null : editing ? 'edit' : 'page',
+        blocks,
+        foldHeader,
+    );
     // Bars typed but not yet applied (#1723).
     const hasPendingText = pendingMeasures;
     // An untouched new song is not unsaved work: there is nothing in it to lose (#1707).
@@ -3094,11 +3105,7 @@ export default function Ensemble() {
     // search, Import chart and New song belong to this view only.
     const homeView = ready && !current && browse.view === 'home';
 
-    // #1993 — on a phone, while the band plays, the header's second row folds into the •••
-    // (`song-header.css`) so the chart keeps the height; the Song menu carries what folded, ahead
-    // of its own actions. Laptop and tablet keep the row (#1969).
-    const phoneWidth = usePhoneWidth();
-    const foldHeader = !!current && phoneWidth && playbackActive;
+    // The Song menu carries what the header folded (`foldHeader`), ahead of its own actions.
     /** A choice that is the whole answer: the Song menu closes as it runs (`SongMenu`'s `done`). */
     const closeThen = (action: () => void) => {
         setSongMenu(null);
