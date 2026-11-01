@@ -122,6 +122,33 @@
 .chorus-part {
     font-weight: 500;
 }
+/* A section loop (#1989): a chip hung from the transport's bottom edge, over the top of the
+   chart. Like the counter it takes no room of its own, so setting a loop never moves the chart's
+   fit or wraps the phone's transport row; unlike it, it is a control (its × ends the loop). */
+.loop-chip {
+    position: absolute;
+    right: 12px;
+    bottom: 0;
+    transform: translateY(50%);
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 4px 10px 4px 12px;
+    border: 1px solid var(--primary);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px #0002;
+}
+.loop-chip-x {
+    font-size: 15px;
+    line-height: 1;
+}
 .setting-label {
     font-size: 9px;
     text-transform: uppercase;

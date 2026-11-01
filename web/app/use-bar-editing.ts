@@ -74,6 +74,8 @@ interface BarEditingOptions {
     updateChart: () => ChartDocument;
     /** The section menu's "Start here" (#1422). */
     startHereSection: (id: string | undefined, pending?: readonly SectionChange[]) => void;
+    /** The section menu's "Loop" (#1989). */
+    loopSection: (id: string | undefined, pending?: readonly SectionChange[]) => void;
     /** Closes the Song menu, Export… and the Key popover. */
     closeSongMenus: () => void;
     /** Offers Undo for the delete just made (`useDeleteUndo`, #1758). */
@@ -131,6 +133,7 @@ export function useBarEditing({
     applyScore,
     updateChart,
     startHereSection,
+    loopSection,
     closeSongMenus,
     offerUndo,
 }: BarEditingOptions): BarEditingHandlers {
@@ -319,6 +322,7 @@ export function useBarEditing({
             onAddAfter: addSectionAfter,
             onDelete: deleteSection,
             onStartHere: startHereSection,
+            onLoop: loopSection,
         };
     }
     /**

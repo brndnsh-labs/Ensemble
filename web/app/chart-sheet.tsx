@@ -128,6 +128,7 @@ export interface SectionEditing {
     onAddAfter: (sectionId: string, pending: readonly SectionChange[]) => void;
     onDelete: (sectionId: string, pending: readonly SectionChange[]) => void;
     onStartHere: (sectionId: string, pending: readonly SectionChange[]) => void;
+    onLoop: (sectionId: string, pending: readonly SectionChange[]) => void;
 }
 
 interface ChartSheetProps {
@@ -159,6 +160,8 @@ interface ChartSheetProps {
     /** Section tap menu's "Start here" (#1422) — jumps playback to the section's first
      * performed bar, starting it if stopped. */
     onStartHere: (sectionId: string | undefined) => void;
+    /** Section tap menu's "Loop" (#1989): the band plays just this section, over and over. */
+    onLoop: (sectionId: string | undefined) => void;
     /** Set while editing a measure chart (#1723); null otherwise. */
     barEdit: BarEditing | null;
     /** Set while editing a measure chart (#1726); null otherwise. */
@@ -197,6 +200,7 @@ export function ChartSheet({
     playbackActive,
     totalBars,
     onStartHere,
+    onLoop,
     barEdit,
     sectionEdit,
     onAudition,
@@ -989,6 +993,7 @@ export function ChartSheet({
                             anchor={sectionAnchor}
                             closer={sectionMenuCloser}
                             onStartHere={(pending) => sectionEdit.onStartHere(written.id, pending)}
+                            onLoop={(pending) => sectionEdit.onLoop(written.id, pending)}
                             onChange={(changes) => sectionEdit.onChange(written.id, changes)}
                             onAddAfter={(pending) => sectionEdit.onAddAfter(written.id, pending)}
                             onDelete={(pending) => {
@@ -1024,6 +1029,14 @@ export function ChartSheet({
                             onSelect: () => {
                                 setSectionMenu(null);
                                 onStartHere(sectionMenu.id);
+                            },
+                        },
+                        {
+                            id: 'loop',
+                            label: 'Loop',
+                            onSelect: () => {
+                                setSectionMenu(null);
+                                onLoop(sectionMenu.id);
                             },
                         },
                     ]}

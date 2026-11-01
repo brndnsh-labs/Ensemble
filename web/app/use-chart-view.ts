@@ -46,14 +46,17 @@ export function useChartView(
     active: number | null,
     playing: boolean,
     countInSlot: number | null = null,
+    polledView: BandChart | null = null,
 ) {
     // Read again whenever the open document changes (`runtime.load`/`editScore` rebuild the
     // view), and when playback starts or stops: a song-mode performance (#1784) is drawn from its
-    // own counted timeline, so `active` indexes that view's slots only while it plays.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `playing` is a re-read trigger.
+    // own counted timeline, so `active` indexes that view's slots only while it plays. And when
+    // the playback poll reads a different view in the same paint as `active` (`polledView`): a
+    // section loop (#1989) set, or cleared mid-play at the barline the band carries on from.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `playing` and `polledView` are re-read triggers.
     const band = useMemo(
         (): BandChart | null => (current ? runtime.bandChartView() : null),
-        [current, playing],
+        [current, playing, polledView],
     );
     const blocks = band?.blocks ?? NO_BLOCKS;
     const displayActive = active === null ? null : (band?.slots[active]?.display ?? active);
