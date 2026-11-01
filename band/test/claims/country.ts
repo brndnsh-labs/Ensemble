@@ -102,6 +102,7 @@ export const country = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['compLeadUnison', 0, 0.15, "the piano leaves the picker's note to the picker"],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chords'],
@@ -115,6 +116,7 @@ export const country = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['compLeadUnison', 0, 0.15, "the piano leaves the picker's note to the picker"],
                 // Measured 0.130; development off 0.070, #2012's bar fix reverted 0.080; always develops 0.39.
                 // Floor is midway between development off (0.070) and shipped: it guards development off. The bar fix (0.080 vs 0.130) is within about 2 sd here; blues, disco and rock guard it.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.

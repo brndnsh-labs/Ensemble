@@ -91,6 +91,7 @@ export const blues = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0.15, 0.4, 'a call, then a bar of room for the band to answer'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the call sits on the chord on the beats'],
@@ -102,6 +103,7 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 // Measured 0.134; development off 0.061, #2012's bar fix reverted 0.071; always develops 0.40.
                 // Floor sits between the bar fix reverted (0.071) and shipped: it guards #2012's bar fix and development off (0.061).
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.

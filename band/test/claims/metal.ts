@@ -428,6 +428,10 @@ export const metal = defineClaims({
             ],
         },
         {
+            take: { lead: 'solo', comp: 'guitar' },
+            claims: [['compLeadUnison', 0, 0.15, 'the rhythm guitar leaves the lead its note']],
+        },
+        {
             take: { lead: 'head' },
             claims: [
                 ['leadLongBreath', 0, 0.02, 'the melody never drops out for two bars'],
