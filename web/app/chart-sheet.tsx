@@ -1,11 +1,9 @@
 import type { BarSplit } from '@core/songbook/score-text';
 import type { SemanticScore } from '@core/songbook/score-types';
-import type { ChartNotation } from '@core/songbook/types';
 import {
     type FocusEvent as ReactFocusEvent,
     type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
-    type ReactNode,
     useEffect,
     useRef,
     useState,
@@ -20,6 +18,7 @@ import { afterPress } from './after-press';
 import { BarDock, usePhoneWidth } from './bar-dock';
 import { BarMenu, type BarMenuBar } from './bar-menu';
 import { BarSplits } from './bar-splits';
+import { eventText } from './chord-text';
 import { Menu } from './menu';
 import { SectionMenu } from './section-menu';
 import type { BarDraft } from './use-bar-drafts';
@@ -51,42 +50,6 @@ function chorusChoice(choruses: number | undefined): string {
         return 'Repeats continuously';
     }
     return choruses === 1 ? 'Plays once' : `Plays ${choruses} times`;
-}
-
-/**
- * The visible chord symbol in the chart's current notation (#1276). `chord.display`
- * (`FormattedChordNames`) is precomputed for all three notations by `chordNames`
- * (`lib/band-chart.ts`) regardless of which one is selected, so switching notation is a
- * pure read-time choice, never a re-analysis of the chord.
- */
-function chordSymbol(chord: ChartChord, notation: ChartNotation): ReactNode {
-    const disp = chord.display?.[notation];
-    if (!disp) {
-        return chord.absName;
-    }
-    // Set the way a real book sets it (#1700): the root full size, the quality small and raised
-    // beside it, a slash bass after. Read at a distance, the root is the fact that matters; the
-    // quality qualifies it. Spans with no space between them, so the text is still "Cmaj7/E".
-    return (
-        <>
-            <span className="chord-root">{disp.root}</span>
-            {disp.suffix && <span className="chord-quality">{disp.suffix}</span>}
-            {disp.bass && <span className="chord-bass">/{disp.bass}</span>}
-        </>
-    );
-}
-
-/**
- * How a written event reads on the stand. A hold is the slash the bar editor takes for it (the
- * chord before it rings on), N.C. is printed as charts print it, and a fermata sits over the
- * symbol it holds. Only the band engine can open charts with these (`lib/band-chart.ts`).
- */
-function eventText(chord: ChartChord, notation: ChartNotation): ReactNode {
-    return chord.kind === 'hold'
-        ? '/'
-        : chord.kind === 'no-chord'
-          ? 'N.C.'
-          : chordSymbol(chord, notation);
 }
 
 /** `audition` false while editing: a chord there opens its bar's field instead of sounding. */

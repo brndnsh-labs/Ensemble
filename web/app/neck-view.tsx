@@ -1,10 +1,12 @@
 'use client';
 
+import type { ChartNotation } from '@core/songbook/types';
 import { type KeyboardEvent, useEffect, useId, useMemo, useState } from 'react';
 import type { BandChart } from '../lib/band-chart';
 import type { NeckLabels, NeckPreferences, PlacedNeckPreferences } from '../lib/session';
 import { gripMidis, NECK_INSTRUMENTS, type VoicedBandChord } from '../lib/voicings';
 import { Neck, type NeckPreview, type NeckZoom } from './neck';
+import { NeckChartRowView } from './neck-chart-row';
 import { HOME_W } from './neck-geometry';
 import {
     changePosition,
@@ -45,6 +47,8 @@ interface NeckViewProps {
     playing: boolean;
     /** Sound these MIDI pitches as a strum, lowest string first (`runtime.auditionPitches`). */
     onStrum?: (midis: number[]) => void;
+    /** The chart's chord notation, for the chart row under the board. */
+    notation: ChartNotation;
     /** The settings with the hand placed (`placeNeckHand`). */
     prefs: PlacedNeckPreferences;
     onPrefs: (patch: Partial<NeckPreferences>) => void;
@@ -56,23 +60,27 @@ const LABEL_CHOICES: [NeckLabels, string][] = [
     ['note', 'Notes'],
 ];
 
-/** `neck-view.css`'s phone breakpoint: below it the board zooms onto the hand (#1593). */
-const PHONE = '(max-width: 760px)';
+/**
+ * Where the board zooms onto the hand (#1593, #1995): a phone, and any portrait screen. A
+ * portrait tablet is as wide as a laptop but twice as tall, and the whole neck drawn to its width
+ * is a strip across the top; zoomed, the frets get the room the height gives them.
+ */
+const ZOOMED = '(max-width: 760px), (orientation: portrait)';
 
 /**
- * The board's zoom for this viewport: the whole neck, or the hand's frets on a phone. The static
+ * The board's zoom for this viewport: the whole neck, or the hand's frets on a phone or portrait screen. The static
  * export prerenders the whole neck; the viewport is read on mount and on every change.
  */
 function useNeckZoom(): NeckZoom {
-    const [phone, setPhone] = useState(false);
+    const [zoomed, setZoomed] = useState(false);
     useEffect(() => {
-        const media = window.matchMedia(PHONE);
-        const read = () => setPhone(media.matches);
+        const media = window.matchMedia(ZOOMED);
+        const read = () => setZoomed(media.matches);
         read();
         media.addEventListener('change', read);
         return () => media.removeEventListener('change', read);
     }, []);
-    return phone ? 'window' : 'board';
+    return zoomed ? 'window' : 'board';
 }
 
 /** The grip's symbol in the chart's own ASCII accidentals, so the notice reads as one chart. */
@@ -92,6 +100,7 @@ export function NeckView({
     changeSoon,
     playing,
     onStrum,
+    notation,
     prefs,
     onPrefs,
 }: NeckViewProps) {
@@ -237,6 +246,9 @@ export function NeckView({
                             strike={active !== null}
                             onStrum={strum}
                         />
+                        {band && (
+                            <NeckChartRowView band={band} notation={notation} slot={shownSlot} />
+                        )}
                     </>
                 )}
                 <div className="neck-settings">

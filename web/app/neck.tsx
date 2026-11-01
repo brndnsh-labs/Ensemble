@@ -43,7 +43,7 @@ import './neck.css';
  * is — its ghost dots and the root's path; `soft` and `off` show the current grip only.
  */
 export type NeckPreview = 'off' | 'soft' | 'strong';
-/** `board` draws the whole neck; `window` zooms onto the hand's frets (a phone, #1593). */
+/** `board` draws the whole neck; `window` zooms onto the hand's frets (a phone or portrait screen, #1593, #1995). */
 export type NeckZoom = 'board' | 'window';
 
 export interface NeckProps {

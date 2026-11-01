@@ -13,6 +13,7 @@ import { type BandChart, bandChart } from '../lib/band-chart';
 import { defaultNeckPreferences, placeNeckHand } from '../lib/session';
 import { gripMidis, type VoicedBandChord, voiceBandChart } from '../lib/voicings';
 import { GUITAR } from '../lib/voicings/instruments';
+import { chartRowAt } from './neck-chart-row';
 import { NeckView } from './neck-view';
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -86,6 +87,7 @@ function render({
                 changeSoon={changeSoon}
                 playing={playing}
                 onStrum={onStrum}
+                notation="name"
                 prefs={prefs}
                 onPrefs={() => {}}
             />,
@@ -253,5 +255,61 @@ describe('NeckView: the board strums the sounding grip (#1596)', () => {
         expect($('.neck-strum')).toBeNull();
         tap();
         expect(onStrum).not.toHaveBeenCalled();
+    });
+});
+
+describe('NeckView: the chart row under the board (#1995)', () => {
+    const bars = () => [...host.querySelectorAll('.neck-chart .bar')];
+    const playing = () =>
+        bars()
+            .map((b, i) => (b.classList.contains('active') ? i + 1 : 0))
+            .filter(Boolean);
+
+    it('names the section and numbers the bars; nothing plays while stopped', () => {
+        render();
+        expect($('.neck-chart .section-letter')?.textContent).toBe('A');
+        expect(bars().map((b) => b.querySelector('.bar-number')?.textContent)).toEqual([
+            '1',
+            '2',
+            '3',
+            '4',
+        ]);
+        expect(bars().map((b) => b.querySelector('.chord')?.textContent)).toEqual([
+            'Dm7',
+            'G7',
+            'Cmaj7',
+            'Cmaj7',
+        ]);
+        expect(playing()).toEqual([]);
+    });
+
+    it('marks the sounding bar and follows the playhead', () => {
+        render({ active: 1, playing: true });
+        expect(playing()).toEqual([2]);
+        render({ active: 3, playing: true });
+        expect(playing()).toEqual([4]);
+    });
+
+    it('follows the stopped step-through', () => {
+        render();
+        press('Next chord');
+        expect(playing()).toEqual([2]);
+    });
+});
+
+describe('chartRowAt (#1995)', () => {
+    const long = chart(['C', 'F', 'G', 'C', 'Am', 'Dm', 'G', 'C', 'F', 'G'].map(chord));
+
+    it('is the sheet line of four that holds the bar, numbered across the chart', () => {
+        const second = chartRowAt(long, 5);
+        expect(second?.bars.map((b) => b.number)).toEqual([5, 6, 7, 8]);
+        expect(second?.bars.map((b) => b.playing)).toEqual([false, true, false, false]);
+        // The last row is short rather than padded.
+        expect(chartRowAt(long, 9)?.bars.map((b) => b.number)).toEqual([9, 10]);
+    });
+
+    it('is the first row when nothing sounds', () => {
+        expect(chartRowAt(long, null)?.bars.map((b) => b.number)).toEqual([1, 2, 3, 4]);
+        expect(chartRowAt(long, null)?.bars.some((b) => b.playing)).toBe(false);
     });
 });

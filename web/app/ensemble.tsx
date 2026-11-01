@@ -3565,6 +3565,7 @@ export default function Ensemble() {
                                     changeSoon={changeSoon}
                                     playing={playbackActive}
                                     onStrum={(midis) => runtime.auditionPitches(midis)}
+                                    notation={current?.chart.score.notation ?? 'name'}
                                 />
                             </Suspense>
                         ) : (
