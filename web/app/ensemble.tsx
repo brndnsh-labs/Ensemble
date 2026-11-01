@@ -397,8 +397,16 @@ export default function Ensemble() {
     // Which home entry point opened the standards browser (#1441) — "Browse all →" or one
     // shelf's link — so the browser opens on that shelf and focus comes back to that button.
     const [standardsEntry, setStandardsEntry] = useState<StandardsEntry>('all');
-    // The shared or standard draft as it landed, so Back can tell an edited one from a glance.
+    // The shared or standard draft as it landed: what "Changed" and its device draft are measured
+    // against, and what Revert goes back to.
     const draftBaseline = useRef<ChartDocument | null>(null);
+    // The device draft a standard or a shared link keeps its changes under (#1979,
+    // `repository.keepSharedDraft`), or null for any other chart — a new song included. Written
+    // with the shared-draft flag (`markSharedDraft`, `landDraftOnStand`), read by `draft()`.
+    const sharedDraftKey = useRef<string | null>(null);
+    // The standard's or link's changes could not be kept on this device (`keepSharedDraft`): the
+    // tab holds the only copy, so closing it asks first, as a song's in-tab draft does.
+    const sharedDraftUnkept = useRef(false);
     /** Which standard the draft on the stand was built from, so its entry can rebuild it. */
     const standardOnStand = useRef<{ documentId: string; standardId: string } | null>(null);
     // Where focus returns on leaving either sub-view (#1440 review P3). Held HERE, not inside
@@ -741,6 +749,14 @@ export default function Ensemble() {
         // and so made the change.
         (newSongDraft && !!current && !untouchedNewSong(current)) ||
         !!(current && saved && !same(current, saved));
+    // A standard or a shared link changed since it landed (#1979): kept on this device and said
+    // in the header ("Changed"), where an untouched one says where it came from.
+    const sharedChanged =
+        sharedDraft &&
+        !newSongDraft &&
+        !!current &&
+        draftBaseline.current !== null &&
+        (hasPendingText || !same(current, draftBaseline.current));
     // Unsaved all the same — only Save commits it — but said apart, so a practice nudge doesn't
     // read like unsaved chart work (#1706).
     const practiceOnly =
@@ -907,7 +923,7 @@ export default function Ensemble() {
             });
         // The playback poll that ran here is `usePlaybackState`'s (#1920).
         const preventLoss = (event: BeforeUnloadEvent) => {
-            if (volatileDrafts.current.size || pendingText.current) {
+            if (volatileDrafts.current.size || pendingText.current || sharedDraftUnkept.current) {
                 event.preventDefault();
                 event.returnValue = '';
             }
@@ -925,20 +941,31 @@ export default function Ensemble() {
      * copy"/Save decides one. Shared by every entry that opens a chart this way: a `#chart=`
      * share link (below), and opening a standard from the catalog (`openStandard`, #1439).
      * Deliberately not `open()`: no `saved` baseline (so it can't masquerade as already
-     * committed), no recovery-storage write (the id may be untrusted, or a catalog id that is
-     * never meant to collide with a recovery key), and `lastOpened`/`rememberSong` are left alone
-     * since this isn't a library entry yet.
+     * committed), no song recovery slot (the id may be a stranger's song id, or a catalog id),
+     * and `lastOpened`/`rememberSong` are left alone since this isn't a library entry yet.
+     *
+     * `draftKey` is where its changes are kept on this device (#1979); `kept` is the draft found
+     * there, which lands instead of `document`, its stored `base` the baseline (as `open()`
+     * baselines a recovered song on the stored copy) — not `document`, whose bar ids a fresh
+     * standard build mints anew.
      */
-    function landDraftOnStand(document: ChartDocument, note: string) {
+    function landDraftOnStand(
+        document: ChartDocument,
+        note: string,
+        draftKey: string | null = null,
+        kept: repository.SharedDraft | null = null,
+    ) {
+        const onStand = kept?.document ?? document;
         setStandardDraft(false);
-        runtime.load(document);
+        runtime.load(onStand);
         setSaved(null);
-        const landed = runtime.withLoadedSounds(document);
+        const landed = runtime.withLoadedSounds(onStand);
         setCurrent(landed);
-        draftBaseline.current = landed;
+        draftBaseline.current = kept ? kept.base : landed;
         currentStore.current = null;
         setStandStore(null);
         markSharedDraft(true);
+        sharedDraftKey.current = draftKey;
         pendingText.current = false;
         setPendingMeasures(false);
         barDrafts.retire();
@@ -946,7 +973,7 @@ export default function Ensemble() {
         setEditing(false);
         setFollowing(true);
         setMessage(note);
-        const section = document.chart.score.sections[0];
+        const section = onStand.chart.score.sections[0];
         setMeasureId(section.measures[0].id);
     }
     // `landDraftOnStand` is a component-scope function declaration, new every render: the
@@ -978,13 +1005,18 @@ export default function Ensemble() {
         let alive = true;
         // `track` stays here rather than inside `landDraftOnStand`: `openStandard` (#1439)
         // tracks its own `chart_opened` event instead of `share_opened`.
-        const openSharedDraft = (link: ChartDocument, note: string) => {
+        const openSharedDraft = (
+            link: ChartDocument,
+            note: string,
+            draftKey: string | null,
+            kept: repository.SharedDraft | null,
+        ) => {
             track('share_opened');
             // A link that decodes can still be one the band refuses (`checkPlayable`: too long
             // to play, #1632). This runs outside `run()`, so say why here instead of leaving
             // an unhandled rejection and a silent page.
             try {
-                landSharedLink(link, note);
+                landSharedLink(link, note, draftKey, kept);
             } catch (e) {
                 setError(e instanceof Error ? e.message : String(e));
             }
@@ -1002,15 +1034,28 @@ export default function Ensemble() {
         // `?autoplay=1` on a `#chart=` link (#1732) arms playback; read before `consumeLink`
         // strips it.
         const wantsAutoplay = new URLSearchParams(search).get('autoplay') === '1';
-        void decodeChartLink(hash).then((document) => {
+        void decodeChartLink(hash).then(async (document) => {
             consumeLink();
+            // The same link opened again finds the changes it was left with (#1979).
+            const draftKey =
+                document && document !== RETIRED_CHART_LINK
+                    ? await repository.sharedLinkDraftKey(document)
+                    : null;
             if (!alive) {
                 return;
             }
             if (document === RETIRED_CHART_LINK) {
                 setError(OLD_FORMAT_REFUSAL);
             } else if (document) {
-                openSharedDraft(document, 'Opened from a shared link · not saved yet');
+                const kept = draftKey ? repository.sharedDraftFor(draftKey, document.id) : null;
+                openSharedDraft(
+                    document,
+                    kept
+                        ? 'Recovered your unsaved changes'
+                        : 'Opened from a shared link · not saved yet',
+                    draftKey,
+                    kept,
+                );
                 if (wantsAutoplay) {
                     setPendingAutoplay(true);
                 }
@@ -1524,6 +1569,10 @@ export default function Ensemble() {
     }
     /** The ONE writer of the shared-draft flag (#1512): the ref and its state mirror together. */
     function markSharedDraft(shared: boolean, newSong = false) {
+        // A chart that is not a standard or a link keeps nothing under one's key (#1979);
+        // `landDraftOnStand` sets it again after marking.
+        sharedDraftKey.current = null;
+        sharedDraftUnkept.current = false;
         sharedDraftNow.current = shared;
         setSharedDraft(shared);
         newSongNow.current = shared && newSong;
@@ -1723,14 +1772,14 @@ export default function Ensemble() {
         setCurrent(next);
         currentNow.current = next;
         // A shared draft — a standard or a #chart= link (`landDraftOnStand`) — belongs to no
-        // songbook yet and has no `saved` baseline to recover FROM if the tab closes; "Keep a
-        // copy"/Save is what turns it into a library entry, and `open()` clears the flag the
-        // moment that happens. Writing recovery storage for it here would key a slot under
-        // the shared id (a catalog id for a standard) that nothing but a Save — which this isn't
-        // — ever clears, so "Older drafts" would grow by one per edited-but-unsaved visit.
-        // Read from the ref (#1512): a caller that has just awaited `open()` holds a closure
-        // whose `sharedDraft` still describes the chart that was on the stand before it.
+        // songbook yet, so it never takes a song's recovery slot: that would key a slot under the
+        // shared id (a catalog id, or a stranger's song id) that nothing but a Save ever clears,
+        // and "Older drafts" would grow by one per edited visit. Its changes are kept under its
+        // own draft key instead (#1979, `keepSharedDraft`). Read from the ref (#1512): a caller
+        // that has just awaited `open()` holds a closure whose `sharedDraft` still describes the
+        // chart that was on the stand before it.
         if (sharedDraftNow.current) {
+            keepSharedDraft(next);
             return;
         }
         if (baseline && same(next, baseline)) {
@@ -1758,6 +1807,36 @@ export default function Ensemble() {
             retained(next);
         } catch (e) {
             retainInTab(next, e);
+        }
+    }
+    /**
+     * Keeps a standard's or a shared link's changes on this device (#1979), so Back, a reload or
+     * a closed tab keeps them as a song's recovery slot does, and the next open of the same
+     * standard or link lands them. Back at the chart as it came, nothing is kept: the slot goes,
+     * as `retainNothingFor` clears a song back at its saved version. A new song (no key) keeps
+     * nothing here; `keepNewSong` makes it a song on its first change.
+     */
+    function keepSharedDraft(next: ChartDocument) {
+        const draftKey = sharedDraftKey.current;
+        const baseline = draftBaseline.current;
+        if (!draftKey || !baseline) {
+            return;
+        }
+        try {
+            if (same(next, baseline)) {
+                repository.clearSharedDraft(draftKey);
+            } else {
+                repository.keepSharedDraft(draftKey, baseline, next);
+            }
+            sharedDraftUnkept.current = false;
+            setRecoveryHealthy(true);
+        } catch (e) {
+            sharedDraftUnkept.current = true;
+            setRecoveryHealthy(false);
+            const reason = e instanceof Error ? e.message : String(e);
+            setError(
+                `Changes are only in this tab: ${reason.replace(/\.$/, '')}. Keep a copy before closing.`,
+            );
         }
     }
     function change(action: () => void | Promise<void>, includeText = false) {
@@ -1977,17 +2056,20 @@ export default function Ensemble() {
             nav.entry.current = target;
             return;
         }
+        // An edited standard or shared link leaves without a question (#1979): its changes are
+        // kept on this device (`keepSharedDraft`) and land again on its next open, as a song's do.
+        // A shared draft with nowhere to keep them still says so once — a new song whose keep was
+        // refused (`keepFirstChange`), or a link on a browser with no digest — since Back, easily
+        // an accidental edge swipe on a phone, would otherwise drop them.
         if (
             current &&
             sharedDraftNow.current &&
-            // A new song is kept by `closeSong` the moment it holds anything: nothing to warn of.
+            sharedDraftKey.current === null &&
             !newSongNow.current &&
             !nav.leaveDraftWarned.current &&
             (hasPendingText ||
                 (draftBaseline.current !== null && !same(current, draftBaseline.current)))
         ) {
-            // An edited shared or standard draft exists nowhere else: Back — easily an accidental
-            // edge swipe on a phone — says so once rather than dropping it.
             nav.leaveDraftWarned.current = true;
             nav.undoPop(target, from);
             setMessage(
@@ -2170,9 +2252,20 @@ export default function Ensemble() {
             createdAt: now,
             updatedAt: now,
         };
+        // Read before `open()` moves the stand off the draft and clears it.
+        const draftKey = sharedDraftKey.current;
         // No owner claim (#1311): a shared draft belongs to no songbook at all until this commit
         // decides one, so it is the live account's — `currentStore` is already null here.
         const created = await storeSave(copy, null, { owner: null, stand: false });
+        // The copy carries the changes (`candidate` is the stand, pending bars applied), so the
+        // standard or link goes back to opening as it came (#1979).
+        if (draftKey) {
+            try {
+                repository.clearSharedDraft(draftKey);
+            } catch {
+                /* A slot that will not clear only offers the changes again; the copy holds them. */
+            }
+        }
         await refreshSongs();
         await open(created);
         setMessage('Saved a local copy');
@@ -2420,7 +2513,8 @@ export default function Ensemble() {
     }
     /**
      * Opens a standards-catalog entry (#1439) the same way a shared `#chart=` link lands: an
-     * unsaved draft (`landDraftOnStand`), never written to storage. The catalog is built fresh
+     * unsaved draft (`landDraftOnStand`), never written to the songbook — only its changes, if
+     * any, are kept on this device under its catalog id (#1979). The catalog is built fresh
      * on every open (`buildStandardDocument`), never cached — so re-opening the same standard
      * twice never shares mutable state with an earlier draft. Save (or "Keep a copy") mints the
      * musician's own copy under a fresh id; the catalog entry itself never changes.
@@ -2433,8 +2527,17 @@ export default function Ensemble() {
                 throw new Error('Standard no longer exists.');
             }
             const document = buildStandardDocument(entry);
-            // No toast: the header already says "From the standards · not saved" (UI audit).
-            landDraftOnStand(document, '');
+            // Changes left on it last time land again, the fresh build their baseline (#1979).
+            const draftKey = repository.standardDraftKey(id);
+            const kept = repository.sharedDraftFor(draftKey, document.id);
+            // No toast for a plain open: the header already says "From the standards · not
+            // saved" (UI audit). A recovered one says so, as a song's recovery does.
+            landDraftOnStand(
+                document,
+                kept ? 'Recovered your unsaved changes' : '',
+                draftKey,
+                kept,
+            );
             standardOnStand.current = { documentId: document.id, standardId: id };
             setStandardDraft(true);
             setBrowse({ view: 'home' });
@@ -3163,6 +3266,8 @@ export default function Ensemble() {
                         hasPendingText={hasPendingText}
                         sharedDraft={sharedDraft}
                         standardDraft={standardDraft}
+                        sharedChanged={sharedChanged}
+                        sharedKept={sharedDraftKey.current !== null}
                         newSongDraft={newSongDraft}
                         practiceOnly={practiceOnly}
                         recoveryHealthy={recoveryHealthy}
@@ -3461,6 +3566,8 @@ export default function Ensemble() {
                 saved={saved}
                 busy={busy}
                 dirty={dirty}
+                // A standard or a shared link reverts to the chart as it came (#1979).
+                revertTo={saved ? 'saved' : sharedChanged ? 'original' : null}
                 canDelete={standDeletable}
                 recoveryOptions={recoveryOptions}
                 syncStatus={syncStatus}
@@ -3473,6 +3580,18 @@ export default function Ensemble() {
                 onCloseShareLink={() => setShareLinkFallback(null)}
                 onRevert={() =>
                     void run(() => {
+                        const original = draftBaseline.current;
+                        if (!saved && sharedDraftNow.current && original) {
+                            // Back to the standard or link as it came; `draft` sees it is and
+                            // lets its device draft go (#1979).
+                            runtime.load(original);
+                            const reverted = runtime.withLoadedSounds(original);
+                            draftBaseline.current = reverted;
+                            clearBuffers();
+                            draft(reverted);
+                            selectSection(original);
+                            return;
+                        }
                         if (!saved) {
                             return;
                         }

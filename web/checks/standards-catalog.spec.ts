@@ -114,8 +114,9 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
 });
 
 /**
- * A shared draft — a standard here, a `#chart=` link in `share-link.spec.ts` — belongs to no songbook yet (`landDraftOnStand`'s own doc comment:
- * "no recovery-storage write"). `draft()` used to write one anyway on every edit, keyed under
+ * A shared draft — a standard here, a `#chart=` link in `share-link.spec.ts` — belongs to no
+ * songbook yet, so it never takes a song's recovery slot (its changes are kept under a draft key
+ * of their own since #1979). `draft()` used to write one anyway on every edit, keyed under
  * the standard's own catalog id (`ensemble-v2-preview:recovery:<writer>:standard-…`) — a slot
  * nothing but a Save, which this never is, ever clears, so "Older drafts (N)" grew by one per
  * edited-but-unsaved visit.
@@ -147,6 +148,77 @@ test('editing an open standard writes nothing to recovery storage', async ({ pag
     await songMenuAction(page, 'More');
     await expect(songMenu(page, 'more')).toBeVisible();
     await expect(page.getByText(/Older drafts \(/)).toHaveCount(0);
+});
+
+/**
+ * A changed standard keeps its changes on this device (#1979), as a song keeps its draft: Back
+ * asks nothing, the next open (a reload too) lands them marked "Changed", Revert to original lets
+ * them go, and Keep a copy carries them into the songbook and leaves the standard as it came.
+ */
+test('a changed standard keeps its changes, marked; Keep a copy carries them', async ({ page }) => {
+    const sharedDrafts = () =>
+        page.evaluate(
+            () =>
+                Object.keys(localStorage).filter((key) =>
+                    key.startsWith('ensemble-v2-preview:shared-draft:'),
+                ).length,
+        );
+    const openBlues = async () => {
+        await page.getByRole('button', { name: 'Browse all →' }).click();
+        const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
+        await row.getByRole('button', { name: 'Open' }).click();
+        await expect(
+            page.getByRole('heading', { name: '12-Bar Blues', exact: true }),
+        ).toBeVisible();
+    };
+    const firstChord = page.locator('.bar').first().locator('.chord');
+    const subtitle = page.locator('.song-subtitle');
+
+    await page.goto(appUrl());
+    await openBlues();
+    await pickSongKey(page, 'D');
+    await expect(firstChord).toHaveText(['D7']);
+    await expect(subtitle).toContainText('Changed · Keep a copy');
+    await expect.poll(sharedDrafts).toBe(1);
+
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await expect(page.locator('main.home')).toBeVisible();
+    await page.reload();
+    await openBlues();
+    await expect(firstChord).toHaveText(['D7']);
+    await expect(subtitle).toContainText('Changed · Keep a copy');
+    expect(await documents(page)).toEqual([]);
+
+    // Taken back by hand on the recovered draft, it is the standard as it came again.
+    await pickSongKey(page, 'C');
+    await expect(firstChord).toHaveText(['C7']);
+    await expect(subtitle).toContainText('From the standards · not saved');
+    await expect.poll(sharedDrafts).toBe(0);
+    await pickSongKey(page, 'D');
+    await expect(subtitle).toContainText('Changed · Keep a copy');
+    await expect.poll(sharedDrafts).toBe(1);
+
+    // Revert to original: the standard as it came, and nothing kept.
+    await songMenuAction(page, 'More');
+    await songMenu(page, 'more').getByRole('menuitem', { name: 'Revert to original' }).click();
+    await expect(firstChord).toHaveText(['C7']);
+    await expect(subtitle).toContainText('From the standards · not saved');
+    await expect.poll(sharedDrafts).toBe(0);
+
+    // Changed again, Keep a copy saves the change; the standard opens as it came.
+    await pickSongKey(page, 'D');
+    await expect.poll(sharedDrafts).toBe(1);
+    await page.getByRole('button', { name: 'Keep a copy', exact: true }).click();
+    await expect(subtitle).toContainText('Saved on this device');
+    await expect(firstChord).toHaveText(['D7']);
+    const saved = await documents(page);
+    expect(saved).toHaveLength(1);
+    expect(saved[0].chart.score.key).toBe('D');
+    expect(await sharedDrafts()).toBe(0);
+    await page.getByRole('button', { name: 'Back to songbook' }).click();
+    await openBlues();
+    await expect(firstChord).toHaveText(['C7']);
+    await expect(subtitle).toContainText('From the standards · not saved');
 });
 
 /**

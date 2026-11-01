@@ -447,6 +447,191 @@ export function clearRecovery(id: string): void {
 }
 
 /**
+ * A standard's or a shared link's unsaved changes (#1979): the device draft that makes Back from
+ * an edited one keep the edit, as a song's recovery slot does, instead of dropping it.
+ *
+ * The same `localStorage` mechanism as `recover` — one slot per writer, the newest read back —
+ * under a prefix of its OWN, never `RECOVERY`'s. A recovery slot is found by document id
+ * (`recoveryKeysFor`), and a shared link carries its sender's song id: a slot under that id would
+ * be offered as "your unsaved changes" the next time a song with the same id opens. So these are
+ * found by a draft key instead (`standardDraftKey`, `sharedLinkDraftKey`), and nothing that reads
+ * a song's recovery (Older drafts, a delete's sweep, the sign-out count) ever sees one.
+ *
+ * A DEVICE draft, signed in or not (Brandon's call on #1979: "keep a device draft"): a standard
+ * or a link belongs to no songbook until "Keep a copy" decides one, so it is not an account chart
+ * (whose experiments live in the account database, #1299) and not a guest song either. So it
+ * outlives a sign-out, as the device's other conveniences do — accepted: what it holds is a
+ * public catalog chart, or a link's chart, with the changes made on it.
+ *
+ * Bounded (`SHARED_DRAFT_LIMIT`): a song's slot goes when the song is saved or deleted, but an
+ * edited link nobody opens again would keep its slot for ever, and this namespace shares its
+ * quota with every song's recovery.
+ */
+const SHARED_DRAFT = 'ensemble-v2-preview:shared-draft:';
+/** The most shared drafts this device keeps; the oldest beyond it go on the next write. */
+export const SHARED_DRAFT_LIMIT = 24;
+
+/** A standard's draft key: its catalog id, which every open of it rebuilds the same. */
+export function standardDraftKey(standardId: string): string {
+    return `standard:${standardId}`;
+}
+
+/**
+ * A shared link's draft key: a digest of the chart the link carries. Reopening the same link
+ * finds its draft; a different link to the same song (a later share, other bars) is a different
+ * snapshot and opens as sent. Not the sender's song id, which every share of that song repeats.
+ * `null` where the browser has no digest (an insecure origin): the link then opens as it always
+ * did, with nothing kept.
+ */
+export async function sharedLinkDraftKey(document: ChartDocument): Promise<string | null> {
+    if (typeof crypto === 'undefined' || !crypto.subtle) {
+        return null;
+    }
+    try {
+        const bytes = new TextEncoder().encode(JSON.stringify(document));
+        const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', bytes));
+        return `link:${Array.from(digest, (b) => b.toString(16).padStart(2, '0')).join('')}`;
+    } catch {
+        return null;
+    }
+}
+
+/** Every shared-draft slot this device holds, parsed; `draftKey` narrows to one draft. */
+function sharedDraftSlots(
+    draftKey?: string,
+): Array<{ storageKey: string; raw: string | null; capturedAt: string }> {
+    const slots: Array<{ storageKey: string; raw: string | null; capturedAt: string }> = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const storageKey = localStorage.key(i);
+        if (!storageKey?.startsWith(SHARED_DRAFT)) {
+            continue;
+        }
+        // `<prefix><writer>:<draft key>` — a writer id holds no colon, a draft key may.
+        const rest = storageKey.slice(SHARED_DRAFT.length);
+        const at = rest.indexOf(':');
+        if (draftKey !== undefined && (at < 0 || rest.slice(at + 1) !== draftKey)) {
+            continue;
+        }
+        const raw = localStorage.getItem(storageKey);
+        let capturedAt = '';
+        try {
+            const parsed = raw ? JSON.parse(raw) : null;
+            capturedAt = typeof parsed?.capturedAt === 'string' ? parsed.capturedAt : '';
+        } catch {
+            /* An unreadable slot sorts oldest, so it is the first the limit lets go. */
+        }
+        slots.push({ storageKey, raw, capturedAt });
+    }
+    return slots;
+}
+
+/** A standard's or a shared link's kept changes, and the chart they were made on. */
+export interface SharedDraft {
+    document: ChartDocument;
+    /**
+     * The chart as it landed when the changes began — what "Changed" is measured against and
+     * Revert to original goes back to. Kept with the draft rather than rebuilt: a standard's
+     * bars get fresh ids on every build, so a rebuilt one never compares equal to the draft.
+     * So a release that corrects a standard leaves an existing draft, and its Revert to
+     * original, on the version the changes were made on; accepted, as the draft holds it anyway.
+     */
+    base: ChartDocument;
+}
+
+/**
+ * Keeps `document` (made on `base`) as this writer's draft of `draftKey`.
+ *
+ * Other writers' slots for the same key go: this tab landed the newest of them, so they are
+ * superseded (a concurrent tab on the same standard writes its own again on its next change).
+ * Then the oldest slots beyond `SHARED_DRAFT_LIMIT` go. A write the storage refuses for room
+ * lets the oldest OTHER shared drafts go, one at a time, and tries again — never a song's
+ * recovery slot. Throws, as `recover` does, when the write cannot be made or verified.
+ */
+export function keepSharedDraft(
+    draftKey: string,
+    base: ChartDocument,
+    document: ChartDocument,
+): void {
+    validated(document);
+    validated(base);
+    const storageKey = `${SHARED_DRAFT}${writer}:${draftKey}`;
+    const json = JSON.stringify({ capturedAt: new Date().toISOString(), base, document });
+    if (new TextEncoder().encode(json).byteLength > 1_048_576) {
+        throw new Error('This draft is too large to keep on this device');
+    }
+    for (const slot of sharedDraftSlots(draftKey)) {
+        if (slot.storageKey !== storageKey) {
+            localStorage.removeItem(slot.storageKey);
+        }
+    }
+    const others = () =>
+        sharedDraftSlots()
+            .filter((slot) => slot.storageKey !== storageKey)
+            .sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+    for (;;) {
+        try {
+            localStorage.setItem(storageKey, json);
+            break;
+        } catch (error) {
+            // Only a full storage is made room in; storage that is blocked keeps every draft.
+            const full =
+                error instanceof DOMException &&
+                (error.name === 'QuotaExceededError' ||
+                    error.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+                    error.code === 22);
+            const oldest = full ? others().pop() : undefined;
+            if (!oldest) {
+                throw error;
+            }
+            localStorage.removeItem(oldest.storageKey);
+        }
+    }
+    if (localStorage.getItem(storageKey) !== json) {
+        throw new Error('Unable to verify the draft on this device');
+    }
+    for (const slot of others().slice(SHARED_DRAFT_LIMIT - 1)) {
+        localStorage.removeItem(slot.storageKey);
+    }
+}
+
+/**
+ * The newest readable draft of `draftKey` whose chart is still `documentId` (a slot is never
+ * trusted to be the chart it is keyed for), or `null`. Never throws: storage that cannot be read
+ * opens the chart as it came.
+ */
+export function sharedDraftFor(draftKey: string, documentId: string): SharedDraft | null {
+    try {
+        const slots = sharedDraftSlots(draftKey);
+        slots.sort((a, b) => b.capturedAt.localeCompare(a.capturedAt));
+        for (const slot of slots) {
+            if (!slot.raw || slot.raw.length > 1_100_000) {
+                continue;
+            }
+            try {
+                const record = JSON.parse(slot.raw);
+                const document = validated(record.document);
+                const base = validated(record.base);
+                if (document.id === documentId && base.id === documentId) {
+                    return { document, base };
+                }
+            } catch {
+                /* Unreadable: left for the limit to retire, never overwritten in place. */
+            }
+        }
+    } catch {
+        /* No storage: nothing kept. */
+    }
+    return null;
+}
+
+/** Removes every writer's draft of `draftKey`: the chart is back as it came, or was kept. */
+export function clearSharedDraft(draftKey: string): void {
+    for (const slot of sharedDraftSlots(draftKey)) {
+        localStorage.removeItem(slot.storageKey);
+    }
+}
+
+/**
  * Guest collections (#1474) live in a database of their OWN, not in a new store of the songbook's.
  *
  * #1474 drafted a `collections` store added to `ensemble-v2-preview` by a version bump. That
