@@ -837,15 +837,25 @@ export async function startSection(
     sectionId: string,
     progress: SoundProgress = () => {},
 ): Promise<boolean> {
-    // Starting somewhere in the song leaves a section loop: the band plays the chart from there.
-    loopPlan = null;
-    const view = playedView();
+    // Starting somewhere in the song leaves a section loop (#1989): the band plays the chart from
+    // there, so the section is found in the chart's view, not the loop's.
+    const view = loopPlan ? bandView : playedView();
     const bounds = view && sectionSteps(view, sectionId);
     if (!bounds) {
         return false;
     }
+    const leaving = loopPlan !== null;
+    loopPlan = null;
     if (getState().playback.isPlaying) {
-        dispatch(ACTIONS.SET_START_STEP, bounds.start);
+        if (leaving) {
+            // Another chart for the band: stopped first, so it starts once (handing the host a
+            // new chart while it plays would restart it before `startBand` restarts it again),
+            // and planned as a start from stopped is, song mode included.
+            silenceBand();
+            planPerformance();
+        }
+        const start = (leaving && songPlan && sectionSteps(songPlan.view, sectionId)) || bounds;
+        dispatch(ACTIONS.SET_START_STEP, start.start);
         startBand();
         return true;
     }
@@ -862,6 +872,15 @@ export async function startSection(
     dispatch(ACTIONS.SET_START_STEP, start.start);
     startBand(true);
     return true;
+}
+
+/**
+ * Stop the band, its scheduled notes cut, without the transport going to stopped: for a start in
+ * another chart while playing, which `startBand` then starts once.
+ */
+function silenceBand(): void {
+    band?.stop();
+    void killAllNotes(getState());
 }
 
 /** Said when a section cannot be looped on its own. */
@@ -900,6 +919,8 @@ export async function loopSection(
         throw new Error(LOOP_UNAVAILABLE);
     }
     if (getState().playback.isPlaying) {
+        // Stopped first, so the band starts once on the loop (see `startSection`).
+        silenceBand();
         loopPlan = plan;
         songPlan = null;
         dispatch(ACTIONS.SET_START_STEP, 0);
@@ -939,7 +960,10 @@ export function clearLoop(): void {
         startBand();
         return;
     }
-    leftLoop = plan;
+    // The timeline the band is really playing: a loop built again (Loop picked once more, an
+    // edit) compiles a new one, but the host keeps the one it has while the chart is unchanged
+    // (`setScore`), and the stand matches views to the band by that timeline (`playedView`).
+    leftLoop = { timeline: band.heardTimeline() ?? plan.timeline, view: plan.view };
     band.carryOn(currentScore, full, entry);
 }
 

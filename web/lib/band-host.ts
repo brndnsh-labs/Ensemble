@@ -927,6 +927,10 @@ export class BandHost {
         segment.until = bar;
         segment.to = tick;
         segment.memoryAfter = segment.snapshots[bar];
+        // A settings change waiting for a barline past the cut is heard at the cut at the latest.
+        if (this.change?.segment === segment && this.change.tick > tick) {
+            this.change.tick = tick;
+        }
     }
 
     private append(plan: SegmentPlan, start: number, memory: PassMemory | undefined): void {

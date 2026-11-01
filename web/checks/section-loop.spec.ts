@@ -125,3 +125,37 @@ test('another song opens without the loop, and the loop is never saved', async (
     await songLink(page, 'Loop study').first().click();
     await expect(chip(page)).toHaveCount(0);
 });
+
+test('a loop set again and cleared while playing keeps the playhead in the section to the seam', async ({
+    page,
+}) => {
+    test.setTimeout(60_000);
+    await openStudy(page);
+    // Loop B, stop, clear it stopped, then loop B again: the band still holds the first loop's
+    // chart, and the stand must keep reading the bars it plays from it once cleared.
+    await loopB(page);
+    await expect(active(page)).toHaveText('Dm7', { timeout: 10_000 });
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    await chip(page).click();
+    await loopB(page);
+    await expect(counter(page)).toHaveText(/^Lap 2$/, { timeout: 15_000 });
+    await chip(page).click();
+    // Until the band reaches C, every bar lit is B's: never the song's first bars.
+    const order: string[] = [];
+    const until = Date.now() + 8000;
+    while (Date.now() < until && !order.includes('Bb')) {
+        const text = await active(page)
+            .first()
+            .textContent({ timeout: 1000 })
+            .catch(() => null);
+        if (text && order.at(-1) !== text.trim()) {
+            order.push(text.trim());
+        }
+        await page.waitForTimeout(50);
+    }
+    expect(order).toContain('Bb');
+    expect(order.slice(0, order.indexOf('Bb')).every((chord) => SECTION_B.includes(chord))).toBe(
+        true,
+    );
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+});
