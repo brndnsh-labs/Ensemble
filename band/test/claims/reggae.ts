@@ -33,6 +33,7 @@ export const reggae = defineClaims({
         {
             take: {},
             claims: [
+                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['dropOnThree', 0.9, 1, 'kick and cross-stick land together on 3 in every riddim'],
                 ['kickOnOne', 0, 0.35, 'the One is a hole: only the high-energy riddims fill it'],
                 ['bassOnOne', 0.15, 0.75, 'the bass leaves the One open as often as it plays it'],

@@ -99,6 +99,7 @@ export const disco = defineClaims({
         {
             take: {},
             claims: [
+                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 [
                     'kickFourOnFloor',
                     0.98,

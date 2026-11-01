@@ -694,6 +694,45 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * At each real chord change, among the notes in the last two steps before it that are a half step (by
+     * pitch class) from the arrival and not the old chord's own bass note, the share that sit more than a fifth from it: a half-step
+     * lead-in an octave away reads as a wrong note, not an approach. An octave pop on the way
+     * in (the same pitch class an octave up) is no lead-in and is not counted here.
+     * (The exclusion only bites when the two roots are a half step apart, C to Db: the old root
+     * is then the pump, not a lead-in. A style that plays no such lead-in reads 0 here.)
+     */
+    bassApproachLeap: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const bass = events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
+            for (const [k, span] of t.spans.entries()) {
+                const before = t.spans[k - 1]?.chord;
+                if (!span.chord || !before || before.bass === span.chord.bass) {
+                    continue;
+                }
+                const i = bass.findIndex((e) => Math.abs(e.tick - span.start) < 1);
+                if (i < 1) {
+                    continue;
+                }
+                const pc = mod12(bass[i].midi - bass[i - 1].midi);
+                // (The old chord's own bass note, an octave away or not, is its pump, no lead-in.)
+                const pump = mod12(bass[i - 1].midi) === before.bass;
+                if (
+                    pump ||
+                    bass[i].tick - bass[i - 1].tick > STEP * 2 ||
+                    pc === 0 ||
+                    (pc > 1 && pc < 11)
+                ) {
+                    continue;
+                }
+                n++;
+                hit += Math.abs(bass[i].midi - bass[i - 1].midi) > 7 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of consecutive bass notes that repeat a pitch (a walking line keeps moving). */
     bassRepeatedNotes: (takes) => {
         let n = 0;

@@ -14,7 +14,9 @@ import {
     BASS,
     bassNote,
     endingBass,
+    isLeadIn,
     type LineMemory,
+    meetRoot,
     nextChord,
     pickApproach,
 } from '../players/bass/line.js';
@@ -247,6 +249,10 @@ const shuffleBass: PitchedIdiom = {
         const tier = energyTier(plan.energy);
         const events: PitchedNote[] = [];
         let last = memory.last;
+        // Where a lead-in told the next chord to land (the next span or bar): a root is placed
+        // near the previous note, and the lead-in is that note, so the root would otherwise
+        // drift to another octave than the one the lead-in aimed at.
+        let land = memory.land ?? null;
         if (plan.ending) {
             const held = endingBass(
                 ctx,
@@ -286,7 +292,9 @@ const shuffleBass: PitchedIdiom = {
             if (!chord) {
                 return;
             }
-            const root = boxRoot(chord.bass);
+            const promised = land !== null && mod12(land) === chord.bass ? land : null;
+            land = null;
+            const root = promised ?? boxRoot(chord.bass);
             const following = spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
             const change = following && following.bass !== chord.bass ? following : null;
             const rng = ctx.rng(`shuffle${i}`);
@@ -323,6 +331,7 @@ const shuffleBass: PitchedIdiom = {
                         note = approach(target, chord, 'chromatic-below');
                     }
                     notes.push({ step: to - 4, midi: note, length: 0, velocity: 84 });
+                    land = target;
                 }
                 notes.forEach((n, k) => {
                     n.length = ((notes[k + 1]?.step ?? to) - n.step) * 0.92;
@@ -344,7 +353,18 @@ const shuffleBass: PitchedIdiom = {
                     // where the line lands next resolves the pitch class correctly but can
                     // still leap an octave or more into the new bar.
                     if (k === beats.length - 1 && change && mod12(midi) === change.bass) {
-                        midi = approach(boxRoot(change.bass), chord, 'chromatic-below');
+                        const target = boxRoot(change.bass);
+                        midi = approach(target, chord, 'chromatic-below');
+                        land = target;
+                    } else if (k === beats.length - 1 && change) {
+                        // A box tone a step from the next root (V's 3rd under I) leads into
+                        // it as a leading tone does, so it sounds beside the root, not an
+                        // octave off: the box's high end folds down to meet it.
+                        const target = boxRoot(change.bass);
+                        if (isLeadIn(midi, target)) {
+                            midi = meetRoot(midi, target);
+                            land = target;
+                        }
                     }
                     const gap = (beats[k + 1] ?? to) - step;
                     const lope = common && lopes.has(step / 4) && gap >= 4;
@@ -362,7 +382,7 @@ const shuffleBass: PitchedIdiom = {
                 last = n.midi;
             }
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

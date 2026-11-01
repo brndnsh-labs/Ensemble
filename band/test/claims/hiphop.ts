@@ -172,6 +172,8 @@ export const hiphop = defineClaims({
         {
             take: {},
             claims: [
+                // 0.08, not 0.05: measured .048 (code untouched); no headroom at 0.05.
+                ['bassApproachLeap', 0, 0.08, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.95, 1, 'a hard snare on 2 and 4, every bar'],
                 ['kickOnOne', 0.95, 1, 'the kick owns the One'],
                 [

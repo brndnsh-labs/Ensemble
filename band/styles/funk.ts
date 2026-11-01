@@ -14,10 +14,11 @@ import {
     endingBass,
     kickSteps,
     type LineMemory,
+    landingRoot,
+    leadTarget,
     nextChord,
     place,
     sectionPlace,
-    targetAfter,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
@@ -113,6 +114,7 @@ const funkBass: PitchedIdiom = {
         const kicks = kickSteps(ctx);
         const events: PitchedNote[] = [];
         let last = memory.last;
+        let land: number | null = null;
         if (plan.ending) {
             // A half note at most: the funk ending is a short hit, not a held note.
             const held = endingBass(
@@ -134,7 +136,7 @@ const funkBass: PitchedIdiom = {
             if (!chord) {
                 return;
             }
-            const root = sectionPlace(ctx, bassPc(chord));
+            const root = landingRoot(ctx, memory, i, bassPc(chord), sectionPlace);
             const codes = new Map<number, string>();
             for (let s = from; s < to; s++) {
                 const c = line[s] ?? '.';
@@ -154,7 +156,8 @@ const funkBass: PitchedIdiom = {
                 codes.set(from, 'R');
             }
             const steps = [...codes.keys()].sort((a, b) => a - b);
-            const target = targetAfter(spans, i, next, root);
+            const lead = leadTarget(ctx, spans, i, next, sectionPlace);
+            const target = lead?.target ?? null;
             const rng = ctx.rng(`funk${i}`);
             steps.forEach((step, k) => {
                 const code = codes.get(step)!;
@@ -167,6 +170,7 @@ const funkBass: PitchedIdiom = {
                     rng.chance(0.3)
                 ) {
                     midi = approach(target, chord, 'chromatic-below');
+                    land = lead?.crossing ? target : null;
                 }
                 const muted = code === 'm';
                 // Funk bass is short: notes stop before the next, ghosts are a clipped thud.
@@ -178,7 +182,7 @@ const funkBass: PitchedIdiom = {
                 }
             });
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

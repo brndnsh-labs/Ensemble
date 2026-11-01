@@ -16,12 +16,15 @@ import {
     bassNote,
     bassPc,
     endingBass,
+    isLeadIn,
     kickSteps,
     type LineMemory,
+    landingRoot,
+    leadTarget,
+    meetRoot,
     nextChord,
     pickApproach,
     place,
-    targetAfter,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
@@ -200,6 +203,7 @@ const reggaeBass: PitchedIdiom = {
         const tier = energyTier(plan.energy);
         const events: PitchedNote[] = [];
         let last = memory.last;
+        let land: number | null = null;
         if (plan.ending) {
             const held = endingBass(
                 ctx,
@@ -223,7 +227,7 @@ const reggaeBass: PitchedIdiom = {
             if (!chord) {
                 return;
             }
-            const root = deepRoot(ctx, bassPc(chord));
+            const root = landingRoot(ctx, memory, i, bassPc(chord), deepRoot);
             const codes = new Map<number, string>();
             for (let s = from; s < to; s++) {
                 const c = line[s] ?? '.';
@@ -247,8 +251,10 @@ const reggaeBass: PitchedIdiom = {
             if (span.attack) {
                 const arrival = codes.get(from);
                 if (arrival !== undefined) {
-                    // The chord arrives on its root (the octave is the root too).
-                    if (arrival !== 'O') {
+                    // The chord arrives on its root (the octave is the root too), but not an
+                    // octave above a lead-in a step from that root: the lead-in aimed at the
+                    // root itself, so the arrival is the root.
+                    if (arrival !== 'O' || (last !== null && isLeadIn(last, root))) {
                         codes.set(from, 'R');
                     }
                 } else if (from > 0) {
@@ -259,7 +265,8 @@ const reggaeBass: PitchedIdiom = {
                 }
             }
             const steps = [...codes.keys()].sort((a, b) => a - b);
-            const target = targetAfter(spans, i, next, root);
+            const lead = leadTarget(ctx, spans, i, next, deepRoot);
+            const target = lead?.target ?? null;
             const rng = ctx.rng(`reggae${i}`);
             steps.forEach((step, k) => {
                 const code = codes.get(step)!;
@@ -282,6 +289,13 @@ const reggaeBass: PitchedIdiom = {
                     rng.chance(0.35)
                 ) {
                     midi = approach(target, chord, pickApproach(rng, false));
+                    land = lead?.crossing ? target : null;
+                }
+                // A riff tone left beside the next root (the fifth of A under F) leads into it as
+                // a step; it sounds beside that root, and across a section change promises it.
+                if (isLast && target !== null && to - step <= 2 && isLeadIn(midi, target)) {
+                    midi = meetRoot(midi, target);
+                    land = lead?.crossing ? target : null;
                 }
                 // Heavy on the drop and the arrivals; the pickups lighter.
                 const strong = step === from || step % 8 === 0;
@@ -297,7 +311,7 @@ const reggaeBass: PitchedIdiom = {
                 last = midi;
             });
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

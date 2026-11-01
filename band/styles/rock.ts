@@ -13,11 +13,12 @@ import {
     endingBass,
     kickSteps,
     type LineMemory,
+    landingRoot,
+    leadTarget,
     nextChord,
     pickApproach,
     place,
     sectionPlace,
-    targetAfter,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
@@ -96,6 +97,7 @@ const rockBass: PitchedIdiom = {
         const next = nextChord(ctx);
         const events: PitchedNote[] = [];
         let last = memory.last;
+        let land: number | null = null;
         if (plan.ending) {
             const held = endingBass(
                 ctx,
@@ -110,7 +112,7 @@ const rockBass: PitchedIdiom = {
             if (!span.chord) {
                 return;
             }
-            const root = sectionPlace(ctx, bassPc(span.chord));
+            const root = landingRoot(ctx, memory, i, bassPc(span.chord), sectionPlace);
             // Rhythm: kick-locked at low energy; driving eighths above it.
             let steps: number[];
             if (tier === 'low') {
@@ -125,7 +127,8 @@ const rockBass: PitchedIdiom = {
                 }
             }
             steps.sort((a, b) => a - b);
-            const target = targetAfter(spans, i, next, root);
+            const lead = leadTarget(ctx, spans, i, next, sectionPlace);
+            const target = lead?.target ?? null;
             const rng = ctx.rng(`line${i}`);
             const pops = new Set(ctx.rng('pops', 'section').pick([[], [6], [14], [6, 14], [10]]));
             steps.forEach((step, k) => {
@@ -145,6 +148,7 @@ const rockBass: PitchedIdiom = {
                     rng.chance(tier === 'low' ? 0.2 : 0.35)
                 ) {
                     midi = approach(target, span.chord, pickApproach(rng, false));
+                    land = lead?.crossing ? target : null;
                 }
                 const gap = (steps[k + 1] ?? to) - step;
                 const length = tier === 'low' ? gap * 0.95 : Math.min(gap, 2) * 0.85;
@@ -153,7 +157,7 @@ const rockBass: PitchedIdiom = {
                 last = midi;
             });
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

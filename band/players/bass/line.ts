@@ -41,9 +41,10 @@ export function approach(target: number, chord: ChordFacts | null, kind: Approac
     const clampIn = (m: number) => (m < BASS.lo ? m + 12 : m > BASS.hi ? m - 12 : m);
     switch (kind) {
         case 'chromatic-below':
-            return clampIn(target - 1);
+            // At the floor the half step below would wrap an octave up: lead in from above.
+            return target - 1 < BASS.lo ? target + 1 : clampIn(target - 1);
         case 'chromatic-above':
-            return clampIn(target + 1);
+            return target + 1 > BASS.hi ? target - 1 : clampIn(target + 1);
         case 'dominant':
             return clampIn(target + 7 > BASS.hi ? target - 5 : target + 7);
         case 'scale': {
@@ -176,15 +177,69 @@ export function kickSteps(ctx: BarContext): Set<number> {
 
 export interface LineMemory {
     last: number | null;
+    /**
+     * Where a lead-in across a section change told the next bar to land: the next section
+     * places its roots in its own register, which this bar cannot know, so the lead-in
+     * promises a pitch and the next bar keeps it (`landingRoot`).
+     */
+    land?: number | null;
 }
 
-/** Where the line is heading at the end of span `i`: the next chord's bass, placed near `from`. */
-export function targetAfter(
+/** How a style places a chord's root for its line, in the register of this bar's section. */
+export type RootPlacer = (ctx: BarContext, pc: number) => number;
+
+/**
+ * The pitch the line will actually play when it reaches the chord after span `i` — the note a
+ * lead-in must aim at. The next span (or the next bar, in one section) places its root with
+ * the same `placeRoot`; `crossing` marks a section change, where the next bar's register is
+ * its own and the caller must hand the target on as `land`.
+ */
+export function leadTarget(
+    ctx: BarContext,
     spans: { span: BarSpan }[],
     i: number,
     next: ChordFacts | null,
-    from: number,
-) {
-    const following = spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
-    return following ? place(bassPc(following), from) : null;
+    placeRoot: RootPlacer,
+): { target: number; crossing: boolean } | null {
+    const inBar = spans[i + 1]?.span.chord ?? null;
+    const following = inBar ?? (i === spans.length - 1 ? next : null);
+    if (!following) {
+        return null;
+    }
+    const crossing =
+        inBar === null &&
+        ctx.next !== null &&
+        ctx.next.bar.visit.sectionIndex !== ctx.bar.visit.sectionIndex;
+    return { target: placeRoot(ctx, bassPc(following)), crossing };
+}
+
+/** A chord's root for the line: where the last bar's lead-in promised (`land`), else placed. */
+export function landingRoot(
+    ctx: BarContext,
+    memory: LineMemory,
+    i: number,
+    pc: number,
+    placeRoot: RootPlacer,
+): number {
+    const land = memory.land ?? null;
+    return i === 0 && land !== null && mod12(land) === pc ? land : placeRoot(ctx, pc);
+}
+
+/** A note a half or whole step (by pitch class) from the root it leads into, not that root's own octave. */
+export function isLeadIn(midi: number, target: number): boolean {
+    const gap = mod12(midi - target);
+    return gap !== 0 && (gap <= 2 || gap >= 10);
+}
+
+/**
+ * A lead-in more than a fifth from the root it leads into folds an octave to sit beside it.
+ * Played where it stands it is a leading tone on paper, yet the ear hears a wrong note or a
+ * leap, not a lead-in. Any other note, and the root's own octave (a pump), stays where it is.
+ */
+export function meetRoot(midi: number, target: number): number {
+    if (!isLeadIn(midi, target) || Math.abs(midi - target) <= 7) {
+        return midi;
+    }
+    const gap = mod12(midi - target);
+    return target + (gap <= 2 ? gap : gap - 12);
 }
