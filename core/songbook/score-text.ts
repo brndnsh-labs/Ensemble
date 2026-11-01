@@ -336,6 +336,70 @@ export function parseChordBar(text: string, meter: string): CodecDecodeResult<Sc
     }
 }
 
+/** One way to share an off-grid bar between its chords: the bar's text with explicit lengths. */
+export interface BarSplit {
+    /** The lengths in counts, as a musician reads them: `2+1+1`. */
+    label: string;
+    /** The bar's text with those lengths written in (`C:2 Dm:1 G7:1`). */
+    text: string;
+}
+
+/** Most splits worth offering; a bar with more ways to share it is asked for lengths instead. */
+const MAX_SPLITS = 6;
+
+/**
+ * Chords typed with no lengths divide the bar equally; when that division does not land on the
+ * engine's sixteenth-note grid (`C Dm G7` in 4/4 is thirds, a triplet) the musician chooses the
+ * lengths instead of getting them silently (charts doc, "Without lengths"). Null when the text
+ * has explicit lengths, does not read, or divides evenly. Otherwise `chords` is how many there
+ * are and `choices` the whole-count splits: each chord takes the same whole number of counts and
+ * the left-over counts go one apiece to a chord (3 chords in 4/4: 2+1+1, 1+2+1, 1+1+2; 3 in 5/4:
+ * 2+2+1, 2+1+2, 1+2+2), first chord first. Two chords in 3/4 or 5/4 are not asked: 1.5 and 2.5
+ * counts are on the grid. Empty `choices` means no short list exists (more chords than
+ * counts, or too many ways), and the musician writes the lengths.
+ */
+export function offGridBarSplit(
+    text: string,
+    meter: string,
+): { chords: number; counts: number; choices: BarSplit[] } | null {
+    if (parseChordBar(text, meter).kind !== 'ok') {
+        return null;
+    }
+    const tokens = text.trim().split(/\s+/);
+    if (tokens.some((token) => token.includes(':'))) {
+        return null;
+    }
+    const { counts, length } = scoreMeter(meter);
+    const n = tokens.length;
+    // Each chord's equal share, in quarter notes (length), must be a whole number of sixteenths.
+    if ((length[0] * 4) % (length[1] * n) === 0) {
+        return null;
+    }
+    const base = Math.floor(counts / n);
+    const extra = counts - base * n;
+    const choices: BarSplit[] = [];
+    const pick = (from: number, left: number, chosen: number[]) => {
+        if (choices.length > MAX_SPLITS) {
+            return;
+        }
+        if (left === 0) {
+            const lengths = tokens.map((_, i) => base + (chosen.includes(i) ? 1 : 0));
+            choices.push({
+                label: lengths.join('+'),
+                text: tokens.map((token, i) => `${token}:${lengths[i]}`).join(' '),
+            });
+            return;
+        }
+        for (let i = from; i <= n - left; i++) {
+            pick(i + 1, left - 1, [...chosen, i]);
+        }
+    };
+    if (base >= 1) {
+        pick(0, extra, []);
+    }
+    return { chords: n, counts, choices: choices.length > MAX_SPLITS ? [] : choices };
+}
+
 /** Only the bar's event text, not section form or annotations. Callers retain those separately. */
 export function printChordBar(events: readonly ScoreEvent[], meter: string): string {
     const config = scoreMeter(meter);

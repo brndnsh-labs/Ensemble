@@ -95,6 +95,16 @@ an off-grid new bar, show a visual choice of lengths instead of rounding. For
 example, `C Dm G7` in 4/4 offers 2+1+1, 1+2+1 and 1+1+2, with no default silently chosen.
 The authored score remains representable even when the engine cannot yet play it.
 
+The bar field implements this (#1980). Chords typed with no lengths are "off-grid" when the
+equal share of the bar is not a whole number of sixteenths (`offGridBarSplit` in
+`score-text.ts`: 3 chords in 4/4, 5 in 6/8; 2 in 3/4 or 5/4 and 8 in 4/4 are on the grid and
+need no question). The field then shows each chord taking the same whole number of counts
+with the left-over counts going one apiece to a chord (4/4: 2+1+1, 1+2+1, 1+1+2; 3 in 5/4:
+2+2+1, 2+1+2, 1+2+2), first highlighted but not applied. A click, or Enter on the highlighted
+one (Up/Down move it), writes explicit lengths into the text; until then the bar stays
+pending and Save refuses it. With more chords than counts, or more than six splits, no short
+list is offered and the bar asks for written lengths. Explicit lengths bypass all of it.
+
 ### Editor direction (some controls remain follow-on work)
 
 - Keep Edit chart as the explicit entry point; playback is still a music stand.

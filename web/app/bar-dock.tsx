@@ -3,6 +3,7 @@ import {
     type FocusEvent as ReactFocusEvent,
     type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
+    type ReactNode,
     type Ref,
     useLayoutEffect,
     useRef,
@@ -126,6 +127,8 @@ interface BarDockProps {
     /** ⋯: the bar menu (#1725), as a sheet over the dock. */
     onMenu: () => void;
     menuOpen: boolean;
+    /** The split choice (#1980) for chords that do not divide the bar, above the field. */
+    splits?: ReactNode;
 }
 
 /**
@@ -150,6 +153,7 @@ export function BarDock({
     onReveal,
     onMenu,
     menuOpen,
+    splits,
 }: BarDockProps) {
     const dock = useRef<HTMLDivElement>(null);
     const field = useRef<HTMLInputElement | null>(null);
@@ -258,6 +262,7 @@ export function BarDock({
                 }
             }}
         >
+            {splits}
             <div className="bar-dock-row">
                 <button
                     type="button"
