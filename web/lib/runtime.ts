@@ -70,12 +70,13 @@ import {
     AUTO_VOICE_FOR_STYLE,
     compForChordsLane,
     LEAD_FOR_VOICE,
-    STYLE_FOR_GENRE,
+    styleForGenre,
     VOICE_FOR_COMP,
     VOICE_FOR_LEAD,
 } from './band-voices';
 import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
 import { checkPlayable } from './engine-mode';
+import { bandHumanize } from './genre-humanize';
 import { genreSwing } from './genre-swing';
 import {
     countInPreference,
@@ -242,10 +243,9 @@ function scoreForBand(): SemanticScore {
 
 /** The band style the chart's genre plays. */
 function bandStyle(): StyleId {
-    const genre = getState().groove.lastSmartGenre;
-    // A persisted genre string indexes this table: guard with hasOwn (the #1266 rule), so
+    // A persisted genre string indexes the table: `styleForGenre` guards it (the #1266 rule), so
     // 'constructor' or a retired key can't read an Object prototype member as a style.
-    return Object.hasOwn(STYLE_FOR_GENRE, genre) ? STYLE_FOR_GENRE[genre] : 'rock';
+    return styleForGenre(getState().groove.lastSmartGenre);
 }
 
 function bandSettings(): BandSettings {
@@ -264,7 +264,8 @@ function bandSettings(): BandSettings {
         intensity: playback.autoIntensity ? null : playback.bandIntensity,
         swing: groove.swing,
         swingGrid: groove.swingSub === '16th' ? 16 : 8,
-        humanize: groove.humanize,
+        // A stored 20 is "not set": the style's own humanize plays (#2010).
+        humanize: bandHumanize(groove.humanize),
         seed: bandSeed,
         // The player trades with the soloist or the drummer; the band decides when it can.
         trade:

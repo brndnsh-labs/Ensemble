@@ -66,11 +66,14 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     const notation = page.getByLabel('Chord notation', { exact: true });
     // The Blues starter's genre sets swing/swingSub at creation time: its band
     // style's shuffle, 100 on the eighths (`genreSwing`, the one swing authority).
-    // humanize is the engine default; the starter's own arrangement
-    // is authored with 'name' notation.
+    // Humanize is not set, so it shows the blues style's own (35, #2010); the starter's own
+    // arrangement is authored with 'name' notation.
     await expect(swing).toHaveValue('100');
     await expect(swingGrid).toHaveValue('8th');
-    await expect(humanize).toHaveValue('20');
+    await expect(humanize).toHaveValue('35');
+    await expect(
+        page.getByText('Humanize follows the Blues style until you change it.'),
+    ).toBeVisible();
     await closeBand(page);
     await openKeyPopover(page);
     await expect(notation).toHaveValue('name');
@@ -85,6 +88,9 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(swing).toHaveValue('60');
     await expect(swingGrid).toHaveValue('16th');
     await expect(humanize).toHaveValue('55');
+    await expect(
+        page.getByText('Humanize follows the Blues style until you change it.'),
+    ).toHaveCount(0);
     // Notation re-renders the chart immediately, not just the popover's own select.
     await expect(page.locator('.chord-button').first()).not.toHaveText('C7');
     await closeBand(page);
@@ -96,7 +102,7 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await openBand(page, 'Groove');
     await expect(swing).toHaveValue('100');
     await expect(swingGrid).toHaveValue('8th');
-    await expect(humanize).toHaveValue('20');
+    await expect(humanize).toHaveValue('35');
     await closeBand(page);
     await openKeyPopover(page);
     await expect(notation).toHaveValue('name');
@@ -280,12 +286,40 @@ test('count-in (#1422) clicks one bar before the band, then the chart plays from
     await playButton.click();
 });
 
+test('humanize 20 is "not set": picking it shows the style\'s own amount (#2010)', async ({
+    page,
+}) => {
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await openBand(page, 'Groove');
+    const humanize = page.getByLabel('Humanize', { exact: true });
+    const hint = page.getByText('Humanize follows the Blues style until you change it.');
+    await expect(humanize).toHaveValue('35');
+
+    // Not set, a pick of 20 is still not set: the slider shows the blues style's 35 again, and
+    // nothing changed, so there is nothing to save.
+    await setRange(page, 'Humanize', 20);
+    await expect(humanize).toHaveValue('35');
+    await expect(hint).toBeVisible();
+
+    // Set, a pick of 20 lets it go back to following the style.
+    await setRange(page, 'Humanize', 55);
+    await expect(humanize).toHaveValue('55');
+    await expect(hint).toHaveCount(0);
+    await setRange(page, 'Humanize', 20);
+    await expect(humanize).toHaveValue('35');
+    await expect(hint).toBeVisible();
+    await closeBand(page);
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+});
+
 test('a slider step with no pointer or key behind it is still applied', async ({ page }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await openBand(page, 'Groove');
     const humanize = page.getByLabel('Humanize', { exact: true });
-    await expect(humanize).toHaveValue('20');
+    // Not set: the blues style's own (#2010).
+    await expect(humanize).toHaveValue('35');
 
     // What assistive technology does to a range (a VoiceOver swipe, a switch-control step):
     // the value moves and the input reports it final, with no pointer or key event around it.
