@@ -271,11 +271,12 @@ expression devices take turns rather than stack; one peak note per cycle.
 - **The comp leaves the soloist its note** (#2014). The comp hears the lead before it plays, so
   each voicing and grip is chosen against the lead notes that will sound over it
   (`leadCost` in `players/comp/voicing.ts`): a voice on the lead's pitch costs, weighed by how
-  long that note sounds over the chord, and one an octave from it costs half. Keyboards stay
-  in their register to do it; an open-position acoustic keeps its cowboy shapes. What the
-  search can't clear, the strike leaves out (`leaveTheLeadItsNote` in `players/comp/idiom.ts`):
-  a voice the lead sits on for half the strike or a beat, never a guide tone or the bottom
-  voice, at least two voices left. A stroked three-string chord whose guide tone the lead
+  long that note sounds over the chord, and one an octave from it costs about a quarter of
+  that. Keyboards stay in their register to do it; an open-position acoustic keeps its cowboy
+  shapes. What the search can't clear, the strike leaves out (`leaveTheLeadItsNote` in
+  `players/comp/idiom.ts`): a voice the lead sits on for half the strike or a beat, never a
+  guide tone or the bottom voice, at least two voices left (an open-position strum gives up
+  only its top string; the organ, which holds, keeps every voice). A stroked three-string chord whose guide tone the lead
   holds right through becomes a double-stop of the other two, if they keep the other guide
   tone (disco's 3-7-9 chuck under a sax on the 3rd). The held ending sounds its whole chord.
   - Claim, every style on its own comp instrument and the piano styles head and solo:

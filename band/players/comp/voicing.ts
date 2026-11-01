@@ -329,11 +329,13 @@ export interface LeadOver {
  * class but the lead's, so a pianist sets the voicing just under the melody. The weights are
  * set against `cost`'s voice leading (0.5 per semitone per voice, 0.6 more for the top): a
  * held unison (26) outweighs moving the voicing by an inversion to clear it, so the comp steps
- * aside rather than sit on the line — but stays under `cost`'s register wall (40 a note), so
- * it never leaves the instrument's slot to do it. A unison the search keeps anyway (the line
+ * aside rather than sit on the line (a keyboard never leaves its register for it: `voice`
+ * drops those candidates under a lead). A unison the search keeps anyway (the line
  * moves too much under one chord) is left out by the comp (`leaveTheLeadItsNote` in
- * idiom.ts). A voice above the lead is not weighed here: on a keyboard `yieldToLead` in
- * perform.ts drops it an octave, as before.
+ * idiom.ts). Sitting above the line is not weighed here: a keyboard's `yieldToLead` in
+ * perform.ts drops a voice above the lead an octave only where that keeps it over the chord's
+ * own bottom note, so a voicing wholly above the lead can stay there. Whether the comp should
+ * keep under the lead, at the register it would cost, is an open decision (#2014's follow-up).
  */
 export function leadCost(v: number[], lead: readonly LeadOver[]): number {
     // why: a unison is the worst — two instruments on one pitch read as one smeared note.
@@ -342,9 +344,11 @@ export function leadCost(v: number[], lead: readonly LeadOver[]): number {
     // 12%; at 30 the keyboards began leaping an octave over a low line (top-voice moves past
     // a fifth went from ~1% of changes to ~5%), so the weight stops short of that.
     const UNISON = 26;
-    // why: an octave doubles the line (a block-chord soli the soloist didn't ask for); half a
-    // unison, since the ear still hears two voices. It is a tie-breaker between voicings that
-    // clear the unison: without it more of them land an octave from the line.
+    // why: an octave doubles the line (a block-chord soli the soloist didn't ask for), but the
+    // ear still hears two voices, and a comp that keeps its guide tones under a chord-tone line
+    // can't avoid every octave — so it is a tie-breaker, about a quarter of a unison, between
+    // voicings that clear the unison. Measured: without it the rock and country piano sit an
+    // octave from the line 2–6 points more of the lead's time (rock head 80% against 74%).
     const OCTAVE = 7;
     let c = 0;
     for (const { midi, share } of lead) {
