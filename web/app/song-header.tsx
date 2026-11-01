@@ -174,7 +174,17 @@ export function SongHeader({
                         Edit<span className="mode-label-long"> chart</span>
                     </button>
                 </div>
-                <button className="btn primary save-btn" disabled={busy || !dirty} onClick={onSave}>
+                <button
+                    className="btn primary save-btn"
+                    // `aria-disabled`, not `disabled`: a Save that is working, or has just saved,
+                    // must keep the focus it was pressed with (like the menu button below).
+                    aria-disabled={busy || !dirty || undefined}
+                    onClick={() => {
+                        if (!busy && dirty) {
+                            onSave();
+                        }
+                    }}
+                >
                     {sharedDraft && !newSongDraft ? 'Keep a copy' : 'Save'}
                 </button>
                 <button

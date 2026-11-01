@@ -62,6 +62,18 @@ export function TempoControl({
                         if (event.key === 'Enter') {
                             event.preventDefault();
                             commit();
+                        } else if (
+                            (event.ctrlKey || event.metaKey) &&
+                            event.key.toLowerCase() === 's'
+                        ) {
+                            // Ctrl/⌘+S saves (the stand's key): typed text is a tempo first, as
+                            // a click on Save would have blurred and committed it (#1984).
+                            commit();
+                        } else if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                            // The field is a number: up and down step it (Shift takes ten), as the
+                            // − and + buttons do. Committed at once, like them, so the band follows.
+                            event.preventDefault();
+                            commit((event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1));
                         } else if (event.key === 'Escape') {
                             event.preventDefault();
                             setText(String(value));

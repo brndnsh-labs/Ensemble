@@ -66,3 +66,22 @@
 .file-input {
     display: none;
 }
+
+/* "Skip to chart" (#1984): the first Tab stop, out of sight until the keyboard lands on it. */
+.skip-link {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 100;
+    transform: translateY(-200%);
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--primary);
+    color: var(--on-primary);
+    font: inherit;
+    font-weight: 600;
+}
+.skip-link:focus-visible {
+    transform: none;
+}

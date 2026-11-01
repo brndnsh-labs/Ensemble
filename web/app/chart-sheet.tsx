@@ -373,7 +373,10 @@ export function ChartSheet({
             return;
         }
         // The chart's own keys (an arrow browsing away from Following) are not the field's.
-        event.stopPropagation();
+        // Ctrl/⌘+S is Save, the stand's (`useStandKeys`, #1984), typing in a bar included.
+        if (!((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's')) {
+            event.stopPropagation();
+        }
         const splits = barEdit.splits(from.id);
         if (splits && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
             event.preventDefault();
