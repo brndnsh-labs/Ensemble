@@ -91,6 +91,7 @@ import {
     initializeSounds,
     prepareSound,
     prepareSounds,
+    type SoundProgress,
     seedInstalledSounds,
     validateVoice,
 } from './sounds';
@@ -671,7 +672,7 @@ function halt(ringOut: boolean): void {
  */
 export async function startSection(
     sectionId: string,
-    progress: (text: string) => void = () => {},
+    progress: SoundProgress = () => {},
 ): Promise<boolean> {
     const view = playedView();
     const bounds = view && sectionSteps(view, sectionId);
@@ -698,7 +699,7 @@ export async function startSection(
     return true;
 }
 
-export async function toggle(progress: (text: string) => void): Promise<void> {
+export async function toggle(progress: SoundProgress): Promise<void> {
     if (getState().playback.isPlaying) {
         stop();
         return;
@@ -756,7 +757,7 @@ export function warmAudio(): void {
 export async function setVoice(
     module: InstrumentModule,
     voice: InstrumentVoice,
-    progress: (text: string) => void,
+    progress: SoundProgress,
     auto = false,
 ): Promise<void> {
     validateVoice(module, voice);
@@ -998,7 +999,7 @@ export function recommendedVoice(
 }
 
 /** Called only after the explicit bulk install has fully succeeded. */
-export async function applyGenreSounds(progress: (text: string) => void): Promise<void> {
+export async function applyGenreSounds(progress: SoundProgress): Promise<void> {
     for (const module of AUTO_LANES) {
         const voice = recommendedVoice(module);
         if (voice !== 'synth') {
@@ -1135,7 +1136,7 @@ export function withLoadedSounds<T extends ChartDocument>(document: T): T {
  * changes: nothing is committed while this is in flight, so a failure has nothing
  * to undo and a band that is already playing keeps its time straight through it.
  */
-async function prepareFeelSounds(name: string, progress: (text: string) => void): Promise<void> {
+async function prepareFeelSounds(name: string, progress: SoundProgress): Promise<void> {
     const state = getState();
     // `resolveAutoVoices` reads the style the feel is about to install, so resolve
     // the chords lane against that rather than the outgoing style.
@@ -1171,10 +1172,7 @@ function awaitBandChange(): Promise<boolean> {
     });
 }
 
-export async function setGenre(
-    name: string,
-    progress: (text: string) => void = () => {},
-): Promise<void> {
+export async function setGenre(name: string, progress: SoundProgress = () => {}): Promise<void> {
     if (!Object.hasOwn(SMART_GENRES, name)) {
         throw new Error('Unknown genre.');
     }
@@ -1500,7 +1498,7 @@ export function cancelExportAudio(): void {
 export async function exportAudio(
     kind: 'mix' | 'stems',
     filename: string,
-    progress: (text: string) => void,
+    progress: SoundProgress,
     instruments: StemInstrument[] = STEM_INSTRUMENTS,
 ): Promise<void> {
     const intent = ++exportIntent;

@@ -40,7 +40,13 @@ import {
     type StandMode,
     standMode,
 } from '../lib/session';
-import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
+import {
+    allSoundsAvailableOffline,
+    installAllSounds,
+    quarterGate,
+    type SoundProgress,
+    soundsAvailableOffline,
+} from '../lib/sounds';
 import { buildStandardDocument, standardFor } from '../lib/standards';
 import { start } from '../lib/starters';
 import type { Progress } from '../lib/sync/status';
@@ -75,6 +81,7 @@ import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
 import { GuidedForm } from './guided-form';
 import { downloadImportSource, ImportDialog } from './import-dialog';
+import { openedSongAnnouncement } from './key-popover';
 import { SettingsSheet } from './settings-sheet';
 import { SongHeader } from './song-header';
 import { SongMenu, type SongMenuView } from './song-menu';
@@ -356,6 +363,10 @@ export default function Ensemble() {
     const exportDialogRef = useModalDialog(exportOpen);
     const [importing, setImporting] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
+    // One gate per operation (`perform` renews it): a sound install settles ~220 files in two
+    // seconds, and a screen reader reads every rewrite of the region they land in (#1985).
+    const progressGate = useRef(quarterGate(setSoundProgress));
+    const soundSink: SoundProgress = (text, fraction) => progressGate.current(text, fraction);
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
     const [allSoundsOffline, setAllSoundsOffline] = useState<boolean | null>(null);
     // The Band sheet (#1703): closed, or open on one of its tabs. `lastBandTab` is where the
@@ -855,6 +866,8 @@ export default function Ensemble() {
             : null;
     const {
         setMessage,
+        announce,
+        announcement,
         dismissMessage,
         toastTone,
         toastText,
@@ -1502,6 +1515,7 @@ export default function Ensemble() {
     /** `run`'s body: the shell busy while `task` runs, its refusal on the error line. */
     async function perform(task: () => void | Promise<void>, keepError: boolean) {
         working.current = true;
+        progressGate.current = quarterGate(setSoundProgress);
         setBusy(true);
         // A feel change now prepares its sounds while the band keeps playing and
         // swaps in at the next bar (#1185); only a failed change stops and resumes.
@@ -1557,7 +1571,7 @@ export default function Ensemble() {
             const next = updateChart();
             setEditing(false);
             setBandTab(null);
-            await runtime.toggle(setSoundProgress);
+            await runtime.toggle(soundSink);
             setPlaying(runtime.state().playback.isPlaying);
             setSoundsOffline(await soundsAvailableOffline(next.chart));
             setSoundProgress('');
@@ -1880,7 +1894,7 @@ export default function Ensemble() {
             if (pending.length > 0) {
                 applyScore(withSectionChanges(updateChart().chart.score, id, pending));
             }
-            await runtime.startSection(id, setSoundProgress);
+            await runtime.startSection(id, soundSink);
             setSoundProgress('');
         });
     }
@@ -2241,6 +2255,7 @@ export default function Ensemble() {
             // hadn't happened while covering the chart's last row on a phone. Clearing still
             // keeps the previous song's sentence from following the musician into this one.
             setMessage('');
+            announce(openedSongAnnouncement(onDevice));
         }
         selectSection(next);
         return { current: onDevice, saved: savedBaseline };
@@ -2572,7 +2587,7 @@ export default function Ensemble() {
             const opened = await open(document);
             setBrowse({ view: 'home' });
             track('chart_opened', { source: 'songbook' });
-            await runtime.toggle(setSoundProgress);
+            await runtime.toggle(soundSink);
             setPlaying(runtime.state().playback.isPlaying);
             setSoundsOffline(await soundsAvailableOffline(opened.current.chart));
             setSoundProgress('');
@@ -3352,7 +3367,7 @@ export default function Ensemble() {
                                 // #1439's standards catalog, which never calls it at all), which
                                 // is why this stayed a separate call site rather than moving
                                 // inside `setGenre` itself.
-                                await runtime.setGenre(genre, setSoundProgress);
+                                await runtime.setGenre(genre, soundSink);
                                 track('genre_changed', { genre });
                             }, true)
                         }
@@ -3376,8 +3391,9 @@ export default function Ensemble() {
                                 pendingSound={pendingSound}
                                 onInstallAll={() =>
                                     change(async () => {
-                                        await installAllSounds(setSoundProgress);
-                                        await runtime.applyGenreSounds(setSoundProgress);
+                                        await installAllSounds(soundSink);
+                                        await runtime.applyGenreSounds(soundSink);
+                                        setMessage('Sounds installed and ready offline');
                                     })
                                 }
                                 onChooseSound={(lane, value) => {
@@ -3392,7 +3408,7 @@ export default function Ensemble() {
                                                 value === 'auto'
                                                     ? runtime.recommendedVoice(lane)
                                                     : (value as InstrumentVoice),
-                                                setSoundProgress,
+                                                soundSink,
                                                 value === 'auto',
                                             );
                                         } finally {
@@ -3558,6 +3574,7 @@ export default function Ensemble() {
                         toastTone={toastTone}
                         toastText={toastText}
                         messageToken={messageToken}
+                        announcement={announcement}
                         setToastHeld={setToastHeld}
                         dismissMessage={dismissMessage}
                         undoLive={undoLive}

@@ -38,6 +38,16 @@ export function songKeyLabel(current: ChartDocument): string {
     return `${keyLabel(shownKey(key, isMinor === true))}${isMinor ? 'm' : ''}`;
 }
 
+/**
+ * What a screen reader hears when a song opens (#1985): "Autumn Leaves, G minor, 120 BPM". The
+ * spoken key spells minor out, since "Gm" is read as a letter and an abbreviation.
+ */
+export function openedSongAnnouncement(current: ChartDocument): string {
+    const key = songKeyLabel(current);
+    const spoken = current.chart.score.isMinor ? `${key.slice(0, -1)} minor` : key;
+    return `${current.title}, ${spoken}, ${current.chart.performance.bpm} BPM`;
+}
+
 /** Frames to wait for the selected bar's number to be enabled again once the change settles. */
 const SETTLE_FRAMES = 30;
 
