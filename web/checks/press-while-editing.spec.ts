@@ -13,7 +13,7 @@ import {
  * #1733 — a press that leaves an open bar (or commits a typed field) lands where it was pressed.
  *
  * Leaving a bar applies it, and an applied change can re-lay the page out: on a CI WebKit the
- * header's status line ("Unsaved changes · locally recovered") took a second line and moved Play
+ * header's status line ("Unsaved changes on this device") took a second line and moved Play
  * 22px down. When that happened between the press's down and its up, the up landed off the
  * button and the click never reached it: Play, pressed with a bar open, left the bar and did not
  * play. How far a change moves the page depends on the fonts, so these checks make it move the

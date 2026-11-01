@@ -105,7 +105,7 @@ import { useChartView } from './use-chart-view';
 import { useCollectionActions } from './use-collection-actions';
 import { useCollections } from './use-collections';
 import { useDeleteUndo } from './use-delete-undo';
-import { useFollowScroll } from './use-follow-scroll';
+import { useFollowScroll, usePlayingRowAway } from './use-follow-scroll';
 import { useHeldAccount } from './use-held-account';
 import { useHistoryNavigation } from './use-history-navigation';
 import { useModalDialog } from './use-modal-dialog';
@@ -775,6 +775,7 @@ export default function Ensemble() {
         [place?.trading, place?.pass, place?.barChorus, place?.bar, place?.tradeKey, current],
     );
     const neckShowing = neck && !editing;
+    const playingRowAway = usePlayingRowAway(scroll, { following, active, remount: neckShowing });
     const neckPrefs = useNeckPrefs();
     // The chart reads as one page where it can (#1712); editing, it scrolls at a reading size.
     useChartFit(scroll, !current || neckShowing ? null : editing ? 'edit' : 'page', blocks);
@@ -1093,9 +1094,7 @@ export default function Ensemble() {
                 const kept = draftKey ? repository.sharedDraftFor(draftKey, document.id) : null;
                 openSharedDraft(
                     document,
-                    kept
-                        ? 'Recovered your unsaved changes'
-                        : 'Opened from a shared link · not saved yet',
+                    kept ? 'Recovered your unsaved changes' : '',
                     draftKey,
                     kept,
                 );
@@ -1727,7 +1726,7 @@ export default function Ensemble() {
         setError(`Draft is only in this tab: ${reason.replace(/\.$/, '')}. Export before closing.`);
     }
     /**
-     * The draft is kept for recovery on this device. Said by the header's "locally recovered"
+     * The draft is kept for recovery on this device. Said by the header's "on this device"
      * alone — never a toast (#1760): this runs on EVERY edit, and "Draft recovered on this
      * device" told a musician who had recovered nothing that they had, an edit at a time. A real
      * recovery is announced where it happens, by `open()` ("Recovered your unsaved changes").
@@ -3664,7 +3663,7 @@ export default function Ensemble() {
                                 : null
                         }
                         dismissSyncFailure={dismissSyncFailure}
-                        showResume={playbackActive && !following && !neckShowing}
+                        showResume={playbackActive && !following && !neckShowing && playingRowAway}
                         onResumeFollow={() => {
                             setFollowing(true);
                             scroll.current?.focus({ preventScroll: true });
