@@ -1,7 +1,8 @@
 import { validateSemanticScore } from './score-codec.js';
 import { scoreDuration, scoreMeter } from './score-duration.js';
 import { compileScoreForm } from './score-form.js';
-import { isScoreChord } from './score-text.js';
+import { resolveScoreMeasureEvents } from './score-measure-events.js';
+import { houseQuality, isScoreChord } from './score-text.js';
 import type {
     ScoreDirection,
     ScoreDuration,
@@ -111,7 +112,13 @@ function canonicalChord(symbol: string): string {
     if (!parts) {
         return symbol;
     }
-    return parts[1] + (CHORD_ALIASES.get(parts[2]) ?? parts[2]) + (parts[3] ?? '');
+    // iReal writes a minor-major seventh as `-^7`; the house spelling is the one the bar field
+    // prints (#2004, via #1978's table), so the shorthand never reaches a stored chord.
+    const quality =
+        CHORD_ALIASES.get(parts[2]) ??
+        (parts[2].startsWith('-^') ? houseQuality(parts[2]) : null) ??
+        parts[2];
+    return parts[1] + quality + (parts[3] ?? '');
 }
 
 function fail(bar: number, message: string): never {
@@ -979,6 +986,204 @@ function mapNavigation(
     return closes.size > 0;
 }
 
+interface Mark {
+    bar: number;
+    label: string;
+    /** The letter as written, for the notes. */
+    letter: string;
+}
+
+const MARK_LETTERS = 'ABCDVvi';
+// iReal's rehearsal-mark letters as section names: `v`/`V` is a verse, every other letter stands
+// for itself. `i` is deliberately NOT renamed "Intro": that label is a playback instruction (the
+// lead rests through it and a counted chart plays it once, `leadRole` and `onceSections`), and
+// the marked bars are often the tune's head (West Coast Blues), so the import never guesses it.
+const MARK_LABELS = new Map([
+    ['v', 'Verse'],
+    ['V', 'Verse'],
+]);
+
+const isMarkText = (note: { text: string; at?: ScoreDuration; cell?: number }) =>
+    note.text.length === 1 && MARK_LETTERS.includes(note.text);
+
+/** The first rehearsal mark of each bar that carries one. */
+function rehearsalMarks(bars: WrittenBar[]): Mark[] {
+    const marks: Mark[] = [];
+    for (const [bar, written] of bars.entries()) {
+        const mark = written.notes.find(
+            (note) => note.cell === 0 && note.above && isMarkText(note),
+        );
+        if (mark) {
+            marks.push({ bar, letter: mark.text, label: MARK_LABELS.get(mark.text) ?? mark.text });
+        }
+    }
+    return marks;
+}
+
+/**
+ * How a section boundary before `bar` meets the written repeats. `broken`: it falls inside an open
+ * repeat, or the next repeat sign is a bare `:|` that would then begin at the new section instead
+ * of where the written repeat begins. `ending`: it falls after a numbered ending that never
+ * closes (iReal lets the last one run on), which a split may or may not preserve, so the caller
+ * proves it. `whole`: every repeat and ending is complete on one side.
+ */
+function repeatsAt(measures: ScoreMeasure[], bar: number): 'whole' | 'ending' | 'broken' {
+    let open = 0;
+    let ending = false;
+    const kinds = (m: ScoreMeasure) => [...(m.start ?? []), ...(m.end ?? [])].map((d) => d.kind);
+    for (const m of measures.slice(0, bar)) {
+        for (const kind of kinds(m)) {
+            if (kind === 'repeat-start') {
+                open++;
+            } else if (kind === 'repeat-end') {
+                open = Math.max(0, open - 1);
+            } else if (kind === 'ending-start') {
+                ending = true;
+            } else if (kind === 'ending-end') {
+                ending = false;
+            }
+        }
+    }
+    if (open > 0) {
+        return 'broken';
+    }
+    for (const m of measures.slice(bar)) {
+        for (const kind of kinds(m)) {
+            if (kind === 'repeat-start') {
+                return ending ? 'ending' : 'whole';
+            }
+            if (kind === 'repeat-end' || kind === 'ending-start') {
+                return 'broken';
+            }
+        }
+    }
+    return ending ? 'ending' : 'whole';
+}
+
+/**
+ * The measures a score performs, in order, chorus by chorus: what "the same timing" means across a
+ * split. The pass numbers a visit reports are left out: a bar that followed a final ending inside
+ * the one section reports that ending's pass, and in its own section it reports none, yet it
+ * sounds on exactly the same beat.
+ */
+function performedRoute(score: SemanticScore): string {
+    return JSON.stringify(
+        compileScoreForm(score).map((visit) => [
+            score.sections[visit.sectionIndex].measures[visit.measureIndex].id,
+            visit.chorus,
+        ]),
+    );
+}
+
+/**
+ * Split the one imported section at the rehearsal marks (#2004), a section per mark, wherever no
+ * repeat or ending crosses it. A mark that would cut one stays a letter in its bar, inside the
+ * section before it, and a note says so. The split is proven, not assumed: the new score must
+ * perform exactly the measures, in the order, the single section did, or the single section stands
+ * and the note says why. A mark that becomes a section's name is not also left as a letter.
+ */
+function splitAtMarks(
+    score: SemanticScore,
+    bars: WrittenBar[],
+    marks: Mark[],
+): { score: SemanticScore; notes: string[] } {
+    const notes: string[] = [];
+    const [only] = score.sections;
+    const candidates: { mark: Mark; ending: boolean }[] = [];
+    for (const mark of marks) {
+        const fit = mark.bar === 0 ? 'skip' : repeatsAt(only.measures, mark.bar);
+        if (fit === 'broken') {
+            notes.push(skipped(mark));
+        } else if (fit !== 'skip') {
+            candidates.push({ mark, ending: fit === 'ending' });
+        }
+    }
+    const named = marks[0]?.bar === 0;
+    // The first mark became the section's name, so it is not also left as a letter in its bar.
+    const single = (): SemanticScore => {
+        if (!named) {
+            return score;
+        }
+        const [head, ...rest] = only.measures;
+        const kept = (head.annotations ?? []).filter((a) => !(a.at[0] === 0 && isMarkText(a)));
+        const { annotations: _mark, ...bare } = head;
+        return {
+            ...score,
+            sections: [
+                {
+                    ...only,
+                    measures: [{ ...bare, ...(kept.length ? { annotations: kept } : {}) }, ...rest],
+                },
+            ],
+        };
+    };
+    // Every candidate first, then without the ones that follow an unclosed ending, then none: the
+    // first of these that performs the same measures in the same order is the split.
+    const attempts = [candidates, candidates.filter((c) => !c.ending)];
+    for (const [n, attempt] of attempts.entries()) {
+        if (!attempt.length || (n > 0 && attempt.length === candidates.length)) {
+            continue;
+        }
+        const built = sectionsAt(
+            score,
+            bars,
+            marks,
+            attempt.map((c) => c.mark),
+        );
+        try {
+            const checked = validateSemanticScore(built);
+            if (checked.kind === 'ok' && performedRoute(checked.value) === performedRoute(score)) {
+                // Playable too: a two-bar repeat must stay whole inside one section.
+                resolveScoreMeasureEvents(checked.value);
+                for (const c of candidates) {
+                    if (!attempt.includes(c)) {
+                        notes.push(skipped(c.mark));
+                    }
+                }
+                return { score: checked.value, notes };
+            }
+        } catch {
+            // Try the next, smaller split.
+        }
+    }
+    if (candidates.length) {
+        notes.push(
+            'The rehearsal marks could not become sections without changing how the form plays, so the chart stays one section.',
+        );
+    }
+    return { score: single(), notes };
+}
+
+const skipped = (mark: Mark) =>
+    `Rehearsal mark ${mark.letter} at bar ${mark.bar + 1} sits inside a repeat or ending, so it stays a letter in its bar and does not start a section.`;
+
+/** The score cut into a section at bar 0 and at each of `cuts`. */
+function sectionsAt(
+    score: SemanticScore,
+    bars: WrittenBar[],
+    marks: Mark[],
+    cuts: Mark[],
+): SemanticScore {
+    const [only] = score.sections;
+    const starts = [0, ...cuts.map((mark) => mark.bar)];
+    const sections = starts.map((start, n) => {
+        const [head, ...rest] = only.measures.slice(start, starts[n + 1] ?? only.measures.length);
+        // A meter written on a bar does not carry into the next section, so a section that opens
+        // in another meter names it on the section instead of on its first bar.
+        const { meter: _carried, annotations, ...bare } = head;
+        const kept = (annotations ?? []).filter((a) => !(a.at[0] === 0 && isMarkText(a)));
+        const meter = bars[start].meter;
+        return {
+            id: `${only.id}-${n + 1}`,
+            label: n === 0 ? (marks[0]?.bar === 0 ? marks[0].label : 'Chart') : cuts[n - 1].label,
+            repeat: 1,
+            ...(meter !== score.meter ? { meter } : {}),
+            measures: [{ ...bare, ...(kept.length ? { annotations: kept } : {}) }, ...rest],
+        };
+    });
+    return { ...score, sections };
+}
+
 /** Original parser of the documented open token grammar, not an upstream tolerant parser. */
 export function scoreFromIRealBody(
     body: string,
@@ -1077,6 +1282,10 @@ function buildScore(
         grouping: null,
         sections: [{ id: `ireal-${index + 1}-section`, label: 'Chart', repeat: 1, measures }],
     };
+    const marks = rehearsalMarks(bars);
+    if (marks.length && marks[0].bar === 0) {
+        score.sections[0].label = marks[0].label;
+    }
     const checked = validateSemanticScore(score);
     if (checked.kind !== 'ok' && applied) {
         return null;
@@ -1098,6 +1307,7 @@ function buildScore(
         }
         throw error;
     }
+    const split = splitAtMarks(checked.value, bars, marks);
     // Dropped alternates are aggregated into one note (never one per occurrence — a pathological
     // chart could repeat "(D)" thousands of times), placed first, then the whole list is bounded
     // so no chart can produce an unbounded diagnostics list (#1447 review).
@@ -1111,6 +1321,6 @@ function buildScore(
             `${signals.droppedAlternates} alternate chords with nothing to attach to were dropped from the import.`,
         );
     }
-    allNotes.push(...notes);
-    return { score: checked.value, notes: boundedNotes(allNotes) };
+    allNotes.push(...notes, ...split.notes);
+    return { score: split.score, notes: boundedNotes(allNotes) };
 }

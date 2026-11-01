@@ -215,8 +215,10 @@ leaving them out would empty a chorus, the chart is played as written. A section
 "Ending", "Tag" or "Coda" is not an outro by this rule; whether it should be is open. An uncounted chart
 loops as written, intro included; whether it should is not decided. iReal Pro does the same
 with its own intro mark: "IN" plays once and later passes return to "A"
-(https://www.irealpro.com/learn/how-to-add-an-intro-to-a-song/). An imported iReal chart is
-one section, so its intro is not a labelled section and is not affected.
+(https://www.irealpro.com/learn/how-to-add-an-intro-to-a-song/). An imported iReal chart's
+`i` mark becomes a section labelled "i", not "Intro" (#2004): the marked bars are often the
+tune's head, and the label would rest the lead and play them once, so that is the musician's
+call to make in Edit.
 
 The band plays a counted chart once and stops (#1475): every chorus, the last-chorus coda on
 the final one, then the transport returns to stopped at the end of the last bar, its notes
@@ -407,7 +409,7 @@ fixture for this specific export, not general import or by-ear compatibility.
 | Unsupported meters or off-grid timing | Block, explain location | Never substitute 4/4 or round durations. |
 | Long charts | No fixed page limit | Synthetic 64/128-bar layouts and explicit input/expansion bounds. |
 | Playlist HTML | Bounded supported-envelope selection/diagnostics implemented; a whole playlist (up to 2,000 songs, the account cap) imports as a collection named after it (#1478) | Additional real playlist envelopes; no silent first-song-only import. |
-| Composer, title, style, transpose, tempo | Display metadata plus original source retained; starting tempo explicit | Verify raw transpose/tempo/repetition meanings before applying them automatically. |
+| Composer, title, style, tempo (#2004) | Style maps to a canon genre (`core/songbook/ireal-style.ts`; an unknown style keeps the current band, with a note) and the tempo is the export's when set (`0` is unset; outside 40-240 is ignored), else the style's default; both are shown and editable in the preview, and a playlist keeps each song's own unless one tempo is typed for all. Rehearsal marks become sections (`v` is Verse, the rest keep their letter) where no repeat, ending or two-bar repeat crosses them and the split performs the same bars in the same order; otherwise the mark stays a letter in its bar, with a preview note. New section boundaries bring the band's section fills and arrival crashes. Source retained | Transpose and player repetitions stay raw metadata: verify their meanings before applying them automatically. |
 
 Unsupported-at-this-stage means visibly unavailable until implemented, not intentionally
 excluded from v2. The ledger must distinguish authored representation, editor support,

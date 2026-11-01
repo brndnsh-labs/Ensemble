@@ -67,8 +67,9 @@ export const DEFAULT_PLAYLIST_NAME = 'iReal playlist';
  * took 2.1-4.3 s in one go on a desktop (Node, Chromium, WebKit), so this hands the event loop
  * back as the parse does. Each document is built exactly as a single-song import builds it (`importedDocument`,
  * including its playability check), except that it keeps its OWN source link rather than the whole
- * playlist. `bpm` is a placeholder — the tempo is chosen when the import is written
- * (`resolvePlaylistImport`). Null when `cancelled` said so.
+ * playlist. Each song keeps the tempo its export proposes (#2004), else the
+ * setup's; a tempo the musician chooses for the whole playlist is applied when the import is
+ * written (`resolvePlaylistImport`). Null when `cancelled` said so.
  */
 export async function planPlaylist(
     result: IRealImportResult,
@@ -93,7 +94,13 @@ export async function planPlaylist(
                 : ['The iReal chart could not be interpreted safely.'];
         } else {
             try {
-                entry.document = importedDocument(result, index, base, PLACEHOLDER_BPM, 'song');
+                entry.document = importedDocument(
+                    result,
+                    index,
+                    base,
+                    song.tempo?.bpm ?? base.chart.performance.bpm,
+                    'song',
+                );
             } catch (reason) {
                 entry.reasons = [
                     reason instanceof Error ? reason.message : 'This chart cannot be played yet.',
@@ -111,9 +118,6 @@ export async function planPlaylist(
     }
     return { playlistName: result.playlistName ?? null, entries };
 }
-
-/** Any valid tempo: `resolvePlaylistImport` stamps the chosen one on every document it writes. */
-const PLACEHOLDER_BPM = 120;
 
 /**
  * The duplicate key: title and composer, each lower-cased with its whitespace collapsed. A song
@@ -146,7 +150,8 @@ export interface ResolveOptions {
     includeDuplicates: boolean;
     /** The collection name the musician settled on (already `collectionName`-cleaned or not). */
     name: string;
-    bpm: number;
+    /** A tempo for every song, or null to let each keep its own (#2004). */
+    bpm: number | null;
     /** Mints a new song id; `crypto.randomUUID` in the app, a counter in a test. */
     newId?: () => string;
 }
@@ -193,7 +198,10 @@ export function resolvePlaylistImport(plan: PlaylistPlan, options: ResolveOption
     if (!name) {
         throw new Error('Name the collection this playlist imports into.');
     }
-    if (!Number.isInteger(options.bpm) || options.bpm < 40 || options.bpm > 240) {
+    if (
+        options.bpm !== null &&
+        (!Number.isInteger(options.bpm) || options.bpm < 40 || options.bpm > 240)
+    ) {
         throw new Error('Choose a tempo from 40 to 240 BPM.');
     }
     const newId = options.newId ?? (() => crypto.randomUUID());
@@ -243,7 +251,10 @@ export function resolvePlaylistImport(plan: PlaylistPlan, options: ResolveOption
             id,
             chart: {
                 ...entry.document.chart,
-                performance: { ...entry.document.chart.performance, bpm: options.bpm },
+                performance: {
+                    ...entry.document.chart.performance,
+                    ...(options.bpm === null ? {} : { bpm: options.bpm }),
+                },
             },
         });
         songIds.push(id);
