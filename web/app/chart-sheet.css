@@ -93,7 +93,7 @@
     top: 3px;
     left: 9px;
     color: var(--bar-number);
-    font-size: 9px;
+    font-size: max(11px, calc(var(--chord-size, 30px) * 0.3));
     font-family: Inter, -apple-system, sans-serif;
     font-weight: 400;
 }
@@ -324,9 +324,6 @@ button.bar-number {
     }
     .chord {
         font-size: 30px;
-    }
-    .bar-number {
-        font-size: 9px;
     }
     .chart-bottom {
         font-size: 10px;

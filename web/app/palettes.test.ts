@@ -186,4 +186,35 @@ describe('colour palettes (#1280)', () => {
             }
         }
     });
+
+    it('Warm: bar numbers, inactive mode tabs and the focus ring clear their floors (#1983)', () => {
+        // Bar numbers and the inactive Chart/Neck/Edit and band tabs (`--muted` on the `--hover`
+        // track) are text, 4.5:1; the focus ring is a non-text indicator, 3:1 (WCAG 1.4.11)
+        // against every surface it lands on, and opaque so the page never thins it.
+        const t = palettes.warm;
+        for (const mode of ['day', 'stage'] as const) {
+            for (const bg of ['paper', 'surface', 'paper-raised']) {
+                expect(
+                    contrast(t['bar-number'][mode], t[bg][mode]),
+                    `${mode}: --bar-number on --${bg}`,
+                ).toBeGreaterThanOrEqual(4.5);
+                expect(
+                    contrast(t['focus-ring'][mode], t[bg][mode]),
+                    `${mode}: --focus-ring on --${bg}`,
+                ).toBeGreaterThanOrEqual(3);
+            }
+            expect(
+                contrast(t.muted[mode], t.hover[mode]),
+                `${mode}: --muted on --hover`,
+            ).toBeGreaterThanOrEqual(4.5);
+        }
+    });
+
+    it('bar numbers scale with the chord size, never under 11px (#1983)', () => {
+        const rule = block(
+            readFileSync(new URL('./chart-sheet.css', import.meta.url), 'utf8'),
+            '.bar-number',
+        );
+        expect(rule).toContain('font-size: max(11px, calc(var(--chord-size, 30px) * 0.3));');
+    });
 });
