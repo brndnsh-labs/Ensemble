@@ -335,7 +335,7 @@ export interface LeadOver {
  * idiom.ts). Sitting above the line is not weighed here: a keyboard's `yieldToLead` in
  * perform.ts drops a voice above the lead an octave only where that keeps it over the chord's
  * own bottom note, so a voicing wholly above the lead can stay there. Whether the comp should
- * keep under the lead, at the register it would cost, is an open decision (#2014's follow-up).
+ * keep under the lead, at the register it would cost, is an open decision (#2057).
  */
 export function leadCost(v: number[], lead: readonly LeadOver[]): number {
     // why: a unison is the worst — two instruments on one pitch read as one smeared note.
