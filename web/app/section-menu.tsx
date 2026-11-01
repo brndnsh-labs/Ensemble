@@ -25,6 +25,8 @@ interface SectionMenuProps {
     onLoop: (pending: SectionChange[]) => void;
     onChange: (changes: SectionChange[]) => void;
     onAddAfter: (pending: SectionChange[]) => void;
+    /** Duplicate section (#2006): the same bars again, straight after. */
+    onDuplicate: (pending: SectionChange[]) => void;
     onDelete: (pending: SectionChange[]) => void;
     /** The menu closes; `refocus` puts focus back on the section letter (Esc, Close). */
     onClose: (refocus: boolean) => void;
@@ -42,7 +44,8 @@ interface SectionMenuProps {
  * with it, as one change: on WebKit a press does not take focus, so the field is still focused
  * when the action runs, and its own commit then would turn the action away (#1726 review).
  *
- * Calm by default (#1758): Start here, Loop (#1989) and the section actions are single rows, the settings are
+ * Calm by default (#1758): Start here, Loop (#1989) and the section actions (Add section after,
+ * Duplicate section #2006) are single rows, the settings are
  * two folded groups (name and plays; key, mode or meter), and Delete section is last, after a
  * divider. On a phone it slides up over a light backdrop, its Close in the heading row.
  */
@@ -57,6 +60,7 @@ export function SectionMenu({
     onLoop,
     onChange,
     onAddAfter,
+    onDuplicate,
     onDelete,
     onClose,
 }: SectionMenuProps) {
@@ -281,6 +285,20 @@ export function SectionMenu({
                     }}
                 >
                     Add section after
+                </button>
+                <button
+                    type="button"
+                    className="bar-menu-item"
+                    aria-disabled={busy || undefined}
+                    onClick={() => {
+                        if (!busy) {
+                            const changes = take();
+                            close(false);
+                            onDuplicate(changes);
+                        }
+                    }}
+                >
+                    Duplicate section
                 </button>
                 <hr />
                 <button

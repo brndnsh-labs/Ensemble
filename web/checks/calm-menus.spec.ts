@@ -119,7 +119,8 @@ test('the section menu: its groups folded, Delete section last after a divider',
     const items = await children(menu);
     expect(items.at(-1)).toEqual({ tag: 'button', text: 'Delete section' });
     expect(items.at(-2)?.tag).toBe('hr');
-    expect(items.at(-3)).toEqual({ tag: 'button', text: 'Add section after' });
+    expect(items.at(-3)).toEqual({ tag: 'button', text: 'Duplicate section' });
+    expect(items.at(-4)).toEqual({ tag: 'button', text: 'Add section after' });
 
     // Unfolded, the name is there to type, as before.
     await openSectionNames(menu);

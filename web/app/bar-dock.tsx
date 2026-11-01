@@ -67,7 +67,11 @@ function insertKey(node: HTMLInputElement, key: string): string {
         end = value.length;
     }
     let text = key;
-    if (key === '/') {
+    if (key === '|') {
+        // The next bar (#2006): spaced from the chords beside it, as a line of bars is written.
+        const before = value.slice(0, start);
+        text = `${before && !/\s$/.test(before) ? ' ' : ''}| `;
+    } else if (key === '/') {
         const before = value.slice(0, start);
         const after = value.slice(end);
         text = `${before && !/\s$/.test(before) ? ' ' : ''}/${after && !/^\s/.test(after) ? ' ' : ''}`;
@@ -356,6 +360,17 @@ export function BarDock({
                     onClick={() => pressKey('/')}
                 >
                     /
+                </button>
+                <button
+                    type="button"
+                    className="bar-dock-key"
+                    aria-label="Bar line"
+                    title="Bar line: the next bar"
+                    aria-disabled={busy}
+                    onMouseDown={keepFocus}
+                    onClick={() => pressKey('|')}
+                >
+                    |
                 </button>
             </div>
         </div>
