@@ -161,7 +161,12 @@ export const disco = defineClaims({
                     0.2,
                     'quarter-note roots: the pump waits for the band to build',
                 ],
-                ['compColour', 0, 0.1, 'plain triads and sevenths when quiet, the 9ths come later'],
+                [
+                    'compColour',
+                    0,
+                    0.12,
+                    'plain triads and sevenths when quiet, a written 9th aside',
+                ],
             ],
         },
         {

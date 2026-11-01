@@ -23,7 +23,7 @@ import { STEP } from '../../players/grid.js';
 import { STYLES } from '../../styles/index.js';
 import { chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { FIXTURES } from '../scores.js';
+import { COLOUR_CHART, FIXTURES } from '../scores.js';
 
 const CHARTS = ['blues', 'rhythmChanges', 'popSong', 'minorFunk', 'bossa', 'romanNumerals'];
 const SEEDS = ['one', 'two', 'three', 'four'];
@@ -44,6 +44,7 @@ export function perform(
     bass = true,
     lead?: 'head' | 'solo',
     trade?: TradeSettings,
+    colour = false,
 ): Take[] {
     const takes: Take[] = [];
     const lanes = { ...DEFAULT_SETTINGS.lanes, bass, lead: lead !== undefined || Boolean(trade) };
@@ -53,8 +54,8 @@ export function perform(
     const passes = trade ? 3 : lead ? CYCLE : 2;
     const judged = (pass: number) =>
         trade || lead === 'solo' ? pass > 0 : lead === 'head' ? pass === 0 : true;
-    for (const chart of CHARTS) {
-        const timeline = compileTimeline(FIXTURES[chart]);
+    for (const chart of colour ? ['colour'] : CHARTS) {
+        const timeline = compileTimeline(colour ? COLOUR_CHART : FIXTURES[chart]);
         for (const seed of SEEDS) {
             let memory: PassMemory | undefined;
             for (let pass = 0; pass < passes; pass++) {
@@ -967,6 +968,34 @@ export const METRICS = {
                 n++;
                 const pcs = notes.map((x) => mod12(x.midi - chord.root));
                 hit += pcs.some((p) => p === 2 || (p === 9 && chord.seventh !== null)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Share of chords with a written tension (add9, maj9, b9…) whose comp playing sounds one
+     * of them. Judged per chord span, so a picked or arpeggiated bar counts whole.
+     */
+    compWrittenTension: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const span of t.spans) {
+                const chord = span.chord;
+                if (!chord?.tensions.length) {
+                    continue;
+                }
+                const notes = events.filter(
+                    (e): e is PitchedNote =>
+                        e.lane === 'comp' && !e.muted && e.tick >= span.start && e.tick < span.end,
+                );
+                if (!notes.length) {
+                    continue;
+                }
+                n++;
+                hit += notes.some((x) => chord.tensions.includes(mod12(x.midi - chord.root)))
+                    ? 1
+                    : 0;
             }
         }
         return ratio(hit, n);
@@ -2067,6 +2096,8 @@ export interface TakeSpec {
     lead?: 'head' | 'solo';
     /** The player trades: the two passes after the head are judged. */
     trade?: TradeSettings;
+    /** Judge the written-colour chart (add9, maj9, b9…) instead of the shared charts. */
+    colour?: boolean;
 }
 
 type MetricName = keyof typeof METRICS;

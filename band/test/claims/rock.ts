@@ -3,6 +3,21 @@ import { defineClaims } from '../critique/harness.js';
 export const rock = defineClaims({
     takes: [
         {
+            take: { colour: true },
+            claims: [
+                [
+                    'compWrittenTension',
+                    0.9,
+                    1,
+                    'a written 9th, 11th or b9 is in the chord the keys play',
+                ],
+            ],
+        },
+        {
+            take: { colour: true, comp: 'guitar' },
+            claims: [['compWrittenTension', 0.9, 1, 'and in the grip the guitar fingers']],
+        },
+        {
             take: {},
             claims: [
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
