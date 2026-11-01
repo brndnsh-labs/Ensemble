@@ -523,6 +523,12 @@
         padding: 0;
         border: 0;
     }
+    /* 12px chips are wider, so the row wraps rather than run a chip off a narrow screen (#1993):
+       at 320px with the instrument chip (#1992) it had ~12px to spare, less than CI's WebKit. */
+    .band-controls {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
     /* 12px, the floor for text a thumb reads (#1993): the mute chips were 9px here. */
     .band-toggle {
         padding: 7px 6px;
