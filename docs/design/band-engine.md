@@ -456,8 +456,20 @@ schedules everything due in the next 150 ms on a 25 ms timer.
   tail does) instead of being cut. A chord a bar's last strike pushed ahead is tied into the
   bar after it only if that bar opens on the same chord: the comp remembers which chord it
   pushed (`CompMemory.pushed`, `tiedFromPush`), and otherwise strikes the bar as written
-  (#1507). There is no section practice loop: it was retired in #1528 (DECISION 2026-10-07),
-  with the host's lap and release paths and the band's `leadsInto` input. `render()` builds the
+  (#1507). The section practice loop retired in #1528 (DECISION 2026-10-07), with the host's
+  lap and release paths and the band's `leadsInto` input, came back in #1989 as a derived
+  chart (DECISION 2026-11-01) and none of that machinery: `web/lib/section-loop.ts` builds a
+  score holding just the section, and the host plays it as any chart that repeats, so a lap's
+  fills into its own top are the looping chart's wrap (#2009's rules: an 8-bar section fills
+  and crashes every lap, a shorter one counts its laps). Cleared while playing, the band
+  carries on into the full chart without stopping (`BandHost.carryOn`): from the first barline
+  it can still change at (after the lookahead and every note sent, `update()`'s rule), it plays
+  the full chart's bar holding the same written bar (`loopEntry`; the top of the next lap is
+  the section's top), so the bars already generated lead into the chord that really follows
+  them, and the engine's memory crosses the seam rebased to the new ticks. Each segment keeps
+  the timeline it plays (`Segment.timeline`), and what it carries on into is data on the
+  segment (`carry`), not a flag spent once, so a follow-on dropped and rebuilt by a settings
+  change still goes there. `render()` builds the
   export the same chorus at a time, so it is exactly the performance that plays.
 
 A pass is generated on the main thread, two seconds before it is needed: about 8 ms for 32

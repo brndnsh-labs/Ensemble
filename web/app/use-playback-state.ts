@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction, useEffect, useEffectEvent, useState } from 'react';
 import { flushSync } from 'react-dom';
+import type { BandChart } from '../lib/band-chart';
 import * as runtime from '../lib/runtime';
 
 /** What the shell hands `usePlaybackState`. */
@@ -35,6 +36,14 @@ interface PlaybackState {
     nextSoon: boolean;
     /** In the active slot's last felt pulse: the neck's chord-change cue. */
     changeSoon: boolean;
+    /**
+     * The chart view the playhead's slot indexes (`runtime.bandChartView`), read in the same
+     * paint as `active`: a section loop cleared mid-play (#1989) changes it at a barline, so the
+     * stand reads the view again when this changes.
+     */
+    chartView: BandChart | null;
+    /** The section being looped (#1989), for the transport's chip; null when none is. */
+    looped: { id: string; label: string } | null;
     /** A `?autoplay=1` link is armed, waiting for the first gesture. */
     pendingAutoplay: boolean;
     /** The shared-link effect arms it. */
@@ -49,6 +58,7 @@ function samePlace(a: runtime.PerformancePlace, b: runtime.PerformancePlace): bo
         a.pass === b.pass &&
         a.barChorus === b.barChorus &&
         a.bar === b.bar &&
+        a.lap === b.lap &&
         a.tradeKey === b.tradeKey &&
         a.trading === b.trading
     );
@@ -89,6 +99,10 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
     // #1990 — which chorus, and whose turn: read off the same tick as the slot, and set only
     // when it changes (a few times a minute), so it costs a frame nothing.
     const [place, setPlace] = useState<runtime.PerformancePlace | null>(null);
+    // #1989 — the view the slot is read from, and the loop the transport's chip names: read on
+    // the same poll, set only when they change.
+    const [chartView, setChartView] = useState<BandChart | null>(null);
+    const [looped, setLooped] = useState<{ id: string; label: string } | null>(null);
 
     useEffect(() => {
         // The stand follows the performance every animation frame while it plays (#1240), reading
@@ -112,7 +126,13 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
             // read separately once showed the bar just left with the new bar's cue.
             const tick = playingNow ? runtime.songTick() : null;
             const slot = runtime.playheadSlot(tick);
+            const view = runtime.bandChartView();
+            const loop = runtime.loopedSection();
             commit(() => {
+                setChartView(view);
+                setLooped((previous) =>
+                    previous?.id === loop?.id && previous?.label === loop?.label ? previous : loop,
+                );
                 setPlaying(playingNow);
                 // No slot while counting in or between two queued segments: the pointer holds.
                 setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
@@ -198,6 +218,8 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
         playbackPending,
         setPlaybackPending,
         active,
+        chartView,
+        looped,
         setActive,
         countInBeat,
         place,

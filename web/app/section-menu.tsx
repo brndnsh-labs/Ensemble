@@ -21,6 +21,8 @@ interface SectionMenuProps {
     closer: RefObject<((refocus: boolean) => void) | null>;
     /** Each action takes what a field still holds uncommitted (`pending`) with it. */
     onStartHere: (pending: SectionChange[]) => void;
+    /** Loop (#1989): the band plays just this section, over and over. */
+    onLoop: (pending: SectionChange[]) => void;
     onChange: (changes: SectionChange[]) => void;
     onAddAfter: (pending: SectionChange[]) => void;
     onDelete: (pending: SectionChange[]) => void;
@@ -40,7 +42,7 @@ interface SectionMenuProps {
  * with it, as one change: on WebKit a press does not take focus, so the field is still focused
  * when the action runs, and its own commit then would turn the action away (#1726 review).
  *
- * Calm by default (#1758): Start here and the section actions are single rows, the settings are
+ * Calm by default (#1758): Start here, Loop (#1989) and the section actions are single rows, the settings are
  * two folded groups (name and plays; key, mode or meter), and Delete section is last, after a
  * divider. On a phone it slides up over a light backdrop, its Close in the heading row.
  */
@@ -52,6 +54,7 @@ export function SectionMenu({
     anchor,
     closer,
     onStartHere,
+    onLoop,
     onChange,
     onAddAfter,
     onDelete,
@@ -196,6 +199,20 @@ export function SectionMenu({
                     }}
                 >
                     Start here
+                </button>
+                <button
+                    type="button"
+                    className="bar-menu-item"
+                    aria-disabled={busy || undefined}
+                    onClick={() => {
+                        if (!busy) {
+                            const changes = take();
+                            close(true);
+                            onLoop(changes);
+                        }
+                    }}
+                >
+                    Loop
                 </button>
                 <hr />
                 <details className="bar-menu-details section-menu-names">

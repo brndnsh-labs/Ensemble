@@ -339,6 +339,8 @@ export default function Ensemble() {
         playbackPending,
         setPlaybackPending,
         active,
+        chartView,
+        looped,
         setActive,
         countInBeat,
         place,
@@ -743,7 +745,7 @@ export default function Ensemble() {
         totalBars,
         writtenBars,
         writtenSections,
-    } = useChartView(current, active, playing, countInSlot);
+    } = useChartView(current, active, playing, countInSlot, chartView);
     useFollowScroll(scroll, {
         following,
         active,
@@ -1921,6 +1923,27 @@ export default function Ensemble() {
             setSoundProgress('');
         });
     }
+    // The section menu's "Loop" (#1989): the band plays just this section, over and over. From
+    // the section's menu in Edit, a name or count still in its field goes in first, as Start
+    // here's does.
+    function loopSection(id: string | undefined, pending: readonly SectionChange[] = []) {
+        if (!id) {
+            return;
+        }
+        setFollowing(true);
+        runtime.warmAudio();
+        void run(async () => {
+            if (pending.length > 0) {
+                applyScore(withSectionChanges(updateChart().chart.score, id, pending));
+            }
+            await runtime.loopSection(id, soundSink);
+            setSoundProgress('');
+        });
+    }
+    /** The transport's "Looping B ×": the band carries on into the chart at a barline. */
+    function clearLoop() {
+        runtime.clearLoop();
+    }
     /** Into the editor: the one way `editing` turns on. It overlays the stand mode (#1587)
      * without changing it, so leaving the editor by any path returns to Chart or Neck. */
     function showEditor() {
@@ -2874,6 +2897,7 @@ export default function Ensemble() {
         applyScore,
         updateChart,
         startHereSection,
+        loopSection,
         closeSongMenus,
         offerUndo,
     });
@@ -3407,6 +3431,8 @@ export default function Ensemble() {
                         playbackActive={playbackActive}
                         countInBeat={countInBeat}
                         place={place}
+                        looped={looped}
+                        onClearLoop={clearLoop}
                         onPlayToggle={togglePlayback}
                         onBand={() => openBand(lastBandTab.current)}
                         bandTab={bandTab}
@@ -3616,6 +3642,7 @@ export default function Ensemble() {
                                         turns={turns}
                                         songReadout={songReadout}
                                         onStartHere={(id) => startHereSection(id)}
+                                        onLoop={(id) => loopSection(id)}
                                         barEdit={barEditing()}
                                         sectionEdit={sectionEditing()}
                                         onAudition={(index) => runtime.audition(index)}

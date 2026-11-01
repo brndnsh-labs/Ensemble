@@ -15,6 +15,10 @@ interface TransportBarProps {
     countInBeat: number | null;
     /** Which chorus the band is in (#1990), or null when stopped. */
     place: PerformancePlace | null;
+    /** The section being looped (#1989), or null; its chip ends the loop. */
+    looped: { id: string; label: string } | null;
+    /** Ends the loop: playing, the band carries on into the chart at a barline. */
+    onClearLoop: () => void;
     onPlayToggle: () => void;
     onTempo: (bpm: number) => void;
     /** Whether the Key popover (#1757) is open. The shell holds it, so a refused meter can
@@ -48,6 +52,8 @@ export function TransportBar({
     playbackActive,
     countInBeat,
     place,
+    looped,
+    onClearLoop,
     onPlayToggle,
     onTempo,
     keyOpen,
@@ -99,6 +105,21 @@ export function TransportBar({
                     onCommit={onTempo}
                 />
                 {place && <ChorusCounter place={place} />}
+                {looped && (
+                    // A loop is a way of playing, not part of the chart: shown here while it is
+                    // set, stopped too (Play loops it again), and ended with its ×.
+                    <button
+                        type="button"
+                        className="loop-chip"
+                        aria-label={`Stop looping section ${looped.label}`}
+                        onClick={onClearLoop}
+                    >
+                        Looping {looped.label}
+                        <span className="loop-chip-x" aria-hidden="true">
+                            ×
+                        </span>
+                    </button>
+                )}
             </div>
             {/* The song's key, mode, meter and chord notation, one popover (#1757). The small
                 label above is the column's, as Tempo's and Style's are; the button's own name
@@ -220,7 +241,10 @@ function ChorusCounter({ place }: { place: PerformancePlace }) {
     const count = place.of === null ? `${place.chorus}` : `${place.chorus} / ${place.of}`;
     return (
         <span className="chorus-counter" data-testid="chorus-counter">
-            <span className="chorus-count">Chorus {count}</span>
+            {/* A section loop's times round are laps of it, not choruses of the song (#1989). */}
+            <span className="chorus-count">
+                {place.lap ? 'Lap' : 'Chorus'} {count}
+            </span>
             {place.part && <span className="chorus-part">{place.part}</span>}
         </span>
     );

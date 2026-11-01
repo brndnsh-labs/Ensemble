@@ -12,6 +12,9 @@
  *     chorus per segment, then stops (`HostOptions.onEnd`).
  *   - A change to the band (style, intensity, lanes, swing…) regenerates from the next
  *     barline, resuming from the engine's memory snapshot at that bar.
+ *   - `carryOn` hands the band another chart to go on in from a barline (a section loop
+ *     cleared, #1989). Each segment keeps the timeline it was played from, and what it carries
+ *     on into is data on the segment itself (`Segment.carry`), never a flag spent once.
  *   - A 25 ms timer schedules everything that starts within the next 150 ms.
  *
  * It never writes engine state; the runtime owns every dispatch.
@@ -79,8 +82,29 @@ const BASS_MUTE = 0.85;
 const PALM_MIN_S = 0.08;
 const PALM_MAX_S = 0.13;
 
+/**
+ * Another chart the band goes on in (`BandHost.carryOn`): its timeline, whether it counts its
+ * choruses, and where in it the band goes on from the old chart's bar `bar` (a barline; the old
+ * chart's bar count is the top of its next pass), or null where it cannot go on.
+ */
+interface Carry {
+    timeline: Timeline;
+    counted: boolean;
+    entry: (bar: number) => number | null;
+}
+
 /** What one segment plays: `performPass`'s options, less the memory it resumes from. */
 interface SegmentPlan {
+    /** The chart's timeline this segment plays: every tick in it is in this timeline. */
+    timeline: Timeline;
+    /** That chart counts its choruses (#1475). */
+    counted: boolean;
+    /**
+     * The chart the band goes on in after this segment, when it is not this one's own next bar
+     * (`carryOn`). Kept on the segment, so a follow-on dropped and built again (`update()`)
+     * still goes where the first one did (#1484).
+     */
+    carry?: Carry;
     pass: number;
     window: PassWindow;
     /** One past the last bar played: the window's end, or the end of a counted chorus. */
@@ -313,6 +337,13 @@ export class BandHost {
     private bpm = 120;
     private segments: Segment[] = [];
     private timer: ReturnType<typeof setInterval> | null = null;
+    /**
+     * The timeline of the segment `songTick()` last read the clock in: what the stand is shown
+     * is in it, so the bar questions asked of that same tick (`placeAt`, `inLastPulse`,
+     * `roleAt`…) read the same chart even while a carried-on chart is queued (#1506's one-read
+     * rule). Null while stopped.
+     */
+    private heard: Timeline | null = null;
     /** The barline where the last settings change is first heard, while it is still to come. */
     private change: { segment: Segment; tick: number } | null = null;
     /** The one-bar count-in scheduled by `start()`, while it is still sounding. */
@@ -353,6 +384,63 @@ export class BandHost {
             // The form changed under the band: restart the song cleanly.
             this.start(this.settings, this.bpm, 0);
         }
+    }
+
+    /**
+     * Go on in another chart from a barline, without stopping (#1989: a section loop cleared
+     * mid-play carries on into the full form). Stopped, this is `setScore`.
+     *
+     * The barline is the first one the band can still change at, as `update()` finds it: after
+     * the lookahead and after every note already sent to the voices. From there the band plays
+     * `score` from `entry(bar)` — the caller's mapping of the old chart's barline to the new
+     * chart's bar — searching on to later barlines while `entry` answers null. The bars before
+     * it play on as they were generated, so `entry` must name a bar that plays the same written
+     * bar the old chart would have (a push or a fill in them aims at its chord). The engine's
+     * memory goes with the band across the seam (`performPass` rebases it to the new ticks).
+     *
+     * Nothing waits here: the queue is cut at that barline and the segment before it carries
+     * the new chart as data (`SegmentPlan.carry`), so a settings change, a tempo change or a
+     * follow-on built again finds it there.
+     */
+    carryOn(
+        score: SemanticScore,
+        compiled: Timeline | undefined,
+        entry: (bar: number) => number | null,
+    ): void {
+        const key = JSON.stringify(score);
+        const timeline = compiled ?? compileTimeline(score);
+        const carry: Carry = { timeline, counted: score.choruses !== undefined, entry };
+        const audio = this.audio;
+        if (!this.playing || !audio || !this.settings) {
+            this.setScore(score, timeline);
+            return;
+        }
+        this.scoreKey = key;
+        this.timeline = timeline;
+        this.counted = carry.counted;
+        const now = audio.currentTime;
+        const horizon = now + LOOKAHEAD_S;
+        const atHorizon = this.current(horizon) ?? this.segments[this.segments.length - 1];
+        const sent = this.underWay(now) ?? atHorizon;
+        const current =
+            this.segments.indexOf(sent) > this.segments.indexOf(atHorizon) ? sent : atHorizon;
+        if (!current) {
+            this.start(this.settings, this.bpm, 0);
+            return;
+        }
+        // Everything after the current segment is built again, from its carry (`followOn`).
+        this.segments.length = this.segments.indexOf(current) + 1;
+        // A bar after the segment's first, so the cut never leaves it empty: a segment nothing
+        // has been sent from yet still plays its first bar in the chart it was built from.
+        const at = Math.max(this.changeBar(current, horizon), current.window.from + 1);
+        for (let bar = at; bar < current.until; bar++) {
+            if (entry(bar) !== null) {
+                this.cut(current, bar);
+                break;
+            }
+        }
+        current.carry = carry;
+        current.ends = false;
     }
 
     /**
@@ -433,17 +521,8 @@ export class BandHost {
      * the segment has no barline left to change at.
      */
     private regenerate(current: Segment, settings: BandSettings, horizon: number): number | null {
-        const timeline = this.timeline!;
-        let cutoffBar = this.barAt(this.tickAt(current, horizon), true);
-        if (current.cursor > 0) {
-            // A note pushed ahead of a barline is sent while the barline is still beyond the
-            // horizon. Its bar plays on as it was: regenerated, its own twin of that note would
-            // sound again. Events are in tick order, so the last one sent is the latest.
-            cutoffBar = Math.max(
-                cutoffBar,
-                this.barAt(current.events[current.cursor - 1].tick) + 1,
-            );
-        }
+        const { timeline } = current;
+        const cutoffBar = this.changeBar(current, horizon);
         if (cutoffBar >= current.until) {
             return null;
         }
@@ -502,7 +581,8 @@ export class BandHost {
         const tick = now > current.start ? this.tickAt(current, now) : current.from;
         const lead = now > current.start ? 0 : current.start - now;
         this.bpm = bpm;
-        current.start = now + lead - (this.secondsTo(tick) - this.secondsTo(current.from));
+        current.start =
+            now + lead - (this.secondsIn(current, tick) - this.secondsIn(current, current.from));
         for (let i = 1; i < this.segments.length; i++) {
             this.segments[i].start = this.endTime(this.segments[i - 1]);
         }
@@ -528,7 +608,19 @@ export class BandHost {
         }
         const now = audio.currentTime;
         const segment = this.segments.find((s) => s.start <= now && now < this.endTime(s));
-        return segment ? this.tickAt(segment, now) : null;
+        if (!segment) {
+            return null;
+        }
+        this.heard = segment.timeline;
+        return this.tickAt(segment, now);
+    }
+
+    /**
+     * The timeline the stand is reading: the one `songTick()` last found sounding, else the
+     * chart the band was handed. A caller picks the chart view drawn from the same timeline.
+     */
+    heardTimeline(): Timeline | null {
+        return this.heard ?? this.timeline;
     }
 
     /**
@@ -539,8 +631,7 @@ export class BandHost {
      */
     placeAt(tick: number): { bar: number; pass: number } | null {
         const audio = this.audio;
-        const bar = this.barContaining(tick);
-        if (!audio || !this.playing || !bar) {
+        if (!audio || !this.playing) {
             return null;
         }
         const now = audio.currentTime;
@@ -548,7 +639,8 @@ export class BandHost {
         if (!segment || tick < segment.from || tick >= segment.to) {
             return null;
         }
-        return { bar: bar.index, pass: segment.pass + bar.visit.chorus };
+        const bar = barAtTick(segment.timeline, tick);
+        return bar && { bar: bar.index, pass: segment.pass + bar.visit.chorus };
     }
 
     /** What the band's trade is now (partner, turn length, lanes), to tell when a turn plan changed. */
@@ -559,12 +651,13 @@ export class BandHost {
 
     /** Which chorus of a counted performance performed bar `index` is in (0 when uncounted). */
     chorusOf(index: number): number {
-        return this.timeline?.bars[index]?.visit.chorus ?? 0;
+        return this.heardTimeline()?.bars[index]?.visit.chorus ?? 0;
     }
 
     /** The lead's job at performed bar `index` of the band's `pass`: the plan's own answer. */
     roleAt(index: number, pass: number): LeadRole | null {
-        const { timeline, settings } = this;
+        const { settings } = this;
+        const timeline = this.heardTimeline();
         return timeline && settings
             ? leadRoleAt(
                   timeline,
@@ -587,7 +680,7 @@ export class BandHost {
      * same tick the moment a beat is at least `leadMs` long.
      *
      * A method here rather than on `BandChart` (`bars`/`barAt`, `lib/band-chart.ts`) because
-     * this reads `this.timeline`, the one the band is playing.
+     * this reads the timeline the band is playing (`heardTimeline`).
      */
     inLastPulse(tick: number, leadMs = 600): boolean {
         const bar = this.barContaining(tick);
@@ -642,7 +735,8 @@ export class BandHost {
 
     /** The performed bar `tick` falls in, or null past either end of the timeline. */
     private barContaining(tick: number): Timeline['bars'][number] | null {
-        return this.timeline ? barAtTick(this.timeline, tick) : null;
+        const timeline = this.heardTimeline();
+        return timeline ? barAtTick(timeline, tick) : null;
     }
 
     /**
@@ -702,6 +796,7 @@ export class BandHost {
 
     private halt(): void {
         this.change = null;
+        this.heard = null;
         // A Stop inside the count-in: its later clicks are already scheduled, so cancel them.
         for (const osc of this.countIn?.clicks ?? []) {
             try {
@@ -718,8 +813,8 @@ export class BandHost {
         this.segments = [];
     }
 
-    private barAt(tick: number, after = false): number {
-        const bars = this.timeline!.bars;
+    private barAt(tick: number, after = false, timeline = this.timeline!): number {
+        const { bars } = timeline;
         const index = bars.findIndex((b) =>
             after ? b.start >= tick : b.start + b.meter.barTicks > tick,
         );
@@ -735,13 +830,21 @@ export class BandHost {
      * one chorus, not of the song). Every chorus is pass 0, whatever `pass` says: its chorus
      * number is its time through (`PassOptions.pass`).
      */
-    private songPlan(fromBar: number, origin: number, pass = 0): SegmentPlan {
-        const bars = this.timeline!.bars;
+    private songPlan(
+        fromBar: number,
+        origin: number,
+        pass = 0,
+        timeline = this.timeline!,
+        counted = this.counted,
+    ): SegmentPlan {
+        const { bars } = timeline;
         const from = Math.min(fromBar, bars.length - 1);
-        if (!this.counted) {
+        if (!counted) {
             // At most `PASS_CHUNK_BARS` at a time, resuming the same pass (#1665): a long
             // chart's whole pass at once blocked the page for seconds on Play.
             return {
+                timeline,
+                counted,
                 pass,
                 window: { from, to: bars.length, origin: Math.min(origin, from) },
                 until: Math.min(from + PASS_CHUNK_BARS, bars.length),
@@ -753,6 +856,8 @@ export class BandHost {
             until++;
         }
         return {
+            timeline,
+            counted,
             pass: 0,
             window: { from, to: bars.length, origin },
             until,
@@ -771,24 +876,67 @@ export class BandHost {
      * not the one after it (#1500).
      */
     private followOn(last: Segment): SegmentPlan {
-        const origin = last.window.origin ?? last.window.from;
-        if (this.counted) {
-            return this.songPlan(last.until, origin);
+        const { carry, timeline, counted } = last;
+        // Carrying on in another chart (`carryOn`) from this barline: the start of a pass there,
+        // the band's first time through it, but no fresh start — origin 0 makes its first bar a
+        // continuation, so it still crashes into a section top and answers the fill before it.
+        const into = carry?.entry(last.until) ?? null;
+        if (carry && into !== null) {
+            return this.songPlan(into, 0, 0, carry.timeline, carry.counted);
         }
+        const origin = last.window.origin ?? last.window.from;
         // The rest of this pass, a chunk at a time, then the next pass from the top.
-        return last.until < this.timeline!.bars.length
-            ? this.songPlan(last.until, origin, last.pass)
-            : this.songPlan(0, 0, last.pass + 1);
+        const plan = counted
+            ? this.songPlan(last.until, origin, 0, timeline, counted)
+            : last.until < timeline.bars.length
+              ? this.songPlan(last.until, origin, last.pass, timeline, counted)
+              : this.songPlan(0, 0, last.pass + 1, timeline, counted);
+        // Not at this barline: the next segment carries the other chart on to the next one.
+        return carry ? { ...plan, carry } : plan;
+    }
+
+    /**
+     * The first barline in `current` the band can still change at: the first after `horizon`,
+     * and after every note already sent to the voices (#1499).
+     */
+    private changeBar(current: Segment, horizon: number): number {
+        const { timeline } = current;
+        let bar = this.barAt(this.tickAt(current, horizon), true, timeline);
+        if (current.cursor > 0) {
+            // A note pushed ahead of a barline is sent while the barline is still beyond the
+            // horizon. Its bar plays on as it was: regenerated, its own twin of that note would
+            // sound again. Events are in tick order, so the last one sent is the latest.
+            bar = Math.max(
+                bar,
+                this.barAt(current.events[current.cursor - 1].tick, false, timeline) + 1,
+            );
+        }
+        return bar;
+    }
+
+    /**
+     * End `segment` at bar `bar`'s barline (a bar after its first): the bars before it play on
+     * exactly as generated, and what follows is built from the memory before that bar.
+     */
+    private cut(segment: Segment, bar: number): void {
+        const tick = segment.timeline.bars[bar].start;
+        // Every note sent is before the barline (`changeBar`), so the cursor stays valid.
+        segment.events = segment.events.filter((e) => e.tick < tick);
+        segment.chordSizes = chordSizes(segment.events);
+        segment.legato = legatoLeads(segment.events);
+        segment.until = bar;
+        segment.to = tick;
+        segment.memoryAfter = segment.snapshots[bar];
     }
 
     private append(plan: SegmentPlan, start: number, memory: PassMemory | undefined): void {
-        const timeline = this.timeline!;
+        const { timeline } = plan;
         const result = performPass(timeline, this.settings!, { ...plan, memory });
         const from = timeline.bars[plan.window.from].start;
         const last = timeline.bars[plan.until - 1];
         this.segments.push({
             ...plan,
-            ends: !plan.looping && plan.until >= timeline.bars.length,
+            ends: !plan.carry && !plan.looping && plan.until >= timeline.bars.length,
             from,
             to: last.start + last.meter.barTicks,
             start,
@@ -803,16 +951,19 @@ export class BandHost {
         });
     }
 
-    private secondsTo(tick: number): number {
-        return secondsAt(this.timeline!, tick, this.bpm);
+    /** Seconds to song tick `tick` of the chart `segment` plays. */
+    private secondsIn(segment: Segment, tick: number): number {
+        return secondsAt(segment.timeline, tick, this.bpm);
     }
 
     private endTime(segment: Segment): number {
-        return segment.start + this.secondsTo(segment.to) - this.secondsTo(segment.from);
+        return this.timeOf(segment, segment.to);
     }
 
     private timeOf(segment: Segment, tick: number): number {
-        return segment.start + this.secondsTo(tick) - this.secondsTo(segment.from);
+        return (
+            segment.start + this.secondsIn(segment, tick) - this.secondsIn(segment, segment.from)
+        );
     }
 
     /** The segment playing at `time` (or the first one still to come). */
@@ -916,7 +1067,7 @@ export class BandHost {
             time,
             durationSeconds,
             segment.chordSizes.get(event.tick) ?? 1,
-            this.timeline!,
+            segment.timeline,
             segment.legato.has(event),
         );
     }
@@ -924,8 +1075,8 @@ export class BandHost {
     /** The click: a beep on each pulse, accented on the downbeat. Same voice as the old engine. */
     private metronome(state: EnsembleState, segment: Segment, now: number, horizon: number): void {
         const audio = this.audio;
-        const timeline = this.timeline;
-        if (!state.playback.metronome || !audio || !timeline) {
+        const { timeline } = segment;
+        if (!state.playback.metronome || !audio) {
             return;
         }
         for (let b = segment.window.from; b < segment.until; b++) {

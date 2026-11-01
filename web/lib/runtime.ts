@@ -77,6 +77,7 @@ import {
 import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
 import { checkPlayable } from './engine-mode';
 import { genreSwing } from './genre-swing';
+import { loopEntry, loopScore, loopView } from './section-loop';
 import {
     countInPreference,
     masterVolumePreference,
@@ -195,9 +196,45 @@ let songMinutes: SongMinutes | null = null;
  */
 let songPlan: (SongPlan & { view: BandChart; minutes: SongMinutes }) | null = null;
 
-/** The chart view of what the band plays: the song-mode performance, else the open chart. */
+/**
+ * A section loop (#1989, `section-loop.ts`): the chart holding just that section, which the band
+ * plays as an ordinary chart repeating continuously, and the stand's view of it. A derived chart
+ * like `songPlan`, and like it session-only: never a state field, never saved, and the band host
+ * holds no loop state of its own. Set by `loopSection`; kept through Stop, so Play loops it
+ * again (the transport says so while it is set); built again from an edited chart; cleared by
+ * `clearLoop`, "Start here" and opening another chart. Exclusive with song mode: a loop is never
+ * counted.
+ */
+interface LoopPlan {
+    sectionId: string;
+    label: string;
+    score: SemanticScore;
+    timeline: Timeline;
+    view: BandChart;
+}
+let loopPlan: LoopPlan | null = null;
+/**
+ * A loop cleared while the band plays (`clearLoop`): the bars already under way in it play on
+ * before the band carries on in the chart (`BandHost.carryOn`), so the stand still draws them
+ * from its view until then. Dropped when the band stops or starts again.
+ */
+let leftLoop: { timeline: Timeline; view: BandChart } | null = null;
+
+/**
+ * The chart view of what the band plays: the one drawn from the timeline the stand's last clock
+ * read found sounding (`BandHost.heardTimeline`, so the playhead and the view never come from two
+ * charts across a loop's seam), else the loop, the song-mode performance, or the open chart.
+ */
 function playedView(): BandChart | null {
-    return songPlan?.view ?? bandView;
+    const heard = band?.playing ? band.heardTimeline() : null;
+    if (heard) {
+        for (const plan of [loopPlan, leftLoop, songPlan]) {
+            if (plan?.timeline === heard) {
+                return plan.view;
+            }
+        }
+    }
+    return loopPlan?.view ?? songPlan?.view ?? bandView;
 }
 
 /** What song mode would play if Play were pressed now, or null when it would not apply. */
@@ -224,6 +261,10 @@ function bandHost(): BandHost {
  * heard.
  */
 function handScore(host: BandHost): void {
+    if (loopPlan) {
+        host.setScore(loopPlan.score, loopPlan.timeline);
+        return;
+    }
     if (songPlan) {
         host.setScore(songPlan.score, songPlan.timeline);
         return;
@@ -293,9 +334,11 @@ function startBand(freshPlay = false): void {
     const host = bandHost();
     const state = getState();
     const { arranger, playback } = state;
-    if (!host.playing && !songPlan) {
+    // A loop is never counted: song mode plans only a performance of the chart itself.
+    if (!host.playing && !songPlan && !loopPlan) {
         planPerformance();
     }
+    leftLoop = null;
     handScore(host);
     // The same take-to-take rule as the old engine: a fresh seed per play unless locked —
     // and the fresh one is recorded, so locking it later reproduces the take you heard.
@@ -362,6 +405,7 @@ const DRUM_WARM_SLICE_MS = 4;
 function stopBand(ringOut = false): void {
     band?.stop();
     songPlan = null;
+    leftLoop = null;
     if (getState().playback.isPlaying) {
         param('playback', 'isPlaying', false);
     }
@@ -407,6 +451,8 @@ export interface PerformancePlace {
     barChorus: number;
     /** The performed bar sounding, so a bar played twice shows the turn of the visit heard. */
     bar: number;
+    /** The band is going round a section loop (#1989): `chorus` counts its laps. */
+    lap: boolean;
     /** The band's trade settings now: a change mid-play replans the turns. */
     tradeKey: string;
     /** The bar sounding is in a traded stretch. */
@@ -425,7 +471,10 @@ export function performancePlace(tick: number | null): PerformancePlace | null {
         return null;
     }
     const role = band.roleAt(at.bar, at.pass);
-    const of = songPlan?.choruses ?? currentScore?.choruses ?? null;
+    // A loop's laps, by the view of the timeline sounding: the bars of a cleared loop still
+    // under way are laps too, the chart's bars after them are not.
+    const lap = view === loopPlan?.view || view === leftLoop?.view;
+    const of = lap ? null : (songPlan?.choruses ?? currentScore?.choruses ?? null);
     const barChorus = band.chorusOf(at.bar);
     let part: string | null = null;
     if (of !== null && of > 1 && role && getState().soloist.enabled) {
@@ -442,6 +491,7 @@ export function performancePlace(tick: number | null): PerformancePlace | null {
         pass: at.pass,
         barChorus,
         bar: at.bar,
+        lap,
         tradeKey: band.tradeKey(),
         trading: role?.kind === 'trade',
     };
@@ -787,6 +837,8 @@ export async function startSection(
     sectionId: string,
     progress: SoundProgress = () => {},
 ): Promise<boolean> {
+    // Starting somewhere in the song leaves a section loop: the band plays the chart from there.
+    loopPlan = null;
     const view = playedView();
     const bounds = view && sectionSteps(view, sectionId);
     if (!bounds) {
@@ -810,6 +862,90 @@ export async function startSection(
     dispatch(ACTIONS.SET_START_STEP, start.start);
     startBand(true);
     return true;
+}
+
+/** Said when a section cannot be looped on its own. */
+export const LOOP_UNAVAILABLE = "This section can't be looped on its own.";
+
+/**
+ * The section loop for `sectionId` of the open chart (`section-loop.ts`), or null when it cannot
+ * be played on its own.
+ */
+function buildLoop(sectionId: string): LoopPlan | null {
+    if (!currentScore || !bandView) {
+        return null;
+    }
+    const score = loopScore(currentScore, sectionId);
+    if (!score) {
+        return null;
+    }
+    const timeline = compileTimeline(score);
+    const view = loopView(bandView, bandChart(score, timeline), sectionId);
+    const label = currentScore.sections.find((section) => section.id === sectionId)?.label ?? '';
+    return view && { sectionId, label, score, timeline, view };
+}
+
+/**
+ * The section menu's "Loop" (#1989): the band plays just this section, over and over, from its
+ * top. Stopped, it starts as Play does (sounds prepared, the count-in per its preference);
+ * playing, it starts the loop at once, as "Start here" restarts the band. Throws
+ * {@link LOOP_UNAVAILABLE} for a section that cannot be played on its own.
+ */
+export async function loopSection(
+    sectionId: string,
+    progress: SoundProgress = () => {},
+): Promise<void> {
+    const plan = buildLoop(sectionId);
+    if (!plan) {
+        throw new Error(LOOP_UNAVAILABLE);
+    }
+    if (getState().playback.isPlaying) {
+        loopPlan = plan;
+        songPlan = null;
+        dispatch(ACTIONS.SET_START_STEP, 0);
+        startBand();
+        return;
+    }
+    bringUpAudio();
+    const intent = ++playIntent;
+    await prepareSounds(captureContent(), progress);
+    if (intent !== playIntent) {
+        return;
+    }
+    loopPlan = plan;
+    dispatch(ACTIONS.SET_START_STEP, 0);
+    startBand(true);
+}
+
+/**
+ * The transport's "Looping B ×" (#1989): the loop ends. Playing, the band carries on into the
+ * chart without stopping (DECISION 2026-11-01): from the first barline it can still change at,
+ * it plays the chart's bar holding the same written bar (`loopEntry`), so it finishes the section
+ * it is in and goes on into the next one. Stopped, the next Play plays the chart.
+ */
+export function clearLoop(): void {
+    const plan = loopPlan;
+    loopPlan = null;
+    if (!plan || !band?.playing || !currentScore) {
+        return;
+    }
+    const full =
+        currentTimeline?.score === currentScore
+            ? currentTimeline.timeline
+            : compileTimeline(currentScore);
+    const entry = loopEntry(full, plan.timeline, plan.sectionId);
+    if (!entry) {
+        // The section is not in the form the chart performs: play the chart from its top.
+        startBand();
+        return;
+    }
+    leftLoop = plan;
+    band.carryOn(currentScore, full, entry);
+}
+
+/** The section being looped (#1989), for the transport's chip; null when none is. */
+export function loopedSection(): { id: string; label: string } | null {
+    return loopPlan && { id: loopPlan.sectionId, label: loopPlan.label };
 }
 
 export async function toggle(progress: SoundProgress): Promise<void> {
@@ -1033,9 +1169,22 @@ function exportScore(host: BandHost): SongPlan | null {
     if (plan) {
         host.setScore(plan.score, plan.timeline);
     } else {
-        handScore(host);
+        const score = scoreForBand();
+        host.setScore(
+            score,
+            currentTimeline?.score === score ? currentTimeline.timeline : undefined,
+        );
     }
     return plan;
+}
+
+/**
+ * The host an export renders on: the live band's, unless it holds a section loop (#1989). An
+ * export is the song, never the loop, and handing the live band the song would restart it, so
+ * that export renders on a host of its own: it needs no audio, only the chart.
+ */
+function exportHost(): BandHost {
+    return loopPlan ? new BandHost({ state: getState, silence: () => {} }) : bandHost();
 }
 
 /**
@@ -1205,6 +1354,8 @@ export function load(document: ChartDocument): void {
     const checked = validateDocument(document);
     const timeline = checkPlayable(checked.chart.score);
     stop();
+    // Another chart: a section loop is the open chart's.
+    loopPlan = null;
     const previous = captureSession();
     loading = true;
     try {
@@ -1482,6 +1633,8 @@ export function editScore(score: SemanticScore): void {
     try {
         const { performance, band } = before;
         apply({ score, performance, band }, timeline);
+        // A section loop goes on with the edited section, or ends with a deleted one.
+        loopPlan = loopPlan && buildLoop(loopPlan.sectionId);
         rebuild();
     } catch (error) {
         apply(before);
@@ -1557,7 +1710,7 @@ function exportSettings(plan: SongPlan | null): ReturnType<typeof bandSettings> 
  * so it never touches the live band or the audio graph — safe while the band is playing.
  */
 export async function exportMidi(filename: string): Promise<void> {
-    const host = bandHost();
+    const host = exportHost();
     const settings = exportSettings(exportScore(host));
     const { events, timeline } = await host.render(settings);
     const bytes = toMidi(events, timeline, {
@@ -1619,7 +1772,7 @@ export async function exportAudio(
     if (intent !== exportIntent) {
         return;
     }
-    const host = bandHost();
+    const host = exportHost();
     const plan = exportScore(host);
     const bpm = getState().playback.bpm;
     if (kind === 'mix') {
@@ -1674,7 +1827,9 @@ export function state(): EnsembleState {
 
 /**
  * The band's view of what it plays: the open score, or during a song-mode performance its
- * counted copy (`songPlan`) — so a reader must read it again when playback starts and stops.
+ * counted copy (`songPlan`), or a section loop (#1989) — so a reader must read it again when
+ * playback starts and stops, and when the view the poll last read changes (a loop cleared mid-play
+ * changes it at the barline the band carries on from).
  * Null before a chart is open.
  */
 export function bandChartView(): BandChart | null {
