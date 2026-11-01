@@ -69,8 +69,9 @@ export function fillStart(ctx: BarContext, book: DrumBook): number | null {
     // Sized by where the music is going: the bigger tier of this bar and the one it leads into.
     const tier = fillTier(plan.energy, ctx.next?.plan.energy ?? null);
     const sized = Math.min(book.fillLength[plan.fill][tier], total - 4);
-    // A short loop's next fill of a kind is the shorter pickup, then the full one again: a
-    // drummer vamping four bars doesn't play the same run each time (#2009).
+    // A short loop's fill at the smaller boundary (odd ordinal: 16, 48… bars) is the shorter
+    // pickup, and the full fill marks the bigger one (32, 64…): the size follows the form's
+    // hierarchy, so a drummer vamping four bars doesn't play the same run each time (#2009).
     const length = plan.fillOrdinal % 2 === 1 && sized >= 4 ? sized / 2 : sized;
     return length > 0 ? total - length : null;
 }
@@ -99,6 +100,7 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
         name: book.name,
         solos: Boolean(book.trade),
         init: () => null,
+        fillStart: (ctx) => fillStart(ctx, book),
         play(ctx) {
             const { bar, plan } = ctx;
             const total = barSteps(bar);

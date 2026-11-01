@@ -18,10 +18,10 @@ export interface BarPlan {
     /** The drummer's job at the end of this bar. */
     fill: Fill;
     /**
-     * Which of its kind this bar's fill is, counting a short loop's laps (`lapFill`): 0 for the
-     * first small fill (or first section fill) of the loop, 1 for the next. The drummer alternates
-     * the fill's size on it so consecutive laps don't play the same fill (#2009). Always 0 off a
-     * short loop, whose fills are not repeats of one another.
+     * How big a boundary a short loop's fill (`lapFill`) marks, as a count of its kind: odd is the
+     * smaller boundary (the drummer plays a pickup), even the bigger (the full fill), so the fill
+     * follows the form's hierarchy and consecutive laps don't repeat (#2009). 0 off a short loop,
+     * whose fills are not repeats of one another.
      */
     fillOrdinal: number;
     /** Crash on this bar's downbeat: a new section, or the downbeat after a phrase fill. */
@@ -80,12 +80,17 @@ function lapFill(lap: number, length: number): Fill {
     return crosses(16) ? 'section' : crosses(8) ? 'phrase' : 'none';
 }
 
-/** Which small fill or section fill of a short loop lap `lap` ends in (0 for the first). */
+/**
+ * How big a boundary lap `lap` ends on is, as a count of its kind: odd is the smaller boundary
+ * (a pickup), even the bigger (the full fill). Section fills fall on the 16-bar lines, so the
+ * 16, 48… are small and the 32, 64… (the next level up) are full; the small fills on the 8-bar
+ * lines the same way, the 8, 40… small and the 24, 56… full (the lead-in to the 32 line).
+ */
 function lapFillOrdinal(lap: number, length: number): number {
     const played = (lap + 1) * length;
     return lapFill(lap, length) === 'section'
-        ? Math.floor(played / 16) - 1
-        : Math.floor((Math.floor(played / 8) - 1) / 2);
+        ? Math.floor(played / 16)
+        : Math.floor((Math.floor(played / 8) - 1) / 2) + 1;
 }
 
 const TIER_ORDER: readonly EnergyTier[] = ['low', 'mid', 'high'];

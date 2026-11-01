@@ -71,6 +71,28 @@ describe('a short loop counts its laps toward 8- and 16-bar periods', () => {
         },
     );
 
+    it('the bigger boundary gets the full fill: 16 small, 32 full, 48 small, 64 full', () => {
+        const ordinals = lapPlans('rock').map((plans) => plans[3].fillOrdinal);
+        // Laps 1, 3, 5, 7 end at 8, 16, 24, 32… bars played (lap k ends at 4(k+1)).
+        expect([ordinals[3], ordinals[7]]).toEqual([1, 2]);
+        const sizes = (laps: number) =>
+            Array.from({ length: laps }, (_, pass) => {
+                const timeline = compileTimeline(LOOP);
+                const plans = planBars(
+                    timeline,
+                    { ...DEFAULT_SETTINGS, style: 'rock' },
+                    {
+                        pass,
+                        looping: true,
+                        window: fullWindow(timeline),
+                    },
+                );
+                return plans[3].fill === 'section' ? plans[3].fillOrdinal % 2 : null;
+            }).filter((x) => x !== null);
+        // Section fills at 16, 32, 48, 64: small (odd), full, small, full.
+        expect(sizes(16)).toEqual([1, 0, 1, 0]);
+    });
+
     it('a loop of 8 bars or more still fills every lap', () => {
         const timeline = compileTimeline(
             score([{ label: 'A', bars: Array(8).fill('C').join(' | ') }]),
