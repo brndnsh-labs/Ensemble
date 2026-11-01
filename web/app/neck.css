@@ -8,7 +8,7 @@
     font-family: inherit;
     user-select: none;
 }
-/* A phone's board follows the hand: the zoom slides when the window moves. */
+/* A zoomed board (phone, portrait) follows the hand: the zoom slides when the window moves. */
 .neck-zoom {
     transition: transform 0.3s ease;
 }

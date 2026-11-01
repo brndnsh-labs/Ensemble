@@ -1,3 +1,4 @@
+import type { ChartNotation } from '@core/songbook/types';
 import type { BandChart } from '../lib/band-chart';
 import type { NeckPreferences } from '../lib/session';
 import { NeckView } from './neck-view';
@@ -16,6 +17,7 @@ interface NeckStandProps {
     changeSoon: boolean;
     playing: boolean;
     onStrum: (midis: number[]) => void;
+    notation: ChartNotation;
 }
 
 export default function NeckStand({ band, stored, onPrefs, ...view }: NeckStandProps) {
