@@ -209,8 +209,10 @@ function problemOf(text: string, meter: string): string | null {
         return null;
     }
     const message = parsed.kind === 'invalid' ? parsed.issues[0].message : 'Cannot read this bar.';
-    const spelling = /^Unsupported chord spelling “(.*)”\.$/.exec(message);
-    return spelling ? `Can’t read “${spelling[1]}”` : message;
+    const spelling = /^Unsupported chord spelling “(.*)”\.(?: Try (.*)\.)?$/.exec(message);
+    return spelling
+        ? `Can’t read “${spelling[1]}”${spelling[2] ? `, try ${spelling[2]}` : ''}`
+        : message;
 }
 
 /** `problemOf` a pending bar; null when the bar has no draft. */

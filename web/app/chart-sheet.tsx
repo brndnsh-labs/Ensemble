@@ -681,6 +681,7 @@ export function ChartSheet({
                                             aria-invalid={problem ? true : undefined}
                                             value={barEdit?.text(measureId) ?? ''}
                                             maxLength={4000}
+                                            placeholder="Dm7 G7 · C:3 G7:1 · N.C. · /"
                                             readOnly={busy}
                                             spellCheck={false}
                                             autoCapitalize="off"
