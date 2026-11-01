@@ -381,6 +381,13 @@ export function grip(
     if (bottom !== null && !pcs.includes(bottom)) {
         pcs.push(bottom);
     }
+    // why: a close voicing gives its 5th's seat to a written tension (`voicingTones`), but a
+    // guitar standing alone on the root keeps the 5th too — the Travis thumb alternates to it,
+    // and six strings have room for both.
+    const fifthPc = mod12(chord.root + fifthOf(chord));
+    if (shape.rootBottom && kind === 'close' && !pcs.includes(fifthPc)) {
+        pcs.push(fifthPc);
+    }
     if (shape.openPosition) {
         const open = openGrip(chord, pcs, bottom, shape, prev);
         if (open) {

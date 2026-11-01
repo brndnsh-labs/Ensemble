@@ -3,6 +3,21 @@ import { defineClaims } from '../critique/harness.js';
 export const country = defineClaims({
     takes: [
         {
+            take: { colour: true },
+            claims: [
+                [
+                    'compWrittenTension',
+                    0.9,
+                    1,
+                    'a written 9th, 11th or b9 is in the chord the keys play',
+                ],
+            ],
+        },
+        {
+            take: { colour: true, comp: 'guitar' },
+            claims: [['compWrittenTension', 0.9, 1, 'and in the grip the guitar fingers']],
+        },
+        {
             take: {},
             claims: [
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
@@ -24,7 +39,12 @@ export const country = defineClaims({
                 ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its bass note'],
                 ['bassNotesPerBeat', 0.5, 0.75, 'two booms a bar, plus walks'],
                 ['compBackbeatShare', 0.6, 1, 'the piano answers the boom on 2 and 4'],
-                ['compColour', 0, 0.1, 'triads and sixths, not jazz ninths'],
+                [
+                    'compColour',
+                    0,
+                    0.12,
+                    'triads and sixths; the 9ths are the ones the chart writes (Em9, measured 0.106)',
+                ],
             ],
         },
         {
