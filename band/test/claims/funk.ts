@@ -32,6 +32,10 @@ export const funk = defineClaims({
             claims: [['compShort', 0.9, 1, 'stabs stay staccato with no scratch between them']],
         },
         {
+            take: { lead: 'solo', comp: 'clav' },
+            claims: [['compLeadUnison', 0, 0.15, 'the clav leaves the horn its note']],
+        },
+        {
             take: { lead: 'head' },
             claims: [
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],

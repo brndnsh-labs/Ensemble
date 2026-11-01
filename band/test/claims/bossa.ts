@@ -21,6 +21,10 @@ export const bossa = defineClaims({
             ],
         },
         {
+            take: { lead: 'solo', comp: 'nylon' },
+            claims: [['compLeadUnison', 0, 0.15, 'the guitar leaves the sax its note']],
+        },
+        {
             take: { lead: 'head' },
             claims: [
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],

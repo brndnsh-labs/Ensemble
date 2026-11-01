@@ -15,7 +15,15 @@
  */
 import { type ChordFacts, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { cost, LOW_INTERVAL_LIMIT, type Slot, type VoicingKind, voicingTones } from './voicing.js';
+import {
+    cost,
+    type LeadOver,
+    LOW_INTERVAL_LIMIT,
+    leadCost,
+    type Slot,
+    type VoicingKind,
+    voicingTones,
+} from './voicing.js';
 
 /** Standard tuning, low E to high E. */
 const STRINGS = [40, 45, 50, 55, 59, 64] as const;
@@ -364,12 +372,16 @@ function openGrip(
     return best;
 }
 
-/** Place a chord as a guitar grip near the previous one. Deterministic. */
+/**
+ * Place a chord as a guitar grip near the previous one, clear of the lead notes sounding over
+ * it where a grip can be (`leadCost`). Deterministic.
+ */
 export function grip(
     chord: ChordFacts,
     kind: VoicingKind,
     shape: GripShape,
     prev: number[] | null,
+    lead: readonly LeadOver[] = [],
 ): number[] {
     const tones = voicingTones(chord, kind);
     const pcs = [...new Set(tones.map((n) => mod12(chord.root + n)))];
@@ -389,6 +401,9 @@ export function grip(
         pcs.push(fifthPc);
     }
     if (shape.openPosition) {
+        // why: an open-position player changes shapes, not voices (`openGrip`): the cowboy chord
+        // is the sound, so it isn't moved to dodge the lead. A voice on the lead's pitch is
+        // left out of the strike instead (`leaveTheLeadItsNote` in idiom.ts).
         const open = openGrip(chord, pcs, bottom, shape, prev);
         if (open) {
             return open;
@@ -426,7 +441,7 @@ export function grip(
     let best: number[] | null = null;
     let bestCost = Infinity;
     for (const g of found) {
-        const c = cost(g, prev, chord, shape.slot);
+        const c = cost(g, prev, chord, shape.slot) + leadCost(g, lead);
         if (c < bestCost) {
             best = g;
             bestCost = c;

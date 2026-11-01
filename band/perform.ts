@@ -340,7 +340,8 @@ export function performPass(
  * never beneath the chord's own bottom note (a power chord keeps its root under its 5th). A
  * voice that can't go down, and that a voice staying in the chord doubles, is left out
  * instead. The chord keeps its pitch classes either way. A guitar's grip is its hand shape, so
- * it stays.
+ * it stays. (The comp voiced each chord against the lead it heard already — `leadCost` in
+ * `players/comp/voicing.ts` — and left out a voice the line sits on; this settles the rest.)
  */
 function yieldToLead(events: BandEvent[]): BandEvent[] {
     const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
@@ -360,16 +361,25 @@ function yieldToLead(events: BandEvent[]): BandEvent[] {
         const sounding = new Set(voices.map((v) => v.midi));
         for (const c of voices) {
             let under = Number.POSITIVE_INFINITY;
+            const on = new Set<number>();
             for (const l of lead) {
                 if (l.tick < c.tick + c.dur && l.tick + l.dur > c.tick) {
                     under = Math.min(under, l.midi);
+                    on.add(l.midi);
                 }
             }
             if (c.midi < under - 1) {
                 continue;
             }
             const down = c.midi - 12;
-            if (down >= 60 && !sounding.has(down) && (c.midi === bottom || down > bottom)) {
+            // Never down onto a note the lead is playing: that trades a voice above the line
+            // for a unison inside it (#2014).
+            if (
+                down >= 60 &&
+                !sounding.has(down) &&
+                !on.has(down) &&
+                (c.midi === bottom || down > bottom)
+            ) {
                 dropped.set(c, { ...c, midi: down });
                 sounding.delete(c.midi);
                 sounding.add(down);

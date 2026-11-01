@@ -216,6 +216,12 @@ export const hiphop = defineClaims({
             ],
         },
         {
+            take: { lead: 'solo', comp: 'rhodes' },
+            claims: [
+                ['compLeadUnison', 0, 0.15, "the Rhodes leaves the guitar's note to the guitar"],
+            ],
+        },
+        {
             take: { lead: 'head' },
             claims: [
                 ['leadLongBreath', 0, 0.02, 'the hook never drops out for two bars'],

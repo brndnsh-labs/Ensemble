@@ -60,6 +60,7 @@ export const jazz = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the head is a tune: it fills the form'],
                 ['leadNotesPerBar', 2, 4.5, 'a singable line, not a run'],
@@ -99,6 +100,7 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 [
                     'leadMotifDevelopment',
                     0.115,

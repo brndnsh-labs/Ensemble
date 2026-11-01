@@ -143,6 +143,23 @@ function compChords(events: BandEvent[]): Map<number, PitchedNote[]> {
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
 
+/** How many ticks between `from` and `to` at least one of the notes sounds. */
+function covered(notes: readonly PitchedNote[], from: number, to: number): number {
+    const spans = notes
+        .map((n) => [Math.max(from, n.tick), Math.min(to, n.tick + n.dur)] as const)
+        .filter(([a, b]) => b > a)
+        .sort((x, y) => x[0] - y[0]);
+    let total = 0;
+    let reach = from;
+    for (const [a, b] of spans) {
+        if (b > reach) {
+            total += b - Math.max(a, reach);
+            reach = b;
+        }
+    }
+    return total;
+}
+
 // ---------------------------------------------------------------- trade helpers
 /** The drums a solo is played on (the snare's ghosts aren't strokes of the idea). */
 const STROKES = ['snare', 'tomHigh', 'tomMid', 'tomLow'];
@@ -1862,6 +1879,32 @@ export const METRICS = {
             }
         }
         return ratio(hit, n);
+    },
+    /**
+     * Of the time the lead sounds over the comp, the share in which a comp voice sits on the
+     * lead's very pitch: a unison that smears the soloist's line into the chord (#2014). The
+     * comp voices under the line and leaves the soloist's note to the soloist, so this stays
+     * low. (An octave from the line is a doubling, not a smear, and is not counted.)
+     */
+    compLeadUnison: (takes) => {
+        let both = 0;
+        let unison = 0;
+        for (const { events } of takes) {
+            const comp = events.filter(
+                (e): e is PitchedNote => e.lane === 'comp' && !(e as PitchedNote).muted,
+            );
+            for (const l of leadNotes(events)) {
+                const end = l.tick + l.dur;
+                const under = comp.filter((c) => c.tick < end && c.tick + c.dur > l.tick);
+                both += covered(under, l.tick, end);
+                unison += covered(
+                    under.filter((c) => c.midi === l.midi),
+                    l.tick,
+                    end,
+                );
+            }
+        }
+        return ratio(unison, both);
     },
     /**
      * How much busier the comp is in the lead's breaths (a dotted quarter or more without it,

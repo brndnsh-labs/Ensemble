@@ -119,6 +119,10 @@ export const reggae = defineClaims({
             ],
         },
         {
+            take: { lead: 'solo', comp: 'guitar' },
+            claims: [['compLeadUnison', 0, 0.15, 'the skank leaves the sax its note']],
+        },
+        {
             take: { lead: 'head' },
             claims: [
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
