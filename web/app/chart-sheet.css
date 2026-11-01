@@ -438,33 +438,81 @@ button.bar-number {
 }
 /* The Following cue and the v2 stand's own bar, chord and sheet additions (#1949, moved from
    stand-shell.css in its order). They still come after the breakpoints above, as they did there. */
-.bar.active {
-    background: var(--green-light);
-    box-shadow: inset 0 -3px var(--green);
+/* The playing bar (#1991): a solid fill that outranks everything else on the sheet. Its text is
+   `--on-bar-playing`, so the tokens the bar's parts read (ink, muted, bar number, repeat ink)
+   are re-pointed here rather than restyled one by one. Last of the bar rules, so a bar that is
+   playing and also next, or a traded turn of yours, still reads as playing; the turn keeps a
+   cap along its top edge in the text colour so "You" and "playing" show together. */
+.bar.active:not(.typing, .pending, .unreadable) {
+    background: var(--bar-playing);
+    --ink: var(--on-bar-playing);
+    --muted: var(--on-bar-playing);
+    --bar-number: var(--on-bar-playing);
+    --bar-repeat-ink: var(--on-bar-playing);
+    color: var(--on-bar-playing);
 }
-/* Following's next-bar cue (#1458): a quiet outline, not a fill, so it reads as "coming up"
-   rather than "playing now" even where it lands on the same bar as `.active` (a one-bar chart).
-   `data-next="soon"` (the playing bar's last felt pulse) thickens and darkens the same outline —
-   ordinary React state (`nextSoon`, `app/use-playback-state.ts`), edge-triggered off a 60ms poll
-   of the engine so it flips only twice a bar, not a DOM write bypassing React. */
+.editing .bar.active:not(.typing, .pending, .unreadable) .chord:hover {
+    background: transparent;
+}
+.bar.active[data-turn="you"] {
+    box-shadow: inset 0 4px 0 0 var(--on-bar-playing);
+}
+.bar.active .bar-turn {
+    color: var(--on-bar-playing);
+}
+.bar.active[data-turn]::before {
+    background: var(--on-bar-playing);
+}
+/* Following's next-bar cue (#1458): a thin 1px outline, quieter than the playing fill (#1991) and
+   steady when the bar changes at 240 BPM. `data-next="soon"` (the playing bar's last felt pulse)
+   darkens the same hairline rather than thickening it — ordinary React state (`nextSoon`,
+   `app/use-playback-state.ts`), edge-triggered off a 60ms poll of the engine so it flips only
+   twice a bar, not a DOM write bypassing React. */
 .bar[data-next] {
-    box-shadow: inset 0 0 0 2px var(--bar-next);
+    box-shadow: inset 0 0 0 1px var(--bar-next);
     border-radius: 4px;
 }
 .bar[data-next="soon"] {
-    box-shadow: inset 0 0 0 3px var(--bar-next-soon);
+    box-shadow: inset 0 0 0 1px var(--bar-next-soon);
 }
-/* A one-bar chart loops onto itself, which makes its bar both `.active` and `[data-next]` at once; combine
-   rather than let the later rule silently win and drop the green underline. */
-.bar.active[data-next] {
-    box-shadow:
-        inset 0 -3px var(--green),
-        inset 0 0 0 2px var(--bar-next);
-}
+/* A one-bar chart loops onto itself, which makes its bar both playing and next: playing wins,
+   so it keeps no outline. */
+.bar.active[data-next],
 .bar.active[data-next="soon"] {
-    box-shadow:
-        inset 0 -3px var(--green),
-        inset 0 0 0 3px var(--bar-next-soon);
+    box-shadow: none;
+}
+.bar.active[data-turn="you"][data-next],
+.bar.active[data-turn="you"][data-next="soon"] {
+    box-shadow: inset 0 4px 0 0 var(--on-bar-playing);
+}
+/* The count-in (#1991): the beat counting down, large over the bar Play starts from, lit as the
+   playing bar will be. The Play button's digit and the clicks are the accessible cue; this is
+   aria-hidden and takes no pointer. A short pop on each beat, none under reduced motion. */
+.bar-countin {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    display: grid;
+    place-items: center;
+    background: var(--bar-playing);
+    color: var(--on-bar-playing);
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 56px;
+    font-weight: 600;
+    line-height: 1;
+    pointer-events: none;
+    animation: count-in-pop var(--motion-base, 120ms) ease-out;
+}
+@keyframes count-in-pop {
+    from {
+        transform: scale(0.85);
+        opacity: 0.6;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .bar-countin {
+        animation: none;
+    }
 }
 .bar {
     gap: 8px;

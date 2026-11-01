@@ -45,6 +45,7 @@ export function useChartView(
     current: ChartDocument | null,
     active: number | null,
     playing: boolean,
+    countInSlot: number | null = null,
 ) {
     // Read again whenever the open document changes (`runtime.load`/`editScore` rebuild the
     // view), and when playback starts or stops: a song-mode performance (#1784) is drawn from its
@@ -68,6 +69,9 @@ export function useChartView(
         const next = nextBarIndex(band.slots, active, (slot) => slot.bar);
         return next === null ? null : band.slots[next].display;
     })();
+    /** The display index of the bar the count-in leads into (the countdown is drawn on it). */
+    const displayCountIn =
+        countInSlot === null ? null : (band?.slots[countInSlot]?.display ?? countInSlot);
     const activeEvent = active === null ? null : (band?.slots[active] ?? null);
     /** The performed bar `active` sits in (`BandSlot.bar`); null while stopped. Used to de-dupe
      * the jump-ahead by performed bar (patch review P3-2), not by slot index — a chord landing
@@ -98,6 +102,7 @@ export function useChartView(
         blocks,
         displayActive,
         displayNext,
+        displayCountIn,
         activeEvent,
         activeBar,
         totalBars,

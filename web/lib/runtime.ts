@@ -494,6 +494,19 @@ export function tradeTurns(place: PerformancePlace): Map<number, TradeTurn> {
     return turns;
 }
 
+/**
+ * The chart slot the count-in leads into (the bar Play starts from), or -1 while no count-in
+ * sounds. The stand draws the countdown over that bar, so it reads from the same clock as
+ * `countInBeat`, with no timer of its own.
+ */
+export function countInSlot(): number {
+    const view = playedView();
+    if (!view || band?.countingInBeat() == null) {
+        return -1;
+    }
+    return slotAt(view, (getState().playback.startStep || 0) * STEP_TICKS);
+}
+
 /** The count-in beat sounding now (0 is "1"), or null when no count-in is. */
 export function countInBeat(): number | null {
     return band?.countingInBeat() ?? null;
