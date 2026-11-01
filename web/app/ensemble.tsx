@@ -3637,6 +3637,20 @@ export default function Ensemble() {
                             }, true)
                         }
                         onToggleLane={toggleLane}
+                        onIntensity={(intensity) =>
+                            // The Groove tab's own path (#1994): Auto, or off Auto onto a level.
+                            change(() => {
+                                if (intensity === 'auto') {
+                                    runtime.setAutoIntensity(true);
+                                    return;
+                                }
+                                if ((current?.chart.performance.energy ?? 'auto') === 'auto') {
+                                    runtime.setAutoIntensity(false);
+                                }
+                                runtime.setBandIntensity(intensity);
+                                setFeel((f) => ({ ...f, bandIntensity: intensity }));
+                            })
+                        }
                         onTrade={() => openBand('trade')}
                         tradeBlocked={runtime.tradeBlocked()}
                         player={

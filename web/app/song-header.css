@@ -189,6 +189,25 @@
     border: 1px solid var(--line);
     border-radius: 5px;
 }
+/* The band's intensity (#1994): a compact slider, Auto at its left stop, on tablet and up. The
+   phone's transport row has no room for it; the Groove tab keeps it there. */
+.intensity-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--setting-row, 32px);
+}
+.intensity-control input[type="range"] {
+    width: 84px;
+    min-width: 0;
+}
+.intensity-value {
+    width: 2.6em;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
+}
 .band-controls {
     margin-left: auto;
     display: flex;
@@ -287,6 +306,17 @@
     .song-header {
         padding: 17px 22px;
     }
+    /* A portrait tablet's transport has ~100px to spare at 768 (#1994): the slider is short. */
+    .intensity-control {
+        gap: 5px;
+    }
+    .intensity-control input[type="range"] {
+        width: 48px;
+    }
+    .intensity-value {
+        width: 2.2em;
+        font-size: 12px;
+    }
     .transport-bar {
         padding: 12px 22px;
         gap: 15px;
@@ -306,6 +336,9 @@
     }
 }
 @media (max-width: 760px) {
+    .intensity-setting {
+        display: none;
+    }
     .song-header {
         padding: 14px 15px;
         align-items: flex-start;
@@ -495,6 +528,9 @@
     }
 }
 @media (max-height: 520px) and (max-width: 1000px) and (orientation: landscape) {
+    .intensity-setting {
+        display: none;
+    }
     .song-header {
         padding: 7px 18px;
         flex-wrap: nowrap;
