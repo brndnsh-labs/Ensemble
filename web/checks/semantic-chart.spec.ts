@@ -171,7 +171,8 @@ test('unfinished bars survive selection, errors and hidden editor; Save commits 
 }) => {
     await editBlue(page);
     const original = await documents(page);
-    await typeBar(page, 1, 'C Dm G7');
+    // Lengths written out: three bare chords in 4/4 would wait for a split choice (#1980).
+    await typeBar(page, 1, 'C:2 Dm:1 G7:1');
     // Moving on applies bar 1; bar 2's unreadable text stays pending on its bar.
     await typeBar(page, 2, 'not-a-chord');
     await leaveBar(page);

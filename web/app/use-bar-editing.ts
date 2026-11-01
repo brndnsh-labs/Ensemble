@@ -1,4 +1,5 @@
 import { compileScoreForm } from '@core/songbook/score-form';
+import type { BarSplit } from '@core/songbook/score-text';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { Dispatch, RefObject, SetStateAction } from 'react';
 import {
@@ -46,7 +47,10 @@ interface BarEditingOptions {
     /** The bar whose field is open on the chart, or null. */
     openBar: OpenBar | null;
     /** Every bar's field text and problem (`barFields`), for the chart. */
-    chartFields: ReadonlyMap<string, { text: string | null; problem: string | null }>;
+    chartFields: ReadonlyMap<
+        string,
+        { text: string | null; problem: string | null; splits: BarSplit[] | null }
+    >;
     /** Each bar as the chart was last kept, for the changed-bar dot. */
     keptBars: ReadonlyMap<string, string>;
     /** Each bar as it now stands. */
@@ -237,6 +241,7 @@ export function useBarEditing({
             open: openBar,
             text: (id) => chartFields.get(id)?.text ?? null,
             problem: (id) => chartFields.get(id)?.problem ?? null,
+            splits: (id) => chartFields.get(id)?.splits ?? null,
             edited: (id) =>
                 drafts.has(id) || (keptBars.size > 0 && keptBars.get(id) !== liveBars.get(id)),
             pending: (id) => drafts.has(id),

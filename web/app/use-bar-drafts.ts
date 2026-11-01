@@ -1,6 +1,11 @@
 import { validateSemanticScore } from '@core/songbook/score-codec';
 import { resolveScoreContext } from '@core/songbook/score-context';
-import { parseChordBar, printChordBar } from '@core/songbook/score-text';
+import {
+    type BarSplit,
+    offGridBarSplit,
+    parseChordBar,
+    printChordBar,
+} from '@core/songbook/score-text';
 import type {
     ScoreContext,
     ScoreEvent,
@@ -203,16 +208,39 @@ export function draftChange(original: BarEntry, next: BarDraft): BarDraft | null
  * for a spelling the parser does not know, otherwise the parser's own sentence. Null when they
  * read.
  */
-function problemOf(text: string, meter: string): string | null {
+function problemOf(text: string, meter: string, applied: string | null): string | null {
     const parsed = parseChordBar(text, meter);
     if (parsed.kind === 'ok') {
-        return null;
+        return splitProblem(text, meter, applied);
     }
     const message = parsed.kind === 'invalid' ? parsed.issues[0].message : 'Cannot read this bar.';
     const spelling = /^Unsupported chord spelling “(.*)”\.(?: Try (.*)\.)?$/.exec(message);
     return spelling
         ? `Can’t read “${spelling[1]}”${spelling[2] ? `, try ${spelling[2]}` : ''}`
         : message;
+}
+
+/**
+ * Chords typed with no lengths that do not divide the bar onto the grid wait for the musician to
+ * choose their lengths (#1980): until then they are the bar's problem, so nothing is applied or
+ * saved as triplets. The bar field draws the choices; this is the sentence for everywhere else.
+ * Chords the bar already holds (`applied`, its text as the chart has it) are not asked again: a
+ * saved triplet bar whose repeat, key or fermata alone changed keeps its music.
+ */
+function splitProblem(text: string, meter: string, applied: string | null): string | null {
+    const split = text === applied ? null : offGridBarSplit(text, meter);
+    if (!split) {
+        return null;
+    }
+    return split.choices.length > 0
+        ? `Choose how the ${split.chords} chords share the bar`
+        : `${split.chords} chords don’t share ${split.counts} counts evenly: give each a length, like ${text.trim().split(/\s+/)[0]}:1`;
+}
+
+/** The ways to share a pending bar's chords when they need choosing (#1980), else null. */
+function splitsOf(text: string, meter: string, applied: string | null): BarSplit[] | null {
+    const split = text === applied ? null : offGridBarSplit(text, meter);
+    return split && split.choices.length > 0 ? split.choices : null;
 }
 
 /** `problemOf` a pending bar; null when the bar has no draft. */
@@ -223,14 +251,21 @@ export function barProblem(
 ): string | null {
     const draft = drafts.get(measureId);
     const entry = draft && entriesFor(score, drafts).find((e) => e.measure.id === measureId);
-    return draft && entry ? problemOf(draft.text, entry.effective.meter) : null;
+    const original = entry && entriesFor(score, NO_DRAFTS).find((e) => e.measure.id === measureId);
+    return draft && entry && original
+        ? problemOf(
+              draft.text,
+              entry.effective.meter,
+              editableText(original.measure, original.effective.meter),
+          )
+        : null;
 }
 
 /** Every bar's field text and problem (`barField`, `barProblem`) in one pass, for the chart. */
 export function barFields(
     score: SemanticScore,
     drafts: ReadonlyMap<string, BarDraft>,
-): Map<string, { text: string | null; problem: string | null }> {
+): Map<string, { text: string | null; problem: string | null; splits: BarSplit[] | null }> {
     const entries = entriesFor(score, drafts);
     return new Map(
         entriesFor(score, NO_DRAFTS).map((original, index) => {
@@ -240,7 +275,12 @@ export function barFields(
                 original.measure.id,
                 {
                     text: applied === null ? null : (draft?.text ?? applied),
-                    problem: draft ? problemOf(draft.text, entries[index].effective.meter) : null,
+                    problem: draft
+                        ? problemOf(draft.text, entries[index].effective.meter, applied)
+                        : null,
+                    splits: draft
+                        ? splitsOf(draft.text, entries[index].effective.meter, applied)
+                        : null,
                 },
             ];
         }),
@@ -279,6 +319,14 @@ export function commitBarDrafts(
                         `${entry.label}: ${parsedBar.kind === 'invalid' ? parsedBar.issues[0].message : 'Cannot read this bar.'}`,
                         measure.id,
                     );
+                }
+                const unsplit = splitProblem(
+                    buffer.text,
+                    entry.effective.meter,
+                    editableText(measure, entry.effective.meter),
+                );
+                if (unsplit) {
+                    throw new BarDraftError(`${entry.label}: ${unsplit}.`, measure.id);
                 }
                 let next: ScoreMeasure;
                 try {

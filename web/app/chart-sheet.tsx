@@ -1,3 +1,4 @@
+import type { BarSplit } from '@core/songbook/score-text';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { ChartNotation } from '@core/songbook/types';
 import {
@@ -17,6 +18,7 @@ import { directionLabel } from '../lib/score-labels';
 import { afterPress } from './after-press';
 import { BarDock, usePhoneWidth } from './bar-dock';
 import { BarMenu, type BarMenuBar } from './bar-menu';
+import { BarSplits } from './bar-splits';
 import { Menu } from './menu';
 import { SectionMenu } from './section-menu';
 import type { BarDraft } from './use-bar-drafts';
@@ -113,6 +115,9 @@ export interface BarEditing {
     text: (measureId: string) => string | null;
     /** Why the bar's pending chords cannot be read ("Can't read “X”"), or null. */
     problem: (measureId: string) => string | null;
+    /** The ways to give chords typed without lengths theirs, when they do not divide the bar onto
+     * the grid (#1980): drawn under the field, none applied until one is picked. Null otherwise. */
+    splits: (measureId: string) => BarSplit[] | null;
     /** Changed since the chart was last saved, or pending: the dot by the bar number. */
     edited: (measureId: string) => boolean;
     /** Typed but not applied yet, though it reads (#1726): tinted until the chart takes it. */
@@ -357,12 +362,34 @@ export function ChartSheet({
             ?.querySelector<HTMLElement>(`[data-measure-id="${CSS.escape(id)}"] .bar-number`)
             ?.focus();
     }, [open]);
+    // The split choice (#1980) highlights its first choice and keeps the highlight per bar and
+    // text, so a new chord typed starts again from the first.
+    const [splitPick, setSplitPick] = useState<{ key: string; index: number } | null>(null);
+    const openSplits = open && barEdit ? barEdit.splits(open.id) : null;
+    const splitKey = open ? `${open.id}\n${barEdit?.text(open.id)}` : '';
+    const splitIndex = splitPick?.key === splitKey ? splitPick.index : 0;
     function onFieldKey(event: ReactKeyboardEvent<HTMLInputElement>, from: OpenBar) {
         if (!barEdit || event.nativeEvent.isComposing) {
             return;
         }
         // The chart's own keys (an arrow browsing away from Following) are not the field's.
         event.stopPropagation();
+        const splits = barEdit.splits(from.id);
+        if (splits && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
+            event.preventDefault();
+            const step = event.key === 'ArrowDown' ? 1 : -1;
+            setSplitPick({
+                key: splitKey,
+                index: (splitIndex + step + splits.length) % splits.length,
+            });
+            return;
+        }
+        if (splits && event.key === 'Enter') {
+            // Enter applies the highlighted choice; the bar is left by the next Enter or Tab.
+            event.preventDefault();
+            barEdit.onText(from.id, splits[Math.min(splitIndex, splits.length - 1)].text);
+            return;
+        }
         if (event.key === 'Tab' || event.key === 'Enter') {
             const moved = barEdit.onLeave(from, event.key === 'Tab' && event.shiftKey ? -1 : 1);
             // Tab past the first or last bar is the page's again; within the chart it is ours.
@@ -725,7 +752,18 @@ export function ChartSheet({
                                             ⋯
                                         </button>
                                     )}
-                                    {problem && <span className="bar-problem">{problem}</span>}
+                                    {typing && open && !docked && openSplits && (
+                                        <BarSplits
+                                            choices={openSplits}
+                                            index={splitIndex}
+                                            onApply={(choice) =>
+                                                barEdit?.onText(measureId, choice.text)
+                                            }
+                                        />
+                                    )}
+                                    {problem && !(typing && openSplits) && (
+                                        <span className="bar-problem">{problem}</span>
+                                    )}
                                     {measure.chords
                                         .filter(
                                             (_, index) =>
@@ -969,6 +1007,16 @@ export function ChartSheet({
                     }
                     onMenu={() => (menuOpen ? closeMenu(true) : openMenu())}
                     menuOpen={menuOpen}
+                    splits={
+                        openSplits && (
+                            <BarSplits
+                                dock
+                                choices={openSplits}
+                                index={splitIndex}
+                                onApply={(choice) => barEdit.onText(open.id, choice.text)}
+                            />
+                        )
+                    }
                 />
             )}
             {menuOpen && open && barEdit && menuView && (
