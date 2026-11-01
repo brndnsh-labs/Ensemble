@@ -26,6 +26,11 @@ export const STYLE_FOR_GENRE: Record<string, StyleId> = {
     Metal: 'metal',
     'Ska-Punk': 'skapunk',
 };
+
+/** The style a genre plays: a name with no band style (or a prototype key) plays rock. */
+export function styleForGenre(genre: string): StyleId {
+    return Object.hasOwn(STYLE_FOR_GENRE, genre) ? STYLE_FOR_GENRE[genre] : 'rock';
+}
 /** The chords-lane sound for each comp instrument (what the band's Auto sound selects). */
 export const VOICE_FOR_COMP: Record<CompInstrument, InstrumentVoice> = {
     piano: 'pack:grand',

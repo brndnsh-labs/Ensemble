@@ -9,6 +9,7 @@ import type {
 import type { ChartBand } from '@core/songbook/types';
 import { validateDocument } from './documents';
 import { checkPlayable } from './engine-mode';
+import { UNSET_HUMANIZE } from './genre-humanize';
 import { genreSwing } from './genre-swing';
 
 /**
@@ -760,7 +761,8 @@ export function bandForGenre(genre: string): ChartBand {
             reverb: LANE_REVERB.groove,
             swing: swing?.swing ?? 0,
             swingSub: swing?.swingSub ?? '8th',
-            humanize: 20,
+            // Not set: the style's own humanize plays (#2010).
+            humanize: UNSET_HUMANIZE,
             genre,
         },
     };
