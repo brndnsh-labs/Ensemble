@@ -106,6 +106,15 @@ export interface BandSettings {
     style: StyleId;
     /** Lane power. A section's own `instruments` map can still silence a lane. */
     lanes: Record<Lane, boolean>;
+    /**
+     * The lane the musician plays themselves (#1992), left as a hole for them: it is planned and
+     * played like any other lane switched on — so the rest of the band hears it and plays as it
+     * would with that player there (the guitar keeps its band shapes for a bassist) — and its
+     * events are then left out of what the pass returns. Never traded with: you can't trade
+     * fours with yourself. Absent or `null`, every switched-on lane sounds. Only meaningful for
+     * a lane that is also on in `lanes`.
+     */
+    you?: Lane | null;
     /** The comp lane's instrument. */
     comp: CompInstrument;
     /** The lead's instrument. */

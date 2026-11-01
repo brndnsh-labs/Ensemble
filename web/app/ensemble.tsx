@@ -27,6 +27,7 @@ import { exportDocument } from '../lib/download';
 import { checkPlayable } from '../lib/engine-mode';
 import { firstBars } from '../lib/first-bars';
 import type { HomeSlice } from '../lib/home';
+import { INSTRUMENT_ROLES, type PlayerInstrument } from '../lib/instrument';
 import { type NavEntry, type NavView, navKey } from '../lib/navigation';
 import { collectionWrite, framePace, type PlaylistImport } from '../lib/playlist-import';
 import * as repository from '../lib/repository';
@@ -83,6 +84,7 @@ import { FormStrip } from './form-strip';
 import { GuidedForm } from './guided-form';
 import { downloadImportSource, ImportDialog } from './import-dialog';
 import { openedSongAnnouncement } from './key-popover';
+import { PlayerPrompt } from './player-prompt';
 import { SettingsSheet } from './settings-sheet';
 import { SongHeader } from './song-header';
 import { SongMenu, type SongMenuView } from './song-menu';
@@ -114,6 +116,7 @@ import { useNeckPrefs } from './use-neck-prefs';
 import { useOfflineInstall } from './use-offline-install';
 import { usePalette } from './use-palette';
 import { usePlaybackState } from './use-playback-state';
+import { usePlayerInstrument } from './use-player-instrument';
 import { useRowMenu } from './use-row-menu';
 import { useSongDeletes } from './use-song-deletes';
 import { type Browse, useSongbookLibrary } from './use-songbook-library';
@@ -354,6 +357,10 @@ export default function Ensemble() {
     } = usePlaybackState({ startPlayback });
     const { theme, stage, chooseTheme, toggleTheme } = useStageTheme();
     const { palette, choosePalette } = usePalette();
+    // What the musician plays (#1992): a per-device choice that mutes their lane on every chart
+    // and moves the chords for a transposing instrument. Never written to a chart.
+    const player = usePlayerInstrument();
+    const playerRole = player.instrument ? INSTRUMENT_ROLES[player.instrument] : null;
     // Settings (#1783): per-device preferences, on the songbook and on a chart.
     const [settingsOpen, setSettingsOpen] = useState(false);
     const settingsDialog = useModalDialog(settingsOpen);
@@ -785,7 +792,38 @@ export default function Ensemble() {
         totalBars,
         writtenBars,
         writtenSections,
-    } = useChartView(current, active, playing, countInSlot, chartView);
+        // A B♭ or E♭ horn reads its chords moved (#1992); the editor always shows what is
+        // written, which is concert.
+    } = useChartView(
+        current,
+        active,
+        playing,
+        countInSlot,
+        chartView,
+        editing ? 0 : (playerRole?.shift ?? 0),
+    );
+    // The chart as the mute chips and the Band sheet show it (#1992): the musician's own lane
+    // reads off unless they turned it on for this chart (`runtime.laneHeard`). Only for showing —
+    // `current` stays the document, so the instrument's default mute is never a chart edit and
+    // never marks the song unsaved.
+    const ownLane = runtime.playerLaneModule();
+    const ownHeard = ownLane ? runtime.laneHeard(ownLane) : true;
+    const laneView = useMemo(
+        () =>
+            current && ownLane && current.chart.band[ownLane].enabled !== ownHeard
+                ? {
+                      ...current,
+                      chart: {
+                          ...current.chart,
+                          band: {
+                              ...current.chart.band,
+                              [ownLane]: { ...current.chart.band[ownLane], enabled: ownHeard },
+                          },
+                      },
+                  }
+                : current,
+        [current, ownLane, ownHeard],
+    );
     useFollowScroll(scroll, {
         following,
         active,
@@ -1043,7 +1081,7 @@ export default function Ensemble() {
     ) {
         const onStand = kept?.document ?? document;
         setStandardDraft(false);
-        runtime.load(onStand);
+        runtime.load(onStand, true);
         setSaved(null);
         const landed = runtime.withLoadedSounds(onStand);
         setCurrent(landed);
@@ -2146,8 +2184,22 @@ export default function Ensemble() {
         setBandTab(tab);
     }
     function toggleLane(lane: Lane) {
-        if (current) {
-            change(() => runtime.setEnabled(lane, !current.chart.band[lane].enabled));
+        if (laneView) {
+            change(() => runtime.setEnabled(lane, !laneView.chart.band[lane].enabled));
+        }
+    }
+    /**
+     * "What do you play?" answered (#1992), from the stand's question or Settings. A guitar turns
+     * the stand to the neck — on a guitar's, if a ukulele's was up.
+     */
+    function choosePlayer(instrument: PlayerInstrument) {
+        player.choose(instrument);
+        if (INSTRUMENT_ROLES[instrument].neck) {
+            if (neckPrefs.prefs.instrument !== 'guitar') {
+                neckPrefs.setPrefs({ instrument: 'guitar' });
+            }
+            setNeck(true);
+            rememberStandMode('neck');
         }
     }
     function goHome() {
@@ -2297,7 +2349,7 @@ export default function Ensemble() {
                 accountDrafts.current.set(document.id, recovery.document);
             }
         }
-        runtime.load(next);
+        runtime.load(next, true);
         const onDevice = runtime.withLoadedSounds(next);
         const savedBaseline = next === document ? onDevice : document;
         setSaved(savedBaseline);
@@ -3465,7 +3517,7 @@ export default function Ensemble() {
                         onMenu={toggleSongMenu}
                     />
                     <TransportBar
-                        current={current}
+                        current={laneView ?? current}
                         busy={busy}
                         playbackActive={playbackActive}
                         countInBeat={countInBeat}
@@ -3508,7 +3560,28 @@ export default function Ensemble() {
                         onToggleLane={toggleLane}
                         onTrade={() => openBand('trade')}
                         tradeBlocked={runtime.tradeBlocked()}
+                        player={
+                            // "Just listening" changes nothing on the stand, so it shows nothing
+                            // there either; Settings still says it (#1992).
+                            playerRole && player.instrument !== 'listening'
+                                ? {
+                                      label: playerRole.short,
+                                      tag: playerRole.tag,
+                                      note:
+                                          playerRole.shift === 0
+                                              ? null
+                                              : editing
+                                                ? 'concert'
+                                                : playerRole.shift === 2
+                                                  ? 'B♭ chords'
+                                                  : 'E♭ chords',
+                                      lane: playerRole.lane,
+                                  }
+                                : null
+                        }
+                        onPlayer={() => setSettingsOpen(true)}
                     />
+                    {player.unasked && <PlayerPrompt onChoose={choosePlayer} />}
                     <BandSheet
                         dialogRef={bandDialog}
                         tab={bandTab ?? lastBandTab.current}
@@ -3517,7 +3590,7 @@ export default function Ensemble() {
                         error={bandOpen ? error : ''}
                         players={
                             <PlayersTab
-                                current={current}
+                                current={laneView ?? current}
                                 busy={busy}
                                 soundProgress={soundProgress}
                                 soundsOffline={soundsOffline}
@@ -3841,6 +3914,8 @@ export default function Ensemble() {
                 onTheme={chooseTheme}
                 palette={palette}
                 onPalette={choosePalette}
+                instrument={player.instrument}
+                onInstrument={choosePlayer}
                 onClose={() => setSettingsOpen(false)}
             />
             {current && (

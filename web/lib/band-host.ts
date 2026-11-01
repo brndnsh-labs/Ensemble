@@ -643,10 +643,15 @@ export class BandHost {
         return bar && { bar: bar.index, pass: segment.pass + bar.visit.chorus };
     }
 
-    /** What the band's trade is now (partner, turn length, lanes), to tell when a turn plan changed. */
+    /**
+     * What the band's trade is now (partner, turn length, lanes, and which lane is the
+     * musician's own hole, #1992), to tell when a turn plan changed.
+     */
     tradeKey(): string {
         const s = this.settings;
-        return s ? JSON.stringify([s.trade ?? null, s.lanes.lead, s.lanes.drums]) : '';
+        return s
+            ? JSON.stringify([s.trade ?? null, s.lanes.lead, s.lanes.drums, s.you ?? null])
+            : '';
     }
 
     /** Which chorus of a counted performance performed bar `index` is in (0 when uncounted). */

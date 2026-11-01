@@ -1070,3 +1070,23 @@ describe('BandHost.inLastPulseBefore: the last beat before a chord gives way (#1
         expect(host.inLastPulseBefore(8 * PPQ, 12 * PPQ, 0)).toBe(false);
     });
 });
+
+describe('BandHost.tradeKey', () => {
+    it('changes when the musician’s own lane becomes a hole or is heard again (#1992)', () => {
+        const state = fakeState(fakeAudioContext(0));
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        const heard: BandSettings = {
+            ...DEFAULT_SETTINGS,
+            lanes: { drums: true, bass: true, comp: true, lead: true },
+            trade: { with: 'lead', bars: 4, choruses: null },
+        };
+        host.update(heard);
+        const before = host.tradeKey();
+        // The lanes read the same either way: only `you` says the lead is now a hole, and the
+        // band no longer trades with it.
+        host.update({ ...heard, you: 'lead' });
+        expect(host.tradeKey()).not.toBe(before);
+        host.update({ ...heard, you: null });
+        expect(host.tradeKey()).toBe(before);
+    });
+});

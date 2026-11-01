@@ -236,6 +236,32 @@
     text-decoration-thickness: 1.5px;
     text-decoration-color: var(--muted-soft);
 }
+/* What you play (#1992): a plain chip, not a lane — no dot, never struck, never green. */
+.band-toggle.player-chip {
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+}
+.player-chip .player-short {
+    display: none;
+}
+.player-note {
+    font-weight: 500;
+    color: var(--muted);
+}
+/* Your own lane, muted, is a hole the band leaves for you: hollow like any muted lane, but not
+   struck through — it isn't missing, you're playing it. */
+.band-toggle.off.yours {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.band-toggle.off.yours .dot {
+    border-color: var(--accent);
+}
+.band-toggle.off.yours span.label {
+    text-decoration: none;
+}
 /* Trade sits by the Soloist chip: hollow while off or paused (the arrow isn't a muted lane,
    so it isn't struck through), filled with the turn length while the band trades with you.
    One fixed width in every state, so turning it on never reflows the chips (#1210), and a
@@ -467,6 +493,17 @@
     }
     .song-actions .btn {
         padding: 7px 8px;
+    }
+}
+/* What you play on a phone (#1992): the chip says one word (a horn's key), and your own lane
+   is told by its accent colour alone — the row of chips has no room for more. */
+@media (max-width: 760px) {
+    .player-chip .player-long,
+    .band-toggle .yours-mark {
+        display: none;
+    }
+    .player-chip .player-short {
+        display: inline;
     }
 }
 /* The workspace's height under the phone, short-laptop and landscape-phone queries (#1949),

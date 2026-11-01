@@ -119,6 +119,12 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
                 if (localStorage.getItem('ensemble-v2-preview:auto-sounds') === null) {
                     localStorage.setItem('ensemble-v2-preview:auto-sounds', '0');
                 }
+                // "What do you play?" (#1992) is asked once on a fresh device; every spec but the
+                // one about it reads as a device that answered "Just listening", which changes
+                // nothing on the stand. Only when unset, for the same reason as the count-in.
+                if (localStorage.getItem('ensemble-v2-preview:player-instrument') === null) {
+                    localStorage.setItem('ensemble-v2-preview:player-instrument', 'listening');
+                }
             } catch {
                 // Best effort, like the app's own preference reads/writes.
             }

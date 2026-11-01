@@ -28,7 +28,7 @@ export function flushBuffers(): void {
 }
 
 /** Silence one lane (never the drums: muting a part must not hiccup the time). */
-function flushBuffer(lane: Exclude<InstrumentModule, 'groove'>): void {
+export function flushBuffer(lane: Exclude<InstrumentModule, 'groove'>): void {
     if (lane === 'bass') {
         killBassNote(stateMap);
         killBassBus(stateMap);
