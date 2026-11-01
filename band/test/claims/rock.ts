@@ -46,6 +46,12 @@ export const rock = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                [
+                    'leadMotifDevelopment',
+                    0.08,
+                    0.4,
+                    "a phrase now and then says the last one's opening again",
+                ],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes'],
                 ['leadChordToneOnBeats', 0.8, 1, 'pentatonic lines land on the chord'],

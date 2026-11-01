@@ -522,6 +522,12 @@ export const skapunk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                [
+                    'leadMotifDevelopment',
+                    0.108,
+                    0.4,
+                    "a phrase now and then says the last one's opening again",
+                ],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.1, 0.35, 'urgent: less room than a roots or hip hop lead'],
                 ['leadShortShare', 0.72, 0.95, 'tongued short, even at the peak'],

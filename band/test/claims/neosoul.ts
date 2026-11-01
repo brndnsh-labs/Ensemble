@@ -234,6 +234,12 @@ export const neosoul = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                [
+                    'leadMotifDevelopment',
+                    0.115,
+                    0.4,
+                    "a phrase now and then says the last one's opening again",
+                ],
                 // Answer off / no lay-out: breath density 1.19 (0.92 / 0.93), lift +4.0 (-3.2 /
                 // -; -2.0 with no lift), line density 0.134 (0.172 / 0.172).
                 ['compBreathDensity', 1.05, 2, 'the Rhodes leans back under the line'],

@@ -219,6 +219,12 @@ export const disco = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                [
+                    'leadMotifDevelopment',
+                    0.045,
+                    0.4,
+                    "a phrase now and then says the last one's opening again",
+                ],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.1, 0.35, 'it breathes, but keeps the floor moving'],
                 ['leadShortShare', 0.6, 0.9, "funk's sixteenth riffs, broken by held notes"],

@@ -447,6 +447,12 @@ export const metal = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                [
+                    'leadMotifDevelopment',
+                    0.165,
+                    0.4,
+                    "a phrase now and then says the last one's opening again",
+                ],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.1, 0.2, 'relentless: less room than any other lead'],
                 ['leadNotesPerBar', 4.5, 9, 'shred: the busiest solo in the band'],

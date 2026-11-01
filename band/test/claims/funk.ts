@@ -44,6 +44,12 @@ export const funk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                [
+                    'leadMotifDevelopment',
+                    0.15,
+                    0.4,
+                    "a phrase now and then says the last one's opening again",
+                ],
                 // Measured 0.87 either way: the funk comp is a groove, not a conversation.
                 ['compBreathDensity', 0.7, 1.0, 'the groove keeps its figure under the lead'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],

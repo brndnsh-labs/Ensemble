@@ -244,6 +244,8 @@ interface SlotPlan {
     riffs: boolean[];
     /** The motif this phrase develops (its opening bar carries the motif's intervals). */
     develops: Motif | null;
+    /** The bar that plays the developed motif's rhythm (the first after a rest), so its intervals land there too. */
+    developsBar: number;
     /** A head phrase that restates the section's opening phrase (its melody, not only its rhythm). */
     restates: number | null;
     /** A solo phrase that plays the last one again, whole (a looping book's hook). */
@@ -323,6 +325,7 @@ function headPlan(ctx: BarContext, book: LeadBook, slotStart: number): SlotPlan 
         from: null,
         riffs: kinds.map(() => false),
         develops: null,
+        developsBar: 0,
         restates,
         loops: null,
         peak: false,
@@ -375,6 +378,7 @@ function soloPlan(
             from: memory.last,
             riffs: previousPhrase.kinds.map(() => false),
             develops: null,
+            developsBar: 0,
             restates: null,
             loops: previousPhrase,
             peak: false,
@@ -429,6 +433,8 @@ function soloPlan(
         develops = displaced ? null : memory.motif;
     }
     let previous: string | null = null;
+    // The bar that plays the opening cell first: where a developed motif's intervals belong.
+    let developsBar = -1;
     const riffs = kinds.map(() => false);
     const cells = kinds.map((kind, i) => {
         if (kind === 'rest') {
@@ -440,7 +446,11 @@ function soloPlan(
         }
         let cell: string;
         if (previous === null) {
-            cell = i === 0 || kinds[i - 1] === 'rest' ? opening : rng.pick(book.cells[arc.density]);
+            const opens = i === 0 || kinds[i - 1] === 'rest';
+            if (opens && developsBar < 0) {
+                developsBar = i;
+            }
+            cell = opens ? opening : rng.pick(book.cells[arc.density]);
         } else if (rng.chance(book.riff)) {
             cell = previous;
             riffs[i] = true;
@@ -463,7 +473,10 @@ function soloPlan(
         velocity: 88 + (arc.peak ? 8 : 0),
         from: memory.last,
         riffs,
-        develops,
+        develops: developsBar < 0 ? null : develops,
+        // The opening cell goes to bar 0, or to the first bar after a rest when the phrase starts
+        // on one: the motif's intervals must go to that same bar.
+        developsBar: Math.max(0, developsBar),
         restates: null,
         loops: null,
         peak: arc.peak,
@@ -782,7 +795,7 @@ function voiceSolo(
     // A developed motif keeps its intervals: the opening bar's first note lands where the line
     // put it, and the rest follow the motif's shape from there, moved onto this chord.
     if (plan.develops) {
-        const opening = inBar(0);
+        const opening = inBar(plan.developsBar);
         const base = pitches[opening[0]];
         opening.forEach((i, n) => {
             if (n > 0 && n < (plan.develops as Motif).intervals.length + 1) {
@@ -987,12 +1000,12 @@ function planSlot(
     landOnHeld(ctx, book, notes, plan.velocity);
     // What the next phrase may develop: this one's opening bar.
     const opening = onsets
-        .map((o, i) => (o.bar === 0 ? pitches[i] : null))
+        .map((o, i) => (o.bar === plan.developsBar ? pitches[i] : null))
         .filter((m) => m !== null);
     const motif =
-        role.kind !== 'head' && plan.cells[0] && opening.length
+        role.kind !== 'head' && plan.cells[plan.developsBar] && opening.length
             ? {
-                  cell: plan.cells[0],
+                  cell: plan.cells[plan.developsBar] as string,
                   contour: plan.contour,
                   intervals: opening.slice(1).map((m) => m - opening[0]),
               }

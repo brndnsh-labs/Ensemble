@@ -49,6 +49,12 @@ export const bossa = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                [
+                    'leadMotifDevelopment',
+                    0.08,
+                    0.4,
+                    "a phrase now and then says the last one's opening again",
+                ],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.15, 0.45, 'cool is spare: the solo leaves air'],
                 [

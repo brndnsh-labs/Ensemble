@@ -879,6 +879,43 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of chord changes the comp anticipates: a sounding comp strike an eighth before the
+     * change that already plays the NEW chord: every guide tone (3rd and 7th) of the new chord
+     * sounds in it, which a voicing of the old chord does not do (its extensions can borrow one,
+     * rarely both). A strike an eighth early that still plays the old chord is
+     * not a push. A change whose guide tones the old chord already has can't be told
+     * apart, so it isn't counted.
+     */
+    compAnticipatesChange: (takes) => {
+        const hasPc = (strikes: PitchedNote[], tick: number, pc: number) =>
+            strikes.some((c) => Math.abs(c.tick - tick) < 1 && mod12(c.midi) === pc);
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const strikes = events.filter(
+                (e): e is PitchedNote => e.lane === 'comp' && !(e as PitchedNote).muted,
+            );
+            t.spans.forEach((span, i) => {
+                const before = t.spans[i - 1]?.chord;
+                if (i === 0 || !span.chord || !before || before.symbol === span.chord.symbol) {
+                    return;
+                }
+                const old = chordPcs(before);
+                const guides = [span.chord.third, span.chord.seventh]
+                    .filter((k): k is NonNullable<typeof k> => k !== null)
+                    .map((k) => mod12((span.chord?.root ?? 0) + k));
+                if (!guides.some((pc) => !old.includes(pc))) {
+                    return;
+                }
+                n++;
+                const early = strikes.filter((c) => Math.abs(c.tick - (span.start - 2 * STEP)) < 1);
+                const sounds = (c: PitchedNote) => guides.every((pc) => hasPc(strikes, c.tick, pc));
+                hit += early.length && sounds(early[0]) ? 1 : 0;
+            });
+        }
+        return ratio(hit, n);
+    },
     /** Share of sounding comp onsets in 4/4 bars that fall on beat 1 or beat 3. */
     compOnOneAndThree: (takes) => {
         let n = 0;
@@ -1582,6 +1619,52 @@ export const METRICS = {
             bars += t.bars.length;
         }
         return ratio(empty, bars);
+    },
+    /**
+     * Motif development rate: of the bars the lead opens a phrase in (it played none the bar
+     * before; three notes or more), the share that say the previous opening again: the same
+     * onsets and the same up/down shape. The lead asks for it in about 28% of its phrases (a
+     * 0.4 chance to develop, 0.7 of those not displaced); a bar whose rhythm came back with
+     * new intervals is a different idea and does not count. The claims' floors are measured, not the 28%: the match
+     * misses a motif the chord moved (the sign shape holds, the rest may not) and the peak and
+     * wind-down phrases never develop. Each floor sits midway between the rate with the fix
+     * reverted and with the fix in place; development off reads 0.02 to 0.07.
+     */
+    leadMotifDevelopment: (takes) => {
+        let n = 0;
+        let hit = 0;
+        let last: { timeline: Timeline; pass?: number; recent: string[] } | null = null;
+        for (const take of takes) {
+            const { timeline: t, events } = take;
+            // A pass continues the last one's memory; a new song or seed starts clean.
+            if (last && (last.timeline !== t || take.pass !== (last.pass ?? 0) + 1)) {
+                last = null;
+            }
+            const notes = leadNotes(events);
+            const played = new Set(notes.map((l) => l.bar));
+            const recent: string[] = last?.recent ?? [];
+            for (const index of [...played].sort((a, b) => a - b)) {
+                if (played.has(index - 1)) {
+                    continue;
+                }
+                const bar = notes.filter((l) => l.bar === index).sort((a, b) => a.tick - b.tick);
+                if (bar.length < 3) {
+                    continue;
+                }
+                const opening = `${bar.map((l) => stepOf(t, l)).join(',')}|${bar
+                    .slice(1)
+                    .map((l, i) => Math.sign(l.midi - bar[i].midi))
+                    .join('')}`;
+                if (recent.length) {
+                    n++;
+                    hit += recent.includes(opening) ? 1 : 0;
+                }
+                recent.push(opening);
+                recent.splice(0, recent.length - 3);
+            }
+            last = recent.length ? { timeline: t, pass: take.pass, recent } : null;
+        }
+        return ratio(hit, n);
     },
     /** Share of lead notes on a beat that are tones of the chord sounding. */
     leadChordToneOnBeats: (takes) => {
