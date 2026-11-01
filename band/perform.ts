@@ -16,6 +16,7 @@ import {
     type ChordSpan,
     chorusBars,
     firstSpanAfter,
+    sectionKey,
     type Timeline,
 } from './form/timeline.js';
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
@@ -217,7 +218,7 @@ export function performPass(
                             style.id,
                             lane,
                             'section',
-                            bar.visit.sectionIndex,
+                            sectionKey(bar.visit),
                             purpose,
                         )
                       : rng(settings.seed, style.id, lane, pass, place, purpose),

@@ -98,12 +98,14 @@ export const neosoul = defineClaims({
                 ['bassSilence', 0.15, 0.45, 'rests are part of the line'],
                 ['bassMeanPitch', 31, 38, 'a deep line, at the bottom of the neck'],
                 ['bassArrivesOnBass', 0.95, 1, 'the chord tone on every change: its bass note'],
-                // Measured 0.356. Against jazz walking's ~0.68: a half step into a change is a
+                // Measured 0.356 before #2007, 0.29 after (A2 shares the A's riff pick). Against jazz walking's ~0.68: a half step into a change is a
                 // choice here (half the sections, every phrase turn), not every change's habit;
                 // at 0.76 it was a mannerism that wrote over the riffs' own endings.
                 [
                     'bassChromaticApproach',
-                    0.3,
+                    // 0.3 before #2007: a repeated letter (A2) now shares the A's riff pick, so
+                    // the corpus holds fewer independent draws and lands at 0.29 on these seeds.
+                    0.25,
                     0.6,
                     'some changes are led into by a half step; many are carried by the riff',
                 ],

@@ -14,7 +14,7 @@
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';
-import { type Bar, chordAt } from '../form/timeline.js';
+import { type Bar, chordAt, sectionKey } from '../form/timeline.js';
 import {
     BASS,
     bassNote,
@@ -343,7 +343,7 @@ function takesAdd9(ctx: BarContext, bar: Bar, chord: ChordFacts): boolean {
     const chance = (bar.key.minor ? ADD9_MINOR : ADD9_MAJOR)[degree] ?? ADD9_ELSEWHERE;
     // Keyed on the chord's section by hand (`scope: 'section'` is this bar's own), so the
     // next bar's chord is judged by its own section's choice.
-    const key = `add9:${bar.visit.sectionIndex}:${degree}:${chord.family}`;
+    const key = `add9:${sectionKey(bar.visit)}:${degree}:${chord.family}`;
     return ctx.rng(key, 'song').chance(chance);
 }
 
