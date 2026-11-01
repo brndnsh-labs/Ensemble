@@ -100,6 +100,7 @@ export const country = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['compLeadUnison', 0, 0.15, "the piano leaves the picker's note to the picker"],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chords'],
@@ -113,6 +114,7 @@ export const country = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['compLeadUnison', 0, 0.15, "the piano leaves the picker's note to the picker"],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.15, 0.45, 'the solo breathes'],
                 [

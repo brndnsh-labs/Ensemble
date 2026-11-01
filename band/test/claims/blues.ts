@@ -89,6 +89,7 @@ export const blues = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0.15, 0.4, 'a call, then a bar of room for the band to answer'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the call sits on the chord on the beats'],
@@ -100,6 +101,7 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 [
                     'leadMotifDevelopment',
                     0.085,

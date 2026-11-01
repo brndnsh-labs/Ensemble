@@ -51,6 +51,7 @@ export const rock = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['compLeadUnison', 0, 0.15, 'the piano voices under the tune, rarely on its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chords'],
@@ -61,6 +62,7 @@ export const rock = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['compLeadUnison', 0, 0.15, 'the piano voices under the tune, rarely on its note'],
                 [
                     'leadMotifDevelopment',
                     0.08,

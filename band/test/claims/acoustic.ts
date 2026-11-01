@@ -587,6 +587,12 @@ export const acoustic = defineClaims({
             ],
         },
         {
+            take: { lead: 'solo', comp: 'nylon' },
+            claims: [
+                ['compLeadUnison', 0, 0.15, "the rhythm guitar leaves the lead's note to the lead"],
+            ],
+        },
+        {
             take: { lead: 'head' },
             claims: [
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],

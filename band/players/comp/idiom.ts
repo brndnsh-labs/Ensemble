@@ -6,13 +6,14 @@
  */
 import { type EnergyTier, energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
-import type { PitchedNote } from '../../core/types.js';
+import { type PitchedNote, PPQ } from '../../core/types.js';
 import type { Bar } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
+import { mod12 } from '../../theory/pitch.js';
 import { at, barSteps, dyn, endingSpans, STEP, spanSteps } from '../grid.js';
 import { type GripShape, grip } from './fretboard.js';
-import { type VoicingKind, voice } from './voicing.js';
+import { type LeadOver, type VoicingKind, voice } from './voicing.js';
 
 export interface Hit {
     step: number;
@@ -133,8 +134,22 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             const shape = !plan.lanes.bass && book.alone ? book.alone : book.grip;
             const kindOf = (chord: ChordFacts) =>
                 typeof book.kind === 'function' ? book.kind(chord) : book.kind;
-            const place = (chord: ChordFacts, prev: number[] | null) =>
-                shape ? grip(chord, kindOf(chord), shape, prev) : voice(chord, kindOf(chord), prev);
+            // The comp hears the lead before it plays (perform.ts), so each placement knows
+            // which lead notes will sound over it, from the strike to where the hand lets go
+            // (a step range in this bar), and sits under them (#2014).
+            const place = (
+                chord: ChordFacts,
+                prev: number[] | null,
+                sounds: readonly (readonly [number, number])[] = [],
+            ) => {
+                const lead = leadOver(
+                    ctx.heard.lead,
+                    sounds.map(([from, to]) => [at(bar, from), at(bar, to)] as const),
+                );
+                return shape
+                    ? grip(chord, kindOf(chord), shape, prev, lead)
+                    : voice(chord, kindOf(chord), prev, lead);
+            };
             const tier = energyTier(plan.energy);
             const total = barSteps(bar);
             const events: PitchedNote[] = [];
@@ -145,8 +160,19 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 length: number,
                 velocity: number,
                 hit?: { stroke?: 'down' | 'up'; muted?: boolean; palm?: boolean },
+                chord?: ChordFacts,
             ) => {
-                for (const m of midi) {
+                const sounded = chord
+                    ? leaveTheLeadItsNote(
+                          midi,
+                          chord,
+                          ctx.heard.lead,
+                          at(bar, step),
+                          at(bar, step) + length * STEP,
+                          !!hit?.stroke,
+                      )
+                    : midi;
+                for (const m of sounded) {
                     const note: PitchedNote = {
                         lane: 'comp',
                         tick: at(bar, step),
@@ -180,8 +206,9 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     if (!span.chord) {
                         return;
                     }
-                    prev = place(span.chord, prev);
                     const until = spans[i + 1]?.span.chord ? to : total;
+                    prev = place(span.chord, prev, [[from, until]]);
+                    // The held ending sounds its whole chord: nothing is left to the lead.
                     chordAt(prev, from, until - from, 92, shape && { stroke: 'down' });
                     held = span.chord.symbol;
                 });
@@ -372,28 +399,44 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             }
             let held: ChordFacts | null = null;
             let ahead = false;
-            planned.forEach((hit, i) => {
-                // A new strike cuts the chord before it: one hand, one chord at a time. A
-                // sustaining instrument (the organ) holds each chord until that next strike.
-                const next = planned[i + 1];
-                // Only an anticipation rings over the barline (it is tied into the next bar);
-                // anything else stops there, and the next bar decides what sounds.
+            // How long a planned strike sounds (in steps). A new strike cuts the chord before
+            // it: one hand, one chord at a time. A sustaining instrument (the organ) holds each
+            // chord until that next strike. Only an anticipation rings over the barline (it is
+            // tied into the next bar); anything else stops there, and the next bar decides
+            // what sounds.
+            const lengthOf = (k: number) => {
+                const hit = planned[k];
+                const next = planned[k + 1];
                 const room = next
                     ? next.step - hit.step
                     : hit.early
                       ? hit.length
                       : total - hit.step;
-                const length = legato ? room : Math.min(hit.length, room);
+                return legato ? room : Math.min(hit.length, room);
+            };
+            planned.forEach((hit, i) => {
+                const length = lengthOf(i);
                 if (!shape) {
                     // A pianist re-voices every strike, leading from the last one. An organ
                     // re-articulating the chord it holds keeps its shape.
-                    prev = hit.again && prev ? prev : place(hit.chord, prev);
+                    prev =
+                        hit.again && prev
+                            ? prev
+                            : place(hit.chord, prev, [[hit.step, hit.step + length]]);
                 } else if (!prev || (hit.chord !== held && (!hit.muted || !ahead))) {
                     // A guitarist holds a grip and moves to the next as its chord arrives, so a
                     // scratch on that chord's first sixteenth deadens the new shape. After an
                     // anticipation the hand already holds the next chord: a scratch deadens
                     // that, it never jumps back to the old shape for one sixteenth.
-                    prev = place(hit.chord, prev);
+                    // The grip sounds at each strike until one on another chord: those
+                    // strikes are what the lead hears it against (a scratch is pitchless).
+                    const sounds: [number, number][] = [];
+                    for (let k = i; k < planned.length && planned[k].chord === hit.chord; k++) {
+                        if (!planned[k].muted) {
+                            sounds.push([planned[k].step, planned[k].step + lengthOf(k)]);
+                        }
+                    }
+                    prev = place(hit.chord, prev, sounds);
                     held = hit.chord;
                 }
                 if (!hit.muted) {
@@ -405,7 +448,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 }
                 // An upstroke catches the top three strings; the downstroke carries the chord.
                 const notes = hit.stroke === 'up' && prev.length > 3 ? prev.slice(-3) : prev;
-                chordAt(notes, hit.step, length, hit.velocity, hit);
+                chordAt(notes, hit.step, length, hit.velocity, hit, hit.chord);
             });
             // What the hand holds going into the next bar: the last chord struck, unless the
             // bar ends in an N.C.
@@ -424,6 +467,92 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             };
         },
     };
+}
+
+/**
+ * A strike's voices, less those the lead sits on (#2014): a voice on the lead's very pitch for
+ * half the strike, or for a beat, is left out — the soloist is playing that note, and a unison
+ * under it smears the line into the chord. The voicing search (`leadCost`) avoids most of
+ * them; this takes what it couldn't, when the line moves too much under one chord to clear.
+ * A guide tone stays (the chord must still name itself), as does the bottom voice, and at
+ * least two voices sound. A guitar just doesn't sound that string: a grip less a string is
+ * still a grip.
+ *
+ * One exception, on a stroked guitar: a three-string chord whose guide tone the lead holds
+ * right through the strike becomes a double-stop of the other two, provided they keep the
+ * other guide tone (disco's 3-7-9 chuck under a sax holding the 3rd plays its b7 and 9). The
+ * grip can't dodge there — high on the neck, the 3rd has nowhere else to go — and the band
+ * still sounds the whole chord: the 3rd is in the lead.
+ */
+function leaveTheLeadItsNote(
+    notes: number[],
+    chord: ChordFacts,
+    lead: readonly PitchedNote[],
+    from: number,
+    to: number,
+    stroked: boolean,
+): number[] {
+    if (!lead.length || notes.length <= 2) {
+        return notes;
+    }
+    const bottom = Math.min(...notes);
+    const guides = new Set(chord.guides.map((g) => mod12(chord.root + g)));
+    const unisonOn = (m: number) => {
+        let unison = 0;
+        for (const l of lead) {
+            if (l.midi === m) {
+                unison += Math.max(0, Math.min(to, l.tick + l.dur) - Math.max(from, l.tick));
+            }
+        }
+        return unison;
+    };
+    let kept = notes;
+    // Top voice first: the one most in the lead's way.
+    for (const m of [...notes].sort((a, b) => b - a)) {
+        if (kept.length <= 2 || m === bottom || guides.has(mod12(m))) {
+            continue;
+        }
+        const unison = unisonOn(m);
+        // why: half the strike, or a beat — a lead note that only brushes the chord (a
+        // passing eighth across a held strike) leaves the voice where it is; one the line sits
+        // on, or holds for a beat under a long chord, takes it.
+        if (unison * 2 >= to - from || unison >= PPQ) {
+            kept = kept.filter((k) => k !== m);
+        }
+    }
+    if (stroked && kept.length === 3) {
+        const held = kept.find((m) => guides.has(mod12(m)) && unisonOn(m) >= to - from);
+        const pair = kept.filter((m) => m !== held);
+        if (held !== undefined && pair.some((m) => guides.has(mod12(m)))) {
+            return pair;
+        }
+    }
+    return kept;
+}
+
+/**
+ * The lead notes sounding while a placement does (tick ranges: its strikes), each with the
+ * share of that time it sounds over it (`leadCost` in voicing.ts). The same pitch struck
+ * twice adds up.
+ */
+function leadOver(
+    lead: readonly PitchedNote[],
+    sounds: readonly (readonly [number, number])[],
+): LeadOver[] {
+    const span = sounds.reduce((sum, [from, to]) => sum + Math.max(0, to - from), 0);
+    if (span <= 0 || !lead.length) {
+        return [];
+    }
+    const shares = new Map<number, number>();
+    for (const l of lead) {
+        for (const [from, to] of sounds) {
+            const overlap = Math.min(to, l.tick + l.dur) - Math.max(from, l.tick);
+            if (overlap > 0) {
+                shares.set(l.midi, (shares.get(l.midi) ?? 0) + overlap / span);
+            }
+        }
+    }
+    return [...shares].map(([midi, share]) => ({ midi, share }));
 }
 
 /**

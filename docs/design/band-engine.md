@@ -266,7 +266,21 @@ expression devices take turns rather than stack; one peak note per cycle.
   the major 3rd from the blue third, the root or 5th from a whole step); a horn scoops now and
   then. The host plays the lead on today's soloist voices and packs.
 - **The comp gives the lead its register.** While the lead sounds, a keyboard voice at or
-  above it drops an octave (never below middle C). A guitar grip is a hand shape and stays.
+  above it drops an octave (never below middle C), and never onto a note the lead is playing.
+  A guitar grip is a hand shape and stays.
+- **The comp leaves the soloist its note** (#2014). The comp hears the lead before it plays, so
+  each voicing and grip is chosen against the lead notes that will sound over it
+  (`leadCost` in `players/comp/voicing.ts`): a voice on the lead's pitch costs, weighed by how
+  long that note sounds over the chord, and one an octave from it costs half. Keyboards stay
+  in their register to do it; an open-position acoustic keeps its cowboy shapes. What the
+  search can't clear, the strike leaves out (`leaveTheLeadItsNote` in `players/comp/idiom.ts`):
+  a voice the lead sits on for half the strike or a beat, never a guide tone or the bottom
+  voice, at least two voices left. A stroked three-string chord whose guide tone the lead
+  holds right through becomes a double-stop of the other two, if they keep the other guide
+  tone (disco's 3-7-9 chuck under a sax on the 3rd). The held ending sounds its whole chord.
+  - Claim, every style on its own comp instrument and the piano styles head and solo:
+    `compLeadUnison`, the share of the time the lead sounds over the comp that a comp voice
+    is on its pitch, ≤15% (it was 19–55% before; an octave from the line isn't counted).
 - **A conversational comp answers the lead** (`CompBook.answer`, `answerLead` in
   `players/comp/idiom.ts`). The styles that have one are the jazz piano, the neo-soul Rhodes
   and the blues pianist's rootless comp.

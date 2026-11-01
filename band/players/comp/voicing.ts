@@ -312,6 +312,54 @@ export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot
     return c;
 }
 
+/** A lead note sounding over a voicing, and the share (0–1) of the voicing's time it sounds. */
+export interface LeadOver {
+    midi: number;
+    share: number;
+}
+
+/**
+ * What the lead costs a placement (lower is better): the comp leaves the soloist's note to the
+ * soloist (#2014). A voice on the lead's pitch is a unison that smears the line into the
+ * chord; a voice an octave from it shadows the line. Each is weighed by the share of the
+ * chord's sounding time that lead note fills, so a passing sixteenth barely counts and a held
+ * note decides the voicing.
+ *
+ * why: a close voicing that sits wholly within the octave under a lead note holds every pitch
+ * class but the lead's, so a pianist sets the voicing just under the melody. The weights are
+ * set against `cost`'s voice leading (0.5 per semitone per voice, 0.6 more for the top): a
+ * held unison (26) outweighs moving the voicing by an inversion to clear it, so the comp steps
+ * aside rather than sit on the line — but stays under `cost`'s register wall (40 a note), so
+ * it never leaves the instrument's slot to do it. A unison the search keeps anyway (the line
+ * moves too much under one chord) is left out by the comp (`leaveTheLeadItsNote` in
+ * idiom.ts). A voice above the lead is not weighed here: on a keyboard `yieldToLead` in
+ * perform.ts drops it an octave, as before.
+ */
+export function leadCost(v: number[], lead: readonly LeadOver[]): number {
+    // why: a unison is the worst — two instruments on one pitch read as one smeared note.
+    // Measured (#2014): 14 left the keyboards on the line 12–24% of the time, since a guide
+    // tone can't be left out and only the search can move it. 26 brings every style under
+    // 12%; at 30 the keyboards began leaping an octave over a low line (top-voice moves past
+    // a fifth went from ~1% of changes to ~5%), so the weight stops short of that.
+    const UNISON = 26;
+    // why: an octave doubles the line (a block-chord soli the soloist didn't ask for); half a
+    // unison, since the ear still hears two voices. It is a tie-breaker between voicings that
+    // clear the unison: without it more of them land an octave from the line.
+    const OCTAVE = 7;
+    let c = 0;
+    for (const { midi, share } of lead) {
+        for (const m of v) {
+            const d = Math.abs(m - midi);
+            if (d === 0) {
+                c += UNISON * share;
+            } else if (d === 12) {
+                c += OCTAVE * share;
+            }
+        }
+    }
+    return c;
+}
+
 /**
  * A keyboard power chord: root, fifth and the root's octave, never inverted — a power chord
  * with its fifth underneath is a fourth, and loses the root the whole sound rests on.
@@ -329,13 +377,27 @@ function powerCandidates(chord: ChordFacts): number[][] {
     return out;
 }
 
-/** Place a chord's voicing near the previous one. Deterministic. */
-export function voice(chord: ChordFacts, kind: VoicingKind, prev: number[] | null): number[] {
+/**
+ * Place a chord's voicing near the previous one, under the lead notes sounding over it.
+ * Deterministic.
+ */
+export function voice(
+    chord: ChordFacts,
+    kind: VoicingKind,
+    prev: number[] | null,
+    lead: readonly LeadOver[] = [],
+): number[] {
     const pcs = voicingTones(chord, kind).map((n) => mod12(chord.root + n));
     let best: number[] | null = null;
     let bestCost = Infinity;
     for (const v of kind === 'power' ? powerCandidates(chord) : candidates(pcs, kind)) {
-        const c = cost(v, prev, chord, KEYS);
+        // why: a voice out of the register is cut below, and with it maybe a guide tone. The
+        // lead's costs can add past the register's own (two voices on the line), so under a
+        // lead an out-of-register placement isn't a candidate at all.
+        if (lead.length && v.some((m) => m < KEYS.lo || m > KEYS.hi)) {
+            continue;
+        }
+        const c = cost(v, prev, chord, KEYS) + leadCost(v, lead);
         if (c < bestCost) {
             best = v;
             bestCost = c;
