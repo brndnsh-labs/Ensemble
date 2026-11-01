@@ -303,6 +303,11 @@ export default function Ensemble() {
     });
     // The bar whose field is open on the chart (#1723), or null.
     const [openBar, setOpenBar] = useState<OpenBar | null>(null);
+    // The bar last opened: where focus returns when a Ctrl/⌘+S save leaves it nowhere (#1984).
+    const lastBarEdited = useRef<string | null>(null);
+    if (openBar) {
+        lastBarEdited.current = openBar.id;
+    }
     // The bar menu's "Repeat or ending…" (#1725): the Repeats and endings dialog over the chart,
     // reviewing every pending bar, on the bar it was opened from. `blocked`: the pending bars'
     // repeat markers make no form yet, so the dialog opens on the bar's own markers (#1758).
@@ -2873,6 +2878,55 @@ export default function Ensemble() {
         open,
     });
 
+    /** The Save button's action: a new song is kept, a shared draft copied, else a plain Save. */
+    function saveFromHeader() {
+        return run(async () => {
+            // Refs, not this render's state: a Save pressed while a new song
+            // was being kept waited for it (`run`) and must see it kept.
+            if (newSongNow.current) {
+                await keepNewSong(updateChart(), true);
+                setMessage('Saved on this device');
+            } else if (sharedDraftNow.current) {
+                await keepSharedCopy();
+            } else {
+                await save();
+            }
+        });
+    }
+    /**
+     * Ctrl/⌘+S (#1984): the Save button's action, then focus stays where the musician was. If the
+     * control they were in is gone by then, it goes back to the last bar they edited. A refusal
+     * that opened a bar to fix has already put focus in it, and is left alone.
+     */
+    function saveFromKeys() {
+        const from = document.activeElement;
+        const bar = lastBarEdited.current;
+        void saveFromHeader().then(() => {
+            // The control may be disabled while the action runs (the tempo field) and enabled by a
+            // render a frame or two later, so try for a few frames before giving up.
+            let frames = 0;
+            const restore = () => {
+                const now = document.activeElement;
+                if (now && now !== document.body) {
+                    return;
+                }
+                if (from instanceof HTMLElement && from !== document.body && from.isConnected) {
+                    from.focus({ preventScroll: true });
+                    if (document.activeElement === from || ++frames > 10) {
+                        return;
+                    }
+                    requestAnimationFrame(restore);
+                } else if (bar) {
+                    scroll.current
+                        ?.querySelector<HTMLElement>(
+                            `[data-measure-id="${CSS.escape(bar)}"] .bar-number`,
+                        )
+                        ?.focus({ preventScroll: true });
+                }
+            };
+            requestAnimationFrame(restore);
+        });
+    }
     useStandKeys({
         current,
         busy,
@@ -2882,6 +2936,8 @@ export default function Ensemble() {
         scroll,
         togglePlayback,
         setFollowing,
+        canSave: !busy && dirty,
+        saveFromKeys,
     });
 
     // The songbook home itself, not the stand or one of its two sub-views (#1441): the top bar's
@@ -2890,6 +2946,13 @@ export default function Ensemble() {
 
     return (
         <div className={`app-shell ${current ? 'song-open' : ''}`}>
+            {current && !neckShowing && (
+                // The first Tab stop (#1984): the header, transport and settings come before the
+                // chart. A button, not a `#hash` link: the address bar belongs to the chart link.
+                <button type="button" className="skip-link" onClick={() => scroll.current?.focus()}>
+                    Skip to chart
+                </button>
+            )}
             <header className="site-header" hidden={!!current} data-home={homeView}>
                 <button
                     className="brand"
@@ -3301,20 +3364,7 @@ export default function Ensemble() {
                         onShowNeck={() => showStand('neck')}
                         onEditChart={editChart}
                         onTitle={(title) => draft({ ...current, title })}
-                        onSave={() =>
-                            void run(async () => {
-                                // Refs, not this render's state: a Save pressed while a new song
-                                // was being kept waited for it (`run`) and must see it kept.
-                                if (newSongNow.current) {
-                                    await keepNewSong(updateChart(), true);
-                                    setMessage('Saved on this device');
-                                } else if (sharedDraftNow.current) {
-                                    await keepSharedCopy();
-                                } else {
-                                    await save();
-                                }
-                            })
-                        }
+                        onSave={() => void saveFromHeader()}
                         menuButtonRef={songMenuTrigger}
                         onMenu={toggleSongMenu}
                     />
