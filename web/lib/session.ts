@@ -416,6 +416,29 @@ export function rememberCountIn(value: boolean): void {
     }
 }
 
+const AUTO_SOUNDS = 'ensemble-v2-preview:auto-sounds';
+
+/**
+ * Whether the band fetches its style's sounds by itself when it plays (#1997): on unless this
+ * device turned it off (the Players tab's switch). A device habit, never part of a chart. A
+ * browser that refuses storage reads as on; with no Cache Storage the fetch skips itself anyway.
+ */
+export function autoSoundsPreference(): boolean {
+    try {
+        return localStorage.getItem(AUTO_SOUNDS) !== '0';
+    } catch {
+        return true;
+    }
+}
+
+export function rememberAutoSounds(value: boolean): void {
+    try {
+        localStorage.setItem(AUTO_SOUNDS, value ? '1' : '0');
+    } catch {
+        // Storage refused: the band fetches as it would by default (`autoSoundsPreference`).
+    }
+}
+
 const SONG_MODE = 'ensemble-v2-preview:song-mode';
 /** The lengths song mode offers, in minutes (#1784); Off is no stored value at all. */
 export const SONG_MINUTES = [3, 4, 5] as const;

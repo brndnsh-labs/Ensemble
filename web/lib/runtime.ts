@@ -1,5 +1,6 @@
 import {
     type BandSettings,
+    barAtTick,
     compileTimeline,
     DEFAULT_SETTINGS,
     type LeadInstrument,
@@ -82,6 +83,7 @@ import { loopEntry, loopScore, loopView } from './section-loop';
 import {
     countInPreference,
     masterVolumePreference,
+    rememberAutoSounds,
     rememberCountIn,
     rememberMasterVolume,
     rememberSongMode,
@@ -97,9 +99,10 @@ import {
     seedInstalledSounds,
     validateVoice,
 } from './sounds';
+import { createStyleSounds, type StyleSoundsStatus } from './style-sounds';
 import { track } from './telemetry';
 
-export type { ChartDocument, SongMinutes, StemInstrument };
+export type { ChartDocument, SongMinutes, StemInstrument, StyleSoundsStatus };
 export { GENRE_NAMES };
 
 let boot: Promise<void> | undefined;
@@ -373,6 +376,7 @@ function startBand(freshPlay = false): void {
         throw error;
     }
     param('playback', 'isPlaying', true);
+    everPlayed = true;
     track('play_started');
     warmDrums();
 }
@@ -588,7 +592,7 @@ function syncBand(): void {
     }
     // The genre-change effect in `core/` picks the old engine's Auto sound; on the band,
     // a native genre's own comp instrument wins (bossa is heard on nylon). Only an installed
-    // pack is taken, since Follow feel never downloads (#1405).
+    // pack is taken (#1405); a missing one is fetched behind the band on Play (#1997).
     const { chords, soloist } = getState();
     const auto = bandAutoComp(groove.lastSmartGenre);
     if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
@@ -616,6 +620,124 @@ function syncBand(): void {
     }
     host.setTempo(playback.bpm);
     host.update(bandSettings());
+}
+
+// ---------------------------------------------------------------- the style's own sounds
+/** The band has played on this page: a style change from now on fetches its sounds too. */
+let everPlayed = false;
+/**
+ * How far ahead of the audio clock the band host sends notes to the voices (`band-host.ts`'s
+ * `LOOKAHEAD_S`). A lane's sound is read when its note is sent, so a sound changed this long
+ * before a barline is first heard on that barline.
+ */
+const SEND_AHEAD_S = 0.15;
+const soundsResolved = new Set<() => void>();
+
+/**
+ * Resolve once the band is about to send the next barline's notes, so a sound changed then is
+ * first heard on the barline (#1997); at once while stopped. Read off the host's song tick and
+ * the timeline it plays, at the transport's tempo — the same clock `inLastBeat` reads.
+ */
+function beforeNextBarline(): Promise<void> {
+    const deadline = Date.now() + STAGED_FEEL_TIMEOUT_MS;
+    return new Promise((resolve) => {
+        const check = () => {
+            const timeline = songPlan?.timeline ?? currentTimeline?.timeline;
+            if (!band?.playing || !timeline || Date.now() > deadline) {
+                resolve();
+                return;
+            }
+            const tick = band.songTick();
+            if (tick === null) {
+                // Counting in, or between two queued segments: look again shortly.
+                setTimeout(check, 100);
+                return;
+            }
+            const bar = barAtTick(timeline, tick);
+            if (!bar) {
+                resolve();
+                return;
+            }
+            const ticksPerSecond = (PPQ * getState().playback.bpm) / 60;
+            const seconds = (bar.start + bar.meter.barTicks - tick) / ticksPerSecond;
+            const wait = seconds - SEND_AHEAD_S;
+            if (wait < 0.02) {
+                // Too close to make this one: past it, then aim for the next.
+                setTimeout(check, (seconds + 0.05) * 1000);
+            } else {
+                setTimeout(resolve, wait * 1000);
+            }
+        };
+        check();
+    });
+}
+
+/**
+ * Packs the playing style wants on a lane that follows it (`autoSound`) and that is on, and that
+ * this device has not installed. A pinned lane — Built-in or a pack chosen by hand — is never
+ * asked about, so a chart saved with its own sounds keeps them. A lane that is off is skipped:
+ * it is not heard, and the next Play after it is turned on fetches it.
+ */
+function stylePacksWanted(): string[] {
+    const state = getState();
+    const wanted = new Set<string>();
+    for (const module of AUTO_LANES) {
+        if (!state[module].autoSound || !state[module].enabled) {
+            continue;
+        }
+        const voice = recommendedVoice(module, undefined, undefined, () => true);
+        if (voice !== 'synth' && !isPackInstalled(voice.slice(5))) {
+            wanted.add(voice.slice(5));
+        }
+    }
+    return [...wanted];
+}
+
+/**
+ * Packs arrived: move every Follow-feel lane onto what is now installed, by the rule a style
+ * change uses (`resolveAutoVoices`). While playing, at the next barline, and without a rebuild
+ * (that would cut off the notes already sent); the band plays straight through. Then tell the
+ * shell, which shows the document as resolved on this device (`withLoadedSounds`), so a sound
+ * that arrived is not an unsaved change.
+ */
+async function switchToArrivedSounds(): Promise<void> {
+    await beforeNextBarline();
+    resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
+    if (!band?.playing) {
+        rebuild();
+    }
+    for (const listener of soundsResolved) {
+        listener();
+    }
+}
+
+const styleSounds = createStyleSounds({
+    wanted: stylePacksWanted,
+    prepare: (id) => prepareSound(id, () => {}),
+    arrived: switchToArrivedSounds,
+});
+
+/** What the stand shows about the style's sounds being fetched (#1997). */
+export const styleSoundsStatus = styleSounds.status;
+export const onStyleSoundsStatus = styleSounds.subscribe;
+/** The stand's offer, taken: fetch now, past Save-Data, and say a failure. */
+export function getStyleSounds(): Promise<void> {
+    return styleSounds.request(true);
+}
+export const declineStyleSounds = styleSounds.decline;
+/** Follow-feel lanes moved onto sounds that arrived in the background. */
+export function onSoundsResolved(listener: () => void): () => void {
+    soundsResolved.add(listener);
+    return () => {
+        soundsResolved.delete(listener);
+    };
+}
+/** The Players tab's switch: fetch the style's sounds when the band plays, or don't. */
+export function setAutoSounds(enabled: boolean): void {
+    rememberAutoSounds(enabled);
+    if (enabled && band?.playing) {
+        void styleSounds.request();
+    }
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -715,7 +837,8 @@ export function initialize(): Promise<void> {
             // #1405 — before any chart opens, so Follow feel resolves against what this device
             // really holds. Local and bounded (`seedInstalledSounds`); no network.
             await seedInstalledSounds();
-            // Guest startup must not download audio without an install/selection gesture.
+            // Guest startup downloads no audio: the style's sounds are fetched only once the band
+            // plays (#1997, `styleSounds`), or by an install/selection gesture.
             for (const module of ['groove', 'bass', 'chords', 'soloist'] as const) {
                 param(module, 'autoSound', false);
             }
@@ -872,6 +995,7 @@ export async function startSection(
     const start = (songPlan && sectionSteps(songPlan.view, sectionId)) || bounds;
     dispatch(ACTIONS.SET_START_STEP, start.start);
     startBand(true);
+    void styleSounds.request();
     return true;
 }
 
@@ -986,6 +1110,7 @@ export async function toggle(progress: SoundProgress): Promise<void> {
         return;
     }
     startBand(true);
+    void styleSounds.request();
 }
 
 /** What a browser without Web Audio (or one that refuses to start it) is told, in one sentence. */
@@ -1262,6 +1387,7 @@ export function recommendedVoice(
     module: InstrumentModule,
     genre?: string,
     chordStyle?: string,
+    installed: (packId: string) => boolean = isPackInstalled,
 ): InstrumentVoice {
     const state = getState();
     const bandVoice =
@@ -1270,17 +1396,18 @@ export function recommendedVoice(
             : module === 'soloist'
               ? bandAutoLead(genre ?? state.groove.lastSmartGenre)
               : null;
-    if (bandVoice && (bandVoice === 'synth' || isPackInstalled(bandVoice.slice(5)))) {
+    if (bandVoice && (bandVoice === 'synth' || installed(bandVoice.slice(5)))) {
         return bandVoice;
     }
-    // Follow feel plays only what this device has installed and never downloads by itself
-    // (#1405, as v1 did); "Install all & use genre sounds" is the download gesture. Installed
-    // is the cache (`seedInstalledSounds`) plus whatever this page has loaded, and every caller
-    // still prepares — verifies and decodes — the files before committing the choice or playing.
+    // Follow feel plays only what this device has installed (#1405, as v1 did). Installed is the
+    // cache (`seedInstalledSounds`) plus whatever this page has loaded, and every caller still
+    // prepares — verifies and decodes — the files before committing the choice or playing. What
+    // it is not yet installed is fetched in the background when the band plays (#1997,
+    // `styleSounds`), which asks this with `installed` always true to learn what the style wants.
     return autoVoiceForGenre(
         genre ?? state.groove.lastSmartGenre,
         module,
-        isPackInstalled,
+        installed,
         chordStyle ?? state.chords.style,
     );
 }
@@ -1420,6 +1547,18 @@ export function withLoadedSounds<T extends ChartDocument>(document: T): T {
 }
 
 /**
+ * `document` resolved on this device as the open chart now is (#1997), for the shell to show a
+ * sound that arrived in the background as no edit. Only a document of the genre playing now:
+ * the live lanes say nothing about how another genre's Follow-feel lanes resolve, so one of
+ * another genre (a saved copy the musician has since restyled) is returned as it is.
+ */
+export function resolvedHere<T extends ChartDocument>(document: T): T {
+    return document.chart.band.groove.genre === getState().groove.lastSmartGenre
+        ? withLoadedSounds(document)
+        : document;
+}
+
+/**
  * Verify — downloading only if a file is missing — every sound the incoming feel
  * will select for a lane still on Auto. Deliberately runs before any engine state
  * changes: nothing is committed while this is in flight, so a failure has nothing
@@ -1499,6 +1638,11 @@ export async function setGenre(name: string, progress: SoundProgress = () => {})
         // auto-voice effects are the entire engine change: no teardown, no rebuild, no
         // restart. A `rebuild()` here would kill the notes the band has just scheduled.
         resolveAutoVoices(getState(), name, dispatch);
+        // The new style's own sounds, fetched behind the band if this device lacks them (#1997).
+        // Only once something has played: a style picked on a stand never played waits for Play.
+        if (staged || everPlayed) {
+            void styleSounds.request();
+        }
         if (!staged) {
             rebuild();
             return;

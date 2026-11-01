@@ -118,9 +118,11 @@ network-disconnection harness is local-only.
   existing genre sound map to the current draft. Per-lane Follow feel updates on genre changes;
   a manual choice pins that lane. Other saved songs are not rewritten. Save keeps the chosen
   setup, including Follow feel, and Revert restores it. Follow feel plays only what this device
-  has installed and never downloads by itself (#1405): startup reads the installed packs from
-  the sound cache, and opening a song resolves each Follow-feel lane against them, so a device
-  with nothing installed stays built-in-only until a sound-selection/install gesture. Starters
+  has installed (#1405): startup reads the installed packs from the sound cache, and opening a
+  song resolves each Follow-feel lane against them. Since #1997 (2026-11-01, reversing #1405's
+  "never downloads by itself") Play fetches the playing style's packs in the background and the
+  Follow-feel lanes move onto them at a barline without stopping; Save-Data makes that a one-tap
+  offer, the Players tab can turn it off, and pinned lanes are never touched. Starters
   and new songs start on Follow feel. Existing decoding,
   sample playback, calibrated gain and voice effects are reused without musical changes. A host
   asset-fetch adapter maps original pack URLs into `/packs/`. The

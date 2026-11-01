@@ -34,6 +34,7 @@ import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
 import {
     allSongsSortPreference,
+    autoSoundsPreference,
     rememberAllSongsSort,
     rememberSong,
     rememberStandMode,
@@ -120,6 +121,7 @@ import { useStageTheme } from './use-stage-theme';
 import { useStandConflict } from './use-stand-conflict';
 import { useStandKeys } from './use-stand-keys';
 import { useStandToast } from './use-stand-toast';
+import { useStyleSounds } from './use-style-sounds';
 
 // The neck and its voicer load only when the neck first shows (#1877).
 const NeckStand = lazy(() => import('./neck-stand'));
@@ -378,6 +380,44 @@ export default function Ensemble() {
     const soundSink: SoundProgress = (text, fraction) => progressGate.current(text, fraction);
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
     const [allSoundsOffline, setAllSoundsOffline] = useState<boolean | null>(null);
+    // The style's sounds, fetched behind the band (#1997). When Follow-feel lanes move onto
+    // sounds that arrived, the chart on the stand — and its saved and original baselines — show
+    // them as resolved on this device (`runtime.resolvedHere`, as an open does), so a sound that
+    // arrived is never an unsaved change. A pinned lane is untouched by both. Deferred while an
+    // action holds the shell (`working`): a Save that captured its document before the switch
+    // would otherwise land a baseline on the old sounds after this ran.
+    function resolveArrivedSounds(): boolean {
+        if (working.current) {
+            return false;
+        }
+        const now = currentNow.current;
+        if (!now) {
+            return true;
+        }
+        const resolved = runtime.resolvedHere(now);
+        // Unchanged (nothing on this chart followed the style onto a new sound): the same
+        // object, so nothing that keys on it — a delete's Undo offer — is retired for nothing.
+        if (!sameData(resolved.chart.band, now.chart.band)) {
+            setCurrent(resolved);
+            currentNow.current = resolved;
+        }
+        const savedDoc = savedNow.current;
+        if (savedDoc?.id === now.id) {
+            const resolvedSaved = runtime.resolvedHere(savedDoc);
+            if (!sameData(resolvedSaved.chart.band, savedDoc.chart.band)) {
+                setSaved(resolvedSaved);
+                savedNow.current = resolvedSaved;
+            }
+        }
+        if (draftBaseline.current?.id === now.id) {
+            draftBaseline.current = runtime.resolvedHere(draftBaseline.current);
+        }
+        void soundsAvailableOffline(resolved.chart).then(setSoundsOffline);
+        return true;
+    }
+    const styleSounds = useStyleSounds(resolveArrivedSounds, busy);
+    // The Players tab's switch (#1997): fetch each style's sounds when the band plays.
+    const [autoSounds, setAutoSounds] = useState(autoSoundsPreference);
     // The Band sheet (#1703): closed, or open on one of its tabs. `lastBandTab` is where the
     // transport's Band button reopens it — the tab the musician was last on.
     const [bandTab, setBandTab] = useState<BandTab | null>(null);
@@ -3517,6 +3557,11 @@ export default function Ensemble() {
                                     change(() => runtime.setReverb(lane, value))
                                 }
                                 onToggleLane={toggleLane}
+                                autoSounds={autoSounds}
+                                onAutoSounds={(enabled) => {
+                                    setAutoSounds(enabled);
+                                    runtime.setAutoSounds(enabled);
+                                }}
                             />
                         }
                         groove={
@@ -3695,6 +3740,9 @@ export default function Ensemble() {
                             setFollowing(true);
                             scroll.current?.focus({ preventScroll: true });
                         }}
+                        styleSounds={styleSounds}
+                        onGetStyleSounds={() => void runtime.getStyleSounds()}
+                        onDeclineStyleSounds={runtime.declineStyleSounds}
                     />
                 </main>
             )}

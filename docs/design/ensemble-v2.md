@@ -66,9 +66,21 @@ downloads the existing catalog and applies established genre defaults to the cur
 Follow feel and manual overrides belong to the saved setup; installation never rewrites other
 saved songs. This is not a new sound-design or whole-library migration project.
 (#1405, 2026-09-24) Installing is durable, so activating is too: Follow feel resolves at open
-against the packs this device has installed, as v1 did, and never downloads by itself. Starters
+against the packs this device has installed, as v1 did, and (until #1997, below) never downloaded
+by itself. Starters
 and new songs default to it, and songs last saved before the change open their built-in pins
 on Follow feel, a read-time upgrade that a Save persists rather than a rewrite of the library.
+(#1997, DECISION 2026-11-01, Brandon — reverses "never downloads by itself") The sampled band
+sounds much better, and the built-in sounds should not hold a first visit back. So Play fetches
+the playing style's packs in the background (`web/lib/style-sounds.ts`): the band starts on
+built-in as before, and once the packs are ready the Follow-feel lanes move onto them at a
+barline without stopping; a style change does the same for the new style. Follow feel still
+resolves only against what is installed, a lane pinned to a sound (Built-in included) is never
+touched, and a lane that is off is not fetched for. Save-Data turns the download into a one-tap
+offer with its size; a device can turn it off in the Players tab; with no Cache Storage it is
+skipped. A failure is quiet and the next Play tries again; only a download the musician asked
+for says why it failed. Built-in stays the offline fallback, and Install all the way to get
+every pack at once.
 
 This approved v2 direction supersedes VISION's absolute no-accounts/no-backend language and the
 old no-navigation premise for this preview. It does not change the production app until an

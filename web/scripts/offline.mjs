@@ -237,6 +237,11 @@ self.addEventListener('fetch', event => {
     if (event.request.method !== 'GET' || url.origin !== self.location.origin || !url.pathname.startsWith(SCOPE)) return;
     if (url.pathname === SCOPE + 'sw.js') return;
     if (PASSES.some(prefix => url.pathname === prefix || url.pathname.startsWith(prefix + '/'))) return;
+    // Sound files are never in this cache (ASSETS leaves them out; \`lib/sounds.ts\` keeps its own),
+    // so they go straight to the network. Answered here, an offline miss failed respondWith,
+    // which WebKit reports as a page error even when the page catches its fetch (#1997: the
+    // band's background sound fetch, offline); answered by the network, it is only a failed fetch.
+    if (url.pathname.startsWith(SCOPE + 'packs/')) return;
     event.respondWith((async () => {
         const cache = await caches.open(CACHE);
         const key = url.pathname;${navigationFallback}

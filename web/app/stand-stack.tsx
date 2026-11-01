@@ -1,4 +1,5 @@
 import { useCallback, useRef } from 'react';
+import type { StyleSoundsStatus } from '../lib/runtime';
 import type { DeleteUndo } from './use-delete-undo';
 
 /**
@@ -22,6 +23,9 @@ export function StandStack({
     dismissSyncFailure,
     showResume,
     onResumeFollow,
+    styleSounds,
+    onGetStyleSounds,
+    onDeclineStyleSounds,
 }: {
     toastTone: 'busy' | 'warning' | 'info';
     toastText: string | null;
@@ -40,6 +44,10 @@ export function StandStack({
     /** Playing, not following, and no neck up: there is something to resume TO. */
     showResume: boolean;
     onResumeFollow: () => void;
+    /** The style's sounds being fetched behind the band, or offered under Save-Data (#1997). */
+    styleSounds: StyleSoundsStatus;
+    onGetStyleSounds: () => void;
+    onDeclineStyleSounds: () => void;
 }) {
     /**
      * Re-review P3 — measures `.stand-stack`'s ACTUAL rendered height (0 when nothing shows,
@@ -153,6 +161,41 @@ export function StandStack({
                             onClick={onUndo}
                         >
                             Undo
+                        </button>
+                    </>
+                )}
+            </div>
+            {/*
+             * The style's sounds (#1997): one quiet line while they download behind the band,
+             * gone when they land, or under Save-Data a one-tap offer with their size. Always
+             * mounted, as the toast is, so its text change is announced. A quiet failure says
+             * nothing; one the musician asked for (the offer's button) says why, on the offer.
+             */}
+            <div
+                className="stand-toast stand-sounds"
+                role="status"
+                data-testid="stand-sounds"
+                data-empty={styleSounds.kind === 'idle'}
+            >
+                {styleSounds.kind === 'fetching' && (
+                    <span>Getting the band's real instruments…</span>
+                )}
+                {styleSounds.kind === 'offer' && (
+                    <>
+                        <span>
+                            {styleSounds.error ??
+                                `The band's real instruments are about ${Math.max(1, Math.round(styleSounds.mb))} MB.`}
+                        </span>
+                        <button type="button" className="toast-action" onClick={onGetStyleSounds}>
+                            {styleSounds.error ? 'Try again' : 'Get them'}
+                        </button>
+                        <button
+                            type="button"
+                            className="toast-close"
+                            aria-label="Not now"
+                            onClick={onDeclineStyleSounds}
+                        >
+                            ×
                         </button>
                     </>
                 )}
