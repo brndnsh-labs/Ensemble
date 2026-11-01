@@ -250,12 +250,37 @@ export const accountTest = test.extend<{ accountApi: AccountApi }>({
     },
 });
 
+/**
+ * Save is disabled: the header's button, or on a phone while the band plays (its row is folded
+ * into the Song menu, #1993) the menu's row.
+ */
+export async function expectSaveDisabled(page: Page) {
+    const save = page.getByRole('button', { name: 'Save', exact: true });
+    if (await save.isVisible()) {
+        await expect(save).toBeDisabled();
+        return;
+    }
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Save', exact: true })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+    );
+    await page.keyboard.press('Escape');
+}
+
 /** Opens the Band sheet (#1703) on `tab` and returns the dialog. */
 export async function openBand(page: Page, tab: 'Players' | 'Groove' | 'Trade' | 'Practice') {
     const sheet = page.getByRole('dialog', { name: 'Band' });
     // `open`, not visibility: a sheet sliding shut after a close is still visible for a moment.
     if ((await page.locator('dialog.band-panel[open]').count()) === 0) {
-        await page.getByRole('button', { name: 'Band…' }).click();
+        const band = page.getByRole('button', { name: 'Band…' });
+        if (await band.isVisible()) {
+            await band.click();
+        } else {
+            // A phone folds Band… into the Song menu while the band plays (#1993).
+            await page.getByRole('button', { name: 'Song actions' }).click();
+            await page.getByRole('menuitem', { name: 'Band…', exact: true }).click();
+        }
     }
     const button = sheet.getByRole('tab', { name: tab });
     // Already on it (the sheet reopens on its last tab): no click, and no wait. Another tab is

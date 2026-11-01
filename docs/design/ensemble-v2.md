@@ -61,7 +61,7 @@ error/recovery behavior are acceptance criteria, not a final polish phase.
 The September 8 follow-up makes the music-stand view part of the preview now: remove duplicate
 branding/metadata above an open chart, put sound details in a dialog, and hide editing/save
 controls during playback with a reversible Show controls action (retired 2026-10-31, #1969: playing
-now hides nothing, since the chart never spent the freed height). An explicit install-all action
+now hides nothing on a laptop or tablet, since the chart never spent the freed height; on a phone, where the chart scrolls, #1993 folds the header's second row into ••• while playing). An explicit install-all action
 downloads the existing catalog and applies established genre defaults to the current draft.
 Follow feel and manual overrides belong to the saved setup; installation never rewrites other
 saved songs. This is not a new sound-design or whole-library migration project.

@@ -441,6 +441,48 @@
     .song-actions .mode-switch {
         margin-right: auto;
     }
+    /* Folded while the band plays (#1993, partly reversing #1969 at phone width only): the
+       second row — Settings, Stage, Chart | Neck | Edit, Save — leaves, and the ••• rises to the
+       title's row. All of it is in the Song menu (`SongMenu`'s `foldedItems`), so nothing is lost
+       to the keyboard or a screen reader. Laptop and tablet keep the row. */
+    .song-open .song-header[data-folded] {
+        padding-top: 5px;
+        padding-bottom: 4px;
+    }
+    .song-header[data-folded] .song-actions {
+        flex: 0 0 auto;
+        flex-basis: auto;
+        padding-left: 0;
+        min-width: 0;
+    }
+    .song-header[data-folded] .song-actions > :not(.menu-btn) {
+        display: none;
+    }
+    /* The transport follows it (#1993): its setting labels go (kept for a screen reader, whose
+       Style select is named by one), Band… moves into the Song menu, and the tempo, key and style
+       settle on one row above the mute chips. Top padding stays: the chorus counter hangs in it. */
+    .song-header[data-folded] ~ .transport-bar {
+        padding: 13px 12px 7px;
+        gap: 6px 10px;
+    }
+    .song-header[data-folded] ~ .transport-bar .setting-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+    .song-header[data-folded] ~ .transport-bar .band-button {
+        display: none;
+    }
+    .song-header[data-folded] ~ .transport-bar .band-controls {
+        padding-top: 4px;
+    }
+    .song-header[data-folded] ~ .transport-bar .band-toggle {
+        padding-top: 4px;
+        padding-bottom: 4px;
+    }
 }
 @media (min-width: 761px) and (max-height: 650px) {
     .song-header {
@@ -481,9 +523,16 @@
         padding: 0;
         border: 0;
     }
+    /* 12px chips are wider, so the row wraps rather than run a chip off a narrow screen (#1993):
+       at 320px with the instrument chip (#1992) it had ~12px to spare, less than CI's WebKit. */
+    .band-controls {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    /* 12px, the floor for text a thumb reads (#1993): the mute chips were 9px here. */
     .band-toggle {
         padding: 7px 6px;
-        font-size: 9px;
+        font-size: 12px;
     }
     .band-toggle .dot {
         display: none;

@@ -76,6 +76,7 @@ import type { Lane } from './band-lanes';
 import { PlayersTab } from './band-players';
 import { BandSheet, type BandTab } from './band-sheet';
 import { TradeTab } from './band-trade';
+import { usePhoneWidth } from './bar-dock';
 import { ChartSheet, type OpenBar } from './chart-sheet';
 import { CollectionNameDialog, DeleteCollectionDialog } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
@@ -84,6 +85,7 @@ import { FormStrip } from './form-strip';
 import { GuidedForm } from './guided-form';
 import { downloadImportSource, ImportDialog } from './import-dialog';
 import { openedSongAnnouncement } from './key-popover';
+import type { MenuItem } from './menu';
 import { PlayerPrompt } from './player-prompt';
 import { SettingsSheet } from './settings-sheet';
 import { SongHeader } from './song-header';
@@ -859,8 +861,19 @@ export default function Ensemble() {
     const neckShowing = neck && !editing;
     const playingRowAway = usePlayingRowAway(scroll, { following, active, remount: neckShowing });
     const neckPrefs = useNeckPrefs();
+    // #1993 — on a phone, while the band plays, the header's second row folds into the ••• (the
+    // Song menu carries it, ahead of its own actions; `song-header.css`). Laptop and tablet keep
+    // the row (#1969).
+    const phoneWidth = usePhoneWidth();
+    const foldHeader = !!current && phoneWidth && (playing || playbackPending);
     // The chart reads as one page where it can (#1712); editing, it scrolls at a reading size.
-    useChartFit(scroll, !current || neckShowing ? null : editing ? 'edit' : 'page', blocks);
+    // The fold's height is not a resize of the stand: the step holds across it (#1784).
+    useChartFit(
+        scroll,
+        !current || neckShowing ? null : editing ? 'edit' : 'page',
+        blocks,
+        foldHeader,
+    );
     // Bars typed but not yet applied (#1723).
     const hasPendingText = pendingMeasures;
     // An untouched new song is not unsaved work: there is nothing in it to lose (#1707).
@@ -3096,6 +3109,67 @@ export default function Ensemble() {
     // search, Import chart and New song belong to this view only.
     const homeView = ready && !current && browse.view === 'home';
 
+    // The Song menu carries what the header folded (`foldHeader`), ahead of its own actions.
+    /** A choice that is the whole answer: the Song menu closes as it runs (`SongMenu`'s `done`). */
+    const closeThen = (action: () => void) => {
+        setSongMenu(null);
+        action();
+    };
+    const foldedItems: MenuItem[] = foldHeader
+        ? [
+              {
+                  id: 'settings',
+                  label: 'Settings…',
+                  testId: 'song-menu-settings',
+                  onSelect: () => closeThen(() => setSettingsOpen(true)),
+              },
+              {
+                  id: 'band',
+                  label: 'Band…',
+                  testId: 'song-menu-band',
+                  disabled: busy,
+                  onSelect: () => closeThen(() => openBand(lastBandTab.current)),
+              },
+              {
+                  id: 'stage',
+                  // Named for what it does, as the header's button title is.
+                  label: stage ? 'Switch to day mode' : 'Switch to stage mode',
+                  testId: 'song-menu-stage',
+                  onSelect: () => closeThen(toggleTheme),
+              },
+              // The stand's mode, a radio group as the header's switch says it (`aria-pressed`).
+              {
+                  id: 'chart',
+                  label: 'Chart',
+                  checked: !editing && !neck,
+                  testId: 'song-menu-chart',
+                  onSelect: () => closeThen(() => showStand('chart')),
+              },
+              {
+                  id: 'neck',
+                  label: 'Neck',
+                  checked: neck && !editing,
+                  testId: 'song-menu-neck',
+                  onSelect: () => closeThen(() => showStand('neck')),
+              },
+              {
+                  id: 'edit',
+                  label: 'Edit chart',
+                  checked: editing,
+                  testId: 'song-menu-edit',
+                  disabled: busy,
+                  onSelect: () => closeThen(editChart),
+              },
+              {
+                  id: 'save',
+                  label: sharedDraft && !newSongDraft ? 'Keep a copy' : 'Save',
+                  testId: 'song-menu-save',
+                  disabled: busy || !dirty,
+                  onSelect: () => closeThen(() => void saveFromHeader()),
+              },
+          ]
+        : [];
+
     return (
         <div className={`app-shell ${current ? 'song-open' : ''}`}>
             {current && !neckShowing && (
@@ -3506,6 +3580,7 @@ export default function Ensemble() {
                         totalBars={totalBars}
                         cloudSaved={cloudSaved}
                         stage={stage}
+                        folded={foldHeader}
                         editing={editing}
                         neck={neck}
                         onHome={goHome}
@@ -3838,6 +3913,7 @@ export default function Ensemble() {
                 recoveryOptions={recoveryOptions}
                 syncStatus={syncStatus}
                 shareLinkFallback={shareLinkFallback}
+                foldedItems={foldedItems}
                 onView={setSongMenu}
                 onShare={() => void run(shareChartLink)}
                 onDuplicate={() => void run(() => save(true))}

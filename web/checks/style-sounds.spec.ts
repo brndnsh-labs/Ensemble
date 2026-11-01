@@ -2,7 +2,7 @@
 // packs with no other tap and the band moves onto them without stopping; a lane pinned to a
 // sound keeps it; Save-Data offers instead; offline, the built-in sounds play.
 import type { Page } from '@playwright/test';
-import { appUrl, expect, openBand, seedStarters, songLink } from './fixtures';
+import { appUrl, expect, expectSaveDisabled, openBand, seedStarters, songLink } from './fixtures';
 import { closeSounds, observeSamples, sampleStarts, test } from './foundation-helpers';
 
 /** The fixture turns the fetch off for every other spec; this one is about it. */
@@ -111,7 +111,7 @@ test('a fresh device gets the style’s sounds on Play and the band moves onto t
     await expect(resolvedSound(page, 'Chords')).toHaveText('Using Acoustic Grand Piano');
     await closeSounds(page);
     // A sound that arrived is not an edit.
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
+    await expectSaveDisabled(page);
     await stop.click();
 });
 
