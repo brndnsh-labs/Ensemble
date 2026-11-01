@@ -305,6 +305,7 @@ export function compileTimeline(score: SemanticScore): Timeline {
     }
 
     impliedTensions(spans);
+    modalTonics(spans, bars);
 
     // Slice global spans into each bar's view.
     let cursor = 0;
@@ -398,17 +399,20 @@ const MINOR_FAMILIES = new Set(['minor', 'half-diminished', 'diminished']);
 /**
  * A dominant that resolves down a fifth to a minor-family chord (V7→i, A7→Dm7) implies
  * the minor key's b9 and b13: it takes phrygian dominant as its scale and voicings prefer
- * those tensions. Only for dominants the chart leaves unaltered — written tensions win.
+ * those tensions. A written b9/#9 keeps its own colour but still gets the b13 in place of the
+ * natural 13 (G7b9→Cm7 must not sound the target's major 3rd); a written 13 or b13 wins.
  */
 function impliedTensions(spans: ChordSpan[]): void {
     const chords = spans.filter((s) => s.chord);
     chords.forEach((span, i) => {
         const chord = span.chord!;
         const next = (chords[i + 1] ?? chords[0])?.chord;
+        const bare = chord.tensions.length === 0;
+        const flatNinth = chord.tensions.some((t) => t === 1 || t === 3);
         if (
             chord.family !== 'dominant' ||
             chord.third === null ||
-            chord.tensions.length > 0 ||
+            !(bare || (flatNinth && !chord.tensions.includes(9) && !chord.tensions.includes(8))) ||
             chord.fifth !== 7 ||
             !next ||
             next.root !== (chord.root + 5) % 12 ||
@@ -416,11 +420,70 @@ function impliedTensions(spans: ChordSpan[]): void {
         ) {
             return;
         }
-        span.chord = {
-            ...chord,
-            scale: [0, 1, 4, 5, 7, 8, 10],
-            implied: { ninth: 1, thirteenth: 8 },
-        };
+        span.chord = bare
+            ? { ...chord, scale: [0, 1, 4, 5, 7, 8, 10], implied: { ninth: 1, thirteenth: 8 } }
+            : {
+                  ...chord,
+                  // The scales `chordScale` gives the same chord with its b13 written: a b9 alone
+                  // is phrygian dominant (7b9b13); a #9 is altered, its 5th kept as written.
+                  scale: chord.tensions.includes(3)
+                      ? [0, 1, 3, 4, 7, 8, 10]
+                      : [0, 1, 4, 5, 7, 8, 10],
+                  implied: { ninth: chord.tensions.includes(1) ? 1 : 3, thirteenth: 8 },
+              };
+    });
+}
+
+const AEOLIAN = [0, 2, 3, 5, 7, 8, 10];
+const DORIAN = [0, 2, 3, 5, 7, 9, 10];
+
+/**
+ * The minor tonic's mode is the neighbours' call: a major (or dominant) IV beside the i is
+ * dorian (Em7 | A7 — the A7's C# is the Em7's 6th, not a clash), while a bVI beside it
+ * keeps natural minor (its b6 is the bVI's root). Degrees are read from each chord's ROOT,
+ * measured from the key's tonic — never the slash bass. A tonic that spells its own b6, 6th
+ * or major 7th was already decided by `chordScale`, so only the default aeolian is revisited.
+ */
+function modalTonics(spans: ChordSpan[], bars: Bar[]): void {
+    const chords = spans.filter((s) => s.chord);
+    let b = 0;
+    chords.forEach((span, i) => {
+        const chord = span.chord!;
+        while (b < bars.length - 1 && bars[b].start + bars[b].meter.barTicks <= span.start) {
+            b++;
+        }
+        const key = bars[b].key;
+        if (
+            !key.minor ||
+            chord.family !== 'minor' ||
+            chord.root !== key.tonic ||
+            chord.scale.join() !== AEOLIAN.join() ||
+            chord.intervals.some((n) => n % 12 === 8)
+        ) {
+            return;
+        }
+        const neighbours: ChordFacts[] = [];
+        for (const dir of [-1, 1]) {
+            for (let k = 1; k < chords.length; k++) {
+                const other =
+                    chords[(((i + dir * k) % chords.length) + chords.length) % chords.length]
+                        .chord!;
+                if (other.root !== chord.root) {
+                    neighbours.push(other);
+                    break;
+                }
+            }
+        }
+        const major = (c: ChordFacts) =>
+            c.third === 4 && (c.family === 'major' || c.family === 'dominant');
+        const at = (c: ChordFacts, degree: number) =>
+            (((c.root - key.tonic) % 12) + 12) % 12 === degree;
+        if (neighbours.some((c) => major(c) && at(c, 8))) {
+            return;
+        }
+        if (neighbours.some((c) => major(c) && at(c, 5))) {
+            span.chord = { ...chord, scale: [...DORIAN] };
+        }
     });
 }
 

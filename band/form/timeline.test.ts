@@ -552,3 +552,53 @@ describe('fermata time (#1665)', () => {
         expect(reads / asked).toBeLessThan(3 * Math.log2(t.stretches.length));
     });
 });
+
+describe('modal tonics and implied tensions (#2011)', () => {
+    const scaleAt = (bars: string, opts: { key: string; isMinor: boolean }, bar: number) => {
+        const t = compileTimeline(score([{ label: 'A', bars }], opts));
+        return chordAt(t, t.bars[bar].start)?.scale;
+    };
+    const DORIAN = [0, 2, 3, 5, 7, 9, 10];
+    const AEOLIAN = [0, 2, 3, 5, 7, 8, 10];
+    const E = { key: 'E', isMinor: true };
+
+    it('plays dorian on a minor tonic beside a major or dominant IV', () => {
+        expect(scaleAt('Em7 | A7 | Em7 | A7', E, 0)).toEqual(DORIAN);
+        expect(scaleAt('Em7 | Amaj7 | Em7 | Amaj7', E, 2)).toEqual(DORIAN);
+    });
+
+    it('keeps natural minor beside a bVI, and with no IV', () => {
+        expect(scaleAt('Em7 | C | Em7 | C', E, 0)).toEqual(AEOLIAN);
+        expect(scaleAt('Em7 | A7 | C | Em7', E, 3)).toEqual(AEOLIAN);
+        expect(scaleAt('Em7 | B7 | Em7 | B7', E, 0)).toEqual(AEOLIAN);
+        expect(scaleAt('Em7 | Am7 | Em7 | Am7', E, 0)).toEqual(AEOLIAN);
+    });
+
+    it('measures the IV from the chord root, not a slash bass', () => {
+        // E/A is the tonic chord over a IV bass, not a IV root.
+        expect(scaleAt('Em7 | E/A | Em7 | E/A', E, 0)).toEqual(AEOLIAN);
+    });
+
+    it('swaps the natural 13 for b13 on a written b9/#9 dominant into a minor chord', () => {
+        const C = { key: 'C', isMinor: true };
+        for (const [sym, scale] of [
+            ['G7b9', [0, 1, 4, 5, 7, 8, 10]],
+            ['G7#9', [0, 1, 3, 4, 7, 8, 10]],
+        ] as const) {
+            const t = compileTimeline(score([{ label: 'A', bars: `${sym} | Cm7` }], C));
+            const g = chordAt(t, 0);
+            expect(g?.scale, sym).toEqual(scale);
+            expect(g?.implied?.thirteenth, sym).toBe(8);
+        }
+        // A written 13 is the musician's call.
+        const t = compileTimeline(score([{ label: 'A', bars: 'G13b9 | Cm7' }], C));
+        expect(chordAt(t, 0)?.implied).toBeUndefined();
+    });
+
+    it('does not touch a b9 dominant that does not resolve to minor', () => {
+        const t = compileTimeline(
+            score([{ label: 'A', bars: 'G7b9 | Cmaj7' }], { key: 'C', isMinor: false }),
+        );
+        expect(chordAt(t, 0)?.implied).toBeUndefined();
+    });
+});
