@@ -342,6 +342,7 @@ export default function Ensemble() {
         setActive,
         countInBeat,
         place,
+        countInSlot,
         nextSoon,
         changeSoon,
         pendingAutoplay,
@@ -736,12 +737,13 @@ export default function Ensemble() {
         blocks,
         displayActive,
         displayNext,
+        displayCountIn,
         activeEvent,
         activeBar,
         totalBars,
         writtenBars,
         writtenSections,
-    } = useChartView(current, active, playing);
+    } = useChartView(current, active, playing, countInSlot);
     useFollowScroll(scroll, {
         following,
         active,
@@ -3596,6 +3598,11 @@ export default function Ensemble() {
                                         blocks={blocks}
                                         displayActive={displayActive}
                                         displayNext={displayNext}
+                                        countIn={
+                                            countInBeat !== null && displayCountIn !== null
+                                                ? { beat: countInBeat, display: displayCountIn }
+                                                : null
+                                        }
                                         nextSoon={nextSoon}
                                         activeEvent={activeEvent}
                                         writtenBars={writtenBars}

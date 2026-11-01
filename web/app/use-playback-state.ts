@@ -29,6 +29,8 @@ interface PlaybackState {
     countInBeat: number | null;
     /** Which chorus the band is in, and its part (#1990); null when stopped. */
     place: runtime.PerformancePlace | null;
+    /** The slot the count-in leads into (the bar the countdown is drawn over), or null. */
+    countInSlot: number | null;
     /** In the active bar's last felt pulse: the chart sheet's next-bar cue. */
     nextSoon: boolean;
     /** In the active slot's last felt pulse: the neck's chord-change cue. */
@@ -72,6 +74,7 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
     // The count-in beat sounding now (0-based), or null when not counting in (#1422) — cheap
     // enough to ride the same 60ms poll `playing`/`active` already use, no new interval.
     const [countInBeat, setCountInBeat] = useState<number | null>(null);
+    const [countInSlot, setCountInSlot] = useState<number | null>(null);
     // #1458 — is playback in the ACTIVE bar's last FELT pulse right now? Strengthens the next-bar
     // cue and gates the Following look-ahead's jump-ahead scroll. Edge-triggered off the same
     // 60ms poll below (`runtime.inLastBeat()`, a pure engine read off the song tick the active slot
@@ -114,6 +117,8 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
                 // No slot while counting in or between two queued segments: the pointer holds.
                 setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
                 setCountInBeat(runtime.countInBeat());
+                const countingSlot = runtime.countInSlot();
+                setCountInSlot(countingSlot >= 0 ? countingSlot : null);
                 // #1458 — a pure engine read off the live song tick, not the ACTIVE bar's rendered
                 // DOM node: React hasn't necessarily committed `active`'s new value yet on the very
                 // frame playback crosses a barline, so reading the OLD bar's DOM attributes here
@@ -196,6 +201,7 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
         setActive,
         countInBeat,
         place,
+        countInSlot,
         nextSoon,
         changeSoon,
         pendingAutoplay,

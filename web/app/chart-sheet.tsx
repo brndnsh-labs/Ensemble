@@ -178,6 +178,9 @@ interface ChartSheetProps {
     /** Playback is in the playing bar's last beat (`app/use-playback-state.ts`'s poll) —
      * strengthens the next-bar cue from a quiet outline to a stronger one. */
     nextSoon: boolean;
+    /** The count-in sounding now: its 0-based beat and the display index of the bar it leads
+     * into, which carries the countdown. Null when no count-in sounds. */
+    countIn: { beat: number; display: number } | null;
     /** The performed event under the playhead, in steps. */
     activeEvent: { start: number; end: number } | null;
     writtenBars: Map<string, WrittenBar>;
@@ -220,6 +223,7 @@ export function ChartSheet({
     displayActive,
     displayNext,
     nextSoon,
+    countIn,
     activeEvent,
     writtenBars,
     writtenSections,
@@ -642,6 +646,22 @@ export function ChartSheet({
                                             {turn.label}
                                         </span>
                                     )}
+                                    {countIn !== null &&
+                                        measure.chords.some(
+                                            (c) => c.globalIndex === countIn.display,
+                                        ) && (
+                                            // The count-in drawn on the bar it leads into (#1991).
+                                            // The Play button's digit and the clicks carry it to
+                                            // assistive tech; this one is only for the eye.
+                                            <span
+                                                className="bar-countin"
+                                                data-count-in={countIn.beat + 1}
+                                                key={countIn.beat}
+                                                aria-hidden="true"
+                                            >
+                                                {countIn.beat + 1}
+                                            </span>
+                                        )}
                                     {barEdit ? (
                                         // The keyboard's way to a bar, one stop per bar.
                                         <button
