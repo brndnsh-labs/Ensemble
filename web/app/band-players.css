@@ -124,6 +124,15 @@
     font-size: 11px;
     line-height: 1.4;
 }
+/* #1997 — the device's switch for fetching each style's sounds when the band plays. */
+.auto-sounds {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 13px;
+    color: var(--ink);
+}
 /* Install-all is a one-off, so it reads as a link, not the tab's loudest button. */
 .install-all {
     padding: 0;

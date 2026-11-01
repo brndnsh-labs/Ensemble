@@ -113,6 +113,12 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
                 if (localStorage.getItem('ensemble-v2-preview:count-in') === null) {
                     localStorage.setItem('ensemble-v2-preview:count-in', '0');
                 }
+                // The same for the style's sounds fetched behind the band (#1997, default on):
+                // left on, every spec that presses Play would download packs and have its lanes
+                // move over mid-test. `style-sounds.spec.ts` turns it back on.
+                if (localStorage.getItem('ensemble-v2-preview:auto-sounds') === null) {
+                    localStorage.setItem('ensemble-v2-preview:auto-sounds', '0');
+                }
             } catch {
                 // Best effort, like the app's own preference reads/writes.
             }

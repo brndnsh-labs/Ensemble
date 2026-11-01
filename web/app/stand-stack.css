@@ -59,6 +59,16 @@
     background: var(--accent-light);
     color: var(--accent);
 }
+/* #1997 — the style's sounds downloading behind the band: a quiet line, not a message, so it
+   reads in the page's own colours rather than the toast's inverted ones. */
+.stand-sounds {
+    background: var(--paper-raised);
+    color: var(--muted);
+    border: 1px solid var(--line);
+}
+.stand-sounds[data-empty="true"] {
+    border: 0;
+}
 /* #1460 review P2 #2 — the sync-failure notice, its own element (not a tone of `.stand-toast`
    any more) so a standing failure can never mask a later message. Review P3: accent, not danger
    — the account will retry, or the musician has an explicit way out (Keep both / a fresh Save);

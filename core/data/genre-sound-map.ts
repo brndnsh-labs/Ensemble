@@ -118,8 +118,9 @@ export const GENRE_SOUND_MAP: Readonly<
 /**
  * The voice an Auto-mode instrument should use for `genre`. Falls back to
  * `synth` when the genre has no mapping for the module, or when the mapped pack
- * isn't installed (auto-follow never auto-downloads — that's the opt-in
- * "Install all packs" gesture; an uninstalled mapping just plays the synth).
+ * isn't installed (this resolution never downloads; since #1997 the v2 band fetches the style's
+ * packs in the background on Play, `web/lib/style-sounds.ts`, and Install all is the explicit
+ * gesture; an uninstalled mapping just plays the synth until its pack lands).
  *
  * @param isPackInstalled sync predicate (registry's installed-set) — keeps this
  *   pure/testable and lets the genre effect resolve without async cache I/O.
