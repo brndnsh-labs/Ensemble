@@ -210,6 +210,82 @@ export function withBarAfter(source: SemanticScore, measureId: string): RemovalR
     return { kind: 'ok', score, measureId: added.id, sectionId: section.id };
 }
 
+/**
+ * Where the extra bars of a typed line go (#2006): `count` bars after `measureId`, in its section.
+ * A following bar `isEmpty` says is blank is overwritten (its id is returned to type into);
+ * otherwise a new tonic bar goes in after the last one placed, by `withBarAfter`'s rules, so the
+ * bars behind it move down rather than being typed over. Returns each target bar's id in order.
+ * Refused, changing nothing, where any insertion is.
+ */
+export function withSpilledBars(
+    source: SemanticScore,
+    measureId: string,
+    count: number,
+    isEmpty: (measure: ScoreMeasure) => boolean,
+): { kind: 'ok'; score: SemanticScore; ids: string[] } | { kind: 'blocked'; message: string } {
+    let score = source;
+    let at = measureId;
+    const ids: string[] = [];
+    for (let placed = 0; placed < count; placed++) {
+        const section = score.sections.find((s) => s.measures.some((m) => m.id === at));
+        const next = section?.measures[(section?.measures.findIndex((m) => m.id === at) ?? 0) + 1];
+        if (next && isEmpty(next)) {
+            ids.push(next.id);
+            at = next.id;
+            continue;
+        }
+        const inserted = withBarAfter(score, at);
+        if (inserted.kind === 'blocked') {
+            return inserted;
+        }
+        score = inserted.score;
+        ids.push(inserted.measureId);
+        at = inserted.measureId;
+    }
+    return { kind: 'ok', score, ids };
+}
+
+/**
+ * Copies a section straight after itself (the section letter's "Duplicate section", #2006): the
+ * same bars under fresh ids, the same plays, named by the next number ("A" gives "A2", "A2"
+ * gives "A3": the engine reads the number off, so the copy is still an A). A measure repeat
+ * inside the copy points at the copy's own bar. Refused, changing nothing, where the result does
+ * not validate (a repeat or ending crossing the seam, a sign named twice).
+ */
+export function withSectionDuplicated(source: SemanticScore, sectionId: string): RemovalResult {
+    const score = structuredClone(source);
+    const index = score.sections.findIndex((s) => s.id === sectionId);
+    if (index < 0) {
+        return { kind: 'blocked', message: 'Pick a section to duplicate.' };
+    }
+    const copy = structuredClone(score.sections[index]);
+    const fresh = new Map(copy.measures.map((m) => [m.id, crypto.randomUUID()]));
+    copy.id = crypto.randomUUID();
+    const base = copy.label.replace(/\d+$/, '');
+    const used = new Set(score.sections.map((s) => s.label));
+    let number = 2;
+    while (used.has(`${base}${number}`)) {
+        number++;
+    }
+    copy.label = `${base}${number}`;
+    for (const measure of copy.measures) {
+        if (measure.content.kind === 'repeat') {
+            measure.content.measureId =
+                fresh.get(measure.content.measureId) ?? measure.content.measureId;
+        }
+        measure.id = fresh.get(measure.id) ?? measure.id;
+    }
+    score.sections.splice(index + 1, 0, copy);
+    if (validateSemanticScore(score).kind !== 'ok') {
+        return {
+            kind: 'blocked',
+            message:
+                'A copy of this section would break the repeats, endings or signs around it. Change them first with Repeat or ending…',
+        };
+    }
+    return { kind: 'ok', score, measureId: copy.measures[0].id, sectionId: copy.id };
+}
+
 export type RemovalResult =
     | { kind: 'ok'; score: SemanticScore; measureId: string; sectionId: string }
     /** Nothing was changed; `message` says what the musician has to change first. */

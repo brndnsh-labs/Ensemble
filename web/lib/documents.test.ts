@@ -12,7 +12,9 @@ import {
     withoutMeasure,
     withoutSection,
     withSectionAfter,
+    withSectionDuplicated,
     withSectionSettings,
+    withSpilledBars,
 } from './documents';
 
 const bar = (id: string, extra: Partial<ScoreMeasure> = {}, beats = 4): ScoreMeasure => ({
@@ -486,5 +488,62 @@ describe('composerOf (#1440)', () => {
     it('is empty for a v2 document with no composer recorded', () => {
         const document = { schemaVersion: 2 } as ChartDocumentV2;
         expect(composerOf(document)).toBe('');
+    });
+});
+
+describe('withSpilledBars (#2006)', () => {
+    const rest = (id: string): ScoreMeasure => ({
+        id,
+        content: { kind: 'events', events: [{ kind: 'no-chord', duration: [4, 1] }] },
+    });
+    const blank = (m: ScoreMeasure) => m.id.startsWith('r');
+    const chart = () => song([section('a', [bar('a1'), rest('r2'), rest('r3'), bar('a4')])]);
+
+    it('overwrites the blank bars after it first, then inserts new ones', () => {
+        const result = withSpilledBars(chart(), 'a1', 3, blank);
+        if (result.kind !== 'ok') {
+            throw new Error(result.message);
+        }
+        expect(result.ids.slice(0, 2)).toEqual(['r2', 'r3']);
+        expect(ids(result.score)[0]).toEqual(['a1', 'r2', 'r3', result.ids[2], 'a4']);
+        expect(validateSemanticScore(result.score).kind).toBe('ok');
+    });
+
+    it('inserts after bars that are music, and past the section end', () => {
+        const result = withSpilledBars(chart(), 'a4', 2, () => false);
+        if (result.kind !== 'ok') {
+            throw new Error(result.message);
+        }
+        expect(ids(result.score)[0]).toEqual(['a1', 'r2', 'r3', 'a4', ...result.ids]);
+    });
+});
+
+describe('withSectionDuplicated (#2006)', () => {
+    it('copies the section straight after itself under fresh ids, labelled by the next number', () => {
+        const source = song([
+            section('a', [bar('a1'), bar('a2')], { repeat: 2 }),
+            section('b', [bar('b1')]),
+        ]);
+        const result = ok(withSectionDuplicated(source, 'a'));
+        expect(result.score.sections.map((s) => s.label)).toEqual(['A', 'A2', 'B']);
+        const copy = result.score.sections[1];
+        expect(copy.repeat).toBe(2);
+        expect(copy.id).not.toBe('a');
+        expect(copy.measures.map((m) => m.id)).not.toContain('a1');
+        expect(copy.measures).toHaveLength(2);
+        expect(validateSemanticScore(result.score).kind).toBe('ok');
+        // The next copy of a copy is the next number, not A22.
+        const again = ok(withSectionDuplicated(result.score, copy.id));
+        expect(again.score.sections.map((s) => s.label)).toEqual(['A', 'A2', 'A3', 'B']);
+    });
+
+    it('points a copied measure repeat at the copy’s own bar', () => {
+        const repeat: ScoreMeasure = {
+            id: 'a2',
+            content: { kind: 'repeat', measureId: 'a1', display: 'one-bar' },
+        };
+        const result = ok(withSectionDuplicated(song([section('a', [bar('a1'), repeat])]), 'a'));
+        const copy = result.score.sections[1].measures;
+        expect(copy[1].content).toMatchObject({ kind: 'repeat', measureId: copy[0].id });
     });
 });

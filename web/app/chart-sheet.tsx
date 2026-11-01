@@ -126,6 +126,8 @@ export interface SectionEditing {
      * the field's commit and the action are one: on WebKit a press does not take focus, and a
      * commit made on its own as the menu closed would turn the action away. */
     onAddAfter: (sectionId: string, pending: readonly SectionChange[]) => void;
+    /** Duplicate section (#2006): a copy straight after, named by the next number. */
+    onDuplicate: (sectionId: string, pending: readonly SectionChange[]) => void;
     onDelete: (sectionId: string, pending: readonly SectionChange[]) => void;
     onStartHere: (sectionId: string, pending: readonly SectionChange[]) => void;
     onLoop: (sectionId: string, pending: readonly SectionChange[]) => void;
@@ -996,6 +998,7 @@ export function ChartSheet({
                             onLoop={(pending) => sectionEdit.onLoop(written.id, pending)}
                             onChange={(changes) => sectionEdit.onChange(written.id, changes)}
                             onAddAfter={(pending) => sectionEdit.onAddAfter(written.id, pending)}
+                            onDuplicate={(pending) => sectionEdit.onDuplicate(written.id, pending)}
                             onDelete={(pending) => {
                                 // Focus goes to the section before it (or after, for the
                                 // first) once it has gone, not to the page.

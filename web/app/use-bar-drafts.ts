@@ -152,6 +152,18 @@ export function editableText(measure: ScoreMeasure, meter: string): string | nul
     }
 }
 
+/**
+ * Whether a bar says nothing yet: only rests and holds (`N.C.`, `/`), the blank a spilled line
+ * (`Dm7 | G7`, #2006) is typed over. A bar with a chord, or a measure repeat, is music and is
+ * never overwritten.
+ */
+export function isBlankBar(measure: ScoreMeasure): boolean {
+    return (
+        measure.content.kind === 'events' &&
+        measure.content.events.every((event) => event.kind !== 'chord')
+    );
+}
+
 /** Reapply the toggle's flag to the freshly re-parsed last event (`printableEvents` stripped it
  * for printing) — `parseChordBar` never emits `fermata` itself, so `false` needs no cleanup. */
 function withFermata(events: readonly ScoreEvent[], fermata: boolean): ScoreEvent[] {

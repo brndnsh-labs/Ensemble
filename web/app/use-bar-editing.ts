@@ -8,7 +8,9 @@ import {
     withoutMeasure,
     withoutSection,
     withSectionAfter,
+    withSectionDuplicated,
     withSectionSettings,
+    withSpilledBars,
 } from '../lib/documents';
 import type { ChartDocument } from '../lib/runtime';
 import { withSongMeter } from '../lib/song-meter';
@@ -24,6 +26,7 @@ import {
     dependsOnPending,
     draftChange,
     initialDraft,
+    isBlankBar,
 } from './use-bar-drafts';
 import type { DeleteUndo } from './use-delete-undo';
 
@@ -229,17 +232,7 @@ export function useBarEditing({
         }
         const score = current.chart.score;
         const drafts = barDrafts.drafts;
-        // The bar Tab/Enter (or the phone's ‹ ›) go to from `id`, passing over a bar the quick
-        // editor cannot edit; null at either end.
-        const stepFrom = (id: string, step: -1 | 1): string | null => {
-            const ids = score.sections.flatMap((section) => section.measures.map((m) => m.id));
-            const pending = barDrafts.latest();
-            let at = ids.indexOf(id) + step;
-            while (at >= 0 && at < ids.length && barField(score, pending, ids[at])?.text == null) {
-                at += step;
-            }
-            return at < 0 || at >= ids.length ? null : ids[at];
-        };
+        const stepFrom = (id: string, step: -1 | 1) => neighbor(score, id, step);
         return {
             open: openBar,
             text: (id) => chartFields.get(id)?.text ?? null,
@@ -256,7 +249,29 @@ export function useBarEditing({
                 }
             },
             onLeave(from, step) {
+                const typed = barDrafts.latest().get(from.id)?.text;
+                if (typed?.includes('|')) {
+                    const spilled = spillBars(from, typed, step);
+                    if (spilled !== undefined) {
+                        return spilled;
+                    }
+                }
+                // Moving on from the chart's last bar, once typed in, adds the next one (#2006): in an
+                // earlier section Tab goes on to the next section as ever.
+                const typedIn =
+                    step === 1 &&
+                    barDrafts.latest().has(from.id) &&
+                    !barProblem(score, barDrafts.latest(), from.id);
                 applyBar(from.id);
+                if (
+                    typedIn &&
+                    lastOfSection(score, from.id) &&
+                    score.sections.at(-1)?.measures.at(-1)?.id === from.id &&
+                    !barDrafts.latest().has(from.id)
+                ) {
+                    insertBarAfter(from.id);
+                    return true;
+                }
                 if (step === 0) {
                     setOpenBar((open) => (open === from ? null : open));
                     return false;
@@ -311,6 +326,159 @@ export function useBarEditing({
             },
         };
     }
+    /**
+     * The bar Tab/Enter (or the phone's ‹ ›) go to from `id`, passing over a bar the quick editor
+     * cannot edit; null at either end.
+     */
+    function neighbor(score: SemanticScore, id: string, step: -1 | 1): string | null {
+        const ids = score.sections.flatMap((section) => section.measures.map((m) => m.id));
+        const pending = barDrafts.latest();
+        let at = ids.indexOf(id) + step;
+        while (at >= 0 && at < ids.length && barField(score, pending, ids[at])?.text == null) {
+            at += step;
+        }
+        return at < 0 || at >= ids.length ? null : ids[at];
+    }
+    /** Whether `measureId` closes its section. */
+    function lastOfSection(score: SemanticScore, measureId: string): boolean {
+        const section = score.sections.find((s) => s.measures.some((m) => m.id === measureId));
+        return section?.measures.at(-1)?.id === measureId;
+    }
+    /**
+     * A bar typed with bars in it, `Dm7 | G7 | Cmaj7` (#2006): the first piece stays in this bar and
+     * each piece after it goes into the next bar of the section — over a blank one (`isBlankBar`),
+     * else in a new bar inserted there (`withSpilledBars`) — then the field moves on past the last.
+     * The pieces go in as pending bars exactly as typed, so a bar that is off the grid waits for
+     * its split choice (#1980) and one that does not read waits tinted, as ever; when everything
+     * reads they are applied together, in one change, and Undo offers it back whole. Undefined
+     * when the text holds a single piece (nothing to spill): the caller leaves the bar as usual.
+     */
+    function spillBars(from: OpenBar, text: string, step: -1 | 0 | 1): boolean | undefined {
+        const pieces = text
+            .split('|')
+            .map((piece) => piece.trim())
+            .filter(Boolean);
+        const start = currentNow.current;
+        if (!start) {
+            return undefined;
+        }
+        const field = barField(start.chart.score, barDrafts.latest(), from.id);
+        if (!field || field.text === null) {
+            return undefined;
+        }
+        if (pieces.length <= 1) {
+            // A stray `|` ("Dm7 |"): the bar is its one piece, or as it was if nothing was typed.
+            barDrafts.put(
+                from.id,
+                draftChange(field.original, {
+                    ...field.draft,
+                    text: pieces[0] ?? initialDraft(field.original).text,
+                }),
+            );
+            return undefined;
+        }
+        if (working.current) {
+            return false;
+        }
+        void run(() => {
+            const before = currentNow.current;
+            if (!before) {
+                return;
+            }
+            const held = barDrafts.latest();
+            const spilled = withSpilledBars(
+                before.chart.score,
+                from.id,
+                pieces.length - 1,
+                (measure) => isBlankBar(measure) && !held.has(measure.id),
+            );
+            if (spilled.kind === 'blocked') {
+                throw new Error(spilled.message);
+            }
+            let score = spilled.score;
+            const ids = [from.id, ...spilled.ids];
+            const last = ids.at(-1) ?? from.id;
+            // Moving on from the last bar of its section adds the next one, as Tab does (#2006).
+            let landing: string | null = null;
+            if (step === 1) {
+                landing = neighborInSection(score, last);
+                if (landing && barField(score, new Map(), landing)?.text == null) {
+                    landing = null;
+                }
+                if (!landing) {
+                    const added = withBarAfter(score, last);
+                    if (added.kind === 'ok') {
+                        score = added.score;
+                        landing = added.measureId;
+                    }
+                }
+            }
+            const pending = new Map(held);
+            ids.forEach((id, i) => {
+                const bar = barField(score, new Map(), id);
+                if (bar && bar.text !== null) {
+                    const next = draftChange(bar.original, {
+                        ...(i === 0 ? field.draft : bar.draft),
+                        text: pieces[i],
+                    });
+                    if (next) {
+                        pending.set(id, next);
+                    } else {
+                        pending.delete(id);
+                    }
+                }
+            });
+            let applied = false;
+            let blamed: string | undefined;
+            try {
+                applyScore(commitBarDrafts(score, pending));
+                applied = true;
+            } catch (reason) {
+                if (!(reason instanceof BarDraftError)) {
+                    throw reason;
+                }
+                // A bar to choose lengths for, or one that does not read: the new bars are in
+                // place, the typed ones wait pending where it can be fixed.
+                applyScore(score);
+                barDrafts.restore(pending);
+                blamed = reason.inForm ? undefined : reason.measureId;
+            }
+            const stuck = applied
+                ? undefined
+                : (ids.find((id) => barProblem(score, pending, id) !== null) ?? blamed);
+            if (stuck) {
+                setMeasureId(stuck);
+                setOpenBar({ id: stuck, select: 'end' });
+            } else if (step === -1) {
+                const back = neighbor(score, from.id, -1);
+                setMeasureId(back ?? from.id);
+                setOpenBar(back ? { id: back, select: 'all' } : null);
+            } else if (step === 1 && landing) {
+                setMeasureId(landing);
+                setOpenBar({ id: landing, select: 'all' });
+            } else {
+                setMeasureId(last);
+                setOpenBar(null);
+            }
+            if (applied) {
+                offerUndo({
+                    text: `${pieces.length} bars typed`,
+                    before,
+                    drafts: held,
+                    measureId: from.id,
+                    sectionId: '',
+                    reopen: from.id,
+                });
+            }
+        });
+        return step !== 0;
+    }
+    /** The bar after `measureId` in its own section, or null at the section's end. */
+    function neighborInSection(score: SemanticScore, measureId: string): string | null {
+        const section = score.sections.find((s) => s.measures.some((m) => m.id === measureId));
+        const at = section?.measures.findIndex((m) => m.id === measureId) ?? -1;
+        return section?.measures[at + 1]?.id ?? null;
+    }
     /** What the section letter's menu asks of the shell (#1726); null unless editing bars. */
     function sectionEditing(): SectionEditing | null {
         if (!typeOnChart || !current) {
@@ -320,6 +488,7 @@ export function useBarEditing({
             score: current.chart.score,
             onChange: changeSection,
             onAddAfter: addSectionAfter,
+            onDuplicate: duplicateSection,
             onDelete: deleteSection,
             onStartHere: startHereSection,
             onLoop: loopSection,
@@ -475,6 +644,23 @@ export function useBarEditing({
             applyScore(result.score);
             setMeasureId(result.measureId);
             setOpenBar({ id: result.measureId, select: 'all' });
+        });
+    }
+    /** The section letter's "Duplicate section" (#2006), by `withSectionDuplicated`'s rules. */
+    function duplicateSection(sectionId: string, pending: readonly SectionChange[]) {
+        void run(() => {
+            const next = updateChart();
+            const score = withSectionChanges(next.chart.score, sectionId, pending);
+            const result = withSectionDuplicated(score, sectionId);
+            if (result.kind === 'blocked') {
+                if (pending.length > 0) {
+                    applyScore(score);
+                }
+                throw new Error(result.message);
+            }
+            applyScore(result.score);
+            setMeasureId(result.measureId);
+            setOpenBar(null);
         });
     }
     /** The section letter's "Delete section" (#1726), by `withoutSection`'s rules. */
