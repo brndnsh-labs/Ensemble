@@ -400,6 +400,7 @@ export const acoustic = defineClaims({
         {
             take: {},
             claims: [
+                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['kickOnOne', 0.95, 1, 'a soft kick states the One'],
                 ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its bass note'],
                 [

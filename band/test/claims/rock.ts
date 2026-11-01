@@ -5,6 +5,7 @@ export const rock = defineClaims({
         {
             take: {},
             claims: [
+                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.9, 1, 'the backbeat is the song'],
                 ['kickOnOne', 0.95, 1, 'the kick owns the one'],
                 [
