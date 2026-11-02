@@ -26,6 +26,7 @@ import {
     splitRange,
     stepSplit,
 } from './bar-ruler';
+import { isSaveKey } from './save-key';
 import { useAnchoredPlacement } from './use-anchored-placement';
 import type { BarDraft } from './use-bar-drafts';
 
@@ -309,7 +310,9 @@ export function BarMenu({
                 onKeyDown={(event) => {
                     // The chart's keys (an arrow browsing away from Following, Space playing) are
                     // not the menu's controls'.
-                    event.stopPropagation();
+                    if (!isSaveKey(event)) {
+                        event.stopPropagation();
+                    }
                     if (event.key === 'Escape') {
                         event.preventDefault();
                         onClose();

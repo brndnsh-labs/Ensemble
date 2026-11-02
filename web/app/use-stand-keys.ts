@@ -1,5 +1,6 @@
 import { type RefObject, useEffect, useEffectEvent, useRef } from 'react';
 import type { ChartDocument } from '../lib/runtime';
+import { isSaveKey } from './save-key';
 
 /** What the shell hands `useStandKeys`: exactly what the key handler reads. */
 interface StandKeysOptions {
@@ -58,10 +59,7 @@ export function useStandKeys({
         if (
             current &&
             !event.defaultPrevented &&
-            !event.altKey &&
-            !event.shiftKey &&
-            (event.ctrlKey || event.metaKey) &&
-            event.key.toLowerCase() === 's' &&
+            isSaveKey(event) &&
             !document.querySelector('dialog[open]')
         ) {
             event.preventDefault();

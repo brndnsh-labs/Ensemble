@@ -10,6 +10,7 @@ import {
 import { createPortal } from 'react-dom';
 import { usePhoneWidth } from './bar-dock';
 import './menu.css';
+import { isSaveKey } from './save-key';
 import { focusAnchor, useAnchoredDismiss } from './use-anchored-dismiss';
 import { useAnchoredPlacement } from './use-anchored-placement';
 
@@ -124,10 +125,26 @@ export function Menu({
             preventScroll: true,
         });
     }, []);
+    // A row that held focus can leave while the menu stays open (the phone's folded rows go
+    // when playback ends, #2069): focus would drop to the page, so it goes to the first row.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `items.length` is the re-check trigger; the body reads the DOM.
+    useEffect(() => {
+        const box = node.current;
+        if (!box || box.contains(document.activeElement)) {
+            return;
+        }
+        const active = document.activeElement;
+        if (active && active !== document.body) {
+            return;
+        }
+        box.querySelector<HTMLElement>('[role^="menuitem"]')?.focus({ preventScroll: true });
+    }, [items.length]);
 
     function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
         // The page's keys (Space playing, an arrow browsing the chart) are not the menu's.
-        event.stopPropagation();
+        if (!isSaveKey(event)) {
+            event.stopPropagation();
+        }
         const rows = Array.from(
             event.currentTarget.querySelectorAll<HTMLElement>('[role^="menuitem"]'),
         );

@@ -8,6 +8,7 @@ import { createPortal } from 'react-dom';
 import type { ChartDocument } from '../lib/runtime';
 import { usePhoneWidth } from './bar-dock';
 import './menu.css';
+import { isSaveKey } from './save-key';
 import { useAnchoredDismiss } from './use-anchored-dismiss';
 import { useAnchoredPlacement } from './use-anchored-placement';
 
@@ -177,7 +178,9 @@ export function KeyPopover({
 
     function onKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
         // The page's keys (Space playing, an arrow browsing the chart) are not the popover's.
-        event.stopPropagation();
+        if (!isSaveKey(event)) {
+            event.stopPropagation();
+        }
         if (event.key === 'Escape') {
             event.preventDefault();
             close(true);

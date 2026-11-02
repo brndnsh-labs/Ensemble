@@ -11,7 +11,10 @@ export type NavView =
 export type SongRef =
     | { kind: 'song'; id: string }
     | { kind: 'standard'; id: string }
-    | { kind: 'draft' };
+    // A shared link's changes kept on this device (#2069, from #1979): `key` finds them
+    // (`repository.sharedDraftFor`) and `documentId` is the chart they were made on, so Forward
+    // can land them again. Without them (a new song, a link with nothing kept) it is just "the draft".
+    | { kind: 'draft'; key?: string; documentId?: string };
 
 /** The object Ensemble writes to `history.state`. `depth` counts the views beneath it. */
 export interface NavEntry {
@@ -47,7 +50,7 @@ export function navKey(view: NavView): string {
             return `standards:${view.entry ?? ''}`;
         case 'song':
             return view.ref.kind === 'draft'
-                ? 'song:draft'
+                ? `song:draft${view.ref.key ? `:${view.ref.key}` : ''}`
                 : `song:${view.ref.kind}:${view.ref.id}`;
     }
 }

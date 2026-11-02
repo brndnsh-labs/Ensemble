@@ -73,4 +73,23 @@ describe('compiling the open chart', () => {
         await runtime.exportMidi('take');
         expect(compiled.count).toBe(1);
     });
+
+    it("reads song mode's readout without compiling the chart again (#2069)", async () => {
+        const { runtime, document } = await freshRuntime();
+        runtime.load(document);
+        runtime.setSongMode(3);
+        compiled.count = 0;
+        const first = runtime.songModeReadout();
+        expect(first).not.toBeNull();
+        const planned = compiled.count;
+        expect(planned).toBeGreaterThan(0);
+        // The stand asks on every render that could change it: same chart, tempo and setting.
+        runtime.songModeReadout();
+        runtime.songModeReadout();
+        expect(compiled.count).toBe(planned);
+        // A different setting is a different plan.
+        runtime.setSongMode(5);
+        runtime.songModeReadout();
+        expect(compiled.count).toBeGreaterThan(planned);
+    });
 });

@@ -834,6 +834,7 @@ export default function Ensemble() {
         chartId: current?.id,
         nextSoon,
         activeBar,
+        countingIn: displayCountIn !== null,
     });
     // Song mode's readout (#1784): what the band plays now, or would at Play. Stopped, reading it
     // compiles the chart a few times, so it is read again only when the chart (its tempo
@@ -1217,7 +1218,9 @@ export default function Ensemble() {
                   standardOnStand.current?.documentId === current.id
                       ? { kind: 'standard', id: standardOnStand.current.standardId }
                       : sharedDraft
-                        ? { kind: 'draft' }
+                        ? sharedDraftKey.current
+                            ? { kind: 'draft', key: sharedDraftKey.current, documentId: current.id }
+                            : { kind: 'draft' }
                         : { kind: 'song', id: current.id },
           }
         : browse.view === 'standards'
@@ -2292,8 +2295,22 @@ export default function Ensemble() {
         } else if (view.ref.kind === 'standard') {
             openStandard(view.ref.id, () => nav.undoPop(target, from));
         } else {
-            // A shared draft lived only on the stand it was opened on; Forward can't rebuild it.
-            nav.undoPop(target, from);
+            // A shared link's changes are kept on this device under its key (#1979), so Forward
+            // lands them again. A draft with nothing kept lived only on the stand it was opened
+            // on; Forward can't rebuild it.
+            const { key, documentId } = view.ref;
+            const kept =
+                typeof key === 'string' && typeof documentId === 'string'
+                    ? repository.sharedDraftFor(key, documentId)
+                    : null;
+            if (!kept || typeof key !== 'string') {
+                nav.undoPop(target, from);
+                return;
+            }
+            void run(async () => {
+                landDraftOnStand(kept.document, 'Recovered your unsaved changes', key, kept);
+                setBrowse({ view: 'home' });
+            });
         }
     }
     function selectSection(document: ChartDocument, id?: string) {

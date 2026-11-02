@@ -21,6 +21,7 @@ import { BarMenu, type BarMenuBar } from './bar-menu';
 import { BarSplits } from './bar-splits';
 import { eventText } from './chord-text';
 import { Menu } from './menu';
+import { isSaveKey } from './save-key';
 import { sectionMarks } from './section-band-fields';
 import { SectionMenu } from './section-menu';
 import type { BarDraft } from './use-bar-drafts';
@@ -372,7 +373,7 @@ export function ChartSheet({
         }
         // The chart's own keys (an arrow browsing away from Following) are not the field's.
         // Ctrl/⌘+S is Save, the stand's (`useStandKeys`, #1984), typing in a bar included.
-        if (!((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's')) {
+        if (!isSaveKey(event)) {
             event.stopPropagation();
         }
         const splits = barEdit.splits(from.id);
