@@ -1,5 +1,6 @@
 import type { SwingSub } from '@core/types';
 import { useEffect, useState } from 'react';
+import { shownHumanize, UNSET_HUMANIZE } from '../lib/genre-humanize';
 import type { ChartDocument, SongMinutes } from '../lib/runtime';
 import { songPlanText } from '../lib/song-mode';
 import { useRangeCommit } from './use-range-commit';
@@ -45,6 +46,12 @@ interface RangeSettingProps {
     max: 1 | 100;
     disabled: boolean;
     onCommit: (value: number) => void;
+    /**
+     * What a pick will read as, when that can differ from the pick: humanize's 20 is "not set"
+     * and reads as the style's own (#2010), so picking it shows the style's amount at once —
+     * and, when that is already what the slider shows, commits nothing. Default: the pick.
+     */
+    readsAs?: (display: number) => number;
 }
 
 /** Stored-value <-> displayed-percent conversion for a `max: 1` field; a `max: 100`
@@ -63,15 +70,24 @@ function toStored(display: number, max: 1 | 100): number {
  * a percent (band intensity, master volume) and the natively-0-100 fields
  * (swing, humanize) with one component instead of two near-duplicates.
  */
-function RangeSetting({ label, ariaLabel, value, max, disabled, onCommit }: RangeSettingProps) {
+function RangeSetting({
+    label,
+    ariaLabel,
+    value,
+    max,
+    disabled,
+    onCommit,
+    readsAs = (display) => display,
+}: RangeSettingProps) {
     const [local, setLocal] = useState(toDisplay(value, max));
     useEffect(() => {
         setLocal(toDisplay(value, max));
     }, [value, max]);
     function commit(next: number) {
         const clamped = Math.max(0, Math.min(100, next));
-        setLocal(clamped);
-        if (clamped !== toDisplay(value, max)) {
+        const shown = readsAs(clamped);
+        setLocal(shown);
+        if (shown !== toDisplay(value, max)) {
             onCommit(toStored(clamped, max));
         }
     }
@@ -160,14 +176,21 @@ export function GrooveTab({
                         disabled here.
                     </p>
                 )}
+                {/* Until the musician sets it, humanize is the style's own (#2010). */}
                 <RangeSetting
                     label="Humanize"
                     ariaLabel="Humanize"
-                    value={groove.humanize}
+                    value={shownHumanize(groove.humanize, groove.genre)}
                     max={100}
                     disabled={busy}
                     onCommit={onHumanize}
+                    readsAs={(display) => shownHumanize(display, groove.genre)}
                 />
+                {groove.humanize === UNSET_HUMANIZE && (
+                    <p className="feel-hint">
+                        Humanize follows the {groove.genre} style until you change it.
+                    </p>
+                )}
             </div>
             <div className="feel-group">
                 <h3>Energy</h3>

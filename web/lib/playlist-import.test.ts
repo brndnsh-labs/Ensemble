@@ -143,6 +143,19 @@ describe('resolving it against the songbook (#1478)', () => {
         expect(result.songs.every((document) => document.chart.performance.bpm === 132)).toBe(true);
     });
 
+    it('lets each song keep its own style and tempo unless a tempo is chosen for all (#2004)', async () => {
+        const styled = (title: string, style: string) =>
+            song(title, 'A').map((f) => (f === 'Medium Swing' ? style : f));
+        const source = playlist([styled('Slow One', 'Ballad'), styled('Bossa One', 'Bossa Nova')]);
+        const options = { library: [], collections: [], includeDuplicates: false, name: 'Set' };
+        const own = resolvePlaylistImport(await plan(source), { ...options, bpm: null });
+        expect(own.songs.map((d) => d.chart.performance.bpm)).toEqual([66, 130]);
+        expect(own.songs.map((d) => d.chart.band.groove.genre)).toEqual(['Jazz', 'Bossa']);
+        const all = resolvePlaylistImport(await plan(source), { ...options, bpm: 100 });
+        expect(all.songs.map((d) => d.chart.performance.bpm)).toEqual([100, 100]);
+        expect(all.songs.map((d) => d.chart.band.groove.genre)).toEqual(['Jazz', 'Bossa']);
+    });
+
     it('imports duplicates as new copies with the checkbox', async () => {
         const result = resolvePlaylistImport(await plan(SOURCE), {
             library,

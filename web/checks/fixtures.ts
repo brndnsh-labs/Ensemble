@@ -113,6 +113,18 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
                 if (localStorage.getItem('ensemble-v2-preview:count-in') === null) {
                     localStorage.setItem('ensemble-v2-preview:count-in', '0');
                 }
+                // The same for the style's sounds fetched behind the band (#1997, default on):
+                // left on, every spec that presses Play would download packs and have its lanes
+                // move over mid-test. `style-sounds.spec.ts` turns it back on.
+                if (localStorage.getItem('ensemble-v2-preview:auto-sounds') === null) {
+                    localStorage.setItem('ensemble-v2-preview:auto-sounds', '0');
+                }
+                // "What do you play?" (#1992) is asked once on a fresh device; every spec but the
+                // one about it reads as a device that answered "Just listening", which changes
+                // nothing on the stand. Only when unset, for the same reason as the count-in.
+                if (localStorage.getItem('ensemble-v2-preview:player-instrument') === null) {
+                    localStorage.setItem('ensemble-v2-preview:player-instrument', 'listening');
+                }
             } catch {
                 // Best effort, like the app's own preference reads/writes.
             }
@@ -238,12 +250,37 @@ export const accountTest = test.extend<{ accountApi: AccountApi }>({
     },
 });
 
+/**
+ * Save is disabled: the header's button, or on a phone while the band plays (its row is folded
+ * into the Song menu, #1993) the menu's row.
+ */
+export async function expectSaveDisabled(page: Page) {
+    const save = page.getByRole('button', { name: 'Save', exact: true });
+    if (await save.isVisible()) {
+        await expect(save).toBeDisabled();
+        return;
+    }
+    await page.getByRole('button', { name: 'Song actions' }).click();
+    await expect(page.getByRole('menuitem', { name: 'Save', exact: true })).toHaveAttribute(
+        'aria-disabled',
+        'true',
+    );
+    await page.keyboard.press('Escape');
+}
+
 /** Opens the Band sheet (#1703) on `tab` and returns the dialog. */
 export async function openBand(page: Page, tab: 'Players' | 'Groove' | 'Trade' | 'Practice') {
     const sheet = page.getByRole('dialog', { name: 'Band' });
     // `open`, not visibility: a sheet sliding shut after a close is still visible for a moment.
     if ((await page.locator('dialog.band-panel[open]').count()) === 0) {
-        await page.getByRole('button', { name: 'Band…' }).click();
+        const band = page.getByRole('button', { name: 'Band…' });
+        if (await band.isVisible()) {
+            await band.click();
+        } else {
+            // A phone folds Band… into the Song menu while the band plays (#1993).
+            await page.getByRole('button', { name: 'Song actions' }).click();
+            await page.getByRole('menuitem', { name: 'Band…', exact: true }).click();
+        }
     }
     const button = sheet.getByRole('tab', { name: tab });
     // Already on it (the sheet reopens on its last tab): no click, and no wait. Another tab is
@@ -374,6 +411,11 @@ export async function openSectionContext(menu: Locator): Promise<void> {
 /** The section menu's "Name and plays" group, unfolded (folded as the menu opens, #1758). */
 export async function openSectionNames(menu: Locator): Promise<void> {
     await unfold(menu.locator('details.section-menu-names'));
+}
+
+/** The section menu's "Role and players" group, unfolded (#2021). */
+export async function openSectionBand(menu: Locator): Promise<void> {
+    await unfold(menu.locator('details.section-menu-band'));
 }
 
 async function unfold(details: Locator): Promise<void> {

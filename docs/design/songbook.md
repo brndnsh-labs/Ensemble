@@ -95,7 +95,7 @@ capture (`web/lib/runtime.ts`'s `captureContent`) and the schema-2 codec.
 
 | Owner | Canonical fields |
 | :--- | :--- |
-| `ChartDocument` | Sections and overrides; key/mode; meter/grouping; **notation**; tempo; song seed and policy; **genre, stored once by name**; **energy (`'auto'` or a level)**; the soloist's phrasing mode and trading; swing, swing grid and humanize; lane enablement, source choice, **volume, and reverb**. |
+| `ChartDocument` | Sections and overrides; key/mode; meter/grouping; **notation**; tempo; song seed and policy; **genre, stored once by name**; **energy (`'auto'` or a level)**; the soloist's phrasing mode and trading; swing, swing grid and humanize (a stored humanize of 20 means "not set": the style's own plays, DECISION 2026-11-01, #2010); lane enablement, source choice, **volume, and reverb**. |
 | `WorkspacePreferences` | Palette/mode; visual aids; count-in and practice defaults; output master volume; MIDI device IDs, latency, local audio muting, octave offsets, velocity sensitivity, and **channel mappings**. |
 | `RuntimeState` / derived | Transport and practice progress; the metronome; generated arranger/worker maps; audio handles; undo and transient UI. |
 

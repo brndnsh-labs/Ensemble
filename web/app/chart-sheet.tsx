@@ -1,11 +1,10 @@
 import type { BarSplit } from '@core/songbook/score-text';
 import type { SemanticScore } from '@core/songbook/score-types';
-import type { ChartNotation } from '@core/songbook/types';
 import {
+    Fragment,
     type FocusEvent as ReactFocusEvent,
     type KeyboardEvent as ReactKeyboardEvent,
     type MouseEvent as ReactMouseEvent,
-    type ReactNode,
     useEffect,
     useRef,
     useState,
@@ -13,13 +12,16 @@ import {
 import { flushSync } from 'react-dom';
 import type { SectionChange } from '../lib/documents';
 import type { ChartBlock, ChartChord } from '../lib/lead-sheet';
-import type { ChartDocument } from '../lib/runtime';
-import { directionLabel } from '../lib/score-labels';
+import type { ChartDocument, TradeTurn } from '../lib/runtime';
+import { directionLabel, IGNORED_SIGN_TITLE, signIsIgnored } from '../lib/score-labels';
+import { songPlanText } from '../lib/song-mode';
 import { afterPress } from './after-press';
 import { BarDock, usePhoneWidth } from './bar-dock';
 import { BarMenu, type BarMenuBar } from './bar-menu';
 import { BarSplits } from './bar-splits';
+import { eventText } from './chord-text';
 import { Menu } from './menu';
+import { sectionMarks } from './section-band-fields';
 import { SectionMenu } from './section-menu';
 import type { BarDraft } from './use-bar-drafts';
 
@@ -32,10 +34,15 @@ type WrittenBar = WrittenSection['measures'][number];
  */
 const STAND_CHORUS_COUNTS = [1, 2, 3, 4, 6, 8, 12, 16];
 
-/** What the footer says the band does with the form: the count, or the loop when there is none. */
-function formLengthText(choruses: number | undefined): string {
+type SongReadout = { choruses: number; seconds: number } | null;
+
+/**
+ * What the footer says the band does with the form: the chart's own count, else the device's
+ * Song length (#1784) as the same readout the Practice tab gives, else the loop.
+ */
+function formLengthText(choruses: number | undefined, song: SongReadout): string {
     if (choruses === undefined) {
-        return 'repeats continuously';
+        return song ? songPlanText(song) : 'repeats continuously';
     }
     return choruses === 1 ? 'plays once, then ends' : `plays ${choruses} times, then ends`;
 }
@@ -45,42 +52,6 @@ function chorusChoice(choruses: number | undefined): string {
         return 'Repeats continuously';
     }
     return choruses === 1 ? 'Plays once' : `Plays ${choruses} times`;
-}
-
-/**
- * The visible chord symbol in the chart's current notation (#1276). `chord.display`
- * (`FormattedChordNames`) is precomputed for all three notations by `chordNames`
- * (`lib/band-chart.ts`) regardless of which one is selected, so switching notation is a
- * pure read-time choice, never a re-analysis of the chord.
- */
-function chordSymbol(chord: ChartChord, notation: ChartNotation): ReactNode {
-    const disp = chord.display?.[notation];
-    if (!disp) {
-        return chord.absName;
-    }
-    // Set the way a real book sets it (#1700): the root full size, the quality small and raised
-    // beside it, a slash bass after. Read at a distance, the root is the fact that matters; the
-    // quality qualifies it. Spans with no space between them, so the text is still "Cmaj7/E".
-    return (
-        <>
-            <span className="chord-root">{disp.root}</span>
-            {disp.suffix && <span className="chord-quality">{disp.suffix}</span>}
-            {disp.bass && <span className="chord-bass">/{disp.bass}</span>}
-        </>
-    );
-}
-
-/**
- * How a written event reads on the stand. A hold is the slash the bar editor takes for it (the
- * chord before it rings on), N.C. is printed as charts print it, and a fermata sits over the
- * symbol it holds. Only the band engine can open charts with these (`lib/band-chart.ts`).
- */
-function eventText(chord: ChartChord, notation: ChartNotation): ReactNode {
-    return chord.kind === 'hold'
-        ? '/'
-        : chord.kind === 'no-chord'
-          ? 'N.C.'
-          : chordSymbol(chord, notation);
 }
 
 /** `audition` false while editing: a chord there opens its bar's field instead of sounding. */
@@ -156,8 +127,11 @@ export interface SectionEditing {
      * the field's commit and the action are one: on WebKit a press does not take focus, and a
      * commit made on its own as the menu closed would turn the action away. */
     onAddAfter: (sectionId: string, pending: readonly SectionChange[]) => void;
+    /** Duplicate section (#2006): a copy straight after, named by the next number. */
+    onDuplicate: (sectionId: string, pending: readonly SectionChange[]) => void;
     onDelete: (sectionId: string, pending: readonly SectionChange[]) => void;
     onStartHere: (sectionId: string, pending: readonly SectionChange[]) => void;
+    onLoop: (sectionId: string, pending: readonly SectionChange[]) => void;
 }
 
 interface ChartSheetProps {
@@ -172,6 +146,9 @@ interface ChartSheetProps {
     /** Playback is in the playing bar's last beat (`app/use-playback-state.ts`'s poll) —
      * strengthens the next-bar cue from a quiet outline to a stronger one. */
     nextSoon: boolean;
+    /** The count-in sounding now: its 0-based beat and the display index of the bar it leads
+     * into, which carries the countdown. Null when no count-in sounds. */
+    countIn: { beat: number; display: number } | null;
     /** The performed event under the playhead, in steps. */
     activeEvent: { start: number; end: number } | null;
     writtenBars: Map<string, WrittenBar>;
@@ -186,11 +163,20 @@ interface ChartSheetProps {
     /** Section tap menu's "Start here" (#1422) — jumps playback to the section's first
      * performed bar, starting it if stopped. */
     onStartHere: (sectionId: string | undefined) => void;
+    /** Section tap menu's "Loop" (#1989): the band plays just this section, over and over. */
+    onLoop: (sectionId: string | undefined) => void;
     /** Set while editing a measure chart (#1723); null otherwise. */
     barEdit: BarEditing | null;
     /** Set while editing a measure chart (#1726); null otherwise. */
     sectionEdit: SectionEditing | null;
     onAudition: (globalIndex: number) => void;
+    /**
+     * Whose turn each written bar is while the band trades (#1990), keyed by the bar's first
+     * chord's `globalIndex`; null when it is not trading.
+     */
+    turns: Map<number, TradeTurn> | null;
+    /** What Song length would play (`runtime.songModeReadout`), null when off or not looping. */
+    songReadout: SongReadout;
     /** How many times the band plays the form, then stops (#1511, the footer's menu);
      * `undefined` repeats it continuously. */
     onChoruses: (choruses: number | undefined) => void;
@@ -207,6 +193,7 @@ export function ChartSheet({
     displayActive,
     displayNext,
     nextSoon,
+    countIn,
     activeEvent,
     writtenBars,
     writtenSections,
@@ -216,9 +203,12 @@ export function ChartSheet({
     playbackActive,
     totalBars,
     onStartHere,
+    onLoop,
     barEdit,
     sectionEdit,
     onAudition,
+    turns,
+    songReadout,
     onChoruses,
 }: ChartSheetProps) {
     // A tap on a section letter opens its menu (#1422): outside Edit a `<Menu>` holding Start
@@ -257,6 +247,12 @@ export function ChartSheet({
         setSectionMenu(null);
     }, [editingSections]);
 
+    /** The section letter's quiet hint (#2021): a role its name doesn't spell, lanes left out. */
+    function marksOf(id: string | undefined): string {
+        const section = current.chart.score.sections.find((s) => s.id === id);
+        return section ? sectionMarks(section) : '';
+    }
+
     function openSectionMenu(event: ReactMouseEvent<HTMLButtonElement>, block: ChartBlock) {
         if (!block.id) {
             return;
@@ -280,6 +276,8 @@ export function ChartSheet({
     // The footer's form-length menu (#1511): how many times the band plays the form, a `<Menu>`
     // at the footer button (#1755).
     const choruses = current.chart.score.choruses;
+    // Signs the band never takes (#2005) are drawn greyed, so the page doesn't promise a jump.
+    const signIgnored = signIsIgnored(current.chart.score);
     const [formMenu, setFormMenu] = useState(false);
     const formMenuTrigger = useRef<HTMLButtonElement>(null);
     // The menu closes with the footer: playback hides it, and so does a busy shell.
@@ -373,7 +371,10 @@ export function ChartSheet({
             return;
         }
         // The chart's own keys (an arrow browsing away from Following) are not the field's.
-        event.stopPropagation();
+        // Ctrl/⌘+S is Save, the stand's (`useStandKeys`, #1984), typing in a bar included.
+        if (!((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's')) {
+            event.stopPropagation();
+        }
         const splits = barEdit.splits(from.id);
         if (splits && (event.key === 'ArrowDown' || event.key === 'ArrowUp')) {
             event.preventDefault();
@@ -490,6 +491,9 @@ export function ChartSheet({
                         >
                             {block.label || 'A'}
                         </button>
+                        {marksOf(block.id) && (
+                            <span className="section-marks">{marksOf(block.id)}</span>
+                        )}
                         {(current.chart.score.sections.find((s) => s.id === block.id)?.repeat ??
                             1) > 1 && (
                             <span className="section-repeat">
@@ -557,6 +561,7 @@ export function ChartSheet({
                             const problem = barEdit?.problem(measureId) ?? null;
                             const edited = barEdit?.edited(measureId) ?? false;
                             const pending = !problem && (barEdit?.pending(measureId) ?? false);
+                            const turn = turns?.get(measure.chords[0]?.globalIndex ?? -1);
                             return (
                                 <div
                                     className={`bar ${measure.chords.some((c) => c.globalIndex === displayActive) ? 'active' : ''} ${i === block.measures.length - 1 ? 'end' : ''} ${repeatStart ? 'repeat-start' : ''} ${repeatEnd ? 'repeat-end' : ''} ${endingStart ? 'ending-start' : ''} ${endingEnd ? 'ending-end' : ''} ${selected ? 'selected' : ''}${typing ? ' typing' : ''}${problem ? ' unreadable' : ''}${pending ? ' pending' : ''}${edited ? ' edited' : ''}${measureRepeat ? '' : splitClass(measure.chords.length)}`}
@@ -565,6 +570,8 @@ export function ChartSheet({
                                         (c) => c.globalIndex === displayActive,
                                     )}
                                     data-next={isNext ? (nextSoon ? 'soon' : 'true') : undefined}
+                                    data-turn={turn?.turn}
+                                    data-turn-label={turn?.label}
                                     key={measure.chords[0]?.globalIndex}
                                     // While editing a measure chart the whole bar is the target
                                     // (#1700, #1723): a press anywhere on it selects it and opens
@@ -609,6 +616,34 @@ export function ChartSheet({
                                             : undefined
                                     }
                                 >
+                                    {turn && !turn.first && (
+                                        <span className="sr-only">
+                                            {turn.turn === 'you'
+                                                ? 'Your turn'
+                                                : `${turn.label}'s turn`}
+                                        </span>
+                                    )}
+                                    {turn?.first && (
+                                        <span className="bar-turn" data-turn-label={turn.turn}>
+                                            {turn.label}
+                                        </span>
+                                    )}
+                                    {countIn !== null &&
+                                        measure.chords.some(
+                                            (c) => c.globalIndex === countIn.display,
+                                        ) && (
+                                            // The count-in drawn on the bar it leads into (#1991).
+                                            // The Play button's digit and the clicks carry it to
+                                            // assistive tech; this one is only for the eye.
+                                            <span
+                                                className="bar-countin"
+                                                data-count-in={countIn.beat + 1}
+                                                key={countIn.beat}
+                                                aria-hidden="true"
+                                            >
+                                                {countIn.beat + 1}
+                                            </span>
+                                        )}
                                     {barEdit ? (
                                         // The keyboard's way to a bar, one stop per bar.
                                         <button
@@ -624,7 +659,36 @@ export function ChartSheet({
                                     )}
                                     {navigation.length > 0 && (
                                         <span className="bar-navigation">
-                                            {navigation.map(directionLabel).join(' · ')}
+                                            {navigation.map((mark, markIndex) => {
+                                                const ignoredMark = signIgnored(mark);
+                                                return (
+                                                    // biome-ignore lint/suspicious/noArrayIndexKey: a bar's marks are a fixed ordered list.
+                                                    <Fragment key={markIndex}>
+                                                        {markIndex > 0 && ' · '}
+                                                        <span
+                                                            className={
+                                                                ignoredMark
+                                                                    ? 'sign-ignored'
+                                                                    : undefined
+                                                            }
+                                                            title={
+                                                                ignoredMark
+                                                                    ? IGNORED_SIGN_TITLE
+                                                                    : undefined
+                                                            }
+                                                        >
+                                                            {directionLabel(mark)}
+                                                            {ignoredMark && (
+                                                                <span className="sr-only">
+                                                                    {' '}
+                                                                    (the band does not take this
+                                                                    sign)
+                                                                </span>
+                                                            )}
+                                                        </span>
+                                                    </Fragment>
+                                                );
+                                            })}
                                         </span>
                                     )}
                                     {endingStart && (
@@ -906,7 +970,7 @@ export function ChartSheet({
                     aria-disabled={busy || undefined}
                     onClick={() => !busy && setFormMenu((was) => !was)}
                 >
-                    {totalBars} bars · {formLengthText(choruses)}
+                    {totalBars} bars · {formLengthText(choruses, songReadout)}
                 </button>
             </div>
             {formMenuOpen && (
@@ -941,8 +1005,10 @@ export function ChartSheet({
                             anchor={sectionAnchor}
                             closer={sectionMenuCloser}
                             onStartHere={(pending) => sectionEdit.onStartHere(written.id, pending)}
+                            onLoop={(pending) => sectionEdit.onLoop(written.id, pending)}
                             onChange={(changes) => sectionEdit.onChange(written.id, changes)}
                             onAddAfter={(pending) => sectionEdit.onAddAfter(written.id, pending)}
+                            onDuplicate={(pending) => sectionEdit.onDuplicate(written.id, pending)}
                             onDelete={(pending) => {
                                 // Focus goes to the section before it (or after, for the
                                 // first) once it has gone, not to the page.
@@ -976,6 +1042,14 @@ export function ChartSheet({
                             onSelect: () => {
                                 setSectionMenu(null);
                                 onStartHere(sectionMenu.id);
+                            },
+                        },
+                        {
+                            id: 'loop',
+                            label: 'Loop',
+                            onSelect: () => {
+                                setSectionMenu(null);
+                                onLoop(sectionMenu.id);
                             },
                         },
                     ]}

@@ -3,8 +3,25 @@ import { defineClaims } from '../critique/harness.js';
 export const country = defineClaims({
     takes: [
         {
+            take: { colour: true },
+            claims: [
+                [
+                    'compWrittenTension',
+                    0.9,
+                    1,
+                    'a written 9th, 11th or b9 is in the chord the keys play',
+                ],
+            ],
+        },
+        {
+            take: { colour: true, comp: 'guitar' },
+            claims: [['compWrittenTension', 0.9, 1, 'and in the grip the guitar fingers']],
+        },
+        {
             take: {},
             claims: [
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (85, about half the 173 measured).
+                ['bassApproachCount', 85, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 [
                     'snareBackbeat',
@@ -24,7 +41,12 @@ export const country = defineClaims({
                 ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its bass note'],
                 ['bassNotesPerBeat', 0.5, 0.75, 'two booms a bar, plus walks'],
                 ['compBackbeatShare', 0.6, 1, 'the piano answers the boom on 2 and 4'],
-                ['compColour', 0, 0.1, 'triads and sixths, not jazz ninths'],
+                [
+                    'compColour',
+                    0,
+                    0.12,
+                    'triads and sixths; the 9ths are the ones the chart writes (Em9, measured 0.106)',
+                ],
             ],
         },
         {
@@ -93,6 +115,16 @@ export const country = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.130; development off 0.070, #2012's bar fix reverted 0.080; always develops 0.39.
+                // Floor is midway between development off (0.070) and shipped: it guards development off. The bar fix (0.080 vs 0.130) is within about 2 sd here; blues, disco and rock guard it.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
+                [
+                    'leadMotifDevelopment',
+                    0.1,
+                    0.26,
+                    "a phrase now and then says the last one's opening again",
+                ],
+                ['leadMotifOpenings', 110, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.15, 0.45, 'the solo breathes'],
                 [

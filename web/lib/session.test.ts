@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { beforeEach, describe, expect, it } from 'vitest';
+import { PLAYER_INSTRUMENTS } from './instrument';
 import {
     allSongsSortPreference,
     countInPreference,
@@ -9,10 +10,12 @@ import {
     openedAtMap,
     patchNeckPreferences,
     placeNeckHand,
+    playerInstrument,
     recordOpened,
     rememberAllSongsSort,
     rememberCountIn,
     rememberNeckPreferences,
+    rememberPlayerInstrument,
     rememberSongMode,
     songModePreference,
 } from './session';
@@ -55,6 +58,24 @@ describe('the song mode preference (#1784)', () => {
         for (const stored of ['2', '6', '3.5', ' 3', '03', 'constructor', '']) {
             store.set('ensemble-v2-preview:song-mode', stored);
             expect(songModePreference()).toBeNull();
+        }
+    });
+});
+
+describe('what you play (#1992)', () => {
+    it('is unanswered on a fresh device', () => {
+        expect(playerInstrument()).toBeNull();
+    });
+    it('round-trips every offered instrument', () => {
+        for (const id of PLAYER_INSTRUMENTS) {
+            rememberPlayerInstrument(id);
+            expect(playerInstrument()).toBe(id);
+        }
+    });
+    it('reads anything but an offered id as unanswered', () => {
+        for (const stored of ['guitar', 'Bass', 'constructor', '__proto__', '']) {
+            store.set('ensemble-v2-preview:player-instrument', stored);
+            expect(playerInstrument()).toBeNull();
         }
     });
 });

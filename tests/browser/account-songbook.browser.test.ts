@@ -640,7 +640,7 @@ describe('account songbook on real IndexedDB', () => {
         const fault = vi.spyOn(indexedDB, 'open').mockImplementationOnce(() => {
             throw new DOMException('Storage denied', 'SecurityError');
         });
-        await expect(book.currentScope()).rejects.toThrow('Storage denied');
+        await expect(book.currentScope()).rejects.toThrow('Account storage unavailable.');
         fault.mockRestore();
         expect(await book.currentScope()).toEqual(scope);
     });

@@ -42,6 +42,8 @@ test('the ••• opens five actions, Delete… last after a divider, and no f
     const menu = await openSongMenu(page);
     await expect(trigger(page)).toHaveAttribute('aria-expanded', 'true');
     await expect(menu.getByRole('menuitem')).toHaveText([
+        // A phone's menu leads with the band's intensity (#1994): the transport has no room.
+        ...(phoneWidth(page) ? [/^Intensity/] : []),
         'Copy link',
         'Duplicate',
         'Export…',

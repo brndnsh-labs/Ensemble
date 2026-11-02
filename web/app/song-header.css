@@ -101,6 +101,54 @@
     align-items: center;
     gap: 11px;
 }
+/* Where the band is (#1990): small, in the bar's top padding, only while it plays. It takes no
+   room of its own, so showing and hiding it never moves the chart's fit. No animation. */
+.transport-bar {
+    position: relative;
+}
+.chorus-counter {
+    position: absolute;
+    top: 0;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    font-size: 10px;
+    line-height: 12px;
+    font-weight: 650;
+    color: var(--muted);
+    white-space: nowrap;
+    pointer-events: none;
+}
+.chorus-part {
+    font-weight: 500;
+}
+/* A section loop (#1989): a chip hung from the transport's bottom edge, over the top of the
+   chart. Like the counter it takes no room of its own, so setting a loop never moves the chart's
+   fit or wraps the phone's transport row; unlike it, it is a control (its × ends the loop). */
+.loop-chip {
+    position: absolute;
+    right: 12px;
+    bottom: 0;
+    transform: translateY(50%);
+    z-index: 3;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-height: 30px;
+    padding: 4px 10px 4px 12px;
+    border: 1px solid var(--primary);
+    border-radius: 999px;
+    background: var(--surface);
+    color: var(--primary);
+    font-size: 12px;
+    font-weight: 650;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px #0002;
+}
+.loop-chip-x {
+    font-size: 15px;
+    line-height: 1;
+}
 .setting-label {
     font-size: 9px;
     text-transform: uppercase;
@@ -140,6 +188,25 @@
     height: 28px;
     border: 1px solid var(--line);
     border-radius: 5px;
+}
+/* The band's intensity (#1994): a compact slider, Auto at its left stop, on tablet and up. The
+   phone's transport row has no room for it; the Groove tab keeps it there. */
+.intensity-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: var(--setting-row, 32px);
+}
+.intensity-control input[type="range"] {
+    width: 84px;
+    min-width: 0;
+}
+.intensity-value {
+    width: 2.6em;
+    font-size: 13px;
+    font-weight: 650;
+    color: var(--ink);
+    font-variant-numeric: tabular-nums;
 }
 .band-controls {
     margin-left: auto;
@@ -188,6 +255,32 @@
     text-decoration-thickness: 1.5px;
     text-decoration-color: var(--muted-soft);
 }
+/* What you play (#1992): a plain chip, not a lane — no dot, never struck, never green. */
+.band-toggle.player-chip {
+    flex: 0 0 auto;
+    border: 1px solid var(--line);
+    background: transparent;
+    color: var(--ink);
+}
+.player-chip .player-short {
+    display: none;
+}
+.player-note {
+    font-weight: 500;
+    color: var(--muted);
+}
+/* Your own lane, muted, is a hole the band leaves for you: hollow like any muted lane, but not
+   struck through — it isn't missing, you're playing it. */
+.band-toggle.off.yours {
+    border-color: var(--accent);
+    color: var(--accent);
+}
+.band-toggle.off.yours .dot {
+    border-color: var(--accent);
+}
+.band-toggle.off.yours span.label {
+    text-decoration: none;
+}
 /* Trade sits by the Soloist chip: hollow while off or paused (the arrow isn't a muted lane,
    so it isn't struck through), filled with the turn length while the band trades with you.
    One fixed width in every state, so turning it on never reflows the chips (#1210), and a
@@ -213,6 +306,17 @@
     .song-header {
         padding: 17px 22px;
     }
+    /* A portrait tablet's transport has ~100px to spare at 768 (#1994): the slider is short. */
+    .intensity-control {
+        gap: 5px;
+    }
+    .intensity-control input[type="range"] {
+        width: 48px;
+    }
+    .intensity-value {
+        width: 2.2em;
+        font-size: 12px;
+    }
     .transport-bar {
         padding: 12px 22px;
         gap: 15px;
@@ -232,6 +336,9 @@
     }
 }
 @media (max-width: 760px) {
+    .intensity-setting {
+        display: none;
+    }
     .song-header {
         padding: 14px 15px;
         align-items: flex-start;
@@ -367,6 +474,48 @@
     .song-actions .mode-switch {
         margin-right: auto;
     }
+    /* Folded while the band plays (#1993, partly reversing #1969 at phone width only): the
+       second row — Settings, Stage, Chart | Neck | Edit, Save — leaves, and the ••• rises to the
+       title's row. All of it is in the Song menu (`SongMenu`'s `foldedItems`), so nothing is lost
+       to the keyboard or a screen reader. Laptop and tablet keep the row. */
+    .song-open .song-header[data-folded] {
+        padding-top: 5px;
+        padding-bottom: 4px;
+    }
+    .song-header[data-folded] .song-actions {
+        flex: 0 0 auto;
+        flex-basis: auto;
+        padding-left: 0;
+        min-width: 0;
+    }
+    .song-header[data-folded] .song-actions > :not(.menu-btn) {
+        display: none;
+    }
+    /* The transport follows it (#1993): its setting labels go (kept for a screen reader, whose
+       Style select is named by one), Band… moves into the Song menu, and the tempo, key and style
+       settle on one row above the mute chips. Top padding stays: the chorus counter hangs in it. */
+    .song-header[data-folded] ~ .transport-bar {
+        padding: 13px 12px 7px;
+        gap: 6px 10px;
+    }
+    .song-header[data-folded] ~ .transport-bar .setting-label {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+    .song-header[data-folded] ~ .transport-bar .band-button {
+        display: none;
+    }
+    .song-header[data-folded] ~ .transport-bar .band-controls {
+        padding-top: 4px;
+    }
+    .song-header[data-folded] ~ .transport-bar .band-toggle {
+        padding-top: 4px;
+        padding-bottom: 4px;
+    }
 }
 @media (min-width: 761px) and (max-height: 650px) {
     .song-header {
@@ -379,6 +528,9 @@
     }
 }
 @media (max-height: 520px) and (max-width: 1000px) and (orientation: landscape) {
+    .intensity-setting {
+        display: none;
+    }
     .song-header {
         padding: 7px 18px;
         flex-wrap: nowrap;
@@ -397,7 +549,7 @@
         min-width: 160px;
     }
     .transport-bar {
-        flex-wrap: nowrap;
+        flex-wrap: wrap;
         padding: 7px 18px;
         gap: 13px;
     }
@@ -407,9 +559,16 @@
         padding: 0;
         border: 0;
     }
+    /* 12px chips are wider, so the row wraps rather than run a chip off a narrow screen (#1993):
+       at 320px with the instrument chip (#1992) it had ~12px to spare, less than CI's WebKit. */
+    .band-controls {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+    /* 12px, the floor for text a thumb reads (#1993): the mute chips were 9px here. */
     .band-toggle {
         padding: 7px 6px;
-        font-size: 9px;
+        font-size: 12px;
     }
     .band-toggle .dot {
         display: none;
@@ -419,6 +578,17 @@
     }
     .song-actions .btn {
         padding: 7px 8px;
+    }
+}
+/* What you play on a phone (#1992): the chip says one word (a horn's key), and your own lane
+   is told by its accent colour alone — the row of chips has no room for more. */
+@media (max-width: 760px) {
+    .player-chip .player-long,
+    .band-toggle .yours-mark {
+        display: none;
+    }
+    .player-chip .player-short {
+        display: inline;
     }
 }
 /* The workspace's height under the phone, short-laptop and landscape-phone queries (#1949),

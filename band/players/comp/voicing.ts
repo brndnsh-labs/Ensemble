@@ -84,6 +84,20 @@ function fifthSeat(chord: ChordFacts): number {
     return fifthOf(chord);
 }
 
+/**
+ * The written tension a close voicing must sound, or null if the chart wrote none. A close
+ * voicing is a triad or seventh chord with the 5th's seat free to carry the chart's colour
+ * (the bass plays the root, so the 5th is the cheapest tone to give up). Priority: the
+ * altered tension that names the chord (a dominant: b13, #11, b9, #9; otherwise #11, b13, b9,
+ * #9 — a major 7th's #11 is its signature), then the dominant's 13th (its identity) before the
+ * plain 9th, the 11th last; a major/minor chord prefers its 9th over its 13th. Only one is
+ * voiced: a second written tension (maj9#11) is left to the melody.
+ */
+function writtenTension(chord: ChordFacts): number | null {
+    const order = chord.family === 'dominant' ? [8, 6, 1, 3, 9, 2, 5] : [6, 8, 1, 3, 2, 9, 5];
+    return order.find((t) => chord.tensions.includes(t)) ?? null;
+}
+
 /** The tones (semitones above the root, < 12) a voicing kind plays for a chord. */
 export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
     const third = chord.third ?? (has(chord, 5) ? 5 : has(chord, 2) ? 2 : null);
@@ -109,11 +123,24 @@ export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
             if (chord.family === 'dominant' && chord.third === 4 && written.includes(3)) {
                 return [0, 4, 10, 3]; // the "Hendrix" 7#9: root, 3rd, b7, #9 on top
             }
-            const tones = [0, third ?? 7, colour !== null ? fifthSeat(chord) : fifth];
+            // why: a written 9th/11th/b9 is part of the chord the chart asked for. Rock, country
+            // and acoustic books play close voicings, which used to keep the 5th and drop the
+            // tension (Fmaj9 as F A C E). The tension takes the 5th's seat instead.
+            const tension = writtenTension(chord);
+            // why: a major 3rd under a written 11th is a minor 9th rub (G11, C7add11), so the
+            // 3rd gives way and the chord reads as the sus it is.
+            const dropThird = tension === 5 && third === 4;
+            const tones = [
+                0,
+                ...(dropThird ? [] : [third ?? 7]),
+                tension ?? (colour !== null ? fifthSeat(chord) : fifth),
+            ];
             if (colour !== null) {
                 tones.push(colour);
-            } else if (written.length) {
-                tones.push(written[0]); // add9 and friends keep their colour tone
+            } else if (tension === null && written.length) {
+                tones.push(written[0]);
+            } else if (tension !== null) {
+                tones.push(fifth); // add9: the triad stays whole and the tension joins it
             }
             return [...new Set(tones)];
         }

@@ -129,6 +129,18 @@ export const FIXTURES: Record<string, SemanticScore> = {
 };
 
 /**
+ * Written colour (#2013): add9, maj9, 6/9, 9, 11 and b9 chords, for the claims that a book
+ * plays the tension the chart wrote. Kept apart from `FIXTURES` so it only reaches the takes
+ * that ask for it.
+ */
+export const COLOUR_CHART: SemanticScore = score([
+    { label: 'A', bars: 'Cadd9 | Fmaj9 | Am9 | G7b9' },
+    { label: 'B', bars: 'Fadd9 | C6/9 | Dm11 | G9' },
+    { label: 'C', bars: 'Gadd9 | Dmaj9 | E7b9 | Amadd9' },
+    { label: 'D', bars: 'G11 | F^7#11 | Bm7b5 | Em9' },
+]);
+
+/**
  * One-chord vamps (#1488): the chord written out in every bar (the 8 bars the organ fell silent
  * on), and held with slashes over a 10-bar section (a 6-bar last phrase). Kept apart from
  * `FIXTURES` so every table-driven test over those stays as it was.

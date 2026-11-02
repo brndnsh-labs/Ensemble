@@ -50,7 +50,7 @@ export function neckLayout(strings: number): NeckLayout {
 }
 
 /**
- * The frets a phone's zoomed board shows (#1593), as `[lo, hi]`: frets `lo`…`hi` inclusive, where
+ * The frets a zoomed board (phone, portrait) shows (#1593), as `[lo, hi]`: frets `lo`…`hi` inclusive, where
  * `lo === 0` means the nut and the open strings are in view too. A locked hand shows its home
  * window ±1; an unlocked one shows the frets the current and next grips use, ±1. Either way every
  * note of both grips stays in view, and the span is never narrower than `HOME_W + 2` frets, so

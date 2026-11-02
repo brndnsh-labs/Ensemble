@@ -1,8 +1,9 @@
 import { appUrl, barField, editorRevealed, expect, openSectionMenu, test } from './fixtures';
 
 /**
- * The section tap menu (#1422): a tap on the section letter opens "Start here". The section
- * practice loop that shared this menu was retired in #1528.
+ * The section tap menu (#1422): a tap on the section letter opens "Start here", and "Loop"
+ * (#1989, `section-loop.spec.ts`). The old practice loop's shortcut, retired in #1528, stays
+ * gone.
  */
 async function newTwoSectionSong(page: import('@playwright/test').Page) {
     await page.goto(appUrl());
@@ -25,7 +26,7 @@ async function newTwoSectionSong(page: import('@playwright/test').Page) {
     await expect(tempo).toHaveValue('240');
 }
 
-test('tapping a section letter opens a menu with Start here, and nothing that loops', async ({
+test('tapping a section letter opens a menu with Start here and Loop, and no shortcut', async ({
     page,
 }) => {
     await newTwoSectionSong(page);
@@ -39,8 +40,8 @@ test('tapping a section letter opens a menu with Start here, and nothing that lo
 
     const menu = page.getByRole('menu', { name: 'Section A' });
     await expect(menu).toBeVisible();
-    await expect(menu.getByRole('menuitem')).toHaveText(['Start here']);
-    // No shortcut starts a loop either (#1528): 'L' on the letter does nothing.
+    await expect(menu.getByRole('menuitem')).toHaveText(['Start here', 'Loop']);
+    // No shortcut starts a loop (#1528): 'L' on the letter does nothing.
     await page.keyboard.press('Escape');
     await sectionA.press('l');
     await expect(sectionA).not.toHaveAttribute('aria-pressed');

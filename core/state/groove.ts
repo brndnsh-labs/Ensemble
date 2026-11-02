@@ -11,6 +11,8 @@ export const groove = deepSignal<GrooveState>({
     autoSound: true,
     volume: 1.0,
     reverb: 0.2,
+    // 20 is "not set" (#2010): the band plays its style's own humanize until the musician
+    // changes it (`web/lib/genre-humanize.ts`'s `UNSET_HUMANIZE`).
     humanize: 20,
     swing: 0,
     swingSub: '8th',

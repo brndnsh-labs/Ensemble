@@ -57,6 +57,15 @@
     font-weight: 600;
     color: var(--green);
 }
+/* A sign the band never takes (#2005): drawn, but visibly not followed. */
+.sign-ignored {
+    color: var(--muted);
+    font-weight: 400;
+    text-decoration: line-through;
+}
+.import-ignored-signs {
+    font-weight: 600;
+}
 @media (max-width: 500px) {
     .import-dialog {
         padding: 20px;

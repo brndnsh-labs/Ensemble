@@ -6,6 +6,7 @@ import type { SectionChange } from '../lib/documents';
 import './bar-menu.css';
 // The phone sheet's slide and backdrop are `<Menu>`'s (#1755), the one copy of that motion.
 import './menu.css';
+import { SectionBandFields, sectionMarks } from './section-band-fields';
 import { type SectionField, SectionNameFields, SectionSelects } from './section-settings';
 import { useAnchoredPlacement } from './use-anchored-placement';
 
@@ -21,8 +22,12 @@ interface SectionMenuProps {
     closer: RefObject<((refocus: boolean) => void) | null>;
     /** Each action takes what a field still holds uncommitted (`pending`) with it. */
     onStartHere: (pending: SectionChange[]) => void;
+    /** Loop (#1989): the band plays just this section, over and over. */
+    onLoop: (pending: SectionChange[]) => void;
     onChange: (changes: SectionChange[]) => void;
     onAddAfter: (pending: SectionChange[]) => void;
+    /** Duplicate section (#2006): the same bars again, straight after. */
+    onDuplicate: (pending: SectionChange[]) => void;
     onDelete: (pending: SectionChange[]) => void;
     /** The menu closes; `refocus` puts focus back on the section letter (Esc, Close). */
     onClose: (refocus: boolean) => void;
@@ -40,7 +45,8 @@ interface SectionMenuProps {
  * with it, as one change: on WebKit a press does not take focus, so the field is still focused
  * when the action runs, and its own commit then would turn the action away (#1726 review).
  *
- * Calm by default (#1758): Start here and the section actions are single rows, the settings are
+ * Calm by default (#1758): Start here, Loop (#1989) and the section actions (Add section after,
+ * Duplicate section #2006) are single rows, the settings are
  * two folded groups (name and plays; key, mode or meter), and Delete section is last, after a
  * divider. On a phone it slides up over a light backdrop, its Close in the heading row.
  */
@@ -52,8 +58,10 @@ export function SectionMenu({
     anchor,
     closer,
     onStartHere,
+    onLoop,
     onChange,
     onAddAfter,
+    onDuplicate,
     onDelete,
     onClose,
 }: SectionMenuProps) {
@@ -197,6 +205,20 @@ export function SectionMenu({
                 >
                     Start here
                 </button>
+                <button
+                    type="button"
+                    className="bar-menu-item"
+                    aria-disabled={busy || undefined}
+                    onClick={() => {
+                        if (!busy) {
+                            const changes = take();
+                            close(true);
+                            onLoop(changes);
+                        }
+                    }}
+                >
+                    Loop
+                </button>
                 <hr />
                 <details className="bar-menu-details section-menu-names">
                     <summary className="bar-menu-item">
@@ -251,6 +273,26 @@ export function SectionMenu({
                         not transposed.
                     </p>
                 </details>
+                <details className="bar-menu-details section-menu-band">
+                    <summary className="bar-menu-item">
+                        Role and players
+                        <span>{sectionMarks(section) || 'Default'}</span>
+                    </summary>
+                    <div className="bar-menu-fields">
+                        <SectionBandFields
+                            score={score}
+                            section={section}
+                            disabled={busy}
+                            onChange={(change) => onChange([change])}
+                        />
+                    </div>
+                    <p className="bar-menu-caption">
+                        The role is read from the section's name: an Intro or Break plays lighter, a
+                        Chorus fuller. A first Intro plays the first time through only, and a last
+                        Outro the last time only. An unticked player sits this section out; your own
+                        instrument is set separately.
+                    </p>
+                </details>
                 <button
                     type="button"
                     className="bar-menu-item"
@@ -264,6 +306,20 @@ export function SectionMenu({
                     }}
                 >
                     Add section after
+                </button>
+                <button
+                    type="button"
+                    className="bar-menu-item"
+                    aria-disabled={busy || undefined}
+                    onClick={() => {
+                        if (!busy) {
+                            const changes = take();
+                            close(false);
+                            onDuplicate(changes);
+                        }
+                    }}
+                >
+                    Duplicate section
                 </button>
                 <hr />
                 <button

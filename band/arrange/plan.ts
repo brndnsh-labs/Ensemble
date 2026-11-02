@@ -5,7 +5,7 @@
  * never a value that drifts while the song plays.
  */
 
-import type { BandSettings, Lane } from '../core/types.js';
+import type { BandSettings, Lane, TradeSettings } from '../core/types.js';
 import { type Bar, chorusBars, type Timeline } from '../form/timeline.js';
 import { type LeadRole, leadRole } from './cycle.js';
 
@@ -35,17 +35,27 @@ export interface BarPlan {
     lead: LeadRole;
 }
 
-// Section roles by label. Unknown labels (A, B, Head…) sit at the middle.
-const ROLE_ENERGY: readonly [RegExp, number][] = [
-    [/^intro/i, 0.35],
-    [/^(verse|v\d*$)/i, 0.5],
-    [/^pre/i, 0.6],
-    [/^(chorus|hook|refrain)/i, 0.75],
-    [/^(bridge|b$)/i, 0.6],
-    [/^solo/i, 0.65],
-    [/^(break|breakdown)/i, 0.3],
-    [/^(outro|coda|ending|tag)/i, 0.45],
+/**
+ * The section roles the band knows, read off a section's label (there is no separate role field):
+ * the name the stand offers, the label pattern the band matches, and the energy it plays at.
+ * Unknown labels (A, B, Head...) have no role and sit at the middle.
+ */
+export const SECTION_ROLES: readonly { name: string; pattern: RegExp; energy: number }[] = [
+    { name: 'Intro', pattern: /^intro/i, energy: 0.35 },
+    { name: 'Verse', pattern: /^(verse|v\d*$)/i, energy: 0.5 },
+    { name: 'Pre-chorus', pattern: /^pre/i, energy: 0.6 },
+    { name: 'Chorus', pattern: /^(chorus|hook|refrain)/i, energy: 0.75 },
+    { name: 'Bridge', pattern: /^(bridge|b$)/i, energy: 0.6 },
+    { name: 'Solo', pattern: /^solo/i, energy: 0.65 },
+    { name: 'Break', pattern: /^(break|breakdown)/i, energy: 0.3 },
+    { name: 'Outro', pattern: /^(outro|coda|ending|tag)/i, energy: 0.45 },
 ];
+
+/** The role the band reads from a section label, or null for one it has no role for. */
+export function sectionRoleOf(label: string): string | null {
+    const text = label.trim();
+    return SECTION_ROLES.find((role) => role.pattern.test(text))?.name ?? null;
+}
 const DEFAULT_ENERGY = 0.55;
 
 function sectionEnergy(bar: Bar): number {
@@ -53,7 +63,7 @@ function sectionEnergy(bar: Bar): number {
         return bar.visit.targetIntensity;
     }
     const label = bar.visit.label.trim();
-    return ROLE_ENERGY.find(([pattern]) => pattern.test(label))?.[1] ?? DEFAULT_ENERGY;
+    return SECTION_ROLES.find((role) => role.pattern.test(label))?.energy ?? DEFAULT_ENERGY;
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
@@ -245,6 +255,39 @@ export function fullWindow(timeline: Timeline): PassWindow {
 }
 
 /**
+ * The trade the band really plays: the one asked for (`BandSettings.trade`), when its partner is
+ * there to take a turn. Trading with the soloist needs the lead on; trading with the drummer
+ * needs the drums on and a drummer who can solo in this style.
+ */
+function tradeThatHappens(settings: BandSettings, drumSolos: boolean): TradeSettings | null {
+    const wanted = settings.trade ?? null;
+    // The musician's own lane (`BandSettings.you`, #1992) is a hole, not a partner: its turns
+    // would be silence.
+    const you = settings.you ?? null;
+    return wanted &&
+        (wanted.with === 'lead'
+            ? settings.lanes.lead && you !== 'lead'
+            : settings.lanes.drums && you !== 'drums' && drumSolos)
+        ? wanted
+        : null;
+}
+
+/**
+ * The lead's job at performed bar `index` of the band's `pass` (the segment's pass plus the
+ * bar's chorus), as the plan gives it: the same `leadRole` and the same trade rule `planBars`
+ * uses, so a host that shows whose turn it is can never disagree with what the band plays.
+ */
+export function leadRoleAt(
+    timeline: Timeline,
+    settings: BandSettings,
+    drumSolos: boolean,
+    index: number,
+    pass: number,
+): LeadRole {
+    return leadRole(timeline, index, pass, tradeThatHappens(settings, drumSolos));
+}
+
+/**
  * Plans for the bars in `window`, indexed by bar index (bars outside it are absent).
  * `next` is resolved in performance order: a looping pass's last bar leads back to the top of
  * the song. `planned` stops planning there (a chunk
@@ -294,12 +337,7 @@ export function planBars(
     // Trading with the soloist needs it on; trading with the
     // drummer needs the drums on and a drummer who can solo in this style.
     const wanted = settings.trade ?? null;
-    const trade =
-        wanted &&
-        window.to === bars.length &&
-        (wanted.with === 'lead' ? settings.lanes.lead : settings.lanes.drums && drumSolos)
-            ? wanted
-            : null;
+    const trade = window.to === bars.length ? tradeThatHappens(settings, drumSolos) : null;
     // Whether the drummer has bar `index` of `pass` to himself: his turn in a trade.
     const drummerAlone = (index: number, onPass: number) => {
         const role = leadRole(timeline, index, passAt(index, onPass), trade);

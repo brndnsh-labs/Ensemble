@@ -23,7 +23,7 @@ import { STEP } from '../../players/grid.js';
 import { STYLES } from '../../styles/index.js';
 import { chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { FIXTURES } from '../scores.js';
+import { COLOUR_CHART, FIXTURES } from '../scores.js';
 
 const CHARTS = ['blues', 'rhythmChanges', 'popSong', 'minorFunk', 'bossa', 'romanNumerals'];
 const SEEDS = ['one', 'two', 'three', 'four'];
@@ -44,6 +44,7 @@ export function perform(
     bass = true,
     lead?: 'head' | 'solo',
     trade?: TradeSettings,
+    colour = false,
 ): Take[] {
     const takes: Take[] = [];
     const lanes = { ...DEFAULT_SETTINGS.lanes, bass, lead: lead !== undefined || Boolean(trade) };
@@ -53,8 +54,8 @@ export function perform(
     const passes = trade ? 3 : lead ? CYCLE : 2;
     const judged = (pass: number) =>
         trade || lead === 'solo' ? pass > 0 : lead === 'head' ? pass === 0 : true;
-    for (const chart of CHARTS) {
-        const timeline = compileTimeline(FIXTURES[chart]);
+    for (const chart of colour ? ['colour'] : CHARTS) {
+        const timeline = compileTimeline(colour ? COLOUR_CHART : FIXTURES[chart]);
         for (const seed of SEEDS) {
             let memory: PassMemory | undefined;
             for (let pass = 0; pass < passes; pass++) {
@@ -296,6 +297,77 @@ function answerStrikes({ timeline: t, events }: Take): PitchedNote[] {
         }
     }
     return [...chosen];
+}
+
+/** The half-step lead-ins into real chord changes: how many (`n`), and how many leap past a fifth (`hit`). */
+function approachTally(takes: Take[]): { n: number; hit: number } {
+    let n = 0;
+    let hit = 0;
+    for (const { timeline: t, events } of takes) {
+        const bass = events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
+        for (const [k, span] of t.spans.entries()) {
+            const before = t.spans[k - 1]?.chord;
+            if (!span.chord || !before || before.bass === span.chord.bass) {
+                continue;
+            }
+            const i = bass.findIndex((e) => Math.abs(e.tick - span.start) < 1);
+            if (i < 1) {
+                continue;
+            }
+            const pc = mod12(bass[i].midi - bass[i - 1].midi);
+            // (The old chord's own bass note, an octave away or not, is its pump, no lead-in.)
+            const pump = mod12(bass[i - 1].midi) === before.bass;
+            if (
+                pump ||
+                bass[i].tick - bass[i - 1].tick > STEP * 4 ||
+                pc === 0 ||
+                (pc > 1 && pc < 11)
+            ) {
+                continue;
+            }
+            n++;
+            hit += Math.abs(bass[i].midi - bass[i - 1].midi) > 7 ? 1 : 0;
+        }
+    }
+    return { n, hit };
+}
+
+/** The lead's phrase openings that had an earlier one to say again (`n`), and those that did (`hit`). */
+function motifTally(takes: Take[]): { n: number; hit: number } {
+    let n = 0;
+    let hit = 0;
+    let last: { timeline: Timeline; pass?: number; recent: string[] } | null = null;
+    for (const take of takes) {
+        const { timeline: t, events } = take;
+        // A pass continues the last one's memory; a new song or seed starts clean.
+        if (last && (last.timeline !== t || take.pass !== (last.pass ?? 0) + 1)) {
+            last = null;
+        }
+        const notes = leadNotes(events);
+        const played = new Set(notes.map((l) => l.bar));
+        const recent: string[] = last?.recent ?? [];
+        for (const index of [...played].sort((a, b) => a - b)) {
+            if (played.has(index - 1)) {
+                continue;
+            }
+            const bar = notes.filter((l) => l.bar === index).sort((a, b) => a.tick - b.tick);
+            if (bar.length < 3) {
+                continue;
+            }
+            const opening = `${bar.map((l) => stepOf(t, l)).join(',')}|${bar
+                .slice(1)
+                .map((l, i) => Math.sign(l.midi - bar[i].midi))
+                .join('')}`;
+            if (recent.length) {
+                n++;
+                hit += recent.includes(opening) ? 1 : 0;
+            }
+            recent.push(opening);
+            recent.splice(0, recent.length - 3);
+        }
+        last = recent.length ? { timeline: t, pass: take.pass, recent } : null;
+    }
+    return { n, hit };
 }
 
 export const METRICS = {
@@ -695,44 +767,23 @@ export const METRICS = {
         return ratio(hit, n);
     },
     /**
-     * At each real chord change, among the notes in the last two steps before it that are a half step (by
+     * At each real chord change, among the notes in the last beat before it that are a half step (by
      * pitch class) from the arrival and not the old chord's own bass note, the share that sit more than a fifth from it: a half-step
      * lead-in an octave away reads as a wrong note, not an approach. An octave pop on the way
      * in (the same pitch class an octave up) is no lead-in and is not counted here.
      * (The exclusion only bites when the two roots are a half step apart, C to Db: the old root
-     * is then the pump, not a lead-in. A style that plays no such lead-in reads 0 here.)
+     * is then the pump, not a lead-in. A style that plays no such lead-in reads 0 here: pair the
+     * ceiling with `bassApproachCount`.)
      */
     bassApproachLeap: (takes) => {
-        let n = 0;
-        let hit = 0;
-        for (const { timeline: t, events } of takes) {
-            const bass = events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
-            for (const [k, span] of t.spans.entries()) {
-                const before = t.spans[k - 1]?.chord;
-                if (!span.chord || !before || before.bass === span.chord.bass) {
-                    continue;
-                }
-                const i = bass.findIndex((e) => Math.abs(e.tick - span.start) < 1);
-                if (i < 1) {
-                    continue;
-                }
-                const pc = mod12(bass[i].midi - bass[i - 1].midi);
-                // (The old chord's own bass note, an octave away or not, is its pump, no lead-in.)
-                const pump = mod12(bass[i - 1].midi) === before.bass;
-                if (
-                    pump ||
-                    bass[i].tick - bass[i - 1].tick > STEP * 2 ||
-                    pc === 0 ||
-                    (pc > 1 && pc < 11)
-                ) {
-                    continue;
-                }
-                n++;
-                hit += Math.abs(bass[i].midi - bass[i - 1].midi) > 7 ? 1 : 0;
-            }
-        }
+        const { n, hit } = approachTally(takes);
         return ratio(hit, n);
     },
+    /**
+     * How many half-step lead-ins `bassApproachLeap` judged. A style that plays none reads 0 there,
+     * which passes any ceiling; a claim that its lead-ins stay close pairs with a floor on this.
+     */
+    bassApproachCount: (takes) => approachTally(takes).n,
     /** Share of consecutive bass notes that repeat a pitch (a walking line keeps moving). */
     bassRepeatedNotes: (takes) => {
         let n = 0;
@@ -879,6 +930,43 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of chord changes the comp anticipates: a sounding comp strike an eighth before the
+     * change that already plays the NEW chord: every guide tone (3rd and 7th) of the new chord
+     * sounds in it, which a voicing of the old chord does not do (its extensions can borrow one,
+     * rarely both). A strike an eighth early that still plays the old chord is
+     * not a push. A change whose guide tones the old chord already has can't be told
+     * apart, so it isn't counted.
+     */
+    compAnticipatesChange: (takes) => {
+        const hasPc = (strikes: PitchedNote[], tick: number, pc: number) =>
+            strikes.some((c) => Math.abs(c.tick - tick) < 1 && mod12(c.midi) === pc);
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const strikes = events.filter(
+                (e): e is PitchedNote => e.lane === 'comp' && !(e as PitchedNote).muted,
+            );
+            t.spans.forEach((span, i) => {
+                const before = t.spans[i - 1]?.chord;
+                if (i === 0 || !span.chord || !before || before.symbol === span.chord.symbol) {
+                    return;
+                }
+                const old = chordPcs(before);
+                const guides = [span.chord.third, span.chord.seventh]
+                    .filter((k): k is NonNullable<typeof k> => k !== null)
+                    .map((k) => mod12((span.chord?.root ?? 0) + k));
+                if (!guides.some((pc) => !old.includes(pc))) {
+                    return;
+                }
+                n++;
+                const early = strikes.filter((c) => Math.abs(c.tick - (span.start - 2 * STEP)) < 1);
+                const sounds = (c: PitchedNote) => guides.every((pc) => hasPc(strikes, c.tick, pc));
+                hit += early.length && sounds(early[0]) ? 1 : 0;
+            });
+        }
+        return ratio(hit, n);
+    },
     /** Share of sounding comp onsets in 4/4 bars that fall on beat 1 or beat 3. */
     compOnOneAndThree: (takes) => {
         let n = 0;
@@ -967,6 +1055,34 @@ export const METRICS = {
                 n++;
                 const pcs = notes.map((x) => mod12(x.midi - chord.root));
                 hit += pcs.some((p) => p === 2 || (p === 9 && chord.seventh !== null)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Share of chords with a written tension (add9, maj9, b9…) whose comp playing sounds one
+     * of them. Judged per chord span, so a picked or arpeggiated bar counts whole.
+     */
+    compWrittenTension: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const span of t.spans) {
+                const chord = span.chord;
+                if (!chord?.tensions.length) {
+                    continue;
+                }
+                const notes = events.filter(
+                    (e): e is PitchedNote =>
+                        e.lane === 'comp' && !e.muted && e.tick >= span.start && e.tick < span.end,
+                );
+                if (!notes.length) {
+                    continue;
+                }
+                n++;
+                hit += notes.some((x) => chord.tensions.includes(mod12(x.midi - chord.root)))
+                    ? 1
+                    : 0;
             }
         }
         return ratio(hit, n);
@@ -1583,6 +1699,23 @@ export const METRICS = {
         }
         return ratio(empty, bars);
     },
+    /**
+     * Motif development rate: of the bars the lead opens a phrase in (it played none the bar
+     * before; three notes or more), the share that say the previous opening again: the same
+     * onsets and the same up/down shape. The lead asks for it in about 28% of its phrases (a
+     * 0.4 chance to develop, 0.7 of those not displaced); a bar whose rhythm came back with
+     * new intervals is a different idea and does not count. The claims' bounds are measured, not the 28%: the match
+     * misses a motif the chord moved (the sign shape holds, the rest may not) and the peak and
+     * wind-down phrases never develop. Each claim's comment lists the rate with development
+     * off, with #2012's bar fix reverted, as shipped, and with every phrase developing; the
+     * floor and ceiling sit between them. `leadMotifOpenings` is the sample under the rate.
+     */
+    leadMotifDevelopment: (takes) => {
+        const { n, hit } = motifTally(takes);
+        return ratio(hit, n);
+    },
+    /** How many openings `leadMotifDevelopment` judged: the sample under its rate. */
+    leadMotifOpenings: (takes) => motifTally(takes).n,
     /** Share of lead notes on a beat that are tones of the chord sounding. */
     leadChordToneOnBeats: (takes) => {
         let n = 0;
@@ -2067,6 +2200,8 @@ export interface TakeSpec {
     lead?: 'head' | 'solo';
     /** The player trades: the two passes after the head are judged. */
     trade?: TradeSettings;
+    /** Judge the written-colour chart (add9, maj9, b9…) instead of the shared charts. */
+    colour?: boolean;
 }
 
 type MetricName = keyof typeof METRICS;

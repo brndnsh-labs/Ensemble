@@ -31,6 +31,12 @@
     --bar-line-strong: light-dark(#788172, #8a9389);
     --bar-number: light-dark(#666b60, #8e958b);
     --bar-current: light-dark(#e6eadb, #263a2e);
+    /* The playing bar (#1991): the palette's own `--green` as a solid fill, with the paper under
+       its ink — so the bar now sounding is the loudest thing on the sheet in every palette and
+       mode (`palettes.test.ts` holds the fill to 3:1 against the page and the text to 4.5:1).
+       Aliases, resolved on the root where a palette's `--green` already is. */
+    --bar-playing: var(--green);
+    --on-bar-playing: var(--paper);
     --bar-repeat-ink: light-dark(#53644c, #b9c8b3);
     /* Following's next-bar cue (#1458) — a blue outline, so it never reads as the green
        playing highlight (`--green`) or the orange edit-selection ring (`--accent`); "soon"

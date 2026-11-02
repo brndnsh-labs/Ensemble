@@ -33,6 +33,8 @@ export const reggae = defineClaims({
         {
             take: {},
             claims: [
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (53, about half the 106 measured; a lead-in is a note within a beat of the change).
+                ['bassApproachCount', 53, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['dropOnThree', 0.9, 1, 'kick and cross-stick land together on 3 in every riddim'],
                 ['kickOnOne', 0, 0.35, 'the One is a hole: only the high-energy riddims fill it'],
@@ -138,6 +140,16 @@ export const reggae = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.189; development off 0.072, #2012's bar fix reverted 0.184; always develops 0.38.
+                // Floor guards development off (0.072) only; this style barely sees the bar fix (0.184 vs 0.189), which blues, disco and rock guard.
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
+                [
+                    'leadMotifDevelopment',
+                    0.13,
+                    0.28,
+                    "a phrase now and then says the last one's opening again",
+                ],
+                ['leadMotifOpenings', 75, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.22, 0.45, 'the horn answers the band and leaves it room'],
                 ['leadPhraseLoop', 0.05, 0.4, 'a dub hook comes round now and then'],

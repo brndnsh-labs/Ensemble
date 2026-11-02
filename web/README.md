@@ -118,9 +118,11 @@ network-disconnection harness is local-only.
   existing genre sound map to the current draft. Per-lane Follow feel updates on genre changes;
   a manual choice pins that lane. Other saved songs are not rewritten. Save keeps the chosen
   setup, including Follow feel, and Revert restores it. Follow feel plays only what this device
-  has installed and never downloads by itself (#1405): startup reads the installed packs from
-  the sound cache, and opening a song resolves each Follow-feel lane against them, so a device
-  with nothing installed stays built-in-only until a sound-selection/install gesture. Starters
+  has installed (#1405): startup reads the installed packs from the sound cache, and opening a
+  song resolves each Follow-feel lane against them. Since #1997 (2026-11-01, reversing #1405's
+  "never downloads by itself") Play fetches the playing style's packs in the background and the
+  Follow-feel lanes move onto them at a barline without stopping; Save-Data makes that a one-tap
+  offer, the Players tab can turn it off, and pinned lanes are never touched. Starters
   and new songs start on Follow feel. Existing decoding,
   sample playback, calibrated gain and voice effects are reused without musical changes. A host
   asset-fetch adapter maps original pack URLs into `/packs/`. The
@@ -146,8 +148,8 @@ network-disconnection harness is local-only.
   cancels a pending restart. Do not use this as the only copy of important writing yet.
 - Four bars per laptop/tablet row, two per portrait phone row, scrolling rather than pagination.
   The open song replaces the branding header; Sounds opens over the score without displacing it.
-  Playback hides nothing: the header's controls stay put, so Save, export and Band… are one
-  press away mid-song.
+  Playback hides nothing on a laptop or tablet: the header's controls stay put. On a phone the
+  header's second row and Band… fold into the ••• while the band plays (#1993), one press away.
   Playback highlights follow the band host's own clock (`lib/band-host.ts`); manual
   wheel/touch/keyboard browsing suspends following until explicitly resumed.
 - Stage mode (#1208) is the dark music-stand theme: a tap on the song header's Stage button.

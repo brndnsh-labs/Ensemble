@@ -27,6 +27,13 @@ interface StandToast {
     toastTone: 'busy' | 'warning' | 'info';
     /** What the toast says, or null when it has nothing to show. */
     toastText: string | null;
+    /**
+     * Says a sentence to a screen reader only (#1985): it lands inside the toast's own live
+     * region, visually hidden, so it is read without a banner covering the chart.
+     */
+    announce: (text: string) => void;
+    /** What `announce` last said, and a token that remounts its node so a repeat is read again. */
+    announcement: { text: string; token: number };
     /** One per `setMessage` call: the toast's text is keyed on it, so a repeat is announced. */
     messageToken: number;
     /** Holds the auto-dismiss clock: the toast has the pointer or focus. */
@@ -64,6 +71,10 @@ export function useStandToast({
     const [message, setMessageState] = useState('');
     const [messageTone, setMessageToneState] = useState<MessageTone>('info');
     const [messageToken, setMessageToken] = useState(0);
+    const [announcement, setAnnouncement] = useState({ text: '', token: 0 });
+    function announce(text: string) {
+        setAnnouncement((previous) => ({ text, token: previous.token + 1 }));
+    }
     // Re-review P3 — a REF, not the `messageTone` state value, because an async caller (one that
     // sets its message from inside a promise chain) closes over whatever `messageTone` was when
     // IT started, which can be stale by the time it resolves. The ref is always current at call
@@ -175,6 +186,8 @@ export function useStandToast({
 
     return {
         setMessage,
+        announce,
+        announcement,
         dismissMessage,
         toastTone,
         toastText,

@@ -284,7 +284,9 @@ describe('bounded source-preserving iReal import', () => {
         const bars = result.sections[0].measures;
         expect(bars).toHaveLength(3);
         expect(bars[0].start).toEqual([{ kind: 'repeat-start' }]);
-        expect(bars[0].annotations).toEqual([{ text: 'A', at: [0, 1], placement: 'above' }]);
+        // The mark names the section (#2004), so it is not also a letter in its bar.
+        expect(result.sections[0].label).toBe('A');
+        expect(bars[0].annotations).toBeUndefined();
         expect(bars[1].start).toEqual([{ kind: 'ending-start', passes: [1] }]);
         expect(bars[1].end).toEqual([{ kind: 'repeat-end', times: 2 }]);
         expect(bars[2].start).toEqual([{ kind: 'ending-start', passes: [2] }]);
@@ -704,7 +706,7 @@ describe('bounded source-preserving iReal import', () => {
             expect(measures[4].start).toEqual([{ kind: 'coda', label: 'coda-2' }]);
             expect(song.diagnostics.map(({ message }) => message)).toEqual([
                 'The coda at bar 5 is played once, at the end: with a chorus count set, the last chorus jumps to it from the end of bar 2. Until then the form loops without it.',
-                'The stored key is used. iReal style is preserved as text, not applied as an Ensemble genre.',
+                'The stored key is used.',
             ]);
             const order = (choruses?: number) =>
                 compileScoreForm({ ...result, ...(choruses ? { choruses } : {}) }).map(
@@ -731,7 +733,7 @@ describe('bounded source-preserving iReal import', () => {
             ]);
             expect(song.diagnostics.map(({ message }) => message)).toEqual([
                 'The coda at bar 3 is played once, at the end: with a chorus count set, the last chorus plays on into it. Until then the form loops without it.',
-                'The stored key is used. iReal style is preserved as text, not applied as an Ensemble genre.',
+                'The stored key is used.',
             ]);
             const order = (choruses?: number) =>
                 compileScoreForm({ ...result, ...(choruses ? { choruses } : {}) }).map(

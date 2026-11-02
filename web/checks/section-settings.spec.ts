@@ -4,6 +4,7 @@ import {
     editorRevealed,
     expect,
     leaveBar,
+    openSectionBand,
     openSectionContext,
     openSectionMenu,
     openSectionNames,
@@ -25,6 +26,49 @@ async function newSong(page: Page) {
 }
 
 const alert = (page: Page) => page.locator('.error-banner[role="alert"]');
+
+test('a section takes a role and sits a player out, and the letter hints it (#2021)', async ({
+    page,
+}) => {
+    const pageErrors: string[] = [];
+    page.on('pageerror', (error) => pageErrors.push(error.message));
+    await newSong(page);
+    await (await openSectionMenu(page, 'A'))
+        .getByRole('button', { name: 'Add section after', exact: true })
+        .click();
+    await leaveBar(page);
+
+    let menu = await openSectionMenu(page, 'B');
+    await openSectionBand(menu);
+    await expect(menu.getByLabel('Section role')).toHaveValue('Bridge');
+    await menu.getByLabel('Section role').selectOption('Break');
+    // A lone B already reads as a Bridge to the band; the role is its reading of the name, so the section is now called Break.
+    menu = page.getByRole('dialog', { name: 'Section Break menu', exact: true });
+    await expect(menu).toBeVisible();
+    await expect(menu.getByLabel('Section role')).toHaveValue('Break');
+    await menu.getByLabel('Drums').uncheck();
+    await menu.getByLabel('Bass').uncheck();
+    await expect(menu.getByLabel('Drums')).not.toBeChecked();
+    await expect(menu.locator('summary', { hasText: 'Role and players' })).toContainText(
+        'no drums, bass',
+    );
+    await menu.press('Escape');
+    await expect(menu).toBeHidden();
+    await expect(page.locator('.section-marks')).toHaveText('no drums, bass');
+    // Only the section that sits players out says so.
+    await expect(page.locator('.section-marks')).toHaveCount(1);
+
+    // Ticking one back, and "None", return the section to the band's own say.
+    menu = await openSectionMenu(page, 'Break');
+    await openSectionBand(menu);
+    await menu.getByLabel('Bass').check();
+    await expect(page.locator('.section-marks')).toHaveText('no drums');
+    await menu.getByLabel('Drums').check();
+    await expect(page.locator('.section-marks')).toHaveCount(0);
+    await menu.getByLabel('Section role').selectOption('');
+    await expect(page.getByRole('dialog', { name: 'Section C menu', exact: true })).toBeVisible();
+    expect(pageErrors).toEqual([]);
+});
 
 test('a new section can be named, repeated and put in 6/8, and it plays', async ({ page }) => {
     const pageErrors: string[] = [];

@@ -27,6 +27,7 @@ import { exportDocument } from '../lib/download';
 import { checkPlayable } from '../lib/engine-mode';
 import { firstBars } from '../lib/first-bars';
 import type { HomeSlice } from '../lib/home';
+import { INSTRUMENT_ROLES, type PlayerInstrument } from '../lib/instrument';
 import { type NavEntry, type NavView, navKey } from '../lib/navigation';
 import { collectionWrite, framePace, type PlaylistImport } from '../lib/playlist-import';
 import * as repository from '../lib/repository';
@@ -34,13 +35,20 @@ import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
 import {
     allSongsSortPreference,
+    autoSoundsPreference,
     rememberAllSongsSort,
     rememberSong,
     rememberStandMode,
     type StandMode,
     standMode,
 } from '../lib/session';
-import { allSoundsAvailableOffline, installAllSounds, soundsAvailableOffline } from '../lib/sounds';
+import {
+    allSoundsAvailableOffline,
+    installAllSounds,
+    quarterGate,
+    type SoundProgress,
+    soundsAvailableOffline,
+} from '../lib/sounds';
 import { buildStandardDocument, standardFor } from '../lib/standards';
 import { start } from '../lib/starters';
 import type { Progress } from '../lib/sync/status';
@@ -68,6 +76,7 @@ import type { Lane } from './band-lanes';
 import { PlayersTab } from './band-players';
 import { BandSheet, type BandTab } from './band-sheet';
 import { TradeTab } from './band-trade';
+import { usePhoneWidth } from './bar-dock';
 import { ChartSheet, type OpenBar } from './chart-sheet';
 import { CollectionNameDialog, DeleteCollectionDialog } from './collection-dialogs';
 import { DeleteGuestSongDialog } from './delete-guest-song';
@@ -75,6 +84,9 @@ import { ExportDialog, type ExportFormat } from './export-dialog';
 import { FormStrip } from './form-strip';
 import { GuidedForm } from './guided-form';
 import { downloadImportSource, ImportDialog } from './import-dialog';
+import { openedSongAnnouncement } from './key-popover';
+import type { MenuItem } from './menu';
+import { PlayerPrompt } from './player-prompt';
 import { SettingsSheet } from './settings-sheet';
 import { SongHeader } from './song-header';
 import { SongMenu, type SongMenuView } from './song-menu';
@@ -98,7 +110,7 @@ import { useChartView } from './use-chart-view';
 import { useCollectionActions } from './use-collection-actions';
 import { useCollections } from './use-collections';
 import { useDeleteUndo } from './use-delete-undo';
-import { useFollowScroll } from './use-follow-scroll';
+import { useFollowScroll, usePlayingRowAway } from './use-follow-scroll';
 import { useHeldAccount } from './use-held-account';
 import { useHistoryNavigation } from './use-history-navigation';
 import { useModalDialog } from './use-modal-dialog';
@@ -106,6 +118,7 @@ import { useNeckPrefs } from './use-neck-prefs';
 import { useOfflineInstall } from './use-offline-install';
 import { usePalette } from './use-palette';
 import { usePlaybackState } from './use-playback-state';
+import { usePlayerInstrument } from './use-player-instrument';
 import { useRowMenu } from './use-row-menu';
 import { useSongDeletes } from './use-song-deletes';
 import { type Browse, useSongbookLibrary } from './use-songbook-library';
@@ -113,6 +126,7 @@ import { useStageTheme } from './use-stage-theme';
 import { useStandConflict } from './use-stand-conflict';
 import { useStandKeys } from './use-stand-keys';
 import { useStandToast } from './use-stand-toast';
+import { useStyleSounds } from './use-style-sounds';
 
 // The neck and its voicer load only when the neck first shows (#1877).
 const NeckStand = lazy(() => import('./neck-stand'));
@@ -256,6 +270,7 @@ export default function Ensemble() {
     // Held as the empty slice boot fell back to, so the notice ends the moment a later read of the
     // songbook succeeds (its slice is a different object) rather than outliving the fault.
     const [savingOffHome, setSavingOffHome] = useState<HomeSlice | null>(null);
+    const savingOffRef = useRef(false);
     const [busy, setBusy] = useState(false);
     const volatileDrafts = useRef(new Map<string, ChartDocument>());
     /**
@@ -303,6 +318,11 @@ export default function Ensemble() {
     });
     // The bar whose field is open on the chart (#1723), or null.
     const [openBar, setOpenBar] = useState<OpenBar | null>(null);
+    // The bar last opened: where focus returns when a Ctrl/⌘+S save leaves it nowhere (#1984).
+    const lastBarEdited = useRef<string | null>(null);
+    if (openBar) {
+        lastBarEdited.current = openBar.id;
+    }
     // The bar menu's "Repeat or ending…" (#1725): the Repeats and endings dialog over the chart,
     // reviewing every pending bar, on the bar it was opened from. `blocked`: the pending bars'
     // repeat markers make no form yet, so the dialog opens on the bar's own markers (#1758).
@@ -327,8 +347,12 @@ export default function Ensemble() {
         playbackPending,
         setPlaybackPending,
         active,
+        chartView,
+        looped,
         setActive,
         countInBeat,
+        place,
+        countInSlot,
         nextSoon,
         changeSoon,
         pendingAutoplay,
@@ -336,6 +360,10 @@ export default function Ensemble() {
     } = usePlaybackState({ startPlayback });
     const { theme, stage, chooseTheme, toggleTheme } = useStageTheme();
     const { palette, choosePalette } = usePalette();
+    // What the musician plays (#1992): a per-device choice that mutes their lane on every chart
+    // and moves the chords for a transposing instrument. Never written to a chart.
+    const player = usePlayerInstrument();
+    const playerRole = player.instrument ? INSTRUMENT_ROLES[player.instrument] : null;
     // Settings (#1783): per-device preferences, on the songbook and on a chart.
     const [settingsOpen, setSettingsOpen] = useState(false);
     const settingsDialog = useModalDialog(settingsOpen);
@@ -356,8 +384,50 @@ export default function Ensemble() {
     const exportDialogRef = useModalDialog(exportOpen);
     const [importing, setImporting] = useState(false);
     const [soundProgress, setSoundProgress] = useState('');
+    // One gate per operation (`perform` renews it): a sound install settles ~220 files in two
+    // seconds, and a screen reader reads every rewrite of the region they land in (#1985).
+    const progressGate = useRef(quarterGate(setSoundProgress));
+    const soundSink: SoundProgress = (text, fraction) => progressGate.current(text, fraction);
     const [soundsOffline, setSoundsOffline] = useState<boolean | null>(null);
     const [allSoundsOffline, setAllSoundsOffline] = useState<boolean | null>(null);
+    // The style's sounds, fetched behind the band (#1997). When Follow-feel lanes move onto
+    // sounds that arrived, the chart on the stand — and its saved and original baselines — show
+    // them as resolved on this device (`runtime.resolvedHere`, as an open does), so a sound that
+    // arrived is never an unsaved change. A pinned lane is untouched by both. Deferred while an
+    // action holds the shell (`working`): a Save that captured its document before the switch
+    // would otherwise land a baseline on the old sounds after this ran.
+    function resolveArrivedSounds(): boolean {
+        if (working.current) {
+            return false;
+        }
+        const now = currentNow.current;
+        if (!now) {
+            return true;
+        }
+        const resolved = runtime.resolvedHere(now);
+        // Unchanged (nothing on this chart followed the style onto a new sound): the same
+        // object, so nothing that keys on it — a delete's Undo offer — is retired for nothing.
+        if (!sameData(resolved.chart.band, now.chart.band)) {
+            setCurrent(resolved);
+            currentNow.current = resolved;
+        }
+        const savedDoc = savedNow.current;
+        if (savedDoc?.id === now.id) {
+            const resolvedSaved = runtime.resolvedHere(savedDoc);
+            if (!sameData(resolvedSaved.chart.band, savedDoc.chart.band)) {
+                setSaved(resolvedSaved);
+                savedNow.current = resolvedSaved;
+            }
+        }
+        if (draftBaseline.current?.id === now.id) {
+            draftBaseline.current = runtime.resolvedHere(draftBaseline.current);
+        }
+        void soundsAvailableOffline(resolved.chart).then(setSoundsOffline);
+        return true;
+    }
+    const styleSounds = useStyleSounds(resolveArrivedSounds, busy);
+    // The Players tab's switch (#1997): fetch each style's sounds when the band plays.
+    const [autoSounds, setAutoSounds] = useState(autoSoundsPreference);
     // The Band sheet (#1703): closed, or open on one of its tabs. `lastBandTab` is where the
     // transport's Band button reopens it — the tab the musician was last on.
     const [bandTab, setBandTab] = useState<BandTab | null>(null);
@@ -669,6 +739,7 @@ export default function Ensemble() {
         sync,
         onStand,
         setError,
+        savingOff: savingOffRef,
         setBrowse,
     });
     const savingOff = savingOffHome !== null && guestHome === savingOffHome;
@@ -719,12 +790,44 @@ export default function Ensemble() {
         blocks,
         displayActive,
         displayNext,
+        displayCountIn,
         activeEvent,
         activeBar,
         totalBars,
         writtenBars,
         writtenSections,
-    } = useChartView(current, active, playing);
+        // A B♭ or E♭ horn reads its chords moved (#1992); the editor always shows what is
+        // written, which is concert.
+    } = useChartView(
+        current,
+        active,
+        playing,
+        countInSlot,
+        chartView,
+        editing ? 0 : (playerRole?.shift ?? 0),
+    );
+    // The chart as the mute chips and the Band sheet show it (#1992): the musician's own lane
+    // reads off unless they turned it on for this chart (`runtime.laneHeard`). Only for showing —
+    // `current` stays the document, so the instrument's default mute is never a chart edit and
+    // never marks the song unsaved.
+    const ownLane = runtime.playerLaneModule();
+    const ownHeard = ownLane ? runtime.laneHeard(ownLane) : true;
+    const laneView = useMemo(
+        () =>
+            current && ownLane && current.chart.band[ownLane].enabled !== ownHeard
+                ? {
+                      ...current,
+                      chart: {
+                          ...current.chart,
+                          band: {
+                              ...current.chart.band,
+                              [ownLane]: { ...current.chart.band[ownLane], enabled: ownHeard },
+                          },
+                      },
+                  }
+                : current,
+        [current, ownLane, ownHeard],
+    );
     useFollowScroll(scroll, {
         following,
         active,
@@ -735,15 +838,42 @@ export default function Ensemble() {
     // Song mode's readout (#1784): what the band plays now, or would at Play. Stopped, reading it
     // compiles the chart a few times, so it is read again only when the chart (its tempo
     // included), the setting or the transport changes, and only while the Practice tab shows it.
+    // The chart footer says the same thing while stopped (#1990): a looping chart under a Song
+    // length plays that many choruses, so "repeats continuously" would be untrue.
+    // The runtime's own value, not `feel`'s: that snapshot is taken when the Band sheet opens, so
+    // after a reload it is stale until then.
+    const songMinutes = runtime.songMode();
     // biome-ignore lint/correctness/useExhaustiveDependencies: `current`, `songMinutes` and `playing` are re-read triggers.
     const songReadout = useMemo(
-        () => (current && bandTab === 'practice' ? runtime.songModeReadout() : null),
-        [current, feel.songMinutes, playing, bandTab],
+        () =>
+            current && (bandTab === 'practice' || songMinutes !== null)
+                ? runtime.songModeReadout()
+                : null,
+        [current, songMinutes, feel.songMinutes, playing, bandTab],
+    );
+    // Whose turn each bar is while the band trades (#1990), from the plan's own `leadRole`:
+    // recomputed when the pass or chorus changes, not per frame.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `place.pass` and `place.barChorus` are the triggers; `place` is a new object per change.
+    const turns = useMemo(
+        () => (place?.trading ? runtime.tradeTurns(place) : null),
+        [place?.trading, place?.pass, place?.barChorus, place?.bar, place?.tradeKey, current],
     );
     const neckShowing = neck && !editing;
+    const playingRowAway = usePlayingRowAway(scroll, { following, active, remount: neckShowing });
     const neckPrefs = useNeckPrefs();
+    // #1993 — on a phone, while the band plays, the header's second row folds into the ••• (the
+    // Song menu carries it, ahead of its own actions; `song-header.css`). Laptop and tablet keep
+    // the row (#1969).
+    const phoneWidth = usePhoneWidth();
+    const foldHeader = !!current && phoneWidth && (playing || playbackPending);
     // The chart reads as one page where it can (#1712); editing, it scrolls at a reading size.
-    useChartFit(scroll, !current || neckShowing ? null : editing ? 'edit' : 'page', blocks);
+    // The fold's height is not a resize of the stand: the step holds across it (#1784).
+    useChartFit(
+        scroll,
+        !current || neckShowing ? null : editing ? 'edit' : 'page',
+        blocks,
+        foldHeader,
+    );
     // Bars typed but not yet applied (#1723).
     const hasPendingText = pendingMeasures;
     // An untouched new song is not unsaved work: there is nothing in it to lose (#1707).
@@ -855,6 +985,8 @@ export default function Ensemble() {
             : null;
     const {
         setMessage,
+        announce,
+        announcement,
         dismissMessage,
         toastTone,
         toastText,
@@ -918,6 +1050,7 @@ export default function Ensemble() {
             .then((result) => {
                 if (alive) {
                     setGuestHome(result.home);
+                    savingOffRef.current = result.savingOff;
                     setSavingOffHome(result.savingOff ? result.home : null);
                     bootHomeFresh.current = true;
                     setReady(true);
@@ -964,7 +1097,7 @@ export default function Ensemble() {
     ) {
         const onStand = kept?.document ?? document;
         setStandardDraft(false);
-        runtime.load(onStand);
+        runtime.load(onStand, true);
         setSaved(null);
         const landed = runtime.withLoadedSounds(onStand);
         setCurrent(landed);
@@ -1057,9 +1190,7 @@ export default function Ensemble() {
                 const kept = draftKey ? repository.sharedDraftFor(draftKey, document.id) : null;
                 openSharedDraft(
                     document,
-                    kept
-                        ? 'Recovered your unsaved changes'
-                        : 'Opened from a shared link · not saved yet',
+                    kept ? 'Recovered your unsaved changes' : '',
                     draftKey,
                     kept,
                 );
@@ -1502,6 +1633,7 @@ export default function Ensemble() {
     /** `run`'s body: the shell busy while `task` runs, its refusal on the error line. */
     async function perform(task: () => void | Promise<void>, keepError: boolean) {
         working.current = true;
+        progressGate.current = quarterGate(setSoundProgress);
         setBusy(true);
         // A feel change now prepares its sounds while the band keeps playing and
         // swaps in at the next bar (#1185); only a failed change stops and resumes.
@@ -1557,7 +1689,7 @@ export default function Ensemble() {
             const next = updateChart();
             setEditing(false);
             setBandTab(null);
-            await runtime.toggle(setSoundProgress);
+            await runtime.toggle(soundSink);
             setPlaying(runtime.state().playback.isPlaying);
             setSoundsOffline(await soundsAvailableOffline(next.chart));
             setSoundProgress('');
@@ -1690,7 +1822,7 @@ export default function Ensemble() {
         setError(`Draft is only in this tab: ${reason.replace(/\.$/, '')}. Export before closing.`);
     }
     /**
-     * The draft is kept for recovery on this device. Said by the header's "locally recovered"
+     * The draft is kept for recovery on this device. Said by the header's "on this device"
      * alone — never a toast (#1760): this runs on EVERY edit, and "Draft recovered on this
      * device" told a musician who had recovered nothing that they had, an edit at a time. A real
      * recovery is announced where it happens, by `open()` ("Recovered your unsaved changes").
@@ -1856,6 +1988,21 @@ export default function Ensemble() {
             draft(runtime.captureDocument(next));
         });
     }
+    /** The band's intensity from the transport's slider or a phone's Song menu (#1994): the
+     * Groove tab's own path, Auto or off Auto onto a level. */
+    function changeIntensity(intensity: 'auto' | number) {
+        change(() => {
+            if (intensity === 'auto') {
+                runtime.setAutoIntensity(true);
+                return;
+            }
+            if ((current?.chart.performance.energy ?? 'auto') === 'auto') {
+                runtime.setAutoIntensity(false);
+            }
+            runtime.setBandIntensity(intensity);
+            setFeel((f) => ({ ...f, bandIntensity: intensity }));
+        });
+    }
     function clearBuffers() {
         pendingText.current = false;
         setPendingMeasures(false);
@@ -1880,9 +2027,30 @@ export default function Ensemble() {
             if (pending.length > 0) {
                 applyScore(withSectionChanges(updateChart().chart.score, id, pending));
             }
-            await runtime.startSection(id, setSoundProgress);
+            await runtime.startSection(id, soundSink);
             setSoundProgress('');
         });
+    }
+    // The section menu's "Loop" (#1989): the band plays just this section, over and over. From
+    // the section's menu in Edit, a name or count still in its field goes in first, as Start
+    // here's does.
+    function loopSection(id: string | undefined, pending: readonly SectionChange[] = []) {
+        if (!id) {
+            return;
+        }
+        setFollowing(true);
+        runtime.warmAudio();
+        void run(async () => {
+            if (pending.length > 0) {
+                applyScore(withSectionChanges(updateChart().chart.score, id, pending));
+            }
+            await runtime.loopSection(id, soundSink);
+            setSoundProgress('');
+        });
+    }
+    /** The transport's "Looping B ×": the band carries on into the chart at a barline. */
+    function clearLoop() {
+        runtime.clearLoop();
     }
     /** Into the editor: the one way `editing` turns on. It overlays the stand mode (#1587)
      * without changing it, so leaving the editor by any path returns to Chart or Neck. */
@@ -2047,8 +2215,22 @@ export default function Ensemble() {
         setBandTab(tab);
     }
     function toggleLane(lane: Lane) {
-        if (current) {
-            change(() => runtime.setEnabled(lane, !current.chart.band[lane].enabled));
+        if (laneView) {
+            change(() => runtime.setEnabled(lane, !laneView.chart.band[lane].enabled));
+        }
+    }
+    /**
+     * "What do you play?" answered (#1992), from the stand's question or Settings. A guitar turns
+     * the stand to the neck — on a guitar's, if a ukulele's was up.
+     */
+    function choosePlayer(instrument: PlayerInstrument) {
+        player.choose(instrument);
+        if (INSTRUMENT_ROLES[instrument].neck) {
+            if (neckPrefs.prefs.instrument !== 'guitar') {
+                neckPrefs.setPrefs({ instrument: 'guitar' });
+            }
+            setNeck(true);
+            rememberStandMode('neck');
         }
     }
     function goHome() {
@@ -2198,7 +2380,7 @@ export default function Ensemble() {
                 accountDrafts.current.set(document.id, recovery.document);
             }
         }
-        runtime.load(next);
+        runtime.load(next, true);
         const onDevice = runtime.withLoadedSounds(next);
         const savedBaseline = next === document ? onDevice : document;
         setSaved(savedBaseline);
@@ -2241,6 +2423,7 @@ export default function Ensemble() {
             // hadn't happened while covering the chart's last row on a phone. Clearing still
             // keeps the previous song's sentence from following the musician into this one.
             setMessage('');
+            announce(openedSongAnnouncement(onDevice));
         }
         selectSection(next);
         return { current: onDevice, saved: savedBaseline };
@@ -2469,7 +2652,7 @@ export default function Ensemble() {
         if (busy || !current) {
             return;
         }
-        if (songMenu === 'actions' || songMenu === 'more') {
+        if (songMenu === 'actions' || songMenu === 'more' || songMenu === 'intensity') {
             setSongMenu(null);
             return;
         }
@@ -2587,7 +2770,7 @@ export default function Ensemble() {
             const opened = await open(document);
             setBrowse({ view: 'home' });
             track('chart_opened', { source: 'songbook' });
-            await runtime.toggle(setSoundProgress);
+            await runtime.toggle(soundSink);
             setPlaying(runtime.state().playback.isPlaying);
             setSoundsOffline(await soundsAvailableOffline(opened.current.chart));
             setSoundProgress('');
@@ -2747,7 +2930,8 @@ export default function Ensemble() {
         setError('');
         try {
             const candidate = updateChart();
-            await runtime.exportAudio(kind, candidate.title, setExportAudioProgress);
+            // A render reports every file it settles into a live region; say a quarter at a time.
+            await runtime.exportAudio(kind, candidate.title, quarterGate(setExportAudioProgress));
         } catch (e) {
             setError(e instanceof Error ? e.message : String(e));
         } finally {
@@ -2851,6 +3035,7 @@ export default function Ensemble() {
         applyScore,
         updateChart,
         startHereSection,
+        loopSection,
         closeSongMenus,
         offerUndo,
     });
@@ -2888,6 +3073,55 @@ export default function Ensemble() {
         open,
     });
 
+    /** The Save button's action: a new song is kept, a shared draft copied, else a plain Save. */
+    function saveFromHeader() {
+        return run(async () => {
+            // Refs, not this render's state: a Save pressed while a new song
+            // was being kept waited for it (`run`) and must see it kept.
+            if (newSongNow.current) {
+                await keepNewSong(updateChart(), true);
+                setMessage('Saved on this device');
+            } else if (sharedDraftNow.current) {
+                await keepSharedCopy();
+            } else {
+                await save();
+            }
+        });
+    }
+    /**
+     * Ctrl/⌘+S (#1984): the Save button's action, then focus stays where the musician was. If the
+     * control they were in is gone by then, it goes back to the last bar they edited. A refusal
+     * that opened a bar to fix has already put focus in it, and is left alone.
+     */
+    function saveFromKeys() {
+        const from = document.activeElement;
+        const bar = lastBarEdited.current;
+        void saveFromHeader().then(() => {
+            // The control may be disabled while the action runs (the tempo field) and enabled by a
+            // render a frame or two later, so try for a few frames before giving up.
+            let frames = 0;
+            const restore = () => {
+                const now = document.activeElement;
+                if (now && now !== document.body) {
+                    return;
+                }
+                if (from instanceof HTMLElement && from !== document.body && from.isConnected) {
+                    from.focus({ preventScroll: true });
+                    if (document.activeElement === from || ++frames > 10) {
+                        return;
+                    }
+                    requestAnimationFrame(restore);
+                } else if (bar) {
+                    scroll.current
+                        ?.querySelector<HTMLElement>(
+                            `[data-measure-id="${CSS.escape(bar)}"] .bar-number`,
+                        )
+                        ?.focus({ preventScroll: true });
+                }
+            };
+            requestAnimationFrame(restore);
+        });
+    }
     useStandKeys({
         current,
         busy,
@@ -2897,14 +3131,84 @@ export default function Ensemble() {
         scroll,
         togglePlayback,
         setFollowing,
+        canSave: !busy && dirty,
+        saveFromKeys,
     });
 
     // The songbook home itself, not the stand or one of its two sub-views (#1441): the top bar's
     // search, Import chart and New song belong to this view only.
     const homeView = ready && !current && browse.view === 'home';
 
+    // The Song menu carries what the header folded (`foldHeader`), ahead of its own actions.
+    /** A choice that is the whole answer: the Song menu closes as it runs (`SongMenu`'s `done`). */
+    const closeThen = (action: () => void) => {
+        setSongMenu(null);
+        action();
+    };
+    const foldedItems: MenuItem[] = foldHeader
+        ? [
+              {
+                  id: 'settings',
+                  label: 'Settings…',
+                  testId: 'song-menu-settings',
+                  onSelect: () => closeThen(() => setSettingsOpen(true)),
+              },
+              {
+                  id: 'band',
+                  label: 'Band…',
+                  testId: 'song-menu-band',
+                  disabled: busy,
+                  onSelect: () => closeThen(() => openBand(lastBandTab.current)),
+              },
+              {
+                  id: 'stage',
+                  // Named for what it does, as the header's button title is.
+                  label: stage ? 'Switch to day mode' : 'Switch to stage mode',
+                  testId: 'song-menu-stage',
+                  onSelect: () => closeThen(toggleTheme),
+              },
+              // The stand's mode, a radio group as the header's switch says it (`aria-pressed`).
+              {
+                  id: 'chart',
+                  label: 'Chart',
+                  checked: !editing && !neck,
+                  testId: 'song-menu-chart',
+                  onSelect: () => closeThen(() => showStand('chart')),
+              },
+              {
+                  id: 'neck',
+                  label: 'Neck',
+                  checked: neck && !editing,
+                  testId: 'song-menu-neck',
+                  onSelect: () => closeThen(() => showStand('neck')),
+              },
+              {
+                  id: 'edit',
+                  label: 'Edit chart',
+                  checked: editing,
+                  testId: 'song-menu-edit',
+                  disabled: busy,
+                  onSelect: () => closeThen(editChart),
+              },
+              {
+                  id: 'save',
+                  label: sharedDraft && !newSongDraft ? 'Keep a copy' : 'Save',
+                  testId: 'song-menu-save',
+                  disabled: busy || !dirty,
+                  onSelect: () => closeThen(() => void saveFromHeader()),
+              },
+          ]
+        : [];
+
     return (
         <div className={`app-shell ${current ? 'song-open' : ''}`}>
+            {current && !neckShowing && (
+                // The first Tab stop (#1984): the header, transport and settings come before the
+                // chart. A button, not a `#hash` link: the address bar belongs to the chart link.
+                <button type="button" className="skip-link" onClick={() => scroll.current?.focus()}>
+                    Skip to chart
+                </button>
+            )}
             <header className="site-header" hidden={!!current} data-home={homeView}>
                 <button
                     className="brand"
@@ -3308,6 +3612,7 @@ export default function Ensemble() {
                         totalBars={totalBars}
                         cloudSaved={cloudSaved}
                         stage={stage}
+                        folded={foldHeader}
                         editing={editing}
                         neck={neck}
                         onHome={goHome}
@@ -3318,28 +3623,18 @@ export default function Ensemble() {
                         onShowNeck={() => showStand('neck')}
                         onEditChart={editChart}
                         onTitle={(title) => draft({ ...current, title })}
-                        onSave={() =>
-                            void run(async () => {
-                                // Refs, not this render's state: a Save pressed while a new song
-                                // was being kept waited for it (`run`) and must see it kept.
-                                if (newSongNow.current) {
-                                    await keepNewSong(updateChart(), true);
-                                    setMessage('Saved on this device');
-                                } else if (sharedDraftNow.current) {
-                                    await keepSharedCopy();
-                                } else {
-                                    await save();
-                                }
-                            })
-                        }
+                        onSave={() => void saveFromHeader()}
                         menuButtonRef={songMenuTrigger}
                         onMenu={toggleSongMenu}
                     />
                     <TransportBar
-                        current={current}
+                        current={laneView ?? current}
                         busy={busy}
                         playbackActive={playbackActive}
                         countInBeat={countInBeat}
+                        place={place}
+                        looped={looped}
+                        onClearLoop={clearLoop}
                         onPlayToggle={togglePlayback}
                         onBand={() => openBand(lastBandTab.current)}
                         bandTab={bandTab}
@@ -3369,14 +3664,36 @@ export default function Ensemble() {
                                 // #1439's standards catalog, which never calls it at all), which
                                 // is why this stayed a separate call site rather than moving
                                 // inside `setGenre` itself.
-                                await runtime.setGenre(genre, setSoundProgress);
+                                await runtime.setGenre(genre, soundSink);
                                 track('genre_changed', { genre });
                             }, true)
                         }
                         onToggleLane={toggleLane}
+                        onIntensity={changeIntensity}
                         onTrade={() => openBand('trade')}
                         tradeBlocked={runtime.tradeBlocked()}
+                        player={
+                            // "Just listening" changes nothing on the stand, so it shows nothing
+                            // there either; Settings still says it (#1992).
+                            playerRole && player.instrument !== 'listening'
+                                ? {
+                                      label: playerRole.short,
+                                      tag: playerRole.tag,
+                                      note:
+                                          playerRole.shift === 0
+                                              ? null
+                                              : editing
+                                                ? 'concert'
+                                                : playerRole.shift === 2
+                                                  ? 'B♭ chords'
+                                                  : 'E♭ chords',
+                                      lane: playerRole.lane,
+                                  }
+                                : null
+                        }
+                        onPlayer={() => setSettingsOpen(true)}
                     />
+                    {player.unasked && <PlayerPrompt onChoose={choosePlayer} />}
                     <BandSheet
                         dialogRef={bandDialog}
                         tab={bandTab ?? lastBandTab.current}
@@ -3385,7 +3702,7 @@ export default function Ensemble() {
                         error={bandOpen ? error : ''}
                         players={
                             <PlayersTab
-                                current={current}
+                                current={laneView ?? current}
                                 busy={busy}
                                 soundProgress={soundProgress}
                                 soundsOffline={soundsOffline}
@@ -3393,8 +3710,9 @@ export default function Ensemble() {
                                 pendingSound={pendingSound}
                                 onInstallAll={() =>
                                     change(async () => {
-                                        await installAllSounds(setSoundProgress);
-                                        await runtime.applyGenreSounds(setSoundProgress);
+                                        await installAllSounds(soundSink);
+                                        await runtime.applyGenreSounds(soundSink);
+                                        setMessage('Sounds installed and ready offline');
                                     })
                                 }
                                 onChooseSound={(lane, value) => {
@@ -3409,7 +3727,7 @@ export default function Ensemble() {
                                                 value === 'auto'
                                                     ? runtime.recommendedVoice(lane)
                                                     : (value as InstrumentVoice),
-                                                setSoundProgress,
+                                                soundSink,
                                                 value === 'auto',
                                             );
                                         } finally {
@@ -3424,6 +3742,11 @@ export default function Ensemble() {
                                     change(() => runtime.setReverb(lane, value))
                                 }
                                 onToggleLane={toggleLane}
+                                autoSounds={autoSounds}
+                                onAutoSounds={(enabled) => {
+                                    setAutoSounds(enabled);
+                                    runtime.setAutoSounds(enabled);
+                                }}
                             />
                         }
                         groove={
@@ -3499,6 +3822,7 @@ export default function Ensemble() {
                                     changeSoon={changeSoon}
                                     playing={playbackActive}
                                     onStrum={(midis) => runtime.auditionPitches(midis)}
+                                    notation={current?.chart.score.notation ?? 'name'}
                                 />
                             </Suspense>
                         ) : (
@@ -3530,6 +3854,11 @@ export default function Ensemble() {
                                         blocks={blocks}
                                         displayActive={displayActive}
                                         displayNext={displayNext}
+                                        countIn={
+                                            countInBeat !== null && displayCountIn !== null
+                                                ? { beat: countInBeat, display: displayCountIn }
+                                                : null
+                                        }
                                         nextSoon={nextSoon}
                                         activeEvent={activeEvent}
                                         writtenBars={writtenBars}
@@ -3539,7 +3868,10 @@ export default function Ensemble() {
                                         playing={playing}
                                         playbackActive={playbackActive}
                                         totalBars={totalBars}
+                                        turns={turns}
+                                        songReadout={songReadout}
                                         onStartHere={(id) => startHereSection(id)}
+                                        onLoop={(id) => loopSection(id)}
                                         barEdit={barEditing()}
                                         sectionEdit={sectionEditing()}
                                         onAudition={(index) => runtime.audition(index)}
@@ -3575,6 +3907,7 @@ export default function Ensemble() {
                         toastTone={toastTone}
                         toastText={toastText}
                         messageToken={messageToken}
+                        announcement={announcement}
                         setToastHeld={setToastHeld}
                         dismissMessage={dismissMessage}
                         undoLive={undoLive}
@@ -3587,11 +3920,14 @@ export default function Ensemble() {
                                 : null
                         }
                         dismissSyncFailure={dismissSyncFailure}
-                        showResume={playbackActive && !following && !neckShowing}
+                        showResume={playbackActive && !following && !neckShowing && playingRowAway}
                         onResumeFollow={() => {
                             setFollowing(true);
                             scroll.current?.focus({ preventScroll: true });
                         }}
+                        styleSounds={styleSounds}
+                        onGetStyleSounds={() => void runtime.getStyleSounds()}
+                        onDeclineStyleSounds={runtime.declineStyleSounds}
                     />
                 </main>
             )}
@@ -3610,6 +3946,16 @@ export default function Ensemble() {
                 recoveryOptions={recoveryOptions}
                 syncStatus={syncStatus}
                 shareLinkFallback={shareLinkFallback}
+                foldedItems={foldedItems}
+                // A phone has no room for the transport's slider (#1994): the menu carries it.
+                intensity={
+                    phoneWidth
+                        ? {
+                              energy: current?.chart.performance.energy ?? 'auto',
+                              onChange: changeIntensity,
+                          }
+                        : null
+                }
                 onView={setSongMenu}
                 onShare={() => void run(shareChartLink)}
                 onDuplicate={() => void run(() => save(true))}
@@ -3690,6 +4036,8 @@ export default function Ensemble() {
                 onTheme={chooseTheme}
                 palette={palette}
                 onPalette={choosePalette}
+                instrument={player.instrument}
+                onInstrument={choosePlayer}
                 onClose={() => setSettingsOpen(false)}
             />
             {current && (

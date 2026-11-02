@@ -1,5 +1,13 @@
 import type { Page } from '@playwright/test';
-import { expect, seedStarters, songLink, test } from './fixtures';
+import {
+    expect,
+    measureSong,
+    seedGuestDocuments,
+    seedStarters,
+    songLink,
+    starterDocuments,
+    test,
+} from './fixtures';
 
 /**
  * #1460 — the stand drops its footer: messages become a toast, sync status moved into Song
@@ -30,7 +38,14 @@ test('no footer in either playback state, and the chart keeps the height back', 
     // A bar that comes and goes on Play/Stop would shift `.chart-scroll`'s own box (Touches #1);
     // with no footer in either state and nothing in the header hidden for playing (#1969), the
     // box is the same in both.
-    expect(playing).toEqual(stopped);
+    // On a phone, though, the header's second row folds into ••• while playing (#1993), so the
+    // chart is taller by what that row held and nothing else moves.
+    if (page.viewportSize()!.width <= 760) {
+        expect(playing!.height).toBeGreaterThan(stopped!.height);
+        expect(playing!.y + playing!.height).toBeCloseTo(stopped!.y + stopped!.height, 0);
+    } else {
+        expect(playing).toEqual(stopped);
+    }
     await page.getByRole('button', { name: 'Stop playback' }).click();
 });
 
@@ -175,11 +190,44 @@ test('a fast action never flashes "Updating…" in the toast', async ({ page }) 
     expect(history.some((text) => text.includes('Updating'))).toBe(false);
 });
 
+function longChart() {
+    return measureSong(
+        [
+            'long-chart',
+            'Long chart',
+            'Jazz',
+            'C',
+            Array.from({ length: 64 }, (_, i) => ['Cmaj7', 'Am7', 'Dm7', 'G7'][i % 4]).join(' | '),
+            110,
+        ],
+        new Date(Date.now() - 60_000).toISOString(),
+    );
+}
+
+test('no Resume follow on a chart that fits, whatever is scrolled or paged (#1986)', async ({
+    page,
+}) => {
+    // Tall enough that the three-row starter fits on a phone too.
+    await page.setViewportSize({ width: 390, height: 1800 });
+    await seedStarters(page);
+    await songLink(page, 'Blue pocket').click();
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
+    const scroller = page.locator('.chart-scroll');
+    expect(await scroller.evaluate((el) => el.scrollHeight <= el.clientHeight + 1)).toBe(true);
+    await scroller.press('PageDown');
+    await scroller.dispatchEvent('wheel', { deltaY: 300 });
+    await page.waitForTimeout(400);
+    await expect(page.getByTestId('resume-follow')).toHaveCount(0);
+});
+
 test('Resume follow only appears playing with Following off, and hides on resume or stop', async ({
     page,
 }) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket').click();
+    // A chart long enough to scroll: the pill needs the playing row to be scrolled out of view
+    // (#1986), which a chart that fits never does.
+    await seedGuestDocuments(page, [...starterDocuments(), longChart()]);
+    await songLink(page, 'Long chart').click();
     // Stopped: no pill, regardless of Following's internal state.
     await expect(page.getByTestId('resume-follow')).toHaveCount(0);
 
@@ -299,8 +347,8 @@ test('dismissing a warning while still hovering it does not stick the pause for 
  */
 test('the empty space around the pill does not eat taps meant for the chart', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket').click();
+    await seedGuestDocuments(page, [...starterDocuments(), longChart()]);
+    await songLink(page, 'Long chart').click();
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback' })).toBeEnabled();
     await page.locator('.chart-scroll').press('PageDown');

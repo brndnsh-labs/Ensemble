@@ -1,5 +1,6 @@
 import { type Dispatch, type SetStateAction, useEffect, useEffectEvent, useState } from 'react';
 import { flushSync } from 'react-dom';
+import type { BandChart } from '../lib/band-chart';
 import * as runtime from '../lib/runtime';
 
 /** What the shell hands `usePlaybackState`. */
@@ -27,14 +28,40 @@ interface PlaybackState {
     setActive: Dispatch<SetStateAction<number | null>>;
     /** The count-in beat sounding now (0-based), or null. */
     countInBeat: number | null;
+    /** Which chorus the band is in, and its part (#1990); null when stopped. */
+    place: runtime.PerformancePlace | null;
+    /** The slot the count-in leads into (the bar the countdown is drawn over), or null. */
+    countInSlot: number | null;
     /** In the active bar's last felt pulse: the chart sheet's next-bar cue. */
     nextSoon: boolean;
     /** In the active slot's last felt pulse: the neck's chord-change cue. */
     changeSoon: boolean;
+    /**
+     * The chart view the playhead's slot indexes (`runtime.bandChartView`), read in the same
+     * paint as `active`: a section loop cleared mid-play (#1989) changes it at a barline, so the
+     * stand reads the view again when this changes.
+     */
+    chartView: BandChart | null;
+    /** The section being looped (#1989), for the transport's chip; null when none is. */
+    looped: { id: string; label: string } | null;
     /** A `?autoplay=1` link is armed, waiting for the first gesture. */
     pendingAutoplay: boolean;
     /** The shared-link effect arms it. */
     setPendingAutoplay: Dispatch<SetStateAction<boolean>>;
+}
+
+function samePlace(a: runtime.PerformancePlace, b: runtime.PerformancePlace): boolean {
+    return (
+        a.chorus === b.chorus &&
+        a.of === b.of &&
+        a.part === b.part &&
+        a.pass === b.pass &&
+        a.barChorus === b.barChorus &&
+        a.bar === b.bar &&
+        a.lap === b.lap &&
+        a.tradeKey === b.tradeKey &&
+        a.trading === b.trading
+    );
 }
 
 /**
@@ -57,6 +84,7 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
     // The count-in beat sounding now (0-based), or null when not counting in (#1422) — cheap
     // enough to ride the same 60ms poll `playing`/`active` already use, no new interval.
     const [countInBeat, setCountInBeat] = useState<number | null>(null);
+    const [countInSlot, setCountInSlot] = useState<number | null>(null);
     // #1458 — is playback in the ACTIVE bar's last FELT pulse right now? Strengthens the next-bar
     // cue and gates the Following look-ahead's jump-ahead scroll. Edge-triggered off the same
     // 60ms poll below (`runtime.inLastBeat()`, a pure engine read off the song tick the active slot
@@ -68,6 +96,13 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
     // two-chord bar is mid-bar, where `nextSoon` (the barline's) never fires. Same poll, same
     // tick; it flips twice a chord.
     const [changeSoon, setChangeSoon] = useState(false);
+    // #1990 — which chorus, and whose turn: read off the same tick as the slot, and set only
+    // when it changes (a few times a minute), so it costs a frame nothing.
+    const [place, setPlace] = useState<runtime.PerformancePlace | null>(null);
+    // #1989 — the view the slot is read from, and the loop the transport's chip names: read on
+    // the same poll, set only when they change.
+    const [chartView, setChartView] = useState<BandChart | null>(null);
+    const [looped, setLooped] = useState<{ id: string; label: string } | null>(null);
 
     useEffect(() => {
         // The stand follows the performance every animation frame while it plays (#1240), reading
@@ -91,11 +126,19 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
             // read separately once showed the bar just left with the new bar's cue.
             const tick = playingNow ? runtime.songTick() : null;
             const slot = runtime.playheadSlot(tick);
+            const view = runtime.bandChartView();
+            const loop = runtime.loopedSection();
             commit(() => {
+                setChartView(view);
+                setLooped((previous) =>
+                    previous?.id === loop?.id && previous?.label === loop?.label ? previous : loop,
+                );
                 setPlaying(playingNow);
                 // No slot while counting in or between two queued segments: the pointer holds.
                 setActive((previous) => (!playingNow ? null : slot >= 0 ? slot : previous));
                 setCountInBeat(runtime.countInBeat());
+                const countingSlot = runtime.countInSlot();
+                setCountInSlot(countingSlot >= 0 ? countingSlot : null);
                 // #1458 — a pure engine read off the live song tick, not the ACTIVE bar's rendered
                 // DOM node: React hasn't necessarily committed `active`'s new value yet on the very
                 // frame playback crosses a barline, so reading the OLD bar's DOM attributes here
@@ -104,6 +147,12 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
                 // The slot this same tick is in, never `active`'s committed value, for the reason
                 // above — and off any slot (-1) there is no chord to be leaving.
                 setChangeSoon(runtime.inLastBeatOfSlot(tick, slot));
+                // Held across the count-in and a seam between two queued segments (null tick).
+                const here = runtime.performancePlace(tick);
+                setPlace((previous) => {
+                    const next = !playingNow ? null : (here ?? previous);
+                    return previous && next && samePlace(previous, next) ? previous : next;
+                });
             });
             if (playingNow) {
                 frame = window.requestAnimationFrame(inFrame);
@@ -169,8 +218,12 @@ export function usePlaybackState({ startPlayback }: PlaybackStateOptions): Playb
         playbackPending,
         setPlaybackPending,
         active,
+        chartView,
+        looped,
         setActive,
         countInBeat,
+        place,
+        countInSlot,
         nextSoon,
         changeSoon,
         pendingAutoplay,

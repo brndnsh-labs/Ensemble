@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { BandChart } from '../lib/band-chart';
+import { type BandChart, shiftedBlocks } from '../lib/band-chart';
 import type { ChartBlock } from '../lib/lead-sheet';
 import type { ChartDocument } from '../lib/runtime';
 import * as runtime from '../lib/runtime';
@@ -45,16 +45,26 @@ export function useChartView(
     current: ChartDocument | null,
     active: number | null,
     playing: boolean,
+    countInSlot: number | null = null,
+    polledView: BandChart | null = null,
+    /** Semitones a transposing instrument reads the chords up (#1992); 0 is concert. */
+    shift = 0,
 ) {
     // Read again whenever the open document changes (`runtime.load`/`editScore` rebuild the
     // view), and when playback starts or stops: a song-mode performance (#1784) is drawn from its
-    // own counted timeline, so `active` indexes that view's slots only while it plays.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: `playing` is a re-read trigger.
+    // own counted timeline, so `active` indexes that view's slots only while it plays. And when
+    // the playback poll reads a different view in the same paint as `active` (`polledView`): a
+    // section loop (#1989) set, or cleared mid-play at the barline the band carries on from.
+    // biome-ignore lint/correctness/useExhaustiveDependencies: `playing` and `polledView` are re-read triggers.
     const band = useMemo(
         (): BandChart | null => (current ? runtime.bandChartView() : null),
-        [current, playing],
+        [current, playing, polledView],
     );
-    const blocks = band?.blocks ?? NO_BLOCKS;
+    // Display only: the band, the slots and every written bar stay in concert.
+    const blocks = useMemo(
+        () => (band ? shiftedBlocks(band.blocks, shift) : NO_BLOCKS),
+        [band, shift],
+    );
     const displayActive = active === null ? null : (band?.slots[active]?.display ?? active);
     /**
      * The next performed bar's display index (#1458's next-bar cue), skipping past any further
@@ -68,6 +78,9 @@ export function useChartView(
         const next = nextBarIndex(band.slots, active, (slot) => slot.bar);
         return next === null ? null : band.slots[next].display;
     })();
+    /** The display index of the bar the count-in leads into (the countdown is drawn on it). */
+    const displayCountIn =
+        countInSlot === null ? null : (band?.slots[countInSlot]?.display ?? countInSlot);
     const activeEvent = active === null ? null : (band?.slots[active] ?? null);
     /** The performed bar `active` sits in (`BandSlot.bar`); null while stopped. Used to de-dupe
      * the jump-ahead by performed bar (patch review P3-2), not by slot index — a chord landing
@@ -98,6 +111,7 @@ export function useChartView(
         blocks,
         displayActive,
         displayNext,
+        displayCountIn,
         activeEvent,
         activeBar,
         totalBars,

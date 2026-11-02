@@ -199,7 +199,7 @@ export function isScoreChord(symbol: string): boolean {
  * accepted, so a symbol that parsed before is never touched. A rewrite counts only when its
  * result is itself a recognised chord; otherwise the symbol stays refused.
  */
-function houseQuality(quality: string): string | null {
+export function houseQuality(quality: string): string | null {
     const candidates: string[] = [];
     // Minor-major seventh: Cm(maj7), CmM7, Cmin(maj7), C-(maj7) → CmMaj7 (the seventh is required).
     if (/^(?:m|min|-)(?:\((?:maj|Maj|MAJ|M|Δ|△|\^)7\)|(?:maj|Maj|MAJ|M|Δ|△|\^)7)$/.test(quality)) {

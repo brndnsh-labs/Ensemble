@@ -111,7 +111,8 @@ describe('genre → sound map (#675)', () => {
         });
 
         it('falls back to synth for a pack-mapped genre when that pack is NOT installed', () => {
-            // Auto-follow never auto-downloads — an uninstalled mapping plays synth.
+            // The resolver never downloads — an uninstalled mapping plays synth (the v2 band
+            // fetches the style's packs behind it on Play since #1997, then resolves again).
             expect(autoVoiceForGenre('Jazz', 'chords', noneInstalled)).toBe('synth');
             expect(autoVoiceForGenre('Funk', 'chords', noneInstalled)).toBe('synth');
             expect(autoVoiceForGenre('Reggae', 'chords', noneInstalled)).toBe('synth');

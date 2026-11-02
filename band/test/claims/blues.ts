@@ -5,6 +5,8 @@ export const blues = defineClaims({
         {
             take: {},
             claims: [
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (150, about half the 301 measured; a lead-in is a note within a beat of the change).
+                ['bassApproachCount', 150, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.95, 1, 'the backbeat on 2 and 4, every bar'],
                 ['kickOnOneAndThree', 0.95, 1, 'the kick grounds 1 and 3'],
@@ -100,10 +102,20 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
-                // The blues figure leaves little room for a stab of its own, so the piano answers by
-                // laying out under the licks: breath density 1.02 (0.86 with the answer off), line
-                // density 0.132 (0.157).
-                ['compBreathDensity', 0.95, 2, "call and response: the piano in the guitar's gaps"],
+                // Measured 0.134; development off 0.061, #2012's bar fix reverted 0.071; always develops 0.40.
+                // Floor sits between the bar fix reverted (0.071) and shipped: it guards #2012's bar fix and development off (0.061).
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
+                [
+                    'leadMotifDevelopment',
+                    0.1,
+                    0.27,
+                    "a phrase now and then says the last one's opening again",
+                ],
+                ['leadMotifOpenings', 120, 10000, 'enough phrase openings to judge the rate on'],
+                // 1.0 is no response (the comp as busy in the breaths as under the line), so the floor
+                // sits above it: breath density 1.29 (0.94 with the answer off), line density 0.138
+                // (0.165).
+                ['compBreathDensity', 1.1, 2, "call and response: the piano in the guitar's gaps"],
                 ['compLineDensity', 0.1, 0.145, 'the piano thins under the licks'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo leaves space between licks'],

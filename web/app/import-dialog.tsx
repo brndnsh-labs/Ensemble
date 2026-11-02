@@ -2,7 +2,7 @@
 
 import { type IRealImportResult, parseIRealImportInSteps } from '@core/songbook/ireal-import';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type ChartDocument, genreOf, validateDocument } from '../lib/documents';
+import { type ChartDocument, validateDocument } from '../lib/documents';
 import { downloadFile } from '../lib/download';
 import { checkPlayable } from '../lib/engine-mode';
 import { importedDocument } from '../lib/import-document';
@@ -15,7 +15,8 @@ import {
     planPlaylist,
     resolvePlaylistImport,
 } from '../lib/playlist-import';
-import { directionLabel } from '../lib/score-labels';
+import { GENRE_NAMES } from '../lib/runtime';
+import { directionLabel, ignoredSignsSentence } from '../lib/score-labels';
 import { capRefusal, MAX_REMOTE_CANDIDATES } from '../lib/sync/repository';
 import { closeDialog, dialogRule } from './dialog-close';
 import './import-dialog.css';
@@ -80,7 +81,14 @@ export function ImportDialog({
     const [result, setResult] = useState<IRealImportResult | null>(null);
     const [native, setNative] = useState<ChartDocument | null>(null);
     const [selected, setSelected] = useState(0);
-    const [tempo, setTempo] = useState(String(base.chart.performance.bpm));
+    // What the musician typed or chose for the song under review, tagged with that song. The
+    // field shows the song's own proposal until then, so a new song starts over from its own with
+    // no effect that could reset a value typed in the window before the effect ran (#2076).
+    const [tempoEdit, setTempoEdit] = useState<{ song: unknown; value: string } | null>(null);
+    // The band style the song plays in: '' keeps this device's current setup (#2004).
+    const [genreEdit, setGenreEdit] = useState<{ song: unknown; value: string } | null>(null);
+    // A tempo for every song in a playlist; empty lets each keep its own (#2004).
+    const [tempoAll, setTempoAll] = useState('');
     const [error, setError] = useState('');
     /** Reading or checking an export: cancellable — Cancel and Escape stay live (review R5). */
     const [reading, setReading] = useState(false);
@@ -256,7 +264,7 @@ export function ImportDialog({
                     collections: playlist.collections,
                     includeDuplicates,
                     name,
-                    bpm: Number(tempo),
+                    bpm: tempoAll.trim() === '' ? null : Number(tempoAll),
                 }),
             };
         } catch (reason) {
@@ -264,7 +272,7 @@ export function ImportDialog({
                 error: reason instanceof Error ? reason.message : 'This playlist cannot import.',
             };
         }
-    }, [plan, playlist.library, playlist.collections, includeDuplicates, name, tempo]);
+    }, [plan, playlist.library, playlist.collections, includeDuplicates, name, tempoAll]);
     const summary = resolved && 'value' in resolved ? resolved.value : null;
     const capMessage =
         summary && accountRoom && room
@@ -275,7 +283,18 @@ export function ImportDialog({
     const whole = !!plan && mode === 'all';
 
     const song = whole ? undefined : result?.songs[selected];
+    // A song proposes its own style and tempo (#2004); choosing another song starts over from its.
+    const tempo =
+        tempoEdit && tempoEdit.song === song
+            ? tempoEdit.value
+            : String(song?.tempo?.bpm ?? base.chart.performance.bpm);
+    const genre = genreEdit && genreEdit.song === song ? genreEdit.value : (song?.genre ?? '');
     const diagnostics = [...(result?.diagnostics ?? []), ...(song?.diagnostics ?? [])];
+    const previewScore = song?.score ?? native?.chart.score;
+    const ignoredSentence = useMemo(
+        () => (previewScore ? ignoredSignsSentence(previewScore) : null),
+        [previewScore],
+    );
     // Playback updates the parent frequently. Only recheck a newly selected score.
     const capability = useMemo(() => {
         if (
@@ -313,7 +332,17 @@ export function ImportDialog({
         setError('');
         try {
             const candidate =
-                native ?? (result ? importedDocument(result, selected, base, Number(tempo)) : null);
+                native ??
+                (result
+                    ? importedDocument(
+                          result,
+                          selected,
+                          base,
+                          Number(tempo),
+                          'input',
+                          genre || null,
+                      )
+                    : null);
             if (!candidate) {
                 throw new Error('Choose a chart to import.');
             }
@@ -642,26 +671,34 @@ export function ImportDialog({
                         </>
                     ) : null}
                     <label className="import-field">
-                        Starting tempo (BPM)
+                        Tempo for every song (BPM)
                         <input
                             aria-label="Import tempo"
                             type="number"
                             min={40}
                             max={240}
-                            value={tempo}
+                            placeholder="Each song’s own"
+                            value={tempoAll}
                             disabled={busy}
-                            onChange={(event) => setTempo(event.target.value)}
+                            onChange={(event) => setTempoAll(event.target.value)}
                         />
                     </label>
                     <p>
-                        Uses your current {genreOf(base)} band setup. Export style, tempo, and
-                        chorus count are preserved in each song’s source, not automatically applied.
+                        Each song plays in the band style its iReal style maps to, at its own tempo
+                        (the export’s, else iReal’s for that style). A style Ensemble has no match
+                        for keeps your current band setup. The export’s own style and tempo stay in
+                        each song’s source.
                     </p>
                 </section>
             )}
             {(song || native) && (
                 <section className="import-summary" aria-label="Import preview">
                     <h3>{song?.title ?? native?.title}</h3>
+                    {ignoredSentence && (
+                        <p className="import-ignored-signs" data-testid="import-ignored-signs">
+                            {ignoredSentence}
+                        </p>
+                    )}
                     {song?.score && (
                         <>
                             <p>
@@ -697,6 +734,32 @@ export function ImportDialog({
                                         </span>
                                     ))}
                             </div>
+                            <p data-testid="import-sections">
+                                Sections:{' '}
+                                {song.score.sections
+                                    .map((s) => `${s.label} (${s.measures.length})`)
+                                    .join(' · ')}
+                            </p>
+                            <label className="import-field">
+                                Band style
+                                <select
+                                    aria-label="Import style"
+                                    value={genre}
+                                    disabled={busy}
+                                    onChange={(event) =>
+                                        setGenreEdit({ song, value: event.target.value })
+                                    }
+                                >
+                                    <option value="">
+                                        Keep my current style ({base.chart.band.groove.genre})
+                                    </option>
+                                    {GENRE_NAMES.map((name) => (
+                                        <option key={name} value={name}>
+                                            {name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
                             <label className="import-field">
                                 Starting tempo (BPM)
                                 <input
@@ -706,13 +769,25 @@ export function ImportDialog({
                                     max={240}
                                     value={tempo}
                                     disabled={busy}
-                                    onChange={(event) => setTempo(event.target.value)}
+                                    onChange={(event) =>
+                                        setTempoEdit({ song, value: event.target.value })
+                                    }
                                 />
                             </label>
-                            <p>
-                                Uses your current {genreOf(base)} band setup. Export style, tempo,
-                                and chorus count are preserved in the source, not automatically
-                                applied.
+                            <p data-testid="import-style-note">
+                                {song.style
+                                    ? `iReal style “${song.style}”: ${
+                                          song.genre
+                                              ? `plays as ${song.genre}`
+                                              : 'no Ensemble match, so your current style is kept'
+                                      }. `
+                                    : ''}
+                                {song.tempo
+                                    ? song.tempo.from === 'export'
+                                        ? 'The tempo is the export’s own.'
+                                        : 'The export sets no tempo, so this is iReal’s starting tempo for the style.'
+                                    : 'The export sets no tempo, so your current tempo is kept.'}{' '}
+                                Both can be changed here and after importing.
                             </p>
                         </>
                     )}

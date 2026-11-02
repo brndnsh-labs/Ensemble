@@ -26,6 +26,8 @@ export interface Transaction<T> {
 }
 
 /** Every result is published on transaction completion, never on a request's success. */
+const STORAGE_UNAVAILABLE = 'Account storage unavailable.';
+
 export class AccountDatabase {
     private opening: Promise<IDBDatabase> | undefined;
     private readonly name: string;
@@ -40,7 +42,16 @@ export class AccountDatabase {
     private open(): Promise<IDBDatabase> {
         if (!this.opening) {
             const opening = new Promise<IDBDatabase>((resolve, reject) => {
-                const request = indexedDB.open(this.name, ACCOUNT_DATABASE_VERSION);
+                // Blocked site data throws a SecurityError from the `indexedDB` getter or from
+                // `open` itself; say the plain sentence `onerror` already does, never the
+                // browser's own words.
+                let request: IDBOpenDBRequest;
+                try {
+                    request = indexedDB.open(this.name, ACCOUNT_DATABASE_VERSION);
+                } catch {
+                    reject(new Error(STORAGE_UNAVAILABLE));
+                    return;
+                }
                 let failed = false;
                 request.onupgradeneeded = (event) => {
                     const db = request.result;
@@ -78,8 +89,7 @@ export class AccountDatabase {
                         new Error('Account storage is blocked by another tab. Close it and retry.'),
                     );
                 };
-                request.onerror = () =>
-                    reject(request.error ?? new Error('Account storage unavailable.'));
+                request.onerror = () => reject(new Error(STORAGE_UNAVAILABLE));
                 request.onsuccess = () => {
                     if (failed) {
                         request.result.close();

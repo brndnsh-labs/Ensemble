@@ -235,3 +235,11 @@ test('leaving the standards browser returns focus to its entry point on home', a
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(page.getByRole('button', { name: 'Browse all →' })).toBeFocused();
 });
+
+test('the standards label sits on its own line under the back link (#1986)', async ({ page }) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Browse all →' }).click();
+    const back = await page.getByRole('button', { name: 'Back to songbook' }).boundingBox();
+    const eyebrow = await page.locator('.standards-browser .eyebrow').first().boundingBox();
+    expect(eyebrow?.y).toBeGreaterThanOrEqual((back?.y ?? 0) + (back?.height ?? 0) - 1);
+});

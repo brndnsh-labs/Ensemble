@@ -121,3 +121,52 @@
         gap: 8px 16px;
     }
 }
+/* The chart row under the board (#1995): the sheet's own line of four bars (`neck-chart-row.tsx`),
+   so the playing bar keeps the look it has on the chart. Four across on every screen, a little
+   shorter than the sheet's bars so the board keeps the room. */
+.neck-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.neck-chart-letter {
+    align-self: flex-start;
+    cursor: default;
+}
+.song-open .neck-chart .bars {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    row-gap: 0;
+}
+.song-open .neck-chart .bar {
+    min-height: 66px;
+    padding: 20px 8px 8px;
+}
+.song-open .neck-chart .bar:nth-child(2n) {
+    border-right: 0;
+}
+.song-open .neck-chart .bar:nth-child(4n),
+.song-open .neck-chart .bar:last-child {
+    border-right: 1.5px solid var(--bar-line-strong);
+}
+@media (max-width: 760px) {
+    .song-open .neck-chart .bar {
+        min-height: 58px;
+        padding: 18px 4px 6px;
+        gap: 4px;
+    }
+    .song-open .neck-chart .chord {
+        font-size: 20px;
+        letter-spacing: -0.5px;
+    }
+}
+/* A portrait tablet (#1995): the height is there, so the stand spends it on air between the
+   strip, the board and the row, and sets the row's bars at music-stand size. */
+@media (min-width: 761px) and (orientation: portrait) {
+    .neck-view-inner {
+        gap: 30px;
+    }
+    .song-open .neck-chart .bar {
+        min-height: 84px;
+        padding-top: 24px;
+    }
+}

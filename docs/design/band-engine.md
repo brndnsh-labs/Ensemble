@@ -136,6 +136,24 @@ physical: its range, its strum speed, whether it sustains.
 Idioms write whole-bar patterns for 4/4 and pulse cells for other meters. Every meter the codec
 accepts plays; only 4/4 is idiomatic in v0.
 
+### Your own lane: a hole, not a missing player (#1992, DECISION 2026-11-01)
+
+A lane switched off is a band without that player: with no bass the guitar plays its `alone`
+shapes (root dyads low on the neck in blues, the boom in country, a thumb bass in bossa) and
+the comp covers the bottom. That is right for a band with no bassist and wrong under a bassist
+practising, so the musician's own lane means something else. `BandSettings.you` names it: the
+lane is planned and played like any lane switched on — every later lane hears it, the comp keeps
+its band shapes, the keyboard yields to the lead — and only then are its events left out of
+what `performPass` returns. The rest of the band is note for note the band with that player
+there (`band/you.test.ts`). The band never trades with `you` (`tradeThatHappens`): its turns
+would be silence.
+
+The host sets it from the stand's "What do you play?" device preference (`web/lib/instrument.ts`):
+the instrument's lane is muted whenever a chart opens, and while it stays muted it is `you`. A
+musician who turns their own lane on hears it as any lane; any other lane switched off keeps the
+old meaning. Exports are what you hear: the `.mid` and the audio mix leave your muted lane out (a
+play-along take), while stem export sets `you` to null and renders every stem.
+
 ### The lead: a soloist that knows the whole song (Round 3, DECISION 2026-09-24)
 
 The lead plays after the bass and before the comp, so the comp hears it (`heard.lead`) and can
@@ -456,8 +474,20 @@ schedules everything due in the next 150 ms on a 25 ms timer.
   tail does) instead of being cut. A chord a bar's last strike pushed ahead is tied into the
   bar after it only if that bar opens on the same chord: the comp remembers which chord it
   pushed (`CompMemory.pushed`, `tiedFromPush`), and otherwise strikes the bar as written
-  (#1507). There is no section practice loop: it was retired in #1528 (DECISION 2026-10-07),
-  with the host's lap and release paths and the band's `leadsInto` input. `render()` builds the
+  (#1507). The section practice loop retired in #1528 (DECISION 2026-10-07), with the host's
+  lap and release paths and the band's `leadsInto` input, came back in #1989 as a derived
+  chart (DECISION 2026-11-01) and none of that machinery: `web/lib/section-loop.ts` builds a
+  score holding just the section, and the host plays it as any chart that repeats, so a lap's
+  fills into its own top are the looping chart's wrap (#2009's rules: an 8-bar section fills
+  and crashes every lap, a shorter one counts its laps). Cleared while playing, the band
+  carries on into the full chart without stopping (`BandHost.carryOn`): from the first barline
+  it can still change at (after the lookahead and every note sent, `update()`'s rule), it plays
+  the full chart's bar holding the same written bar (`loopEntry`; the top of the next lap is
+  the section's top), so the bars already generated lead into the chord that really follows
+  them, and the engine's memory crosses the seam rebased to the new ticks. Each segment keeps
+  the timeline it plays (`Segment.timeline`), and what it carries on into is data on the
+  segment (`carry`), not a flag spent once, so a follow-on dropped and rebuilt by a settings
+  change still goes there. `render()` builds the
   export the same chorus at a time, so it is exactly the performance that plays.
 
 A pass is generated on the main thread, two seconds before it is needed: about 8 ms for 32

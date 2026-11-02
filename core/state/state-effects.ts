@@ -24,7 +24,8 @@ const AUTO_FOLLOW_MODULES: InstrumentModule[] = ['chords', 'bass', 'soloist', 'g
  * Resolve every Auto-mode lane's voice to what `genre` maps to right now, and
  * dispatch the changes (#675/#683). Pinned lanes (`autoSound:false`) are left
  * alone; an uninstalled mapping resolves to synth (`autoVoiceForGenre` gates on
- * the registry's installed-set — auto-follow never auto-downloads). No-op writes
+ * the registry's installed-set; this resolution never downloads — the v2 band fetches the
+ * style's packs behind it on Play, #1997, and calls this again when they land). No-op writes
  * are skipped so non-mapped lanes don't churn dispatch.
  *
  * Two callers in `web/lib/runtime.ts`, one rule so they can't drift: a genre

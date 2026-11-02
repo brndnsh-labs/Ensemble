@@ -3,8 +3,25 @@ import { defineClaims } from '../critique/harness.js';
 export const rock = defineClaims({
     takes: [
         {
+            take: { colour: true },
+            claims: [
+                [
+                    'compWrittenTension',
+                    0.9,
+                    1,
+                    'a written 9th, 11th or b9 is in the chord the keys play',
+                ],
+            ],
+        },
+        {
+            take: { colour: true, comp: 'guitar' },
+            claims: [['compWrittenTension', 0.9, 1, 'and in the grip the guitar fingers']],
+        },
+        {
             take: {},
             claims: [
+                // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (70, about half the 139 measured; a lead-in is a note within a beat of the change).
+                ['bassApproachCount', 70, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.9, 1, 'the backbeat is the song'],
                 ['kickOnOne', 0.95, 1, 'the kick owns the one'],
@@ -46,6 +63,16 @@ export const rock = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Measured 0.149; development off 0.040, #2012's bar fix reverted 0.067; always develops 0.26.
+                // Floor sits between the bar fix reverted (0.067) and shipped: it guards #2012's bar fix and development off (0.040).
+                // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
+                [
+                    'leadMotifDevelopment',
+                    0.105,
+                    0.21,
+                    "a phrase now and then says the last one's opening again",
+                ],
+                ['leadMotifOpenings', 100, 10000, 'enough phrase openings to judge the rate on'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes'],
                 ['leadChordToneOnBeats', 0.8, 1, 'pentatonic lines land on the chord'],

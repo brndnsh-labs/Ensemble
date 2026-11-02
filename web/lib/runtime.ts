@@ -1,7 +1,9 @@
 import {
     type BandSettings,
+    barAtTick,
     compileTimeline,
     DEFAULT_SETTINGS,
+    type Lane,
     type LeadInstrument,
     PPQ,
     STYLE_IDS,
@@ -10,7 +12,7 @@ import {
     type Timeline,
     toMidi,
 } from '@band/index';
-import { flushBuffers, togglePower } from '@core/controllers/instrument-controller';
+import { flushBuffer, flushBuffers, togglePower } from '@core/controllers/instrument-controller';
 import { autoVoiceForGenre } from '@core/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@core/data/smart-genres';
 import {
@@ -70,16 +72,19 @@ import {
     AUTO_VOICE_FOR_STYLE,
     compForChordsLane,
     LEAD_FOR_VOICE,
-    STYLE_FOR_GENRE,
+    styleForGenre,
     VOICE_FOR_COMP,
     VOICE_FOR_LEAD,
 } from './band-voices';
 import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
 import { checkPlayable } from './engine-mode';
+import { bandHumanize } from './genre-humanize';
 import { genreSwing } from './genre-swing';
+import { loopEntry, loopScore, loopView } from './section-loop';
 import {
     countInPreference,
     masterVolumePreference,
+    rememberAutoSounds,
     rememberCountIn,
     rememberMasterVolume,
     rememberSongMode,
@@ -91,12 +96,14 @@ import {
     initializeSounds,
     prepareSound,
     prepareSounds,
+    type SoundProgress,
     seedInstalledSounds,
     validateVoice,
 } from './sounds';
+import { createStyleSounds, type StyleSoundsStatus } from './style-sounds';
 import { track } from './telemetry';
 
-export type { ChartDocument, SongMinutes, StemInstrument };
+export type { ChartDocument, SongMinutes, StemInstrument, StyleSoundsStatus };
 export { GENRE_NAMES };
 
 let boot: Promise<void> | undefined;
@@ -178,6 +185,33 @@ let bandView: BandChart | null = null;
  */
 let songMinutes: SongMinutes | null = null;
 /**
+ * The lane that is the musician's own (#1992, `lib/instrument.ts`), or null. A device
+ * preference the shell owns and hands over (`setPlayerLane`), never a state field or a chart
+ * field: it composes with the chart's lane power at read time (`laneHeard`, `bandSettings`), so
+ * the chart's own `enabled` is never written for it.
+ */
+let playerLane: InstrumentModule | null = null;
+/**
+ * Whether the musician has turned their own lane on for the chart open now. Every chart opens
+ * with it off — the instrument's default mute — and that mute is a hole the band leaves for them
+ * (`BandSettings.you`). Session-only: reset when a chart is opened (`load(…, true)`) or the
+ * instrument changes — never by the reloads an edit, an Undo or a Duplicate make of the same chart.
+ */
+let playerLaneHeard = false;
+/**
+ * Set while turning the musician's own lane on had to switch the CHART's lane on too (the chart
+ * had it off): muting it again takes that write back, so the chart says what the musician last
+ * chose. Cleared with `playerLaneHeard`.
+ */
+let playerLaneWroteChart = false;
+/** The band engine's name for each state lane. */
+const BAND_LANE: Record<InstrumentModule, Lane> = {
+    groove: 'drums',
+    bass: 'bass',
+    chords: 'comp',
+    soloist: 'lead',
+};
+/**
  * The performance song mode planned for the band now playing: the open score counted to the
  * chosen number of choruses, its timeline, and the chart sheet's view of it. Null while stopped,
  * and while the band plays the chart as written.
@@ -194,9 +228,45 @@ let songMinutes: SongMinutes | null = null;
  */
 let songPlan: (SongPlan & { view: BandChart; minutes: SongMinutes }) | null = null;
 
-/** The chart view of what the band plays: the song-mode performance, else the open chart. */
+/**
+ * A section loop (#1989, `section-loop.ts`): the chart holding just that section, which the band
+ * plays as an ordinary chart repeating continuously, and the stand's view of it. A derived chart
+ * like `songPlan`, and like it session-only: never a state field, never saved, and the band host
+ * holds no loop state of its own. Set by `loopSection`; kept through Stop, so Play loops it
+ * again (the transport says so while it is set); built again from an edited chart; cleared by
+ * `clearLoop`, "Start here" and opening another chart. Exclusive with song mode: a loop is never
+ * counted.
+ */
+interface LoopPlan {
+    sectionId: string;
+    label: string;
+    score: SemanticScore;
+    timeline: Timeline;
+    view: BandChart;
+}
+let loopPlan: LoopPlan | null = null;
+/**
+ * A loop cleared while the band plays (`clearLoop`): the bars already under way in it play on
+ * before the band carries on in the chart (`BandHost.carryOn`), so the stand still draws them
+ * from its view until then. Dropped when the band stops or starts again.
+ */
+let leftLoop: { timeline: Timeline; view: BandChart } | null = null;
+
+/**
+ * The chart view of what the band plays: the one drawn from the timeline the stand's last clock
+ * read found sounding (`BandHost.heardTimeline`, so the playhead and the view never come from two
+ * charts across a loop's seam), else the loop, the song-mode performance, or the open chart.
+ */
 function playedView(): BandChart | null {
-    return songPlan?.view ?? bandView;
+    const heard = band?.playing ? band.heardTimeline() : null;
+    if (heard) {
+        for (const plan of [loopPlan, leftLoop, songPlan]) {
+            if (plan?.timeline === heard) {
+                return plan.view;
+            }
+        }
+    }
+    return loopPlan?.view ?? songPlan?.view ?? bandView;
 }
 
 /** What song mode would play if Play were pressed now, or null when it would not apply. */
@@ -223,6 +293,10 @@ function bandHost(): BandHost {
  * heard.
  */
 function handScore(host: BandHost): void {
+    if (loopPlan) {
+        host.setScore(loopPlan.score, loopPlan.timeline);
+        return;
+    }
     if (songPlan) {
         host.setScore(songPlan.score, songPlan.timeline);
         return;
@@ -241,29 +315,48 @@ function scoreForBand(): SemanticScore {
 
 /** The band style the chart's genre plays. */
 function bandStyle(): StyleId {
-    const genre = getState().groove.lastSmartGenre;
-    // A persisted genre string indexes this table: guard with hasOwn (the #1266 rule), so
+    // A persisted genre string indexes the table: `styleForGenre` guards it (the #1266 rule), so
     // 'constructor' or a retired key can't read an Object prototype member as a style.
-    return Object.hasOwn(STYLE_FOR_GENRE, genre) ? STYLE_FOR_GENRE[genre] : 'rock';
+    return styleForGenre(getState().groove.lastSmartGenre);
+}
+
+/**
+ * Whether `module` sounds: the chart's lane power, and for the musician's own lane (#1992) also
+ * whether they have turned it on for this chart. What the mute chips and the Band sheet show.
+ */
+export function laneHeard(module: InstrumentModule): boolean {
+    const on = getState()[module].enabled;
+    return module === playerLane ? on && playerLaneHeard : on;
+}
+
+/** The musician's own lane while it is muted (#1992): the hole the band leaves for them. */
+function playerHole(): InstrumentModule | null {
+    return playerLane && !laneHeard(playerLane) ? playerLane : null;
 }
 
 function bandSettings(): BandSettings {
     const { groove, bass, chords, soloist, playback } = getState();
     const style = bandStyle();
+    // The musician's own lane, muted, is a hole (#1992): the band plays it — so every other
+    // player hears a bassist, a comper, a soloist there — and leaves its notes out
+    // (`BandSettings.you`). Any other lane switched off is a band without that player, as ever.
+    const hole = playerHole();
     return {
         style,
         lanes: {
-            drums: groove.enabled,
-            bass: bass.enabled,
-            comp: chords.enabled,
-            lead: soloist.enabled,
+            drums: groove.enabled || hole === 'groove',
+            bass: bass.enabled || hole === 'bass',
+            comp: chords.enabled || hole === 'chords',
+            lead: soloist.enabled || hole === 'soloist',
         },
+        you: hole && BAND_LANE[hole],
         comp: compForChordsLane(chords, STYLES[style].prefers),
         lead: bandLead(style),
         intensity: playback.autoIntensity ? null : playback.bandIntensity,
         swing: groove.swing,
         swingGrid: groove.swingSub === '16th' ? 16 : 8,
-        humanize: groove.humanize,
+        // A stored 20 is "not set": the style's own humanize plays (#2010).
+        humanize: bandHumanize(groove.humanize),
         seed: bandSeed,
         // The player trades with the soloist or the drummer; the band decides when it can.
         trade:
@@ -292,9 +385,11 @@ function startBand(freshPlay = false): void {
     const host = bandHost();
     const state = getState();
     const { arranger, playback } = state;
-    if (!host.playing && !songPlan) {
+    // A loop is never counted: song mode plans only a performance of the chart itself.
+    if (!host.playing && !songPlan && !loopPlan) {
         planPerformance();
     }
+    leftLoop = null;
     handScore(host);
     // The same take-to-take rule as the old engine: a fresh seed per play unless locked —
     // and the fresh one is recorded, so locking it later reproduces the take you heard.
@@ -328,6 +423,7 @@ function startBand(freshPlay = false): void {
         throw error;
     }
     param('playback', 'isPlaying', true);
+    everPlayed = true;
     track('play_started');
     warmDrums();
 }
@@ -361,6 +457,7 @@ const DRUM_WARM_SLICE_MS = 4;
 function stopBand(ringOut = false): void {
     band?.stop();
     songPlan = null;
+    leftLoop = null;
     if (getState().playback.isPlaying) {
         param('playback', 'isPlaying', false);
     }
@@ -393,6 +490,132 @@ export function playheadSlot(tick: number | null): number {
     return tick == null || !view ? -1 : slotAt(view, tick);
 }
 
+/** Where the performance is, for the transport's readout and the chart's trade turns (#1990). */
+export interface PerformancePlace {
+    /** Which time through the song, from 1: a looping chart's laps, a counted one's choruses. */
+    chorus: number;
+    /** How many times through the song ends on its own; null when it repeats continuously. */
+    of: number | null;
+    /** What the lead is doing in a counted performance ("Head", "Solo 2", "Out"), else null. */
+    part: string | null;
+    /** The band's pass, and the bar's chorus: with them `tradeTurns` reads the same plan. */
+    pass: number;
+    barChorus: number;
+    /** The performed bar sounding, so a bar played twice shows the turn of the visit heard. */
+    bar: number;
+    /** The band is going round a section loop (#1989): `chorus` counts its laps. */
+    lap: boolean;
+    /** The band's trade settings now: a change mid-play replans the turns. */
+    tradeKey: string;
+    /** The bar sounding is in a traded stretch. */
+    trading: boolean;
+}
+
+/**
+ * Where the band is at `tick` (the one `songTick()` read for this paint, as `playheadSlot` is):
+ * read off the host's playing segment and the plan's own `leadRole`, never a UI timer. Null
+ * while stopped, counting in, or between two queued segments.
+ */
+export function performancePlace(tick: number | null): PerformancePlace | null {
+    const view = playedView();
+    const at = tick == null ? null : (band?.placeAt(tick) ?? null);
+    if (!band || !view || !at) {
+        return null;
+    }
+    const role = band.roleAt(at.bar, at.pass);
+    // A loop's laps, by the view of the timeline sounding: the bars of a cleared loop still
+    // under way are laps too, the chart's bars after them are not.
+    const lap = view === loopPlan?.view || view === leftLoop?.view;
+    const of = lap ? null : (songPlan?.choruses ?? currentScore?.choruses ?? null);
+    const barChorus = band.chorusOf(at.bar);
+    let part: string | null = null;
+    // The lead's parts are named for a soloist the band has — or for you, when the lead is your
+    // own lane (#1992): Head, Solo 1… is then when to play what.
+    if (
+        of !== null &&
+        of > 1 &&
+        role &&
+        (getState().soloist.enabled || playerHole() === 'soloist')
+    ) {
+        if (role.kind === 'head') {
+            part = barChorus === of - 1 ? 'Out' : 'Head';
+        } else if (role.kind === 'solo') {
+            part = `Solo ${role.chorus}`;
+        }
+    }
+    return {
+        chorus: at.pass + 1,
+        of,
+        part,
+        pass: at.pass,
+        barChorus,
+        bar: at.bar,
+        lap,
+        tradeKey: band.tradeKey(),
+        trading: role?.kind === 'trade',
+    };
+}
+
+/** One written bar's place in a trade: whose turn it is, and whether the turn opens on it. */
+export interface TradeTurn {
+    turn: 'you' | 'band';
+    /** "You", or the partner who answers: "Drums" or "Soloist". */
+    label: string;
+    first: boolean;
+}
+
+/**
+ * The turns of the chorus `place` is in, keyed by the first chord's `globalIndex` of each written
+ * bar (the chart sheet's bar). Derived from `BandHost.roleAt`, the plan's own `leadRole`: the
+ * stand tints exactly the bars the band leaves to the player. A bar written once but played twice
+ * in a chorus (a repeat) shows the turn of the visit at or after the bar sounding, else its first.
+ */
+export function tradeTurns(place: PerformancePlace): Map<number, TradeTurn> {
+    const turns = new Map<number, TradeTurn>();
+    const view = playedView();
+    if (!band || !view) {
+        return turns;
+    }
+    // Slots run in performance order, so a visit already passed is replaced by the next one
+    // once the playhead is past it: the first visit at or after `place.bar` wins.
+    const settled = new Set<number>();
+    for (const slot of view.slots) {
+        const chord = view.chords[slot.display];
+        if (
+            !chord ||
+            settled.has(chord.globalIndex) ||
+            band.chorusOf(slot.bar) !== place.barChorus
+        ) {
+            continue;
+        }
+        if (slot.bar >= place.bar) {
+            settled.add(chord.globalIndex);
+        }
+        const role = band.roleAt(slot.bar, place.pass);
+        if (role?.kind === 'trade') {
+            turns.set(chord.globalIndex, {
+                turn: role.turn,
+                label: role.turn === 'you' ? 'You' : role.with === 'drums' ? 'Drums' : 'Soloist',
+                first: role.at === 0,
+            });
+        }
+    }
+    return turns;
+}
+
+/**
+ * The chart slot the count-in leads into (the bar Play starts from), or -1 while no count-in
+ * sounds. The stand draws the countdown over that bar, so it reads from the same clock as
+ * `countInBeat`, with no timer of its own.
+ */
+export function countInSlot(): number {
+    const view = playedView();
+    if (!view || band?.countingInBeat() == null) {
+        return -1;
+    }
+    return slotAt(view, (getState().playback.startStep || 0) * STEP_TICKS);
+}
+
 /** The count-in beat sounding now (0 is "1"), or null when no count-in is. */
 export function countInBeat(): number | null {
     return band?.countingInBeat() ?? null;
@@ -423,7 +646,7 @@ function syncBand(): void {
     }
     // The genre-change effect in `core/` picks the old engine's Auto sound; on the band,
     // a native genre's own comp instrument wins (bossa is heard on nylon). Only an installed
-    // pack is taken, since Follow feel never downloads (#1405).
+    // pack is taken (#1405); a missing one is fetched behind the band on Play (#1997).
     const { chords, soloist } = getState();
     const auto = bandAutoComp(groove.lastSmartGenre);
     if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
@@ -451,6 +674,124 @@ function syncBand(): void {
     }
     host.setTempo(playback.bpm);
     host.update(bandSettings());
+}
+
+// ---------------------------------------------------------------- the style's own sounds
+/** The band has played on this page: a style change from now on fetches its sounds too. */
+let everPlayed = false;
+/**
+ * How far ahead of the audio clock the band host sends notes to the voices (`band-host.ts`'s
+ * `LOOKAHEAD_S`). A lane's sound is read when its note is sent, so a sound changed this long
+ * before a barline is first heard on that barline.
+ */
+const SEND_AHEAD_S = 0.15;
+const soundsResolved = new Set<() => void>();
+
+/**
+ * Resolve once the band is about to send the next barline's notes, so a sound changed then is
+ * first heard on the barline (#1997); at once while stopped. Read off the host's song tick and
+ * the timeline it plays, at the transport's tempo — the same clock `inLastBeat` reads.
+ */
+function beforeNextBarline(): Promise<void> {
+    const deadline = Date.now() + STAGED_FEEL_TIMEOUT_MS;
+    return new Promise((resolve) => {
+        const check = () => {
+            const timeline = songPlan?.timeline ?? currentTimeline?.timeline;
+            if (!band?.playing || !timeline || Date.now() > deadline) {
+                resolve();
+                return;
+            }
+            const tick = band.songTick();
+            if (tick === null) {
+                // Counting in, or between two queued segments: look again shortly.
+                setTimeout(check, 100);
+                return;
+            }
+            const bar = barAtTick(timeline, tick);
+            if (!bar) {
+                resolve();
+                return;
+            }
+            const ticksPerSecond = (PPQ * getState().playback.bpm) / 60;
+            const seconds = (bar.start + bar.meter.barTicks - tick) / ticksPerSecond;
+            const wait = seconds - SEND_AHEAD_S;
+            if (wait < 0.02) {
+                // Too close to make this one: past it, then aim for the next.
+                setTimeout(check, (seconds + 0.05) * 1000);
+            } else {
+                setTimeout(resolve, wait * 1000);
+            }
+        };
+        check();
+    });
+}
+
+/**
+ * Packs the playing style wants on a lane that follows it (`autoSound`) and that is on, and that
+ * this device has not installed. A pinned lane — Built-in or a pack chosen by hand — is never
+ * asked about, so a chart saved with its own sounds keeps them. A lane that is off is skipped:
+ * it is not heard, and the next Play after it is turned on fetches it.
+ */
+function stylePacksWanted(): string[] {
+    const state = getState();
+    const wanted = new Set<string>();
+    for (const module of AUTO_LANES) {
+        if (!state[module].autoSound || !state[module].enabled) {
+            continue;
+        }
+        const voice = recommendedVoice(module, undefined, undefined, () => true);
+        if (voice !== 'synth' && !isPackInstalled(voice.slice(5))) {
+            wanted.add(voice.slice(5));
+        }
+    }
+    return [...wanted];
+}
+
+/**
+ * Packs arrived: move every Follow-feel lane onto what is now installed, by the rule a style
+ * change uses (`resolveAutoVoices`). While playing, at the next barline, and without a rebuild
+ * (that would cut off the notes already sent); the band plays straight through. Then tell the
+ * shell, which shows the document as resolved on this device (`withLoadedSounds`), so a sound
+ * that arrived is not an unsaved change.
+ */
+async function switchToArrivedSounds(): Promise<void> {
+    await beforeNextBarline();
+    resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
+    if (!band?.playing) {
+        rebuild();
+    }
+    for (const listener of soundsResolved) {
+        listener();
+    }
+}
+
+const styleSounds = createStyleSounds({
+    wanted: stylePacksWanted,
+    prepare: (id) => prepareSound(id, () => {}),
+    arrived: switchToArrivedSounds,
+});
+
+/** What the stand shows about the style's sounds being fetched (#1997). */
+export const styleSoundsStatus = styleSounds.status;
+export const onStyleSoundsStatus = styleSounds.subscribe;
+/** The stand's offer, taken: fetch now, past Save-Data, and say a failure. */
+export function getStyleSounds(): Promise<void> {
+    return styleSounds.request(true);
+}
+export const declineStyleSounds = styleSounds.decline;
+/** Follow-feel lanes moved onto sounds that arrived in the background. */
+export function onSoundsResolved(listener: () => void): () => void {
+    soundsResolved.add(listener);
+    return () => {
+        soundsResolved.delete(listener);
+    };
+}
+/** The Players tab's switch: fetch the style's sounds when the band plays, or don't. */
+export function setAutoSounds(enabled: boolean): void {
+    rememberAutoSounds(enabled);
+    if (enabled && band?.playing) {
+        void styleSounds.request();
+    }
 }
 
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -550,7 +891,8 @@ export function initialize(): Promise<void> {
             // #1405 — before any chart opens, so Follow feel resolves against what this device
             // really holds. Local and bounded (`seedInstalledSounds`); no network.
             await seedInstalledSounds();
-            // Guest startup must not download audio without an install/selection gesture.
+            // Guest startup downloads no audio: the style's sounds are fetched only once the band
+            // plays (#1997, `styleSounds`), or by an install/selection gesture.
             for (const module of ['groove', 'bass', 'chords', 'soloist'] as const) {
                 param(module, 'autoSound', false);
             }
@@ -671,15 +1013,27 @@ function halt(ringOut: boolean): void {
  */
 export async function startSection(
     sectionId: string,
-    progress: (text: string) => void = () => {},
+    progress: SoundProgress = () => {},
 ): Promise<boolean> {
-    const view = playedView();
+    // Starting somewhere in the song leaves a section loop (#1989): the band plays the chart from
+    // there, so the section is found in the chart's view, not the loop's.
+    const view = loopPlan ? bandView : playedView();
     const bounds = view && sectionSteps(view, sectionId);
     if (!bounds) {
         return false;
     }
+    const leaving = loopPlan !== null;
+    loopPlan = null;
     if (getState().playback.isPlaying) {
-        dispatch(ACTIONS.SET_START_STEP, bounds.start);
+        if (leaving) {
+            // Another chart for the band: stopped first, so it starts once (handing the host a
+            // new chart while it plays would restart it before `startBand` restarts it again),
+            // and planned as a start from stopped is, song mode included.
+            silenceBand();
+            planPerformance();
+        }
+        const start = (leaving && songPlan && sectionSteps(songPlan.view, sectionId)) || bounds;
+        dispatch(ACTIONS.SET_START_STEP, start.start);
         startBand();
         return true;
     }
@@ -695,10 +1049,109 @@ export async function startSection(
     const start = (songPlan && sectionSteps(songPlan.view, sectionId)) || bounds;
     dispatch(ACTIONS.SET_START_STEP, start.start);
     startBand(true);
+    void styleSounds.request();
     return true;
 }
 
-export async function toggle(progress: (text: string) => void): Promise<void> {
+/**
+ * Stop the band, its scheduled notes cut, without the transport going to stopped: for a start in
+ * another chart while playing, which `startBand` then starts once.
+ */
+function silenceBand(): void {
+    band?.stop();
+    void killAllNotes(getState());
+}
+
+/** Said when a section cannot be looped on its own. */
+export const LOOP_UNAVAILABLE = "This section can't be looped on its own.";
+
+/**
+ * The section loop for `sectionId` of the open chart (`section-loop.ts`), or null when it cannot
+ * be played on its own.
+ */
+function buildLoop(sectionId: string): LoopPlan | null {
+    if (!currentScore || !bandView) {
+        return null;
+    }
+    const score = loopScore(currentScore, sectionId);
+    if (!score) {
+        return null;
+    }
+    const timeline = compileTimeline(score);
+    const view = loopView(bandView, bandChart(score, timeline), sectionId);
+    const label = currentScore.sections.find((section) => section.id === sectionId)?.label ?? '';
+    return view && { sectionId, label, score, timeline, view };
+}
+
+/**
+ * The section menu's "Loop" (#1989): the band plays just this section, over and over, from its
+ * top. Stopped, it starts as Play does (sounds prepared, the count-in per its preference);
+ * playing, it starts the loop at once, as "Start here" restarts the band. Throws
+ * {@link LOOP_UNAVAILABLE} for a section that cannot be played on its own.
+ */
+export async function loopSection(
+    sectionId: string,
+    progress: SoundProgress = () => {},
+): Promise<void> {
+    const plan = buildLoop(sectionId);
+    if (!plan) {
+        throw new Error(LOOP_UNAVAILABLE);
+    }
+    if (getState().playback.isPlaying) {
+        // Stopped first, so the band starts once on the loop (see `startSection`).
+        silenceBand();
+        loopPlan = plan;
+        songPlan = null;
+        dispatch(ACTIONS.SET_START_STEP, 0);
+        startBand();
+        return;
+    }
+    bringUpAudio();
+    const intent = ++playIntent;
+    await prepareSounds(captureContent(), progress);
+    if (intent !== playIntent) {
+        return;
+    }
+    loopPlan = plan;
+    dispatch(ACTIONS.SET_START_STEP, 0);
+    startBand(true);
+}
+
+/**
+ * The transport's "Looping B ×" (#1989): the loop ends. Playing, the band carries on into the
+ * chart without stopping (DECISION 2026-11-01): from the first barline it can still change at,
+ * it plays the chart's bar holding the same written bar (`loopEntry`), so it finishes the section
+ * it is in and goes on into the next one. Stopped, the next Play plays the chart.
+ */
+export function clearLoop(): void {
+    const plan = loopPlan;
+    loopPlan = null;
+    if (!plan || !band?.playing || !currentScore) {
+        return;
+    }
+    const full =
+        currentTimeline?.score === currentScore
+            ? currentTimeline.timeline
+            : compileTimeline(currentScore);
+    const entry = loopEntry(full, plan.timeline, plan.sectionId);
+    if (!entry) {
+        // The section is not in the form the chart performs: play the chart from its top.
+        startBand();
+        return;
+    }
+    // The timeline the band is really playing: a loop built again (Loop picked once more, an
+    // edit) compiles a new one, but the host keeps the one it has while the chart is unchanged
+    // (`setScore`), and the stand matches views to the band by that timeline (`playedView`).
+    leftLoop = { timeline: band.heardTimeline() ?? plan.timeline, view: plan.view };
+    band.carryOn(currentScore, full, entry);
+}
+
+/** The section being looped (#1989), for the transport's chip; null when none is. */
+export function loopedSection(): { id: string; label: string } | null {
+    return loopPlan && { id: loopPlan.sectionId, label: loopPlan.label };
+}
+
+export async function toggle(progress: SoundProgress): Promise<void> {
     if (getState().playback.isPlaying) {
         stop();
         return;
@@ -711,6 +1164,7 @@ export async function toggle(progress: (text: string) => void): Promise<void> {
         return;
     }
     startBand(true);
+    void styleSounds.request();
 }
 
 /** What a browser without Web Audio (or one that refuses to start it) is told, in one sentence. */
@@ -756,7 +1210,7 @@ export function warmAudio(): void {
 export async function setVoice(
     module: InstrumentModule,
     voice: InstrumentVoice,
-    progress: (text: string) => void,
+    progress: SoundProgress,
     auto = false,
 ): Promise<void> {
     validateVoice(module, voice);
@@ -797,8 +1251,8 @@ export function setTrade(
     param('soloist', 'tradeBars', bars);
     param('soloist', 'tradeChoruses', choruses);
     param('soloist', 'tradeWith', tradeWith);
-    if (tradeWith === 'soloist' && !getState().soloist.enabled) {
-        togglePower('soloist');
+    if (tradeWith === 'soloist' && !laneHeard('soloist')) {
+        setEnabled('soloist', true);
     }
 }
 
@@ -816,12 +1270,18 @@ export function tradePartners(): { soloist: boolean; drums: boolean } {
  * trade the band won't play.
  */
 export function tradeBlocked(): 'soloist-off' | 'drums-off' | 'drummer-no-solo' | null {
-    const { soloist, groove } = getState();
+    // Read through `laneHeard`: your own lane muted is a hole, and the band never trades with
+    // it (`tradeThatHappens`, #1992).
+    const { soloist } = getState();
     if (soloist.tradeWith === 'soloist') {
-        return soloist.enabled ? null : 'soloist-off';
+        return laneHeard('soloist') ? null : 'soloist-off';
     }
     if (soloist.tradeWith === 'drums') {
-        return !groove.enabled ? 'drums-off' : tradePartners().drums ? null : 'drummer-no-solo';
+        return !laneHeard('groove')
+            ? 'drums-off'
+            : tradePartners().drums
+              ? null
+              : 'drummer-no-solo';
     }
     return null;
 }
@@ -919,9 +1379,22 @@ function exportScore(host: BandHost): SongPlan | null {
     if (plan) {
         host.setScore(plan.score, plan.timeline);
     } else {
-        handScore(host);
+        const score = scoreForBand();
+        host.setScore(
+            score,
+            currentTimeline?.score === score ? currentTimeline.timeline : undefined,
+        );
     }
     return plan;
+}
+
+/**
+ * The host an export renders on: the live band's, unless it holds a section loop (#1989). An
+ * export is the song, never the loop, and handing the live band the song would restart it, so
+ * that export renders on a host of its own: it needs no audio, only the chart.
+ */
+function exportHost(): BandHost {
+    return loopPlan ? new BandHost({ state: getState, silence: () => {} }) : bandHost();
 }
 
 /**
@@ -974,6 +1447,7 @@ export function recommendedVoice(
     module: InstrumentModule,
     genre?: string,
     chordStyle?: string,
+    installed: (packId: string) => boolean = isPackInstalled,
 ): InstrumentVoice {
     const state = getState();
     const bandVoice =
@@ -982,23 +1456,24 @@ export function recommendedVoice(
             : module === 'soloist'
               ? bandAutoLead(genre ?? state.groove.lastSmartGenre)
               : null;
-    if (bandVoice && (bandVoice === 'synth' || isPackInstalled(bandVoice.slice(5)))) {
+    if (bandVoice && (bandVoice === 'synth' || installed(bandVoice.slice(5)))) {
         return bandVoice;
     }
-    // Follow feel plays only what this device has installed and never downloads by itself
-    // (#1405, as v1 did); "Install all & use genre sounds" is the download gesture. Installed
-    // is the cache (`seedInstalledSounds`) plus whatever this page has loaded, and every caller
-    // still prepares — verifies and decodes — the files before committing the choice or playing.
+    // Follow feel plays only what this device has installed (#1405, as v1 did). Installed is the
+    // cache (`seedInstalledSounds`) plus whatever this page has loaded, and every caller still
+    // prepares — verifies and decodes — the files before committing the choice or playing. What
+    // it is not yet installed is fetched in the background when the band plays (#1997,
+    // `styleSounds`), which asks this with `installed` always true to learn what the style wants.
     return autoVoiceForGenre(
         genre ?? state.groove.lastSmartGenre,
         module,
-        isPackInstalled,
+        installed,
         chordStyle ?? state.chords.style,
     );
 }
 
 /** Called only after the explicit bulk install has fully succeeded. */
-export async function applyGenreSounds(progress: (text: string) => void): Promise<void> {
+export async function applyGenreSounds(progress: SoundProgress): Promise<void> {
     for (const module of AUTO_LANES) {
         const voice = recommendedVoice(module);
         if (voice !== 'synth') {
@@ -1087,10 +1562,19 @@ function apply(content: Session, compiled?: Timeline): void {
     dispatch(ACTIONS.SET_START_STEP, 0);
 }
 
-export function load(document: ChartDocument): void {
+/**
+ * `opened` marks a chart the musician has just put on the stand through the shell's `open()` or
+ * `landDraftOnStand` (the songbook, a link, a standard, a new song, a kept or recovered copy): its
+ * own lane starts muted again (#1992). Every other load is the chart already on the stand — an
+ * edit, an Undo, a Revert, the chart after a Duplicate or Keep both re-points it — and keeps what
+ * the musician chose on it.
+ */
+export function load(document: ChartDocument, opened = false): void {
     const checked = validateDocument(document);
     const timeline = checkPlayable(checked.chart.score);
     stop();
+    // Another chart: a section loop is the open chart's.
+    loopPlan = null;
     const previous = captureSession();
     loading = true;
     try {
@@ -1106,6 +1590,11 @@ export function load(document: ChartDocument): void {
         throw error;
     } finally {
         loading = false;
+    }
+    if (opened) {
+        // Each chart opens with the musician's own lane muted (#1992).
+        playerLaneHeard = false;
+        playerLaneWroteChart = false;
     }
 }
 
@@ -1130,12 +1619,24 @@ export function withLoadedSounds<T extends ChartDocument>(document: T): T {
 }
 
 /**
+ * `document` resolved on this device as the open chart now is (#1997), for the shell to show a
+ * sound that arrived in the background as no edit. Only a document of the genre playing now:
+ * the live lanes say nothing about how another genre's Follow-feel lanes resolve, so one of
+ * another genre (a saved copy the musician has since restyled) is returned as it is.
+ */
+export function resolvedHere<T extends ChartDocument>(document: T): T {
+    return document.chart.band.groove.genre === getState().groove.lastSmartGenre
+        ? withLoadedSounds(document)
+        : document;
+}
+
+/**
  * Verify — downloading only if a file is missing — every sound the incoming feel
  * will select for a lane still on Auto. Deliberately runs before any engine state
  * changes: nothing is committed while this is in flight, so a failure has nothing
  * to undo and a band that is already playing keeps its time straight through it.
  */
-async function prepareFeelSounds(name: string, progress: (text: string) => void): Promise<void> {
+async function prepareFeelSounds(name: string, progress: SoundProgress): Promise<void> {
     const state = getState();
     // `resolveAutoVoices` reads the style the feel is about to install, so resolve
     // the chords lane against that rather than the outgoing style.
@@ -1171,10 +1672,7 @@ function awaitBandChange(): Promise<boolean> {
     });
 }
 
-export async function setGenre(
-    name: string,
-    progress: (text: string) => void = () => {},
-): Promise<void> {
+export async function setGenre(name: string, progress: SoundProgress = () => {}): Promise<void> {
     if (!Object.hasOwn(SMART_GENRES, name)) {
         throw new Error('Unknown genre.');
     }
@@ -1212,6 +1710,11 @@ export async function setGenre(
         // auto-voice effects are the entire engine change: no teardown, no rebuild, no
         // restart. A `rebuild()` here would kill the notes the band has just scheduled.
         resolveAutoVoices(getState(), name, dispatch);
+        // The new style's own sounds, fetched behind the band if this device lacks them (#1997).
+        // Only once something has played: a style picked on a stand never played waits for Play.
+        if (staged || everPlayed) {
+            void styleSounds.request();
+        }
         if (!staged) {
             rebuild();
             return;
@@ -1271,10 +1774,55 @@ const TELEMETRY_PART: Record<InstrumentModule, 'drums' | 'bass' | 'chords' | 'so
 };
 
 export function setEnabled(module: InstrumentModule, enabled: boolean): void {
+    if (module === playerLane) {
+        // Your own lane (#1992): muting it is the instrument's default, not a chart edit, so it
+        // never writes the chart's `enabled`. Turning it on does only where the chart itself has
+        // the lane off — that is a choice about this song, and Save keeps it.
+        if (playerLaneHeard === enabled && laneHeard(module) === enabled) {
+            return;
+        }
+        playerLaneHeard = enabled;
+        track('part_toggled', { part: TELEMETRY_PART[module] });
+        if (enabled && !getState()[module].enabled) {
+            playerLaneWroteChart = true;
+            togglePower(module); // its dispatch syncs the band
+        } else if (!enabled && playerLaneWroteChart && getState()[module].enabled) {
+            // Off again: the chart goes back to the off it had (its dispatch syncs the band).
+            playerLaneWroteChart = false;
+            togglePower(module);
+        } else {
+            playerLaneWroteChart = false;
+            if (!enabled && module !== 'groove') {
+                // What rings now stops now, as any lane's mute does; the host drops the lane's
+                // notes still to come (`BandHost.sound`).
+                flushBuffer(module);
+            }
+            band?.update(bandSettings());
+        }
+        return;
+    }
     if (getState()[module].enabled !== enabled) {
         togglePower(module);
         track('part_toggled', { part: TELEMETRY_PART[module] });
     }
+}
+
+/**
+ * The musician's own lane (#1992), from the shell's "What do you play?" preference; null for
+ * none. A change mutes the new lane at once, as opening a chart does.
+ */
+export function setPlayerLane(module: InstrumentModule | null): void {
+    if (module === playerLane) {
+        return;
+    }
+    playerLane = module;
+    playerLaneHeard = false;
+    playerLaneWroteChart = false;
+    band?.update(bandSettings());
+}
+
+export function playerLaneModule(): InstrumentModule | null {
+    return playerLane;
 }
 /**
  * Moves the song by `delta` semitones. `key` is the name the key picker chose (`F#`, not `Gb`),
@@ -1371,6 +1919,8 @@ export function editScore(score: SemanticScore): void {
     try {
         const { performance, band } = before;
         apply({ score, performance, band }, timeline);
+        // A section loop goes on with the edited section, or ends with a deleted one.
+        loopPlan = loopPlan && buildLoop(loopPlan.sectionId);
         rebuild();
     } catch (error) {
         apply(before);
@@ -1446,7 +1996,7 @@ function exportSettings(plan: SongPlan | null): ReturnType<typeof bandSettings> 
  * so it never touches the live band or the audio graph — safe while the band is playing.
  */
 export async function exportMidi(filename: string): Promise<void> {
-    const host = bandHost();
+    const host = exportHost();
     const settings = exportSettings(exportScore(host));
     const { events, timeline } = await host.render(settings);
     const bytes = toMidi(events, timeline, {
@@ -1500,7 +2050,7 @@ export function cancelExportAudio(): void {
 export async function exportAudio(
     kind: 'mix' | 'stems',
     filename: string,
-    progress: (text: string) => void,
+    progress: SoundProgress,
     instruments: StemInstrument[] = STEM_INSTRUMENTS,
 ): Promise<void> {
     const intent = ++exportIntent;
@@ -1508,7 +2058,7 @@ export async function exportAudio(
     if (intent !== exportIntent) {
         return;
     }
-    const host = bandHost();
+    const host = exportHost();
     const plan = exportScore(host);
     const bpm = getState().playback.bpm;
     if (kind === 'mix') {
@@ -1530,6 +2080,8 @@ export async function exportAudio(
     const { events, timeline } = await host.render({
         ...exportSettings(plan),
         lanes: { drums: true, bass: true, comp: true, lead: true },
+        // Every stem, your own lane's included (#1992).
+        you: null,
     });
     if (intent !== exportIntent) {
         return;
@@ -1563,7 +2115,9 @@ export function state(): EnsembleState {
 
 /**
  * The band's view of what it plays: the open score, or during a song-mode performance its
- * counted copy (`songPlan`) — so a reader must read it again when playback starts and stops.
+ * counted copy (`songPlan`), or a section loop (#1989) — so a reader must read it again when
+ * playback starts and stops, and when the view the poll last read changes (a loop cleared mid-play
+ * changes it at the barline the band carries on from).
  * Null before a chart is open.
  */
 export function bandChartView(): BandChart | null {

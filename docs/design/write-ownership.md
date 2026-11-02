@@ -121,6 +121,15 @@ no race to lose.
   `document`-owned. That is safe precisely because no runtime system writes either any more —
   the user is their only writer. A future system that wants to move the band's energy at runtime
   needs its own `runtime-derived` field, composed at read time, per §1.
+- **A Follow-feel lane's `voice`** (`autoSound: true`; `document`-owned) — written by the
+  runtime, and that is not a breach: what the user decided is `autoSound` ("follow the style"),
+  and `voice` on such a lane is that decision resolved against the packs this device holds. The
+  runtime resolves it on open (`load`, #1405), on a style change (`setGenre`, `syncBand`'s
+  native-comp/lead pick) and, since #1997, when the style's packs arrive in the background
+  (`switchToArrivedSounds` in `web/lib/runtime.ts`). It never writes `autoSound`, and never the
+  `voice` of a pinned lane (`autoSound: false`), which is the user's own value. The shell shows
+  each resolution as device-resolved, not as an edit (`withLoadedSounds`, `resolvedHere`). A
+  runtime writer of any other `document` field still needs §1's paired field.
 
 ## 4. Composition with the timing-model law
 

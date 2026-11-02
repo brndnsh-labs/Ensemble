@@ -56,9 +56,13 @@
     white-space: nowrap;
     text-overflow: ellipsis;
 }
-.section-repeat {
+.section-repeat,
+.section-marks {
     color: var(--muted);
     font-size: 11px;
+}
+.section-marks {
+    margin-left: 6px;
 }
 .bar.repeat-start {
     padding-left: 25px;

@@ -19,9 +19,13 @@ interface StandKeysOptions {
     togglePlayback: () => void;
     /** A page turn is the musician leaving the Following look-ahead. */
     setFollowing: (following: boolean) => void;
+    /** Save is pressable right now: the header's own test (something to save, nothing running). */
+    canSave: boolean;
+    /** Exactly what the Save button does, plus handing focus back after it. */
+    saveFromKeys: () => void;
 }
 
-/** The stand's keyboard: Space plays and stops, PageDown/PageUp turn the page (#1932). */
+/** The stand's keyboard: Space plays and stops, PageDown/PageUp turn the page (#1932), Ctrl/⌘+S saves (#1984). */
 export function useStandKeys({
     current,
     busy,
@@ -31,6 +35,8 @@ export function useStandKeys({
     scroll,
     togglePlayback,
     setFollowing,
+    canSave,
+    saveFromKeys,
 }: StandKeysOptions) {
     const pointerFocused = useRef<Element | null>(null);
     // Keys on the stand (UI audit): Space plays and stops, and PageDown/PageUp step through the
@@ -38,14 +44,46 @@ export function useStandKeys({
     // sheet or dialog open, and never while typing: Space on a control the keyboard focused is that
     // control's own, so it is left alone. An effect event, so the listener, added once, always
     // sees the latest render's state.
+    // The latest render's save, for the one key that waits for a render before it looks.
+    const latest = useRef({ canSave, saveFromKeys });
+    useEffect(() => {
+        latest.current = { canSave, saveFromKeys };
+    });
     const onStandKey = useEffectEvent((event: KeyboardEvent) => {
+        const target = event.target instanceof Element ? event.target : null;
+        // Ctrl/⌘+S is Save, typing in a bar or the tempo field included — never the browser's
+        // Save Page, which has nothing to offer a stand. It does what the Save button does (a bar
+        // with a choice still pending is refused the same way). A dialog open over the stand has
+        // its own business; with nothing to save the key is still taken, and does nothing.
+        if (
+            current &&
+            !event.defaultPrevented &&
+            !event.altKey &&
+            !event.shiftKey &&
+            (event.ctrlKey || event.metaKey) &&
+            event.key.toLowerCase() === 's' &&
+            !document.querySelector('dialog[open]')
+        ) {
+            event.preventDefault();
+            if (canSave) {
+                saveFromKeys();
+            } else if (target?.closest('#tempo')) {
+                // The tempo field commits its typed text on this very key (`TempoControl`), so
+                // whether there is anything to save is known only after that render lands.
+                setTimeout(() => {
+                    if (latest.current.canSave) {
+                        latest.current.saveFromKeys();
+                    }
+                }, 100);
+            }
+            return;
+        }
         if (!current || event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
             return;
         }
         if (document.querySelector('dialog[open]')) {
             return;
         }
-        const target = event.target instanceof Element ? event.target : null;
         if (target?.closest('input, textarea, select, [contenteditable="true"]')) {
             return;
         }

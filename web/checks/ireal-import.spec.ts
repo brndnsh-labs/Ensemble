@@ -220,7 +220,9 @@ for (const study of [
         await dialog.getByText('Or paste an iReal link', { exact: true }).click();
         await dialog.getByLabel('iReal link', { exact: true }).fill(openProtocol(study.body));
         await dialog.getByRole('button', { name: 'Review link', exact: true }).click();
-        await dialog.getByLabel('Import tempo', { exact: true }).fill('240');
+        const tempo = dialog.getByLabel('Import tempo', { exact: true });
+        await tempo.fill('240');
+        await expect(tempo).toHaveValue('240');
         await dialog.getByRole('button', { name: 'Add to songbook', exact: true }).click();
         await expect(dialog).not.toBeVisible();
         await expect(page.locator('.chord')).toHaveText(study.labels);

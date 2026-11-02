@@ -73,6 +73,9 @@ interface PlayersTabProps {
     onVolume: (lane: Lane, value: number) => void;
     onReverb: (lane: Lane, value: number) => void;
     onToggleLane: (lane: Lane) => void;
+    /** Fetch the style's sounds when the band plays (#1997): a device preference. */
+    autoSounds: boolean;
+    onAutoSounds: (enabled: boolean) => void;
 }
 
 /**
@@ -93,6 +96,8 @@ export function PlayersTab({
     onVolume,
     onReverb,
     onToggleLane,
+    autoSounds,
+    onAutoSounds,
 }: PlayersTabProps) {
     return (
         <>
@@ -169,6 +174,14 @@ export function PlayersTab({
                 {soundProgress}
             </p>
             <div className="players-foot">
+                <label className="auto-sounds">
+                    <input
+                        type="checkbox"
+                        checked={autoSounds}
+                        onChange={(event) => onAutoSounds(event.target.checked)}
+                    />
+                    Get each style's sounds when the band plays
+                </label>
                 <button
                     type="button"
                     className="install-all"

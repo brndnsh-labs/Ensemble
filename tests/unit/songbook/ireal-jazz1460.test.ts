@@ -80,6 +80,25 @@ function fixture(slug: string): string {
     ).trim();
 }
 
+/** The written bars in order, whatever sections the rehearsal marks made of them (#2004). */
+function measuresOf(document: ChartDocumentV2) {
+    return document.chart.score.sections.flatMap((section) => section.measures);
+}
+
+/** A visit's written bar number across all sections, from 1. */
+function barNumber(
+    score: ChartDocumentV2['chart']['score'],
+    visit: { sectionIndex: number; measureIndex: number },
+): number {
+    return (
+        score.sections
+            .slice(0, visit.sectionIndex)
+            .reduce((count, section) => count + section.measures.length, 0) +
+        visit.measureIndex +
+        1
+    );
+}
+
 /** Imports the fixture's sole song through the app's own path and returns the new document. */
 function importFixture(slug: string) {
     const source = fixture(slug);
@@ -159,8 +178,8 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         // the end of bar 36; jumping at bar 35 instead would drop the bridge's last bar (63).
         const { document, song } = importFixture('cherokee');
         expect(performedBarCount(document)).toBe(64);
-        const visits = compileScoreForm(document.chart.score).map(
-            ({ measureIndex }) => measureIndex + 1,
+        const visits = compileScoreForm(document.chart.score).map((visit) =>
+            barNumber(document.chart.score, visit),
         );
         const range = (from: number, to: number) =>
             Array.from({ length: to - from + 1 }, (_, i) => from + i);
@@ -172,7 +191,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             ...range(17, 20),
         ]);
         expectCanonicalRoundTrip(document);
-        const measures = document.chart.score.sections[0].measures;
+        const measures = measuresOf(document);
         expect(measures[35].end).toEqual([
             {
                 kind: 'jump',
@@ -244,10 +263,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         /** [chorus, written bar number] for each performed bar. */
         function performed(document: ChartDocumentV2, choruses?: number) {
             const score = { ...document.chart.score, ...(choruses ? { choruses } : {}) };
-            return compileScoreForm(score).map(({ chorus, measureIndex }) => [
-                chorus,
-                measureIndex + 1,
-            ]);
+            return compileScoreForm(score).map((visit) => [visit.chorus, barNumber(score, visit)]);
         }
         const bars = (chorus: number, from: number, to: number) =>
             Array.from({ length: to - from + 1 }, (_, i) => [chorus, from + i]);
@@ -297,7 +313,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             expect(performedBarCount(document)).toBe(10);
             expect(performed(document)).toEqual(bars(0, 1, 10));
             expect(performed(document, 2)).toEqual([...bars(0, 1, 10), ...bars(1, 1, 14)]);
-            const measures = document.chart.score.sections[0].measures;
+            const measures = measuresOf(document);
             expect(measures[9].end).toEqual([
                 { kind: 'coda', label: 'coda-1' },
                 {
@@ -372,7 +388,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
                 ...bars(1, 33, 36),
                 ...bars(1, 33, 36),
             ]);
-            const measures = document.chart.score.sections[0].measures;
+            const measures = measuresOf(document);
             expect(measures[31].end).toBeUndefined();
             expect(measures[32].start).toEqual([
                 { kind: 'repeat-start' },
@@ -394,7 +410,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         const { document } = importFixture('one-for-my-baby');
         expect(performedBarCount(document)).toBe(61);
         expectCanonicalRoundTrip(document);
-        const measures = document.chart.score.sections[0].measures;
+        const measures = measuresOf(document);
         const last = measures[measures.length - 1];
         expect(last.content).toEqual({
             kind: 'events',
@@ -411,7 +427,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         const { document, song } = importFixture('round-midnight');
         expect(performedBarCount(document)).toBe(41);
         expectCanonicalRoundTrip(document);
-        const measures = document.chart.score.sections[0].measures;
+        const measures = measuresOf(document);
         expect(measures[8].content).toEqual({
             kind: 'events',
             events: [
@@ -438,7 +454,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         // of 2, as the reference converter's half-beat cell says.
         const { document } = importFixture('502-blues');
         expect(document.chart.score.meter).toBe('3/4');
-        const measures = document.chart.score.sections[0].measures;
+        const measures = measuresOf(document);
         expect(measures[11].content).toEqual({
             kind: 'events',
             events: [
@@ -457,7 +473,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         expect(document.chart.score.meter).toBe('5/4');
         expect(performedBarCount(document)).toBe(24);
         expectCanonicalRoundTrip(document);
-        expect(document.chart.score.sections[0].measures[0].content).toEqual({
+        expect(measuresOf(document)[0].content).toEqual({
             kind: 'events',
             events: [
                 { kind: 'chord', symbol: 'Ebm', duration: [3, 1] },
@@ -471,7 +487,7 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
         expect(document.chart.score.meter).toBe('6/4');
         expect(performedBarCount(document)).toBe(36);
         expectCanonicalRoundTrip(document);
-        expect(document.chart.score.sections[0].measures[3].content).toEqual({
+        expect(measuresOf(document)[3].content).toEqual({
             kind: 'events',
             events: [
                 { kind: 'chord', symbol: 'Bm7', duration: [3, 1] },
@@ -496,14 +512,14 @@ describe('the Jazz 1460 playlist fixtures (#1447)', () => {
             'imports %s, reading its "%s" as three passes',
             (slug, text, closingBar, bars, performed) => {
                 const { document, song } = importFixture(slug);
-                const measures = document.chart.score.sections[0].measures;
+                const measures = measuresOf(document);
                 expect(measures[closingBar - 1].end).toEqual([{ kind: 'repeat-end', times: 3 }]);
                 expect(measures[closingBar - 1].annotations).toBeUndefined();
                 expect(song.diagnostics.map(({ message }) => message).join('\n')).not.toContain(
                     text,
                 );
-                const visits = compileScoreForm(document.chart.score).map(
-                    ({ measureIndex }) => measureIndex + 1,
+                const visits = compileScoreForm(document.chart.score).map((visit) =>
+                    barNumber(document.chart.score, visit),
                 );
                 for (const bar of bars) {
                     expect(visits.filter((visit) => visit === bar)).toHaveLength(3);

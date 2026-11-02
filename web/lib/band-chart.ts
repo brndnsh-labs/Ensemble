@@ -19,11 +19,13 @@ import {
 } from '@band/index';
 import { INTERVAL_TO_NNS, INTERVAL_TO_ROMAN } from '@core/config';
 import { spellPitchClass } from '@core/engine/note-spelling';
+import { transposeChordText } from '@core/engine/transpose';
 import { resolveScoreContext } from '@core/songbook/score-context';
 import { compileScoreForm } from '@core/songbook/score-form';
 import { resolveScoreMeasureEvents } from '@core/songbook/score-measure-events';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { ChordNamePart, FormattedChordNames } from '@core/types';
+import { respellKeyForMode, transposeKeyName } from '@core/utils';
 import { type ChartBlock, type ChartChord, type ChartMeasure, writtenBlocks } from './lead-sheet';
 
 /** One sixteenth in band ticks: the unit the chart sheet speaks. */
@@ -312,4 +314,58 @@ export function chordNames(
         absName: `${name.root}${name.suffix}${name.bass ? `/${name.bass}` : ''}`,
         display: { name, nns, roman },
     };
+}
+
+/**
+ * The key a transposing instrument reads in (#1992): `key` moved up `shift` semitones, spelled as
+ * that key is usually written in its mode (`F#` minor, `Db` major), so its chords take the
+ * sharps or flats a part in that key would.
+ */
+export function shiftedKey(key: string, isMinor: boolean, shift: number): string {
+    return respellKeyForMode(transposeKeyName(key, shift), isMinor);
+}
+
+/**
+ * One chord as a transposing instrument reads it (#1992): its letter name moved up `shift`
+ * semitones and spelled from the key it lands in (`transposeChordText`, the Key popover's own
+ * path, #1977). Display only — the score, the band and every stored chord stay in concert.
+ * Roman numerals and Nashville numbers name degrees of the key, so they read the same in any
+ * transposition and are left as they are. A hold, an N.C. or a symbol that won't read is
+ * returned unchanged.
+ */
+export function shiftedChord<C extends ChartChord>(chord: C, shift: number): C {
+    if (
+        shift % 12 === 0 ||
+        (chord.kind !== undefined && chord.kind !== 'chord') ||
+        !chord.display
+    ) {
+        return chord;
+    }
+    const minor = chord.keyIsMinor === true;
+    const key = shiftedKey(chord.key, minor, shift);
+    const named = chordNames(
+        transposeChordText(chord.absName, shift, { key, isMinor: minor }),
+        key,
+        minor,
+    );
+    return {
+        ...chord,
+        key,
+        absName: named.absName,
+        display: { ...chord.display, name: named.display.name },
+    };
+}
+
+/** The chart sheet's blocks with every chord read for a transposing instrument (#1992). */
+export function shiftedBlocks<B extends ChartBlock>(blocks: B[], shift: number): B[] {
+    if (shift % 12 === 0) {
+        return blocks;
+    }
+    return blocks.map((block) => ({
+        ...block,
+        measures: block.measures.map((measure) => ({
+            ...measure,
+            chords: measure.chords.map((chord) => shiftedChord(chord, shift)),
+        })),
+    }));
 }

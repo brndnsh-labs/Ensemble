@@ -63,9 +63,8 @@ function contrast(a: string, b: string): number {
 /**
  * Foreground on background, at 4.5:1 (AA body text) unless noted. `--accent` is text across
  * the app (`color: var(--accent)`: links, badges, the conflict banner), so it is held as text.
- * The playing bar is `.bar.active`: `--green-light` under the chord's `--ink`, with a `--green`
- * underline; the same two greens are an "on" chip's text and fill, so `--green` is held as text
- * on it. The accent is text on its own tint as well (the conflict banner, the toasts' actions).
+ * The playing bar is `.bar.active`: a `--green` fill under `--paper` (checked below, #1991); the
+ * `--green-light` pair is an "on" chip's fill and text, so `--green` is held as text on it. The accent is text on its own tint as well (the conflict banner, the toasts' actions).
  * `--primary` fills the main controls under `--on-primary`, and is a selected tab's label on
  * `--surface`.
  * (`--bar-current` is not checked: its one rule, `.bar.current`, is set by no component.)
@@ -208,6 +207,42 @@ describe('colour palettes (#1280)', () => {
                 `${mode}: --muted on --hover`,
             ).toBeGreaterThanOrEqual(4.5);
         }
+    });
+
+    it('the playing bar is a solid fill the page can see, and louder than the next-bar cue (#1991)', () => {
+        // `--bar-playing` / `--on-bar-playing` alias `--green` / `--paper` on the root, so each
+        // palette's own green is the fill; the aliases are pinned here, the ratios below.
+        expect(block(css, ':root')).toContain('--bar-playing: var(--green);');
+        expect(block(css, ':root')).toContain('--on-bar-playing: var(--paper);');
+        for (const id of PALETTES) {
+            for (const mode of ['day', 'stage'] as const) {
+                const t = palettes[id];
+                const fill = t.green[mode];
+                for (const bg of ['paper', 'surface']) {
+                    expect(
+                        contrast(fill, t[bg][mode]),
+                        `${id} ${mode}: playing fill on --${bg}`,
+                    ).toBeGreaterThanOrEqual(3);
+                }
+                expect(
+                    contrast(t.paper[mode], fill),
+                    `${id} ${mode}: bar text on the playing fill`,
+                ).toBeGreaterThanOrEqual(4.5);
+                // The next bar's outline (its darkest, "soon" state) stays under the fill's.
+                expect(
+                    contrast(t['bar-next-soon'][mode], t.paper[mode]),
+                    `${id} ${mode}: next cue louder than the playing fill`,
+                ).toBeLessThan(contrast(fill, t.paper[mode]));
+            }
+        }
+    });
+
+    it('the next-bar cue is a 1px outline (#1991)', () => {
+        const sheet = readFileSync(new URL('./chart-sheet.css', import.meta.url), 'utf8');
+        expect(block(sheet, '.bar[data-next]')).toContain('inset 0 0 0 1px var(--bar-next)');
+        expect(block(sheet, '.bar[data-next="soon"]')).toContain(
+            'inset 0 0 0 1px var(--bar-next-soon)',
+        );
     });
 
     it('bar numbers scale with the chord size, never under 11px (#1983)', () => {
