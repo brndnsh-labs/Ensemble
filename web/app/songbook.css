@@ -435,17 +435,43 @@
 .standard-item:hover {
     background: var(--hover);
 }
+.standard-open {
+    flex: 1;
+    min-width: 0;
+    align-self: stretch;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    text-align: left;
+    padding: 0;
+    background: none;
+    border: 0;
+}
+/* A 44px hit area (the phone's floor) around the 32px drawn circle. */
 .play-circle {
-    width: 32px;
-    height: 32px;
+    position: relative;
+    isolation: isolate;
+    width: 44px;
+    height: 44px;
+    margin: -6px;
+    padding: 0;
+    cursor: pointer;
     flex-shrink: 0;
     display: grid;
     place-content: center;
+    border: 0;
+    background: none;
+    color: var(--accent);
+    font-size: 10px;
+}
+.play-circle::before {
+    content: "";
+    position: absolute;
+    inset: 6px;
+    z-index: -1;
     border: 1px solid var(--line);
     border-radius: 50%;
     background: var(--surface);
-    color: var(--accent);
-    font-size: 10px;
 }
 .standard-copy {
     display: flex;
