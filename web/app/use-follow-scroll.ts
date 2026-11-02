@@ -118,12 +118,16 @@ export function useFollowScroll(
         chartId,
         nextSoon,
         activeBar,
+        countingIn = false,
     }: {
         following: boolean;
         active: number | null;
         chartId: string | undefined;
         nextSoon: boolean;
         activeBar: number | null;
+        /** The band is counting in: no bar is playing yet, but the one Play starts from is drawn
+         * (#2069, from #1991), so Following brings its row on screen before the first downbeat. */
+        countingIn?: boolean;
     },
 ): void {
     // Following's look-ahead scroll (#1458): the active bar's document-space top the last time
@@ -175,11 +179,17 @@ export function useFollowScroll(
     // Keyed on `active` (which changes at chord granularity, at least once per bar) rather than a
     // poll: `followRowTop` turns a same-row chord change into a no-op via the guard below.
     useEffect(() => {
-        if (!following || active === null) {
+        if (!following || (active === null && !countingIn)) {
             return;
         }
         const scrollEl = scroll.current;
-        const activeEl = scrollEl?.querySelector<HTMLElement>('[data-active="true"]');
+        // The playing bar, or during the count-in the bar it leads into (the one wearing the
+        // countdown digit): the row is brought up the same way, so the first downbeat lands on a
+        // bar already in view and the same-row memory below carries into the first chord.
+        const activeEl =
+            active === null
+                ? (scrollEl?.querySelector('.bar-countin')?.closest<HTMLElement>('.bar') ?? null)
+                : scrollEl?.querySelector<HTMLElement>('[data-active="true"]');
         if (!scrollEl || !activeEl) {
             return;
         }
@@ -192,7 +202,7 @@ export function useFollowScroll(
         }
         followRowTop.current = top;
         scrollRowIntoView(scrollEl, activeEl, nextRowBottom(scrollEl, activeEl));
-    }, [scroll, active, following]);
+    }, [scroll, active, following, countingIn]);
     // The jump-ahead (#1458, Touches #3): fires once per bar, on `nextSoon`'s rising edge (the
     // playing bar's last beat), only when the next performed bar isn't document-adjacent to the
     // active one and isn't already on screen — a repeat back, an ending skip, or the form's loop
@@ -237,7 +247,7 @@ export function useFollowScroll(
 /**
  * Whether the playing row is (even partly) out of `.chart-scroll`'s view (#1986): "Resume follow" has something
  * to resume TO only then. A chart that fits has nothing to scroll, so a wheel or PageDown over
- * it leaves the playing row on screen and no pill is owed. Measured on scroll and on every
+ * it leaves the playing row on screen and no pill is owed. Measured on scroll, on a resize of the scroller or its content, and on every
  * active-bar change, and only while Following is off (while on, the look-ahead keeps it in view).
  */
 export function usePlayingRowAway(
@@ -264,7 +274,18 @@ export function usePlayingRowAway(
         };
         measure();
         scrollEl.addEventListener('scroll', measure, { passive: true });
-        return () => scrollEl.removeEventListener('scroll', measure);
+        // A rotate, a window resize or a refit moves the playing row (or the viewport edge)
+        // without a scroll event (#1986); the pill would stay stale until the next scroll.
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure);
+        observer?.observe(scrollEl);
+        const content = scrollEl.firstElementChild;
+        if (content) {
+            observer?.observe(content);
+        }
+        return () => {
+            scrollEl.removeEventListener('scroll', measure);
+            observer?.disconnect();
+        };
     }, [scroll, following, active, remount]);
     return away;
 }

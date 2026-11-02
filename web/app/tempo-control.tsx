@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { afterPress } from './after-press';
 
+const MIN_TEMPO = 40;
+const MAX_TEMPO = 240;
+function clampTempo(bpm: number): number {
+    return Math.max(MIN_TEMPO, Math.min(MAX_TEMPO, Math.round(bpm)));
+}
+
 /** Keep intermediate keystrokes local; changing the band is a committed user action. */
 export function TempoControl({
     value,
@@ -25,10 +31,10 @@ export function TempoControl({
     }, [value]);
     function commit(step = 0) {
         const number = text.trim() ? Number(text) : NaN;
-        const next = Math.max(
-            40,
-            Math.min(240, Math.round((Number.isFinite(number) ? number : value) + step)),
-        );
+        // What was typed is a tempo first (clamped), then the step moves it: `1` then Up is 41,
+        // not 2 pulled up to 40 (#2069).
+        const typed = clampTempo(Number.isFinite(number) ? number : value);
+        const next = clampTempo(typed + step);
         setText(String(next));
         if (next !== committed.current) {
             committed.current = next;
@@ -53,6 +59,11 @@ export function TempoControl({
                 <input
                     id="tempo"
                     inputMode="numeric"
+                    // Up and Down step it, so it says so (#2069): a spinbutton with its range.
+                    role="spinbutton"
+                    aria-valuemin={MIN_TEMPO}
+                    aria-valuemax={MAX_TEMPO}
+                    aria-valuenow={value}
                     value={text}
                     disabled={disabled}
                     onChange={(event) => setText(event.target.value)}

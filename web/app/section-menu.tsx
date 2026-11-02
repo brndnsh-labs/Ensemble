@@ -6,6 +6,7 @@ import type { SectionChange } from '../lib/documents';
 import './bar-menu.css';
 // The phone sheet's slide and backdrop are `<Menu>`'s (#1755), the one copy of that motion.
 import './menu.css';
+import { isSaveKey } from './save-key';
 import { SectionBandFields, sectionMarks } from './section-band-fields';
 import { type SectionField, SectionNameFields, SectionSelects } from './section-settings';
 import { useAnchoredPlacement } from './use-anchored-placement';
@@ -162,7 +163,9 @@ export function SectionMenu({
                 }}
                 onKeyDown={(event) => {
                     // The chart's keys (Space playing, an arrow browsing) are not the menu's.
-                    event.stopPropagation();
+                    if (!isSaveKey(event)) {
+                        event.stopPropagation();
+                    }
                     if (event.key === 'Escape') {
                         event.preventDefault();
                         close(true);

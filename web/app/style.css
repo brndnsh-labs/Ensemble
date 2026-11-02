@@ -93,7 +93,7 @@
     --on-ink: light-dark(#f6f8fb, #11161c);
     --primary: light-dark(#2a336e, #c3c8f2);
     --on-primary: light-dark(#f6f8fb, #11161c);
-    --muted: light-dark(#5b6676, #9aa6b5);
+    --muted: light-dark(#546070, #9aa6b5);
     --muted-soft: light-dark(#6a7484, #808c9b);
     --line: light-dark(#ccd5e0, #2c3642);
     --hover: light-dark(#d8dfe8, #232d38);
@@ -114,7 +114,7 @@
     --chord-hover: light-dark(#d2dbe6, #2c3746);
     --backdrop: light-dark(#1a243066, #000000a0);
     --shadow: 0 16px 60px light-dark(#1a243014, #00000080);
-    --focus-ring: light-dark(#4a4fc490, #9da3ffb0);
+    --focus-ring: light-dark(#4a4fc4, #9da3ff);
 }
 /* High contrast: near-black on white and white on near-black, every text token at AAA (7:1).
    Lines and bar numbers are drawn dark enough to read as structure, not hairlines; the accent
@@ -180,7 +180,7 @@
     --chord-hover: light-dark(#d9e3d3, #2a3f30);
     --backdrop: light-dark(#14261b66, #000000a0);
     --shadow: 0 16px 60px light-dark(#14261b14, #00000080);
-    --focus-ring: light-dark(#93520f90, #e6ab55b0);
+    --focus-ring: light-dark(#93520f, #e6ab55);
 }
 /* Plum: a lilac-white page with aubergine ink, a dusk-violet Stage. The accent is the plum
    itself; the playing bar stays sage, the one green on the page, so it reads at a glance. */
@@ -212,7 +212,7 @@
     --chord-hover: light-dark(#e4d3e0, #3a2c3d);
     --backdrop: light-dark(#2a1a2c66, #000000a0);
     --shadow: 0 16px 60px light-dark(#2a1a2c14, #00000080);
-    --focus-ring: light-dark(#8b2f7f90, #e49ad8b0);
+    --focus-ring: light-dark(#8b2f7f, #e49ad8);
 }
 * {
     box-sizing: border-box;

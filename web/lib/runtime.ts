@@ -269,12 +269,37 @@ function playedView(): BandChart | null {
     return loopPlan?.view ?? songPlan?.view ?? bandView;
 }
 
-/** What song mode would play if Play were pressed now, or null when it would not apply. */
+/** The last `planForPlay` answer, kept for the inputs it was made from (#2069). */
+let plannedForPlay: {
+    score: SemanticScore;
+    bpm: number;
+    minutes: SongMinutes;
+    plan: SongPlan | null;
+} | null = null;
+
+/**
+ * What song mode would play if Play were pressed now, or null when it would not apply. Planning
+ * compiles the chart up to 16 times, and the stand reads it for the readout on every render that
+ * could change it, so the answer is kept until the score, tempo or setting changes.
+ */
 function planForPlay(): SongPlan | null {
     if (!songMinutes || !currentScore) {
         return null;
     }
-    return planSong(currentScore, getState().playback.bpm, songMinutes * 60);
+    const bpm = getState().playback.bpm;
+    if (
+        plannedForPlay?.score !== currentScore ||
+        plannedForPlay.bpm !== bpm ||
+        plannedForPlay.minutes !== songMinutes
+    ) {
+        plannedForPlay = {
+            score: currentScore,
+            bpm,
+            minutes: songMinutes,
+            plan: planSong(currentScore, bpm, songMinutes * 60),
+        };
+    }
+    return plannedForPlay.plan;
 }
 
 function bandHost(): BandHost {
