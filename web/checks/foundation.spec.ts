@@ -181,6 +181,8 @@ test('two tabs cannot overwrite a newer save; a conflicting take can become a co
     const second = await context.newPage();
     await second.goto(appUrl());
     await songLink(second, 'Blue pocket', 'Blues').click();
+    // On the saved song before the other tab changes it, or the open recovers that change (#2084).
+    await expect(second.getByLabel('Tempo', { exact: true })).toHaveValue('110');
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -277,6 +279,8 @@ test('an older competing draft remains explicitly recoverable after another tab 
     const second = await context.newPage();
     await second.goto(appUrl());
     await songLink(second, 'Blue pocket', 'Blues').click();
+    // On the saved song before the other tab changes it, or the open recovers that change (#2084).
+    await expect(second.getByLabel('Tempo', { exact: true })).toHaveValue('110');
     await page.getByRole('button', { name: 'Slower', exact: true }).click();
     await second.getByRole('button', { name: 'Faster', exact: true }).click();
     await second.getByRole('button', { name: 'Save', exact: true }).click();

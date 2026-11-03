@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, measureSong, seedGuestDocuments, songLink, test } from './fixtures';
+import { expect, measureSong, resizeTo, seedGuestDocuments, songLink, test } from './fixtures';
 
 /**
  * #1993 — on a phone, while the band plays, the header's second row (Settings, Stage, the mode
@@ -196,9 +196,10 @@ test('the chart keeps its step through the fold at every phone height (#1784, #1
     const fit = () => scroll.getAttribute('data-fit');
     const steps = new Set<string | null>();
     for (let height = 520; height <= 900; height += 20) {
-        await page.setViewportSize({ width: 390, height });
-        // A real resize re-fits; let it settle before taking the stopped step.
-        await page.waitForTimeout(250);
+        // A real resize re-fits: take the stopped step only once that re-fit has run. A fixed
+        // wait read the PREVIOUS height's step on a loaded runner, and the re-fit then landed
+        // during Play and read as the stand re-fitting for it (#2083).
+        await resizeTo(page, 390, height);
         const stopped = await fit();
         steps.add(stopped);
         await play(page);

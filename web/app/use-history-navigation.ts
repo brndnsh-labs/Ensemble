@@ -1,4 +1,4 @@
-import { type RefObject, useEffect, useEffectEvent, useRef } from 'react';
+import { type RefObject, useEffect, useEffectEvent, useLayoutEffect, useRef } from 'react';
 import { isNavEntry, type NavEntry, type NavView, navKey, stepTo } from '../lib/navigation';
 
 /** What the shell hands `useHistoryNavigation`. */
@@ -119,8 +119,11 @@ export function useHistoryNavigation({
     // Every view change writes history: deeper pushes, shallower goes back (so Forward still
     // reopens what was left), level replaces. The first run claims the page's entry in place —
     // a reload lands on the songbook whatever entry it reloaded on.
+    // A layout effect, so the entry is written before the view is painted (#2084): as a passive
+    // effect it ran a frame or more after the new view was on screen, and a Back pressed in
+    // between left from the entry beneath it (Back from a song landed one page too far).
     // biome-ignore lint/correctness/useExhaustiveDependencies: `navViewKey` names `navView` exactly.
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (!ready) {
             return;
         }

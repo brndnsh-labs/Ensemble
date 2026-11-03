@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
+import { appUrl, expect, resizeTo, seedStarters, songLink, test } from './fixtures';
 
 /**
  * #1704 — the song header's action row stays ONE row, inside the screen, in both of its widths:
@@ -117,7 +117,7 @@ test('a landscape phone keeps the transport on one row (#1986)', async ({ page }
         { width: 844, height: 390 },
         { width: 740, height: 360 },
     ]) {
-        await page.setViewportSize(size);
+        await resizeTo(page, size.width, size.height);
         const tops = await page
             .locator('.transport-bar > *')
             .evaluateAll((els) =>

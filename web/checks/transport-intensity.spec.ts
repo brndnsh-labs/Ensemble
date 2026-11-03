@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { expect, openBand, seedStarters, songLink, test } from './fixtures';
+import { expect, openBand, resizeTo, seedStarters, songLink, test } from './fixtures';
 
 // #1994 — the band's intensity on the transport, tablet width and up, Auto at its left stop. It is
 // the chart's own energy (the Groove tab's field, `band-sheet.spec.ts`), so this spec checks the
@@ -59,7 +59,7 @@ test('a tablet’s transport holds the slider on one row, and Play does not move
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     for (const width of [820, 768]) {
-        await page.setViewportSize({ width, height: 1000 });
+        await resizeTo(page, width, 1000);
         const fit = await page.locator('.transport-bar').evaluate((bar) => {
             const kids = [...bar.children].filter(
                 (el) => (el as HTMLElement).offsetParent !== null,

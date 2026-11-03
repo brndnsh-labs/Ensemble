@@ -251,12 +251,25 @@ export const accountTest = test.extend<{ accountApi: AccountApi }>({
 });
 
 /**
+ * Whether a phone's header row is folded into the Song menu while the band plays (#1993), read
+ * from the app's own signal (`data-folded`) once the stand is up. Never a visibility check on
+ * the folded control: right after a song opens the stand is not drawn yet, so an instant
+ * `isVisible()` reads "folded" on any screen and the caller then waits forever for a menu row
+ * that only a playing phone has (#2084).
+ */
+export async function headerFolded(page: Page) {
+    const header = page.locator('.song-header');
+    await expect(header).toBeVisible();
+    return (await header.getAttribute('data-folded')) !== null;
+}
+
+/**
  * Save is disabled: the header's button, or on a phone while the band plays (its row is folded
  * into the Song menu, #1993) the menu's row.
  */
 export async function expectSaveDisabled(page: Page) {
     const save = page.getByRole('button', { name: 'Save', exact: true });
-    if (await save.isVisible()) {
+    if (!(await headerFolded(page))) {
         await expect(save).toBeDisabled();
         return;
     }
@@ -273,9 +286,8 @@ export async function openBand(page: Page, tab: 'Players' | 'Groove' | 'Trade' |
     const sheet = page.getByRole('dialog', { name: 'Band' });
     // `open`, not visibility: a sheet sliding shut after a close is still visible for a moment.
     if ((await page.locator('dialog.band-panel[open]').count()) === 0) {
-        const band = page.getByRole('button', { name: 'Band…' });
-        if (await band.isVisible()) {
-            await band.click();
+        if (!(await headerFolded(page))) {
+            await page.getByRole('button', { name: 'Band…' }).click();
         } else {
             // A phone folds Band… into the Song menu while the band plays (#1993).
             await page.getByRole('button', { name: 'Song actions' }).click();
@@ -322,6 +334,27 @@ export async function settled(locator: Locator): Promise<void> {
         Promise.all(
             element.getAnimations({ subtree: true }).map((animation) => animation.finished),
         ),
+    );
+}
+
+/**
+ * Sets the viewport and waits until the page has it and two frames have rendered since (#2084).
+ * The chart re-fits from a `ResizeObserver` (`useChartFit`), delivered in the rendering step of
+ * the frame after the resize, so the step on the chart is the new size's once this returns.
+ * `setViewportSize` alone can return before the page sees the new size: a read straight after
+ * it, or after a fixed wait, got the previous size's step on a loaded runner.
+ */
+export async function resizeTo(page: Page, width: number, height: number): Promise<void> {
+    await page.setViewportSize({ width, height });
+    await page.waitForFunction(
+        ([w, h]) => window.innerWidth === w && window.innerHeight === h,
+        [width, height],
+    );
+    await page.evaluate(
+        () =>
+            new Promise<void>((done) =>
+                requestAnimationFrame(() => requestAnimationFrame(() => done())),
+            ),
     );
 }
 

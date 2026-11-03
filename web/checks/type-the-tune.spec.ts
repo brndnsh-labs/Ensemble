@@ -117,6 +117,9 @@ test('a 32-bar AABA, A typed once and duplicated, takes under 40 actions', async
         await expect(barField(page, 9)).toBeFocused();
         await act(() => page.getByRole('button', { name: 'Bar menu', exact: true }).click());
         await act(() => page.getByRole('button', { name: 'Delete bar', exact: true }).click());
+        // The delete has landed once the bar before it is open for typing (`deleteBar`): until
+        // then bar 9's field is the deleted bar's, and `openBar` would take it as open (#2084).
+        await expect(barField(page, 8)).toBeFocused();
         if (n < 2) {
             await act(() => openBar(page, 9));
         }
