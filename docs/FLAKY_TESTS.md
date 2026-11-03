@@ -27,6 +27,95 @@ entry here).
 
 ## Registry
 
+### 🟢 `web/checks/fixtures.ts` `openBand` / `expectSaveDisabled` — "locator.click: Test timeout … waiting for getByRole('menuitem', { name: 'Band…' })"
+
+- **Class:** e2e-timing (a race in the helper, not the app).
+- **Symptom:** the commonest red on `main` and PRs from 2026-11-01 to 2026-11-02 (#2084): 13 click timeouts across `band-sheet.spec.ts` (lines 36, 157, 181, 340), `instrument-settings.spec.ts` (85, 160), `foundation-sounds.spec.ts` (14, 178, 293) and `where-you-are.spec.ts` (47), on both projects, laptop included. Each ran `openBand` straight after a song was opened (`songLink(...).click()`), often after a reload, and timed out on the Song menu's "Band…" row.
+- **Root cause:** #2066 (#1993) taught `openBand` that a playing phone folds Band… into the Song menu, and chose the path with an instant `band.isVisible()`. Called before the stand had drawn, it read "not visible" on any screen, took the folded path and waited for a menu row only a playing phone has. `expectSaveDisabled` (same commit) made the same choice the same way.
+- **Fix (2026-11-03, #2084):** `headerFolded(page)` waits for the stand's header, then reads the app's own fold signal (`.song-header[data-folded]`). Both helpers branch on it. No spec changed.
+- **Before / after:** `band-sheet.spec.ts:181` and `instrument-settings.spec.ts:85` on laptop, 20 repeats each, contention recipe (2 pinned cores, 3 spinners on them, 2 workers): 23 of 40 failed before (15/20 and 8/20, every one the CI timeout), 40/40 after. Also after: 100/100 on `webkit-phone` under contention (`instrument-settings.spec.ts` 85 and 160, `band-sheet.spec.ts` 36, `foundation-sounds.spec.ts` 14, `song-mode.spec.ts` 174; 20 each).
+- **Last seen:** 2026-11-02 (PR #2084's trigger, run 41534342329).
+
+### 🟢 `web/checks/history-navigation.spec.ts` — "Back from a shared link lands on the songbook…" (117) and "Back from a song returns to the page it was opened from" (29)
+
+- **Class:** e2e-timing, but the race is in the **app**.
+- **Symptom:** `webkit-phone`, 5 times from 2026-10-28 to 2026-11-01: after `page.goBack()`, `main.home` (or the All songs heading) "element(s) not found": Back had gone one page past where it should.
+- **Root cause:** `useHistoryNavigation` wrote each view change to history from a passive effect, which runs after the new view is painted. A probe that read `history.state` the moment the song appeared found it still on the previous entry in 5 of 6 runs, and still there a frame later. A Back pressed in that gap (by Playwright right after the song showed, or by a musician) stepped back from the entry beneath, so it left the page it should have landed on.
+- **Fix (2026-11-03, #2084):** that effect is a layout effect, so the entry is written before the view is painted. Nothing else in the hook changed.
+- **Before / after:** a forced reproduction (a throwaway spec pressing Back from a `MutationObserver` the moment the song is first drawn, from All songs): 12 of 20 left the app's page on the old build, 20/20 landed on All songs after. Contention alone did not reproduce it in 10 runs of each test. After, under contention: 40/40 for each test on `webkit-phone`.
+- **Last seen:** 2026-11-01 (run of `feat/section-role-and-players-2021`, attempt 2).
+
+### 🟢 `web/checks/key-popover.spec.ts` — "the picker names each key by its mode…" (156)
+
+- **Class:** e2e-timing (the spec).
+- **Symptom:** `webkit-phone`, 3 times on 2026-11-01: `expect(received).toContain("C♯")`, received the major-key names.
+- **Root cause:** the spec read the Key options once, straight after `selectOption('minor')`, before the render that renames them.
+- **Fix (2026-11-03, #2084):** `expect.poll` until the minor names show, then the one read for the flats that must be gone. Nothing loosened.
+- **Before / after:** contention, 10 repeats: 1 failed before, the CI shape. After: 40/40 on `webkit-phone` under contention.
+- **Last seen:** 2026-11-01.
+
+### 🟢 `web/checks/revert-undo.spec.ts` — "Continue is tagged while the song has unsaved changes; Revert to saved offers Undo" (24)
+
+- **Class:** e2e-timing (the spec).
+- **Symptom:** `webkit-phone` on PR #2004's run (2026-11-01): after Revert, expected the first chord `[]`, received `["Am6"]`.
+- **Root cause:** `before` was read with `allTextContents()` the instant Open chart was clicked, before the chart was drawn, so it was `[]`. The check after it (`changed` differs from `before`) was a one-shot read too.
+- **Fix (2026-11-03, #2084):** wait for the first chord to be visible before reading `before`, and poll for the transposed chord before reading `changed`.
+- **Before / after:** not reproduced in 10 contention runs before; the CI value (`[]`) is the read itself. After: 40/40 on `webkit-phone` under contention.
+- **Last seen:** 2026-11-01.
+
+### 🟢 `web/checks/dialog-rules.spec.ts` — "Older drafts and the Copy link fallback close on a backdrop tap" (273), and its twins in `foundation.spec.ts` (175, 273)
+
+- **Class:** e2e-timing (the spec).
+- **Symptom:** `webkit-phone` on `main` 2026-11-01: the second tab's Save stayed disabled for 45s after its Faster click.
+- **Root cause:** read from the CI trace. The second tab's song open was still loading when the first tab clicked Slower, so the open recovered that tab's fresh draft (tempo 105, "Practice settings changed"). Faster then took it back to the saved 110, so there was nothing to save. The app behaved as designed. `foundation.spec.ts`'s two two-tab tests have the same race.
+- **Fix (2026-11-03, #2084):** the second tab waits for the saved tempo (110) before the first tab edits, in all three tests.
+- **Before / after:** not reproduced in 10 contention runs before; the trace is the evidence. After, under contention: dialog-rules 40/40 on `webkit-phone`, the two foundation tests 40/40 each on laptop.
+- **Last seen:** 2026-11-01.
+
+### 🟢 `web/checks/type-the-tune.spec.ts` — "a 32-bar AABA, A typed once and duplicated, takes under 40 actions" (92)
+
+- **Class:** e2e-timing (the spec, through `openBar`).
+- **Symptom:** `webkit-phone`, 2026-11-01 and 2026-11-02: `toBeFocused` on "Chords in bar 9" failed; the snapshot showed bar 8's field open.
+- **Root cause:** Delete bar opens the bar before the deleted one (`deleteBar`). `openBar(page, 9)` checks whether bar 9's field is already open with an instant `isVisible()`. Straight after the Delete click it still saw the deleted bar's field, skipped its click, and then the delete landed on bar 8.
+- **Fix (2026-11-03, #2084):** after each Delete, wait for bar 8's field to be focused, then open bar 9. Not counted as an action.
+- **Before / after:** not reproduced in 10 contention runs before. After: 40/40 on `webkit-phone` under contention.
+- **Last seen:** 2026-11-02 (run 41534414241).
+
+### 🟢 `web/checks/phone-fold.spec.ts` — "the chart keeps its step through the fold at every phone height" (179, #2083), and `usability.spec.ts` — "the stand scales to its screen…" (393)
+
+- **Class:** e2e-timing (the specs). Not the fold's hold.
+- **Symptom:** phone-fold, `webkit-phone`, on PR #2079 and `main` `e171ea36`: "playing at 520", expected `7`, received `3`. Usability, once on a branch: "chord @820x1180", 24px where ≥52 was expected.
+- **Root cause:** both read the chart's step before the resize had re-fitted it. Phone-fold failed only at 520, the first height after 844: it read `7` (844's step) after a 250ms wait, and the 520 re-fit (`3`, the scrolling size) landed during Play, which read as the stand re-fitting for Play. Usability read straight after `setViewportSize` and got the previous, landscape size's step.
+- **Fix (2026-11-03, #2084):** a shared `resizeTo` in `fixtures.ts`: set the viewport, wait until the page reports it, then two frames, so `useChartFit`'s `ResizeObserver` re-fit has run. The fold's hold in `use-chart-fit.ts` is unchanged.
+- **Before / after:** phone-fold, contention, 10 repeats: 1 failed before, exactly CI's "playing at 520". After: 40/40 under contention. Usability: not reproduced in 10 before; 40/40 on `webkit-phone` under contention after.
+- **Last seen:** 2026-11-01 (main push `e171ea36`, run 41362341528).
+
+### 🟢 `web/checks/account-retired-text-chart.chromium.spec.ts` — "sign-out and account deletion name a song this app can no longer open…" (172)
+
+- **Class:** e2e-timing (the spec).
+- **Symptom:** laptop, 2026-10-29 (PR) and 2026-11-01 (`main`): after a reload, `openSignOut`'s `dialog.account-page` stayed hidden.
+- **Root cause:** read from the CI trace. This account skipped its recovery code. After a reload the header shows "Signed in" until the server reports the account unprotected, then swaps in "Finish protecting your account · Account". Playwright aimed at "Signed in", the swap landed, and the click opened Finish protecting instead of the account page. Showing "Signed in" while unknown is deliberate (`AccountView.recoveryEnrolled`: never assume unprotected).
+- **Fix (2026-11-03, #2084):** after that reload the spec waits for "Finish protecting your account" before opening the account page. No other account spec opens the page straight after a reload.
+- **Before / after:** not measured before the fix; the CI trace is the evidence. After: 40/40 on laptop under contention.
+- **Last seen:** 2026-11-01.
+
+### 🟢 `web/checks/ireal-import.spec.ts` — "multi-chord repeated bars imports and highlights exact performed visits on the compact stand" (214)
+
+- **Class:** e2e-timing, the race in the app; fixed by #2076.
+- **Symptom:** 4 times on 2026-11-01, laptop and phone: the import dialog stayed open after Add to songbook. Its snapshot says "Choose a tempo from 40 to 240 BPM.": the typed 240 had been reset.
+- **Root cause / fix:** the import review's tempo reset, fixed by #2076 (merged 2026-11-01 21:16). All four failures came before that merge, none after.
+- **After:** 80/80 on laptop under contention (this study and its D.C. al Fine twin, 40 each).
+- **Last seen:** 2026-11-01 19:05.
+
+### 🔴 `web/checks/screen-reader-announce.spec.ts` — "an install writes each live region at most six times" (18)
+
+- **Class:** e2e-timing, outside the app (headless WebKit stopped rendering).
+- **Symptom:** once, `webkit-phone`, PR #2065's run (2026-11-01): `closeSounds`'s "Close band" click waited 110s for the button to be stable.
+- **What the trace shows:** the button was found and visible; Playwright's stable check, which counts animation frames, never got an answer. The page's JavaScript was not stuck: the teardown's evaluate answered in 5ms. The screencast's last frame is 1.5s before the click. WebKit stopped producing frames, so nothing the app did could move it.
+- **Rate:** 1 in the two weeks of CI logs (2026-10-19 to 2026-11-02); not seen locally.
+- **Next step:** if it happens again, keep the trace and check whether frames stop at the same moment (right after "Sounds installed"); if they do, look at what the install's end does to the compositor.
+- **Last seen:** 2026-11-01.
+
 ### 🟢 `web/checks/semantic-form-editor.spec.ts` — "a form built bar by bar applies without a refusal, saves from the hidden editor, transposes and reopen offline as four written bars"
 
 - **Class:** slow-legitimate.

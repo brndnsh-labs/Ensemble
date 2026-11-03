@@ -11,6 +11,7 @@ import {
     openSectionMenu,
     phoneWidth,
     pickSongKey,
+    resizeTo,
     seedStarters,
     settled,
     songLink,
@@ -424,7 +425,8 @@ test('the stand scales to its screen and keeps mute state readable', async ({ pa
         { width: 1300, height: 940 },
         { width: 1600, height: 1100 },
     ]) {
-        await page.setViewportSize({ width: at.width, height: at.height });
+        // The new size's step, not the last one's: `data-fits` can't tell them apart (#2084).
+        await resizeTo(page, at.width, at.height);
         await expect(page.locator('.chart-scroll[data-fits="true"]')).toBeVisible();
         const idle = await measure();
         expect(idle.chord, `chord @${at.width}x${at.height}`).toBeGreaterThanOrEqual(18);
