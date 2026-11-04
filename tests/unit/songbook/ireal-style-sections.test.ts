@@ -175,6 +175,14 @@ describe('the style table (#2004)', () => {
         expect(writtenIRealTempo('120')).toBe(120);
         expect(writtenIRealTempo('300')).toBeNull();
         expect(writtenIRealTempo('12x')).toBeNull();
+        for (const edge of ['40', '240']) {
+            expect(writtenIRealTempo(edge)).toBe(Number(edge));
+            expect(unplayableIRealTempo(edge)).toBeNull();
+        }
+        for (const edge of ['39', '241']) {
+            expect(writtenIRealTempo(edge)).toBeNull();
+            expect(unplayableIRealTempo(edge)).toBe(Number(edge));
+        }
         expect(unplayableIRealTempo('300')).toBe(300);
         expect(unplayableIRealTempo('0')).toBeNull();
         expect(unplayableIRealTempo('120')).toBeNull();
