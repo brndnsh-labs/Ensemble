@@ -17,6 +17,7 @@ const AUTUMN = score(
     { key: 'G', isMinor: true },
 );
 const SAX: readonly [number, number] = [53, 82];
+const BAR = 1920;
 
 const lead = (head: 'guide-tones' | null, pass = 0) =>
     performPass(
@@ -37,52 +38,90 @@ describe('the guide-tone line', () => {
 
     it('plays each chord its 3rd or 7th, struck as the chord arrives', () => {
         for (const note of line) {
-            expect(guidePitchClasses(note.chord)).toContain(mod12(note.midi));
+            expect(guidePitchClasses(note.chord, note.key)).toContain(mod12(note.midi));
             expect(chordAt(timeline, note.tick)).toBe(note.chord);
         }
     });
 
-    it('is voice-led: a ii-V-I falls by half steps, and a common tone is held', () => {
-        // Cm7's Bb → F7's A (held: it is Bbmaj7's 7th) → Ebmaj7's G → Am7b5's G (struck again:
-        // a new phrase) → D7's F# → Gm7's F, held through both bars.
-        expect(line.map((n) => n.midi)).toEqual([70, 69, 67, 67, 66, 65]);
-        expect(line[1].dur).toBe(2 * 1920);
+    it('is voice-led: each guide tone steps to the next chord’s, a common tone held', () => {
+        // Cm7's Eb (its 3rd) is F7's 7th: held. It falls to Bbmaj7's D, which is Ebmaj7's 7th:
+        // held to the phrase's end. Am7b5's C is D7's 7th: held. Then Gm7's Bb.
+        const firstA = line.filter((n) => n.tick < 8 * BAR);
+        expect(firstA.map((n) => [n.tick / BAR, n.midi])).toEqual([
+            [0, 63],
+            [2, 62],
+            [4, 60],
+            [6, 58],
+        ]);
+        // Inside a phrase no move is wider than a minor 3rd.
         for (let i = 1; i < line.length; i++) {
-            expect(Math.abs(line[i].midi - line[i - 1].midi)).toBeLessThanOrEqual(2);
+            const top = timeline.bars.find((b) => b.start === line[i].tick)?.phrase.bar === 0;
+            if (!top) {
+                expect(Math.abs(line[i].midi - line[i - 1].midi)).toBeLessThanOrEqual(3);
+            }
         }
     });
 
-    it('breathes at the end of each phrase', () => {
-        // The Ebmaj7's G and the last Gm7's F end their phrases an eighth early.
-        expect(line[2].tick + line[2].dur).toBe(4 * 1920 - 240);
-        expect(line.at(-1)!.tick + line.at(-1)!.dur).toBe(8 * 1920 - 240);
+    it('starts on the 3rd, the key stated first', () => {
+        expect(mod12(line[0].midi)).toBe(3); // Cm7's Eb
     });
 
-    it('gives a triad the 7th of its key', () => {
-        const t = compileTimeline(score([{ label: 'A', bars: 'C | G | C | C' }]));
-        expect(guidePitchClasses(chordAt(t, 0)!)).toEqual([4, 11]); // E and B over C
-        expect(guidePitchClasses(chordAt(t, 1920)!)).toEqual([11, 5]); // B and F over G
+    it('never holds a note across a phrase’s first barline, and breathes before it', () => {
+        for (const note of line) {
+            const end = note.tick + note.dur;
+            const phraseTop = (tick: number) =>
+                timeline.bars.some((b) => b.start === tick && b.phrase.bar === 0);
+            for (let t = note.tick + 1; t < end; t++) {
+                if (t % BAR === 0) {
+                    expect(phraseTop(t), `note at ${note.tick} crosses ${t}`).toBe(false);
+                }
+            }
+        }
+        // Bbmaj7's D, held through Ebmaj7, ends its phrase an eighth early.
+        expect(line[1].tick + line[1].dur).toBe(4 * BAR - 240);
     });
 
-    it('moves to the other guide tone on a chord held past two bars', () => {
-        const t = compileTimeline(score([{ label: 'A', bars: 'Cmaj7 | / | / | /' }]));
+    it('strikes every phrase, even when one chord or a common tone runs across it', () => {
+        // One chord held over the phrase line (bars 1–4), then a common tone into the next.
+        const t = compileTimeline(
+            score([{ label: 'A', bars: 'Dm7 | Cmaj7 | Cmaj7 | Cmaj7 | Cmaj7 | G7 | C | C' }]),
+        );
         const held = guideToneLine(t, t.bars[0], 67, SAX);
-        expect(held.map((n) => n.tick)).toEqual([0, 2 * 1920]);
-        expect(held[0].midi).not.toBe(held[1].midi);
+        for (const top of [0, 4]) {
+            expect(held.some((n) => n.tick === top * BAR)).toBe(true);
+        }
+    });
+
+    it('strikes a chord held past two bars again on the same tone, never leaping', () => {
+        const t = compileTimeline(score([{ label: 'A', bars: 'G7 | G7 | G7 | G7' }]));
+        const held = guideToneLine(t, t.bars[0], 67, SAX);
+        expect(held.map((n) => n.tick)).toEqual([0, 2 * BAR]);
+        expect(held[1].midi).toBe(held[0].midi);
+    });
+
+    it('reads a triad’s 7th from what it does', () => {
+        const C = { tonic: 0, minor: false };
+        const t = compileTimeline(score([{ label: 'A', bars: 'C | G | D | Bdim' }]));
+        const at = (bar: number) => chordAt(t, bar * BAR)!;
+        expect(guidePitchClasses(at(0), C)).toEqual([4, 11]); // the I: E and its major 7th
+        expect(guidePitchClasses(at(1), C)).toEqual([11, 5]); // the V: B and the b7
+        // D falling a fifth to G is V of V: F# and C, not C#.
+        expect(guidePitchClasses(at(2), C, at(1))).toEqual([6, 0]);
+        // A diminished triad is heard as a diminished 7th.
+        expect(guidePitchClasses(at(3), C)).toEqual([2, 8]);
+        // In a minor key the V triad is a dominant too: D in G minor takes C, not C#.
+        const g = compileTimeline(
+            score([{ label: 'A', bars: 'Gm | D | Gm | Gm' }], { key: 'G', isMinor: true }),
+        );
+        expect(guidePitchClasses(chordAt(g, BAR)!, { tonic: 7, minor: true })).toEqual([6, 0]);
     });
 });
 
 describe('the band plays it for the head only (#2027)', () => {
-    it('as the head of a standard: the line, every A alike', () => {
-        const notes = lead('guide-tones');
-        const head = notes.filter((n) => n.bar < 24);
-        // One long note a chord (or fewer, where a common tone is held), not a tune.
+    it('as the head of a standard: one long note a chord, not a tune', () => {
+        const head = lead('guide-tones').filter((n) => n.bar < 24);
         expect(head.length).toBeLessThanOrEqual(24);
-        const firstA = head.filter((n) => n.bar < 8).map((n) => [n.bar, n.midi]);
-        const secondA = head
-            .filter((n) => n.bar >= 8 && n.bar < 16)
-            .map((n) => [n.bar - 8, n.midi]);
-        expect(secondA).toEqual(firstA);
+        expect(head.every((n) => n.dur >= 960)).toBe(true);
     });
 
     it('not on any other chart: the lead invents the head', () => {

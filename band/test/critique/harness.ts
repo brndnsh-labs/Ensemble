@@ -2111,6 +2111,22 @@ export const METRICS = {
         }
         return ratio(sum, n);
     },
+    /**
+     * Share of moves inside a phrase wider than a minor 3rd. For a voice-led line (#2027's
+     * guide-tone head), where each tone steps to the next chord's or holds, a 4th or a tritone
+     * is a break in the voice-leading that `leadLeapShare` (wider than a fifth) cannot see.
+     */
+    leadMoveOverThird: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const [a, b] of leadPairs(events)) {
+                n++;
+                hit += Math.abs(b.midi - a.midi) > 3 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of moves inside a phrase wider than a fifth. */
     leadLeapShare: (takes) => {
         let n = 0;

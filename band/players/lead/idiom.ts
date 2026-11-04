@@ -739,9 +739,10 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
     const plan: SlotPlan = {
         kinds,
         cells: kinds.map(() => null),
+        // The line's pitches are its own (`guideToneLine`); contour and span shape nothing here.
         contour: 'arch',
         centre: home,
-        span: 7,
+        span: 0,
         // A touch under the invented head's 84: long notes under the band, not over it.
         velocity: 78,
         from: null,
@@ -969,6 +970,7 @@ function planSlot(
         voiced = voiceSolo(ctx, book, slotStart, plan, role);
     }
     const { onsets, pitches, plan } = voiced;
+    const guideTones = role.kind === 'head' && ctx.guideToneHead;
     // Keyed like the line: a head's articulation returns with it.
     const first = ctx.timeline.bars[slotStart];
     const rng =
@@ -1003,11 +1005,12 @@ function planSlot(
         const next = pitches[i + 1];
         // A higher note is played a little harder (0.8 of a velocity step per semitone).
         let velocity = plan.velocity + (midi - homeOf(ctx, book)) * 0.8;
-        // Upbeats inside a line lift a little; a note in a valley of a run is ghosted.
-        if (o.step % 4 === 2 && o.dur <= STEP * 2) {
+        // Upbeats inside a line lift a little; a note in a valley of a run is ghosted. Not in a
+        // guide-tone head: every note of it is a chord's arrival, none a passing tone.
+        if (!guideTones && o.step % 4 === 2 && o.dur <= STEP * 2) {
             velocity += 5;
         }
-        if (prev !== undefined && next !== undefined && midi < prev && midi < next) {
+        if (!guideTones && prev !== undefined && next !== undefined && midi < prev && midi < next) {
             velocity -= 10;
         }
         const note: Planned = {
@@ -1040,7 +1043,12 @@ function planSlot(
             ) {
                 note.bendIn = 2;
             }
-        } else if (!ctx.lead.bends && o.dur >= STEP * 4 && rng.chance(book.scoop)) {
+        } else if (
+            !ctx.lead.bends &&
+            o.dur >= STEP * 4 &&
+            // A guide-tone head scoops half as often: the pitch is what the line is there to state.
+            rng.chance(guideTones ? book.scoop / 2 : book.scoop)
+        ) {
             note.bendIn = 1;
         }
         // Vibrato on a note long enough for this player to sing it; on a horn a scooped note

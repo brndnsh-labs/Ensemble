@@ -6,10 +6,11 @@
  * falls a half step to G7's B, which stays as Cmaj7's 7th), and claims no tune it doesn't
  * know. Only the standards shelf asks for it (`BandSettings.head`); solos are unchanged.
  *
- * Pure: a section visit's line is a function of its chords and the lead's home, so a head
- * resumed at any barline, or an A section's next visit, plays the same line.
+ * The line is one chain over a whole chorus, so it is voice-led across section seams too (Blue
+ * Bossa's G7b9 F falls to the top's Cm7 Eb). It is pure — a function of the timeline and the
+ * lead's register — so a head resumed at any barline plays the same line.
  */
-import type { Bar, Timeline } from '../../form/timeline.js';
+import { type Bar, chorusBars, type Timeline } from '../../form/timeline.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { type KeyContext, mod12, nearestMidi } from '../../theory/pitch.js';
 import { STEP } from '../grid.js';
@@ -23,16 +24,40 @@ export interface GuideNote {
 }
 
 /**
- * A chord's two guide tones, absolute pitch classes: its 3rd (a sus chord's 4th or 2nd) and its
- * 7th (a 6 chord's 6th). A triad writes no 7th, so it takes the one its chord scale gives — the
- * key's own 7th over that root (`parseChord` reads the scale in the bar's key: the I's major
- * 7th, the V's minor 7th) — which fits the chord and the key alike.
+ * A triad's 7th, which the chart doesn't write, read from what the chord does: a diminished
+ * triad is heard as a diminished 7th (its bb7); a major triad on the key's V, or one that falls a
+ * fifth to the next chord (a secondary dominant), is a dominant and takes the b7; any other
+ * triad takes the 7th of its chord scale (`parseChord` reads it in the bar's key: the I's
+ * major 7th, a minor chord's b7). Null for a chord with no 3rd to pair it with.
  */
-export function guidePitchClasses(chord: ChordFacts): number[] {
+function triadSeventh(chord: ChordFacts, key: KeyContext, next: ChordFacts | null): number | null {
+    if (chord.family === 'diminished') {
+        return 9;
+    }
+    const dominant =
+        chord.third === 4 &&
+        (mod12(chord.root - key.tonic) === 7 ||
+            (next !== null && mod12(next.root - chord.root) === 5));
+    if (dominant) {
+        return 10;
+    }
+    return [11, 10].find((i) => chord.scale.includes(i)) ?? null;
+}
+
+/**
+ * A chord's two guide tones, absolute pitch classes: its 3rd (a sus chord's 4th or 2nd) and its
+ * 7th (a 6 chord's 6th; a triad's, `triadSeventh`). `next` is the chord after it, which tells a
+ * major triad that resolves down a fifth from one that doesn't.
+ */
+export function guidePitchClasses(
+    chord: ChordFacts,
+    key: KeyContext,
+    next: ChordFacts | null = null,
+): number[] {
     const guides = [...chord.guides];
     if (guides.length < 2) {
-        const seventh = [11, 10, 9].find((i) => chord.scale.includes(i) && !guides.includes(i));
-        if (seventh !== undefined) {
+        const seventh = triadSeventh(chord, key, next);
+        if (seventh !== null && !guides.includes(seventh)) {
             guides.push(seventh);
         }
     }
@@ -41,13 +66,15 @@ export function guidePitchClasses(chord: ChordFacts): number[] {
 }
 
 /**
- * How far the line may wander from the lead's home, in semitones either way. A guide-tone line
- * lives in a fifth or so: a voice-led choice that would leave the window is placed in the
- * other octave instead, so the line never drifts off over a long tune.
+ * How far from the lead's home a phrase may start, in semitones either way. Inside a phrase the
+ * line takes the nearest guide tone wherever it is (in the instrument's range): voice-leading
+ * wins. At a phrase's first note, where the line breathes and is struck fresh, a line that has
+ * wandered further than this comes back towards home, as a player moves a guide-tone line up or
+ * down an octave at a phrase break and never mid-phrase.
  */
 const WINDOW = 7;
 
-/** A chord held longer than this many bars moves to its other guide tone, so it still breathes. */
+/** A chord held longer than this many bars is struck again, so a long chord still breathes. */
 const LONGEST = 2;
 
 /**
@@ -56,10 +83,17 @@ const LONGEST = 2;
  */
 const BREATH = STEP * 2;
 
+/** The 3rd starts a chorus when it is this close to home: it states the key first. */
+const THIRD_FIRST = 4;
+
+const LINES = new WeakMap<Timeline, Map<string, GuideNote[]>>();
+
 /**
- * The guide-tone line over the section visit `bar` is in: one long note per chord, voice-led
- * from the guide tone nearest `home`. A note that would sound the same pitch as the one before
- * it (a common tone) is held through instead, unless a new phrase starts there.
+ * The guide-tone line over the chorus bar `bar` is in: one long note per chord, voice-led from
+ * the first chord's 3rd (or the guide tone nearest `home`). A common tone held into the next
+ * chord is held through; a note never crosses a phrase's first barline (each phrase is struck
+ * fresh, and a phrase is the lead's planning slot), and a chord held past `LONGEST` bars is
+ * struck again on the same tone.
  */
 export function guideToneLine(
     timeline: Timeline,
@@ -67,83 +101,161 @@ export function guideToneLine(
     home: number,
     range: readonly [number, number],
 ): GuideNote[] {
+    const { first, end } = chorusBars(timeline, bar.index);
+    const memo = `${first}:${home}:${range[0]}:${range[1]}`;
+    let byChorus = LINES.get(timeline);
+    if (!byChorus) {
+        byChorus = new Map();
+        LINES.set(timeline, byChorus);
+    }
+    const cached = byChorus.get(memo);
+    if (cached) {
+        return cached;
+    }
+    const line = chorusLine(timeline, first, end, home, range);
+    byChorus.set(memo, line);
+    return line;
+}
+
+function chorusLine(
+    timeline: Timeline,
+    firstBar: number,
+    endBar: number,
+    home: number,
+    range: readonly [number, number],
+): GuideNote[] {
     const { bars } = timeline;
-    const first = bars[bar.visit.firstBar];
-    const lastBar = bars[bar.visit.firstBar + bar.visit.barCount - 1];
-    const from = first.start;
-    const to = lastBar.start + lastBar.meter.barTicks;
-    const lo = Math.max(range[0], home - WINDOW);
-    const hi = Math.min(range[1], home + WINDOW);
-    const barAt = (tick: number) => {
-        let b = bar.visit.firstBar;
-        while (b + 1 < bars.length && bars[b + 1].start <= tick) {
-            b++;
+    const from = bars[firstBar].start;
+    const last = bars[endBar - 1];
+    const to = last.start + last.meter.barTicks;
+    // Where a note must be struck fresh: each phrase's first barline, and every `LONGEST` bars
+    // into a held chord (counted in bars, whatever their meter).
+    const tops = new Set<number>();
+    for (let b = firstBar; b < endBar; b++) {
+        if (bars[b].phrase.bar === 0) {
+            tops.add(bars[b].start);
         }
-        return bars[b];
+    }
+    const barIndexAt = (tick: number) => {
+        let lo = firstBar;
+        let hi = endBar - 1;
+        while (lo < hi) {
+            const mid = (lo + hi + 1) >> 1;
+            if (bars[mid].start <= tick) {
+                lo = mid;
+            } else {
+                hi = mid - 1;
+            }
+        }
+        return lo;
     };
-    // The chord segments of the visit (a chord held over a barline is one), each then split
-    // every `LONGEST` bars.
-    const segments: { start: number; end: number; chord: ChordFacts }[] = [];
+    // The chorus's chords (a chord held over a barline is one), each cut at the phrase tops and
+    // every `LONGEST` bars after its own start.
+    const chords: { start: number; end: number; chord: ChordFacts }[] = [];
     for (const span of timeline.spans) {
-        if (span.end <= from || span.start >= to || !span.chord) {
+        if (span.start >= to) {
+            break;
+        }
+        if (span.end <= from || !span.chord) {
             continue;
         }
         const start = Math.max(span.start, from);
         const end = Math.min(span.end, to);
-        const prev = segments.at(-1);
+        const prev = chords.at(-1);
         if (prev && prev.end === start && prev.chord.symbol === span.chord.symbol) {
             prev.end = end;
-            continue;
-        }
-        segments.push({ start, end, chord: span.chord });
-    }
-    const split: (typeof segments)[number][] = [];
-    for (const segment of segments) {
-        let start = segment.start;
-        while (start < segment.end) {
-            const at = barAt(start);
-            const end = Math.min(segment.end, at.start + LONGEST * at.meter.barTicks);
-            split.push({ ...segment, start, end });
-            start = end;
+        } else {
+            chords.push({ start, end, chord: span.chord });
         }
     }
+    const pieces: {
+        start: number;
+        end: number;
+        chord: ChordFacts;
+        next: ChordFacts | null;
+        fresh: boolean;
+    }[] = [];
+    chords.forEach(({ start, end, chord }, c) => {
+        const next = chords[c + 1]?.chord ?? null;
+        const opening = barIndexAt(start);
+        let at = start;
+        while (at < end) {
+            const b = barIndexAt(at);
+            let cut = end;
+            for (let k = b + 1; k < endBar && bars[k].start < end; k++) {
+                if (tops.has(bars[k].start) || (k - opening) % LONGEST === 0) {
+                    cut = bars[k].start;
+                    break;
+                }
+            }
+            pieces.push({ start: at, end: cut, chord, next, fresh: at !== start || tops.has(at) });
+            at = cut;
+        }
+    });
+    const [lo, hi] = range;
     const notes: GuideNote[] = [];
     let prev: number | null = null;
-    for (const { start, end, chord } of split) {
-        const pcs = guidePitchClasses(chord);
-        // Nearest first; on a tie, the one that falls (a 7th resolving to the next chord's 3rd
-        // moves down).
-        const choose = (anchor: number) =>
-            pcs
-                .map((pc) => nearestMidi(pc, anchor, lo, hi))
-                .sort((a, b) => Math.abs(a - anchor) - Math.abs(b - anchor) || a - b)[0];
-        // The same chord, split because it is held long: move to its other guide tone.
-        const held = notes.at(-1)?.chord === chord;
-        const other =
-            held && prev !== null ? pcs.find((pc) => pc !== mod12(prev as number)) : undefined;
-        const midi: number =
-            prev !== null && other !== undefined
-                ? nearestMidi(other, prev, lo, hi)
-                : choose(prev ?? home);
-        const at = barAt(start);
-        const phraseTop = start === at.start && at.phrase.bar === 0;
-        const last = notes.at(-1);
-        if (last && last.midi === midi && last.tick + last.dur === start && !phraseTop) {
-            last.dur = end - last.tick;
+    for (const { start, end, chord, next, fresh } of pieces) {
+        const key = bars[barIndexAt(start)].key;
+        const pcs = guidePitchClasses(chord, key, next);
+        let midi: number;
+        if (prev === null) {
+            // The chorus opens on the chord's 3rd when it is near home: it states the key.
+            const third = nearestMidi(pcs[0], home, lo, hi);
+            midi = Math.abs(third - home) <= THIRD_FIRST ? third : nearest(pcs, home, home, lo, hi);
+        } else if (notes.at(-1)?.chord === chord) {
+            // The same chord struck again (held past `LONGEST` bars, or over a phrase top): the
+            // same tone. Its other guide tone is a 4th, 5th or tritone away — a leap, not a breath.
+            midi = prev;
         } else {
-            notes.push({ tick: start, dur: end - start, midi, chord, key: at.key });
+            const outside = Math.abs(prev - home) > WINDOW;
+            midi =
+                fresh && tops.has(start) && outside
+                    ? nearest(
+                          pcs,
+                          prev,
+                          home,
+                          Math.max(lo, home - WINDOW),
+                          Math.min(hi, home + WINDOW),
+                      )
+                    : nearest(pcs, prev, home, lo, hi);
+        }
+        const previous = notes.at(-1);
+        if (
+            previous &&
+            !fresh &&
+            previous.midi === midi &&
+            previous.tick + previous.dur === start
+        ) {
+            // A common tone into the next chord: held through.
+            previous.dur = end - previous.tick;
+        } else {
+            notes.push({ tick: start, dur: end - start, midi, chord, key });
         }
         prev = midi;
     }
-    // Breathe at each phrase's end: the note sounding up to the next phrase's first bar (or the
-    // visit's end) releases an eighth early, when it is long enough to spare it.
+    // Breathe at each phrase's end: the note sounding up to the next phrase's first barline (or
+    // the chorus's end) releases an eighth early, when it is long enough to spare it.
     for (const note of notes) {
-        const end = note.tick + note.dur;
-        const next = end < to ? barAt(end) : null;
-        const ends = end === to || (next !== null && next.start === end && next.phrase.bar === 0);
-        if (ends && note.dur >= STEP * 8) {
+        const stop = note.tick + note.dur;
+        if ((stop === to || tops.has(stop)) && note.dur >= STEP * 8) {
             note.dur -= BREATH;
         }
     }
     return notes;
+}
+
+/**
+ * The guide tone nearest `anchor`, placed in [lo, hi]. On a tie, the one nearer `home`, so a
+ * line falling chord by chord (a ii-V chain's half steps) leans back up instead of sinking.
+ */
+function nearest(pcs: number[], anchor: number, home: number, lo: number, hi: number): number {
+    return pcs
+        .map((pc) => nearestMidi(pc, anchor, lo, hi))
+        .sort(
+            (a, b) =>
+                Math.abs(a - anchor) - Math.abs(b - anchor) ||
+                Math.abs(a - home) - Math.abs(b - home) ||
+                a - b,
+        )[0];
 }
