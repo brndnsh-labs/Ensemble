@@ -1,4 +1,12 @@
 export { KEY_ORDER, MAJOR_KEY_NAMES, MINOR_KEY_NAMES } from './data/note-names.js';
+
+/**
+ * The tempos Ensemble plays, in BPM: what a chart may carry and what the stand's tempo field
+ * accepts. The top went from 240 to 320 (#1996, DECISION 2026-11-04): bebop heads and
+ * up-tempo practice live above 240.
+ */
+export const MIN_BPM = 40;
+export const MAX_BPM = 320;
 export const ENHARMONIC_MAP = {
     // Standard sharp→flat equivalents (the 5 chromatic sharps)
     'C#': 'Db',

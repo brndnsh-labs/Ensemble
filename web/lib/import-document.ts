@@ -1,3 +1,4 @@
+import { MAX_BPM, MIN_BPM } from '@core/config';
 import { writtenSettings } from '@core/songbook/codec';
 import { songSourceLink } from '@core/songbook/ireal-decode';
 import type { IRealImportResult } from '@core/songbook/ireal-import';
@@ -34,8 +35,8 @@ export function importedDocument(
     ) {
         throw new Error('Resolve the import warnings marked as errors before adding this chart.');
     }
-    if (!Number.isInteger(bpm) || bpm < 40 || bpm > 240) {
-        throw new Error('Choose a tempo from 40 to 240 BPM.');
+    if (!Number.isInteger(bpm) || bpm < MIN_BPM || bpm > MAX_BPM) {
+        throw new Error(`Choose a tempo from ${MIN_BPM} to ${MAX_BPM} BPM.`);
     }
     checkPlayable(song.score);
     const now = new Date().toISOString();

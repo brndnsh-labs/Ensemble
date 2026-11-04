@@ -80,7 +80,7 @@ test('clicking Save keeps the focus on Save', async ({ page }) => {
     await expect(save(page)).toBeFocused();
 });
 
-test('the tempo field steps on arrows, Shift by ten, inside 40–240', async ({ page }, testInfo) => {
+test('the tempo field steps on arrows, Shift by ten, inside 40–320', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'laptop', 'a hardware keyboard');
     await newSong(page);
     const tempo = page.getByLabel('Tempo');
@@ -96,9 +96,9 @@ test('the tempo field steps on arrows, Shift by ten, inside 40–240', async ({ 
     await tempo.press('Shift+ArrowDown');
     await tempo.press('Shift+ArrowDown');
     await expect(tempo).toHaveValue('89');
-    await tempo.fill('235');
+    await tempo.fill('315');
     await tempo.press('Shift+ArrowUp');
-    await expect(tempo).toHaveValue('240');
+    await expect(tempo).toHaveValue('320');
     await tempo.fill('45');
     await tempo.press('Shift+ArrowDown');
     await expect(tempo).toHaveValue('40');

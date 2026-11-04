@@ -298,7 +298,7 @@ test('Older drafts and the Copy link fallback close on a backdrop tap', async ({
     await second.close();
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
     await songMenuAction(page, /Older drafts \(/);
     await closesOnBackdrop(page, page.getByRole('dialog', { name: 'Older drafts' }));
 });

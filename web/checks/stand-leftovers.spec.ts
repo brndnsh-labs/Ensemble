@@ -127,14 +127,14 @@ test('the tempo field clamps what was typed before it steps, and is a spinbutton
     await songLink(page, 'Blue pocket').first().click();
     const tempo = page.getByRole('spinbutton', { name: 'Tempo' });
     await expect(tempo).toHaveAttribute('aria-valuemin', '40');
-    await expect(tempo).toHaveAttribute('aria-valuemax', '240');
+    await expect(tempo).toHaveAttribute('aria-valuemax', '320');
     await tempo.fill('1');
     await tempo.press('ArrowUp');
     await expect(tempo).toHaveValue('41');
     await expect(tempo).toHaveAttribute('aria-valuenow', '41');
     await tempo.fill('999');
     await tempo.press('ArrowDown');
-    await expect(tempo).toHaveValue('239');
+    await expect(tempo).toHaveValue('319');
 });
 
 test('Forward onto a shared link lands the changes it was left with (#1979)', async ({ page }) => {
