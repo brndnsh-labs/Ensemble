@@ -173,17 +173,19 @@ describe('the style table (#2004)', () => {
         expect(writtenIRealTempo('0')).toBeNull();
         expect(writtenIRealTempo('')).toBeNull();
         expect(writtenIRealTempo('120')).toBe(120);
-        expect(writtenIRealTempo('300')).toBeNull();
+        expect(writtenIRealTempo('300')).toBe(300);
+        expect(writtenIRealTempo('400')).toBeNull();
         expect(writtenIRealTempo('12x')).toBeNull();
-        for (const edge of ['40', '240']) {
+        for (const edge of ['40', '320']) {
             expect(writtenIRealTempo(edge)).toBe(Number(edge));
             expect(unplayableIRealTempo(edge)).toBeNull();
         }
-        for (const edge of ['39', '241']) {
+        for (const edge of ['39', '321']) {
             expect(writtenIRealTempo(edge)).toBeNull();
             expect(unplayableIRealTempo(edge)).toBe(Number(edge));
         }
-        expect(unplayableIRealTempo('300')).toBe(300);
+        expect(unplayableIRealTempo('300')).toBeNull();
+        expect(unplayableIRealTempo('400')).toBe(400);
         expect(unplayableIRealTempo('0')).toBeNull();
         expect(unplayableIRealTempo('120')).toBeNull();
     });
@@ -207,15 +209,16 @@ describe('the style table (#2004)', () => {
         expect(song.genre).toBe('Jazz');
     });
 
-    it('takes the export’s own tempo over the style’s, and ignores one outside 40-240', () => {
+    it('takes the export’s own tempo over the style’s, and ignores one outside 40-320', () => {
         const { text } = fixtureText('giant-steps');
         expect(text.endsWith('==0=0')).toBe(true);
         const withTempo = (bpm: string) =>
             parseIRealImport(`${text.slice(0, -'==0=0'.length)}==${bpm}=0`).songs[0];
         expect(withTempo('112').tempo).toEqual({ bpm: 112, from: 'export' });
-        expect(withTempo('300').tempo).toEqual({ bpm: 200, from: 'style' });
-        expect(withTempo('300').diagnostics.map((d) => d.message)).toContain(
-            "The export's tempo of 300 BPM is outside the 40-240 Ensemble plays, so it is ignored and 200 BPM, iReal's starting tempo for the style, is used.",
+        expect(withTempo('300').tempo).toEqual({ bpm: 300, from: 'export' });
+        expect(withTempo('400').tempo).toEqual({ bpm: 200, from: 'style' });
+        expect(withTempo('400').diagnostics.map((d) => d.message)).toContain(
+            "The export's tempo of 400 BPM is outside the 40-320 Ensemble plays, so it is ignored and 200 BPM, iReal's starting tempo for the style, is used.",
         );
         expect(withTempo('0').diagnostics.some((d) => d.message.includes('tempo of'))).toBe(false);
     });

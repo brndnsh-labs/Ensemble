@@ -13,6 +13,8 @@
  * how a genre swings.
  */
 
+import { MAX_BPM, MIN_BPM } from '../config.js';
+
 interface IRealStyle {
     genre: string;
     /** Where iReal starts this style when a chart carries no tempo of its own. */
@@ -73,20 +75,21 @@ export function defaultTempoForIRealStyle(style: string | undefined): number | n
 
 /**
  * The tempo an export writes, when it is one Ensemble plays. iReal writes 0 for "not set"
- * (verified: the supplied charts all carry 0), and anything outside the 40-240 BPM the app
- * accepts is left unapplied rather than clamped.
+ * (verified: the supplied charts all carry 0), and anything outside the `MIN_BPM`-`MAX_BPM` range
+ * the app accepts is left unapplied rather than clamped.
  */
 export function writtenIRealTempo(raw: string): number | null {
     if (!/^\d{1,4}$/.test(raw.trim())) {
         return null;
     }
     const bpm = Number(raw);
-    return bpm >= 40 && bpm <= 240 ? bpm : null;
+    return bpm >= MIN_BPM && bpm <= MAX_BPM ? bpm : null;
 }
 
 /**
- * A tempo the export writes that Ensemble cannot play: a number outside 40-240. Absent or 0 means
- * "not set", which is no one's complaint, and so does anything that is not a number.
+ * A tempo the export writes that Ensemble cannot play: a number outside `MIN_BPM`-`MAX_BPM`.
+ * Absent or 0 means "not set", which is no one's complaint, and so does anything that is not a
+ * number.
  */
 export function unplayableIRealTempo(raw: string): number | null {
     if (!/^\d{1,4}$/.test(raw.trim())) {

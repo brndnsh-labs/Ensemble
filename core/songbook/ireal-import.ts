@@ -1,3 +1,4 @@
+import { MAX_BPM, MIN_BPM } from '../config.js';
 import { decodeIRealInput, decodeIRealMusic } from './ireal-decode.js';
 import { scoreFromIRealBody } from './ireal-score.js';
 import {
@@ -123,7 +124,7 @@ function importSong(fields: string[], modern: boolean, index: number): IRealImpo
         if (dropped !== null) {
             song.diagnostics.push({
                 severity: 'warning',
-                message: `The export's tempo of ${dropped} BPM is outside the 40-240 Ensemble plays, so it is ignored${
+                message: `The export's tempo of ${dropped} BPM is outside the ${MIN_BPM}-${MAX_BPM} Ensemble plays, so it is ignored${
                     song.tempo
                         ? ` and ${song.tempo.bpm} BPM, iReal's starting tempo for the style, is used`
                         : ' and your current tempo is kept'
