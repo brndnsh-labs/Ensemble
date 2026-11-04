@@ -5,6 +5,7 @@ import { genreOf } from './documents';
 import {
     buildStandardDocument,
     firstBarsPreview,
+    playsGuideToneHead,
     STANDARD_SHELF_LABELS,
     STANDARDS,
 } from './standards';
@@ -131,5 +132,14 @@ describe('the standards catalog (#1439)', () => {
             expect(total, entry.title).toBe(expected.bars);
             expect(entry.meter ?? '4/4', entry.title).toBe(expected.meter ?? '4/4');
         }
+    });
+});
+
+describe('which standards play their head as a guide-tone line (#2027)', () => {
+    it('the jazz shelf, and nothing else', () => {
+        for (const entry of STANDARDS) {
+            expect(playsGuideToneHead(entry.id), entry.title).toBe(entry.shelf === 'jazz');
+        }
+        expect(playsGuideToneHead('a-saved-song')).toBe(false);
     });
 });

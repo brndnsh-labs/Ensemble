@@ -42,7 +42,7 @@ export function perform(
     intensity: number | null = null,
     comp: CompInstrument = 'piano',
     bass = true,
-    lead?: 'head' | 'solo',
+    lead?: 'head' | 'solo' | 'guide-tones',
     trade?: TradeSettings,
     colour = false,
 ): Take[] {
@@ -52,8 +52,13 @@ export function perform(
     // The lead's form spans a cycle: the head is pass 0, the solo choruses passes 1–3. Trading,
     // every pass after the head is traded: two of them are judged.
     const passes = trade ? 3 : lead ? CYCLE : 2;
+    // A guide-tone head (#2027) is a head: judged on the first pass, like the invented one.
     const judged = (pass: number) =>
-        trade || lead === 'solo' ? pass > 0 : lead === 'head' ? pass === 0 : true;
+        trade || lead === 'solo'
+            ? pass > 0
+            : lead === 'head' || lead === 'guide-tones'
+              ? pass === 0
+              : true;
     for (const chart of colour ? ['colour'] : CHARTS) {
         const timeline = compileTimeline(colour ? COLOUR_CHART : FIXTURES[chart]);
         for (const seed of SEEDS) {
@@ -68,6 +73,7 @@ export function perform(
                     intensity,
                     lead: instrument,
                     trade: trade ?? null,
+                    head: lead === 'guide-tones' ? ('guide-tones' as const) : null,
                 };
                 settings.lanes = lanes;
                 const result = performPass(timeline, settings, { pass, looping: true, memory });
@@ -2196,8 +2202,11 @@ export interface TakeSpec {
     comp?: CompInstrument;
     intensity?: number;
     bass?: boolean;
-    /** Judge the lead: its head (the first pass) or its solo choruses (passes 1–3). */
-    lead?: 'head' | 'solo';
+    /**
+     * Judge the lead: its head (the first pass), its solo choruses (passes 1–3), or a known
+     * standard's head, played as its guide-tone line (`BandSettings.head`, #2027).
+     */
+    lead?: 'head' | 'solo' | 'guide-tones';
     /** The player trades: the two passes after the head are judged. */
     trade?: TradeSettings;
     /** Judge the written-colour chart (add9, maj9, b9…) instead of the shared charts. */

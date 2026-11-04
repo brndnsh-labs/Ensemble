@@ -14,6 +14,7 @@ import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { barSteps, dyn, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
+import { guideToneLine } from './guide-tones.js';
 import {
     type Contour,
     type LinePalette,
@@ -704,6 +705,56 @@ function lineRng(ctx: BarContext, role: LeadRole, slotStart: number): Rng {
         : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:line`, 'song');
 }
 
+/**
+ * A known standard's head phrase (`BarContext.guideToneHead`): the slot's share of its section
+ * visit's guide-tone line (`guideToneLine`), every note a chord change's target. Planned like any
+ * head — keyed on the section, so it is the same line every time the head comes round.
+ */
+function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
+    const { bars } = ctx.timeline;
+    const first = bars[slotStart];
+    const length = first.phrase.length;
+    const lastBar = bars[Math.min(bars.length, slotStart + length) - 1];
+    const from = first.start;
+    const to = lastBar.start + lastBar.meter.barTicks;
+    const home = homeOf(ctx, book);
+    const line = guideToneLine(ctx.timeline, first, home, ctx.lead.range).filter(
+        (n) => n.tick >= from && n.tick < to,
+    );
+    const onsets: SlotOnset[] = line.map((n) => {
+        const bar = barOf(ctx, n.tick);
+        return {
+            tick: n.tick,
+            // Held to its chord's end, but never past the phrase: the next one is struck fresh.
+            dur: Math.min(n.dur, to - n.tick),
+            step: Math.round((n.tick - bars[bar].start) / STEP),
+            chord: n.chord,
+            key: n.key,
+            change: true,
+            span: spanIndexAt(ctx.timeline, n.tick),
+            bar: bar - slotStart,
+        };
+    });
+    const kinds: BarKind[] = Array.from({ length }, () => 'line');
+    const plan: SlotPlan = {
+        kinds,
+        cells: kinds.map(() => null),
+        contour: 'arch',
+        centre: home,
+        span: 7,
+        // A touch under the invented head's 84: long notes under the band, not over it.
+        velocity: 78,
+        from: null,
+        riffs: kinds.map(() => false),
+        develops: null,
+        developsBar: 0,
+        restates: null,
+        loops: null,
+        peak: false,
+    };
+    return { onsets, pitches: line.map((n) => n.midi), plan };
+}
+
 /** A head phrase, voiced — the restatement of an opening needs the opening's own notes. */
 function voiceHead(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
     const plan = headPlan(ctx, book, slotStart);
@@ -910,7 +961,9 @@ function planSlot(
     }
     let voiced: Voiced;
     if (role.kind === 'head') {
-        voiced = voiceHead(ctx, book, slotStart);
+        voiced = ctx.guideToneHead
+            ? voiceGuideTones(ctx, book, slotStart)
+            : voiceHead(ctx, book, slotStart);
     } else {
         const plan = soloPlan(ctx, book, slotStart, role, memory);
         voiced = voiceSolo(ctx, book, slotStart, plan, role);

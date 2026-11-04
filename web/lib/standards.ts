@@ -813,6 +813,17 @@ export function standardFor(id: string): StandardEntry | null {
     return STANDARDS.find((entry) => entry.id === id) ?? null;
 }
 
+/**
+ * Whether the chart with this id is a known standard, whose head the band's lead plays as its
+ * guide-tone line rather than an invented melody that would pass for the tune (#2027, DECISION
+ * 2026-11-04). The jazz shelf only: its tunes have melodies a player knows. The blues forms and
+ * grooves are changes, not tunes, so the lead's own head suits them. A saved copy has its own
+ * id: it is the musician's song from then on.
+ */
+export function playsGuideToneHead(id: string): boolean {
+    return standardFor(id)?.shelf === 'jazz';
+}
+
 /** Every bar of a section's chord text, joined for a browse-row preview. Never builds a document. */
 export function firstBarsPreview(entry: StandardEntry, bars = 4): string {
     return entry.sections[0].bars.slice(0, bars).join(' | ');

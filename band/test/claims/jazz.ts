@@ -81,6 +81,25 @@ export const jazz = defineClaims({
             ],
         },
         {
+            // A known standard's head (#2027): the changes' guide-tone line, not a tune.
+            take: { lead: 'guide-tones' },
+            claims: [
+                // Measured 0.950 (the misses are triads, whose 7th the key supplies). The
+                // invented head on these charts: 3.30 notes a bar, mean move 3.02, leaps 0.048.
+                ['leadChangeGuideTones', 0.9, 1, 'each change lands on its 3rd or 7th'],
+                ['leadNotesPerBar', 0.6, 1.5, 'one long note a chord, not a tune (0.98)'],
+                [
+                    'leadMeanInterval',
+                    0,
+                    2.3,
+                    "voice-led: each guide tone steps to the next chord's, or holds (1.72)",
+                ],
+                ['leadStepShare', 0.65, 1, 'mostly half and whole steps (0.75)'],
+                ['leadLeapShare', 0, 0.01, 'no leaps: it stays in its fifth (0)'],
+                ['leadLongBreath', 0, 0.02, 'the line never drops out for two bars'],
+            ],
+        },
+        {
             take: { trade: { with: 'drums', bars: 4, choruses: null } },
             claims: [
                 ['tradeYourTurn', 1, 1, 'your four are yours: no sax, and the band keeps time'],

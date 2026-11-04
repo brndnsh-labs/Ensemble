@@ -170,7 +170,10 @@ expression devices take turns rather than stack; one peak note per cycle.
 - **Form first.** The lead works out the song's form before any note.
   - The first time through, it plays the **head**: a tune it writes from the changes, keyed on
     the written section, so an AABA chart gets an AABA tune and the head sounds the same every
-    time it comes back.
+    time it comes back. On a known standard (the stand's jazz shelf, `BandSettings.head`, #2027)
+    it does not pretend to know the tune: the head is the changes' guide-tone line instead —
+    one long 3rd or 7th a chord, each stepping to the nearest of the next chord's, a common
+    tone held (`players/lead/guide-tones.ts`). Solos and trades are the same either way.
   - Looping, it solos over the next three choruses and brings the head back on the fourth:
     head, solo, solo, solo, head… The three solo choruses are one arc: the first starts low and
     sparse, the second develops, the third reaches the cycle's one peak note, then winds down so
