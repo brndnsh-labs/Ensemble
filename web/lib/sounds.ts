@@ -278,11 +278,49 @@ async function fetchAssets(
     }
 }
 
-export async function prepareSound(
-    id: string,
-    progress: SoundProgress,
-    concurrency = 1,
-): Promise<void> {
+/** One pack's download in flight: who is watching it, and the last thing it said. */
+interface Flight {
+    promise: Promise<void>;
+    watchers: Set<SoundProgress>;
+    last?: Parameters<SoundProgress>;
+}
+
+const flights = new Map<string, Flight>();
+
+/**
+ * Download, verify and decode one pack. One run per pack id at a time (#2060): a second caller
+ * (a style change's `prepareFeelSounds` while the background fetch is on the same pack) joins the
+ * run in flight instead of fetching and verifying every file again, and keeps its own `progress`,
+ * told where the run already is as it joins. A failure reaches every caller, and the next call
+ * starts afresh. A joiner's `concurrency` is moot: the run began at its first caller's.
+ */
+export function prepareSound(id: string, progress: SoundProgress, concurrency = 1): Promise<void> {
+    const running = flights.get(id);
+    if (running) {
+        running.watchers.add(progress);
+        if (running.last) {
+            progress(...running.last);
+        }
+        return running.promise;
+    }
+    const flight: Flight = { promise: Promise.resolve(), watchers: new Set([progress]) };
+    flights.set(id, flight);
+    flight.promise = prepareOnce(
+        id,
+        (...report) => {
+            flight.last = report;
+            for (const watcher of flight.watchers) {
+                watcher(...report);
+            }
+        },
+        concurrency,
+    ).finally(() => {
+        flights.delete(id);
+    });
+    return flight.promise;
+}
+
+async function prepareOnce(id: string, progress: SoundProgress, concurrency: number) {
     const pack = SOUND_PACKS.find((p) => p.id === id);
     if (!pack) {
         throw new Error('Unknown sound pack.');
