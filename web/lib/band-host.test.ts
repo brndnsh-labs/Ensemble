@@ -1121,3 +1121,123 @@ describe('BandHost.tradeKey', () => {
         expect(host.tradeKey()).toBe(before);
     });
 });
+
+/**
+ * `beforeBarline` (#2060): a sound that arrives is first heard on a barline. The hook runs inside
+ * the pump, before the first note at or after the barline is sent, so a late page timer cannot
+ * let the downbeat go out on the old sound.
+ */
+describe('BandHost.beforeBarline', () => {
+    const BAR_S = 2;
+    const barline = 10.1 + BAR_S;
+    const onOrAfter = (calls: { time: number }[]) =>
+        calls.filter((call) => call.time >= barline - 0.06);
+
+    it('runs before the first note of the barline is sent, however late the timer is', () => {
+        // The timer fires 25 ms apart until 200 ms before the barline, then stalls for 210 ms:
+        // the pump that follows finds the barline's pushed downbeat already due.
+        const { host, tick, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.5);
+        let sentWhenRun = -1;
+        let runs = 0;
+        host.beforeBarline(() => {
+            runs++;
+            sentWhenRun = onOrAfter(voiceCalls()).length;
+        });
+        pumpTo(barline - 0.5, barline - 0.2);
+        expect(runs).toBe(0);
+        tick(barline + 0.01);
+        expect(runs).toBe(1);
+        expect(sentWhenRun).toBe(0);
+        // The downbeat itself still went out, after the hook.
+        expect(onOrAfter(voiceCalls()).length).toBeGreaterThan(0);
+        // And once only.
+        pumpTo(barline + 0.03, barline + 1);
+        expect(runs).toBe(1);
+        host.stop();
+    });
+
+    it('a hook that changes the band settings sends no note twice, mid-pass or at a seam', () => {
+        // The arrived sound's dispatch reaches `update()` from inside the pump, with the
+        // barline's first note due but not yet sent. Both a barline inside a pass and the seam
+        // between two passes (the next segment queued ahead), on an on-time and a stalled timer.
+        const changed = { ...wholeBand, intensity: 0.9 };
+        const lapEnd = 10.1 + 4 * BAR_S;
+        for (const line of [barline, lapEnd]) {
+            for (const stall of [0, 0.21]) {
+                const { host, tick, pumpTo } = rig(aThenB);
+                pumpTo(10.1, line - 0.5);
+                let runs = 0;
+                host.beforeBarline(() => {
+                    runs++;
+                    host.update(changed);
+                });
+                pumpTo(line - 0.5, line - 0.2);
+                tick(line - 0.2 + stall + 0.01);
+                pumpTo(line + 0.03, line + 2 * BAR_S);
+                expect(runs).toBe(1);
+                expect(doubled(voiceCalls())).toEqual([]);
+                host.stop();
+            }
+        }
+    });
+
+    it('a hook that throws does not stop the pump or the hooks after it', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { host, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.5);
+        let second = 0;
+        host.beforeBarline(() => {
+            throw new Error('boom');
+        });
+        host.beforeBarline(() => second++);
+        pumpTo(barline - 0.5, barline + 1);
+        expect(second).toBe(1);
+        expect(onOrAfter(voiceCalls()).length).toBeGreaterThan(0);
+        error.mockRestore();
+        host.stop();
+    });
+
+    it('runs just ahead of the barline on an on-time timer, not a bar early', () => {
+        const { host, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.5);
+        const at: number[] = [];
+        host.beforeBarline(() => at.push(voiceCalls().at(-1)?.time ?? 0));
+        pumpTo(barline - 0.5, barline + 0.5);
+        expect(at).toHaveLength(1);
+        // Every note sent by then is before the barline's pushed downbeat.
+        expect(at[0]).toBeLessThan(barline - 0.06);
+        host.stop();
+    });
+
+    it('takes the barline after one a note was already pushed ahead of', () => {
+        // A pump 150 ms before the barline has sent its pushed downbeat: the hook waits for the
+        // next barline, as `update()` does, so the sound never changes under a bar half sent.
+        const { host, tick, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.15);
+        tick(barline - 0.15);
+        expect(onOrAfter(voiceCalls()).length).toBeGreaterThan(0);
+        let runs = 0;
+        host.beforeBarline(() => runs++);
+        pumpTo(barline - 0.125, barline + 0.5);
+        expect(runs).toBe(0);
+        pumpTo(barline + 0.5, barline + BAR_S + 0.5);
+        expect(runs).toBe(1);
+        host.stop();
+    });
+
+    it('runs at once while stopped, and when a Stop comes before the barline', async () => {
+        const audio = fakeAudioContext(10);
+        const idle = new BandHost({ state: () => fakeState(audio), silence: () => {} });
+        let ran = 0;
+        idle.beforeBarline(() => ran++);
+        expect(ran).toBe(1);
+
+        const { host, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.5);
+        host.beforeBarline(() => ran++);
+        host.stop();
+        await Promise.resolve();
+        expect(ran).toBe(2);
+    });
+});

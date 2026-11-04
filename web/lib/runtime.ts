@@ -1,6 +1,5 @@
 import {
     type BandSettings,
-    barAtTick,
     compileTimeline,
     DEFAULT_SETTINGS,
     type Lane,
@@ -704,52 +703,7 @@ function syncBand(): void {
 // ---------------------------------------------------------------- the style's own sounds
 /** The band has played on this page: a style change from now on fetches its sounds too. */
 let everPlayed = false;
-/**
- * How far ahead of the audio clock the band host sends notes to the voices (`band-host.ts`'s
- * `LOOKAHEAD_S`). A lane's sound is read when its note is sent, so a sound changed this long
- * before a barline is first heard on that barline.
- */
-const SEND_AHEAD_S = 0.15;
 const soundsResolved = new Set<() => void>();
-
-/**
- * Resolve once the band is about to send the next barline's notes, so a sound changed then is
- * first heard on the barline (#1997); at once while stopped. Read off the host's song tick and
- * the timeline it plays, at the transport's tempo — the same clock `inLastBeat` reads.
- */
-function beforeNextBarline(): Promise<void> {
-    const deadline = Date.now() + STAGED_FEEL_TIMEOUT_MS;
-    return new Promise((resolve) => {
-        const check = () => {
-            const timeline = songPlan?.timeline ?? currentTimeline?.timeline;
-            if (!band?.playing || !timeline || Date.now() > deadline) {
-                resolve();
-                return;
-            }
-            const tick = band.songTick();
-            if (tick === null) {
-                // Counting in, or between two queued segments: look again shortly.
-                setTimeout(check, 100);
-                return;
-            }
-            const bar = barAtTick(timeline, tick);
-            if (!bar) {
-                resolve();
-                return;
-            }
-            const ticksPerSecond = (PPQ * getState().playback.bpm) / 60;
-            const seconds = (bar.start + bar.meter.barTicks - tick) / ticksPerSecond;
-            const wait = seconds - SEND_AHEAD_S;
-            if (wait < 0.02) {
-                // Too close to make this one: past it, then aim for the next.
-                setTimeout(check, (seconds + 0.05) * 1000);
-            } else {
-                setTimeout(resolve, wait * 1000);
-            }
-        };
-        check();
-    });
-}
 
 /**
  * Packs the playing style wants on a lane that follows it (`autoSound`) and that is on, and that
@@ -779,15 +733,34 @@ function stylePacksWanted(): string[] {
  * shell, which shows the document as resolved on this device (`withLoadedSounds`), so a sound
  * that arrived is not an unsaved change.
  */
-async function switchToArrivedSounds(): Promise<void> {
-    await beforeNextBarline();
-    resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
-    if (!band?.playing) {
-        rebuild();
-    }
-    for (const listener of soundsResolved) {
-        listener();
-    }
+function switchToArrivedSounds(): Promise<void> {
+    return new Promise((resolve) => {
+        let done = false;
+        const apply = () => {
+            if (done) {
+                return;
+            }
+            done = true;
+            clearTimeout(failsafe);
+            resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
+            if (!band?.playing) {
+                rebuild();
+            }
+            for (const listener of soundsResolved) {
+                listener();
+            }
+            resolve();
+        };
+        // The band host runs this inside its pump, just before it sends the first note of the
+        // next barline, so the new sound is heard on that barline whatever the page timer does
+        // (#2060). The bound is only for a clock that never reaches one (a suspended context).
+        const failsafe = setTimeout(apply, STAGED_FEEL_TIMEOUT_MS);
+        if (band?.playing) {
+            band.beforeBarline(apply);
+        } else {
+            apply();
+        }
+    });
 }
 
 const styleSounds = createStyleSounds({

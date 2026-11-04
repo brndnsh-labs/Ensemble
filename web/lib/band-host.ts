@@ -327,6 +327,15 @@ function chordSizes(events: BandEvent[]): Map<number, number> {
     return sizes;
 }
 
+/** A hook runs inside the pump: one that throws must not stop the pump or the hooks after it. */
+function runHook(run: () => void): void {
+    try {
+        run();
+    } catch (error) {
+        console.error('A barline hook failed', error);
+    }
+}
+
 export class BandHost {
     private readonly options: HostOptions;
     private timeline: Timeline | null = null;
@@ -346,6 +355,8 @@ export class BandHost {
     private heard: Timeline | null = null;
     /** The barline where the last settings change is first heard, while it is still to come. */
     private change: { segment: Segment; tick: number } | null = null;
+    /** `beforeBarline` callbacks still waiting for their barline. */
+    private hooks: { segment: Segment; tick: number; run: () => void }[] = [];
     /** The one-bar count-in scheduled by `start()`, while it is still sounding. */
     private countIn: {
         start: number;
@@ -600,6 +611,75 @@ export class BandHost {
         return audio.currentTime >= this.timeOf(change.segment, change.tick);
     }
 
+    /**
+     * Run `run` once, synchronously inside the pump, just before the voices are sent the first
+     * note at or after the next barline the band can still change at (`update()`'s own: after
+     * the lookahead and after every note already sent). A voice reads its sound when a note is
+     * sent, so whatever `run` changes (the arrived sounds, #2060) is first heard on that
+     * barline whatever the page timer does: no timer is aimed at the barline, so none can be
+     * late. Stopped, `run` runs at once; a Stop or restart before the barline runs it too (on
+     * the next microtask, once the host has settled), so a caller waiting on it never hangs.
+     */
+    beforeBarline(run: () => void): void {
+        const audio = this.audio;
+        if (!this.playing || !audio || this.segments.length === 0) {
+            run();
+            return;
+        }
+        const now = audio.currentTime;
+        const horizon = now + LOOKAHEAD_S;
+        const atHorizon = this.current(horizon);
+        const sent = this.underWay(now)!;
+        const segment =
+            atHorizon && this.segments.indexOf(sent) <= this.segments.indexOf(atHorizon)
+                ? atHorizon
+                : sent;
+        const bar = this.changeBar(segment, horizon);
+        // No barline left in this segment: the next segment's first note is the one.
+        const tick = bar < segment.until ? segment.timeline.bars[bar].start : segment.to;
+        this.hooks.push({ segment, tick, run });
+    }
+
+    /** Run every hook whose barline `event` (about to be sent from `segment`) is at or past. */
+    private releaseHooks(segment: Segment, tick: number): boolean {
+        if (this.hooks.length === 0) {
+            return false;
+        }
+        const at = this.segments.indexOf(segment);
+        return this.releaseWhere((hook) =>
+            hook.segment === segment ? tick >= hook.tick : this.segments.indexOf(hook.segment) < at,
+        );
+    }
+
+    /**
+     * After a pump: a hook whose barline is within the horizon and has no unsent note before it
+     * (a barline with no note at it, or its notes all later than the horizon) runs now, as does
+     * one whose segment is gone (a settings change rebuilt the queue under it).
+     */
+    private releaseDueHooks(horizon: number): void {
+        this.releaseWhere((hook) => {
+            if (!this.segments.includes(hook.segment)) {
+                return true;
+            }
+            const next = hook.segment.events[hook.segment.cursor];
+            return (
+                this.timeOf(hook.segment, hook.tick) <= horizon && (!next || next.tick >= hook.tick)
+            );
+        });
+    }
+
+    private releaseWhere(due: (hook: { segment: Segment; tick: number }) => boolean): boolean {
+        if (!this.hooks.some(due)) {
+            return false;
+        }
+        const ready = this.hooks.filter(due);
+        this.hooks = this.hooks.filter((hook) => !ready.includes(hook));
+        for (const hook of ready) {
+            runHook(hook.run);
+        }
+        return true;
+    }
+
     /** The song tick sounding now, or null while stopped. */
     songTick(): number | null {
         const audio = this.audio;
@@ -816,6 +896,17 @@ export class BandHost {
             this.timer = null;
         }
         this.segments = [];
+        // Whoever waits on a barline is told the wait is over, once this has settled: the host
+        // may be about to start again (a restart), and a hook must not run inside a half-halted one.
+        const waiting = this.hooks;
+        this.hooks = [];
+        if (waiting.length) {
+            queueMicrotask(() => {
+                for (const hook of waiting) {
+                    runHook(hook.run);
+                }
+            });
+        }
     }
 
     private barAt(tick: number, after = false, timeline = this.timeline!): number {
@@ -1048,12 +1139,27 @@ export class BandHost {
             this.segments.shift();
         }
         const state = this.options.state();
-        for (const segment of this.segments) {
+        const queue = this.segments;
+        segments: for (const segment of queue) {
             while (segment.cursor < segment.events.length) {
                 const event = segment.events[segment.cursor];
                 const time = this.timeOf(segment, event.tick) + event.offsetMs / 1000;
                 if (time > horizon) {
                     break;
+                }
+                // A hook runs before the first note at its barline is sent, even one that is
+                // skipped as missed below: what it changes is for the notes after it.
+                if (this.releaseHooks(segment, event.tick)) {
+                    // What the hook changed may have rebuilt the queue (a dispatch reaches
+                    // `update()`): this event is not yet sent, so look again at what is next
+                    // in this segment, or leave it if the segment was dropped.
+                    if (this.segments !== queue) {
+                        return; // stopped or restarted from inside the hook
+                    }
+                    if (!queue.includes(segment)) {
+                        continue segments; // dropped: no notes, and no clicks, from it
+                    }
+                    continue;
                 }
                 segment.cursor++;
                 if (time < now - 0.02) {
@@ -1063,6 +1169,7 @@ export class BandHost {
             }
             this.metronome(state, segment, now, horizon);
         }
+        this.releaseDueHooks(horizon);
     }
 
     private sound(state: EnsembleState, segment: Segment, event: BandEvent, time: number): void {
