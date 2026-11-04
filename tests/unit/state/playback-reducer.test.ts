@@ -10,8 +10,11 @@ describe('Playback Reducer', () => {
     });
 
     it('should set BPM with clamping', () => {
+        // Up to 320 (#1996): 300 plays as written, 400 is held at the top.
         playbackReducer({ type: ACTIONS.SET_BPM, payload: 300 });
-        expect(playback.bpm).toBe(240);
+        expect(playback.bpm).toBe(300);
+        playbackReducer({ type: ACTIONS.SET_BPM, payload: 400 });
+        expect(playback.bpm).toBe(320);
         playbackReducer({ type: ACTIONS.SET_BPM, payload: 20 });
         expect(playback.bpm).toBe(40);
     });
@@ -25,7 +28,7 @@ describe('Playback Reducer', () => {
 
     it('clamps an infinite tempo and leaves a NaN one as NaN (no guard, as before)', () => {
         playbackReducer({ type: ACTIONS.SET_BPM, payload: Number.POSITIVE_INFINITY });
-        expect(playback.bpm).toBe(240);
+        expect(playback.bpm).toBe(320);
         playbackReducer({ type: ACTIONS.SET_BPM, payload: Number.NEGATIVE_INFINITY });
         expect(playback.bpm).toBe(40);
         // The only dispatcher rounds and clamps first, so NaN never arrives; the reducer's

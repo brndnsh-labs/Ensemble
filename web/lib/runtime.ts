@@ -11,6 +11,7 @@ import {
     type Timeline,
     toMidi,
 } from '@band/index';
+import { MAX_BPM, MIN_BPM } from '@core/config';
 import { flushBuffer, flushBuffers, togglePower } from '@core/controllers/instrument-controller';
 import { autoVoiceForGenre } from '@core/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@core/data/smart-genres';
@@ -1782,7 +1783,7 @@ export async function setGenre(name: string, progress: SoundProgress = () => {})
 }
 
 export function setTempo(bpm: number): void {
-    dispatch(ACTIONS.SET_BPM, Math.max(40, Math.min(240, Math.round(bpm))));
+    dispatch(ACTIONS.SET_BPM, Math.max(MIN_BPM, Math.min(MAX_BPM, Math.round(bpm))));
 }
 /** `InstrumentModule`'s state-slice name for the drum lane; the telemetry event names it `drums`. */
 const TELEMETRY_PART: Record<InstrumentModule, 'drums' | 'bass' | 'chords' | 'soloist'> = {

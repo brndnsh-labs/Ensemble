@@ -27,6 +27,7 @@ import { pathToFileURL } from 'node:url';
 import playwright from '@playwright/test';
 import { compileTimeline, performPass } from '../band/index.js';
 import { encodeWav } from '../core/engine/wav-encoder.js';
+import { countInBars } from '../web/lib/count-in.js';
 import { buildAuditionLink } from './audition-link.js';
 import { laneEvents, performSceneForReport, sceneSettings, sceneVoices } from './band-scene.js';
 import {
@@ -311,10 +312,12 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
 
         const scheduled = marker('scheduled');
         const stop = marker('stop');
-        // The band's first bar starts 0.1 s after it was scheduled (`BandHost.start`), after a
-        // bar of count-in clicks when that preference is on. The judged region skips the first
-        // bar on both sides and covers whole bars the stand actually played.
-        const musicStart = scheduled + Math.round((0.1 + (countIn ? barSeconds : 0)) * sampleRate);
+        // The band's first bar starts 0.1 s after it was scheduled (`BandHost.start`), after the
+        // count-in's clicks when that preference is on (a bar, two up-tempo: `countInBars`). The
+        // judged region skips the first bar on both sides and covers whole bars the stand
+        // actually played.
+        const counted = countIn ? countInBars(scene.bpm) : 0;
+        const musicStart = scheduled + Math.round((0.1 + counted * barSeconds) * sampleRate);
         const playedBars = Math.floor((stop - musicStart) / (barSeconds * sampleRate));
         if (capture.dropouts > 0) {
             log.write(
@@ -323,7 +326,7 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
         }
         if (countIn) {
             log.write(
-                'the stand counted a bar in (playback.countIn); the music starts a bar after Play\n',
+                `the stand counted ${counted} bar(s) in (playback.countIn); the music starts after them\n`,
             );
         }
 

@@ -79,22 +79,22 @@ test('real runtime, local saves, reload recovery and offline playback', async ({
         .toBeGreaterThan(0.0001);
     await page.getByRole('button', { name: 'Stop playback' }).click();
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('120');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('112');
     await songMenuAction(page, 'Revert to saved');
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
     await expect
         .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL || ''))
         .toContain(appUrl('sw.js'));
     await disconnect();
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect.poll(() => page.locator('[data-active="true"]').count()).toBeGreaterThan(0);
     expect(await page.evaluate(() => localStorage.getItem('ensemble_currentState'))).toBe(
@@ -191,14 +191,14 @@ test('two tabs cannot overwrite a newer save; a conflicting take can become a co
     await expect(
         second.getByRole('alert').filter({ hasText: 'saved in another tab' }),
     ).toBeVisible();
-    await expect(second.getByLabel('Tempo', { exact: true })).toHaveValue('105');
+    await expect(second.getByLabel('Tempo', { exact: true })).toHaveValue('109');
     await songMenuAction(second, 'Duplicate');
     await expect(
         second.getByRole('heading', { name: 'Blue pocket — copy', exact: true }),
     ).toBeVisible();
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
 });
 
 test('file export/import is detached; invalid input never changes the active song', async ({
@@ -264,7 +264,7 @@ test('failed recovery stays in memory through navigation and is never labelled r
     await songLink(page, 'After hours', 'Bossa').click();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
     await expect(
         page.getByText('Practice settings changed · this tab only', { exact: true }),
     ).toBeVisible();
@@ -287,10 +287,10 @@ test('an older competing draft remains explicitly recoverable after another tab 
     await expect(second.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
     await songMenuAction(page, /Older drafts \(/);
-    await page.getByRole('button', { name: /Blue pocket · 105 BPM/ }).click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('105');
+    await page.getByRole('button', { name: /Blue pocket · 109 BPM/ }).click();
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('109');
     await expect(
         page.getByRole('heading', { name: 'Blue pocket — recovered', exact: true }),
     ).toBeVisible();

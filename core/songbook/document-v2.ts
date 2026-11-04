@@ -1,3 +1,4 @@
+import { MAX_BPM, MIN_BPM } from '../config.js';
 import { GENRE_NAMES } from '../data/smart-genres.js';
 import { normalizeSongSeed, SONG_SEED_MAX_LENGTH, stripDangerousChars } from '../sanitize.js';
 import { isSwingSub } from '../types.js';
@@ -189,7 +190,7 @@ function validatePerformance(ctx: ValidationContext, candidate: unknown, path: s
         predicate: (value) => normalizeSongSeed(value) === value,
         message: 'Song seed is not canonical',
     });
-    numberField(ctx, record, 'bpm', path, 40, 240, true);
+    numberField(ctx, record, 'bpm', path, MIN_BPM, MAX_BPM, true);
     booleanField(ctx, record, 'randomizeSeed', path);
     if (Object.hasOwn(record, 'energy')) {
         validateEnergy(ctx, record.energy, path);

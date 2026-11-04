@@ -42,6 +42,7 @@ import { playDrumSound } from '@core/engine/synth-drums';
 import { playSoloNote } from '@core/engine/synth-soloist';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { EnsembleState } from '@core/types';
+import { countInBars } from './count-in';
 
 const LOOKAHEAD_S = 0.15;
 const TIMER_MS = 25;
@@ -147,34 +148,46 @@ export interface HostOptions {
     onEnd?: () => void;
 }
 
-/** One bar of count-in clicks: pure and audio-free, so it's unit-testable on its own. */
+/** The count-in's clicks: pure and audio-free, so it's unit-testable on its own. */
 export interface CountInPlan {
-    /** Seconds from the count-in's own start to each click — same length as the bar's pulses. */
+    /** Seconds from the count-in's own start to each click: the bar's pulses, once per bar. */
     times: number[];
     /** Same accent scheme `BandHost`'s per-segment metronome uses: 1000 Hz on the downbeat,
      * 800/600 by role otherwise. */
     freqs: number[];
-    /** The bar's own length in seconds at `bpm` — how long the count-in runs, and so exactly
-     * how much the first real bar is pushed back from the moment Play was pressed. */
+    /** The count-in's length in seconds at `bpm` (its bars, each the first bar's length) — how
+     * long it runs, and so exactly how much the first real bar is pushed back from the moment
+     * Play was pressed. */
     seconds: number;
+    /** Clicks in each of its bars: the beat a click counts is its index modulo this. */
+    perBar: number;
 }
 
 /**
- * One bar of clicks in the timeline's bar `fromBar`, at `bpm` — the chart's own meter and
- * tempo, not a fixed 4/4. Goes through `secondsAt` like every other time computation here, so
- * a fermata or tempo change elsewhere in the song can't skew a bar that has none of its own.
+ * The count-in (`countInBars` of them) in the meter of the timeline's bar `fromBar`, at `bpm` —
+ * the chart's own meter and tempo, not a fixed 4/4. Goes through `secondsAt` like every other
+ * time computation here, so a fermata or tempo change elsewhere in the song can't skew a bar
+ * that has none of its own. Each bar of a two-bar count is the same bar again, its downbeat
+ * accented, so the player hears "1 2 3 4, 1 2 3 4".
  */
 export function countInPlan(timeline: Timeline, bpm: number, fromBar: number): CountInPlan {
     const bar = timeline.bars[fromBar];
     const barStart = secondsAt(timeline, bar.start, bpm);
-    const times = bar.meter.pulses.map(
+    const once = bar.meter.pulses.map(
         (offset) => secondsAt(timeline, bar.start + offset, bpm) - barStart,
     );
-    const freqs = bar.meter.pulses.map((_offset, i) =>
+    const accents = bar.meter.pulses.map((_offset, i) =>
         i === 0 ? 1000 : bar.meter.roles[i] === 'strong' ? 800 : 600,
     );
-    const seconds = secondsAt(timeline, bar.start + bar.meter.barTicks, bpm) - barStart;
-    return { times, freqs, seconds };
+    const length = secondsAt(timeline, bar.start + bar.meter.barTicks, bpm) - barStart;
+    const bars = countInBars(bpm);
+    const each = Array.from({ length: bars }, (_, b) => b);
+    return {
+        times: each.flatMap((b) => once.map((time) => b * length + time)),
+        freqs: each.flatMap(() => accents),
+        seconds: bars * length,
+        perBar: once.length,
+    };
 }
 
 function hz(midi: number): number {
@@ -357,11 +370,13 @@ export class BandHost {
     private change: { segment: Segment; tick: number } | null = null;
     /** `beforeBarline` callbacks still waiting for their barline. */
     private hooks: { segment: Segment; tick: number; run: () => void }[] = [];
-    /** The one-bar count-in scheduled by `start()`, while it is still sounding. */
+    /** The count-in scheduled by `start()`, while it is still sounding. */
     private countIn: {
         start: number;
         end: number;
         times: number[];
+        /** Clicks in each of its bars (`CountInPlan.perBar`). */
+        perBar: number;
         /** Its clicks, scheduled up to a bar ahead: a Stop mid-count silences the rest. */
         clicks: OscillatorNode[];
     } | null = null;
@@ -455,9 +470,9 @@ export class BandHost {
     }
 
     /**
-     * `countIn` is one bar of clicks before the first segment, requested only by a fresh Play
-     * from stopped (`runtime.ts`'s `startBand`) and gated there on the `playback.countIn`
-     * preference — every other caller (a wrap's own `append`, `update`'s barline swap,
+     * `countIn` is a bar of clicks (two above `TWO_BAR_COUNT_IN_ABOVE_BPM`) before the first
+     * segment, requested only by a fresh Play from stopped (`runtime.ts`'s `startBand`) and
+     * gated there on the `playback.countIn` preference — every other caller (a wrap's own `append`, `update`'s barline swap,
      * `setScore`'s restart, a mid-song resume) passes nothing and gets the default `false`, so
      * the chart's first bar starts on the beat it always did.
      */
@@ -484,7 +499,13 @@ export class BandHost {
             const clicks = plan.times.map((offset, i) =>
                 this.click(audio, state, countInStart + offset, plan.freqs[i]),
             );
-            this.countIn = { start: countInStart, end: segmentStart, times: plan.times, clicks };
+            this.countIn = {
+                start: countInStart,
+                end: segmentStart,
+                times: plan.times,
+                perBar: plan.perBar,
+                clicks,
+            };
         }
         this.append(first, segmentStart, undefined);
         this.timer = setInterval(() => this.pump(), TIMER_MS);
@@ -825,8 +846,8 @@ export class BandHost {
     }
 
     /**
-     * The count-in beat sounding now (0-based: "1" is beat 0), or null when no count-in is
-     * running — either stopped, past it into the song, or `start()` was never asked for one.
+     * The count-in beat sounding now, within its bar (0-based: "1" is beat 0; a two-bar count
+     * reads 1 2 3 4, 1 2 3 4), or null when no count-in is running — either stopped, past it into the song, or `start()` was never asked for one.
      * The chart shouldn't advance while this is non-null: `songTick()` already returns null for
      * the same window, since the first segment's `start` is the moment the count-in ends.
      */
@@ -846,7 +867,7 @@ export class BandHost {
                 beat = i;
             }
         }
-        return beat;
+        return beat % countIn.perBar;
     }
 
     /**

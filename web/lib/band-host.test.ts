@@ -154,8 +154,22 @@ describe('countInPlan', () => {
     });
 
     it("halves at double tempo — it tracks the chart's own bpm, not a fixed duration", () => {
-        const plan = countInPlan(timeline, 240, 0);
-        expect(plan.seconds).toBeCloseTo(1, 10);
+        expect(countInPlan(timeline, 100, 0).seconds).toBeCloseTo(2.4, 10);
+        expect(countInPlan(timeline, 200, 0).seconds).toBeCloseTo(1.2, 10);
+    });
+
+    it('is two bars above 200 bpm, counted 1 2 3 4, 1 2 3 4 (#1996)', () => {
+        const at200 = countInPlan(timeline, 200, 0);
+        const at201 = countInPlan(timeline, 201, 0);
+        expect(at200.times).toHaveLength(4);
+        expect(at201.times).toHaveLength(8);
+        expect(at201.perBar).toBe(4);
+        // Two bars of 201's own length, each downbeat accented as the metronome's is.
+        const bar = (60 / 201) * 4;
+        expect(at201.seconds).toBeCloseTo(2 * bar, 10);
+        expect(at201.times[4]).toBeCloseTo(bar, 10);
+        expect([at201.freqs[0], at201.freqs[4]]).toEqual([1000, 1000]);
+        expect(countInPlan(timeline, 320, 0).times).toHaveLength(8);
     });
 
     it('accents the downbeat exactly like the per-segment metronome does', () => {
@@ -190,6 +204,29 @@ describe('BandHost count-in scheduling', () => {
         expect(host.songTick()).toBeCloseTo(0, 6);
         expect(host.countingInBeat()).toBeNull();
 
+        host.stop();
+    });
+
+    it('counts two bars in above 200 bpm, the beat read within its bar (#1996)', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        host.setScore(twoBars);
+        const bpm = 240;
+        host.start(drumsOnly, bpm, 0, true);
+        const beat = 60 / bpm;
+        // Eight clicks: two bars of four.
+        expect(audio.createOscillator).toHaveBeenCalledTimes(8);
+        const start = 10 + 0.1;
+        // The second bar's second click reads "2", as its first bar's did.
+        audio.currentTime = start + 5 * beat + beat / 2;
+        expect(host.countingInBeat()).toBe(1);
+        expect(host.songTick()).toBeNull();
+        // The chart starts after both bars, not one.
+        audio.currentTime = start + 8 * beat - 0.01;
+        expect(host.songTick()).toBeNull();
+        audio.currentTime = start + 8 * beat;
+        expect(host.songTick()).toBeCloseTo(0, 6);
         host.stop();
     });
 

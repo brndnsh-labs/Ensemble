@@ -1,4 +1,5 @@
 import { deepSignal } from 'deepsignal/core';
+import { MAX_BPM, MIN_BPM } from '../config.js';
 import type { Action, GlobalContext, Mutable } from '../types.js';
 import { ACTIONS } from '../types.js';
 import { writeDeclaredParam } from './set-param.js';
@@ -25,7 +26,7 @@ export function playbackReducer(action: Action): boolean {
     const p = playback as Mutable<typeof playback>;
     switch (action.type) {
         case ACTIONS.SET_BPM:
-            p.bpm = Math.max(40, Math.min(240, Math.trunc(action.payload)));
+            p.bpm = Math.max(MIN_BPM, Math.min(MAX_BPM, Math.trunc(action.payload)));
             return true;
         case ACTIONS.SET_PARAM:
             if (action.payload.module === 'playback') {
