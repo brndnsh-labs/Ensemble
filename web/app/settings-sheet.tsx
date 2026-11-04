@@ -96,8 +96,8 @@ export function SettingsSheet({
                     </label>
                 ))}
                 <p className="muted settings-hint settings-group-note">
-                    Your part is muted when a song opens and the band leaves room for it. Turn it on
-                    any time for that song.
+                    Your part starts muted and the band leaves room for it. Turn it on any time; it
+                    stays on for your next songs on this device.
                 </p>
             </fieldset>
             <fieldset className="settings-group">

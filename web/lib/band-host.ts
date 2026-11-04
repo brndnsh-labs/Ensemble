@@ -212,14 +212,22 @@ export function bandEventLevel(event: BandEvent): { level: number; levelScale?: 
  * trim (`getCymbalMixScale`) follows the section that is playing and never re-derives it from
  * the arranger's step maps. A tick outside every bar (none is expected) falls back to the
  * switched-on lanes, the rule for a hit with no section (`enabledLayerCount`).
+ *
+ * `you` is the musician's own muted lane (`BandSettings.you`, #2072): the chart has it on but
+ * nobody plays it, so it is not a layer the cymbals share the mix with.
  */
-export function soundingLayers(state: EnsembleState, timeline: Timeline, tick: number): number {
+export function soundingLayers(
+    state: EnsembleState,
+    timeline: Timeline,
+    tick: number,
+    you: BandEvent['lane'] | null = null,
+): number {
     // Runs for every drum hit, so no objects are built here.
     const lanes = barAtTick(timeline, tick)?.visit.lanes;
     return (
-        (state.bass?.enabled && lanes?.bass !== false ? 1 : 0) +
-        (state.chords?.enabled && lanes?.comp !== false ? 1 : 0) +
-        (state.soloist?.enabled && lanes?.lead !== false ? 1 : 0)
+        (state.bass?.enabled && lanes?.bass !== false && you !== 'bass' ? 1 : 0) +
+        (state.chords?.enabled && lanes?.comp !== false && you !== 'comp' ? 1 : 0) +
+        (state.soloist?.enabled && lanes?.lead !== false && you !== 'lead' ? 1 : 0)
     );
 }
 
@@ -242,6 +250,7 @@ export function playBandEvent(
     chordSize: number,
     timeline: Timeline,
     legato = false,
+    you: BandEvent['lane'] | null = null,
 ): void {
     const { level } = bandEventLevel(event);
     if (event.lane === 'drums') {
@@ -250,7 +259,7 @@ export function playBandEvent(
             DRUM_NAMES[event.piece],
             time,
             level,
-            soundingLayers(state, timeline, event.tick),
+            soundingLayers(state, timeline, event.tick, you),
         );
         return;
     }
@@ -1191,6 +1200,7 @@ export class BandHost {
             segment.chordSizes.get(event.tick) ?? 1,
             segment.timeline,
             segment.legato.has(event),
+            this.settings?.you ?? null,
         );
     }
 
