@@ -222,7 +222,8 @@ describe('hip hop rolls into a louder section on every lap, whatever lifts the b
         const snares = events.filter(
             (e) => e.lane === 'drums' && e.bar === 3 && e.piece === 'snare' && e.tick >= lastBeat,
         );
-        expect(snares.length).toBeLessThan(2);
+        // It drops out instead: no snare at all where the roll would be.
+        expect(snares).toHaveLength(0);
     });
 });
 
