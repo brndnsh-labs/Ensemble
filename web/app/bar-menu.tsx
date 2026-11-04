@@ -1,7 +1,7 @@
 'use client';
 
 import type { resolveScoreContext } from '@core/songbook/score-context';
-import { parseChordBar } from '@core/songbook/score-text';
+import { offGridBarSplit, parseChordBar } from '@core/songbook/score-text';
 import {
     type CSSProperties,
     type KeyboardEvent as ReactKeyboardEvent,
@@ -17,6 +17,7 @@ import './bar-menu.css';
 import './menu.css';
 import {
     countsLabel,
+    lengthsExample,
     movedSplit,
     type Ruler,
     readRuler,
@@ -98,7 +99,10 @@ function BarRuler({
                 {parseChordBar(text, meter).kind === 'ok' ? (
                     <>
                         These lengths are finer than half a {unitWord(meter, 2)}: type them, like{' '}
-                        <code>C:2 D:1 E:1</code>
+                        <code>{lengthsExample(meter, 'C', 'D')}</code>
+                        {offGridBarSplit(text, meter)
+                            ? ', or leave the lengths out to choose a split'
+                            : ''}
                     </>
                 ) : (
                     'Type chords that fill the bar, and their lengths show here.'

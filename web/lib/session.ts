@@ -496,3 +496,37 @@ export function rememberPlayerInstrument(instrument: PlayerInstrument): void {
         // The choice still applies for this page; only the memory is lost.
     }
 }
+
+const PLAYER_LANE_ON = 'ensemble-v2-preview:player-lane-on';
+
+/**
+ * The lane the musician turned on for themselves (#2072): their own instrument's lane, un-muted,
+ * which then stays on for every chart opened on this device until they mute it again or change
+ * instrument. Stored as the lane's name and read strictly: anything but a state lane is none.
+ * A per-device habit like `playerInstrument`, never part of a chart.
+ */
+export function playerLaneOnPreference(): 'groove' | 'bass' | 'chords' | 'soloist' | null {
+    try {
+        const stored = localStorage.getItem(PLAYER_LANE_ON);
+        return stored === 'groove' ||
+            stored === 'bass' ||
+            stored === 'chords' ||
+            stored === 'soloist'
+            ? stored
+            : null;
+    } catch {
+        return null;
+    }
+}
+
+export function rememberPlayerLaneOn(lane: 'groove' | 'bass' | 'chords' | 'soloist' | null): void {
+    try {
+        if (lane === null) {
+            localStorage.removeItem(PLAYER_LANE_ON);
+        } else {
+            localStorage.setItem(PLAYER_LANE_ON, lane);
+        }
+    } catch {
+        // The choice still applies for this page; only the memory is lost.
+    }
+}

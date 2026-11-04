@@ -32,10 +32,13 @@ test('Continue is tagged while the song has unsaved changes; Revert to saved off
     await expect(page.getByTestId('continue-unsaved')).toHaveCount(0);
 
     await card.getByRole('button', { name: 'Open chart' }).click();
+    // Read the chord only once the chart is drawn, and the changed one once the new key has
+    // re-drawn it: an instant read right after the open got the empty stand (#2084).
+    await expect(firstChord(page).first()).toBeVisible();
     const before = await firstChord(page).allTextContents();
     await pickSongKey(page, 'D');
+    await expect.poll(() => firstChord(page).allTextContents()).not.toEqual(before);
     const changed = await firstChord(page).allTextContents();
-    expect(changed).not.toEqual(before);
 
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(page.getByTestId('continue-unsaved')).toHaveText('Unsaved changes');

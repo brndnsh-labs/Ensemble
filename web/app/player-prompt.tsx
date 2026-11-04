@@ -17,7 +17,7 @@ export function PlayerPrompt({ onChoose }: PlayerPromptProps) {
                 What do you play?
             </h2>
             <p className="player-prompt-note muted">
-                Your part is muted when a song opens, and the band leaves room for it.
+                Your part starts muted and the band leaves room for it. Turn it on and it stays on.
             </p>
             <div className="player-prompt-choices">
                 {PLAYER_INSTRUMENTS.filter((id) => id !== 'listening').map((id) => (

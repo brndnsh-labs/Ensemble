@@ -331,6 +331,21 @@ describe('Songbook codecs (#1044)', () => {
         }
     });
 
+    it('takes a tempo from 40 to 320 BPM, whole numbers only (#1996)', () => {
+        for (const [bpm, kind] of [
+            [40, 'ok'],
+            [240, 'ok'],
+            [320, 'ok'],
+            [39, 'invalid'],
+            [321, 'invalid'],
+            [300.5, 'invalid'],
+        ] as const) {
+            const chart = makeChartDocument();
+            chart.chart.performance.bpm = bpm;
+            expect(validateChartDocument(chart).kind, `bpm ${bpm}`).toBe(kind);
+        }
+    });
+
     it('round-trips tradeChoruses, defaults it absent, and rejects out-of-range values', () => {
         const plain = makeChartDocument();
         const decoded = validateChartDocument(plain);

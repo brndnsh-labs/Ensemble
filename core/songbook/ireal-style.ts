@@ -3,7 +3,8 @@
  * naming one of iReal Pro's feels; it maps to one of the 13 canon genres (`GENRE_NAMES`, pinned by
  * `tests/standards/genre-canon-guard.test.ts`) and to the tempo iReal itself starts that style at.
  * A style this table does not know maps to nothing: the importer keeps the musician's current band
- * rather than guess a genre.
+ * rather than guess a genre, and says so. `Afro` is left out on purpose (#2073): none of the 13
+ * genres is an Afro-Cuban or Afrobeat band. `Latin` stays Bossa, a stretch for the faster ones.
  *
  * The styles are the ones the supplied Jazz 1460 charts use (Medium Swing, Medium Up Swing, Up
  * Tempo Swing, Ballad, Bossa Nova, Waltz) plus iReal Pro's other stock feels that land on a canon
@@ -11,6 +12,8 @@
  * swing near 130), not figures read from iReal; the band style's feel (not this table) decides
  * how a genre swings.
  */
+
+import { MAX_BPM, MIN_BPM } from '../config.js';
 
 interface IRealStyle {
     genre: string;
@@ -27,6 +30,8 @@ const STYLES = new Map<string, IRealStyle>([
     ['up tempo swing', { genre: 'Jazz', bpm: 200 }],
     ['ballad', { genre: 'Jazz', bpm: 66 }],
     ['ballad swing', { genre: 'Jazz', bpm: 66 }],
+    ['slow swing', { genre: 'Jazz', bpm: 90 }],
+    ['medium slow', { genre: 'Jazz', bpm: 100 }],
     ['bebop', { genre: 'Jazz', bpm: 190 }],
     ['cool jazz', { genre: 'Jazz', bpm: 120 }],
     ['jazz waltz', { genre: 'Jazz', bpm: 150 }],
@@ -40,6 +45,7 @@ const STYLES = new Map<string, IRealStyle>([
     ['funk', { genre: 'Funk', bpm: 100 }],
     ['rock', { genre: 'Rock', bpm: 120 }],
     ['rock pop', { genre: 'Rock', bpm: 120 }],
+    ['even 8ths', { genre: 'Rock', bpm: 120 }],
     ['pop rock', { genre: 'Rock', bpm: 120 }],
     ['blues', { genre: 'Blues', bpm: 100 }],
     ['shuffle', { genre: 'Blues', bpm: 110 }],
@@ -69,15 +75,28 @@ export function defaultTempoForIRealStyle(style: string | undefined): number | n
 
 /**
  * The tempo an export writes, when it is one Ensemble plays. iReal writes 0 for "not set"
- * (verified: the supplied charts all carry 0), and anything outside the 40-240 BPM the app
- * accepts is left unapplied rather than clamped.
+ * (verified: the supplied charts all carry 0), and anything outside the `MIN_BPM`-`MAX_BPM` range
+ * the app accepts is left unapplied rather than clamped.
  */
 export function writtenIRealTempo(raw: string): number | null {
     if (!/^\d{1,4}$/.test(raw.trim())) {
         return null;
     }
     const bpm = Number(raw);
-    return bpm >= 40 && bpm <= 240 ? bpm : null;
+    return bpm >= MIN_BPM && bpm <= MAX_BPM ? bpm : null;
+}
+
+/**
+ * A tempo the export writes that Ensemble cannot play: a number outside `MIN_BPM`-`MAX_BPM`.
+ * Absent or 0 means "not set", which is no one's complaint, and so does anything that is not a
+ * number.
+ */
+export function unplayableIRealTempo(raw: string): number | null {
+    if (!/^\d{1,4}$/.test(raw.trim())) {
+        return null;
+    }
+    const bpm = Number(raw);
+    return bpm !== 0 && writtenIRealTempo(raw) === null ? bpm : null;
 }
 
 /** @internal a test seam: every style the table knows, so a test can hold it to the genre canon. */

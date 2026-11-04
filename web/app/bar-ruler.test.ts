@@ -6,7 +6,9 @@
 import { parseChordBar } from '@core/songbook/score-text';
 import { describe, expect, it } from 'vitest';
 import {
+    barPlaceholder,
     countsLabel,
+    lengthsExample,
     movedSplit,
     readRuler,
     rulerText,
@@ -212,5 +214,20 @@ describe('moving a split', () => {
 
     it('labels lengths for a reader', () => {
         expect([countsLabel(6), countsLabel(3), countsLabel(1)]).toEqual(['3', '1½', '½']);
+    });
+});
+
+describe('the bar field’s example follows the meter (#2068)', () => {
+    it.each(['4/4', '3/4', '6/8', '5/4', '7/8', '12/8', '2/2', '3/8', '9/8', '5/16', '1/4'])(
+        '%s: the example fills the bar',
+        (meter) => {
+            expect(parseChordBar(lengthsExample(meter), meter).kind).toBe('ok');
+            expect(parseChordBar(barPlaceholder(meter).split(' · ')[1], meter).kind).toBe('ok');
+        },
+    );
+
+    it('is the familiar one in 4/4 and shorter in 3/4', () => {
+        expect(barPlaceholder('4/4')).toBe('Dm7 G7 · C:3 G7:1 · N.C. · /');
+        expect(barPlaceholder('3/4')).toBe('Dm7 G7 · C:2 G7:1 · N.C. · /');
     });
 });

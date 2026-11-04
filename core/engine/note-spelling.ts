@@ -14,9 +14,8 @@ import { KEY_ORDER } from '../data/note-names.js';
 
 const SHARP_NOTE_ORDER = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-// Major keys whose signature is written in sharps. F#/C# are listed for
-// completeness even though the all-flat KEY_ORDER picker can only reach them as
-// Gb/Db today (distinct F#/C# selection is deferred — see #779).
+// Major keys whose signature is written in sharps. F# is a picker name since #2031 (C# is listed
+// for completeness, a spelling an import or a typed key can carry).
 const SHARP_FRIENDLY_MAJOR_KEYS = new Set(['G', 'D', 'A', 'E', 'B', 'F#', 'C#']);
 
 // Minor keys whose signature is written in sharps (their relative major is a

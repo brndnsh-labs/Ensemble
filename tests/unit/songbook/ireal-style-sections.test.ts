@@ -11,6 +11,7 @@ import {
     defaultTempoForIRealStyle,
     genreForIRealStyle,
     knownIRealStyles,
+    unplayableIRealTempo,
     writtenIRealTempo,
 } from '../../../core/songbook/ireal-style.js';
 import { compileScoreForm } from '../../../core/songbook/score-form.js';
@@ -172,8 +173,33 @@ describe('the style table (#2004)', () => {
         expect(writtenIRealTempo('0')).toBeNull();
         expect(writtenIRealTempo('')).toBeNull();
         expect(writtenIRealTempo('120')).toBe(120);
-        expect(writtenIRealTempo('300')).toBeNull();
+        expect(writtenIRealTempo('300')).toBe(300);
+        expect(writtenIRealTempo('400')).toBeNull();
         expect(writtenIRealTempo('12x')).toBeNull();
+        for (const edge of ['40', '320']) {
+            expect(writtenIRealTempo(edge)).toBe(Number(edge));
+            expect(unplayableIRealTempo(edge)).toBeNull();
+        }
+        for (const edge of ['39', '321']) {
+            expect(writtenIRealTempo(edge)).toBeNull();
+            expect(unplayableIRealTempo(edge)).toBe(Number(edge));
+        }
+        expect(unplayableIRealTempo('300')).toBeNull();
+        expect(unplayableIRealTempo('400')).toBe(400);
+        expect(unplayableIRealTempo('0')).toBeNull();
+        expect(unplayableIRealTempo('120')).toBeNull();
+    });
+
+    it('maps Slow Swing and Medium Slow to Jazz, Even 8ths to Rock, and leaves Afro and Latin as decided (#2073)', () => {
+        expect(genreForIRealStyle('Slow Swing')).toBe('Jazz');
+        expect(genreForIRealStyle('Medium Slow')).toBe('Jazz');
+        expect(genreForIRealStyle('Even 8ths')).toBe('Rock');
+        expect(genreForIRealStyle('Afro')).toBeNull();
+        expect(genreForIRealStyle('Latin')).toBe('Bossa');
+        const song = parseIRealImport('irealbook://Tune=Someone=Afro=C=n=T44[C   |G7  Z').songs[0];
+        expect(song.diagnostics.map((d) => d.message)).toContain(
+            'iReal style "Afro" has no Ensemble equivalent, so your current band style is kept.',
+        );
     });
 
     it('has no tempo field in the open protocol, so the style’s default stands', () => {
@@ -183,13 +209,18 @@ describe('the style table (#2004)', () => {
         expect(song.genre).toBe('Jazz');
     });
 
-    it('takes the export’s own tempo over the style’s, and ignores one outside 40-240', () => {
+    it('takes the export’s own tempo over the style’s, and ignores one outside 40-320', () => {
         const { text } = fixtureText('giant-steps');
         expect(text.endsWith('==0=0')).toBe(true);
         const withTempo = (bpm: string) =>
             parseIRealImport(`${text.slice(0, -'==0=0'.length)}==${bpm}=0`).songs[0];
         expect(withTempo('112').tempo).toEqual({ bpm: 112, from: 'export' });
-        expect(withTempo('300').tempo).toEqual({ bpm: 200, from: 'style' });
+        expect(withTempo('300').tempo).toEqual({ bpm: 300, from: 'export' });
+        expect(withTempo('400').tempo).toEqual({ bpm: 200, from: 'style' });
+        expect(withTempo('400').diagnostics.map((d) => d.message)).toContain(
+            "The export's tempo of 400 BPM is outside the 40-320 Ensemble plays, so it is ignored and 200 BPM, iReal's starting tempo for the style, is used.",
+        );
+        expect(withTempo('0').diagnostics.some((d) => d.message.includes('tempo of'))).toBe(false);
     });
 
     it('keeps a two-bar repeat whole: a mark between its bars does not start a section', () => {

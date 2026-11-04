@@ -161,3 +161,18 @@ export function countsLabel(halves: number): string {
     const whole = Math.floor(halves / 2);
     return halves % 2 ? `${whole || ''}½` : String(whole);
 }
+
+/**
+ * Chords with lengths that fill a bar of `meter`, for the bar field's placeholder and the menu's
+ * caption (#2068): the first chord takes all the counts but one, so `C:3 G7:1` in 4/4, `C:2 G7:1`
+ * in 3/4. A one-count bar cannot be shared in whole counts, so it gets halves.
+ */
+export function lengthsExample(meter: string, first = 'C', second = 'G7'): string {
+    const { counts } = scoreMeter(meter);
+    return counts > 1 ? `${first}:${counts - 1} ${second}:1` : `${first}:1/2 ${second}:1/2`;
+}
+
+/** The bar field's placeholder: bare chords, chords with lengths, no chord, a hold. */
+export function barPlaceholder(meter: string): string {
+    return `Dm7 G7 · ${lengthsExample(meter)} · N.C. · /`;
+}

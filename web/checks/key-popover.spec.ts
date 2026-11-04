@@ -164,10 +164,10 @@ test('the picker names each key by its mode: F♯, C♯ and G♯ minor, F♯ maj
     expect(await labels()).toContain('F♯');
     expect(await labels()).not.toContain('G♭');
     await popover.getByLabel('Mode', { exact: true }).selectOption('minor');
+    // The labels change with the render that follows the change, not within it: wait for the
+    // minor names before reading the list once for the flats that must be gone (#2084).
+    await expect.poll(labels).toEqual(expect.arrayContaining(['C♯', 'F♯', 'G♯']));
     const minor = await labels();
-    for (const name of ['C♯', 'F♯', 'G♯']) {
-        expect(minor).toContain(name);
-    }
     for (const name of ['D♭', 'G♭', 'A♭']) {
         expect(minor).not.toContain(name);
     }

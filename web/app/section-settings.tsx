@@ -4,9 +4,8 @@ import type { ScoreSection, SemanticScore } from '@core/songbook/score-types';
 import { useEffect, useState } from 'react';
 import { SECTION_NAME_MAX, type SectionChange } from '../lib/documents';
 import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
+import { keyChoices } from '../lib/key-choices';
 import { afterPress } from './after-press';
-
-const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 interface SectionSettingsProps {
     score: SemanticScore;
@@ -81,7 +80,7 @@ export function SectionSelects({ score, section, disabled, onChange }: SectionSe
     const inheritedGrouping =
         (section.meter === undefined ? song.grouping : null) ?? defaultGrouping(effective.meter);
     const meters = [...new Set([...Object.keys(TIME_SIGNATURES), section.meter ?? song.meter])];
-    const keys = [...new Set([...KEYS, section.key ?? song.key])];
+    const keys = keyChoices(section.key ?? song.key);
     return (
         <>
             <label>

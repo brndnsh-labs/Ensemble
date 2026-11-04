@@ -18,6 +18,7 @@ import { songPlanText } from '../lib/song-mode';
 import { afterPress } from './after-press';
 import { BarDock, usePhoneWidth } from './bar-dock';
 import { BarMenu, type BarMenuBar } from './bar-menu';
+import { barPlaceholder } from './bar-ruler';
 import { BarSplits } from './bar-splits';
 import { eventText } from './chord-text';
 import { Menu } from './menu';
@@ -773,7 +774,9 @@ export function ChartSheet({
                                             aria-invalid={problem ? true : undefined}
                                             value={barEdit?.text(measureId) ?? ''}
                                             maxLength={4000}
-                                            placeholder="Dm7 G7 · C:3 G7:1 · N.C. · /"
+                                            placeholder={barPlaceholder(
+                                                measure.chords[0]?.timeSignature ?? '4/4',
+                                            )}
                                             readOnly={busy}
                                             spellCheck={false}
                                             autoCapitalize="off"

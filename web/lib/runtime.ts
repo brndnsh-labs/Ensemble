@@ -1,6 +1,5 @@
 import {
     type BandSettings,
-    barAtTick,
     compileTimeline,
     DEFAULT_SETTINGS,
     type Lane,
@@ -12,6 +11,7 @@ import {
     type Timeline,
     toMidi,
 } from '@band/index';
+import { MAX_BPM, MIN_BPM } from '@core/config';
 import { flushBuffer, flushBuffers, togglePower } from '@core/controllers/instrument-controller';
 import { autoVoiceForGenre } from '@core/data/genre-sound-map';
 import { GENRE_NAMES, SMART_GENRES } from '@core/data/smart-genres';
@@ -58,7 +58,12 @@ import {
     type ParamSlices,
     type SwingSub,
 } from '@core/types';
-import { getFrequency, respellKeyForMode, transposeKeyName } from '@core/utils';
+import {
+    getFrequency,
+    respellKeyForMode,
+    transposeKeyKeepingSpelling,
+    transposeKeyName,
+} from '@core/utils';
 import { auditionMidis, type BandChart, bandChart, sectionSteps, slotAt } from './band-chart';
 import {
     downloadExportResult,
@@ -84,9 +89,11 @@ import { loopEntry, loopScore, loopView } from './section-loop';
 import {
     countInPreference,
     masterVolumePreference,
+    playerLaneOnPreference,
     rememberAutoSounds,
     rememberCountIn,
     rememberMasterVolume,
+    rememberPlayerLaneOn,
     rememberSongMode,
     type SongMinutes,
     songModePreference,
@@ -99,6 +106,7 @@ import {
     type SoundProgress,
     seedInstalledSounds,
     validateVoice,
+    warmSounds,
 } from './sounds';
 import { createStyleSounds, type StyleSoundsStatus } from './style-sounds';
 import { track } from './telemetry';
@@ -192,10 +200,10 @@ let songMinutes: SongMinutes | null = null;
  */
 let playerLane: InstrumentModule | null = null;
 /**
- * Whether the musician has turned their own lane on for the chart open now. Every chart opens
- * with it off — the instrument's default mute — and that mute is a hole the band leaves for them
- * (`BandSettings.you`). Session-only: reset when a chart is opened (`load(…, true)`) or the
- * instrument changes — never by the reloads an edit, an Undo or a Duplicate make of the same chart.
+ * Whether the musician has turned their own lane on. The lane opens muted — the instrument's
+ * default — and that mute is a hole the band leaves for them (`BandSettings.you`). Turning it on
+ * is a choice that carries to every chart opened on this device (#2072, `playerLaneOnPreference`)
+ * until they mute it again or change instrument.
  */
 let playerLaneHeard = false;
 /**
@@ -357,6 +365,20 @@ export function laneHeard(module: InstrumentModule): boolean {
 /** The musician's own lane while it is muted (#1992): the hole the band leaves for them. */
 function playerHole(): InstrumentModule | null {
     return playerLane && !laneHeard(playerLane) ? playerLane : null;
+}
+
+/**
+ * The chart's content as the band PLAYS it: the musician's own muted lane is a hole, not a player,
+ * so it is off here (#2072). For what is fetched and decoded for Play — never for Save, which
+ * keeps the chart's own `captureContent`.
+ */
+function playedContent(): ChartSettings {
+    const content = captureContent();
+    const hole = playerHole();
+    if (hole) {
+        content.band[hole].enabled = false;
+    }
+    return content;
 }
 
 function bandSettings(): BandSettings {
@@ -646,6 +668,34 @@ export function countInBeat(): number | null {
     return band?.countingInBeat() ?? null;
 }
 
+/**
+ * The genre-change effect in `core/` picks the old engine's Auto sound; on the band, a native
+ * genre's own comp instrument wins (bossa is heard on nylon), and so does its own lead. Only an
+ * installed pack is taken (#1405); a missing one is fetched behind the band on Play (#1997).
+ * True when a lane moved (that dispatch syncs the band again).
+ */
+function applyBandAutoVoices(): boolean {
+    const { groove, chords, soloist } = getState();
+    const auto = bandAutoComp(groove.lastSmartGenre);
+    if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
+        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'chords', voice: auto, auto: true });
+        return true;
+    }
+    // The same for the lead: a native style's own lead instrument, when its pack is installed
+    // (the built-in voice needs no pack).
+    const autoLead = bandAutoLead(groove.lastSmartGenre);
+    if (
+        autoLead &&
+        soloist.autoSound &&
+        soloist.voice !== autoLead &&
+        (autoLead === 'synth' || isPackInstalled(autoLead.slice(5)))
+    ) {
+        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'soloist', voice: autoLead, auto: true });
+        return true;
+    }
+    return false;
+}
+
 /** Keep the band in step with every change the app makes to the shared state. */
 function syncBand(): void {
     const host = band;
@@ -669,26 +719,8 @@ function syncBand(): void {
             param('groove', 'swingSub', payload.sub);
         }
     }
-    // The genre-change effect in `core/` picks the old engine's Auto sound; on the band,
-    // a native genre's own comp instrument wins (bossa is heard on nylon). Only an installed
-    // pack is taken (#1405); a missing one is fetched behind the band on Play (#1997).
-    const { chords, soloist } = getState();
-    const auto = bandAutoComp(groove.lastSmartGenre);
-    if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
-        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'chords', voice: auto, auto: true });
+    if (applyBandAutoVoices()) {
         return; // that dispatch syncs the band again
-    }
-    // The same for the lead: a native style's own lead instrument, when its pack is installed
-    // (the built-in voice needs no pack).
-    const autoLead = bandAutoLead(groove.lastSmartGenre);
-    if (
-        autoLead &&
-        soloist.autoSound &&
-        soloist.voice !== autoLead &&
-        (autoLead === 'synth' || isPackInstalled(autoLead.slice(5)))
-    ) {
-        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'soloist', voice: autoLead, auto: true });
-        return;
     }
     if (!host?.playing) {
         return;
@@ -704,64 +736,20 @@ function syncBand(): void {
 // ---------------------------------------------------------------- the style's own sounds
 /** The band has played on this page: a style change from now on fetches its sounds too. */
 let everPlayed = false;
-/**
- * How far ahead of the audio clock the band host sends notes to the voices (`band-host.ts`'s
- * `LOOKAHEAD_S`). A lane's sound is read when its note is sent, so a sound changed this long
- * before a barline is first heard on that barline.
- */
-const SEND_AHEAD_S = 0.15;
 const soundsResolved = new Set<() => void>();
-
-/**
- * Resolve once the band is about to send the next barline's notes, so a sound changed then is
- * first heard on the barline (#1997); at once while stopped. Read off the host's song tick and
- * the timeline it plays, at the transport's tempo — the same clock `inLastBeat` reads.
- */
-function beforeNextBarline(): Promise<void> {
-    const deadline = Date.now() + STAGED_FEEL_TIMEOUT_MS;
-    return new Promise((resolve) => {
-        const check = () => {
-            const timeline = songPlan?.timeline ?? currentTimeline?.timeline;
-            if (!band?.playing || !timeline || Date.now() > deadline) {
-                resolve();
-                return;
-            }
-            const tick = band.songTick();
-            if (tick === null) {
-                // Counting in, or between two queued segments: look again shortly.
-                setTimeout(check, 100);
-                return;
-            }
-            const bar = barAtTick(timeline, tick);
-            if (!bar) {
-                resolve();
-                return;
-            }
-            const ticksPerSecond = (PPQ * getState().playback.bpm) / 60;
-            const seconds = (bar.start + bar.meter.barTicks - tick) / ticksPerSecond;
-            const wait = seconds - SEND_AHEAD_S;
-            if (wait < 0.02) {
-                // Too close to make this one: past it, then aim for the next.
-                setTimeout(check, (seconds + 0.05) * 1000);
-            } else {
-                setTimeout(resolve, wait * 1000);
-            }
-        };
-        check();
-    });
-}
 
 /**
  * Packs the playing style wants on a lane that follows it (`autoSound`) and that is on, and that
  * this device has not installed. A pinned lane — Built-in or a pack chosen by hand — is never
- * asked about, so a chart saved with its own sounds keeps them. A lane that is off is skipped:
- * it is not heard, and the next Play after it is turned on fetches it.
+ * asked about, so a chart saved with its own sounds keeps them. A lane that is not heard is
+ * skipped — one switched off, or your own muted one (#2072) — and the next Play after it is turned
+ * on fetches it.
  */
 function stylePacksWanted(): string[] {
     const state = getState();
     const wanted = new Set<string>();
     for (const module of AUTO_LANES) {
-        if (!state[module].autoSound || !state[module].enabled) {
+        if (!state[module].autoSound || !laneHeard(module)) {
             continue;
         }
         const voice = recommendedVoice(module, undefined, undefined, () => true);
@@ -779,15 +767,34 @@ function stylePacksWanted(): string[] {
  * shell, which shows the document as resolved on this device (`withLoadedSounds`), so a sound
  * that arrived is not an unsaved change.
  */
-async function switchToArrivedSounds(): Promise<void> {
-    await beforeNextBarline();
-    resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
-    if (!band?.playing) {
-        rebuild();
-    }
-    for (const listener of soundsResolved) {
-        listener();
-    }
+function switchToArrivedSounds(): Promise<void> {
+    return new Promise((resolve) => {
+        let done = false;
+        const apply = () => {
+            if (done) {
+                return;
+            }
+            done = true;
+            clearTimeout(failsafe);
+            resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
+            if (!band?.playing) {
+                rebuild();
+            }
+            for (const listener of soundsResolved) {
+                listener();
+            }
+            resolve();
+        };
+        // The band host runs this inside its pump, just before it sends the first note of the
+        // next barline, so the new sound is heard on that barline whatever the page timer does
+        // (#2060). The bound is only for a clock that never reaches one (a suspended context).
+        const failsafe = setTimeout(apply, STAGED_FEEL_TIMEOUT_MS);
+        if (band?.playing) {
+            band.beforeBarline(apply);
+        } else {
+            apply();
+        }
+    });
 }
 
 const styleSounds = createStyleSounds({
@@ -1064,7 +1071,7 @@ export async function startSection(
     }
     bringUpAudio();
     const intent = ++playIntent;
-    await prepareSounds(captureContent(), progress);
+    await prepareSounds(playedContent(), progress);
     if (intent !== playIntent) {
         return true;
     }
@@ -1133,7 +1140,7 @@ export async function loopSection(
     }
     bringUpAudio();
     const intent = ++playIntent;
-    await prepareSounds(captureContent(), progress);
+    await prepareSounds(playedContent(), progress);
     if (intent !== playIntent) {
         return;
     }
@@ -1184,7 +1191,7 @@ export async function toggle(progress: SoundProgress): Promise<void> {
     // Keep AudioContext creation on the gesture stack for mobile Safari.
     bringUpAudio();
     const intent = ++playIntent;
-    await prepareSounds(captureContent(), progress);
+    await prepareSounds(playedContent(), progress);
     if (intent !== playIntent) {
         return;
     }
@@ -1294,16 +1301,30 @@ export function tradePartners(): { soloist: boolean; drums: boolean } {
  * Mirrors the gate in `planBars` (band/arrange/plan.ts), so the Trade control never claims a
  * trade the band won't play.
  */
-export function tradeBlocked(): 'soloist-off' | 'drums-off' | 'drummer-no-solo' | null {
+export type TradeBlocked =
+    | 'soloist-off'
+    | 'drums-off'
+    | 'drummer-no-solo'
+    /** The lane to trade with is yours, and muted (#2072): the band has no one there. */
+    | 'you-soloist'
+    | 'you-drums';
+
+export function tradeBlocked(): TradeBlocked | null {
     // Read through `laneHeard`: your own lane muted is a hole, and the band never trades with
     // it (`tradeThatHappens`, #1992).
     const { soloist } = getState();
     if (soloist.tradeWith === 'soloist') {
-        return laneHeard('soloist') ? null : 'soloist-off';
+        return laneHeard('soloist')
+            ? null
+            : playerLane === 'soloist'
+              ? 'you-soloist'
+              : 'soloist-off';
     }
     if (soloist.tradeWith === 'drums') {
         return !laneHeard('groove')
-            ? 'drums-off'
+            ? playerLane === 'groove'
+                ? 'you-drums'
+                : 'drums-off'
             : tradePartners().drums
               ? null
               : 'drummer-no-solo';
@@ -1608,6 +1629,13 @@ export function load(document: ChartDocument, opened = false): void {
         // about this device. Resolve it again against what is installed here, by the same rule a
         // feel change uses.
         resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
+        // And the band's own comp and lead, which `syncBand` would otherwise only settle on the
+        // first dispatch after Play: too late for `prepareSounds`, so a pack installed here
+        // started on built-in and swapped in once decoded (#2082). The subscriber is off while
+        // loading, so both lanes are settled here (the second pass takes the lead).
+        if (applyBandAutoVoices()) {
+            applyBandAutoVoices();
+        }
         rebuild();
     } catch (error) {
         apply(previous);
@@ -1617,10 +1645,13 @@ export function load(document: ChartDocument, opened = false): void {
         loading = false;
     }
     if (opened) {
-        // Each chart opens with the musician's own lane muted (#1992).
-        playerLaneHeard = false;
+        // The musician's own lane keeps the choice they made on this device (#2072); what turning
+        // it on wrote into the previous chart does not follow them.
         playerLaneWroteChart = false;
     }
+    // The packs this chart's lanes name that the device already holds, decoded while the page is
+    // idle, so Play finds them ready (#2082).
+    warmSounds(playedContent());
 }
 
 /**
@@ -1788,7 +1819,7 @@ export async function setGenre(name: string, progress: SoundProgress = () => {})
 }
 
 export function setTempo(bpm: number): void {
-    dispatch(ACTIONS.SET_BPM, Math.max(40, Math.min(240, Math.round(bpm))));
+    dispatch(ACTIONS.SET_BPM, Math.max(MIN_BPM, Math.min(MAX_BPM, Math.round(bpm))));
 }
 /** `InstrumentModule`'s state-slice name for the drum lane; the telemetry event names it `drums`. */
 const TELEMETRY_PART: Record<InstrumentModule, 'drums' | 'bass' | 'chords' | 'soloist'> = {
@@ -1807,6 +1838,7 @@ export function setEnabled(module: InstrumentModule, enabled: boolean): void {
             return;
         }
         playerLaneHeard = enabled;
+        rememberPlayerLaneOn(enabled ? module : null);
         track('part_toggled', { part: TELEMETRY_PART[module] });
         if (enabled && !getState()[module].enabled) {
             playerLaneWroteChart = true;
@@ -1823,6 +1855,12 @@ export function setEnabled(module: InstrumentModule, enabled: boolean): void {
                 flushBuffer(module);
             }
             band?.update(bandSettings());
+        }
+        if (enabled) {
+            // Heard from now on, so its sounds are wanted: a pinned pack and the style's own
+            // (#2072), fetched behind the band as a lane switched on is.
+            void prepareSounds(playedContent(), () => {}).catch(() => {});
+            void styleSounds.request();
         }
         return;
     }
@@ -1841,7 +1879,12 @@ export function setPlayerLane(module: InstrumentModule | null): void {
         return;
     }
     playerLane = module;
-    playerLaneHeard = false;
+    // Their remembered choice stands only for the instrument it was made on: another instrument
+    // starts muted, as the first answer does.
+    playerLaneHeard = module !== null && playerLaneOnPreference() === module;
+    if (!playerLaneHeard) {
+        rememberPlayerLaneOn(null);
+    }
     playerLaneWroteChart = false;
     band?.update(bandSettings());
 }
@@ -1861,11 +1904,11 @@ export function transpose(delta: number, key?: string): void {
     const target = { key: score.key, isMinor: score.isMinor === true };
     for (const section of score.sections) {
         if (section.key) {
-            section.key = transposeKeyName(section.key, delta);
+            section.key = transposeKeyKeepingSpelling(section.key, delta);
         }
         for (const measure of section.measures) {
             if (measure.key) {
-                measure.key = transposeKeyName(measure.key, delta);
+                measure.key = transposeKeyKeepingSpelling(measure.key, delta);
             }
             if (measure.content.kind === 'events') {
                 for (const event of measure.content.events) {
@@ -2079,7 +2122,8 @@ export async function exportAudio(
     instruments: StemInstrument[] = STEM_INSTRUMENTS,
 ): Promise<void> {
     const intent = ++exportIntent;
-    await prepareSounds(captureContent(), progress);
+    // A mix is the band as played, so it fetches only what is heard; stems render every lane.
+    await prepareSounds(kind === 'mix' ? playedContent() : captureContent(), progress);
     if (intent !== exportIntent) {
         return;
     }
@@ -2088,11 +2132,17 @@ export async function exportAudio(
     const bpm = getState().playback.bpm;
     if (kind === 'mix') {
         progress('Rendering mix…');
-        const { events, timeline } = await host.render(exportSettings(plan));
+        // The mix is the band as played (#2072): your own muted part is left out, as in Play and
+        // the .mid; the stems below keep every lane.
+        const settings = exportSettings(plan);
+        const { events, timeline } = await host.render(settings);
         if (intent !== exportIntent) {
             return;
         }
-        const result = await renderBandMixToWav(events, timeline, bpm, { filename });
+        const result = await renderBandMixToWav(events, timeline, bpm, {
+            filename,
+            you: settings.you,
+        });
         if (intent !== exportIntent) {
             return;
         }

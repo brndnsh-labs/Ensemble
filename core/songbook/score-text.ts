@@ -139,6 +139,7 @@ const QUALITIES = new Set([
     // the suspended 9th and 13th with their 4th spelled out.
     'mMaj7',
     'madd9',
+    'm69',
     'm7b9',
     'm7#11',
     'm7b13',
@@ -201,36 +202,57 @@ export function isScoreChord(symbol: string): boolean {
  */
 export function houseQuality(quality: string): string | null {
     const candidates: string[] = [];
-    // Minor-major seventh: Cm(maj7), CmM7, Cmin(maj7), C-(maj7) → CmMaj7 (the seventh is required).
-    if (/^(?:m|min|-)(?:\((?:maj|Maj|MAJ|M|Δ|△|\^)7\)|(?:maj|Maj|MAJ|M|Δ|△|\^)7)$/.test(quality)) {
-        candidates.push('mMaj7');
-    }
     const spelled = quality
-        .replace(/^(?:min|Min|MIN|mi)(?=[^a-z]|$)/, 'm')
+        .replace(/^(?:min|Min|MIN|mi|Mi|MI)(?=[^a-z]|$)/, 'm')
         .replace(/^(?:Maj|MAJ|MA|Ma)(?![a-z])/, 'maj')
         .replace(/^(?:Δ|△)(?=\d)/, 'maj')
         .replace(/^M(?=\d)/, 'maj')
         .replace(/(\d)\+(?=\d)/g, '$1#');
+    // Minor-major seventh: Cm(maj7), Cmi(maj7), CmM7, Cmin(maj7), C-(maj7) → CmMaj7 (the seventh
+    // is required).
+    if (/^(?:m|-)(?:\((?:maj|Maj|MAJ|M|Δ|△|\^)7\)|(?:maj|Maj|MAJ|M|Δ|△|\^)7)$/.test(spelled)) {
+        candidates.push('mMaj7');
+    }
+    // Minor sixth-ninth: Cm6/9, Cmin6/9, Cm69 → Cm69 (the band reads iReal's `-69` the same way).
+    if (/^m6\/?9$/.test(spelled)) {
+        candidates.push('m69');
+    }
     candidates.push(spelled);
-    // Alterations may be parenthesised after the stem: C7(#9) reads as C7#9, but maj(add4) stays.
-    candidates.push(spelled.replace(/\((?!add)([#b]\d+)\)/g, '$1'));
+    // Alterations may be parenthesised after the stem, one or a comma list, `+5` for `#5`:
+    // C7(#9) reads as C7#9, C7(+5) as C7#5, C7(b9,#11) as C7b9#11; maj(add4) stays, and
+    // Cm(add9) reads as Cmadd9.
+    candidates.push(
+        spelled
+            .replace(/\(([#b+]\d+(?:,[#b+]\d+)*)\)/g, (_, list: string) =>
+                list.replace(/,/g, '').replace(/\+(?=\d)/g, '#'),
+            )
+            .replace(/^m\((add\d+)\)$/, 'm$1'),
+    );
     return candidates.find((candidate) => QUALITIES.has(candidate)) ?? null;
 }
 
-/** The house spelling of a chord symbol: itself when accepted, else a known everyday alias. */
+/**
+ * The house spelling of a chord symbol: itself when accepted, else a known everyday alias. The
+ * flat and sharp signs become `b` and `#` either way, so `B♭m7` and `B♭min7` both store `Bbm7`.
+ */
 function houseChord(symbol: string): string | null {
-    if (isScoreChord(symbol)) {
-        return symbol;
-    }
     if (symbol.length > 80) {
         return null;
     }
     const normalized = symbol.replaceAll('♭', 'b').replaceAll('♯', '#');
+    if (isScoreChord(normalized)) {
+        return normalized;
+    }
     const root = normalized.match(ROOT)?.[0];
     if (!root) {
         return null;
     }
     const tail = normalized.slice(root.length);
+    // A quality can hold a slash itself (`m6/9`), so the whole tail is tried before a bass is split off.
+    const whole = houseQuality(tail);
+    if (whole !== null && isScoreChord(`${root}${whole}`)) {
+        return `${root}${whole}`;
+    }
     const slash = tail.lastIndexOf('/');
     const quality = slash < 0 ? tail : tail.slice(0, slash);
     const bass = slash < 0 ? '' : tail.slice(slash);

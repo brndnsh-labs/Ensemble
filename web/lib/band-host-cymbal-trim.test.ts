@@ -144,6 +144,15 @@ describe('soundingLayers', () => {
         expect(soundingLayers(state, timeline, timeline.bars[2].start)).toBe(2);
     });
 
+    it('does not count your own muted lane: the chart has it on but nobody plays it (#2072)', () => {
+        expect(soundingLayers(state, timeline, 0, 'bass')).toBe(2);
+        expect(soundingLayers(state, timeline, 0, 'comp')).toBe(2);
+        expect(soundingLayers(state, timeline, 0, 'lead')).toBe(2);
+        // The drummer is not a pitched lane: a muted kit changes no count.
+        expect(soundingLayers(state, timeline, 0, 'drums')).toBe(3);
+        expect(soundingLayers(state, timeline, 0, null)).toBe(3);
+    });
+
     it('falls back to the switched-on lanes outside every bar', () => {
         expect(soundingLayers(state, timeline, timeline.ticks + 1000)).toBe(3);
     });

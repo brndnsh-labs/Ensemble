@@ -1,10 +1,17 @@
+import { MAX_BPM, MIN_BPM } from '@core/config';
 import { useEffect, useRef, useState } from 'react';
 import { afterPress } from './after-press';
 
-const MIN_TEMPO = 40;
-const MAX_TEMPO = 240;
 function clampTempo(bpm: number): number {
-    return Math.max(MIN_TEMPO, Math.min(MAX_TEMPO, Math.round(bpm)));
+    return Math.max(MIN_BPM, Math.min(MAX_BPM, Math.round(bpm)));
+}
+
+/**
+ * How far − and + move the tempo: one BPM a press, ten with Shift (#1996, DECISION 2026-11-04),
+ * as the field's own Up and Down keys do. Five at a time skipped the tempo a player was after.
+ */
+function stepOf(direction: 1 | -1, shift: boolean): number {
+    return direction * (shift ? 10 : 1);
 }
 
 /** Keep intermediate keystrokes local; changing the band is a committed user action. */
@@ -52,7 +59,7 @@ export function TempoControl({
                     aria-label="Slower"
                     disabled={disabled}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => commit(-5)}
+                    onClick={(event) => commit(stepOf(-1, event.shiftKey))}
                 >
                     −
                 </button>
@@ -61,8 +68,8 @@ export function TempoControl({
                     inputMode="numeric"
                     // Up and Down step it, so it says so (#2069): a spinbutton with its range.
                     role="spinbutton"
-                    aria-valuemin={MIN_TEMPO}
-                    aria-valuemax={MAX_TEMPO}
+                    aria-valuemin={MIN_BPM}
+                    aria-valuemax={MAX_BPM}
                     aria-valuenow={value}
                     value={text}
                     disabled={disabled}
@@ -84,7 +91,7 @@ export function TempoControl({
                             // The field is a number: up and down step it (Shift takes ten), as the
                             // − and + buttons do. Committed at once, like them, so the band follows.
                             event.preventDefault();
-                            commit((event.key === 'ArrowUp' ? 1 : -1) * (event.shiftKey ? 10 : 1));
+                            commit(stepOf(event.key === 'ArrowUp' ? 1 : -1, event.shiftKey));
                         } else if (event.key === 'Escape') {
                             event.preventDefault();
                             setText(String(value));
@@ -96,7 +103,7 @@ export function TempoControl({
                     aria-label="Faster"
                     disabled={disabled}
                     onPointerDown={(event) => event.preventDefault()}
-                    onClick={() => commit(5)}
+                    onClick={(event) => commit(stepOf(1, event.shiftKey))}
                 >
                     +
                 </button>

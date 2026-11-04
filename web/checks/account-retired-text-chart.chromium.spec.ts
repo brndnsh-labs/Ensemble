@@ -212,7 +212,10 @@ test('sign-out and account deletion name a song this app can no longer open, and
     // The copies go again, so the rest is about the one real song and the text chart.
     await seedCopies(page, 8, true);
     await page.reload();
-    await expect(accountChip(page)).toBeVisible();
+    // This account is unprotected (its recovery code was skipped), and the header first says
+    // "Signed in" until the server says so, then swaps in "Finish protecting your account" where
+    // that chip was. Wait for the swap, or the chip's click lands on the new button (#2084).
+    await expect(page.getByTestId('account-finish-protecting')).toBeVisible();
 
     await openSignOut(page);
     await expect(page.getByTestId('sign-out-unreadable')).toHaveText(

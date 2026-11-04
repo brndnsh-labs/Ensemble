@@ -11,6 +11,7 @@ import {
     openSectionMenu,
     phoneWidth,
     pickSongKey,
+    resizeTo,
     seedStarters,
     settled,
     songLink,
@@ -120,7 +121,7 @@ test('a practice nudge is said apart from a chart change, and both wait for Save
     await expect(save).toBeDisabled();
     await expect(status).toHaveText('Saved on this device');
     const kept = await savedBlue(page);
-    expect(kept.chart.performance.bpm).toBe(stored.chart.performance.bpm + 5);
+    expect(kept.chart.performance.bpm).toBe(stored.chart.performance.bpm + 1);
     expect(kept.chart.score.key).toBe(before === 'D' ? 'E' : 'D');
 });
 
@@ -181,18 +182,23 @@ test('tempo allows sequential typing, Enter, blur, Escape and single step commit
     await tempo.press('Escape');
     await expect(tempo).toHaveValue('135');
     await tempo.fill('100');
+    // One BPM a press (#1996), ten with Shift.
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
-    await expect(tempo).toHaveValue('105');
-    expect((await exportCurrent(page)).chart.performance.bpm).toBe(105);
+    await expect(tempo).toHaveValue('101');
+    expect((await exportCurrent(page)).chart.performance.bpm).toBe(101);
     await tempo.fill('80');
     await page.getByRole('button', { name: 'Slower', exact: true }).click();
-    await expect(tempo).toHaveValue('75');
+    await expect(tempo).toHaveValue('79');
+    await page.getByRole('button', { name: 'Faster', exact: true }).click({ modifiers: ['Shift'] });
+    await expect(tempo).toHaveValue('89');
+    await page.getByRole('button', { name: 'Slower', exact: true }).click({ modifiers: ['Shift'] });
+    await expect(tempo).toHaveValue('79');
     await tempo.fill('1');
     await tempo.press('Enter');
     await expect(tempo).toHaveValue('40');
     await tempo.fill('999');
     await tempo.press('Enter');
-    await expect(tempo).toHaveValue('240');
+    await expect(tempo).toHaveValue('320');
 });
 
 // #1485 — opening a song remounts the tempo field (`key={current.id}`), and its sync effect used
@@ -252,14 +258,14 @@ test('Continue remembers opened songs and recovered setup without changing saved
     await page.getByRole('button', { name: 'Faster', exact: true }).click();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(page.locator('.continue-card')).toContainText('Blue pocket');
-    await expect(page.locator('.continue-card')).toContainText('115 BPM');
+    await expect(page.locator('.continue-card')).toContainText('111 BPM');
     expect(await savedBlue(page)).toEqual(before);
     await page.reload();
     await expect(page.locator('.continue-card')).toContainText('Pick up where you left off');
     await expect(page.locator('.continue-card')).toContainText('Blue pocket');
-    await expect(page.locator('.continue-card')).toContainText('115 BPM');
+    await expect(page.locator('.continue-card')).toContainText('111 BPM');
     await page.getByRole('button', { name: 'Open chart', exact: true }).click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
     expect(await savedBlue(page)).toEqual(before);
 });
 
@@ -424,7 +430,8 @@ test('the stand scales to its screen and keeps mute state readable', async ({ pa
         { width: 1300, height: 940 },
         { width: 1600, height: 1100 },
     ]) {
-        await page.setViewportSize({ width: at.width, height: at.height });
+        // The new size's step, not the last one's: `data-fits` can't tell them apart (#2084).
+        await resizeTo(page, at.width, at.height);
         await expect(page.locator('.chart-scroll[data-fits="true"]')).toBeVisible();
         const idle = await measure();
         expect(idle.chord, `chord @${at.width}x${at.height}`).toBeGreaterThanOrEqual(18);

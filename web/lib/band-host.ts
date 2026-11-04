@@ -42,6 +42,7 @@ import { playDrumSound } from '@core/engine/synth-drums';
 import { playSoloNote } from '@core/engine/synth-soloist';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { EnsembleState } from '@core/types';
+import { countInBars } from './count-in';
 
 const LOOKAHEAD_S = 0.15;
 const TIMER_MS = 25;
@@ -147,34 +148,46 @@ export interface HostOptions {
     onEnd?: () => void;
 }
 
-/** One bar of count-in clicks: pure and audio-free, so it's unit-testable on its own. */
+/** The count-in's clicks: pure and audio-free, so it's unit-testable on its own. */
 export interface CountInPlan {
-    /** Seconds from the count-in's own start to each click — same length as the bar's pulses. */
+    /** Seconds from the count-in's own start to each click: the bar's pulses, once per bar. */
     times: number[];
     /** Same accent scheme `BandHost`'s per-segment metronome uses: 1000 Hz on the downbeat,
      * 800/600 by role otherwise. */
     freqs: number[];
-    /** The bar's own length in seconds at `bpm` — how long the count-in runs, and so exactly
-     * how much the first real bar is pushed back from the moment Play was pressed. */
+    /** The count-in's length in seconds at `bpm` (its bars, each the first bar's length) — how
+     * long it runs, and so exactly how much the first real bar is pushed back from the moment
+     * Play was pressed. */
     seconds: number;
+    /** Clicks in each of its bars: the beat a click counts is its index modulo this. */
+    perBar: number;
 }
 
 /**
- * One bar of clicks in the timeline's bar `fromBar`, at `bpm` — the chart's own meter and
- * tempo, not a fixed 4/4. Goes through `secondsAt` like every other time computation here, so
- * a fermata or tempo change elsewhere in the song can't skew a bar that has none of its own.
+ * The count-in (`countInBars` of them) in the meter of the timeline's bar `fromBar`, at `bpm` —
+ * the chart's own meter and tempo, not a fixed 4/4. Goes through `secondsAt` like every other
+ * time computation here, so a fermata or tempo change elsewhere in the song can't skew a bar
+ * that has none of its own. Each bar of a two-bar count is the same bar again, its downbeat
+ * accented, so the player hears "1 2 3 4, 1 2 3 4".
  */
 export function countInPlan(timeline: Timeline, bpm: number, fromBar: number): CountInPlan {
     const bar = timeline.bars[fromBar];
     const barStart = secondsAt(timeline, bar.start, bpm);
-    const times = bar.meter.pulses.map(
+    const once = bar.meter.pulses.map(
         (offset) => secondsAt(timeline, bar.start + offset, bpm) - barStart,
     );
-    const freqs = bar.meter.pulses.map((_offset, i) =>
+    const accents = bar.meter.pulses.map((_offset, i) =>
         i === 0 ? 1000 : bar.meter.roles[i] === 'strong' ? 800 : 600,
     );
-    const seconds = secondsAt(timeline, bar.start + bar.meter.barTicks, bpm) - barStart;
-    return { times, freqs, seconds };
+    const length = secondsAt(timeline, bar.start + bar.meter.barTicks, bpm) - barStart;
+    const bars = countInBars(bpm);
+    const each = Array.from({ length: bars }, (_, b) => b);
+    return {
+        times: each.flatMap((b) => once.map((time) => b * length + time)),
+        freqs: each.flatMap(() => accents),
+        seconds: bars * length,
+        perBar: once.length,
+    };
 }
 
 function hz(midi: number): number {
@@ -212,14 +225,22 @@ export function bandEventLevel(event: BandEvent): { level: number; levelScale?: 
  * trim (`getCymbalMixScale`) follows the section that is playing and never re-derives it from
  * the arranger's step maps. A tick outside every bar (none is expected) falls back to the
  * switched-on lanes, the rule for a hit with no section (`enabledLayerCount`).
+ *
+ * `you` is the musician's own muted lane (`BandSettings.you`, #2072): the chart has it on but
+ * nobody plays it, so it is not a layer the cymbals share the mix with.
  */
-export function soundingLayers(state: EnsembleState, timeline: Timeline, tick: number): number {
+export function soundingLayers(
+    state: EnsembleState,
+    timeline: Timeline,
+    tick: number,
+    you: BandEvent['lane'] | null = null,
+): number {
     // Runs for every drum hit, so no objects are built here.
     const lanes = barAtTick(timeline, tick)?.visit.lanes;
     return (
-        (state.bass?.enabled && lanes?.bass !== false ? 1 : 0) +
-        (state.chords?.enabled && lanes?.comp !== false ? 1 : 0) +
-        (state.soloist?.enabled && lanes?.lead !== false ? 1 : 0)
+        (state.bass?.enabled && lanes?.bass !== false && you !== 'bass' ? 1 : 0) +
+        (state.chords?.enabled && lanes?.comp !== false && you !== 'comp' ? 1 : 0) +
+        (state.soloist?.enabled && lanes?.lead !== false && you !== 'lead' ? 1 : 0)
     );
 }
 
@@ -242,6 +263,7 @@ export function playBandEvent(
     chordSize: number,
     timeline: Timeline,
     legato = false,
+    you: BandEvent['lane'] | null = null,
 ): void {
     const { level } = bandEventLevel(event);
     if (event.lane === 'drums') {
@@ -250,7 +272,7 @@ export function playBandEvent(
             DRUM_NAMES[event.piece],
             time,
             level,
-            soundingLayers(state, timeline, event.tick),
+            soundingLayers(state, timeline, event.tick, you),
         );
         return;
     }
@@ -327,6 +349,15 @@ function chordSizes(events: BandEvent[]): Map<number, number> {
     return sizes;
 }
 
+/** A hook runs inside the pump: one that throws must not stop the pump or the hooks after it. */
+function runHook(run: () => void): void {
+    try {
+        run();
+    } catch (error) {
+        console.error('A barline hook failed', error);
+    }
+}
+
 export class BandHost {
     private readonly options: HostOptions;
     private timeline: Timeline | null = null;
@@ -346,11 +377,15 @@ export class BandHost {
     private heard: Timeline | null = null;
     /** The barline where the last settings change is first heard, while it is still to come. */
     private change: { segment: Segment; tick: number } | null = null;
-    /** The one-bar count-in scheduled by `start()`, while it is still sounding. */
+    /** `beforeBarline` callbacks still waiting for their barline. */
+    private hooks: { segment: Segment; tick: number; run: () => void }[] = [];
+    /** The count-in scheduled by `start()`, while it is still sounding. */
     private countIn: {
         start: number;
         end: number;
         times: number[];
+        /** Clicks in each of its bars (`CountInPlan.perBar`). */
+        perBar: number;
         /** Its clicks, scheduled up to a bar ahead: a Stop mid-count silences the rest. */
         clicks: OscillatorNode[];
     } | null = null;
@@ -444,11 +479,11 @@ export class BandHost {
     }
 
     /**
-     * `countIn` is one bar of clicks before the first segment, requested only by a fresh Play
-     * from stopped (`runtime.ts`'s `startBand`) and gated there on the `playback.countIn`
-     * preference — every other caller (a wrap's own `append`, `update`'s barline swap,
-     * `setScore`'s restart, a mid-song resume) passes nothing and gets the default `false`, so
-     * the chart's first bar starts on the beat it always did.
+     * `countIn` is a bar of clicks (two above `TWO_BAR_COUNT_IN_ABOVE_BPM`) before the first
+     * segment, requested only by a fresh Play from stopped (`runtime.ts`'s `startBand`) and
+     * gated there on the `playback.countIn` preference — every other caller (a wrap's own
+     * `append`, `update`'s barline swap, `setScore`'s restart, a mid-song resume) passes nothing
+     * and gets the default `false`, so the chart's first bar starts on the beat it always did.
      */
     start(settings: BandSettings, bpm: number, fromTick = 0, countIn = false): void {
         const audio = this.audio;
@@ -473,7 +508,13 @@ export class BandHost {
             const clicks = plan.times.map((offset, i) =>
                 this.click(audio, state, countInStart + offset, plan.freqs[i]),
             );
-            this.countIn = { start: countInStart, end: segmentStart, times: plan.times, clicks };
+            this.countIn = {
+                start: countInStart,
+                end: segmentStart,
+                times: plan.times,
+                perBar: plan.perBar,
+                clicks,
+            };
         }
         this.append(first, segmentStart, undefined);
         this.timer = setInterval(() => this.pump(), TIMER_MS);
@@ -598,6 +639,75 @@ export class BandHost {
             return true;
         }
         return audio.currentTime >= this.timeOf(change.segment, change.tick);
+    }
+
+    /**
+     * Run `run` once, synchronously inside the pump, just before the voices are sent the first
+     * note at or after the next barline the band can still change at (`update()`'s own: after
+     * the lookahead and after every note already sent). A voice reads its sound when a note is
+     * sent, so whatever `run` changes (the arrived sounds, #2060) is first heard on that
+     * barline whatever the page timer does: no timer is aimed at the barline, so none can be
+     * late. Stopped, `run` runs at once; a Stop or restart before the barline runs it too (on
+     * the next microtask, once the host has settled), so a caller waiting on it never hangs.
+     */
+    beforeBarline(run: () => void): void {
+        const audio = this.audio;
+        if (!this.playing || !audio || this.segments.length === 0) {
+            run();
+            return;
+        }
+        const now = audio.currentTime;
+        const horizon = now + LOOKAHEAD_S;
+        const atHorizon = this.current(horizon);
+        const sent = this.underWay(now)!;
+        const segment =
+            atHorizon && this.segments.indexOf(sent) <= this.segments.indexOf(atHorizon)
+                ? atHorizon
+                : sent;
+        const bar = this.changeBar(segment, horizon);
+        // No barline left in this segment: the next segment's first note is the one.
+        const tick = bar < segment.until ? segment.timeline.bars[bar].start : segment.to;
+        this.hooks.push({ segment, tick, run });
+    }
+
+    /** Run every hook whose barline `event` (about to be sent from `segment`) is at or past. */
+    private releaseHooks(segment: Segment, tick: number): boolean {
+        if (this.hooks.length === 0) {
+            return false;
+        }
+        const at = this.segments.indexOf(segment);
+        return this.releaseWhere((hook) =>
+            hook.segment === segment ? tick >= hook.tick : this.segments.indexOf(hook.segment) < at,
+        );
+    }
+
+    /**
+     * After a pump: a hook whose barline is within the horizon and has no unsent note before it
+     * (a barline with no note at it, or its notes all later than the horizon) runs now, as does
+     * one whose segment is gone (a settings change rebuilt the queue under it).
+     */
+    private releaseDueHooks(horizon: number): void {
+        this.releaseWhere((hook) => {
+            if (!this.segments.includes(hook.segment)) {
+                return true;
+            }
+            const next = hook.segment.events[hook.segment.cursor];
+            return (
+                this.timeOf(hook.segment, hook.tick) <= horizon && (!next || next.tick >= hook.tick)
+            );
+        });
+    }
+
+    private releaseWhere(due: (hook: { segment: Segment; tick: number }) => boolean): boolean {
+        if (!this.hooks.some(due)) {
+            return false;
+        }
+        const ready = this.hooks.filter(due);
+        this.hooks = this.hooks.filter((hook) => !ready.includes(hook));
+        for (const hook of ready) {
+            runHook(hook.run);
+        }
+        return true;
     }
 
     /** The song tick sounding now, or null while stopped. */
@@ -745,8 +855,9 @@ export class BandHost {
     }
 
     /**
-     * The count-in beat sounding now (0-based: "1" is beat 0), or null when no count-in is
-     * running — either stopped, past it into the song, or `start()` was never asked for one.
+     * The count-in beat sounding now, within its bar (0-based: "1" is beat 0; a two-bar count
+     * reads 1 2 3 4, 1 2 3 4), or null when no count-in is running — either stopped, past it
+     * into the song, or `start()` was never asked for one.
      * The chart shouldn't advance while this is non-null: `songTick()` already returns null for
      * the same window, since the first segment's `start` is the moment the count-in ends.
      */
@@ -766,7 +877,7 @@ export class BandHost {
                 beat = i;
             }
         }
-        return beat;
+        return beat % countIn.perBar;
     }
 
     /**
@@ -816,6 +927,17 @@ export class BandHost {
             this.timer = null;
         }
         this.segments = [];
+        // Whoever waits on a barline is told the wait is over, once this has settled: the host
+        // may be about to start again (a restart), and a hook must not run inside a half-halted one.
+        const waiting = this.hooks;
+        this.hooks = [];
+        if (waiting.length) {
+            queueMicrotask(() => {
+                for (const hook of waiting) {
+                    runHook(hook.run);
+                }
+            });
+        }
     }
 
     private barAt(tick: number, after = false, timeline = this.timeline!): number {
@@ -1048,12 +1170,27 @@ export class BandHost {
             this.segments.shift();
         }
         const state = this.options.state();
-        for (const segment of this.segments) {
+        const queue = this.segments;
+        segments: for (const segment of queue) {
             while (segment.cursor < segment.events.length) {
                 const event = segment.events[segment.cursor];
                 const time = this.timeOf(segment, event.tick) + event.offsetMs / 1000;
                 if (time > horizon) {
                     break;
+                }
+                // A hook runs before the first note at its barline is sent, even one that is
+                // skipped as missed below: what it changes is for the notes after it.
+                if (this.releaseHooks(segment, event.tick)) {
+                    // What the hook changed may have rebuilt the queue (a dispatch reaches
+                    // `update()`): this event is not yet sent, so look again at what is next
+                    // in this segment, or leave it if the segment was dropped.
+                    if (this.segments !== queue) {
+                        return; // stopped or restarted from inside the hook
+                    }
+                    if (!queue.includes(segment)) {
+                        continue segments; // dropped: no notes, and no clicks, from it
+                    }
+                    continue;
                 }
                 segment.cursor++;
                 if (time < now - 0.02) {
@@ -1063,6 +1200,7 @@ export class BandHost {
             }
             this.metronome(state, segment, now, horizon);
         }
+        this.releaseDueHooks(horizon);
     }
 
     private sound(state: EnsembleState, segment: Segment, event: BandEvent, time: number): void {
@@ -1084,6 +1222,7 @@ export class BandHost {
             segment.chordSizes.get(event.tick) ?? 1,
             segment.timeline,
             segment.legato.has(event),
+            this.settings?.you ?? null,
         );
     }
 

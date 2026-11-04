@@ -4,8 +4,7 @@ import { TIME_SIGNATURES } from '@core/config';
 import type { resolveScoreContext } from '@core/songbook/score-context';
 import type { ScoreContext } from '@core/songbook/score-types';
 import { defaultGrouping, groupingsFor, groupingText, parseGrouping } from '../lib/grouping';
-
-const KEYS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+import { keyChoices } from '../lib/key-choices';
 
 interface BarContextFieldsProps {
     /** What the bar itself writes: an empty field is "Continue". */
@@ -31,7 +30,7 @@ export function BarContextFields({
     className,
     onChange,
 }: BarContextFieldsProps) {
-    const keys = [...new Set([...KEYS, context.key].filter((key): key is string => Boolean(key)))];
+    const keys = keyChoices(context.key);
     const meters = [...new Set([...Object.keys(TIME_SIGNATURES), meter])];
     // #1376 — offered only where the bar's meter has more than one idiomatic split. What
     // "Continue" plays: the grouping this bar inherits, unless it writes a meter, which resets

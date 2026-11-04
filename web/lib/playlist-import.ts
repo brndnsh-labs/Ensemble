@@ -1,3 +1,4 @@
+import { MAX_BPM, MIN_BPM } from '@core/config';
 import { stripDangerousChars } from '@core/sanitize';
 import type { IRealImportResult } from '@core/songbook/ireal-import';
 import type { ChartDocumentV2 } from '@core/songbook/score-types';
@@ -200,9 +201,9 @@ export function resolvePlaylistImport(plan: PlaylistPlan, options: ResolveOption
     }
     if (
         options.bpm !== null &&
-        (!Number.isInteger(options.bpm) || options.bpm < 40 || options.bpm > 240)
+        (!Number.isInteger(options.bpm) || options.bpm < MIN_BPM || options.bpm > MAX_BPM)
     ) {
-        throw new Error('Choose a tempo from 40 to 240 BPM.');
+        throw new Error(`Choose a tempo from ${MIN_BPM} to ${MAX_BPM} BPM.`);
     }
     const newId = options.newId ?? (() => crypto.randomUUID());
     type Match = { id: string; title: string; composer: string };

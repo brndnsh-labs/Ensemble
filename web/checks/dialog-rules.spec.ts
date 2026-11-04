@@ -288,6 +288,9 @@ test('Older drafts and the Copy link fallback close on a backdrop tap', async ({
     const second = await context.newPage();
     await second.goto(appUrl());
     await songLink(second, 'Blue pocket', 'Blues').click();
+    // The second tab has the saved song before this one edits it: an open still loading reads
+    // this tab's new draft and recovers it, and Faster then lands back on the saved tempo (#2084).
+    await expect(second.getByLabel('Tempo', { exact: true })).toHaveValue('110');
     await page.getByRole('button', { name: 'Slower', exact: true }).click();
     await second.getByRole('button', { name: 'Faster', exact: true }).click();
     await second.getByRole('button', { name: 'Save', exact: true }).click();
@@ -295,7 +298,7 @@ test('Older drafts and the Copy link fallback close on a backdrop tap', async ({
     await second.close();
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('115');
+    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
     await songMenuAction(page, /Older drafts \(/);
     await closesOnBackdrop(page, page.getByRole('dialog', { name: 'Older drafts' }));
 });

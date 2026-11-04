@@ -9,6 +9,7 @@ import {
     keyNamesFor,
     normalizeKey,
     respellKeyForMode,
+    transposeKeyKeepingSpelling,
     transposeKeyName,
 } from '../../../core/utils.js';
 
@@ -74,6 +75,23 @@ describe('Utility Functions', () => {
         it('should transpose normalized keys across large negative intervals', () => {
             expect(transposeKeyName('C', -13)).toBe('B');
             expect(transposeKeyName('F#', -1)).toBe('F');
+        });
+    });
+
+    describe('transposeKeyKeepingSpelling (#2068)', () => {
+        it('keeps a sharp key in sharps and a flat or natural one in flats', () => {
+            expect(transposeKeyKeepingSpelling('F#', 2)).toBe('G#');
+            expect(transposeKeyKeepingSpelling('F#', 0)).toBe('F#');
+            expect(transposeKeyKeepingSpelling('C#', 1)).toBe('D');
+            expect(transposeKeyKeepingSpelling('Bb', 2)).toBe('C');
+            expect(transposeKeyKeepingSpelling('Bb', 1)).toBe('B');
+            expect(transposeKeyKeepingSpelling('Gb', 1)).toBe('G');
+            expect(transposeKeyKeepingSpelling('C', 1)).toBe('Db');
+            expect(transposeKeyKeepingSpelling('F#', -13)).toBe('F');
+        });
+
+        it('moves nothing for a key it cannot place', () => {
+            expect(transposeKeyKeepingSpelling('H', 3)).toBe('H');
         });
     });
 

@@ -154,8 +154,22 @@ describe('countInPlan', () => {
     });
 
     it("halves at double tempo — it tracks the chart's own bpm, not a fixed duration", () => {
-        const plan = countInPlan(timeline, 240, 0);
-        expect(plan.seconds).toBeCloseTo(1, 10);
+        expect(countInPlan(timeline, 100, 0).seconds).toBeCloseTo(2.4, 10);
+        expect(countInPlan(timeline, 200, 0).seconds).toBeCloseTo(1.2, 10);
+    });
+
+    it('is two bars above 200 bpm, counted 1 2 3 4, 1 2 3 4 (#1996)', () => {
+        const at200 = countInPlan(timeline, 200, 0);
+        const at201 = countInPlan(timeline, 201, 0);
+        expect(at200.times).toHaveLength(4);
+        expect(at201.times).toHaveLength(8);
+        expect(at201.perBar).toBe(4);
+        // Two bars of 201's own length, each downbeat accented as the metronome's is.
+        const bar = (60 / 201) * 4;
+        expect(at201.seconds).toBeCloseTo(2 * bar, 10);
+        expect(at201.times[4]).toBeCloseTo(bar, 10);
+        expect([at201.freqs[0], at201.freqs[4]]).toEqual([1000, 1000]);
+        expect(countInPlan(timeline, 320, 0).times).toHaveLength(8);
     });
 
     it('accents the downbeat exactly like the per-segment metronome does', () => {
@@ -190,6 +204,29 @@ describe('BandHost count-in scheduling', () => {
         expect(host.songTick()).toBeCloseTo(0, 6);
         expect(host.countingInBeat()).toBeNull();
 
+        host.stop();
+    });
+
+    it('counts two bars in above 200 bpm, the beat read within its bar (#1996)', () => {
+        const audio = fakeAudioContext(10);
+        const state = fakeState(audio);
+        const host = new BandHost({ state: () => state, silence: () => {} });
+        host.setScore(twoBars);
+        const bpm = 240;
+        host.start(drumsOnly, bpm, 0, true);
+        const beat = 60 / bpm;
+        // Eight clicks: two bars of four.
+        expect(audio.createOscillator).toHaveBeenCalledTimes(8);
+        const start = 10 + 0.1;
+        // The second bar's second click reads "2", as its first bar's did.
+        audio.currentTime = start + 5 * beat + beat / 2;
+        expect(host.countingInBeat()).toBe(1);
+        expect(host.songTick()).toBeNull();
+        // The chart starts after both bars, not one.
+        audio.currentTime = start + 8 * beat - 0.01;
+        expect(host.songTick()).toBeNull();
+        audio.currentTime = start + 8 * beat;
+        expect(host.songTick()).toBeCloseTo(0, 6);
         host.stop();
     });
 
@@ -1119,5 +1156,125 @@ describe('BandHost.tradeKey', () => {
         expect(host.tradeKey()).not.toBe(before);
         host.update({ ...heard, you: null });
         expect(host.tradeKey()).toBe(before);
+    });
+});
+
+/**
+ * `beforeBarline` (#2060): a sound that arrives is first heard on a barline. The hook runs inside
+ * the pump, before the first note at or after the barline is sent, so a late page timer cannot
+ * let the downbeat go out on the old sound.
+ */
+describe('BandHost.beforeBarline', () => {
+    const BAR_S = 2;
+    const barline = 10.1 + BAR_S;
+    const onOrAfter = (calls: { time: number }[]) =>
+        calls.filter((call) => call.time >= barline - 0.06);
+
+    it('runs before the first note of the barline is sent, however late the timer is', () => {
+        // The timer fires 25 ms apart until 200 ms before the barline, then stalls for 210 ms:
+        // the pump that follows finds the barline's pushed downbeat already due.
+        const { host, tick, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.5);
+        let sentWhenRun = -1;
+        let runs = 0;
+        host.beforeBarline(() => {
+            runs++;
+            sentWhenRun = onOrAfter(voiceCalls()).length;
+        });
+        pumpTo(barline - 0.5, barline - 0.2);
+        expect(runs).toBe(0);
+        tick(barline + 0.01);
+        expect(runs).toBe(1);
+        expect(sentWhenRun).toBe(0);
+        // The downbeat itself still went out, after the hook.
+        expect(onOrAfter(voiceCalls()).length).toBeGreaterThan(0);
+        // And once only.
+        pumpTo(barline + 0.03, barline + 1);
+        expect(runs).toBe(1);
+        host.stop();
+    });
+
+    it('a hook that changes the band settings sends no note twice, mid-pass or at a seam', () => {
+        // The arrived sound's dispatch reaches `update()` from inside the pump, with the
+        // barline's first note due but not yet sent. Both a barline inside a pass and the seam
+        // between two passes (the next segment queued ahead), on an on-time and a stalled timer.
+        const changed = { ...wholeBand, intensity: 0.9 };
+        const lapEnd = 10.1 + 4 * BAR_S;
+        for (const line of [barline, lapEnd]) {
+            for (const stall of [0, 0.21]) {
+                const { host, tick, pumpTo } = rig(aThenB);
+                pumpTo(10.1, line - 0.5);
+                let runs = 0;
+                host.beforeBarline(() => {
+                    runs++;
+                    host.update(changed);
+                });
+                pumpTo(line - 0.5, line - 0.2);
+                tick(line - 0.2 + stall + 0.01);
+                pumpTo(line + 0.03, line + 2 * BAR_S);
+                expect(runs).toBe(1);
+                expect(doubled(voiceCalls())).toEqual([]);
+                host.stop();
+            }
+        }
+    });
+
+    it('a hook that throws does not stop the pump or the hooks after it', () => {
+        const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { host, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.5);
+        let second = 0;
+        host.beforeBarline(() => {
+            throw new Error('boom');
+        });
+        host.beforeBarline(() => second++);
+        pumpTo(barline - 0.5, barline + 1);
+        expect(second).toBe(1);
+        expect(onOrAfter(voiceCalls()).length).toBeGreaterThan(0);
+        error.mockRestore();
+        host.stop();
+    });
+
+    it('runs just ahead of the barline on an on-time timer, not a bar early', () => {
+        const { host, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.5);
+        const at: number[] = [];
+        host.beforeBarline(() => at.push(voiceCalls().at(-1)?.time ?? 0));
+        pumpTo(barline - 0.5, barline + 0.5);
+        expect(at).toHaveLength(1);
+        // Every note sent by then is before the barline's pushed downbeat.
+        expect(at[0]).toBeLessThan(barline - 0.06);
+        host.stop();
+    });
+
+    it('takes the barline after one a note was already pushed ahead of', () => {
+        // A pump 150 ms before the barline has sent its pushed downbeat: the hook waits for the
+        // next barline, as `update()` does, so the sound never changes under a bar half sent.
+        const { host, tick, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.15);
+        tick(barline - 0.15);
+        expect(onOrAfter(voiceCalls()).length).toBeGreaterThan(0);
+        let runs = 0;
+        host.beforeBarline(() => runs++);
+        pumpTo(barline - 0.125, barline + 0.5);
+        expect(runs).toBe(0);
+        pumpTo(barline + 0.5, barline + BAR_S + 0.5);
+        expect(runs).toBe(1);
+        host.stop();
+    });
+
+    it('runs at once while stopped, and when a Stop comes before the barline', async () => {
+        const audio = fakeAudioContext(10);
+        const idle = new BandHost({ state: () => fakeState(audio), silence: () => {} });
+        let ran = 0;
+        idle.beforeBarline(() => ran++);
+        expect(ran).toBe(1);
+
+        const { host, pumpTo } = rig(aThenB);
+        pumpTo(10.1, barline - 0.5);
+        host.beforeBarline(() => ran++);
+        host.stop();
+        await Promise.resolve();
+        expect(ran).toBe(2);
     });
 });
