@@ -39,7 +39,12 @@ function organ(bars: string, index: number, steps: number[], memory?: CompMemory
         timeline,
         bar,
         plan: plans[index],
-        next: { bar: next, plan: plans[next.index], wraps: next.index !== index + 1 },
+        next: {
+            bar: next,
+            plan: plans[next.index],
+            wraps: next.index !== index + 1,
+            rng: (purpose) => rng('test', next.index, purpose),
+        },
         heard: { drums: [], bass: [], lead: [] },
         instrument: COMP_INSTRUMENTS.organ,
         lead: LEAD_INSTRUMENTS[settings.lead],

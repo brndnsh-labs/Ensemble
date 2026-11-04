@@ -190,9 +190,11 @@ export type RootPlacer = (ctx: BarContext, pc: number) => number;
 
 /**
  * The pitch the line will actually play when it reaches the chord after span `i` — the note a
- * lead-in must aim at. The next span (or the next bar, in one section) places its root with
- * the same `placeRoot`; `crossing` marks a section change, where the next bar's register is
- * its own and the caller must hand the target on as `land`.
+ * lead-in must aim at, placed with the same `placeRoot` the next span or bar uses. Across a
+ * section change (`crossing`) it is placed as the next bar places it, in the next section's
+ * register, so the new section starts in its own octave rather than carrying the old one for a
+ * bar (#2071); the caller still hands the target on as `land`, so the next bar plays exactly
+ * the note the lead-in aimed at.
  */
 export function leadTarget(
     ctx: BarContext,
@@ -210,7 +212,13 @@ export function leadTarget(
         inBar === null &&
         ctx.next !== null &&
         ctx.next.bar.visit.sectionIndex !== ctx.bar.visit.sectionIndex;
-    return { target: placeRoot(ctx, bassPc(following)), crossing };
+    const placed = crossing
+        ? placeRoot(
+              { ...ctx, bar: ctx.next!.bar, plan: ctx.next!.plan, next: null, rng: ctx.next!.rng },
+              bassPc(following),
+          )
+        : placeRoot(ctx, bassPc(following));
+    return { target: placed, crossing };
 }
 
 /** A chord's root for the line: where the last bar's lead-in promised (`land`), else placed. */

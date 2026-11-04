@@ -1,7 +1,7 @@
 /**
  * Drum fills are sized by where the music is going, and a short loop counts its laps (#2009).
  */
-import { DEFAULT_SETTINGS, type DrumHit, type StyleId } from '../core/types.js';
+import { DEFAULT_SETTINGS, type DrumHit, PPQ, type StyleId } from '../core/types.js';
 import { compileTimeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
 import { type DrumBook, fillStart } from '../players/drums/kit.js';
@@ -107,6 +107,125 @@ describe('a short loop counts its laps toward 8- and 16-bar periods', () => {
     });
 });
 
+describe('a short counted chart counts its choruses as laps (#2071, from #2009)', () => {
+    const timeline = compileTimeline({ ...LOOP, choruses: LAPS });
+    const plansFor = (style: StyleId) =>
+        planBars(
+            timeline,
+            { ...DEFAULT_SETTINGS, style, seed: 'fills' },
+            { pass: 0, looping: false, window: fullWindow(timeline) },
+        );
+
+    it.each(STYLE_IDS)('%s: its chorus seams fill as the loop’s laps do', (style) => {
+        const plans = plansFor(style);
+        const seams = Array.from({ length: LAPS }, (_, k) => plans[4 * k + 3]);
+        // The last chorus ends the song on a held ending, not a fill.
+        expect(seams.map((p) => p.fill)).toEqual([
+            'none',
+            'phrase',
+            'none',
+            'section',
+            'none',
+            'phrase',
+            'none',
+            'none',
+        ]);
+        expect(seams.at(-1)?.ending).toBe(true);
+        // The same boundaries the loop marks, sized alike.
+        expect(seams[3].fillOrdinal).toBe(1);
+        // Only the 16-bar top crashes once the song is going.
+        const tops = Array.from({ length: LAPS }, (_, k) => plans[4 * k].crash);
+        expect(tops.slice(1)).toEqual([false, false, false, true, false, false, false]);
+    });
+
+    it('counts a 7-bar chorus as a lap too: only 8 bars or more is a section', () => {
+        const t = compileTimeline({
+            ...score([{ label: 'A', bars: Array(7).fill('C').join(' | ') }]),
+            choruses: 3,
+        });
+        const plans = planBars(t, DEFAULT_SETTINGS, {
+            pass: 0,
+            looping: false,
+            window: fullWindow(t),
+        });
+        // The first seam (7 bars played) crosses no 8-bar line: no fill, no crash after it. The
+        // second (14 bars) crosses the 8: a small fill.
+        expect(plans[6].fill).toBe('none');
+        expect(plans[7].crash).toBe(false);
+        expect(plans[13].fill).toBe('phrase');
+    });
+
+    it('keeps the section fill where a chorus is a real section seam', () => {
+        // Two sections a chorus, or one of 8 bars: every chorus seam is still an arrival.
+        for (const chart of [
+            score([
+                { label: 'A', bars: 'C | G' },
+                { label: 'B', bars: 'Am | F' },
+            ]),
+            score([{ label: 'A', bars: Array(8).fill('C').join(' | ') }]),
+        ]) {
+            const t = compileTimeline({ ...chart, choruses: 3 });
+            const plans = planBars(t, DEFAULT_SETTINGS, {
+                pass: 0,
+                looping: false,
+                window: fullWindow(t),
+            });
+            const length = t.bars.length / 3;
+            expect(plans[length - 1].fill).toBe('section');
+            expect(plans[length].crash).toBe(true);
+        }
+    });
+});
+
+describe('hip hop rolls into a louder section on every lap, whatever lifts the bar (#2071)', () => {
+    // An intro at its role's own level (low) into a verse (mid). The build into the verse and,
+    // from the fourth lap, the pass lift carry the intro's last bar over the low/mid line; the
+    // verse is still the louder section.
+    const timeline = compileTimeline(
+        score([
+            { label: 'Intro', bars: 'C | G | Am | F' },
+            { label: 'Verse', bars: 'C | G | Am | F' },
+        ]),
+    );
+    const intro = timeline.bars[3];
+    it.each([0, 1, 2, 3, 4, 5])('pass %i', (pass) => {
+        const { events } = performPass(
+            timeline,
+            { ...DEFAULT_SETTINGS, style: 'hiphop' },
+            { pass, looping: true },
+        );
+        // The roll: snare in the last beat of the intro, where a drop would leave silence.
+        const lastBeat = intro.start + intro.meter.barTicks - PPQ;
+        const roll = events.filter(
+            (e) =>
+                e.lane === 'drums' &&
+                e.bar === intro.index &&
+                e.piece === 'snare' &&
+                e.tick >= lastBeat,
+        );
+        expect(roll.length).toBeGreaterThanOrEqual(2);
+    });
+
+    it('and does not roll into a section that is no louder', () => {
+        const level = compileTimeline(
+            score([
+                { label: 'Verse', bars: 'C | G | Am | F' },
+                { label: 'Verse 2', bars: 'C | G | Am | F' },
+            ]),
+        );
+        const { events } = performPass(
+            level,
+            { ...DEFAULT_SETTINGS, style: 'hiphop' },
+            { pass: 3, looping: true },
+        );
+        const lastBeat = level.bars[3].start + level.bars[3].meter.barTicks - PPQ;
+        const snares = events.filter(
+            (e) => e.lane === 'drums' && e.bar === 3 && e.piece === 'snare' && e.tick >= lastBeat,
+        );
+        expect(snares.length).toBeLessThan(2);
+    });
+});
+
 describe('a fill is sized by the bigger tier of here and where it leads', () => {
     it('takes the destination tier when it is higher, and keeps its own when it is', () => {
         expect(fillTier(0.5, 0.75)).toBe('high');
@@ -127,7 +246,7 @@ describe('a fill is sized by the bigger tier of here and where it leads', () => 
             fillStart(
                 {
                     bar: timeline.bars[3],
-                    plan: { fill: 'section', energy, ending: false, fillOrdinal: 0 },
+                    plan: { fill: 'section', energy, level: energy, ending: false, fillOrdinal: 0 },
                     next: next === null ? null : { plan: { energy: next } },
                 } as unknown as BarContext,
                 book,

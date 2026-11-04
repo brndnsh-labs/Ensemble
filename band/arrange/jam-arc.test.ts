@@ -5,6 +5,7 @@
  * tiers, never as a snapshot of the numbers — so the constants can be tuned by ear.
  */
 
+import { isOutroLabel } from '../../core/songbook/score-form.js';
 import type { SemanticScore } from '../../core/songbook/score-types.js';
 import { type BandSettings, DEFAULT_SETTINGS } from '../core/types.js';
 import { compileTimeline, type Timeline } from '../form/timeline.js';
@@ -72,9 +73,6 @@ function chorusEndFraction(timeline: Timeline, chorus: number): number {
     const end = timeline.bars.filter((bar) => bar.visit.chorus <= chorus).length;
     return end / timeline.bars.length;
 }
-
-/** The closing sections' labels, as the plan's role table reads them. */
-const CLOSING = /^(outro|coda|ending|tag)/i;
 
 const loudest = (values: number[]) => values.indexOf(Math.max(...values));
 
@@ -188,7 +186,7 @@ describe('the jam arc across a counted performance', () => {
             const plans = plan(timeline, JAM);
             const climax = Math.max(...chorusMeans(timeline, plans));
             for (const bar of timeline.bars) {
-                if (CLOSING.test(bar.visit.label.trim())) {
+                if (isOutroLabel(bar.visit.label)) {
                     expect(plans[bar.index].energy, `${name} bar ${bar.index}`).toBeLessThan(
                         climax,
                     );

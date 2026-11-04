@@ -12,6 +12,7 @@ import { rng } from './core/random.js';
 import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
 import { applyFeel } from './feel/feel.js';
 import {
+    type Bar,
     barAtTick,
     type ChordSpan,
     chorusBars,
@@ -191,12 +192,25 @@ export function performPass(
                       // The fill into the next lap is sized by that lap's own energy, so a
                       // pass resumed here (whose window has no bar 0 to read) sizes it alike.
                       energy: wrapPlan.energy,
+                      level: wrapPlan.level,
                       // And it crashes, or not, as the next lap's top does (`lapFill`).
                       crash: wrapPlan.crash,
                   }
                 : wrapped;
         const heard: BarContext['heard'] = { drums: [], bass: [], lead: [] };
         const barFirst = events.length;
+        // The seeded streams for a bar at its place in the performance: this bar's, and the
+        // next one's (the next pass's, when the song wraps), so a lane that plans across the
+        // barline can make the choice the next bar will make — a lead-in placing its target
+        // in the next section's register (#2071).
+        const rngAt =
+            (lane: Lane, at: Bar, atPass: number, atPlace: number): BarContext['rng'] =>
+            (purpose, scope = 'bar') =>
+                scope === 'song'
+                    ? rng(settings.seed, style.id, lane, 'song', purpose)
+                    : scope === 'section'
+                      ? rng(settings.seed, style.id, lane, 'section', sectionKey(at.visit), purpose)
+                      : rng(settings.seed, style.id, lane, atPass, atPlace, purpose);
         const context = (lane: Lane): BarContext => ({
             timeline,
             bar: plan.ending && ending?.index === i ? ending : bar,
@@ -212,6 +226,13 @@ export function performPass(
                                   : bars[nextIndex],
                           plan: nextPlan,
                           wraps: last,
+                          rng: rngAt(
+                              lane,
+                              bars[nextIndex],
+                              (last ? options.pass + 1 : options.pass) +
+                                  bars[nextIndex].visit.chorus,
+                              nextIndex - chorusBars(timeline, nextIndex).first,
+                          ),
                       }
                     : null,
             heard,
@@ -220,19 +241,7 @@ export function performPass(
             pass,
             looping: options.looping,
             ending,
-            rng: (purpose, scope = 'bar') =>
-                scope === 'song'
-                    ? rng(settings.seed, style.id, lane, 'song', purpose)
-                    : scope === 'section'
-                      ? rng(
-                            settings.seed,
-                            style.id,
-                            lane,
-                            'section',
-                            sectionKey(bar.visit),
-                            purpose,
-                        )
-                      : rng(settings.seed, style.id, lane, pass, place, purpose),
+            rng: rngAt(lane, bar, pass, place),
         });
         if (plan.lanes.drums) {
             const out = style.drums.play(context('drums'), memory.drums);

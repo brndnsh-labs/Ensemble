@@ -4,6 +4,7 @@
  * first bar and kept in memory, so the lead can resume at any barline; the rest of the slot's
  * bars just play what was planned.
  */
+import { isIntroLabel } from '../../../core/songbook/score-form.js';
 import type { LeadRole } from '../../arrange/cycle.js';
 import { energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
@@ -390,7 +391,7 @@ function soloPlan(
     const opensSolo =
         role.kind === 'solo' &&
         role.chorus === 1 &&
-        (placeOf(ctx, slotStart) === 0 || /^intro/i.test(bars[slotStart - 1].visit.label));
+        (placeOf(ctx, slotStart) === 0 || isIntroLabel(bars[slotStart - 1].visit.label));
     // Now and then (the book's `space`) a phrase takes a roomier shape than its density — but
     // the two-bar breath stays the opening statement's, and a phrase after an empty bar comes
     // straight in.

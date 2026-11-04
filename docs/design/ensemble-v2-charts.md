@@ -207,12 +207,13 @@ is behind its departure, and, for now, any chart that also has a D.C./D.S. jump:
 is then passed both before and after the jump.
 A counted chart plays an intro and an outro once (#1483, DECISION 2026-10-08): a section whose
 label starts with "Intro" (`isIntroLabel`, the test the band's `leadRole` uses) is played in the
-first chorus only, and one whose label starts with "Outro" (`isOutroLabel`) in the last only.
+first chorus only, and one whose label starts with "Outro", "Coda", "Ending" or "Tag"
+(`isOutroLabel`, the same pattern the band's role table plays as an outro; #2071, DECISION
+2026-11-04) in the last only.
 By place as well as label: the intro is the sections so labelled that open the chart and the
 outro those that close it, so an "Intro" between two verses is an interlude and plays every
 chorus. Only the bars are left out: the signs and jumps on their barlines are still read. If
-leaving them out would empty a chorus, the chart is played as written. A section labelled
-"Ending", "Tag" or "Coda" is not an outro by this rule; whether it should be is open. An uncounted chart
+leaving them out would empty a chorus, the chart is played as written. An uncounted chart
 loops as written, intro included; whether it should is not decided. iReal Pro does the same
 with its own intro mark: "IN" plays once and later passes return to "A"
 (https://www.irealpro.com/learn/how-to-add-an-intro-to-a-song/). An imported iReal chart's
