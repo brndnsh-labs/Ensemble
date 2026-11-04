@@ -57,7 +57,12 @@ import {
     type ParamSlices,
     type SwingSub,
 } from '@core/types';
-import { getFrequency, respellKeyForMode, transposeKeyName } from '@core/utils';
+import {
+    getFrequency,
+    respellKeyForMode,
+    transposeKeyKeepingSpelling,
+    transposeKeyName,
+} from '@core/utils';
 import { auditionMidis, type BandChart, bandChart, sectionSteps, slotAt } from './band-chart';
 import {
     downloadExportResult,
@@ -1855,11 +1860,11 @@ export function transpose(delta: number, key?: string): void {
     const target = { key: score.key, isMinor: score.isMinor === true };
     for (const section of score.sections) {
         if (section.key) {
-            section.key = transposeKeyName(section.key, delta);
+            section.key = transposeKeyKeepingSpelling(section.key, delta);
         }
         for (const measure of section.measures) {
             if (measure.key) {
-                measure.key = transposeKeyName(measure.key, delta);
+                measure.key = transposeKeyKeepingSpelling(measure.key, delta);
             }
             if (measure.content.kind === 'events') {
                 for (const event of measure.content.events) {

@@ -121,8 +121,8 @@ describe('semantic score chord-bar text', () => {
         ],
         ['C7/E:4', '4/4', [{ kind: 'chord', symbol: 'C7/E', duration: [4, 1] }]],
         ['C6/9:4', '4/4', [{ kind: 'chord', symbol: 'C6/9', duration: [4, 1] }]],
-        ['C♯m7:4', '4/4', [{ kind: 'chord', symbol: 'C♯m7', duration: [4, 1] }]],
-        ['♭IIImaj7:4', '4/4', [{ kind: 'chord', symbol: '♭IIImaj7', duration: [4, 1] }]],
+        ['C♯m7:4', '4/4', [{ kind: 'chord', symbol: 'C#m7', duration: [4, 1] }]],
+        ['♭IIImaj7:4', '4/4', [{ kind: 'chord', symbol: 'bIIImaj7', duration: [4, 1] }]],
         ['#4m7:4', '4/4', [{ kind: 'chord', symbol: '#4m7', duration: [4, 1] }]],
         ['C7b9#11:4', '4/4', [{ kind: 'chord', symbol: 'C7b9#11', duration: [4, 1] }]],
         ['Cmaj(add4):4', '4/4', [{ kind: 'chord', symbol: 'Cmaj(add4)', duration: [4, 1] }]],
@@ -216,6 +216,18 @@ describe('everyday chord spellings are stored in the house spelling (#1978)', ()
         ['Bb7(b9)/D', 'Bb7b9/D'],
         ['Fmin7/Eb', 'Fm7/Eb'],
         ['CMaj', 'Cmaj'],
+        // #2068: gaps found in the #1978 review.
+        ['CMI7', 'Cm7'],
+        ['Cmi(maj7)', 'CmMaj7'],
+        ['Cm(add9)', 'Cmadd9'],
+        ['Cmin(add9)', 'Cmadd9'],
+        ['C7(+5)', 'C7#5'],
+        ['C7(b9,#11)', 'C7b9#11'],
+        ['Cmin6/9', 'Cm69'],
+        ['Cm6/9', 'Cm69'],
+        ['B♭min7', 'Bbm7'],
+        ['B♭m7', 'Bbm7'],
+        ['F♯7(♭9)/A♯', 'F#7b9/A#'],
     ])('%s is stored as %s', (written, house) => {
         expectBar(written, '4/4', [{ kind: 'chord', symbol: house, duration: [4, 1] }]);
     });
