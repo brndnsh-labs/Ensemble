@@ -1,6 +1,11 @@
 import { decodeIRealInput, decodeIRealMusic } from './ireal-decode.js';
 import { scoreFromIRealBody } from './ireal-score.js';
-import { defaultTempoForIRealStyle, genreForIRealStyle, writtenIRealTempo } from './ireal-style.js';
+import {
+    defaultTempoForIRealStyle,
+    genreForIRealStyle,
+    unplayableIRealTempo,
+    writtenIRealTempo,
+} from './ireal-style.js';
 import type { SemanticScore } from './score-types.js';
 
 export interface IRealImportDiagnostic {
@@ -114,6 +119,17 @@ function importSong(fields: string[], modern: boolean, index: number): IRealImpo
                 ? 'Stored key is used without transposition. iReal transpose and player repetitions are preserved as raw metadata, not applied as Ensemble settings.'
                 : 'The stored key is used.',
         });
+        const dropped = modern ? unplayableIRealTempo(fields[8]) : null;
+        if (dropped !== null) {
+            song.diagnostics.push({
+                severity: 'warning',
+                message: `The export's tempo of ${dropped} BPM is outside the 40-240 Ensemble plays, so it is ignored${
+                    song.tempo
+                        ? ` and ${song.tempo.bpm} BPM, iReal's starting tempo for the style, is used`
+                        : ' and your current tempo is kept'
+                }.`,
+            });
+        }
         if (song.style && song.genre === null) {
             song.diagnostics.push({
                 severity: 'warning',
