@@ -1,5 +1,10 @@
 import { packsForInstrument, revForPack, SOUND_PACKS } from '@core/data/sound-packs';
-import { isPackLoaded, markPackInstalled, packIdFromVoice } from '@core/engine/instrument-registry';
+import {
+    isPackInstalled,
+    isPackLoaded,
+    markPackInstalled,
+    packIdFromVoice,
+} from '@core/engine/instrument-registry';
 import { ensurePackLoaded } from '@core/engine/pack-runtime';
 import { type PackManifest, setPackAssetFetcher, withRevToken } from '@core/engine/sample-loader';
 import type { ChartSettings } from '@core/songbook/types';
@@ -103,6 +108,14 @@ async function files(): Promise<Record<string, string>> {
     return index;
 }
 
+/**
+ * Cache keys whose bytes this page load has already checked against their hash. A key carries
+ * the content hash, so a hit under a verified key is the verified file: it is not hashed again
+ * for the rest of the page load (bytes rewritten in place meanwhile are not noticed until a reload)
+ * (#2082: a pack's files were digested once to prepare it and again when it was decoded).
+ */
+const verified = new Set<string>();
+
 /** Exact shipped bytes only, in a preview-owned cache. No root-app cache reads/writes. */
 async function asset(source: string, cachedOnly = false): Promise<Response> {
     const url = new URL(source, location.origin);
@@ -117,7 +130,8 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
     const key = `${url.pathname}?asset=${hash}`;
     const cache = await caches.open(CACHE);
     const cached = await cache.match(key);
-    if (cached && (await digest(await bytesOf(cached))) === hash) {
+    if (cached && (verified.has(key) || (await digest(await bytesOf(cached))) === hash)) {
+        verified.add(key);
         return cached;
     }
     if (cachedOnly) {
@@ -136,6 +150,7 @@ async function asset(source: string, cachedOnly = false): Promise<Response> {
     if (!stored || (await digest(await bytesOf(stored))) !== hash) {
         throw new Error('Sound storage is unavailable. Your previous sound is unchanged.');
     }
+    verified.add(key);
     return response;
 }
 
@@ -233,7 +248,8 @@ const FETCH_CONCURRENCY = 6;
  * Workers drain before the throw so a rejected walk leaves no unhandled promise behind.
  *
  * **Defaults to serial (`concurrency: 1`) on purpose.** Only the explicit install-all
- * gesture opts into the pool — see `installAllSounds`. Feel preparation and the
+ * gesture and the packs the cache already holds (`prepareOnce`: cache reads are not
+ * network-bound) opt into the pool. A pack still to download and the
  * offline-readiness checks stay one-at-a-time because observers of those paths, including
  * `checks/foundation-sounds.spec.ts`'s Stop-during-preparation harness, pin the app by holding a
  * single in-flight request. With several outstanding, holding one no longer stops
@@ -281,6 +297,8 @@ async function fetchAssets(
 /** One pack's download in flight: who is watching it, and the last thing it said. */
 interface Flight {
     promise: Promise<void>;
+    /** Decoding what the cache holds, before anyone asked: it never goes to the network. */
+    cachedOnly: boolean;
     watchers: Set<SoundProgress>;
     last?: Parameters<SoundProgress>;
 }
@@ -296,6 +314,13 @@ const flights = new Map<string, Flight>();
  */
 export function prepareSound(id: string, progress: SoundProgress, concurrency = 1): Promise<void> {
     const running = flights.get(id);
+    if (running?.cachedOnly) {
+        // Decoding ahead of Play (`warmSounds`) is under way: wait for it rather than decode the
+        // same files twice, then prepare as usual (a no-op if it finished the pack).
+        const pack = SOUND_PACKS.find((p) => p.id === id);
+        progress(`Preparing ${pack?.name ?? 'sounds'}…`, 0);
+        return running.promise.catch(() => {}).then(() => prepareSound(id, progress, concurrency));
+    }
     if (running) {
         running.watchers.add(progress);
         if (running.last) {
@@ -303,7 +328,20 @@ export function prepareSound(id: string, progress: SoundProgress, concurrency = 
         }
         return running.promise;
     }
-    const flight: Flight = { promise: Promise.resolve(), watchers: new Set([progress]) };
+    return startFlight(id, progress, concurrency, false);
+}
+
+function startFlight(
+    id: string,
+    progress: SoundProgress,
+    concurrency: number,
+    cachedOnly: boolean,
+): Promise<void> {
+    const flight: Flight = {
+        promise: Promise.resolve(),
+        cachedOnly,
+        watchers: new Set([progress]),
+    };
     flights.set(id, flight);
     flight.promise = prepareOnce(
         id,
@@ -314,34 +352,75 @@ export function prepareSound(id: string, progress: SoundProgress, concurrency = 
             }
         },
         concurrency,
+        cachedOnly,
     ).finally(() => {
         flights.delete(id);
     });
     return flight.promise;
 }
 
-async function prepareOnce(id: string, progress: SoundProgress, concurrency: number) {
+async function prepareOnce(
+    id: string,
+    progress: SoundProgress,
+    concurrency: number,
+    cachedOnly: boolean,
+) {
     const pack = SOUND_PACKS.find((p) => p.id === id);
     if (!pack) {
         throw new Error('Unknown sound pack.');
     }
     progress(`Preparing ${pack.name}…`, 0);
-    const manifest = await manifestFor(id, false);
+    const manifest = await manifestFor(id, cachedOnly);
     const urls = sampleUrls(manifest);
     await fetchAssets(
         urls,
         revForPack(id),
-        false,
+        cachedOnly,
         (done) => {
             progress(`${pack.name} · ${done}/${urls.length} files`, done / urls.length);
         },
-        concurrency,
+        // Files the cache already holds are not network-bound: read them side by side. A pack
+        // still to download keeps its serial walk (the Stop-during-preparation checks hold one
+        // request to pin it).
+        isPackInstalled(id) ? Math.max(concurrency, FETCH_CONCURRENCY) : concurrency,
     );
     await ensurePackLoaded(new OfflineAudioContext(1, 1, 44100), id);
     // The old runtime intentionally swallows decode failures; this UI must not.
     if (!isPackLoaded(id)) {
         throw new Error(`${pack.name} could not be decoded by this browser.`);
     }
+}
+
+/**
+ * Decode, ahead of Play, the packs this device already holds for the lanes of `chart` that are
+ * on (#2082), one pack at a time, while the page is idle. A lane that is off is left for Play:
+ * decoded packs stay in memory for the page's life, and browsing charts should not fill a phone
+ * with sounds nobody asked to hear. It reads only the cache and never downloads (guest startup
+ * fetches no audio), so a pack with a file missing or failing its check is left for Play to
+ * prepare as before. Nothing here is awaited by the caller; a Play that arrives meanwhile waits
+ * for the pack in hand (`prepareSound`).
+ */
+export function warmSounds(chart: Pick<ChartSettings, 'band'>): void {
+    const lanes = Object.values(chart.band).filter((lane) => lane.enabled !== false);
+    const ids = [...new Set(lanes.map((lane) => packIdFromVoice(lane.voice)).filter(Boolean))];
+    const idle: (run: () => void) => void =
+        typeof requestIdleCallback === 'function'
+            ? (run) => requestIdleCallback(run, { timeout: 1500 })
+            : (run) => void setTimeout(run, 0);
+    const next = (queue: string[]) => {
+        const id = queue[0];
+        if (!id) {
+            return;
+        }
+        idle(() => {
+            const pending =
+                !isPackLoaded(id) && isPackInstalled(id) && !flights.has(id)
+                    ? startFlight(id, () => {}, FETCH_CONCURRENCY, true)
+                    : Promise.resolve();
+            pending.catch(() => {}).finally(() => next(queue.slice(1)));
+        });
+    };
+    next(ids as string[]);
 }
 
 export async function prepareSounds(
