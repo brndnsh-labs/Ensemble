@@ -277,7 +277,7 @@ forward.
   before leaving important writing.
 - Edit chart opens the editor over the chart; Chart is a view switch,
   not the playback button. Tempo keeps intermediate keystrokes local until Enter/blur; Escape
-  cancels, and steppers commit once. Its 40–240 bounds match the existing engine and codec.
+  cancels, and steppers commit once. Its 40–320 bounds (`MIN_BPM`/`MAX_BPM`, `core/config.ts`) are the engine's and the codec's; − and + step by 1, Shift by 10 (#1996).
 - Continue uses a best-effort device-local last-opened preference, including recovered setup
   metadata. Opening a song does not alter saved revisions/timestamps. First visits offer a
   standard from the catalog (#1439) honestly ("A good place to start") rather than implying

@@ -172,7 +172,8 @@ and seed as `mix:report` does, so the comparison also carries whatever the stand
 differently: that is how #1564 was found. The offline side uses the `full` stem (the lead lane is
 off by default on the stand), minus any lane `--off=` switched off. Both sides skip their first bar and
 cover the whole bars the stand got through before Stop; the stand counts a bar in by default
-(`playback.countIn`), which the script reads and skips. Playback is real time: eight bars at
+(`playback.countIn`; two bars above 200 BPM, `web/lib/count-in.ts`), which the script reads
+and skips. Playback is real time: eight bars at
 104 bpm is eighteen seconds, nineteen with the count-in.
 
 **Two facts about the tap worth knowing.** `ScriptProcessorNode`'s `playbackTime` names when

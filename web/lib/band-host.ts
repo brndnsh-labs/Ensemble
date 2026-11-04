@@ -472,9 +472,9 @@ export class BandHost {
     /**
      * `countIn` is a bar of clicks (two above `TWO_BAR_COUNT_IN_ABOVE_BPM`) before the first
      * segment, requested only by a fresh Play from stopped (`runtime.ts`'s `startBand`) and
-     * gated there on the `playback.countIn` preference — every other caller (a wrap's own `append`, `update`'s barline swap,
-     * `setScore`'s restart, a mid-song resume) passes nothing and gets the default `false`, so
-     * the chart's first bar starts on the beat it always did.
+     * gated there on the `playback.countIn` preference — every other caller (a wrap's own
+     * `append`, `update`'s barline swap, `setScore`'s restart, a mid-song resume) passes nothing
+     * and gets the default `false`, so the chart's first bar starts on the beat it always did.
      */
     start(settings: BandSettings, bpm: number, fromTick = 0, countIn = false): void {
         const audio = this.audio;
@@ -847,7 +847,8 @@ export class BandHost {
 
     /**
      * The count-in beat sounding now, within its bar (0-based: "1" is beat 0; a two-bar count
-     * reads 1 2 3 4, 1 2 3 4), or null when no count-in is running — either stopped, past it into the song, or `start()` was never asked for one.
+     * reads 1 2 3 4, 1 2 3 4), or null when no count-in is running — either stopped, past it
+     * into the song, or `start()` was never asked for one.
      * The chart shouldn't advance while this is non-null: `songTick()` already returns null for
      * the same window, since the first segment's `start` is the moment the count-in ends.
      */

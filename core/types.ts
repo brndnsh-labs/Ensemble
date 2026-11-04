@@ -341,7 +341,7 @@ export interface GlobalContext {
     readonly audioGraph: AudioGraph | null;
     /** Whether the sequencer is currently playing. */
     readonly isPlaying: boolean;
-    /** Beats per minute (40-240). */
+    /** Beats per minute (`MIN_BPM`–`MAX_BPM` in `config.ts`: 40–320). */
     readonly bpm: number;
     /**
      * Section-practice ("drill") — the absolute step at which the next play
