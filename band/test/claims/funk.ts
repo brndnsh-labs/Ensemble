@@ -7,9 +7,10 @@ export const funk = defineClaims({
             claims: [
                 // A ceiling on a ratio passes at 0 lead-ins, so the count has a floor (18, about half the 37 measured; a lead-in is a note within a beat of the change).
                 ['bassApproachCount', 18, 10000, 'it does play half-step lead-ins into changes'],
-                // Measured 0.108 (4 of 37): riff 2's 5 on step 14 drops a major seventh into the change
-                // (Em9's B2 falling to C2), an engine follow-up; 0.15 leaves headroom over it.
-                ['bassApproachLeap', 0, 0.15, 'a lead-in stays beside the note it leads to'],
+                // The riff's last note meets the next root as blues and reggae do (a leading tone
+                // like Em9's B2 folds to sit beside the C2 it falls into, #2078); before that fold
+                // 4 of 37 (0.108) dropped a major seventh into the change. Now measured 0; ceiling 0.05.
+                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.9, 1, 'the backbeat is hit hard'],
                 ['kickOnOne', 0.95, 1, 'on the One'],
                 ['ghostsPerBar', 1, 5, 'ghost notes around the backbeat'],
