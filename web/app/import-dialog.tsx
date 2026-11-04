@@ -1,5 +1,6 @@
 'use client';
 
+import { MAX_BPM, MIN_BPM } from '@core/config';
 import { type IRealImportResult, parseIRealImportInSteps } from '@core/songbook/ireal-import';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ChartDocument, validateDocument } from '../lib/documents';
@@ -675,8 +676,8 @@ export function ImportDialog({
                         <input
                             aria-label="Import tempo"
                             type="number"
-                            min={40}
-                            max={240}
+                            min={MIN_BPM}
+                            max={MAX_BPM}
                             placeholder="Each song’s own"
                             value={tempoAll}
                             disabled={busy}
@@ -765,8 +766,8 @@ export function ImportDialog({
                                 <input
                                     aria-label="Import tempo"
                                     type="number"
-                                    min={40}
-                                    max={240}
+                                    min={MIN_BPM}
+                                    max={MAX_BPM}
                                     value={tempo}
                                     disabled={busy}
                                     onChange={(event) =>
