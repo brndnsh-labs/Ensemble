@@ -87,20 +87,20 @@ export const jazz = defineClaims({
                 // A wiring check: the line chooses only guide tones, so this proves the take
                 // plays the guide-tone head. The voice-leading is the interval claims below.
                 ['leadChangeGuideTones', 0.9, 1, 'each change lands on its 3rd or 7th'],
-                ['leadNotesPerBar', 0.6, 1.5, 'one long note a chord, not a tune (0.86)'],
+                ['leadNotesPerBar', 0.6, 1.5, 'one long note a chord, not a tune (0.90)'],
                 [
                     'leadMeanInterval',
                     0,
                     2.3,
-                    "voice-led: each guide tone steps to the next chord's, or holds (1.54)",
+                    "voice-led: each guide tone steps to the next chord's, or holds (1.68)",
                 ],
-                ['leadStepShare', 0.65, 1, 'mostly half and whole steps (0.80)'],
+                ['leadStepShare', 0.65, 1, 'mostly half and whole steps (0.74)'],
                 ['leadLeapShare', 0, 0.01, 'no leaps wider than a fifth (0)'],
                 [
                     'leadMoveOverThird',
                     0,
                     0.05,
-                    'voice-led: no 4th or tritone inside a phrase (0.012; the invented head 0.31)',
+                    'voice-led: no 4th or tritone inside a phrase (0; the invented head 0.30)',
                 ],
                 ['leadLongBreath', 0, 0.02, 'the line never drops out for two bars'],
             ],

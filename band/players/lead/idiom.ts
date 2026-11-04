@@ -718,9 +718,29 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
     const from = first.start;
     const to = lastBar.start + lastBar.meter.barTicks;
     const home = homeOf(ctx, book);
-    const line = guideToneLine(ctx.timeline, first, home, ctx.lead.range).filter(
+    const written = guideToneLine(ctx.timeline, first, home, ctx.lead.range).filter(
         (n) => n.tick >= from && n.tick < to,
     );
+    // A pass that ends on a held chord (`ctx.ending`): a guide tone held into the ending bar is
+    // struck again on its barline, so the held-ending settle below lands it on a tone of the
+    // chord the band holds, rather than a common tone of the chart's chord ringing over it.
+    const split = ctx.ending?.start;
+    const line =
+        split === undefined
+            ? written
+            : written.flatMap((n) =>
+                  n.tick < split && n.tick + n.dur > split
+                      ? [
+                            { ...n, dur: split - n.tick },
+                            {
+                                ...n,
+                                tick: split,
+                                dur: n.tick + n.dur - split,
+                                chord: chordAt(ctx.timeline, split) ?? n.chord,
+                            },
+                        ]
+                      : [n],
+              );
     const onsets: SlotOnset[] = line.map((n) => {
         const bar = barOf(ctx, n.tick);
         return {

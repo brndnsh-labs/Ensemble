@@ -25,8 +25,9 @@ export interface GuideNote {
 
 /**
  * A triad's 7th, which the chart doesn't write, read from what the chord does: a diminished
- * triad is heard as a diminished 7th (its bb7); a major triad on the key's V, or one that falls a
- * fifth to the next chord (a secondary dominant), is a dominant and takes the b7; any other
+ * triad is heard as a diminished 7th (its bb7); a major triad on the key's V, or one off the
+ * tonic that falls a fifth to the next chord (a secondary dominant), is a dominant and takes the
+ * b7; any other
  * triad takes the 7th of its chord scale (`parseChord` reads it in the bar's key: the I's
  * major 7th, a minor chord's b7). Null for a chord with no 3rd to pair it with.
  */
@@ -34,10 +35,11 @@ function triadSeventh(chord: ChordFacts, key: KeyContext, next: ChordFacts | nul
     if (chord.family === 'diminished') {
         return 9;
     }
+    // The tonic's own triad falling a fifth is I going to IV, not V of IV: it stays the tonic.
+    const degree = mod12(chord.root - key.tonic);
     const dominant =
         chord.third === 4 &&
-        (mod12(chord.root - key.tonic) === 7 ||
-            (next !== null && mod12(next.root - chord.root) === 5));
+        (degree === 7 || (degree !== 0 && next !== null && mod12(next.root - chord.root) === 5));
     if (dominant) {
         return 10;
     }
@@ -66,13 +68,16 @@ export function guidePitchClasses(
 }
 
 /**
- * How far from the lead's home a phrase may start, in semitones either way. Inside a phrase the
- * line takes the nearest guide tone wherever it is (in the instrument's range): voice-leading
- * wins. At a phrase's first note, where the line breathes and is struck fresh, a line that has
- * wandered further than this comes back towards home, as a player moves a guide-tone line up or
- * down an octave at a phrase break and never mid-phrase.
+ * Where a phrase may start, in semitones from the lead's home: a little under it to well over
+ * it. Inside a phrase the line takes the nearest guide tone wherever it is (in the instrument's
+ * range): voice-leading wins, and a ii-V chain falls a half step a chord. At a phrase's first
+ * note, where the line breathes and is struck fresh, a line that has left this band starts
+ * again from the guide tone nearest home, as a player moves a guide-tone line up an octave at a
+ * phrase break and never mid-phrase. why: the band's floor is three under home because below it
+ * the line sinks into the comp's own 3rd-and-7th shells (a jazz piano's sit around Eb4) and on
+ * down towards the bass's slot; over the comp, the line is heard.
  */
-const WINDOW = 7;
+const BAND = { below: 3, above: 7 } as const;
 
 /** A chord held longer than this many bars is struck again, so a long chord still breathes. */
 const LONGEST = 2;
@@ -83,8 +88,8 @@ const LONGEST = 2;
  */
 const BREATH = STEP * 2;
 
-/** The 3rd starts a chorus when it is this close to home: it states the key first. */
-const THIRD_FIRST = 4;
+/** The 3rd starts a chorus when it lies this close to home (from two under to four over). */
+const THIRD_FIRST = { below: 2, above: 4 } as const;
 
 const LINES = new WeakMap<Timeline, Map<string, GuideNote[]>>();
 
@@ -177,13 +182,12 @@ function chorusLine(
     }[] = [];
     chords.forEach(({ start, end, chord }, c) => {
         const next = chords[c + 1]?.chord ?? null;
-        const opening = barIndexAt(start);
         let at = start;
         while (at < end) {
             const b = barIndexAt(at);
             let cut = end;
             for (let k = b + 1; k < endBar && bars[k].start < end; k++) {
-                if (tops.has(bars[k].start) || (k - opening) % LONGEST === 0) {
+                if (tops.has(bars[k].start) || k - b === LONGEST) {
                     cut = bars[k].start;
                     break;
                 }
@@ -198,27 +202,32 @@ function chorusLine(
     for (const { start, end, chord, next, fresh } of pieces) {
         const key = bars[barIndexAt(start)].key;
         const pcs = guidePitchClasses(chord, key, next);
+        // The guide tone nearest home inside the band a phrase may start in.
+        const fromHome = () =>
+            nearest(
+                pcs,
+                home,
+                home,
+                Math.max(lo, home - BAND.below),
+                Math.min(hi, home + BAND.above),
+            );
         let midi: number;
         if (prev === null) {
             // The chorus opens on the chord's 3rd when it is near home: it states the key.
             const third = nearestMidi(pcs[0], home, lo, hi);
-            midi = Math.abs(third - home) <= THIRD_FIRST ? third : nearest(pcs, home, home, lo, hi);
+            midi =
+                third >= home - THIRD_FIRST.below && third <= home + THIRD_FIRST.above
+                    ? third
+                    : fromHome();
+        } else if (tops.has(start) && (prev < home - BAND.below || prev > home + BAND.above)) {
+            // A phrase starting outside the band starts again near home.
+            midi = fromHome();
         } else if (notes.at(-1)?.chord === chord) {
             // The same chord struck again (held past `LONGEST` bars, or over a phrase top): the
             // same tone. Its other guide tone is a 4th, 5th or tritone away — a leap, not a breath.
             midi = prev;
         } else {
-            const outside = Math.abs(prev - home) > WINDOW;
-            midi =
-                fresh && tops.has(start) && outside
-                    ? nearest(
-                          pcs,
-                          prev,
-                          home,
-                          Math.max(lo, home - WINDOW),
-                          Math.min(hi, home + WINDOW),
-                      )
-                    : nearest(pcs, prev, home, lo, hi);
+            midi = nearest(pcs, prev, home, lo, hi);
         }
         const previous = notes.at(-1);
         if (

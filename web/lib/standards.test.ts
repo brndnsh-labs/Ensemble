@@ -160,6 +160,10 @@ describe('the guide-tone head over every jazz standard (#2027)', () => {
                 (n, i) => i > 0 && !top(n.tick) && Math.abs(n.midi - line[i - 1].midi) > 3,
             );
             expect(wide.map((n) => `${n.chord.symbol}@${n.tick}`)).toEqual([]);
+            // Over the comp's shells and clear of the bass's slot (23–57), centred near home.
+            expect(Math.min(...line.map((n) => n.midi))).toBeGreaterThanOrEqual(58);
+            const mean = line.reduce((sum, n) => sum + n.midi, 0) / line.length;
+            expect(mean).toBeGreaterThanOrEqual(SAX.home - 4);
             // Every phrase of the chorus is struck: none is left silent.
             for (const bar of timeline.bars.filter((b) => b.phrase.bar === 0)) {
                 const end = bar.start + bar.phrase.length * bar.meter.barTicks;

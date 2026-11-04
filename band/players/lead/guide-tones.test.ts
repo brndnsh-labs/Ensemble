@@ -44,14 +44,16 @@ describe('the guide-tone line', () => {
     });
 
     it('is voice-led: each guide tone steps to the next chord’s, a common tone held', () => {
-        // Cm7's Eb (its 3rd) is F7's 7th: held. It falls to Bbmaj7's D, which is Ebmaj7's 7th:
-        // held to the phrase's end. Am7b5's C is D7's 7th: held. Then Gm7's Bb.
+        // The textbook line: Cm7's Bb falls to F7's A, which is Bbmaj7's 7th (held), and on to
+        // Ebmaj7's G; Am7b5's G (struck again: a new phrase) falls to D7's F# and Gm7's F.
         const firstA = line.filter((n) => n.tick < 8 * BAR);
         expect(firstA.map((n) => [n.tick / BAR, n.midi])).toEqual([
-            [0, 63],
-            [2, 62],
-            [4, 60],
-            [6, 58],
+            [0, 70],
+            [1, 69],
+            [3, 67],
+            [4, 67],
+            [5, 66],
+            [6, 65],
         ]);
         // Inside a phrase no move is wider than a minor 3rd.
         for (let i = 1; i < line.length; i++) {
@@ -62,8 +64,17 @@ describe('the guide-tone line', () => {
         }
     });
 
-    it('starts on the 3rd, the key stated first', () => {
-        expect(mod12(line[0].midi)).toBe(3); // Cm7's Eb
+    it('opens near home: on the 3rd when it lies close, else the nearest guide tone', () => {
+        // Cm7's Eb is four under the sax's G: it opens on the Bb instead.
+        expect(line[0].midi).toBe(70);
+        const t = compileTimeline(score([{ label: 'A', bars: 'Dm7 | G7 | Cmaj7 | Cmaj7' }]));
+        expect(guideToneLine(t, t.bars[0], 67, SAX)[0].midi).toBe(65); // Dm7's F
+    });
+
+    it('stays over the comp and out of the bass: a phrase that sank starts again near home', () => {
+        for (const note of line) {
+            expect(note.midi).toBeGreaterThanOrEqual(67 - 5);
+        }
     });
 
     it('never holds a note across a phrase’s first barline, and breathes before it', () => {
@@ -77,8 +88,8 @@ describe('the guide-tone line', () => {
                 }
             }
         }
-        // Bbmaj7's D, held through Ebmaj7, ends its phrase an eighth early.
-        expect(line[1].tick + line[1].dur).toBe(4 * BAR - 240);
+        // Ebmaj7's G ends its phrase an eighth early.
+        expect(line[2].tick + line[2].dur).toBe(4 * BAR - 240);
     });
 
     it('strikes every phrase, even when one chord or a common tone runs across it', () => {
@@ -107,6 +118,9 @@ describe('the guide-tone line', () => {
         expect(guidePitchClasses(at(1), C)).toEqual([11, 5]); // the V: B and the b7
         // D falling a fifth to G is V of V: F# and C, not C#.
         expect(guidePitchClasses(at(2), C, at(1))).toEqual([6, 0]);
+        // But the tonic going to IV stays the tonic: C to F is not V of IV.
+        const f = compileTimeline(score([{ label: 'A', bars: 'F | F | F | F' }]));
+        expect(guidePitchClasses(at(0), C, chordAt(f, 0))).toEqual([4, 11]);
         // A diminished triad is heard as a diminished 7th.
         expect(guidePitchClasses(at(3), C)).toEqual([2, 8]);
         // In a minor key the V triad is a dominant too: D in G minor takes C, not C#.
@@ -126,6 +140,31 @@ describe('the band plays it for the head only (#2027)', () => {
 
     it('not on any other chart: the lead invents the head', () => {
         expect(lead(null).filter((n) => n.bar < 24).length).toBeGreaterThan(40);
+    });
+
+    it('lands a guide tone held into a held ending on a tone of the chord the band holds', () => {
+        // Dm7's F is G7's 7th, held through it; the ending holds C in the last bar instead.
+        const t = compileTimeline(
+            score([{ label: 'A', bars: 'Cmaj7 | Am7 | Dm7 | G7 | Cmaj7 | A7 | Dm7 | G7' }]),
+        );
+        const { events } = performPass(
+            t,
+            {
+                ...DEFAULT_SETTINGS,
+                style: 'jazz',
+                lead: 'sax',
+                lanes: { ...DEFAULT_SETTINGS.lanes, lead: true },
+                head: 'guide-tones',
+            },
+            { pass: 0, looping: false },
+        );
+        const notes = events.filter((e): e is PitchedNote => e.lane === 'lead');
+        const final = notes.filter((n) => n.bar === 7);
+        expect(final.length).toBeGreaterThan(0);
+        // Nothing sounds the F over the held C, from this bar or carried into it.
+        for (const n of notes.filter((n) => n.tick + n.dur > 7 * BAR)) {
+            expect(mod12(n.midi), `${n.tick}`).not.toBe(5);
+        }
     });
 
     it('leaves the solos as they were', () => {

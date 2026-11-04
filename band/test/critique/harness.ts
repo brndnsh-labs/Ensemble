@@ -2112,15 +2112,22 @@ export const METRICS = {
         return ratio(sum, n);
     },
     /**
-     * Share of moves inside a phrase wider than a minor 3rd. For a voice-led line (#2027's
+     * Share of moves inside a phrase (not onto its first barline) wider than a minor 3rd. For a
+     * voice-led line (#2027's
      * guide-tone head), where each tone steps to the next chord's or holds, a 4th or a tritone
      * is a break in the voice-leading that `leadLeapShare` (wider than a fifth) cannot see.
      */
     leadMoveOverThird: (takes) => {
         let n = 0;
         let hit = 0;
-        for (const { events } of takes) {
+        for (const { timeline: t, events } of takes) {
+            // A move onto a phrase's first barline comes after a breath: a line may start a new
+            // phrase where it likes (the guide-tone head re-centres there), so it isn't counted.
+            const tops = new Set(t.bars.filter((b) => b.phrase.bar === 0).map((b) => b.start));
             for (const [a, b] of leadPairs(events)) {
+                if (tops.has(b.tick)) {
+                    continue;
+                }
                 n++;
                 hit += Math.abs(b.midi - a.midi) > 3 ? 1 : 0;
             }
