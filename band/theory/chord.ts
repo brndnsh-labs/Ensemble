@@ -107,7 +107,7 @@ const QUALITY_TABLE: readonly (readonly [spellings: readonly string[], formula: 
     // `13` and `^13` here, and the one chord dictionaries give (#1580).
     [['m13', 'min13'], '1 b3 5 b7 9 13'],
     [['-6', 'm6'], '1 b3 5 6'],
-    [['-69'], '1 b3 5 6 9'],
+    [['-69', 'm69'], '1 b3 5 6 9'],
     // `mMaj7` is the Real Book's spelling of iReal's `-^7`, and `madd9` a minor triad with a
     // 9th and no 7th. Both are names the measure-less charts' parser writes (#1662).
     [['-^7', 'mMaj7'], '1 b3 5 7'],

@@ -74,6 +74,24 @@ export function transposeKeyName(key: string, semitoneShift: number): string {
     return KEY_ORDER[(((currentIndex + semitoneShift) % 12) + 12) % 12];
 }
 
+const SHARP_KEY_ORDER = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
+/**
+ * Transposes a key that is written on a section or a bar, keeping how it was written (#2068): a
+ * sharp key (`F#`) stays in sharps (`G#`), a flat or natural one in flats, so a chart's `F#`
+ * section is not respelled `Gb` by a transpose. `transposeKeyName` is the flat pitch-class name
+ * for the song's own key, which the key picker sets. An unknown key moves nothing.
+ */
+export function transposeKeyKeepingSpelling(key: string, semitoneShift: number): string {
+    const sharp = key.includes('#');
+    const index = (sharp ? SHARP_KEY_ORDER : KEY_ORDER).indexOf(sharp ? key : normalizeKey(key));
+    if (index === -1) {
+        return key;
+    }
+    const names = sharp ? SHARP_KEY_ORDER : KEY_ORDER;
+    return names[(((index + semitoneShift) % 12) + 12) % 12];
+}
+
 /**
  * Semitones up from one key to another, counted on `KEY_ORDER`'s all-flat spelling. A chart may
  * carry a sharp spelling the key picker does not list (`F#` from an iReal import), so both ends
