@@ -28,6 +28,8 @@ const RELEASE_TAIL_S = 2;
 export interface AudioExportOptions {
     /** Sample rate for the render. Defaults to 44100. */
     sampleRate?: number;
+    /** The musician's own muted lane, left out of the mix (`BandSettings.you`, #2072). */
+    you?: BandEvent['lane'] | null;
     /** Filename hint for the resulting Blob (used by the UI for the download). */
     filename?: string;
 }
@@ -114,6 +116,11 @@ export interface BandRenderOptions {
     prepare?: (state: EnsembleState) => void;
     /** Called once per event, with the time and length its voice is played with. */
     onSchedule?: (scheduled: ScheduledBandEvent) => void;
+    /**
+     * The musician's own muted lane (`BandSettings.you`), which the cymbals' mix trim does not
+     * count as a layer (#2072). A mix passes it; a stem, which keeps every lane, does not.
+     */
+    you?: BandEvent['lane'] | null;
 }
 
 export interface BandRender {
@@ -202,6 +209,7 @@ export async function renderBandPasses(
                 chordSizes.get(event.tick) ?? 1,
                 timeline,
                 legato.has(event),
+                options.you ?? null,
             );
         }
     });
@@ -230,8 +238,9 @@ async function renderBandEventsToWav(
     bpm: number,
     filename: string,
     sampleRate: number,
+    you: BandEvent['lane'] | null = null,
 ): Promise<AudioExportResult> {
-    const render = await renderBandPasses([events], timeline, bpm, { sampleRate });
+    const render = await renderBandPasses([events], timeline, bpm, { sampleRate, you });
     const wav = encodeWav(render.channels, render.sampleRate);
     return {
         blob: new Blob([wav], { type: 'audio/wav' }),
@@ -251,7 +260,7 @@ export async function renderBandMixToWav(
 ): Promise<AudioExportResult> {
     const sampleRate = opts.sampleRate ?? 44100;
     const filename = sanitizeFilename(opts.filename ?? 'ensemble-export');
-    return renderBandEventsToWav(events, timeline, bpm, filename, sampleRate);
+    return renderBandEventsToWav(events, timeline, bpm, filename, sampleRate, opts.you ?? null);
 }
 
 /**

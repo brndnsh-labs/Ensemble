@@ -70,16 +70,22 @@ test('asked once on the stand; Bass mutes the bass on every chart without making
     await chip(page, 'Drums').click();
     await expect(save(page)).toHaveAttribute('aria-disabled', 'true');
 
-    // The next chart opens with the bass muted again, and the choice survives a reload, asked
-    // no more.
+    // Turned on, the bass stays on for the next chart and across a reload (#2072), asked no
+    // more; muting it is the same choice, carried the same way.
     await page
         .getByRole('button', { name: /songbook|Back/i })
         .first()
         .click();
     await songLink(page, 'Minor swing sketch', 'Jazz').click();
     await page.waitForSelector('.bar');
-    await expect(chip(page, 'Bass')).toHaveAttribute('aria-pressed', 'false');
+    await expect(chip(page, 'Bass')).toHaveAttribute('aria-pressed', 'true');
     await expect(save(page)).toHaveAttribute('aria-disabled', 'true');
+    await page.reload();
+    await songLink(page, 'Blue pocket', 'Blues').click();
+    await page.waitForSelector('.bar');
+    await expect(chip(page, 'Bass')).toHaveAttribute('aria-pressed', 'true');
+    await chip(page, 'Bass').click();
+    await expect(chip(page, 'Bass')).toHaveAttribute('aria-pressed', 'false');
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').click();
     await page.waitForSelector('.bar');

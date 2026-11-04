@@ -18,6 +18,8 @@ vi.mock('./band-export', () => ({
 }));
 
 async function setup() {
+    // The remembered "my lane is on" is a device preference (#2072): each test starts without it.
+    localStorage.clear();
     vi.resetModules();
     // One at a time: two imports at once can each reach a mocked module mid-import (#1699).
     const runtime = await import('./runtime');
@@ -77,7 +79,7 @@ describe('your own lane (#1992)', () => {
         expect(runtime.captureDocument(off).chart.band.bass.enabled).toBe(false);
     });
 
-    it('opens muted on the next chart opened, and keeps the choice through every other load', async () => {
+    it('keeps your lane on for the next chart opened, and through every other load (#2072)', async () => {
         const { runtime, songs } = await setup();
         runtime.setPlayerLane('bass');
         runtime.load(songs[0], true);
@@ -88,8 +90,45 @@ describe('your own lane (#1992)', () => {
         // …and a Duplicate's or a Keep both's copy reloads it under a new id.
         runtime.load({ ...songs[0], id: 'copy' });
         expect(runtime.laneHeard('bass')).toBe(true);
+        // Turned on, it stays on for the next chart opened…
         runtime.load(songs[1], true);
+        expect(runtime.laneHeard('bass')).toBe(true);
+        // …until it is muted again, which carries the same way.
+        runtime.setEnabled('bass', false);
+        runtime.load(songs[0], true);
         expect(runtime.laneHeard('bass')).toBe(false);
+    });
+
+    it('remembers the choice on this device, for that instrument only (#2072)', async () => {
+        const first = await setup();
+        first.runtime.setPlayerLane('bass');
+        first.runtime.load(first.songs[0], true);
+        first.runtime.setEnabled('bass', true);
+        // A new page load (a fresh runtime, the same storage): the choice is still on.
+        vi.resetModules();
+        const again = await import('./runtime');
+        again.setPlayerLane('bass');
+        again.load(first.songs[0], true);
+        expect(again.laneHeard('bass')).toBe(true);
+        // Another instrument starts muted, as a first answer does, and drops the old choice.
+        again.setPlayerLane('chords');
+        again.load(first.songs[0], true);
+        expect(again.laneHeard('chords')).toBe(false);
+        again.setPlayerLane('bass');
+        expect(again.laneHeard('bass')).toBe(false);
+    });
+
+    it('leaves a lane the chart has off off on the next chart, whatever you chose (#2072)', async () => {
+        const { runtime, songs } = await setup();
+        const off = structuredClone(songs[1]);
+        off.chart.band.bass.enabled = false;
+        runtime.setPlayerLane('bass');
+        runtime.load(songs[0], true);
+        runtime.setEnabled('bass', true);
+        runtime.load(off, true);
+        expect(runtime.laneHeard('bass')).toBe(false);
+        // The previous chart's write did not follow: unmuting here is this song's own choice.
+        expect(runtime.captureDocument(off).chart.band.bass.enabled).toBe(false);
     });
 
     it('leaves another muted lane meaning a band without that player', async () => {
@@ -120,6 +159,11 @@ describe('your own lane (#1992)', () => {
         // Asking to trade with the soloist turns it on, as it does for anyone.
         expect(runtime.laneHeard('soloist')).toBe(true);
         expect(runtime.tradeBlocked()).toBeNull();
+        // Muted again, the lane is yours and the band has no one there to trade with.
+        runtime.setEnabled('soloist', false);
+        expect(runtime.tradeBlocked()).toBe('you-soloist');
+        // Another player's soloist switched off is the plain reason.
+        runtime.setPlayerLane('bass');
         runtime.setEnabled('soloist', false);
         expect(runtime.tradeBlocked()).toBe('soloist-off');
     });

@@ -3,7 +3,7 @@ import type {
     SoloistTradeChoruses,
     SoloistTradeWith,
 } from '@core/songbook/types';
-import type { ChartDocument } from '../lib/runtime';
+import type { ChartDocument, TradeBlocked } from '../lib/runtime';
 
 const TURNS: { value: SoloistTradeBars; label: string }[] = [
     { value: 2, label: 'Twos (2 bars)' },
@@ -25,7 +25,7 @@ interface TradeTabProps {
     /** Who this style's band can trade with: the drummer solos only in some styles. */
     partners: { soloist: boolean; drums: boolean };
     /** Why the band can't trade as asked right now (`runtime.tradeBlocked`), or null. */
-    blocked: 'soloist-off' | 'drums-off' | 'drummer-no-solo' | null;
+    blocked: TradeBlocked | null;
     onChange: (
         tradeWith: SoloistTradeWith,
         bars: SoloistTradeBars,
@@ -72,19 +72,7 @@ export function TradeTab({ current, busy, partners, blocked, onChange }: TradeTa
                             </option>
                         </select>
                     </label>
-                    <p className="trade-note">
-                        {blocked === 'soloist-off'
-                            ? 'Paused: the soloist is off. Turn it on to trade with it.'
-                            : blocked === 'drums-off'
-                              ? 'Paused: the drums are off. Turn them on to trade with the drummer.'
-                              : blocked === 'drummer-no-solo'
-                                ? "Paused: this style's drummer doesn't solo yet. The band plays on, and leaves the soloing to you."
-                                : tradeWith === 'soloist'
-                                  ? 'The soloist plays a phrase, then lays out while the band comps for yours.'
-                                  : tradeWith === 'drums'
-                                    ? 'The band drops out for the drummer’s solo, then comps for yours.'
-                                    : 'The band plays the whole song with you.'}
-                    </p>
+                    <p className="trade-note">{tradeNote(blocked, tradeWith)}</p>
                 </div>
                 <div className="feel-group">
                     <label>
@@ -135,4 +123,26 @@ export function TradeTab({ current, busy, partners, blocked, onChange }: TradeTa
             </div>
         </>
     );
+}
+
+/** The line under "Trade with", per reason the band can't trade (#2072), else what trading does. */
+function tradeNote(blocked: TradeBlocked | null, tradeWith: SoloistTradeWith): string {
+    switch (blocked) {
+        case 'soloist-off':
+            return 'Paused: the soloist is off. Turn it on to trade with it.';
+        case 'drums-off':
+            return 'Paused: the drums are off. Turn them on to trade with the drummer.';
+        case 'drummer-no-solo':
+            return "Paused: this style's drummer doesn't solo yet. The band plays on, and leaves the soloing to you.";
+        case 'you-soloist':
+            return "Paused: you're the soloist, so the band has no one to trade with. Turn your part on to hear the band's soloist.";
+        case 'you-drums':
+            return "Paused: you're the drummer, so the band has no one to trade with. Turn your part on to hear the band's drummer.";
+        default:
+            return tradeWith === 'soloist'
+                ? 'The soloist plays a phrase, then lays out while the band comps for yours.'
+                : tradeWith === 'drums'
+                  ? 'The band drops out for the drummer’s solo, then comps for yours.'
+                  : 'The band plays the whole song with you.';
+    }
 }
