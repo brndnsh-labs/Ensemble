@@ -98,6 +98,7 @@ import {
     type SoundProgress,
     seedInstalledSounds,
     validateVoice,
+    warmSounds,
 } from './sounds';
 import { createStyleSounds, type StyleSoundsStatus } from './style-sounds';
 import { track } from './telemetry';
@@ -645,6 +646,34 @@ export function countInBeat(): number | null {
     return band?.countingInBeat() ?? null;
 }
 
+/**
+ * The genre-change effect in `core/` picks the old engine's Auto sound; on the band, a native
+ * genre's own comp instrument wins (bossa is heard on nylon), and so does its own lead. Only an
+ * installed pack is taken (#1405); a missing one is fetched behind the band on Play (#1997).
+ * True when a lane moved (that dispatch syncs the band again).
+ */
+function applyBandAutoVoices(): boolean {
+    const { groove, chords, soloist } = getState();
+    const auto = bandAutoComp(groove.lastSmartGenre);
+    if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
+        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'chords', voice: auto, auto: true });
+        return true;
+    }
+    // The same for the lead: a native style's own lead instrument, when its pack is installed
+    // (the built-in voice needs no pack).
+    const autoLead = bandAutoLead(groove.lastSmartGenre);
+    if (
+        autoLead &&
+        soloist.autoSound &&
+        soloist.voice !== autoLead &&
+        (autoLead === 'synth' || isPackInstalled(autoLead.slice(5)))
+    ) {
+        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'soloist', voice: autoLead, auto: true });
+        return true;
+    }
+    return false;
+}
+
 /** Keep the band in step with every change the app makes to the shared state. */
 function syncBand(): void {
     const host = band;
@@ -668,26 +697,8 @@ function syncBand(): void {
             param('groove', 'swingSub', payload.sub);
         }
     }
-    // The genre-change effect in `core/` picks the old engine's Auto sound; on the band,
-    // a native genre's own comp instrument wins (bossa is heard on nylon). Only an installed
-    // pack is taken (#1405); a missing one is fetched behind the band on Play (#1997).
-    const { chords, soloist } = getState();
-    const auto = bandAutoComp(groove.lastSmartGenre);
-    if (auto && chords.autoSound && chords.voice !== auto && isPackInstalled(auto.slice(5))) {
-        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'chords', voice: auto, auto: true });
+    if (applyBandAutoVoices()) {
         return; // that dispatch syncs the band again
-    }
-    // The same for the lead: a native style's own lead instrument, when its pack is installed
-    // (the built-in voice needs no pack).
-    const autoLead = bandAutoLead(groove.lastSmartGenre);
-    if (
-        autoLead &&
-        soloist.autoSound &&
-        soloist.voice !== autoLead &&
-        (autoLead === 'synth' || isPackInstalled(autoLead.slice(5)))
-    ) {
-        dispatch(ACTIONS.SET_INSTRUMENT_VOICE, { module: 'soloist', voice: autoLead, auto: true });
-        return;
     }
     if (!host?.playing) {
         return;
@@ -1581,6 +1592,13 @@ export function load(document: ChartDocument, opened = false): void {
         // about this device. Resolve it again against what is installed here, by the same rule a
         // feel change uses.
         resolveAutoVoices(getState(), getState().groove.lastSmartGenre, dispatch);
+        // And the band's own comp and lead, which `syncBand` would otherwise only settle on the
+        // first dispatch after Play: too late for `prepareSounds`, so a pack installed here
+        // started on built-in and swapped in once decoded (#2082). The subscriber is off while
+        // loading, so both lanes are settled here (the second pass takes the lead).
+        if (applyBandAutoVoices()) {
+            applyBandAutoVoices();
+        }
         rebuild();
     } catch (error) {
         apply(previous);
@@ -1594,6 +1612,9 @@ export function load(document: ChartDocument, opened = false): void {
         playerLaneHeard = false;
         playerLaneWroteChart = false;
     }
+    // The packs this chart's lanes name that the device already holds, decoded while the page is
+    // idle, so Play finds them ready (#2082).
+    warmSounds(captureContent());
 }
 
 /**
