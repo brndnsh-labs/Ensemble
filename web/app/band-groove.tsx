@@ -1,6 +1,7 @@
+import { UNSET_HUMANIZE } from '@core/songbook/humanize';
 import type { SwingSub } from '@core/types';
 import { useEffect, useState } from 'react';
-import { shownHumanize, UNSET_HUMANIZE } from '../lib/genre-humanize';
+import { playedHumanize } from '../lib/genre-humanize';
 import type { ChartDocument, SongMinutes } from '../lib/runtime';
 import { songPlanText } from '../lib/song-mode';
 import { useRangeCommit } from './use-range-commit';
@@ -180,11 +181,11 @@ export function GrooveTab({
                 <RangeSetting
                     label="Humanize"
                     ariaLabel="Humanize"
-                    value={shownHumanize(groove.humanize, groove.genre)}
+                    value={playedHumanize(groove.humanize, groove.genre)}
                     max={100}
                     disabled={busy}
                     onCommit={onHumanize}
-                    readsAs={(display) => shownHumanize(display, groove.genre)}
+                    readsAs={(display) => playedHumanize(display, groove.genre)}
                 />
                 {groove.humanize === UNSET_HUMANIZE && (
                     <p className="feel-hint">

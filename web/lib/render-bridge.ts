@@ -201,7 +201,11 @@ export async function renderBand(request: BandRenderRequest): Promise<BandRender
         playback.bpm = request.bpm;
         playback.bandIntensity = request.intensity;
         if (request.genreFeel) {
-            (state.groove as Mutable<EnsembleState['groove']>).genreFeel = request.genreFeel;
+            const groove = state.groove as Mutable<EnsembleState['groove']>;
+            groove.genreFeel = request.genreFeel;
+            // And the genre the band's style is read from, so the soloist's timbre jitter
+            // follows the scene's style while humanize is not set (#2055), as it does live.
+            groove.lastSmartGenre = request.genreFeel;
         }
         for (const pin of pins) {
             (state[pin.module as LaneModule] as { voice: InstrumentVoice }).voice =

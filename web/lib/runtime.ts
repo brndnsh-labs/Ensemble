@@ -30,7 +30,7 @@ import {
 import { warmDrumBuffers } from '@core/engine/synth-drums';
 import { transposeChordText } from '@core/engine/transpose';
 import { unlockAudio } from '@core/platform';
-
+import { bandHumanize } from '@core/songbook/humanize';
 import type { SemanticScore } from '@core/songbook/score-types';
 import {
     type ChartLaneMix,
@@ -83,7 +83,6 @@ import {
 } from './band-voices';
 import { type ChartDocument, type DocumentContent, validateDocument } from './documents';
 import { checkPlayable } from './engine-mode';
-import { bandHumanize } from './genre-humanize';
 import { genreSwing } from './genre-swing';
 import { loopEntry, loopScore, loopView } from './section-loop';
 import {

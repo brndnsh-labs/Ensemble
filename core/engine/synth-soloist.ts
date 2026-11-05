@@ -247,6 +247,10 @@ function playSoloNoteCurrent(
     isLegato: boolean = false,
     vibrato: boolean = false,
     noteSeed: number = 0,
+    // The humanize the band plays (0-100): the chart's own amount, or its style's while the
+    // chart has not set one (#2055) — the caller resolves it, since `core/` can't see the style.
+    // Never the raw `groove.humanize`, whose stored 20 means "not set" (#2010).
+    humanize: number = 0,
 ): void {
     const { playback, soloist } = state;
     // Guard every value that feeds an AudioParam: freq → oscillators, vol →
@@ -290,7 +294,7 @@ function playSoloNoteCurrent(
     (soloist.audio as Mutable<typeof soloist.audio>).lastRenderedFreq = freq; // @direct-mutation
 
     // Per-note timbral humanization (epic-3-soloist S5).
-    const timbre = soloistTimbreJitter(noteSeed, (state.groove?.humanize ?? 0) / 100);
+    const timbre = soloistTimbreJitter(noteSeed, humanize / 100);
 
     playTrumpet(
         state,
@@ -425,7 +429,8 @@ const NO_TIMBRE_JITTER: TimbreJitter = {
  * note" tell is gone. Four independent `scrambleHash` draws off one seed
  * (XORed with distinct constants so the dimensions don't move in lockstep)
  * jitter cutoff ±8%, detune ±3c, attack ±20%, and bell/formant freq ±5%.
- * `scale` is the `groove.humanize / 100` knob; at 0 the result is neutral.
+ * `scale` is the played humanize / 100 (`playSoloNoteCurrent`'s `humanize`); at 0 the result
+ * is neutral.
  * Deterministic — the same seed always yields the same offsets, so looped
  * playback and critique tests reproduce exactly.
  */

@@ -1,3 +1,4 @@
+import { UNSET_HUMANIZE } from '../../core/songbook/humanize.js';
 import { type ArrangerState, arranger } from '../../core/state/arranger.js';
 import { type GrooveState, groove } from '../../core/state/groove.js';
 import { bass, chords, INSTRUMENT_REVERB_DEFAULTS, soloist } from '../../core/state/instruments.js';
@@ -45,7 +46,7 @@ export function resetAllStateForTest(): void {
     g.swingSub = '8th';
     g.genreFeel = 'Rock';
     g.lastSmartGenre = 'Rock';
-    g.humanize = 20;
+    g.humanize = UNSET_HUMANIZE;
     g.lastHatGain = null;
     g.lastSampledHatVoice = null;
     g.lastRideGain = null;

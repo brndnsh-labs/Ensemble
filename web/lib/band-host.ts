@@ -43,6 +43,7 @@ import { playSoloNote } from '@core/engine/synth-soloist';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { EnsembleState } from '@core/types';
 import { countInBars } from './count-in';
+import { playedHumanize } from './genre-humanize';
 
 const LOOKAHEAD_S = 0.15;
 const TIMER_MS = 25;
@@ -290,7 +291,8 @@ export function playBandEvent(
     if (event.lane === 'lead') {
         // The soloist's voice or pack (sax, trumpet, guitars) on the soloist bus. A bend or
         // scoop starts below the written pitch and glides up into it; the per-note seed keys
-        // the voice's timbral humanising to the note's place in the song.
+        // the voice's timbral humanising to the note's place in the song, scaled by the
+        // humanize the band plays (the style's own while the chart hasn't set one, #2055).
         playSoloNote(
             state,
             hz(event.midi),
@@ -301,6 +303,7 @@ export function playBandEvent(
             legato,
             event.vibrato === true,
             event.tick,
+            playedHumanize(state.groove.humanize, state.groove.lastSmartGenre),
         );
         return;
     }

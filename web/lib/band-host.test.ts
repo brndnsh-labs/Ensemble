@@ -95,6 +95,8 @@ function fakeState(audio: ReturnType<typeof fakeAudioContext>, metronome = false
     return {
         playback: { audio, audioGraph: null, metronome },
         chords: { instrument: 'Piano' },
+        // What the lead's timbre jitter reads its humanize from (`playedHumanize`, #2055).
+        groove: { humanize: 20, lastSmartGenre: 'Rock' },
     } as unknown as EnsembleState;
 }
 
