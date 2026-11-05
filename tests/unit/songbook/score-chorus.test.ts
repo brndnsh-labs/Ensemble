@@ -2,8 +2,9 @@
  * #1472: a chart's chorus count and its last-chorus coda in the score form.
  */
 import { describe, expect, it } from 'vitest';
+import { sectionRoleOf } from '../../../band/arrange/plan.js';
 import { compileTimeline } from '../../../band/form/timeline.js';
-import { compileScoreForm } from '../../../core/songbook/score-form.js';
+import { compileScoreForm, isOutroLabel } from '../../../core/songbook/score-form.js';
 import type {
     ScoreDestination,
     ScoreDirection,
@@ -561,15 +562,29 @@ describe('a counted chart plays its intro and its outro once (#1483)', () => {
     it('plays an intro or outro inside the form every chorus: it is an interlude', () => {
         // Sections share a label here, so the bars are named by section.
         const score = scoreFixture(
-            ...['i', 'v1', 'riff', 'v2', 'out', 'end', 'o'].map((id) => [bar(id)]),
+            ...['i', 'v1', 'riff', 'v2', 'out', 'v3', 'o'].map((id) => [bar(id)]),
         );
-        ['Intro', 'Verse', 'Intro', 'Verse', 'Outro', 'Ending', 'Outro'].forEach((label, i) => {
+        ['Intro', 'Verse', 'Intro', 'Verse', 'Outro', 'Verse', 'Outro'].forEach((label, i) => {
             score.sections[i].label = label;
         });
         expect(byChorus({ ...score, choruses: 2 })).toEqual([
-            ['i', 'v1', 'riff', 'v2', 'out', 'end'],
-            ['v1', 'riff', 'v2', 'out', 'end', 'o'],
+            ['i', 'v1', 'riff', 'v2', 'out', 'v3'],
+            ['v1', 'riff', 'v2', 'out', 'v3', 'o'],
         ]);
+    });
+
+    it('reads a Coda, an Ending and a Tag as an outro, as the band does (#2071)', () => {
+        for (const label of ['Coda', 'Ending', 'Tag', 'tag 2']) {
+            const score = { ...song('Verse', label), choruses: 2 };
+            expect(byChorus(score), label).toEqual([
+                ['Verse1', 'Verse2'],
+                ['Verse1', 'Verse2', `${label}1`, `${label}2`],
+            ]);
+            // The band's role table reads the same label the same way: the outro's dynamics.
+            expect(sectionRoleOf(label), label).toBe('Outro');
+        }
+        // The label's start is what counts: a verse's ending is a verse.
+        expect(isOutroLabel('Verse ending')).toBe(false);
     });
 
     it('plays a chart that is all intro and outro as written, so no chorus is empty', () => {

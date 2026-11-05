@@ -5,6 +5,7 @@
  * never a value that drifts while the song plays.
  */
 
+import { INTRO_LABEL, OUTRO_LABEL } from '../../core/songbook/score-form.js';
 import type { BandSettings, Lane, TradeSettings } from '../core/types.js';
 import { type Bar, chorusBars, type Timeline } from '../form/timeline.js';
 import { type LeadRole, leadRole } from './cycle.js';
@@ -14,6 +15,13 @@ export type Fill = 'none' | 'phrase' | 'section';
 export interface BarPlan {
     /** 0–1. Tiers (see `energyTier`) are what idioms branch on; the raw value scales dynamics. */
     energy: number;
+    /**
+     * 0–1. The bar's section level before anything lifts it — the build into a bigger section,
+     * a looping song's pass lift, the jam arc: what the form says, at the intensity the player
+     * chose. For a choice about the form itself (is the next section a louder one?), which
+     * must not change with how many times round the song has gone (#2071).
+     */
+    level: number;
     lanes: Record<Lane, boolean>;
     /** The drummer's job at the end of this bar. */
     fill: Fill;
@@ -41,14 +49,14 @@ export interface BarPlan {
  * Unknown labels (A, B, Head...) have no role and sit at the middle.
  */
 export const SECTION_ROLES: readonly { name: string; pattern: RegExp; energy: number }[] = [
-    { name: 'Intro', pattern: /^intro/i, energy: 0.35 },
+    { name: 'Intro', pattern: INTRO_LABEL, energy: 0.35 },
     { name: 'Verse', pattern: /^(verse|v\d*$)/i, energy: 0.5 },
     { name: 'Pre-chorus', pattern: /^pre/i, energy: 0.6 },
     { name: 'Chorus', pattern: /^(chorus|hook|refrain)/i, energy: 0.75 },
     { name: 'Bridge', pattern: /^(bridge|b$)/i, energy: 0.6 },
     { name: 'Solo', pattern: /^solo/i, energy: 0.65 },
     { name: 'Break', pattern: /^(break|breakdown)/i, energy: 0.3 },
-    { name: 'Outro', pattern: /^(outro|coda|ending|tag)/i, energy: 0.45 },
+    { name: 'Outro', pattern: OUTRO_LABEL, energy: 0.45 },
 ];
 
 /** The role the band reads from a section label, or null for one it has no role for. */
@@ -67,6 +75,21 @@ function sectionEnergy(bar: Bar): number {
 }
 
 const clamp01 = (n: number) => Math.min(1, Math.max(0, n));
+
+/** How far the last bar before a bigger section climbs toward it (`buildsInto`). */
+const BUILD_LIFT = 0.06;
+
+/**
+ * Does `bar` build into `next`: the last bar of its section visit, before a section that sits
+ * higher? Its plan's energy then carries `BUILD_LIFT` on top of its own section's level.
+ */
+function buildsInto(bar: Bar, next: Bar | null): boolean {
+    return (
+        bar.barInVisit === bar.visit.barCount - 1 &&
+        next !== null &&
+        sectionEnergy(next) > sectionEnergy(bar) + 0.05
+    );
+}
 
 /**
  * A looping form shorter than this (under 8 bars; an 8-bar form already carries the 8-bar period
@@ -101,6 +124,28 @@ function lapFillOrdinal(lap: number, length: number): number {
     return lapFill(lap, length) === 'section'
         ? Math.floor(played / 16)
         : Math.floor((Math.floor(played / 8) - 1) / 2) + 1;
+}
+
+/**
+ * The length of each chorus of a counted chart that is a short form played over and over: two
+ * or more choruses, each one visit of the same single section, all the same length and under
+ * `SHORT_FORM` bars. 0 for any other chart, whose chorus seams are real section arrivals.
+ */
+function shortChorusLength({ bars, visits }: Timeline): number {
+    const length = visits[0]?.barCount ?? 0;
+    const choruses = visits.at(-1)?.chorus ?? 0;
+    return choruses > 0 &&
+        length < SHORT_FORM &&
+        visits.length === choruses + 1 &&
+        visits.every(
+            (v, k) =>
+                v.chorus === k &&
+                v.sectionIndex === visits[0].sectionIndex &&
+                v.barCount === length,
+        ) &&
+        bars.length === length * visits.length
+        ? length
+        : 0;
 }
 
 const TIER_ORDER: readonly EnergyTier[] = ['low', 'mid', 'high'];
@@ -181,7 +226,9 @@ const ARC_LAST_FROM = 0.09;
 const ARC_END = 0.2;
 // why: inside a building chorus the band leans in, ±0.05 around its level, as a soloist builds
 // a chorus: the climax chorus opens upper mid and crosses into high by its second phrase. The
-// bigger step comes at the chorus seam, where the section fill and crash already mark it.
+// bigger step comes at the chorus seam, where the section fill and crash already mark it —
+// except in a short counted vamp, whose seams are laps (`shortChorusLength`): there only the
+// seams on the 8- and 16-bar lines are marked.
 const ARC_RISE = 0.1;
 
 /**
@@ -353,13 +400,21 @@ export function planBars(
     // outside it (its predecessor, when a resumed pass or a fresh pass's own origin needs it),
     // so the two can't drift apart. "Last bar" is window-relative (`window.to - 1`).
     // A short single-section, uncounted form: each lap's wrap is counted (`lapFill`), not
-    // filled. A counted chart's choruses and a form with real section seams keep the section
-    // fill. `shortForm` is the form alone (the previous lap of a final, non-looping pass is
-    // still a lap of the loop); `shortLoop` is whether this call's pass wraps into another.
+    // filled. A form with real section seams keeps the section fill. `shortForm` is the form
+    // alone (the previous lap of a final, non-looping pass is still a lap of the loop);
+    // `shortLoop` is whether this call's pass wraps into another.
     const shortForm =
         bars.length < SHORT_FORM &&
         bars.every((b) => b.visit.chorus === 0 && b.visit.ordinal === bars[0].visit.ordinal);
     const shortLoop = looping && shortForm;
+    // A counted chart of the same short form: each chorus is one lap of it, and its seams are
+    // counted the same way (#2071, from #2009) — four choruses of a 4-bar vamp are 16 bars of
+    // one groove, not four sections. The lap's length, or 0 for any other chart.
+    const chorusLap = shortChorusLength(timeline);
+    const chorusSeam = (index: number) =>
+        chorusLap > 0 &&
+        index + 1 < bars.length &&
+        bars[index + 1].visit.chorus !== bars[index].visit.chorus;
     const fillAt = (index: number, onPass: number): Fill => {
         const bar = bars[index];
         const isLast = index === window.to - 1;
@@ -374,6 +429,10 @@ export function planBars(
         if (isLast && looping && shortLoop) {
             // The loop's wrap is a lap, counted toward the 8- and 16-bar periods.
             return lapFill(onPass, bars.length);
+        }
+        if (!isLast && chorusSeam(index)) {
+            // So is a short counted chorus's seam into the next.
+            return lapFill(passAt(index, onPass), chorusLap);
         }
         // A counted chart's chorus ends into its next chorus the way a looping song's last
         // bar wraps to the top: a section fill, even out of a seamless section.
@@ -409,13 +468,12 @@ export function planBars(
             settings.intensity === null
                 ? section
                 : settings.intensity + (section - DEFAULT_ENERGY) * 0.5;
-        const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
         // The section's own level, before anything lifts it: the side of the high line a
         // style that keeps it holds (#1794).
         const own = clamp01(energy);
         // Build into a bigger section over the last bar before it.
-        if (visitEnd && next && sectionEnergy(next) > section + 0.05) {
-            energy += 0.06;
+        if (buildsInto(bar, next)) {
+            energy += BUILD_LIFT;
         }
         // The lift is the last term, so nothing after it washes the arc out.
         energy = clamp01(energy + lift(i));
@@ -470,7 +528,9 @@ export function planBars(
         const arrival = bar.barInVisit === 0 && !bar.visit.seamless && !first && !drumsTurn;
         // The top of a short loop's next lap is no new section: it crashes only after the
         // lap's section fill (`lapFill`), so a 4-bar loop crashes every 16 bars, not every 4.
-        const lapTop = shortForm && i === 0 && pass > 0;
+        const lapTop =
+            (shortForm && i === 0 && pass > 0) ||
+            (chorusLap > 0 && bar.barInVisit === 0 && bar.visit.chorus > 0);
         // A crash marks an arrival: a new section, or the downbeat after a phrase fill once the
         // band is past quiet energy — the previous bar's fill, in performance order. Past the
         // origin, that's bar `i - 1` on this same pass, read from the form (`fillAt`) rather
@@ -503,10 +563,17 @@ export function planBars(
         const afterDrums = before && !drumsTurn;
         plans[i] = {
             energy,
+            level: own,
             lanes,
             fill,
             fillOrdinal:
-                fill !== 'none' && shortLoop && isLast ? lapFillOrdinal(pass, bars.length) : 0,
+                fill === 'none'
+                    ? 0
+                    : shortLoop && isLast
+                      ? lapFillOrdinal(pass, bars.length)
+                      : !isLast && chorusSeam(i)
+                        ? lapFillOrdinal(passAt(i, pass), chorusLap)
+                        : 0,
             crash:
                 (arrival && !(lapTop && priorFill !== 'section')) ||
                 afterFill ||

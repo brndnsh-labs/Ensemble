@@ -229,10 +229,19 @@ function sectionForm(section: ScoreSection): Node[] {
     return result;
 }
 
+/** The label of an intro section; the band's role table (`SECTION_ROLES`) reads the same one. */
+export const INTRO_LABEL = /^intro/i;
+/**
+ * The label of an outro section: written ending material, whatever the chart calls it — an
+ * Outro, a Coda, an Ending or a Tag (#2071, DECISION 2026-11-04). The band's role table
+ * (`SECTION_ROLES`) reads the same pattern, so a section that plays the outro's dynamics is
+ * also the one a counted chart plays once, in its last chorus.
+ */
+export const OUTRO_LABEL = /^(outro|coda|ending|tag)/i;
 /** A section labelled as an intro: the band's, before the lead comes in (`leadRole`). */
-export const isIntroLabel = (label: string) => /^intro/i.test(label.trim());
-/** A section labelled as an outro: written ending material. */
-export const isOutroLabel = (label: string) => /^outro/i.test(label.trim());
+export const isIntroLabel = (label: string) => INTRO_LABEL.test(label.trim());
+/** A section labelled as an outro (`OUTRO_LABEL`). */
+export const isOutroLabel = (label: string) => OUTRO_LABEL.test(label.trim());
 
 /**
  * The sections a counted chart plays once (#1483, DECISION 2026-10-08): an intro in the first

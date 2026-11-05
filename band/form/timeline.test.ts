@@ -595,6 +595,49 @@ describe('modal tonics and implied tensions (#2011)', () => {
         expect(chordAt(t, 0)?.implied).toBeUndefined();
     });
 
+    it('reads no neighbour past the ends of a counted chart, which plays once (#2071)', () => {
+        const chart = score([{ label: 'A', bars: 'Em7 | B7 | C | A7' }], E);
+        // Uncounted, the form loops: the A7 at the end leads back into the Em7.
+        const looped = compileTimeline(chart);
+        expect(chordAt(looped, 0)?.scale).toEqual(DORIAN);
+        // Counted, the first Em7 is the start of the performance: the final A7 is not before it.
+        const once = compileTimeline({ ...chart, choruses: 1 });
+        expect(chordAt(once, 0)?.scale).toEqual(AEOLIAN);
+        // Its second chorus's Em7 does follow an A7, so it is dorian.
+        const twice = compileTimeline({ ...chart, choruses: 2 });
+        expect(chordAt(twice, 0)?.scale).toEqual(AEOLIAN);
+        expect(chordAt(twice, twice.bars[4].start)?.scale).toEqual(DORIAN);
+    });
+
+    it("implies no b13 on a counted chart's last dominant from its first chord (#2071)", () => {
+        const C = { key: 'C', isMinor: true };
+        const chart = score([{ label: 'A', bars: 'Cm7 | Fm7 | Ab | G7' }], C);
+        expect(chordAt(compileTimeline(chart), 3 * BAR)?.implied?.thirteenth).toBe(8);
+        const once = compileTimeline({ ...chart, choruses: 2 });
+        // Into the second chorus the G7 resolves to the Cm7; at the very end it resolves nowhere.
+        expect(chordAt(once, 3 * BAR)?.implied?.thirteenth).toBe(8);
+        expect(chordAt(once, 7 * BAR)?.implied).toBeUndefined();
+    });
+
+    it('measures the IV from the tonic chord across a key change (#2071)', () => {
+        // The A section is in E minor; B is written in A major. The A beside the last Em7 is
+        // the Em7's major IV — its C# is the Em7's 6th — whatever key its own bar is in.
+        const t = compileTimeline(
+            score(
+                [
+                    { label: 'A', bars: 'Em7 | B7 | Em7' },
+                    { label: 'B', key: 'A', isMinor: false, bars: 'A | D | E7' },
+                ],
+                E,
+            ),
+        );
+        expect(t.bars[3].key).toEqual({ tonic: 9, minor: false });
+        expect(chordAt(t, 2 * BAR)?.scale).toEqual(DORIAN);
+        // The first Em7's neighbours, the B7 and (round the loop, past the E7 on its own root)
+        // the D, are no IV: it stays natural minor.
+        expect(chordAt(t, 0)?.scale).toEqual(AEOLIAN);
+    });
+
     it('does not touch a b9 dominant that does not resolve to minor', () => {
         const t = compileTimeline(
             score([{ label: 'A', bars: 'G7b9 | Cmaj7' }], { key: 'C', isMinor: false }),

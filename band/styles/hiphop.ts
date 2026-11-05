@@ -61,16 +61,18 @@ function fillFrom(ctx: BarContext): number | null {
 }
 
 /**
- * The band is building into a louder section: the next bar sits in a higher energy tier.
- * That is the one place hip hop plays into a section instead of cutting out before it.
+ * The band is building into a louder section: the next section sits in a higher energy tier.
+ * That is the one place hip hop plays into a section instead of cutting out before it. Read
+ * from the two sections' own levels (`BarPlan.level`), before the build into the next section
+ * or the pass lift raise this bar: with them, an intro's last bar could cross into the verse's
+ * tier and the roll into the verse was lost, from one lap on (#2071, from #2009).
  */
 function building(ctx: BarContext): boolean {
-    const next = ctx.next?.plan;
-    return (
-        !!next &&
-        TIER_RANK[energyTier(next.energy)] > TIER_RANK[energyTier(ctx.plan.energy)] &&
-        ctx.next?.bar.barInVisit === 0
-    );
+    const next = ctx.next;
+    if (next?.bar.barInVisit !== 0) {
+        return false;
+    }
+    return TIER_RANK[energyTier(next.plan.level)] > TIER_RANK[energyTier(ctx.plan.level)];
 }
 
 // ================================================================ drums
