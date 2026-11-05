@@ -178,6 +178,49 @@ describe('Stop cuts every lane’s notes scheduled ahead of the clock (#1999)', 
         expect(reaching(nodes, state, 'drums')).toEqual(before);
     });
 
+    it('the synth bass note sounding at Stop fades there, and the next one sent ahead never sounds', () => {
+        // The monophonic bass remembers only its latest note (`lastBassGain`), and Stop used to
+        // fade just that. Once note 2 is sent ahead it is the latest, so note 1, still sounding,
+        // rang on until note 2's start, up to a lookahead after Stop.
+        const { audio, nodes } = makeAudio();
+        const state = makeState(audio);
+        playBassNote(state, 110, audio.currentTime, 2, 0.8, 0);
+        const first = state.bass.lastBassGain;
+        audio.currentTime += 0.5; // note 1 is sounding
+        const fromSecond = nodes.length;
+        playBassNote(state, 98, audio.currentTime + AHEAD, 2, 0.8, 0);
+        const second = nodes.slice(fromSecond);
+        expect(state.bass.lastBassGain).not.toBe(first);
+        expect(reaching(second, state, 'bass').length).toBeGreaterThan(0);
+        const fadesAtStop = () =>
+            first.gain.setTargetAtTime.mock.calls.filter(
+                ([value, at]) => value === 0 && at === audio.currentTime,
+            ).length;
+        expect(fadesAtStop()).toBe(0);
+
+        killBassNote(state);
+
+        // Note 1 fades from the moment of Stop (5 ms), still connected so the fade is heard.
+        expect(fadesAtStop()).toBe(1);
+        expect(first.gain.cancelScheduledValues).toHaveBeenCalledWith(audio.currentTime);
+        expect(first.targets.has(state.playback.audioGraph.bass.gain)).toBe(true);
+        // Note 2 never reaches the bus.
+        expect(reaching(second, state, 'bass')).toEqual([]);
+    });
+
+    it('a synth bass note that has ended is out of Stop’s reach', () => {
+        const { audio, nodes } = makeAudio();
+        const state = makeState(audio);
+        playBassNote(state, 110, audio.currentTime, 0.5, 0.8, 0);
+        const amp = state.bass.lastBassGain;
+        audio.currentTime += 3;
+        // The sub oscillator's end takes the note out of the registry.
+        nodes.find((n) => n.onended)?.onended();
+        const before = amp.gain.setTargetAtTime.mock.calls.length;
+        killBassNote(state);
+        expect(amp.gain.setTargetAtTime.mock.calls.length).toBe(before);
+    });
+
     it('a stopped lane forgets what it cut: the next play is not cut by an old Stop', () => {
         const { audio, nodes } = makeAudio();
         const state = makeState(audio);
