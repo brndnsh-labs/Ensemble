@@ -433,6 +433,16 @@ describe('drum dispatcher', () => {
         await expect(out).toMatchFileSnapshot('./__snapshots__/drum-dispatch-pack.txt');
     });
 
+    it('plays a ghost on the synth kit exactly as a snare at the same level (#1998)', async () => {
+        // The band host names its ghost piece `Ghost` so a sampled kit can damp it; the synth
+        // snare already shapes a soft stroke by level, so it must not tell the two apart.
+        for (const variant of ['normal', 'default-velocity', 'late-time', 'burst'] as const) {
+            expect(await record({ name: 'Ghost', variant }), variant).toEqual(
+                await record({ name: 'Snare', variant }),
+            );
+        }
+    });
+
     it('gives every band drum piece a synth voice, ride bell excepted (#1644)', async () => {
         // `DRUM_NAMES` is `Record<DrumPiece, string>`, so the compiler makes its keys exactly the
         // `DrumPiece` union: a piece added to the type without a row there fails typecheck.

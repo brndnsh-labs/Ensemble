@@ -176,6 +176,9 @@ const RIGHT_PANNED_INSTRUMENTS = new Set(['HiHat', 'Open', 'Crash', 'Shaker']);
 const KNOWN_SOUND_NAMES = new Set<string>([
     'Kick',
     'Snare',
+    // The band's ghost stroke (#1998): the snare, played as one. The band host names it
+    // apart so a sampled kit can damp it; the synth voice plays it as a snare.
+    'Ghost',
     'Sidestick',
     'HiHat',
     'Open',
@@ -1014,6 +1017,7 @@ export function drumArticulationKey(name: string): string | null {
         case 'Kick':
             return 'kick';
         case 'Snare':
+        case 'Ghost':
             return 'snare';
         case 'Sidestick':
             return 'sidestick';
@@ -1055,7 +1059,7 @@ function drumPanValue(name: string, time: number): number {
     if (RIGHT_PANNED_INSTRUMENTS.has(name)) {
         return 0.35;
     }
-    if (name === 'Snare' || name === 'Sidestick') {
+    if (isSnareName(name) || name === 'Sidestick') {
         return -0.2;
     }
     if (name.includes('Tom')) {
@@ -1144,10 +1148,7 @@ function tryPlaySampledDrum(
     }
     // A ghost stroke strikes through its own damping chain (#1998); every other hit goes
     // straight to the panner.
-    const ghost =
-        name === 'Snare' && ctx.hitVelocity < GHOST_SNARE_LEVEL
-            ? ghostSnareChain(ctx.audio, ctx.panner, ctx.playTime)
-            : null;
+    const ghost = name === 'Ghost' ? ghostSnareChain(ctx.audio, ctx.panner, ctx.playTime) : null;
     // `let` (not `const`) so the onEnded closure below can reference `voice`
     // without a temporal-dead-zone hazard on playSampledStrike's synchronous bail.
     let voice: SampleVoiceHandle | null = null;
@@ -1188,15 +1189,6 @@ function duckKickSidechain(state: EnsembleState, playTime: number): void {
     }
 }
 
-/**
- * Below this drum level a sampled snare hit is a ghost stroke. It is the band's own line between
- * a ghost and a snare hit (`band/players/drums/kit.ts` labels a snare under velocity 50 a ghost),
- * carried through the band host's drum level (`bandEventLevel`: velocity / 127 × 1.2). The
- * pattern ghost sits at 36 and the softest written snare at 72, so feel's ±10 velocity jitter
- * never carries one across it.
- */
-const GHOST_SNARE_LEVEL = (50 / 127) * 1.2;
-
 // why (#1998): the kit has one snare articulation, a backbeat take, so a ghost used to be that
 // crack 10 dB down. A real ghost is a stick dropped an inch onto the head: little wire sizzle and
 // a short, papery tail. Until the pack carries velocity layers (#2000), the backbeat take is
@@ -1235,6 +1227,14 @@ function ghostSnareChain(
         stopAt: playTime + GHOST_STOP_S,
         release: () => safeDisconnect([filter, envelope]),
     };
+}
+
+/**
+ * The snare, struck as a backbeat (`Snare`) or as a ghost (`Ghost`, the band's `ghost` piece,
+ * #1998). The synth voice plays both alike, shaped by level; only a sampled kit tells them apart.
+ */
+function isSnareName(name: string): boolean {
+    return name === 'Snare' || name === 'Ghost';
 }
 
 /** Any hi-hat articulation — all of these choke a ringing open hat. */
@@ -1833,7 +1833,7 @@ function playKickSnareCrashTom(
     let panValue = 0;
     if (RIGHT_PANNED_INSTRUMENTS.has(name)) {
         panValue = 0.35;
-    } else if (name === 'Snare' || name === 'Sidestick') {
+    } else if (isSnareName(name) || name === 'Sidestick') {
         // why: widened from -0.1 to -0.2 in Epic 7 S1 to better balance the +0.35
         // hi-hat mass on the right.
         panValue = -0.2;
@@ -1939,7 +1939,7 @@ function playKickSnareCrashTom(
         beater.stop(playTime + 0.1);
 
         beater.onended = () => safeDisconnect([beater, beaterGain]);
-    } else if (name === 'Snare' || name === 'Sidestick') {
+    } else if (isSnareName(name) || name === 'Sidestick') {
         const isSidestick = name === 'Sidestick';
         const vol =
             masterVol * getSnareMixScale(state, velocity) * rr() * (isSidestick ? 0.8 : 1.0);

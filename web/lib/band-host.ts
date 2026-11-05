@@ -63,7 +63,7 @@ function givePageATurn(): Promise<void> {
 export const DRUM_NAMES: Record<DrumPiece, string> = {
     kick: 'Kick',
     snare: 'Snare',
-    ghost: 'Snare',
+    ghost: 'Ghost',
     rim: 'Sidestick',
     hat: 'HiHat',
     hatOpen: 'Open',

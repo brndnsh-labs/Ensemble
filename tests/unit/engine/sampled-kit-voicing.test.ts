@@ -5,6 +5,7 @@ import {
 } from '../../../core/engine/instrument-registry.js';
 import { playDrumSound } from '../../../core/engine/synth-drums.js';
 import type { EnsembleState } from '../../../core/types.js';
+import { DRUM_NAMES } from '../../../web/lib/band-host.js';
 
 /**
  * #1998 — what the installed acoustic kit plays, against a recording audio context:
@@ -153,14 +154,22 @@ describe('sampled kit — three toms (#1998)', () => {
 });
 
 describe('sampled kit — a ghost stroke is damped, not just quieter (#1998)', () => {
-    it('a ghost (band velocity under 50) strikes through a low-pass and a short decay', () => {
+    it('the band host names its ghost piece apart from the snare', () => {
+        expect(DRUM_NAMES.ghost).toBe('Ghost');
+        expect(DRUM_NAMES.snare).toBe('Snare');
+    });
+
+    it('a ghost plays the snare take through a low-pass and a short decay', () => {
         const { state, nodes } = makeState();
-        playDrumSound(state, 'Snare', 2, level(36));
+        playDrumSound(state, DRUM_NAMES.ghost, 2, level(36));
+        expect((sources(nodes)[0].buffer as { tag: string }).tag).toBe('snare');
         const [source] = sources(nodes);
         expect(chainFrom(source)).toEqual(['source', 'gain', 'biquad:lowpass', 'gain']);
         const filter = nodes.find((n) => n.kind === 'biquad') as FakeNode & { Q: Param };
         const cutoff = (filter.frequency as Param).calls[0];
-        expect(cutoff[1]).toBeLessThan(3400); // under the backbeat take's spectral centroid
+        // Under the backbeat take's ~3.4 kHz spectral centroid, but not so low it reads as a tom.
+        expect(cutoff[1]).toBeGreaterThan(2000);
+        expect(cutoff[1]).toBeLessThan(3400);
         expect(filter.Q.calls[0][1]).toBeLessThanOrEqual(-3); // no resonant peak (Q is in dB)
         // The decay closes the tail, and the source stops well before the take's 1.4 s.
         const envelope = filter.outputs[0] as FakeNode & { gain: Param };
@@ -173,7 +182,7 @@ describe('sampled kit — a ghost stroke is damped, not just quieter (#1998)', (
 
     it('frees its filter and envelope with the hit', () => {
         const { state, nodes } = makeState();
-        playDrumSound(state, 'Snare', 2, level(36));
+        playDrumSound(state, DRUM_NAMES.ghost, 2, level(36));
         const [source] = sources(nodes);
         (source.onended as () => void)();
         for (const n of nodes.filter((x) => x.kind === 'biquad' || x.kind === 'gain')) {
@@ -181,21 +190,23 @@ describe('sampled kit — a ghost stroke is damped, not just quieter (#1998)', (
         }
     });
 
-    it('splits where the band does: velocity 49 is a ghost, 50 is a snare hit', () => {
-        const ghost = makeState();
-        playDrumSound(ghost.state, 'Snare', 2, level(49));
-        expect(chainFrom(sources(ghost.nodes)[0])).toContain('biquad:lowpass');
-
-        const hit = makeState();
-        playDrumSound(hit.state, 'Snare', 2, level(50));
-        expect(chainFrom(sources(hit.nodes)[0])).toEqual(['source', 'gain']);
+    it('the band decides what is a ghost, not the level: a soft snare rings, a loud ghost is damped', () => {
+        // A soft backbeat at low energy reaches the ghost's level; it is still a backbeat.
+        const soft = makeState();
+        playDrumSound(soft.state, DRUM_NAMES.snare, 2, level(36));
+        expect(chainFrom(sources(soft.nodes)[0])).toEqual(['source', 'gain']);
         // A full hit rings the whole take: its only stop is past the recording's end.
-        const stops = (sources(hit.nodes)[0].stop as ReturnType<typeof vi.fn>).mock.calls;
+        const stops = (sources(soft.nodes)[0].stop as ReturnType<typeof vi.fn>).mock.calls;
         expect(stops.map(([t]) => t)).toEqual([expect.any(Number)]);
         expect(stops[0][0]).toBeGreaterThan(2 + 1.4);
+
+        // A ghost pushed up by energy and humanize is still a ghost.
+        const loud = makeState();
+        playDrumSound(loud.state, DRUM_NAMES.ghost, 2, level(60));
+        expect(chainFrom(sources(loud.nodes)[0])).toContain('biquad:lowpass');
     });
 
-    it('only the snare is damped: a soft sidestick or tom plays its take as recorded', () => {
+    it('only the ghost is damped: a soft sidestick or tom plays its take as recorded', () => {
         registerPackBuffer(PACK, 'sidestick', buffer('sidestick'));
         const { state, nodes } = makeState();
         playDrumSound(state, 'Sidestick', 2, level(30));
