@@ -32,6 +32,7 @@ const EXPECTED: Record<string, [string, string, number, string, number]> = {
     'donna-lee': ['Up Tempo Swing', 'Jazz', 200, 'A:16 B:16', 0],
     driftin: ['Medium Swing', 'Jazz', 130, 'A:10 B:8 A:11', 0],
     'giant-steps': ['Up Tempo Swing', 'Jazz', 200, 'Chart:16', 0],
+    // An opening `i` of more than 8 bars keeps its letter (#2073): an Intro would rest the lead.
     harlequin: ['Ballad', 'Jazz', 66, 'i:10 A:34', 0],
     'hello-dolly': ['Medium Swing', 'Jazz', 130, 'A:16 B:22', 0],
     'i-got-rhythm': ['Up Tempo Swing', 'Jazz', 200, 'A:9 B:8 A:12', 0],
@@ -40,11 +41,11 @@ const EXPECTED: Record<string, [string, string, number, string, number]> = {
     // Its C (bar 33) sits inside the repeat that opens at bar 17, so it stays a letter in its bar.
     'one-for-my-baby': ['Ballad', 'Jazz', 66, 'A:16 B:31', 0],
     ornithology: ['Up Tempo Swing', 'Jazz', 200, 'A:8 B:8 A:8 C:8', 0],
-    'round-midnight': ['Ballad', 'Jazz', 66, 'i:8 A:10 B:17', 0],
+    'round-midnight': ['Ballad', 'Jazz', 66, 'Intro:8 A:10 B:17', 0],
     'speak-like-a-child': ['Bossa Nova', 'Bossa', 130, 'A:24 B:24', 0],
     'stella-by-starlight': ['Medium Swing', 'Jazz', 130, 'A:16 B:8 C:8', 0],
     'take-five': ['Medium Up Swing', 'Jazz', 160, 'A:8 B:8 A:8', 0],
-    'up-with-the-lark': ['Medium Swing', 'Jazz', 130, 'i:8 A:16 B:24 A:16', 0],
+    'up-with-the-lark': ['Medium Swing', 'Jazz', 130, 'Intro:8 A:16 B:24 A:16', 0],
     'west-coast-blues': ['Waltz', 'Jazz', 150, 'i:12 A:12', 0],
 };
 
@@ -231,11 +232,34 @@ describe('the style table (#2004)', () => {
         expect(song.score!.sections.map((s) => s.label)).toEqual(['Chart']);
     });
 
-    it('labels the tune’s `i` mark with its letter, never "Intro", which would rest the lead', () => {
-        const song = parseIRealImport(
-            'irealbook://Tune=Someone=Medium Swing=C=n=T44*i[C   |F   |G   ]*A[C   |F   Z',
-        ).songs[0];
-        expect(song.score!.sections.map((s) => s.label)).toEqual(['i', 'A']);
+    // #2073, DECISION 2026-11-05: only a short opening `i` is an Intro; the lead rests through one.
+    const labels = (body: string) =>
+        parseIRealImport(`irealbook://Tune=Someone=Medium Swing=C=n=T44${body}`)
+            .songs[0].score!.sections.map((s) => `${s.label}:${s.measures.length}`)
+            .join(' ');
+
+    it('names a short opening `i` mark the Intro', () => {
+        expect(labels('*i[C   |F   |G   ]*A[C   |F   Z')).toBe('Intro:3 A:2');
+        expect(labels(`*i[${'C   |'.repeat(7)}G   ]*A[C   |F   Z`)).toBe('Intro:8 A:2');
+        // Round Midnight's eight-bar `i`, as the playlist writes it.
+        expect(importFixture('round-midnight').song.score!.sections[0]).toMatchObject({
+            label: 'Intro',
+            measures: { length: 8 },
+        });
+    });
+
+    it('keeps the letter on an `i` longer than 8 bars: West Coast Blues’ head', () => {
+        expect(labels(`*i[${'C   |'.repeat(8)}G   ]*A[C   |F   Z`)).toBe('i:9 A:2');
+        expect(
+            importFixture('west-coast-blues')
+                .song.score!.sections.map((s) => `${s.label}:${s.measures.length}`)
+                .join(' '),
+        ).toBe('i:12 A:12');
+    });
+
+    it('keeps the letter on an `i` that is not the first section, or the whole chart', () => {
+        expect(labels('*A[C   |F   ]*i[G   |C   Z')).toBe('A:2 i:2');
+        expect(labels('*i[C   |F   |G   |C   Z')).toBe('i:4');
     });
 });
 

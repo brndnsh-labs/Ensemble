@@ -995,9 +995,10 @@ interface Mark {
 
 const MARK_LETTERS = 'ABCDVvi';
 // iReal's rehearsal-mark letters as section names: `v`/`V` is a verse, every other letter stands
-// for itself. `i` is deliberately NOT renamed "Intro": that label is a playback instruction (the
-// lead rests through it and a counted chart plays it once, `leadRole` and `onceSections`), and
-// the marked bars are often the tune's head (West Coast Blues), so the import never guesses it.
+// for itself. `i` is not renamed here: "Intro" is a playback instruction (the lead rests through
+// it and a counted chart plays it once, `leadRole` and `onceSections`), and the marked bars are
+// sometimes the tune's head (West Coast Blues' 12 bars), so only a short opening one becomes an
+// Intro, once the sections stand (`introFromMark`).
 const MARK_LABELS = new Map([
     ['v', 'Verse'],
     ['V', 'Verse'],
@@ -1156,6 +1157,24 @@ function splitAtMarks(
 
 const skipped = (mark: Mark) =>
     `Rehearsal mark ${mark.letter} at bar ${mark.bar + 1} sits inside a repeat or ending, so it stays a letter in its bar and does not start a section.`;
+
+/** The longest opening `i` section the import calls an Intro (#2073, DECISION 2026-11-05). */
+const MAX_INTRO_MARK_BARS = 8;
+
+/**
+ * An `i` mark's section becomes the Intro only when it opens the chart, something follows it, and
+ * it is at most `MAX_INTRO_MARK_BARS` written bars (#2073, DECISION 2026-11-05): that is an intro
+ * as a band plays one (Round Midnight's 8). A longer `i` is the tune's head more often than not
+ * (West Coast Blues' 12 bars), and an Intro would rest the lead through it, so it keeps its letter;
+ * so does an `i` later in the chart, which is an interlude at most.
+ */
+function introFromMark(score: SemanticScore): SemanticScore {
+    const [first, ...rest] = score.sections;
+    if (first?.label !== 'i' || !rest.length || first.measures.length > MAX_INTRO_MARK_BARS) {
+        return score;
+    }
+    return { ...score, sections: [{ ...first, label: 'Intro' }, ...rest] };
+}
 
 /** The score cut into a section at bar 0 and at each of `cuts`. */
 function sectionsAt(
@@ -1322,5 +1341,5 @@ function buildScore(
         );
     }
     allNotes.push(...notes, ...split.notes);
-    return { score: split.score, notes: boundedNotes(allNotes) };
+    return { score: introFromMark(split.score), notes: boundedNotes(allNotes) };
 }
