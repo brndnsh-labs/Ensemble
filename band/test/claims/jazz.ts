@@ -63,6 +63,7 @@ export const jazz = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the head is a tune: it fills the form'],
                 ['leadNotesPerBar', 2, 4.5, 'a singable line, not a run'],
@@ -127,6 +128,7 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 // Measured 0.118; development off 0.026, #2012's bar fix reverted 0.106; always develops 0.32.
                 // Floor guards development off (0.026) only; this style barely sees the bar fix (0.106 vs 0.118), which blues, disco and rock guard.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.

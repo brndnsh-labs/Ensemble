@@ -53,6 +53,7 @@ export const rock = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                ['compLeadUnison', 0, 0.15, 'the piano voices under the tune, rarely on its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chords'],
@@ -63,6 +64,7 @@ export const rock = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                ['compLeadUnison', 0, 0.15, 'the piano voices under the tune, rarely on its note'],
                 // Measured 0.149; development off 0.040, #2012's bar fix reverted 0.067; always develops 0.26.
                 // Floor sits between the bar fix reverted (0.067) and shipped: it guards #2012's bar fix and development off (0.040).
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
