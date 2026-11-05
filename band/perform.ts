@@ -219,6 +219,7 @@ export function performPass(
             lead: leadProfile,
             pass,
             looping: options.looping,
+            guideToneHead: settings.head === 'guide-tones',
             ending,
             rng: (purpose, scope = 'bar') =>
                 scope === 'song'

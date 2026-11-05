@@ -45,6 +45,7 @@ function organ(bars: string, index: number, steps: number[], memory?: CompMemory
         lead: LEAD_INSTRUMENTS[settings.lead],
         pass: 0,
         looping: true,
+        guideToneHead: false,
         ending: null,
         rng: (purpose) => rng('test', index, purpose),
     };

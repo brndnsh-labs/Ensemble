@@ -14,6 +14,7 @@ import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { barSteps, dyn, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
+import { guideToneLine } from './guide-tones.js';
 import {
     type Contour,
     type LinePalette,
@@ -704,6 +705,77 @@ function lineRng(ctx: BarContext, role: LeadRole, slotStart: number): Rng {
         : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:line`, 'song');
 }
 
+/**
+ * A known standard's head phrase (`BarContext.guideToneHead`): the slot's share of its section
+ * visit's guide-tone line (`guideToneLine`), every note a chord change's target. Planned like any
+ * head — keyed on the section, so it is the same line every time the head comes round.
+ */
+function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
+    const { bars } = ctx.timeline;
+    const first = bars[slotStart];
+    const length = first.phrase.length;
+    const lastBar = bars[Math.min(bars.length, slotStart + length) - 1];
+    const from = first.start;
+    const to = lastBar.start + lastBar.meter.barTicks;
+    const home = homeOf(ctx, book);
+    const written = guideToneLine(ctx.timeline, first, home, ctx.lead.range).filter(
+        (n) => n.tick >= from && n.tick < to,
+    );
+    // A pass that ends on a held chord (`ctx.ending`): a guide tone held into the ending bar is
+    // struck again on its barline, so the held-ending settle below lands it on a tone of the
+    // chord the band holds, rather than a common tone of the chart's chord ringing over it.
+    const split = ctx.ending?.start;
+    const line =
+        split === undefined
+            ? written
+            : written.flatMap((n) =>
+                  n.tick < split && n.tick + n.dur > split
+                      ? [
+                            { ...n, dur: split - n.tick },
+                            {
+                                ...n,
+                                tick: split,
+                                dur: n.tick + n.dur - split,
+                                chord: chordAt(ctx.timeline, split) ?? n.chord,
+                            },
+                        ]
+                      : [n],
+              );
+    const onsets: SlotOnset[] = line.map((n) => {
+        const bar = barOf(ctx, n.tick);
+        return {
+            tick: n.tick,
+            // Held to its chord's end, but never past the phrase: the next one is struck fresh.
+            dur: Math.min(n.dur, to - n.tick),
+            step: Math.round((n.tick - bars[bar].start) / STEP),
+            chord: n.chord,
+            key: n.key,
+            change: true,
+            span: spanIndexAt(ctx.timeline, n.tick),
+            bar: bar - slotStart,
+        };
+    });
+    const kinds: BarKind[] = Array.from({ length }, () => 'line');
+    const plan: SlotPlan = {
+        kinds,
+        cells: kinds.map(() => null),
+        // The line's pitches are its own (`guideToneLine`); contour and span shape nothing here.
+        contour: 'arch',
+        centre: home,
+        span: 0,
+        // A touch under the invented head's 84: long notes under the band, not over it.
+        velocity: 78,
+        from: null,
+        riffs: kinds.map(() => false),
+        develops: null,
+        developsBar: 0,
+        restates: null,
+        loops: null,
+        peak: false,
+    };
+    return { onsets, pitches: line.map((n) => n.midi), plan };
+}
+
 /** A head phrase, voiced — the restatement of an opening needs the opening's own notes. */
 function voiceHead(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
     const plan = headPlan(ctx, book, slotStart);
@@ -910,12 +982,15 @@ function planSlot(
     }
     let voiced: Voiced;
     if (role.kind === 'head') {
-        voiced = voiceHead(ctx, book, slotStart);
+        voiced = ctx.guideToneHead
+            ? voiceGuideTones(ctx, book, slotStart)
+            : voiceHead(ctx, book, slotStart);
     } else {
         const plan = soloPlan(ctx, book, slotStart, role, memory);
         voiced = voiceSolo(ctx, book, slotStart, plan, role);
     }
     const { onsets, pitches, plan } = voiced;
+    const guideTones = role.kind === 'head' && ctx.guideToneHead;
     // Keyed like the line: a head's articulation returns with it.
     const first = ctx.timeline.bars[slotStart];
     const rng =
@@ -950,11 +1025,12 @@ function planSlot(
         const next = pitches[i + 1];
         // A higher note is played a little harder (0.8 of a velocity step per semitone).
         let velocity = plan.velocity + (midi - homeOf(ctx, book)) * 0.8;
-        // Upbeats inside a line lift a little; a note in a valley of a run is ghosted.
-        if (o.step % 4 === 2 && o.dur <= STEP * 2) {
+        // Upbeats inside a line lift a little; a note in a valley of a run is ghosted. Not in a
+        // guide-tone head: every note of it is a chord's arrival, none a passing tone.
+        if (!guideTones && o.step % 4 === 2 && o.dur <= STEP * 2) {
             velocity += 5;
         }
-        if (prev !== undefined && next !== undefined && midi < prev && midi < next) {
+        if (!guideTones && prev !== undefined && next !== undefined && midi < prev && midi < next) {
             velocity -= 10;
         }
         const note: Planned = {
@@ -987,7 +1063,12 @@ function planSlot(
             ) {
                 note.bendIn = 2;
             }
-        } else if (!ctx.lead.bends && o.dur >= STEP * 4 && rng.chance(book.scoop)) {
+        } else if (
+            !ctx.lead.bends &&
+            o.dur >= STEP * 4 &&
+            // A guide-tone head scoops half as often: the pitch is what the line is there to state.
+            rng.chance(guideTones ? book.scoop / 2 : book.scoop)
+        ) {
             note.bendIn = 1;
         }
         // Vibrato on a note long enough for this player to sing it; on a horn a scooped note

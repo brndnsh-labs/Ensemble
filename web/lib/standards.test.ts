@@ -1,3 +1,5 @@
+import { compileTimeline } from '@band/form/timeline';
+import { guideToneLine } from '@band/players/lead/guide-tones';
 import { GENRE_NAMES } from '@core/data/smart-genres';
 import { validateChartDocumentV2 } from '@core/songbook/document-v2';
 import { describe, expect, it } from 'vitest';
@@ -5,6 +7,7 @@ import { genreOf } from './documents';
 import {
     buildStandardDocument,
     firstBarsPreview,
+    playsGuideToneHead,
     STANDARD_SHELF_LABELS,
     STANDARDS,
 } from './standards';
@@ -132,4 +135,43 @@ describe('the standards catalog (#1439)', () => {
             expect(entry.meter ?? '4/4', entry.title).toBe(expected.meter ?? '4/4');
         }
     });
+});
+
+describe('which standards play their head as a guide-tone line (#2027)', () => {
+    it('the jazz shelf, and nothing else', () => {
+        for (const entry of STANDARDS) {
+            expect(playsGuideToneHead(entry.id), entry.title).toBe(entry.shelf === 'jazz');
+        }
+        expect(playsGuideToneHead('a-saved-song')).toBe(false);
+    });
+});
+
+describe('the guide-tone head over every jazz standard (#2027)', () => {
+    // The line the lead plays for these heads: voice-led inside each phrase on the real charts,
+    // not only on the band's own fixtures. Sax, the jazz lead's own instrument.
+    const SAX = { home: 67, range: [53, 82] as const };
+    for (const entry of STANDARDS.filter((e) => e.shelf === 'jazz')) {
+        it(entry.title, () => {
+            const timeline = compileTimeline(buildStandardDocument(entry).chart.score);
+            const line = guideToneLine(timeline, timeline.bars[0], SAX.home, SAX.range);
+            const top = (tick: number) =>
+                timeline.bars.some((b) => b.start === tick && b.phrase.bar === 0);
+            const wide = line.filter(
+                (n, i) => i > 0 && !top(n.tick) && Math.abs(n.midi - line[i - 1].midi) > 3,
+            );
+            expect(wide.map((n) => `${n.chord.symbol}@${n.tick}`)).toEqual([]);
+            // Over the comp's shells and clear of the bass's slot (23–57), centred near home.
+            expect(Math.min(...line.map((n) => n.midi))).toBeGreaterThanOrEqual(58);
+            const mean = line.reduce((sum, n) => sum + n.midi, 0) / line.length;
+            expect(mean).toBeGreaterThanOrEqual(SAX.home - 4);
+            // Every phrase of the chorus is struck: none is left silent.
+            for (const bar of timeline.bars.filter((b) => b.phrase.bar === 0)) {
+                const end = bar.start + bar.phrase.length * bar.meter.barTicks;
+                expect(
+                    line.some((n) => n.tick >= bar.start && n.tick < end),
+                    `phrase at bar ${bar.index + 1}`,
+                ).toBe(true);
+            }
+        });
+    }
 });

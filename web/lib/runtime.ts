@@ -108,6 +108,7 @@ import {
     validateVoice,
     warmSounds,
 } from './sounds';
+import { playsGuideToneHead } from './standards';
 import { createStyleSounds, type StyleSoundsStatus } from './style-sounds';
 import { track } from './telemetry';
 
@@ -192,6 +193,12 @@ let bandView: BandChart | null = null;
  * preference (`songModePreference`), never part of a chart.
  */
 let songMinutes: SongMinutes | null = null;
+/**
+ * Whether the chart open now is a known standard off the standards shelf (`playsGuideToneHead`),
+ * whose head the lead plays as its guide-tone line (`BandSettings.head`, #2027). Read off the
+ * loaded document's id; never a state field or a chart field.
+ */
+let guideToneHead = false;
 /**
  * The lane that is the musician's own (#1992, `lib/instrument.ts`), or null. A device
  * preference the shell owns and hands over (`setPlayerLane`), never a state field or a chart
@@ -417,6 +424,7 @@ function bandSettings(): BandSettings {
         // A song-mode performance is a jam: its energy breathes across the counted choruses
         // (#1785). The band applies it only on Auto intensity.
         arc: songPlan ? 'jam' : null,
+        head: guideToneHead ? 'guide-tones' : null,
     };
 }
 
@@ -1644,6 +1652,7 @@ export function load(document: ChartDocument, opened = false): void {
     } finally {
         loading = false;
     }
+    guideToneHead = playsGuideToneHead(checked.id);
     if (opened) {
         // The musician's own lane keeps the choice they made on this device (#2072); what turning
         // it on wrote into the previous chart does not follow them.

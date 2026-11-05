@@ -45,6 +45,8 @@ export interface BarContext {
     pass: number;
     /** Whether the performance goes round again after this pass. */
     looping: boolean;
+    /** The head is a guide-tone line, not an invented tune (`BandSettings.head`, #2027). */
+    guideToneHead: boolean;
     /**
      * The bar this pass ends on as the band plays it, when that differs from the written one: a
      * turnaround resolved to the tonic (`arrange/ending.ts`). Null when the pass loops or ends

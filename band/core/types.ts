@@ -147,6 +147,14 @@ export interface BandSettings {
      * manual intensity pins the level as before. Absent (or `null`), nothing changes.
      */
     arc?: 'jam' | null;
+    /**
+     * What the lead plays for the head. `'guide-tones'` (#2027): a known standard's head is its
+     * guide-tone line — long 3rds and 7ths, voice-led (`players/lead/guide-tones.ts`) — rather
+     * than an invented melody that would pass for the tune; the stand asks for it on the
+     * standards shelf only. Absent (or `null`), the lead invents the head, as on a songwriter's
+     * own chords. Solos and trades are the same either way.
+     */
+    head?: 'guide-tones' | null;
 }
 
 export interface TradeSettings {
