@@ -12,10 +12,12 @@ import {
     bassNote,
     bassPc,
     endingBass,
+    isLeadIn,
     kickSteps,
     type LineMemory,
     landingRoot,
     leadTarget,
+    meetRoot,
     nextChord,
     place,
     sectionPlace,
@@ -26,6 +28,7 @@ import { dyn, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bluesColour, chordScale, fifthFirst, rootFirst } from '../players/lead/palette.js';
 import { type ChordFacts, fifthOf } from '../theory/chord.js';
+import { mod12 } from '../theory/pitch.js';
 import type { PitchedIdiom, Style } from './types.js';
 
 // ================================================================ drums
@@ -88,15 +91,25 @@ const FUNK_RIFFS = [
     'R......7O.R..5..',
 ];
 
+/**
+ * A riff note: `root` is where the sounding bass is placed, and the chord's own tones are
+ * measured from the chord root, not from that bass. Over C/E the 5 is still G (a third above
+ * the E), never B, which is E's fifth and C's major seventh.
+ */
 function riffPitch(code: string, root: number, chord: ChordFacts): number {
+    const above = (interval: number) => root + mod12(chord.root + interval - chord.bass);
     switch (code) {
         case 'O':
             return root + 12 <= BASS_SLOT_HI ? root + 12 : root;
-        case '5':
-            return root + fifthOf(chord);
+        case '5': {
+            const up = above(fifthOf(chord));
+            return up <= BASS_SLOT_HI ? up : up - 12;
+        }
         case '7': {
             // The b7 drops below the root when it would leave the register (a funk staple).
-            const up = chord.seventh === 10 ? root + 10 : root + 12;
+            // Any other chord plays the chord root's octave in the seat.
+            const slash = chord.root !== chord.bass;
+            const up = chord.seventh === 10 ? above(10) : above(0) + (slash ? 0 : 12);
             return up <= BASS_SLOT_HI ? up : up - 12;
         }
         default:
@@ -170,6 +183,18 @@ const funkBass: PitchedIdiom = {
                     rng.chance(0.3)
                 ) {
                     midi = approach(target, chord, 'chromatic-below');
+                    land = lead?.crossing ? target : null;
+                } else if (
+                    k === steps.length - 1 &&
+                    target !== null &&
+                    to - step <= 3 &&
+                    isLeadIn(midi, target)
+                ) {
+                    // A riff tone within a beat of the change that sits a half or whole step from the next
+                    // root (riffs 2 and 5's 5 under a chord a half step up) leads into it as a
+                    // leading tone does, beside that root and not a major seventh off: the same
+                    // fold blues and reggae use.
+                    midi = meetRoot(midi, target);
                     land = lead?.crossing ? target : null;
                 }
                 const muted = code === 'm';
