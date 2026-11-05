@@ -160,6 +160,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | :--- | :--- |
 | `core/engine/instrument-registry.ts` | Instrument-source indirection: resolves each voice to a synth function or an installed sample-pack buffer (synth-fallback when no pack is loaded). |
 | `core/engine/sample-loader.ts` | Lazy fetch + `decodeAudioData` + cache of sample-pack buffers into the instrument registry (atomic, deduped, fail-loud). |
+| `core/engine/lane-voices.ts` | What Stop can reach, per audio context and lane: `trackLaneVoice` (a sounding or scheduled voice that can silence itself), `cancelAheadOnStop` (a synth note sent ahead of the clock, cut before it sounds) and `releaseLaneVoices`, which each lane's kill function calls (#1530, #1569, #1999). |
 | `core/engine/sample-voice.ts` | Sample playback: `playSampledNote` (pitched — nearest-zone + `playbackRate` shift) and `playSampledStrike` (percussion — native-rate, unfiltered drum hit), both through a click-free envelope into the instrument's gain bus; plus `pickRoundRobin` for deterministic take selection. |
 | `core/engine/pack-runtime.ts` | Pack runtime glue: fetch a pack's manifest, load+decode its samples, and cache the built `SampleZone[]` the pitched seams consume (percussion packs build no zones — they play buffers by articulation key); `ensurePackLoaded` is idempotent (load-on-select / on audio init). |
 | `core/engine/synth-bass.ts` | Sub-bass and Growl synthesis. |

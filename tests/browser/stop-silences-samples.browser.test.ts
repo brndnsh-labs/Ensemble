@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
-import { playSampledNote, releaseSampledVoices } from '../../core/engine/sample-voice.js';
+import { releaseLaneVoices } from '../../core/engine/lane-voices.js';
+import { playSampledNote } from '../../core/engine/sample-voice.js';
 
 /**
  * Stop, heard (#1530): a real `OfflineAudioContext` renders a held sampled note, the render is
@@ -39,7 +40,7 @@ async function render(stopAt: number | null): Promise<Float32Array> {
     play(1.1);
     if (stopAt !== null) {
         void audio.suspend(stopAt).then(() => {
-            releaseSampledVoices(audio, 'chords', audio.currentTime);
+            releaseLaneVoices(audio, 'chords', audio.currentTime);
             void audio.resume();
         });
     }

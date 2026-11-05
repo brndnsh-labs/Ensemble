@@ -3,13 +3,9 @@ import type { EnsembleState } from '../types.js';
 import { getMidi } from '../utils.js';
 import { safeDisconnect } from './audio-graph-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
+import { cancelAheadOnStop, releaseLaneVoices, trackLaneVoice } from './lane-voices.js';
 import { getPackZones } from './pack-runtime.js';
-import {
-    pickZone,
-    playSampledNote,
-    releaseSampledVoices,
-    type SampledNoteHandle,
-} from './sample-voice.js';
+import { pickZone, playSampledNote, type SampledNoteHandle } from './sample-voice.js';
 import {
     createSimplePanner,
     playPercussiveStrike,
@@ -41,47 +37,14 @@ function createBrightWave(audioCtx: AudioContext): PeriodicWave {
 
 let brightWave: PeriodicWave | null = null;
 
-/**
- * The synth chord voices still sounding (or scheduled to), per audio context (#1569) — the
- * synth sibling of `sample-voice.ts`'s registry for #1530. A synth note used to live nowhere
- * Stop could find it: `killAllPianoNotes` released only the sampled voices, and a whole-note
- * piano chord rang to its written end after Stop. A voice joins as it is made and leaves when
- * its fundamental ends, so the set stays as small as what is ringing. Keyed by the context,
- * not the state tree: an offline render's voices are its own.
- */
-const soundingChordVoices = new WeakMap<BaseAudioContext, Set<(when: number) => void>>();
-
-function trackChordVoice(audio: BaseAudioContext, silence: (when: number) => void): () => void {
-    let voices = soundingChordVoices.get(audio);
-    if (!voices) {
-        voices = new Set();
-        soundingChordVoices.set(audio, voices);
-    }
-    voices.add(silence);
-    return () => voices.delete(silence);
-}
-
-/** Silence every synth chord voice of the context from `when`: the ones sounding fade in a
- * few milliseconds, the ones scheduled but not yet started never sound. */
-function releaseSynthChordVoices(audio: BaseAudioContext, when: number): void {
-    const voices = soundingChordVoices.get(audio);
-    if (!voices) {
-        return;
-    }
-    for (const silence of [...voices]) {
-        silence(when);
-    }
-}
-
 export function killAllPianoNotes(state: EnsembleState): void {
     const { playback } = state;
     const now = playback.audio?.currentTime || 0;
-    // Each sampled chord voice registers itself with its lane as it is made (#1530), so a
-    // stop, restart or voice switch silences it. An organ holds for bars; unreleased, it rang
-    // on under whatever came next.
+    // Each chord voice, sampled (#1530) or synth (#1569), registers itself with the chords lane
+    // as it is made, so a stop, restart or voice switch silences it. An organ holds for bars;
+    // unreleased, it rang on under whatever came next.
     if (playback.audio) {
-        releaseSampledVoices(playback.audio, 'chords', now);
-        releaseSynthChordVoices(playback.audio, now);
+        releaseLaneVoices(playback.audio, 'chords', now);
     }
 }
 
@@ -206,18 +169,24 @@ function playSynthNote(...args: PlayNoteArgs): void {
         const dest = playback.audioGraph.chords.gain;
         // Hammer "chiff" — bandpass noise, a touch brighter than the legacy
         // strike's 800-4000 Hz band so it reads as an edge, not a thud.
-        playPercussiveStrike(playback.audio, groove.audioBuffers.noise, dest, startTime, {
-            volume: finalVol * 0.45,
-            filterType: 'bandpass',
-            freq: Math.max(900, Math.min(5000, 1200 + (freq / 440) * 700 + finalVol * 600)),
-            Q: 1.2,
-            attack: 0.0008,
-            decay: 0.008,
-            duration: 0.08,
-        });
+        const chiff = playPercussiveStrike(
+            playback.audio,
+            groove.audioBuffers.noise,
+            dest,
+            startTime,
+            {
+                volume: finalVol * 0.45,
+                filterType: 'bandpass',
+                freq: Math.max(900, Math.min(5000, 1200 + (freq / 440) * 700 + finalVol * 600)),
+                Q: 1.2,
+                attack: 0.0008,
+                decay: 0.008,
+                duration: 0.08,
+            },
+        );
         // Pitched click — a ~45 ms triangle blip at the note pitch. The fast
         // 6 ms decay keeps it a transient tick, not an audible doubled tone.
-        playResonantTone(playback.audio, dest, startTime, {
+        const click = playResonantTone(playback.audio, dest, startTime, {
             type: 'triangle',
             freqStart: freq,
             freqEnd: freq,
@@ -226,6 +195,14 @@ function playSynthNote(...args: PlayNoteArgs): void {
             decay: 0.006,
             duration: 0.045,
         });
+        // The onset's two transients are too short for a fade to matter once sounding, but one
+        // sent ahead of the clock must not tick after Stop (#1999).
+        cancelAheadOnStop(
+            playback.audio,
+            'chords',
+            startTime,
+            [chiff, click].filter((node) => node !== null),
+        );
 
         // synth-audit Epic 2 S3 — velocity → brightness. The legacy body moved
         // only cutoff + gain with velocity; its wave content never changed, so
@@ -259,7 +236,7 @@ function playSynthNote(...args: PlayNoteArgs): void {
             brightOsc.stop(startTime + 1.0);
             // Stop reaches the bloom too (#1569): one scheduled ahead of the clock never
             // sounds, one sounding takes a 5 ms fade.
-            const untrackBright = trackChordVoice(playback.audio, (when) => {
+            const untrackBright = trackLaneVoice(playback.audio, 'chords', (when) => {
                 try {
                     if (when <= startTime) {
                         brightGain.gain.cancelScheduledValues(0);
@@ -442,7 +419,7 @@ function playAdditiveBody(
     // default 1 for a few milliseconds — a click — so its oscillators are stopped at their
     // start instead and the gain pinned to 0 now. A sounding voice takes the panic stop
     // (`stopBody`), not `release`: that one clamps into the written window.
-    untrack = trackChordVoice(audio, (when) => {
+    untrack = trackLaneVoice(audio, 'chords', (when) => {
         if (when <= startTime) {
             try {
                 bodyGain.gain.cancelScheduledValues(0);
