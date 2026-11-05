@@ -74,9 +74,9 @@ describe('drumArticulationKey — pack contract', () => {
         expect(drumArticulationKey('HiHatPedal')).toBe('hihat-pedal');
     });
 
-    it('folds the mid tom onto the high rack tom (kit ships two tom samples)', () => {
+    it('gives each tom its own articulation (#1998: mid no longer folds onto high)', () => {
         expect(drumArticulationKey('High Tom')).toBe('tom-high');
-        expect(drumArticulationKey('Mid Tom')).toBe('tom-high');
+        expect(drumArticulationKey('Mid Tom')).toBe('tom-mid');
         expect(drumArticulationKey('Low Tom')).toBe('tom-low');
     });
 
