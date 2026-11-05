@@ -2,8 +2,9 @@ import { gainForPack, toneTiltForPack } from '../data/sound-packs.js';
 import type { EnsembleState, Mutable } from '../types.js';
 import { createSoftClipCurve, safeDisconnect } from './audio-graph-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
+import { cancelAheadOnStop, releaseLaneVoices, trackLaneVoice } from './lane-voices.js';
 import { MUTE_ATTENUATION, muteGain, normalizeMuteAmount } from './mute-contract.js';
-import { playSampledNote, releaseSampledVoices } from './sample-voice.js';
+import { playSampledNote } from './sample-voice.js';
 import {
     playPercussiveStrike,
     rampGain,
@@ -13,16 +14,15 @@ import {
 import { BASS_VELOCITY_DOMAIN_MAX, bassVelocityToAmplitude } from './velocity-shaping.js';
 
 export function killBassNote(state: EnsembleState): void {
-    const { playback, bass } = state;
+    const { playback } = state;
     if (!playback.audio) {
         return;
     }
-    if (bass.lastBassGain) {
-        rampGain(bass.lastBassGain.gain, 0, playback.audio.currentTime, 0.005);
-        (bass as Mutable<typeof bass>).lastBassGain = null; // @direct-mutation
-    }
-    // A sampled bass note has no `lastBassGain`: it is silenced with its lane (#1530).
-    releaseSampledVoices(playback.audio, 'bass', playback.audio.currentTime);
+    // Every bass note is silenced with its lane: a sampled one (#1530), a synth one sounding at
+    // Stop (faded there), and a synth one sent ahead of the clock (cut before it sounds, #1999).
+    // Fading only `lastBassGain` was not enough: once the next note is sent ahead, that is the
+    // field's note, and the one still sounding rang on until the next one's start.
+    releaseLaneVoices(playback.audio, 'bass', playback.audio.currentTime);
 }
 
 // Bass styles whose genre identity calls for sub-bass content (a sine an
@@ -329,7 +329,7 @@ function playBassNoteNew(
             Math.min(1600, freq * 1.6 * (0.7 + timbre.brightness * 0.9)),
         );
         const impactQ = 1.2 + timbre.brightness * 2.2;
-        playPercussiveStrike(
+        const impact = playPercussiveStrike(
             audio,
             groove.audioBuffers.noise,
             playback.audioGraph.bass.gain,
@@ -345,6 +345,10 @@ function playBassNoteNew(
             },
         );
 
+        // The note reaches the bus through its amp and its thud: a Stop before it starts cuts
+        // both (#1999), or the note sent just ahead of the clock still sounds after Stop.
+        cancelAheadOnStop(audio, 'bass', startTime, impact ? [amp, impact] : [amp]);
+
         // Monophonic note-off — kill the previous note's amp.
         if (bass.lastBassGain && bass.lastBassGain !== amp) {
             rampGain(bass.lastBassGain.gain, 0, startTime, 0.005);
@@ -358,7 +362,25 @@ function playBassNoteNew(
         sub.stop(stopTime);
         saw.stop(stopTime);
         subOct.stop(stopTime);
-        sub.onended = () =>
+        // A note sounding at Stop fades there in 5 ms, the monophonic note-off's own fade, and
+        // its oscillators stop once it is silent (20 time constants on), never later than they
+        // would have. One not yet started is the ahead path's (`cancelAheadOnStop` above).
+        const untrack = trackLaneVoice(audio, 'bass', (when) => {
+            if (when < startTime) {
+                return;
+            }
+            rampGain(amp.gain, 0, when, 0.005);
+            const silent = Math.min(stopTime, when + 0.1);
+            for (const osc of [sub, saw, subOct]) {
+                try {
+                    osc.stop(silent);
+                } catch {
+                    /* already stopped */
+                }
+            }
+        });
+        sub.onended = () => {
+            untrack();
             safeDisconnect([
                 sub,
                 saw,
@@ -372,6 +394,7 @@ function playBassNoteNew(
                 shaper,
                 amp,
             ]);
+        };
     } catch (e) {
         console.error('playBassNoteNew error:', e, { freq, time, duration });
     }

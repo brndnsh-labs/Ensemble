@@ -3,12 +3,8 @@ import type { EnsembleState, Mutable, SoloistVoice } from '../types.js';
 import { clampFreq, safeDisconnect } from './audio-graph-utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
-import {
-    playSampledNote,
-    releaseSampledVoices,
-    type SampleBend,
-    type SampleVibrato,
-} from './sample-voice.js';
+import { cancelAheadOnStop, releaseLaneVoices } from './lane-voices.js';
+import { playSampledNote, type SampleBend, type SampleVibrato } from './sample-voice.js';
 import {
     getSoloistVoiceLimit,
     isSoloistGuitarMode,
@@ -41,7 +37,8 @@ export function killSoloistNote(state: EnsembleState): void {
     if (playback.audio) {
         killActiveVoices(soloist.audio.activeVoices, playback.audio.currentTime, 0.01);
         // A sampled lead note is not among `activeVoices`: it is silenced with its lane (#1530).
-        releaseSampledVoices(playback.audio, 'soloist', playback.audio.currentTime);
+        // A synth note sent ahead of the clock is cut there before it sounds (#1999).
+        releaseLaneVoices(playback.audio, 'soloist', playback.audio.currentTime);
     }
 }
 
@@ -282,6 +279,8 @@ function playSoloNoteCurrent(
     if (playback.audioGraph) {
         pan.connect(playback.audioGraph.soloist.gain);
     }
+    // The whole voice leaves through its panner: a Stop before the note starts cuts it (#1999).
+    cancelAheadOnStop(ctx, 'soloist', playTime, [pan]);
 
     // We store nodes in a single array for the utility to handle stopping/cleanup
     const voiceObj: SoloistVoice = { gain, time: playTime, duration, nodes: [gain, pan] };
@@ -765,12 +764,13 @@ function createVibrato(
     const vibDelay = forceVibrato ? 0.08 : 0.12 + Math.random() * 0.08;
     const finalVibDepth = freq * (isLongNote ? depthFactor : depthFactor * 0.45);
 
+    // The depth fades in from 0 after the delay, a straight line like the amp and cutoff taps
+    // below (#1999). It was an exponential ramp from 0, which Web Audio holds AT 0 for the whole
+    // ramp and then jumps to the end value: the vibrato snapped on half a second into the note.
+    const rampEnd = time + vibDelay + (isLongNote ? 0.35 : 0.18);
     vibGain.gain.setValueAtTime(0, time);
     vibGain.gain.setValueAtTime(0, time + vibDelay);
-    vibGain.gain.exponentialRampToValueAtTime(
-        Math.max(0.001, finalVibDepth),
-        time + vibDelay + (isLongNote ? 0.35 : 0.18),
-    );
+    vibGain.gain.linearRampToValueAtTime(Math.max(0.001, finalVibDepth), rampEnd);
 
     const depthMod = ctx.createOscillator();
     depthMod.type = 'sine';
@@ -795,8 +795,6 @@ function createVibrato(
     // gains land in depthModNodes so the existing voiceObj cleanup covers them.
     const couplingNodes: AudioNode[] = [];
     if (vibRuns) {
-        const rampEnd = time + vibDelay + (isLongNote ? 0.35 : 0.18);
-
         // Amplitude tremolo — small, correlated with the pitch rise.
         const ampDepthGain = ctx.createGain();
         ampDepthGain.gain.setValueAtTime(0, time);

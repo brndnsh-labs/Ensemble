@@ -94,10 +94,7 @@ function makeState(audio) {
     };
 }
 
-/**
- * The fades a stop asked for at the context's current time (a drum hit is scheduled a couple of
- * milliseconds ahead, so its fade is from its own start).
- */
+/** The fades a stop asked for at (or within 10 ms after) the context's current time. */
 const fadedNow = (gains, audio) =>
     gains.filter((gain) =>
         gain.gain.setTargetAtTime.mock.calls.some(
@@ -129,6 +126,9 @@ describe('Stop silences every sampled lane (#1530)', () => {
         const state = makeState(audio);
         play(state);
         expect(sources).toHaveLength(1);
+        // A hit is scheduled a couple of milliseconds past the clock; move the clock on so every
+        // lane's voice is sounding, not still ahead (that case is stop-cancels-notes-ahead's).
+        audio.currentTime += 0.01;
         expect(fadedNow(gains, audio)).toHaveLength(0);
 
         kill(state);

@@ -246,10 +246,10 @@ export function playPercussiveStrike(
         holdTime,
         bodyDecay,
     }: PercussiveStrikeOptions = {},
-): void {
+): GainNode | null {
     if (!audio || !buffer || !destination) {
         onEnded?.();
-        return;
+        return null;
     }
 
     try {
@@ -285,9 +285,12 @@ export function playPercussiveStrike(
             safeDisconnect([source, filter, gain]);
             onEnded?.();
         };
+        // The strike's output, for a caller whose Stop must cut it before it sounds (#1999).
+        return gain;
     } catch {
         /* ignore audio errors */
         onEnded?.();
+        return null;
     }
 }
 
@@ -325,10 +328,10 @@ export function playResonantTone(
         holdTime,
         bodyDecay,
     }: ResonantToneOptions = {},
-): void {
+): GainNode | null {
     if (!audio || !destination) {
         onEnded?.();
-        return;
+        return null;
     }
 
     try {
@@ -356,9 +359,12 @@ export function playResonantTone(
             safeDisconnect([osc, gain]);
             onEnded?.();
         };
+        // The tone's output, for a caller whose Stop must cut it before it sounds (#1999).
+        return gain;
     } catch {
         /* ignore audio errors */
         onEnded?.();
+        return null;
     }
 }
 

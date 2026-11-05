@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { releaseLaneVoices } from '../../../core/engine/lane-voices.js';
 import {
     buildToneTilt,
     foldToSampledCeiling,
@@ -6,7 +7,6 @@ import {
     pitchRatio,
     playSampledNote,
     playSampledStrike,
-    releaseSampledVoices,
     type SampleZone,
 } from '../../../core/engine/sample-voice.js';
 
@@ -516,12 +516,19 @@ describe('sample-voice — playSampledStrike (sampled drums #662)', () => {
         expect(source.stop.mock.calls[0][0]).toBeLessThan(5); // earlier than natural end
     });
 
-    it('clamps a choke time into the live window (never before the voice starts)', () => {
-        const { ctx, gain } = makeCtx();
+    it('a choke before the voice starts keeps it from sounding: gain pinned to 0, stopped at its start', () => {
+        // #1999: the choke used to clamp to the start and fade from there, which cancelled the
+        // envelope's 0 at the start and left the gain's default of 1 under the fade — a tick.
+        const { ctx, gain, source } = makeCtx();
         const handle = playSampledStrike(ctx, fakeBuffer(2), {} as AudioNode, 3, {});
-        handle?.choke(1.0); // before startTime 3 → clamps to 3
-        const target = gain.gain.calls.find((c: any) => c.op === 'target');
-        expect(target.time).toBe(3);
+        source.stop.mockClear();
+        handle?.choke(1.0); // before startTime 3
+        expect(gain.gain.calls.slice(-2)).toEqual([
+            { op: 'cancel', value: 0, time: 0 },
+            { op: 'set', value: 0, time: 0 },
+        ]);
+        expect(gain.gain.calls.some((c: any) => c.op === 'target')).toBe(false);
+        expect(source.stop).toHaveBeenCalledWith(3);
     });
 
     it('a choke after the source already stopped is swallowed (no throw)', () => {
@@ -635,10 +642,10 @@ describe('sample-voice — a stop silences its lane (#1530)', () => {
         playSampledNote(ctx, zone(60), {} as AudioNode, 60, 5, { duration: 8, lane: 'chords' });
         source.stop.mockClear();
 
-        releaseSampledVoices(ctx, 'bass', 6);
+        releaseLaneVoices(ctx, 'bass', 6);
         expect(gain.gain.setTargetAtTime).not.toHaveBeenCalled();
 
-        releaseSampledVoices(ctx, 'chords', 6);
+        releaseLaneVoices(ctx, 'chords', 6);
         expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 6, expect.any(Number));
         // Stopped within tens of milliseconds, not at the end of its eight-second hold.
         expect(source.stop).toHaveBeenCalledTimes(1);
@@ -650,7 +657,7 @@ describe('sample-voice — a stop silences its lane (#1530)', () => {
         // The host sends notes up to 150 ms ahead: this one starts after the stop.
         playSampledNote(ctx, zone(60), {} as AudioNode, 60, 5.1, { duration: 2, lane: 'chords' });
         source.stop.mockClear();
-        releaseSampledVoices(ctx, 'chords', 5);
+        releaseLaneVoices(ctx, 'chords', 5);
         // Held at its level on its start (silence, before the attack) and faded from there.
         expect(gain.gain.calls.slice(-2)).toEqual([
             { op: 'ramp', value: 0, time: 5.1 },
@@ -663,7 +670,7 @@ describe('sample-voice — a stop silences its lane (#1530)', () => {
         const { ctx, source, gain } = makeCtx();
         playSampledNote(ctx, zone(60), {} as AudioNode, 60, 5, { duration: 1, lane: 'chords' });
         source.onended();
-        releaseSampledVoices(ctx, 'chords', 6);
+        releaseLaneVoices(ctx, 'chords', 6);
         expect(gain.gain.setTargetAtTime).not.toHaveBeenCalled();
     });
 
@@ -671,7 +678,7 @@ describe('sample-voice — a stop silences its lane (#1530)', () => {
         const { ctx, gain } = makeCtx();
         playSampledNote(ctx, zone(60), {} as AudioNode, 60, 5, { duration: 8 });
         for (const lane of ['chords', 'bass', 'soloist', 'drums'] as const) {
-            releaseSampledVoices(ctx, lane, 6);
+            releaseLaneVoices(ctx, lane, 6);
         }
         expect(gain.gain.setTargetAtTime).not.toHaveBeenCalled();
     });
@@ -680,7 +687,7 @@ describe('sample-voice — a stop silences its lane (#1530)', () => {
         const { ctx, source, gain } = makeCtx();
         playSampledStrike(ctx, fakeBuffer(3), {} as AudioNode, 5, { lane: 'drums' });
         source.stop.mockClear();
-        releaseSampledVoices(ctx, 'drums', 5.5);
+        releaseLaneVoices(ctx, 'drums', 5.5);
         expect(gain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 5.5, expect.any(Number));
         expect(source.stop.mock.calls[0][0]).toBeLessThan(5.7);
     });

@@ -9,12 +9,8 @@ import {
     packIdFromVoice,
     resolveInstrumentSource,
 } from './instrument-registry.js';
-import {
-    pickRoundRobin,
-    playSampledStrike,
-    releaseSampledVoices,
-    type SampleVoiceHandle,
-} from './sample-voice.js';
+import { cancelAheadOnStop, releaseLaneVoices } from './lane-voices.js';
+import { pickRoundRobin, playSampledStrike, type SampleVoiceHandle } from './sample-voice.js';
 import {
     createSimplePanner,
     duckGain,
@@ -932,8 +928,9 @@ export function killDrumNote(state: EnsembleState): void {
         rampGain(groove.lastCrashGain.gain, 0, playback.audio.currentTime, 0.12);
         (groove as Mutable<typeof groove>).lastCrashGain = null; // @direct-mutation
     }
-    // Every other sampled hit — a crash or ride still ringing — is silenced with its lane (#1530).
-    releaseSampledVoices(playback.audio, 'drums', playback.audio.currentTime);
+    // Every other sampled hit — a crash or ride still ringing — is silenced with its lane (#1530),
+    // and every hit sent ahead of the clock, synth or sampled, never sounds (#1999).
+    releaseLaneVoices(playback.audio, 'drums', playback.audio.currentTime);
 }
 
 // Mix state for density-aware normalization, one per audio context (#1531): an offline render
@@ -1065,6 +1062,25 @@ function drumPanValue(name: string, time: number): number {
 }
 
 /**
+ * The take each sampled articulation played last, per audio context (#1999), so the next hit of
+ * that articulation never repeats it (`pickRoundRobin`'s `previous`). Per context, as the mix
+ * state is: an offline render starts its own run, so an export is the same every time.
+ */
+const lastTakesByAudio = new WeakMap<BaseAudioContext, Map<string, AudioBuffer>>();
+
+function lastTakesFor(audio: BaseAudioContext | null): Map<string, AudioBuffer> | null {
+    if (!audio) {
+        return null;
+    }
+    let lastTakes = lastTakesByAudio.get(audio);
+    if (!lastTakes) {
+        lastTakes = new Map();
+        lastTakesByAudio.set(audio, lastTakes);
+    }
+    return lastTakes;
+}
+
+/**
  * Play one drum hit from the installed groove pack, or return `false` so the
  * caller falls back to the synth voice. Resolves the articulation → manifest key
  * → the zone's round-robin take set (#657), picks a take deterministically from
@@ -1091,10 +1107,13 @@ function tryPlaySampledDrum(
     if (!takes || takes.length === 0) {
         return false; // pack lacks this articulation, or its buffers haven't loaded yet
     }
-    const buffer = pickRoundRobin(takes, Math.round(time * 1000));
+    const lastTakes = lastTakesFor(state.playback.audio);
+    const takeKey = `${packId}:${key}`;
+    const buffer = pickRoundRobin(takes, Math.round(time * 1000), lastTakes?.get(takeKey) ?? null);
     if (!buffer) {
         return false;
     }
+    lastTakes?.set(takeKey, buffer);
     // setupPercussiveHit allocates the per-hit panner, so resolve the buffer FIRST —
     // a bail after this point would orphan that panner (it frees only via the
     // strike's onEnded → releasePanner below). setupPercussiveHit returns null only
@@ -1197,6 +1216,8 @@ function setupPercussiveHit(
     if (playback.audioGraph) {
         panner.connect(playback.audioGraph.drums.gain);
     }
+    // Every layer of the hit leaves through its panner: a Stop before the hit starts cuts it.
+    cancelAheadOnStop(playback.audio, 'drums', playTime, [panner]);
     return {
         audio: playback.audio,
         playTime,
@@ -1751,6 +1772,8 @@ function playKickSnareCrashTom(
     if (playback.audioGraph) {
         panner.connect(playback.audioGraph.drums.gain);
     }
+    // Every layer of the hit leaves through its panner: a Stop before the hit starts cuts it.
+    cancelAheadOnStop(playback.audio, 'drums', playTime, [panner]);
     // why: this per-hit panner must be disconnected once the hit fully decays, or it
     // leaks one StereoPannerNode per drum hit — dozens/second at tempo (synth-audit
     // Epic 4 S1). The crash branch already frees it via its own

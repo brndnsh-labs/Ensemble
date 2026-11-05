@@ -20,6 +20,7 @@
 // `audio-graph-utils.js`. (#1192)
 import { safeDisconnect } from './audio-graph-utils.js';
 import { scrambleHash } from './hash-utils.js';
+import { trackLaneVoice, type VoiceLane } from './lane-voices.js';
 
 /**
  * Sanity ceiling on the envelope peak (see `playSampledNote`). Lets a loudness-
@@ -50,7 +51,7 @@ const fadeCurve = (shape: (x: number) => number): Float32Array =>
 const FADE_IN = fadeCurve(Math.sin);
 const FADE_OUT = fadeCurve(Math.cos);
 
-/** Seconds a stopped voice takes to fade (`releaseSampledVoices`): short, and click-free. */
+/** Seconds a stopped voice takes to fade (`releaseLaneVoices`, `lane-voices.ts`): short, and click-free. */
 const STOP_FADE = 0.01;
 
 /** A pitched sample zone: a decoded buffer recorded at a known root pitch. */
@@ -82,65 +83,9 @@ export interface SampleVoiceHandle {
     choke(when: number): void;
 }
 
-/** The lane a sampled voice sounds in: what a stop silences together. */
-export type SampleLane = 'chords' | 'bass' | 'soloist' | 'drums';
-
-/**
- * The sampled voices still sounding (or scheduled to), per audio context and lane (#1530), so
- * a stop can silence them: `releaseSampledVoices`. A voice joins when it is made and leaves
- * when its source ends, so the sets stay as small as what is ringing. Keyed by the context, not
- * kept in the state tree: an offline render's voices are its own, and a handle closes over
- * audio nodes no slice should hold.
- */
-const soundingVoices = new WeakMap<
-    BaseAudioContext,
-    Map<SampleLane, Set<(when: number) => void>>
->();
-
-/** Register `silence` for `lane`; returns the function that takes it out again. */
-function trackVoice(
-    audio: BaseAudioContext,
-    lane: SampleLane | undefined,
-    silence: (when: number) => void,
-): () => void {
-    if (!lane) {
-        return () => {};
-    }
-    let lanes = soundingVoices.get(audio);
-    if (!lanes) {
-        lanes = new Map();
-        soundingVoices.set(audio, lanes);
-    }
-    let voices = lanes.get(lane);
-    if (!voices) {
-        voices = new Set();
-        lanes.set(lane, voices);
-    }
-    voices.add(silence);
-    return () => voices.delete(silence);
-}
-
-/**
- * Silence every sampled voice of `lane` from `when`: the ones sounding fade in a few
- * milliseconds, the ones scheduled but not yet started never sound.
- */
-export function releaseSampledVoices(
-    audio: BaseAudioContext,
-    lane: SampleLane,
-    when: number,
-): void {
-    const voices = soundingVoices.get(audio)?.get(lane);
-    if (!voices) {
-        return;
-    }
-    for (const silence of [...voices]) {
-        silence(when);
-    }
-}
-
 /**
  * Handle returned by {@link playSampledNote}. Its `release` ends the voice early:
- * the lane registry (`trackVoice`) calls it on Stop, so a sustained pack (e.g. the
+ * the lane registry (`trackLaneVoice`) calls it on Stop, so a sustained pack (e.g. the
  * Drawbar Organ, which holds flat at full level for its whole duration) doesn't
  * ring on.
  */
@@ -195,15 +140,15 @@ export interface SampledNoteOptions {
      * as a struck or plucked one should. A note the recording covers is untouched either way.
      */
     readonly sustain?: boolean;
-    /** The lane a stop silences this voice with (`releaseSampledVoices`). Omitted: none. */
-    readonly lane?: SampleLane;
+    /** The lane a stop silences this voice with (`releaseLaneVoices`, `lane-voices.ts`). Omitted: none. */
+    readonly lane?: VoiceLane;
 }
 
 export interface SampledStrikeOptions {
     /** 0..1 → envelope peak gain. */
     readonly velocity?: number;
-    /** The lane a stop silences this voice with (`releaseSampledVoices`). Omitted: none. */
-    readonly lane?: SampleLane;
+    /** The lane a stop silences this voice with (`releaseLaneVoices`, `lane-voices.ts`). Omitted: none. */
+    readonly lane?: VoiceLane;
     readonly onEnded?: () => void;
 }
 
@@ -318,18 +263,30 @@ export function foldToSampledCeiling(
  * Uses `scrambleHash` rather than a bare `seed % length`: a raw modulo locks the
  * choice to a fixed grid pattern (take 0 on every downbeat, say), which is its
  * own kind of machine-gun; scrambling decorrelates the take from the beat while
- * staying fully reproducible — the same seed always yields the same take, so
- * looped playback and the unit test are byte-stable. Returns `null` only for an
+ * staying fully reproducible — the same seed and `previous` always yield the
+ * same take, so looped playback and the unit test are byte-stable.
+ *
+ * `previous` is the take this sample played last (#1999). Drawn independently,
+ * the pick repeated it a quarter of the time (over half on the open hat): two
+ * identical hits in a row, the machine-gun round robin exists to avoid. Given, the pick is drawn from the other takes only, so
+ * consecutive hits of one sample never share a take. Returns `null` only for an
  * empty set; a single-take zone always returns that take.
  */
-export function pickRoundRobin<T>(takes: readonly T[], seed: number): T | null {
+export function pickRoundRobin<T>(
+    takes: readonly T[],
+    seed: number,
+    previous: T | null = null,
+): T | null {
     if (takes.length === 0) {
         return null;
     }
-    const idx = Math.floor(scrambleHash(seed) * takes.length);
-    // scrambleHash is [0,1); floor keeps idx in [0, length-1]. Guard the 1.0
+    const skip = previous === null ? -1 : takes.indexOf(previous);
+    const choices = skip < 0 || takes.length === 1 ? takes.length : takes.length - 1;
+    // scrambleHash is [0,1); floor keeps idx in [0, choices-1]. Guard the 1.0
     // edge (unreachable in practice) so we never index past the end.
-    return takes[Math.min(idx, takes.length - 1)];
+    const idx = Math.min(Math.floor(scrambleHash(seed) * choices), choices - 1);
+    // Step over the previous take: the indices after it shift up by one.
+    return takes[skip >= 0 && choices < takes.length && idx >= skip ? idx + 1 : idx];
 }
 
 /**
@@ -434,6 +391,16 @@ export function playSampledStrike(
         const handle: SampleVoiceHandle = {
             choke(when: number) {
                 try {
+                    // A hit not yet sounding (a Stop inside the lookahead) must never sound:
+                    // cancelling its envelope from its start would drop the gain's 0 there and
+                    // leave the default of 1 under the fade — a full-level tick (#1999, the trap
+                    // #1569 met in the chords). Pin the gain to 0 now and stop it at its start.
+                    if (Number.isFinite(when) && when < startTime) {
+                        gain.gain.cancelScheduledValues(0);
+                        gain.gain.setValueAtTime(0, 0);
+                        source.stop(startTime);
+                        return;
+                    }
                     // Clamp into the voice's live window: never before it starts,
                     // and a no-op once it's already past its natural stop.
                     const at = Number.isFinite(when)
@@ -454,7 +421,7 @@ export function playSampledStrike(
                 }
             },
         };
-        untrack = trackVoice(audio, lane, (when) => handle.choke(when));
+        untrack = trackLaneVoice(audio, lane, (when) => handle.choke(when));
         return handle;
     } catch {
         /* ignore audio errors (e.g. a closed context) */
@@ -816,7 +783,7 @@ export function playSampledNote(
                 }
             },
         };
-        untrack = trackVoice(audio, lane, (when) => handle.release(when, STOP_FADE));
+        untrack = trackLaneVoice(audio, lane, (when) => handle.release(when, STOP_FADE));
         return handle;
     } catch {
         /* ignore audio errors (e.g. a closed context) */
