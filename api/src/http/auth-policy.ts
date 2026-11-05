@@ -84,6 +84,16 @@ function boundedExtension(value: unknown, depth = 0): boolean {
         )
     );
 }
+/**
+ * The longest assertion `signature` (base64url characters) sign-in accepts (#2103). Sized for
+ * the largest signature a stored credential can make, not for `SUPPORTED_ALGORITHM_IDS`: before
+ * that pin the library's default offered ML-DSA-44 first, so passkeys registered with it exist
+ * and must keep signing in. An ML-DSA-44 signature is 2420 bytes = 3227 base64url characters
+ * (ceil(2420 * 4 / 3), unpadded); RS256 from a 16384-bit key is 2048 bytes = 2731. 4096
+ * characters (3072 bytes) holds both with headroom. The old cap, 2048, refused ML-DSA-44, so
+ * such a passkey registered and then could never sign in.
+ */
+export const MAX_SIGNATURE_LENGTH = 4096;
 export function validAuthBody(shape: Shape, value: unknown): boolean {
     if (value === undefined) {
         return shape === 'empty' || shape === 'label';
@@ -137,7 +147,7 @@ export function validAuthBody(shape: Shape, value: unknown): boolean {
         return (
             keys(response, ['clientDataJSON', 'authenticatorData', 'signature', 'userHandle']) &&
             base64(response.authenticatorData, 8192) &&
-            base64(response.signature, 2048) &&
+            base64(response.signature, MAX_SIGNATURE_LENGTH) &&
             (response.userHandle === undefined ||
                 response.userHandle === null ||
                 base64(response.userHandle, 128))

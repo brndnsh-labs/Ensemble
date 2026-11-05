@@ -147,6 +147,19 @@ describe('startAddPasskey / verifyAddPasskey (#1190 decision 4)', () => {
         expect(result.options.authenticatorSelection?.residentKey).toBe('required');
     });
 
+    it('offers exactly EdDSA, ES256, RS256, never the library default (#2103)', async () => {
+        testDb = createTestDatabase();
+        const authenticator = createSoftAuthenticator({ rpId: CONFIG.rpId, origin: CONFIG.origin });
+        const { accountId, credentialId } = await registerFreshCredential(testDb, authenticator);
+        const sessionId = issueTestSession(testDb, accountId, credentialId);
+
+        const started = await startAddPasskey(testDb.db, CONFIG, { accountId, sessionId });
+        if (!started.ok) {
+            throw new Error(`unexpected: ${started.reason}`);
+        }
+        expect(started.options.pubKeyCredParams.map((p) => p.alg)).toEqual([-8, -7, -257]);
+    });
+
     it('enrolls a genuinely second credential; the account can then log in with EITHER passkey', async () => {
         testDb = createTestDatabase();
         const firstAuthenticator = createSoftAuthenticator({

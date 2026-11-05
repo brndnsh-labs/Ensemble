@@ -6,7 +6,7 @@ import { recordSecurityEvent } from '../../src/auth/security-events.js';
 import { assertAccountDeletionCoverage } from '../../src/db/account-deletion-registry.js';
 import { ADMIN_POLICIES } from '../../src/http/admin.js';
 import { createApp } from '../../src/http/app.js';
-import { AUTH_POLICIES, validAuthBody } from '../../src/http/auth-policy.js';
+import { AUTH_POLICIES, MAX_SIGNATURE_LENGTH, validAuthBody } from '../../src/http/auth-policy.js';
 import { createClientIdentity } from '../../src/http/client-identity.js';
 import { DOCUMENT_POLICIES } from '../../src/http/documents.js';
 import { createCookieJar } from '../helpers/cookie-jar.js';
@@ -167,6 +167,30 @@ describe('deny-by-default HTTP contracts', () => {
             }),
         ).toBe(false);
         expect(validAuthBody('code', { code: 'x'.repeat(129) })).toBe(false);
+    });
+    it('sign-in accepts an ML-DSA-44 signature and refuses one past the cap (#2103)', () => {
+        const auth = createSoftAuthenticator({ rpId: config.rpId, origin: config.origin });
+        const valid = auth.authenticate({ challenge: 'test' });
+        const withSignature = (bytes: Buffer | string) => ({
+            ...valid,
+            response: {
+                ...valid.response,
+                signature: typeof bytes === 'string' ? bytes : bytes.toString('base64url'),
+            },
+        });
+        expect(validAuthBody('authentication', valid)).toBe(true);
+        // An ML-DSA-44 signature is 2420 bytes, 3227 base64url characters. The old 2048 cap
+        // refused it, so a passkey that registered with ML-DSA-44 could never sign in.
+        const mlDsa44 = Buffer.alloc(2420, 0xab);
+        expect(mlDsa44.toString('base64url')).toHaveLength(3227);
+        expect(validAuthBody('authentication', withSignature(mlDsa44))).toBe(true);
+        expect(
+            validAuthBody('authentication', withSignature('a'.repeat(MAX_SIGNATURE_LENGTH))),
+        ).toBe(true);
+        expect(
+            validAuthBody('authentication', withSignature('a'.repeat(MAX_SIGNATURE_LENGTH + 1))),
+        ).toBe(false);
+        expect(MAX_SIGNATURE_LENGTH).toBe(4096);
     });
 });
 

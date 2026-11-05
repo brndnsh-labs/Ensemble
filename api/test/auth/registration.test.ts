@@ -28,6 +28,14 @@ describe('registration ceremony (#1188)', () => {
         testDb?.cleanup();
     });
 
+    it('offers exactly EdDSA, ES256, RS256, never the library default (#2103)', async () => {
+        testDb = createTestDatabase();
+        const { options } = await startRegistration(testDb.db, CONFIG);
+        // The library default puts ML-DSA-44 (-48) first on Node 26, whose 2420-byte signatures
+        // once outgrew sign-in's body cap. Pinned, in this order.
+        expect(options.pubKeyCredParams.map((p) => p.alg)).toEqual([-8, -7, -257]);
+    });
+
     it('registers a new discoverable passkey end-to-end against the real verify path', async () => {
         testDb = createTestDatabase();
         const authenticator = createSoftAuthenticator({ rpId: CONFIG.rpId, origin: CONFIG.origin });

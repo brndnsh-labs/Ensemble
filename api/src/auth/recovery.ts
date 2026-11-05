@@ -15,7 +15,7 @@ import {
     insertChallenge,
     sweepExpiredChallenges,
 } from './challenges.js';
-import type { WebAuthnConfig } from './config.js';
+import { SUPPORTED_ALGORITHM_IDS, type WebAuthnConfig } from './config.js';
 import { encodeTransports } from './credential-row.js';
 import { isFreshlyAuthenticated } from './fresh-auth.js';
 import type { RateLimiterOptions } from './rate-limit.js';
@@ -345,6 +345,7 @@ export async function startRecoveryEnrollPasskey(
             residentKey: 'required',
             userVerification: 'required',
         },
+        supportedAlgorithmIDs: [...SUPPORTED_ALGORITHM_IDS],
     });
 
     const { token, hash } = generateCeremonyToken();
@@ -474,6 +475,7 @@ export async function verifyRecoveryEnrollPasskey(
             expectedOrigin: config.origin,
             expectedRPID: config.rpId,
             requireUserVerification: true,
+            supportedAlgorithmIDs: [...SUPPORTED_ALGORITHM_IDS],
         });
     } catch {
         return { ok: false, reason: 'verification_failed' };

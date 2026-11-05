@@ -644,6 +644,23 @@ describe('startRecoveryEnrollPasskey / verifyRecoveryEnrollPasskey (#1191 decisi
         expect(result).toEqual({ ok: false, reason: 'recovery_session_invalid' });
     });
 
+    it('offers exactly EdDSA, ES256, RS256, never the library default (#2103)', async () => {
+        testDb = createTestDatabase();
+        const now = 1_000_000;
+        const setup = await setUpClaimedRecovery(now);
+
+        const started = await startRecoveryEnrollPasskey(
+            testDb.db,
+            CONFIG,
+            { accountId: setup.accountId, sessionId: setup.recoverySessionId },
+            now,
+        );
+        if (!started.ok) {
+            throw new Error(`unexpected: ${started.reason}`);
+        }
+        expect(started.options.pubKeyCredParams.map((p) => p.alg)).toEqual([-8, -7, -257]);
+    });
+
     it('happy path: consumes the code, revokes EVERY session, deletes EVERY old credential, inserts the new one', async () => {
         testDb = createTestDatabase();
         const now = 1_000_000;
