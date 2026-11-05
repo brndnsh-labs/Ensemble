@@ -15,7 +15,7 @@ import {
     insertChallenge,
     sweepExpiredChallenges,
 } from './challenges.js';
-import type { WebAuthnConfig } from './config.js';
+import { SUPPORTED_ALGORITHM_IDS, type WebAuthnConfig } from './config.js';
 import { encodeTransports, isDuplicateCredentialIdError } from './credential-row.js';
 import { isMalformedCeremonyRequest } from './request-guard.js';
 
@@ -106,8 +106,7 @@ export async function startRegistration(
             residentKey: 'required',
             userVerification: 'required',
         },
-        // Keep the library default (EdDSA/ES256/RS256): restricting to ES256 would break
-        // Windows Hello, which uses RS256, and Edge on Windows is a target device.
+        supportedAlgorithmIDs: [...SUPPORTED_ALGORITHM_IDS],
     });
 
     const { token, hash } = generateCeremonyToken();
@@ -202,6 +201,7 @@ export async function verifyRegistration(
             // Explicit even though `true` is also the library default: never rely on the
             // default happening to match policy. Ensemble requires user verification.
             requireUserVerification: true,
+            supportedAlgorithmIDs: [...SUPPORTED_ALGORITHM_IDS],
         });
     } catch {
         return { ok: false, reason: 'verification_failed' };

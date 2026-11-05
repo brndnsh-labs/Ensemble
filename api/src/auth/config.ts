@@ -1,3 +1,5 @@
+import { COSEALG } from '@simplewebauthn/server/helpers';
+
 /**
  * WebAuthn ceremony configuration for #1188's registration/login modules.
  *
@@ -110,3 +112,22 @@ export function createWebAuthnConfig(input: WebAuthnConfigInput): WebAuthnConfig
 
     return Object.freeze({ rpId, rpName, origin });
 }
+
+/**
+ * The public-key algorithms every registration ceremony offers and accepts (#2103), in order of
+ * preference: EdDSA, ES256, RS256. Passed to BOTH `generateRegistrationOptions` and
+ * `verifyRegistrationResponse` at every call site, never left to the library default — the same
+ * stance as `requireUserVerification`. `@simplewebauthn/server` 14's default puts ML-DSA-44
+ * first whenever the runtime supports post-quantum keys (Node 26 does), so a library or Node bump
+ * would silently change what we offer. RS256 stays: Windows Hello signs with it, and Edge on
+ * Windows is a target device; restricting to ES256 would lock it out.
+ *
+ * Sign-in does not consult this list: a credential already stored with another algorithm (an
+ * ML-DSA-44 key registered before this pin) still verifies, which is why `validAuthBody` sizes its
+ * signature cap for ML-DSA-44, not for this list.
+ */
+export const SUPPORTED_ALGORITHM_IDS: readonly COSEALG[] = Object.freeze([
+    COSEALG.EdDSA,
+    COSEALG.ES256,
+    COSEALG.RS256,
+]);

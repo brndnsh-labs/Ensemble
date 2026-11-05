@@ -15,7 +15,7 @@ import {
     insertChallenge,
     sweepExpiredChallenges,
 } from './challenges.js';
-import type { WebAuthnConfig } from './config.js';
+import { SUPPORTED_ALGORITHM_IDS, type WebAuthnConfig } from './config.js';
 import { decodeTransports, encodeTransports } from './credential-row.js';
 import { isFreshlyAuthenticated } from './fresh-auth.js';
 import { hasEnrolledRecoveryMaterial } from './recovery-material.js';
@@ -84,6 +84,7 @@ export async function startAddPasskey(
             residentKey: 'required',
             userVerification: 'required',
         },
+        supportedAlgorithmIDs: [...SUPPORTED_ALGORITHM_IDS],
     });
 
     const { token, hash } = generateCeremonyToken();
@@ -173,6 +174,7 @@ export async function verifyAddPasskey(
             // against the installed v14.0.1; see #1188's decision comment). Never omit this.
             expectedRPID: config.rpId,
             requireUserVerification: true,
+            supportedAlgorithmIDs: [...SUPPORTED_ALGORITHM_IDS],
         });
     } catch {
         return { ok: false, reason: 'verification_failed' };
