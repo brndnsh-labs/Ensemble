@@ -557,6 +557,10 @@ export function restoreGains(state: EnsembleState) {
             m.node.gain.setTargetAtTime(target, t, 0.04);
         }
     });
+    // The style's make-up gain is a gain the graph holds too (#2002). Opening a chart sets its
+    // genre while the runtime's dispatch subscriber is off (`load`), so no genre effect runs:
+    // every rebuild restores the make-up for the style now set, as it restores the buses.
+    syncMasterMakeup(state);
 }
 
 /**
@@ -656,9 +660,11 @@ export function syncMasterVolume(state: EnsembleState): void {
 }
 
 /**
- * Glide the master make-up gain to the style now playing (#2002), on a genre change. A quarter
- * second's time constant: the band changes style at its next barline, so the level moves with it
- * rather than jumping ahead of the music.
+ * Glide the master make-up gain to the style now set (#2002): on a genre change and on every
+ * `restoreGains`. The glide starts when the genre is set — at the press, since the reducer writes
+ * `lastSmartGenre` at once — not at the barline where a playing band takes the new style, so it
+ * can lead the music by up to a bar; a quarter second's time constant keeps that a fade, not a
+ * jump. Once it has settled, a repeat call changes nothing.
  */
 export function syncMasterMakeup(state: EnsembleState): void {
     const { playback } = state;

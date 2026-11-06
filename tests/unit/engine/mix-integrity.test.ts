@@ -257,6 +257,44 @@ describe('Mix & Signal Integrity Audit', () => {
         }
     });
 
+    it('restores the make-up gain for the style now set on every restoreGains', () => {
+        const groove = getState().groove;
+        groove.lastSmartGenre = 'Metal';
+        initAudio(getState());
+        const { makeup } = playback.audioGraph.master;
+        // A chart opens on another style with no genre effect running (the runtime's
+        // subscriber is off while it loads); its rebuild's restoreGains brings the make-up along.
+        groove.lastSmartGenre = 'Jazz';
+        restoreGains(getState());
+        expect(makeup.gain.setTargetAtTime.mock.calls.at(-1)[0]).toBeCloseTo(10 ** (3 / 20), 6);
+        groove.lastSmartGenre = 'Metal';
+    });
+
+    it('falls back to the safety limiter when addModule throws synchronously', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        global.AudioWorkletNode = vi.fn();
+        const BaseContext = global.window.AudioContext;
+        global.window.AudioContext = vi.fn().mockImplementation(function () {
+            BaseContext.call(this);
+            this.audioWorklet = {
+                addModule: vi.fn(() => {
+                    throw new Error('InvalidStateError');
+                }),
+            };
+        });
+        try {
+            initAudio(getState());
+            const { master } = playback.audioGraph;
+            await expect(masterChainReady(playback.audio)).resolves.toBeUndefined();
+            const safety = playback.audio.createDynamicsCompressor.mock.results[1].value;
+            expect(master.makeup.connect).toHaveBeenCalledWith(safety);
+        } finally {
+            delete global.AudioWorkletNode;
+            global.window.AudioContext = BaseContext;
+            warn.mockRestore();
+        }
+    });
+
     it("sets the style's make-up gain from MASTER_MAKEUP_DB and glides it on a genre change", () => {
         const groove = getState().groove;
         groove.lastSmartGenre = 'Metal';

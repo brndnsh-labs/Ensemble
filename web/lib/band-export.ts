@@ -18,7 +18,7 @@ import { masterChainReady } from '@core/engine/master-limiter';
 import { encodeWav } from '@core/engine/wav-encoder';
 import { cloneStateForDetachedGeneration } from '@core/export/detached-generation-state';
 import { getState } from '@core/state';
-import type { EnsembleState } from '@core/types';
+import type { EnsembleState, Mutable } from '@core/types';
 import { legatoLeads, playBandEvent } from './band-host';
 
 /** A hair of silence before the first note. */
@@ -154,6 +154,11 @@ export async function renderBandPasses(
     // A throwaway clone, never the live state tree. Nothing here dispatches or touches the live
     // band or audio graph.
     const state = cloneStateForDetachedGeneration(getState());
+    // #2002 — an export is the band at its calibrated loudness (−16 LUFS, −1 dBTP), not at this
+    // device's listening level: the master volume sits after the limiter and only turns the
+    // speakers down, so a WAV exported with the slider at 50% would otherwise come out 6 dB
+    // quiet. Writes the detached clone only.
+    (state.playback as Mutable<EnsembleState['playback']>).masterVolume = 1; // @direct-mutation
     // A lane with events in this render is heard. `initAudio` holds a lane's bus at silence
     // (0.0001) while its state is disabled, which is right live and wrong here: a stem renders
     // its lane even when that lane is off live (`renderBandStemsToWav`), and without this the

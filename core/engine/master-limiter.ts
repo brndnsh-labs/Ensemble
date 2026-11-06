@@ -67,20 +67,21 @@ function registerLimiter(ctx: BaseAudioContext): Promise<boolean> {
                       console.warn('[MasterLimiter] worklet load timed out; safety limiter only');
                       resolve(false);
                   }, REGISTER_TIMEOUT_MS);
-                  ctx.audioWorklet.addModule(MODULE_URL.href).then(
-                      () => {
+                  const fail = (error: unknown) => {
+                      clearTimeout(timer);
+                      console.warn('[MasterLimiter] worklet failed; safety limiter only:', error);
+                      resolve(false);
+                  };
+                  try {
+                      ctx.audioWorklet.addModule(MODULE_URL.href).then(() => {
                           clearTimeout(timer);
                           resolve(true);
-                      },
-                      (error: unknown) => {
-                          clearTimeout(timer);
-                          console.warn(
-                              '[MasterLimiter] worklet failed; safety limiter only:',
-                              error,
-                          );
-                          resolve(false);
-                      },
-                  );
+                      }, fail);
+                  } catch (error) {
+                      // A synchronous throw (a closed context, an engine refusing the URL) falls
+                      // back too, and never rejects `masterChainReady`.
+                      fail(error);
+                  }
               })
             : Promise.resolve(false);
         registrations.set(ctx, registration);

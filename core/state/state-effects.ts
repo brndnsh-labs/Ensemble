@@ -159,15 +159,12 @@ export function handleEffects(
             if (action.payload?.module === 'playback' && action.payload?.param === 'masterVolume') {
                 syncMasterVolume(stateMap);
             }
-            // #2002 — a chart opening sets its genre through `SET_PARAM` (`applyGenre`).
-            if (action.payload?.module === 'groove' && action.payload?.param === 'lastSmartGenre') {
-                syncMasterMakeup(stateMap);
-            }
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {
             // #2002 — the master's make-up gain follows the style, so a genre change keeps the
-            // band at the same loudness. No-op before the audio graph exists.
+            // band at the same loudness. No-op before the audio graph exists. A chart opening
+            // sets its genre with the runtime's subscriber off; `restoreGains` covers that.
             syncMasterMakeup(stateMap);
             break;
         }
