@@ -1,3 +1,6 @@
+import { mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { decodeChartLink } from '../../core/songbook/chart-link.js';
 import type { ChartDocumentV2 } from '../../core/songbook/score-types.js';
@@ -125,5 +128,213 @@ describe('ad-hoc audition links', () => {
         await expect(runAuditionLink(['--prog=C', '--density=huge'])).rejects.toThrow(/--density/);
         await expect(runAuditionLink(['--prog=C', '--key=H'])).rejects.toThrow(/--key/);
         await expect(runAuditionLink(['--prog=Q#zz'])).rejects.toThrow(/--prog: bar/);
+    });
+});
+
+const FIXTURE = 'tests/fixtures/audition/two-section-chart.json';
+
+async function run(argv: string[], encode?: Parameters<typeof runAuditionLink>[1]) {
+    let out = '';
+    const write = process.stdout.write;
+    process.stdout.write = ((chunk: string) => {
+        out += chunk;
+        return true;
+    }) as typeof process.stdout.write;
+    try {
+        const code = await runAuditionLink(argv, encode);
+        return { code, out };
+    } finally {
+        process.stdout.write = write;
+    }
+}
+
+const linksOf = (out: string) => [...out.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1]);
+
+describe('--chart', () => {
+    it('opens the loaded chart unchanged when no override is passed', async () => {
+        const { out } = await run([`--chart=${FIXTURE}`]);
+        const { chart } = await chartOf(out.trim());
+        expect(chart.score.sections.map((s) => s.measures.length)).toEqual([4, 4]);
+        expect(chart.score.key).toBe('F');
+        expect(chart.performance.bpm).toBe(90);
+        expect(chart.band.groove.genre).toBe('Jazz');
+    });
+
+    it('applies every override on top of the chart', async () => {
+        const { out } = await run([
+            `--chart=${FIXTURE}`,
+            '--genre=Funk',
+            '--bpm=66',
+            '--key=Am',
+            '--int=0.3',
+            '--swing=60',
+            '--swing-sub=16th',
+            '--humanize=25',
+            '--on=soloist',
+            '--off=chords',
+        ]);
+        const { chart } = await chartOf(out.trim());
+        expect(chart.band.groove.genre).toBe('Funk');
+        expect(chart.performance.bpm).toBe(66);
+        expect(chart.score.key).toBe('A');
+        expect(chart.score.isMinor).toBe(true);
+        expect(chart.performance.energy).toBeCloseTo(0.3);
+        expect(chart.band.groove.swing).toBe(60);
+        expect(chart.band.groove.swingSub).toBe('16th');
+        expect(chart.band.groove.humanize).toBe(25);
+        expect(chart.band.soloist.enabled).toBe(true);
+        expect(chart.band.chords.enabled).toBe(false);
+        // the score itself is the loaded one
+        expect(chart.score.sections).toHaveLength(2);
+    });
+
+    it('takes --int=auto', async () => {
+        const { out } = await run([`--chart=${FIXTURE}`, '--int=auto']);
+        expect((await chartOf(out.trim())).chart.performance.energy).toBe('auto');
+    });
+
+    it('rejects a missing file, a non-chart document and a schema-1 chart', async () => {
+        const dir = mkdtempSync(join(tmpdir(), 'audition-'));
+        const bad = join(dir, 'bad.json');
+        writeFileSync(bad, JSON.stringify({ schemaVersion: 2, nope: true }));
+        const old = join(dir, 'old.json');
+        writeFileSync(old, JSON.stringify({ schemaVersion: 1, text: 'C | F' }));
+        await expect(run(['--chart=/nonexistent/chart.json'])).rejects.toThrow(
+            /--chart: cannot read/,
+        );
+        await expect(run([`--chart=${bad}`])).rejects.toThrow(/not a valid schema-2 chart/);
+        await expect(run([`--chart=${old}`])).rejects.toThrow(/schema-1/);
+    });
+
+    it('makes --scene, --prog and --chart mutually exclusive', async () => {
+        await expect(run([`--chart=${FIXTURE}`, '--prog=C'])).rejects.toThrow(/mutually exclusive/);
+        await expect(run([`--chart=${FIXTURE}`, '--scene=jazz-ride'])).rejects.toThrow(
+            /mutually exclusive/,
+        );
+        await expect(run(['--prog=C', '--scene=jazz-ride'])).rejects.toThrow(/mutually exclusive/);
+    });
+});
+
+describe('overrides on --prog and --scene', () => {
+    it('carries swing, swing-sub, humanize and --int=auto', async () => {
+        const { out } = await run([
+            '--prog=C | F',
+            '--swing=40',
+            '--swing-sub=8th',
+            '--humanize=10',
+            '--int=auto',
+        ]);
+        const { chart } = await chartOf(out.trim());
+        expect(chart.band.groove.swing).toBe(40);
+        expect(chart.band.groove.swingSub).toBe('8th');
+        expect(chart.band.groove.humanize).toBe(10);
+        expect(chart.performance.energy).toBe('auto');
+    });
+
+    it('lets --bpm and --genre take on a catalog scene', async () => {
+        const { out } = await run(['--scene=jazz-ride', '--bpm=77', '--genre=Blues']);
+        const { chart } = await chartOf(out.trim());
+        expect(chart.performance.bpm).toBe(77);
+        expect(chart.band.groove.genre).toBe('Blues');
+    });
+
+    it('refuses out-of-range and unknown values', async () => {
+        await expect(run(['--prog=C', '--swing=101'])).rejects.toThrow(/--swing/);
+        await expect(run(['--prog=C', '--humanize=-1'])).rejects.toThrow(/--humanize/);
+        await expect(run(['--prog=C', '--swing-sub=32nd'])).rejects.toThrow(/--swing-sub/);
+        await expect(run(['--prog=C', '--int=loud'])).rejects.toThrow(/--int/);
+        await expect(run(['--prog=C', '--bpm=60,,70'])).rejects.toThrow(/--bpm/);
+    });
+});
+
+describe('variants', () => {
+    it('prints one bare link when nothing is listed', async () => {
+        const { out } = await run(['--prog=C', '--swing=60']);
+        expect(out.trim().split('\n')).toHaveLength(1);
+        expect(out.startsWith('http://localhost:3100/')).toBe(true);
+    });
+
+    it('prints the cartesian product, each labelled by what varies and each applied', async () => {
+        const { out } = await run([
+            `--chart=${FIXTURE}`,
+            '--bpm=66',
+            '--swing=50,60',
+            '--int=0.3,auto',
+        ]);
+        const lines = out.trim().split('\n');
+        expect(lines.map((l) => l.split(': ')[0])).toEqual([
+            'swing 50 · int 0.3',
+            'swing 50 · int auto',
+            'swing 60 · int 0.3',
+            'swing 60 · int auto',
+        ]);
+        const charts = await Promise.all(lines.map((l) => chartOf(l.slice(l.indexOf(': ') + 2))));
+        expect(charts.map((c) => c.chart.band.groove.swing)).toEqual([50, 50, 60, 60]);
+        expect(charts.map((c) => c.chart.performance.energy)).toEqual([0.3, 'auto', 0.3, 'auto']);
+        expect(charts.every((c) => c.chart.performance.bpm === 66)).toBe(true);
+    });
+
+    it('varies genre and bpm too', async () => {
+        const { out } = await run(['--prog=C', '--genre=Jazz,Funk', '--bpm=80,120']);
+        const labels = out
+            .trim()
+            .split('\n')
+            .map((l) => l.split(': ')[0]);
+        expect(labels).toEqual([
+            'Jazz · bpm 80',
+            'Jazz · bpm 120',
+            'Funk · bpm 80',
+            'Funk · bpm 120',
+        ]);
+    });
+});
+
+describe('--md', () => {
+    it('prints one markdown row of labelled links that decode', async () => {
+        const { out } = await run([
+            `--chart=${FIXTURE}`,
+            '--bpm=66',
+            '--int=0.3,auto',
+            '--swing-sub=8th,16th',
+            '--md',
+        ]);
+        expect(out.trim().split('\n')).toHaveLength(1);
+        expect(out).toMatch(/^\[sub 8th · int 0\.3\]\(http[^)]+\) · \[sub 8th · int auto\]\(/);
+        const urls = linksOf(out);
+        expect(urls).toHaveLength(4);
+        const charts = await Promise.all(urls.map(chartOf));
+        expect(charts.map((c) => c.chart.band.groove.swingSub)).toEqual([
+            '8th',
+            '8th',
+            '16th',
+            '16th',
+        ]);
+        expect(charts.every((c) => c.chart.performance.bpm === 66)).toBe(true);
+    });
+
+    it('labels a single link', async () => {
+        const { out } = await run(['--prog=C', '--md']);
+        expect(out).toMatch(/^\[audition\]\(http/);
+    });
+});
+
+describe('decode self-check', () => {
+    it('fails the run when the encoded link is not the chart that was built', async () => {
+        const { encodeChartLink } = await import('../../core/songbook/chart-link.js');
+        // a deliberately broken encode: it drops the swing override on the way out
+        const broken = (document: ChartDocumentV2) => {
+            const copy = structuredClone(document);
+            copy.chart.band.groove.swing = 0;
+            return encodeChartLink(copy);
+        };
+        await expect(run([`--chart=${FIXTURE}`, '--swing=60'], broken)).rejects.toThrow(
+            /different chart/,
+        );
+    });
+
+    it('fails when the link does not decode at all', async () => {
+        await expect(run(['--prog=C'], async () => '#chart=garbage')).rejects.toThrow(
+            /does not decode/,
+        );
     });
 });

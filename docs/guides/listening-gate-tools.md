@@ -433,6 +433,29 @@ npm run --silent audition-link -- --base-url=https://ensemble.brndn.zip/ \
 Flags the link carries: `--genre` (one of the 13, validated), `--key`,
 `--ts` (e.g. `6/8`), `--bpm`, `--int` (clamped 0-1), and `--on=`/`--off=` with `soloist`,
 `bass` or `chords`. Ignored, with a note: `--density`, `--seed`, `--on=`/`--off=harmony`.
+### A real chart, and variants to compare
+
+`--chart=<file.json>` replaces `--scene`/`--prog` with a schema-2 chart document (one the app
+exports, or a pasted one). It goes through the app's own validator (`validateChartDocumentV2`):
+a schema-1 or invalid file fails the run. The overrides apply on top of it: `--genre`, `--bpm`,
+`--key`, `--int` (a number, clamped 0-1, or `auto`), `--on`/`--off`, and the groove's
+`--swing=<0-100>`, `--swing-sub=8th|16th` and `--humanize=<0-100>` (also valid with `--scene`
+and `--prog`). `--scene`, `--prog` and `--chart` are mutually exclusive.
+
+`--genre`, `--bpm`, `--int`, `--swing` and `--swing-sub` take a comma list; the run prints one
+labelled link per combination, the label naming only what varies (`swing 60 · int 0.3`). With
+no list the output is the one bare link as before. `--md` prints the links as one markdown row,
+ready for a listen-menu comment:
+
+```bash
+npm run --silent audition-link -- --chart=tests/fixtures/audition/two-section-chart.json \
+    --bpm=66 --int=0.3,auto --swing-sub=8th,16th --md
+# → [sub 8th · int 0.3](http://…#chart=…) · [sub 8th · int auto](…) · [sub 16th · int 0.3](…) · …
+```
+
+Every link is decoded with `decodeChartLink` before it is printed and must be the chart that
+was built with each override in place; otherwise the run exits non-zero.
+
 `tests/scripts/audition-link.test.ts` decodes generated links with the app's own
 `decodeChartLink` and checks every field; the v2 Playwright suite
 (`web/checks/audition-link-fields.spec.ts`) opens them in the browser and checks
