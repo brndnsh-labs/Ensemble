@@ -59,8 +59,11 @@ export interface MixScene {
     key: string;
     isMinor?: boolean;
     timeSignature?: string;
-    /** The band's energy, 0–1, held for the whole render. */
-    intensity?: number;
+    /**
+     * The band's energy, 0–1, held for the whole render; `'auto'` lets the band plan its own, as
+     * the stand does by default (`intensity: null`). Default 0.7.
+     */
+    intensity?: number | 'auto';
     sections: SceneSection[];
     includeDrums?: boolean;
     includeBass?: boolean;
@@ -194,7 +197,7 @@ export function sceneSettings(scene: MixScene, seed: string, voices: VoicePin[])
             (soloistVoice ? LEAD_FOR_VOICE[soloistVoice] : undefined) ??
             STYLES[style].lead?.prefers ??
             DEFAULT_SETTINGS.lead,
-        intensity: scene.intensity ?? 0.7,
+        intensity: scene.intensity === 'auto' ? null : (scene.intensity ?? 0.7),
         swing: scene.swing ?? null,
         swingGrid: null,
         humanize: scene.humanize ?? null,

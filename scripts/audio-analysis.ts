@@ -313,3 +313,163 @@ export function computeTransientMetrics(
         threshold,
     };
 }
+
+// --- Loudness (ITU-R BS.1770-4 / EBU R128) -------------------------------------------------
+//
+// The master limiter (#2002) is held to these: integrated loudness in LUFS and true peak in
+// dBTP. `npm run mix:report` prints both per stem; an independent check is ffmpeg's
+// `ebur128=peak=true` filter on a written WAV, which agrees with these to 0.1 LU / 0.1 dB.
+
+/** Biquad coefficients, normalised so a0 = 1. */
+interface Biquad {
+    b0: number;
+    b1: number;
+    b2: number;
+    a1: number;
+    a2: number;
+}
+
+/**
+ * The K-weighting pre-filter's two stages at any sample rate: the head shelf and the RLB
+ * high-pass, derived from their analog prototypes the way libebur128 does, so 44.1 kHz renders
+ * are weighted as exactly as the standard's 48 kHz table.
+ */
+function kWeighting(sampleRate: number): [Biquad, Biquad] {
+    let f0 = 1681.974450955533;
+    const gainDb = 3.999843853973347;
+    let q = 0.7071752369554196;
+    let k = Math.tan((Math.PI * f0) / sampleRate);
+    const vh = 10 ** (gainDb / 20);
+    const vb = vh ** 0.4996667741545416;
+    let a0 = 1 + k / q + k * k;
+    const shelf: Biquad = {
+        b0: (vh + (vb * k) / q + k * k) / a0,
+        b1: (2 * (k * k - vh)) / a0,
+        b2: (vh - (vb * k) / q + k * k) / a0,
+        a1: (2 * (k * k - 1)) / a0,
+        a2: (1 - k / q + k * k) / a0,
+    };
+    f0 = 38.13547087602444;
+    q = 0.5003270373238773;
+    k = Math.tan((Math.PI * f0) / sampleRate);
+    a0 = 1 + k / q + k * k;
+    const highpass: Biquad = {
+        b0: 1,
+        b1: -2,
+        b2: 1,
+        a1: (2 * (k * k - 1)) / a0,
+        a2: (1 - k / q + k * k) / a0,
+    };
+    return [shelf, highpass];
+}
+
+function biquad(samples: Float32Array | Float64Array, f: Biquad): Float64Array {
+    const out = new Float64Array(samples.length);
+    let x1 = 0;
+    let x2 = 0;
+    let y1 = 0;
+    let y2 = 0;
+    for (let i = 0; i < samples.length; i++) {
+        const x = samples[i];
+        const y = f.b0 * x + f.b1 * x1 + f.b2 * x2 - f.a1 * y1 - f.a2 * y2;
+        x2 = x1;
+        x1 = x;
+        y2 = y1;
+        y1 = y;
+        out[i] = y;
+    }
+    return out;
+}
+
+/**
+ * Integrated loudness in LUFS (BS.1770-4): K-weighted mean square over 400 ms blocks at 75%
+ * overlap, gated absolutely at −70 LUFS and then relatively at 10 LU under the mean of what
+ * passed. Every channel weighs 1 (left and right; no surround). `null` when nothing passes the
+ * gates (silence).
+ */
+export function computeIntegratedLoudness(
+    channels: Float32Array[],
+    sampleRate: number,
+): number | null {
+    if (channels.length === 0 || channels[0].length === 0) {
+        return null;
+    }
+    const [shelf, highpass] = kWeighting(sampleRate);
+    const weighted = channels.map((data) => biquad(biquad(data, shelf), highpass));
+    const block = Math.round(0.4 * sampleRate);
+    const hop = Math.round(0.1 * sampleRate);
+    const length = channels[0].length;
+    const powers: number[] = [];
+    for (let start = 0; start + block <= length; start += hop) {
+        let power = 0;
+        for (const data of weighted) {
+            let sum = 0;
+            for (let i = start; i < start + block; i++) {
+                sum += data[i] * data[i];
+            }
+            power += sum / block;
+        }
+        powers.push(power);
+    }
+    const loudness = (power: number) => -0.691 + 10 * Math.log10(power);
+    const absolute = powers.filter((power) => power > 0 && loudness(power) > -70);
+    if (absolute.length === 0) {
+        return null;
+    }
+    const mean = (list: number[]) => list.reduce((a, b) => a + b, 0) / list.length;
+    const relativeGate = loudness(mean(absolute)) - 10;
+    const relative = absolute.filter((power) => loudness(power) > relativeGate);
+    return relative.length > 0 ? loudness(mean(relative)) : null;
+}
+
+/** BS.1770-4 Annex 2's 4× interpolation filter (48 taps as four 12-tap phases). */
+const TRUE_PEAK_PHASES = [
+    [
+        0.001708984375, 0.010986328125, -0.0196533203125, 0.033203125, -0.0594482421875,
+        0.1373291015625, 0.97216796875, -0.102294921875, 0.047607421875, -0.026611328125,
+        0.014892578125, -0.00830078125,
+    ],
+    [
+        -0.0291748046875, 0.029296875, -0.0517578125, 0.089111328125, -0.16650390625,
+        0.465087890625, 0.77978515625, -0.2003173828125, 0.1015625, -0.0582275390625,
+        0.0330810546875, -0.0189208984375,
+    ],
+    [
+        -0.0189208984375, 0.0330810546875, -0.0582275390625, 0.1015625, -0.2003173828125,
+        0.77978515625, 0.465087890625, -0.16650390625, 0.089111328125, -0.0517578125, 0.029296875,
+        -0.0291748046875,
+    ],
+    [
+        -0.00830078125, 0.014892578125, -0.026611328125, 0.047607421875, -0.102294921875,
+        0.97216796875, 0.1373291015625, -0.0594482421875, 0.033203125, -0.0196533203125,
+        0.010986328125, 0.001708984375,
+    ],
+];
+
+/** True peak in dBTP (BS.1770-4 Annex 2): the loudest of every sample and its 4× interpolation,
+ * across channels. −120 for silence. */
+export function computeTruePeakDb(channels: Float32Array[]): number {
+    let peak = 0;
+    for (const data of channels) {
+        for (let n = 0; n < data.length; n++) {
+            const sample = Math.abs(data[n]);
+            if (sample > peak) {
+                peak = sample;
+            }
+            for (const phase of TRUE_PEAK_PHASES) {
+                let y = 0;
+                for (let k = 0; k < phase.length; k++) {
+                    const index = n - k;
+                    if (index >= 0) {
+                        y += phase[k] * data[index];
+                    }
+                }
+                const value = Math.abs(y);
+                if (value > peak) {
+                    peak = value;
+                }
+            }
+        }
+    }
+    return toDb(peak);
+}

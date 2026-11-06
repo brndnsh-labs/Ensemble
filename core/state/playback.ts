@@ -18,7 +18,9 @@ export const playback = deepSignal<GlobalContext>({
     bandIntensity: DEFAULT_BAND_INTENSITY,
     autoIntensity: true,
     metronome: false,
-    masterVolume: 0.4,
+    // Full: the master volume is a plain level after the limiter (#2002), so 1 is the band at
+    // its calibrated loudness (−16 LUFS, `MASTER_MAKEUP_DB`) and the slider only turns it down.
+    masterVolume: 1,
     countIn: true,
 });
 

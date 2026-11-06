@@ -24,7 +24,7 @@ export function resetAllStateForTest(): void {
     p.autoIntensity = true;
     p.metronome = false;
     p.countIn = true;
-    p.masterVolume = 0.4;
+    p.masterVolume = 1;
 
     const a = arranger as Mutable<ArrangerState>;
     a.sections = [{ id: 's1', label: 'Intro', repeat: 1 }];

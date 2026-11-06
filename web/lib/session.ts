@@ -361,7 +361,13 @@ export function patchNeckPreferences(
     return { ...prev, ...patch };
 }
 
-const MASTER_VOLUME = 'ensemble-v2-preview:master-volume';
+/**
+ * Its own key since #2002, when the master volume moved after the limiter and 100% became the
+ * band's calibrated loudness. The value stored under the old key (`…:master-volume`, default
+ * 40%) was a drive into the master chain, not a listening level, so it is not carried over: it
+ * stays behind, inert, and every device starts at full.
+ */
+const MASTER_VOLUME = 'ensemble-v2-preview:master-level';
 
 /**
  * Device-local mixer preference (#1276) — `playback.masterVolume` is classified

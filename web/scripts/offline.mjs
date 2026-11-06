@@ -116,8 +116,10 @@ function buildCsp(scriptHashes) {
         // events back to the same host its script loaded from.
         `connect-src 'self' https://umami.brndn.zip`,
         // The only worker this app registers is its own service worker (this script's `sw.js`),
-        // same-origin. No `Worker`/`AudioWorklet` runs — the band plays on the main-thread
-        // `AudioContext` (`band/CLAUDE.md`; the old logic/MIDI workers are gone, #1404).
+        // same-origin. The master limiter's `AudioWorklet` module (#2002,
+        // `core/engine/master-limiter.worklet.js`) is not a worker: a worklet module is fetched
+        // under `script-src`, and it is a same-origin `/_next/static/media/` file, so `'self'`
+        // above covers it. Never a `blob:` URL, which would need `script-src blob:`.
         `worker-src 'self'`,
         `img-src 'self'`,
         // `chart-sheet.tsx` sets two runtime-calculated inline `style={{...}}` props (the

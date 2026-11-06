@@ -4,6 +4,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { Lane } from '../band/index.js';
 import { encodeWav } from '../core/engine/wav-encoder.js';
+import { DEFAULT_BAND_INTENSITY } from '../core/state/playback.js';
 import { renderBand } from '../web/lib/render-bridge.js';
 import { laneEvents, performSceneForReport, sceneVoices } from './band-scene.js';
 import { DEFAULT_MIX_REPORT_SCENES, MIX_REPORT_STEMS } from './mix-report-utils.js';
@@ -49,7 +50,8 @@ for (const stem of stems) {
         ),
         bpm: scene.bpm,
         sampleRate: 44100,
-        intensity: performed.settings.intensity ?? 0.7,
+        // Auto intensity: the voices read the stand's default energy, as they do live.
+        intensity: performed.settings.intensity ?? DEFAULT_BAND_INTENSITY,
         voices,
         randomSeed: `${scene.id}:${seed}`,
         genreFeel: scene.genreFeel,

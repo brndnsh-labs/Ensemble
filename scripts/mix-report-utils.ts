@@ -246,6 +246,12 @@ function buildStemAggregate(samples) {
         peakDb: roundValue(average(samples.map((sample) => sample.peakDb)), 2),
         rmsDb: roundValue(average(samples.map((sample) => sample.rmsDb)), 2),
         crestDb: roundValue(average(samples.map((sample) => sample.crestDb)), 2),
+        lufs: samples.every((sample) => sample.lufs != null)
+            ? roundValue(average(samples.map((sample) => sample.lufs)), 2)
+            : null,
+        truePeakDb: samples.every((sample) => sample.truePeakDb != null)
+            ? roundValue(Math.max(...samples.map((sample) => sample.truePeakDb)), 2)
+            : null,
         transients: {
             maxDelta: roundValue(
                 average(samples.map((sample) => sample.transients?.maxDelta || 0)),

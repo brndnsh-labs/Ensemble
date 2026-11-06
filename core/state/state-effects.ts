@@ -1,6 +1,11 @@
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { SMART_GENRES } from '../data/smart-genres.js';
-import { syncBusReverbSend, syncBusVolume, syncMasterVolume } from '../engine/engine.js';
+import {
+    syncBusReverbSend,
+    syncBusVolume,
+    syncMasterMakeup,
+    syncMasterVolume,
+} from '../engine/engine.js';
 import { isPackInstalled, packIdFromVoice } from '../engine/instrument-registry.js';
 import { ensurePackLoaded } from '../engine/pack-runtime.js';
 import { deriveSoloistMode } from '../engine/soloist-mode-policy.js';
@@ -154,6 +159,16 @@ export function handleEffects(
             if (action.payload?.module === 'playback' && action.payload?.param === 'masterVolume') {
                 syncMasterVolume(stateMap);
             }
+            // #2002 — a chart opening sets its genre through `SET_PARAM` (`applyGenre`).
+            if (action.payload?.module === 'groove' && action.payload?.param === 'lastSmartGenre') {
+                syncMasterMakeup(stateMap);
+            }
+            break;
+        }
+        case ACTIONS.SET_GENRE_FEEL: {
+            // #2002 — the master's make-up gain follows the style, so a genre change keeps the
+            // band at the same loudness. No-op before the audio graph exists.
+            syncMasterMakeup(stateMap);
             break;
         }
     }

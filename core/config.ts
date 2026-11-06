@@ -136,9 +136,41 @@ export const TIME_SIGNATURES: Record<string, TimeSignatureConfig> = Object.assig
 );
 
 export const MIXER_GAIN_MULTIPLIERS = {
-    master: 0.85,
+    // The bus sum's level into the master glue compressor (#2002). Before #2002 the master volume
+    // slider sat here (slider × 0.85); it moved after the limiter, and this is fixed at what the
+    // default slider (40%) fed the glue, 0.4 × 0.85, so the glue compresses exactly as it did.
+    master: 0.34,
     chords: 0.135, // Mix-pass 2026-05-23 (iter 2): -1.5 dB total — first ear-pass found chords still slightly too present in some genres; this lands rock/blues at roughly -10 dB vs full+solo
     bass: 0.135, // Mix-pass 2026-05-23: -1.3 dB; mix-report baseline put bass at -3.7 dB vs target -5; user confirmed it was sitting a touch forward at the first ear-pass
     soloist: 0.2, // Mix-pass 2026-05-23: soloist +2.5 dB; baseline mix-report put trumpet 5-7 dB under full mix — buried for a lead. Lifts toward -3 to -4 dB lead seat.
     drums: 0.38, // Mix-pass 2026-05-23: drums +3.3 dB; rhythmic anchor was 7-9 dB under full mix in non-jazz scenes, making the beat hard to track. Iter 2 (+1.5 dB on top of iter 1) brings rock/blues/funk into the -4 to -5 dB target window; jazz stays naturally quieter (brushes/ride)
 };
+
+/**
+ * Per-style make-up gain in dB on the master, before the limiter (#2002), keyed by the 13
+ * canonical genre names (`GENRE_NAMES`; read with `Object.hasOwn`, the value is persisted). Each
+ * brings that style, played on its own sounds (the style's packs, lead off, as the stand starts),
+ * to −16 LUFS integrated (the target #2002 set: the AES streaming level, with the limiter's
+ * −1 dBTP ceiling 15 dB above it) at full master volume. Derived from measured renders, not
+ * set by ear: `npm run mix:report -- --scenes-from=scripts/scenes/loudness-styles.json
+ * --stems=full,full+solo` prints each style's integrated loudness and true peak; a style off
+ * target by more than 1 LU is re-derived from that. A missing genre plays at 0 dB.
+ */
+export const MASTER_MAKEUP_DB: Readonly<Record<string, number>> = Object.assign(
+    Object.create(null),
+    {
+        Rock: 6.5,
+        Jazz: 11.7,
+        Funk: 7.7,
+        Disco: 6.8,
+        'Hip Hop': 8.4,
+        Blues: 10.8,
+        'Neo-Soul': 8.7,
+        Reggae: 9.5,
+        Acoustic: 8.9,
+        Bossa: 9.7,
+        Country: 11.5,
+        Metal: 6.1,
+        'Ska-Punk': 7.5,
+    },
+);

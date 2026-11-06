@@ -14,6 +14,7 @@
 import type { BandEvent, Lane, Timeline } from '@band/index';
 import { secondsAt } from '@band/index';
 import { initAudio } from '@core/engine/engine';
+import { masterChainReady } from '@core/engine/master-limiter';
 import { encodeWav } from '@core/engine/wav-encoder';
 import { cloneStateForDetachedGeneration } from '@core/export/detached-generation-state';
 import { getState } from '@core/state';
@@ -140,7 +141,7 @@ export interface BandRender {
  * through `playBandEvent`, the voice mapping `BandHost` schedules live with, feel offsets
  * included.
  *
- * Everything before `startRendering` is synchronous, so a caller that seeds `Math.random`
+ * Everything up to the scheduling's end is synchronous, so a caller that seeds `Math.random`
  * around this call seeds exactly the draws the voices make while scheduling.
  */
 export async function renderBandPasses(
@@ -214,6 +215,9 @@ export async function renderBandPasses(
         }
     });
 
+    // The master's limiter is an audio worklet whose module loads asynchronously (#2002): the
+    // render waits for it, after scheduling, so the scheduling above stays synchronous.
+    await masterChainReady(offlineCtx);
     const rendered = await offlineCtx.startRendering();
     const channels: Float32Array[] = [];
     for (let ch = 0; ch < rendered.numberOfChannels; ch++) {

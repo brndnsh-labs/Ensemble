@@ -1,0 +1,431 @@
+[
+    {
+        "id": "loudness-rock",
+        "label": "Rock on its own sounds",
+        "genreFeel": "Rock",
+        "bpm": 118,
+        "intensity": "auto",
+        "key": "C",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "C | G | Am | F | C | G | F | G"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "synth"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:grand"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:electric-guitar-driven"
+            }
+        ]
+    },
+    {
+        "id": "loudness-jazz",
+        "label": "Jazz on its own sounds",
+        "genreFeel": "Jazz",
+        "bpm": 138,
+        "intensity": "auto",
+        "key": "C",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "Dm7 | G7 | Cmaj7 | A7 | Dm7 | G7 | Cmaj7 | Cmaj7"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "pack:upright-bass"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:grand"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:sax-alto"
+            }
+        ]
+    },
+    {
+        "id": "loudness-funk",
+        "label": "Funk on its own sounds",
+        "genreFeel": "Funk",
+        "bpm": 104,
+        "intensity": "auto",
+        "key": "E",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "Em7 | Em7 | A7 | A7 | Em7 | Em7 | A7 | B7"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "synth"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:clavinet"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:sax-alto"
+            }
+        ]
+    },
+    {
+        "id": "loudness-disco",
+        "label": "Disco on its own sounds",
+        "genreFeel": "Disco",
+        "bpm": 120,
+        "intensity": "auto",
+        "key": "A",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "Am7 | D7 | Am7 | D7 | Fmaj7 | E7 | Am7 | Am7"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "synth"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:electric-guitar-clean"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:sax-alto"
+            }
+        ]
+    },
+    {
+        "id": "loudness-hip-hop",
+        "label": "Hip Hop on its own sounds",
+        "genreFeel": "Hip Hop",
+        "bpm": 90,
+        "intensity": "auto",
+        "key": "C",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "Cm7 | Fm7 | Abmaj7 | G7 | Cm7 | Fm7 | Abmaj7 | G7"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "synth"
+            },
+            {
+                "module": "bass",
+                "voice": "synth"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:rhodes"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:electric-guitar-clean"
+            }
+        ]
+    },
+    {
+        "id": "loudness-blues",
+        "label": "Blues on its own sounds",
+        "genreFeel": "Blues",
+        "bpm": 96,
+        "intensity": "auto",
+        "key": "C",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "C7 | F7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C7 | G7"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "pack:upright-bass"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:grand"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:electric-guitar-clean"
+            }
+        ]
+    },
+    {
+        "id": "loudness-neo-soul",
+        "label": "Neo-Soul on its own sounds",
+        "genreFeel": "Neo-Soul",
+        "bpm": 84,
+        "intensity": "auto",
+        "key": "C",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "Fmaj7 | Em7 | Dm7 | Cmaj7 | Fmaj7 | Em7 | Dm7 | G7"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "synth"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:rhodes"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:electric-guitar-clean"
+            }
+        ]
+    },
+    {
+        "id": "loudness-reggae",
+        "label": "Reggae on its own sounds",
+        "genreFeel": "Reggae",
+        "bpm": 76,
+        "intensity": "auto",
+        "key": "G",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "G | C | D | C | G | C | D | G"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "synth"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:electric-guitar-clean"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:sax-alto"
+            }
+        ]
+    },
+    {
+        "id": "loudness-acoustic",
+        "label": "Acoustic on its own sounds",
+        "genreFeel": "Acoustic",
+        "bpm": 100,
+        "intensity": "auto",
+        "key": "G",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "G | D | Em | C | G | D | C | G"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "pack:upright-bass"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:nylon-guitar"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:nylon-guitar"
+            }
+        ]
+    },
+    {
+        "id": "loudness-bossa",
+        "label": "Bossa on its own sounds",
+        "genreFeel": "Bossa",
+        "bpm": 130,
+        "intensity": "auto",
+        "key": "C",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "Cmaj7 | Cmaj7 | D7 | D7 | Dm7 | G7 | Cmaj7 | Cmaj7"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "pack:upright-bass"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:nylon-guitar"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:sax-alto"
+            }
+        ]
+    },
+    {
+        "id": "loudness-country",
+        "label": "Country on its own sounds",
+        "genreFeel": "Country",
+        "bpm": 110,
+        "intensity": "auto",
+        "key": "G",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "G | G | C | G | G | D | D | G"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "pack:upright-bass"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:grand"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:electric-guitar-clean"
+            }
+        ]
+    },
+    {
+        "id": "loudness-metal",
+        "label": "Metal on its own sounds",
+        "genreFeel": "Metal",
+        "bpm": 140,
+        "intensity": "auto",
+        "key": "E",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "Em | C | D | Em | Em | C | D | B"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "synth"
+            },
+            {
+                "module": "bass",
+                "voice": "synth"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:electric-guitar-rhythm"
+            },
+            {
+                "module": "soloist",
+                "voice": "pack:electric-guitar-driven"
+            }
+        ]
+    },
+    {
+        "id": "loudness-ska-punk",
+        "label": "Ska-Punk on its own sounds",
+        "genreFeel": "Ska-Punk",
+        "bpm": 160,
+        "intensity": "auto",
+        "key": "C",
+        "sections": [
+            {
+                "id": "a",
+                "label": "A",
+                "value": "C | Am | F | G | C | Am | F | G"
+            }
+        ],
+        "voices": [
+            {
+                "module": "groove",
+                "voice": "pack:acoustic-kit"
+            },
+            {
+                "module": "bass",
+                "voice": "synth"
+            },
+            {
+                "module": "chords",
+                "voice": "pack:electric-guitar-clean"
+            },
+            {
+                "module": "soloist",
+                "voice": "synth"
+            }
+        ]
+    }
+]

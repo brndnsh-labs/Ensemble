@@ -1,4 +1,5 @@
 // @ts-nocheck
+
 import { spawn } from 'node:child_process';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import http from 'node:http';
@@ -6,6 +7,7 @@ import path from 'node:path';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import playwright from '@playwright/test';
+import { DEFAULT_BAND_INTENSITY } from '../core/state/playback.js';
 
 const { chromium } = playwright;
 
@@ -285,6 +287,8 @@ function printHumanMixReport(report) {
                     peakDb: formatDb(metrics.peakDb),
                     rmsDb: formatDb(metrics.rmsDb),
                     crestDb: formatDb(metrics.crestDb),
+                    lufs: metrics.lufs == null ? '-' : Number(metrics.lufs).toFixed(1),
+                    tpDb: metrics.truePeakDb == null ? '-' : formatDb(metrics.truePeakDb),
                     maxDelta: formatMetric(metrics.transients?.maxDelta || 0, 3),
                     spikesPerSec: formatMetric(metrics.transients?.spikeRate || 0, 1),
                     maxVoices: metrics.schedule?.maxSimultaneousVoices ?? '-',
@@ -565,6 +569,10 @@ async function renderAndMeasureInPage({ request, loopCount, wavName }) {
             rms,
             rmsDb: toDb(rms),
             crestDb: toDb(peak) - toDb(rms),
+            // Loudness and true peak are measured in node only (`mix-render-node.ts`); the page
+            // does not carry the K-weighting and the 4× interpolator.
+            lufs: null,
+            truePeakDb: null,
             probes: computeSpectralProbes(mono),
             transients: computeTransientMetrics(mono),
             stereo: computeStereoMetrics(channels),
@@ -720,7 +728,8 @@ async function renderSceneReports({
                 passes: laneEvents(performance[stem.performance], stem.lanes),
                 bpm: scene.bpm,
                 sampleRate: SAMPLE_RATE,
-                intensity: performance.settings.intensity ?? 0.7,
+                // Auto intensity: the voices read the stand's default energy, as they do live.
+                intensity: performance.settings.intensity ?? DEFAULT_BAND_INTENSITY,
                 voices,
                 muteReverb,
                 // Keyed on the scene and seed, as the old harness keyed its renders, so
