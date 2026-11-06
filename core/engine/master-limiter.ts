@@ -15,7 +15,7 @@
  * `web/lib/runtime.ts`; `renderBandPasses` before it renders). A browser that cannot run the
  * worklet, or whose module fails or stalls past {@link REGISTER_TIMEOUT_MS}, gets a
  * `DynamicsCompressorNode` safety limiter in its place (a warning in the console): never silence,
- * and never the make-up gain (up to +11.7 dB) clipping straight into the destination.
+ * and never the make-up gain (up to +12.4 dB) clipping straight into the destination.
  */
 
 /** The processor's registered name (`registerProcessor` in the worklet file). */

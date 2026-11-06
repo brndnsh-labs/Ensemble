@@ -64,7 +64,12 @@ describe('Engine Bus Management', () => {
             playback: {
                 audio: { currentTime: 10.0 },
                 audioGraph: {
-                    master: {},
+                    // restoreGains restores the style's make-up gain too (#2002).
+                    master: {
+                        makeup: {
+                            gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() },
+                        },
+                    },
                     chords: bus(),
                     bass: bus(),
                     soloist: bus(),
