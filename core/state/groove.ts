@@ -1,4 +1,5 @@
 import { deepSignal } from 'deepsignal/core';
+import { UNSET_HUMANIZE } from '../songbook/humanize.js';
 import type { Action, GlobalContext, GrooveState, Mutable } from '../types.js';
 import { ACTIONS, isSwingSub } from '../types.js';
 import { writeDeclaredParam } from './set-param.js';
@@ -11,9 +12,8 @@ export const groove = deepSignal<GrooveState>({
     autoSound: true,
     volume: 1.0,
     reverb: 0.2,
-    // 20 is "not set" (#2010): the band plays its style's own humanize until the musician
-    // changes it (`web/lib/genre-humanize.ts`'s `UNSET_HUMANIZE`).
-    humanize: 20,
+    // "Not set" (#2010): the band plays its style's own humanize until the musician changes it.
+    humanize: UNSET_HUMANIZE,
     swing: 0,
     swingSub: '8th',
     audioBuffers: {},

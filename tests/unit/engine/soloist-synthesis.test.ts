@@ -223,6 +223,22 @@ describe('Soloist Synthesis', () => {
         expect(voiceSteals.length).toBeGreaterThan(1);
     });
 
+    // #2055: the caller hands the voice the humanize the band plays (the style's own while the
+    // chart hasn't set one); the stored `groove.humanize` (20 = "not set") is never read here.
+    it('scales its timbre jitter by the humanize it is handed, not the stored slice value', () => {
+        const stored = { ...getState(), groove: { humanize: 100 } };
+        const detuneFor = (humanize: number) => {
+            playback.audio.createOscillator.mockClear();
+            playSoloNote(stored, 440, 10, 1.0, 1.0, 0, false, false, 1234, humanize);
+            return playback.audio.createOscillator.mock.results[0].value.detune.value;
+        };
+        expect(detuneFor(0)).toBe(0);
+        const at60 = detuneFor(60);
+        expect(at60).not.toBe(0);
+        // Linear in the handed amount: 30 is half of 60's detune.
+        expect(detuneFor(30)).toBeCloseTo(at60 / 2, 10);
+    });
+
     describe('Vibrato Engine Extensivenss', () => {
         it('should create vibrato for long notes', () => {
             // Note > 0.4s triggers vibrato

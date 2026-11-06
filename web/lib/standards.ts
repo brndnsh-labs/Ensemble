@@ -1,4 +1,5 @@
 import { GENRE_NAMES, SMART_GENRES } from '@core/data/smart-genres';
+import { UNSET_HUMANIZE } from '@core/songbook/humanize';
 import { parseChordBar } from '@core/songbook/score-text';
 import type {
     ChartDocumentV2,
@@ -9,7 +10,6 @@ import type {
 import type { ChartBand } from '@core/songbook/types';
 import { validateDocument } from './documents';
 import { checkPlayable } from './engine-mode';
-import { UNSET_HUMANIZE } from './genre-humanize';
 import { genreSwing } from './genre-swing';
 
 /**

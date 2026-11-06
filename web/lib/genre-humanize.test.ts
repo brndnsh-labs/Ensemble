@@ -9,9 +9,10 @@
  */
 import { DEFAULT_SETTINGS, STYLES } from '@band/index';
 import { GENRE_NAMES } from '@core/data/smart-genres';
+import { bandHumanize, UNSET_HUMANIZE } from '@core/songbook/humanize';
 import { describe, expect, it, vi } from 'vitest';
 import { STYLE_FOR_GENRE } from './band-voices';
-import { bandHumanize, shownHumanize, UNSET_HUMANIZE } from './genre-humanize';
+import { playedHumanize } from './genre-humanize';
 
 vi.mock('./band-export', () => ({
     downloadExportResult: vi.fn(),
@@ -47,14 +48,14 @@ describe('humanize follows the style until it is set', () => {
     });
 
     it("shows the style's own amount while not set, and the musician's once set", () => {
-        expect(shownHumanize(20, 'Jazz')).toBe(STYLES.jazz.feel.humanize);
-        expect(shownHumanize(20, 'Neo-Soul')).toBe(STYLES.neosoul.feel.humanize);
-        expect(shownHumanize(20, 'Metal')).toBe(STYLES.metal.feel.humanize);
-        expect(shownHumanize(55, 'Jazz')).toBe(55);
-        expect(shownHumanize(0, 'Neo-Soul')).toBe(0);
+        expect(playedHumanize(20, 'Jazz')).toBe(STYLES.jazz.feel.humanize);
+        expect(playedHumanize(20, 'Neo-Soul')).toBe(STYLES.neosoul.feel.humanize);
+        expect(playedHumanize(20, 'Metal')).toBe(STYLES.metal.feel.humanize);
+        expect(playedHumanize(55, 'Jazz')).toBe(55);
+        expect(playedHumanize(0, 'Neo-Soul')).toBe(0);
         // A persisted genre with no band style (or a prototype key) shows rock's, as it plays.
-        expect(shownHumanize(20, 'constructor')).toBe(STYLES.rock.feel.humanize);
-        expect(shownHumanize(20, 'Polka')).toBe(STYLES.rock.feel.humanize);
+        expect(playedHumanize(20, 'constructor')).toBe(STYLES.rock.feel.humanize);
+        expect(playedHumanize(20, 'Polka')).toBe(STYLES.rock.feel.humanize);
     });
 
     it('new standards are written not set', async () => {

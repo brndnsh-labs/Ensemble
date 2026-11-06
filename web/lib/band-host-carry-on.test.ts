@@ -104,6 +104,8 @@ function rig() {
     const state = {
         playback: { audio, audioGraph: null, metronome: false },
         chords: { instrument: 'Piano' },
+        // What the lead's timbre jitter reads its humanize from (`playedHumanize`, #2055).
+        groove: { humanize: 20, lastSmartGenre: 'Rock' },
     } as unknown as EnsembleState;
     const host = new BandHost({ state: () => state, silence: () => {} });
     host.setScore(loop, loopTimeline);
