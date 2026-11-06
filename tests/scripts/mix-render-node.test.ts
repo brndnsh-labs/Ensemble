@@ -4,6 +4,7 @@
  * node Web Audio and comes back measured — the shape `mix-report.ts` reads off the page today.
  */
 
+import { MASTER_MAKEUP_DB } from '../../core/config.js';
 import { laneEvents, performSceneForReport, sceneVoices } from '../../scripts/band-scene.js';
 import { createNodeRenderer } from '../../scripts/mix-render-node.js';
 import { DEFAULT_MIX_REPORT_SCENES, parseExternalScenes } from '../../scripts/mix-report-utils.js';
@@ -148,8 +149,12 @@ describe('mix:report node render backend', () => {
                 s2 = s1;
                 s1 = s0;
             }
+            // Less the style's master make-up gain (#2002: the scene's genre names the style it
+            // reads), so only the bus EQ is compared; unset is the slice default, Rock.
             return (
-                20 * Math.log10(Math.sqrt(s1 * s1 + s2 * s2 - coefficient * s1 * s2) / mono.length)
+                20 *
+                    Math.log10(Math.sqrt(s1 * s1 + s2 * s2 - coefficient * s1 * s2) / mono.length) -
+                MASTER_MAKEUP_DB[genreFeel ?? 'Rock']
             );
         };
         const jazz = await subEnergyDb('Jazz');

@@ -20,7 +20,13 @@ vi.mock('../../../core/state.js', () => {
     const mockChords = { volume: 1.0, enabled: true, reverb: 0.2 };
     const mockBass = { volume: 1.0, enabled: true, reverb: 0.05 };
     const mockSoloist = makeSoloistMock({ volume: 1.0, enabled: true, reverb: 0.6 });
-    const mockGroove = { volume: 1.0, enabled: true, reverb: 0.2, audioBuffers: { noise: {} } };
+    const mockGroove = {
+        volume: 1.0,
+        enabled: true,
+        reverb: 0.2,
+        audioBuffers: { noise: {} },
+        lastSmartGenre: 'Metal',
+    };
     const mockArranger = {};
 
     const mockStateMap = {
@@ -49,6 +55,7 @@ vi.mock('../../../core/config.js', () => ({
         soloist: 0.15,
         drums: 0.26,
     },
+    MASTER_MAKEUP_DB: Object.assign(Object.create(null), { Metal: -6, Jazz: 3 }),
     TIME_SIGNATURES: {},
 }));
 
@@ -59,7 +66,13 @@ vi.mock('../../../core/engine/audio-graph-utils.js', async (importOriginal) => (
     createSoftClipCurve: vi.fn(() => new Float32Array(1024)),
 }));
 
-import { initAudio, restoreGains } from '../../../core/engine/engine.js';
+import {
+    initAudio,
+    restoreGains,
+    syncMasterMakeup,
+    syncMasterVolume,
+} from '../../../core/engine/engine.js';
+import { MASTER_LIMITER, masterChainReady } from '../../../core/engine/master-limiter.js';
 import { getState } from '../../../core/state.js';
 
 const { playback } = getState();
@@ -131,24 +144,173 @@ describe('Mix & Signal Integrity Audit', () => {
         document.body.appendChild(masterVolInput);
     });
 
-    it('should correctly assemble the master chain (Gain -> Glue -> Saturator -> Limiter -> Dest)', () => {
+    it('assembles the master chain: gain -> glue -> make-up, volume -> destination (#2002)', () => {
         initAudio(getState());
 
-        // Verify Master Chain Connections
         const { master } = playback.audioGraph;
         expect(master.gain.connect).toHaveBeenCalledWith(master.glue);
-        expect(master.glue.connect).toHaveBeenCalledWith(master.saturator);
-        expect(master.saturator.connect).toHaveBeenCalledWith(master.limiter);
-        expect(master.limiter.connect).toHaveBeenCalledWith(playback.audio.destination);
+        expect(master.glue.connect).toHaveBeenCalledWith(master.makeup);
+        expect(master.volume.connect).toHaveBeenCalledWith(playback.audio.destination);
+        // The waveshaper and the brick-wall compressor that used to end the chain are gone.
+        expect(playback.audio.createWaveShaper).not.toHaveBeenCalled();
+        // Just the glue until the limiter is wired (a fallback would add the safety compressor).
+        expect(playback.audio.createDynamicsCompressor).toHaveBeenCalledTimes(1);
     });
 
-    it('should apply safety limiter settings to prevent hard clipping', () => {
+    it('passes nothing from make-up to volume until the limiter is wired, then a safety limiter without worklet support', async () => {
         initAudio(getState());
+        const { master } = playback.audioGraph;
+        // The gap is closed asynchronously: nothing is connected across it yet.
+        expect(master.makeup.connect).not.toHaveBeenCalled();
+        await masterChainReady(playback.audio);
+        // happy-dom has no AudioWorkletNode: a compressor safety limiter takes the worklet's
+        // place, never silence and never the make-up gain straight into the destination.
+        const safety = playback.audio.createDynamicsCompressor.mock.results[1].value;
+        expect(master.makeup.connect).toHaveBeenCalledWith(safety);
+        expect(master.makeup.connect).not.toHaveBeenCalledWith(master.volume);
+        expect(safety.connect).toHaveBeenCalledWith(master.volume);
+        expect(safety.ratio.setValueAtTime).toHaveBeenCalledWith(20, 0);
+    });
 
-        // Threshold should be below 0dB to allow for saturator peaks
-        const { limiter } = playback.audioGraph.master;
-        expect(limiter.threshold.setValueAtTime).toHaveBeenCalledWith(expect.any(Number), 0);
-        expect(limiter.ratio.setValueAtTime).toHaveBeenCalledWith(expect.any(Number), 0);
+    it('puts the look-ahead limiter between make-up and volume when worklets run', async () => {
+        const built = [];
+        const addModule = vi.fn().mockResolvedValue(undefined);
+        global.AudioWorkletNode = vi.fn().mockImplementation(function (_ctx, name, options) {
+            this.name = name;
+            this.options = options;
+            this.connect = vi.fn();
+            built.push(this);
+        });
+        const BaseContext = global.window.AudioContext;
+        const WorkletContext = vi.fn().mockImplementation(function () {
+            BaseContext.call(this);
+            this.audioWorklet = { addModule };
+        });
+        global.window.AudioContext = WorkletContext;
+        try {
+            initAudio(getState());
+            const { master } = playback.audioGraph;
+            await masterChainReady(playback.audio);
+            expect(addModule).toHaveBeenCalledTimes(1);
+            expect(String(addModule.mock.calls[0][0])).toMatch(/master-limiter\.worklet\.js$/);
+            expect(built).toHaveLength(1);
+            const [limiter] = built;
+            expect(limiter.name).toBe('ensemble-master-limiter');
+            expect(limiter.options.processorOptions).toEqual({ ...MASTER_LIMITER });
+            expect(limiter.options.outputChannelCount).toEqual([2]);
+            expect(master.makeup.connect).toHaveBeenCalledWith(limiter);
+            expect(master.makeup.connect).not.toHaveBeenCalledWith(master.volume);
+            expect(limiter.connect).toHaveBeenCalledWith(master.volume);
+        } finally {
+            delete global.AudioWorkletNode;
+            global.window.AudioContext = BaseContext;
+        }
+    });
+
+    it('falls back to the safety limiter (never silence) when the worklet module fails to load', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        global.AudioWorkletNode = vi.fn();
+        const BaseContext = global.window.AudioContext;
+        global.window.AudioContext = vi.fn().mockImplementation(function () {
+            BaseContext.call(this);
+            this.audioWorklet = { addModule: vi.fn().mockRejectedValue(new Error('blocked')) };
+        });
+        try {
+            initAudio(getState());
+            const { master } = playback.audioGraph;
+            await masterChainReady(playback.audio);
+            expect(global.AudioWorkletNode).not.toHaveBeenCalled();
+            const safety = playback.audio.createDynamicsCompressor.mock.results[1].value;
+            expect(master.makeup.connect).toHaveBeenCalledWith(safety);
+            expect(safety.connect).toHaveBeenCalledWith(master.volume);
+            expect(warn).toHaveBeenCalled();
+        } finally {
+            delete global.AudioWorkletNode;
+            global.window.AudioContext = BaseContext;
+            warn.mockRestore();
+        }
+    });
+
+    it('falls back to the safety limiter when the module load stalls, so Play never waits forever', async () => {
+        vi.useFakeTimers();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        global.AudioWorkletNode = vi.fn();
+        const BaseContext = global.window.AudioContext;
+        global.window.AudioContext = vi.fn().mockImplementation(function () {
+            BaseContext.call(this);
+            this.audioWorklet = { addModule: vi.fn(() => new Promise(() => {})) };
+        });
+        try {
+            initAudio(getState());
+            const { master } = playback.audioGraph;
+            const ready = masterChainReady(playback.audio);
+            await vi.advanceTimersByTimeAsync(3000);
+            await ready;
+            const safety = playback.audio.createDynamicsCompressor.mock.results[1].value;
+            expect(master.makeup.connect).toHaveBeenCalledWith(safety);
+            expect(global.AudioWorkletNode).not.toHaveBeenCalled();
+        } finally {
+            vi.useRealTimers();
+            delete global.AudioWorkletNode;
+            global.window.AudioContext = BaseContext;
+            warn.mockRestore();
+        }
+    });
+
+    it('restores the make-up gain for the style now set on every restoreGains', () => {
+        const groove = getState().groove;
+        groove.lastSmartGenre = 'Metal';
+        initAudio(getState());
+        const { makeup } = playback.audioGraph.master;
+        // A chart opens on another style with no genre effect running (the runtime's
+        // subscriber is off while it loads); its rebuild's restoreGains brings the make-up along.
+        groove.lastSmartGenre = 'Jazz';
+        restoreGains(getState());
+        expect(makeup.gain.setTargetAtTime.mock.calls.at(-1)[0]).toBeCloseTo(10 ** (3 / 20), 6);
+        groove.lastSmartGenre = 'Metal';
+    });
+
+    it('falls back to the safety limiter when addModule throws synchronously', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        global.AudioWorkletNode = vi.fn();
+        const BaseContext = global.window.AudioContext;
+        global.window.AudioContext = vi.fn().mockImplementation(function () {
+            BaseContext.call(this);
+            this.audioWorklet = {
+                addModule: vi.fn(() => {
+                    throw new Error('InvalidStateError');
+                }),
+            };
+        });
+        try {
+            initAudio(getState());
+            const { master } = playback.audioGraph;
+            await expect(masterChainReady(playback.audio)).resolves.toBeUndefined();
+            const safety = playback.audio.createDynamicsCompressor.mock.results[1].value;
+            expect(master.makeup.connect).toHaveBeenCalledWith(safety);
+        } finally {
+            delete global.AudioWorkletNode;
+            global.window.AudioContext = BaseContext;
+            warn.mockRestore();
+        }
+    });
+
+    it("sets the style's make-up gain from MASTER_MAKEUP_DB and glides it on a genre change", () => {
+        const groove = getState().groove;
+        groove.lastSmartGenre = 'Metal';
+        initAudio(getState());
+        const { makeup } = playback.audioGraph.master;
+        expect(makeup.gain.setValueAtTime.mock.calls[0][0]).toBeCloseTo(10 ** (-6 / 20), 6);
+
+        groove.lastSmartGenre = 'Jazz';
+        syncMasterMakeup(getState());
+        expect(makeup.gain.setTargetAtTime.mock.calls.at(-1)[0]).toBeCloseTo(10 ** (3 / 20), 6);
+
+        // An unknown or prototype-key genre plays at 0 dB, never reads Object's prototype.
+        groove.lastSmartGenre = 'constructor';
+        syncMasterMakeup(getState());
+        expect(makeup.gain.setTargetAtTime.mock.calls.at(-1)[0]).toBe(1);
+        groove.lastSmartGenre = 'Metal';
     });
 
     it('should route the drums bus through its own highpass EQ chain', () => {
@@ -196,13 +358,6 @@ describe('Mix & Signal Integrity Audit', () => {
         expect(bassTarget).toBeCloseTo(0.1575, 4);
     });
 
-    it('should ensure the saturator uses an oversampled soft-clip curve', () => {
-        initAudio(getState());
-
-        expect(playback.audioGraph.master.saturator.curve).toBeDefined();
-        expect(playback.audioGraph.master.saturator.oversample).toBe('4x');
-    });
-
     it('should maintain cumulative gain below 1.0 before the limiter', () => {
         initAudio(getState());
         restoreGains(getState());
@@ -227,11 +382,27 @@ describe('Mix & Signal Integrity Audit', () => {
         expect(totalInstrumentGain).toBeCloseTo(0.6975, 4);
     });
 
-    it('should calculate master gain correctly (Headroom Check)', () => {
+    it('holds the bus sum at a fixed level into the glue, whatever the master volume', () => {
         initAudio(getState());
-        // Master Gain = ui.masterVol (0.5) * masterMultiplier (0.85) = 0.425
         const masterGain =
             playback.audioGraph.master.gain.gain.exponentialRampToValueAtTime.mock.calls[0][0];
-        expect(masterGain).toBeCloseTo(0.425, 4);
+        expect(masterGain).toBeCloseTo(0.85, 4);
+    });
+
+    it('makes the master volume a plain level after the limiter, guarded against NaN', () => {
+        initAudio(getState());
+        const { volume } = playback.audioGraph.master;
+        // masterVolume 0.5 in the mock state.
+        expect(volume.gain.setValueAtTime.mock.calls[0][0]).toBeCloseTo(0.5, 6);
+
+        playback.masterVolume = Number.NaN;
+        syncMasterVolume(getState());
+        expect(volume.gain.exponentialRampToValueAtTime.mock.calls.at(-1)[0]).toBe(1);
+
+        playback.masterVolume = 0;
+        syncMasterVolume(getState());
+        // The floor keeps the exponential ramp off zero.
+        expect(volume.gain.exponentialRampToValueAtTime.mock.calls.at(-1)[0]).toBe(0.0001);
+        playback.masterVolume = 0.5;
     });
 });

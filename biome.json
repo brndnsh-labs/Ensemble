@@ -114,6 +114,12 @@
     },
     "overrides": [
         {
+            "includes": ["core/**/*.worklet.js"],
+            "javascript": {
+                "globals": ["AudioWorkletProcessor", "registerProcessor", "sampleRate"]
+            }
+        },
+        {
             "includes": ["scripts/*.mjs", ".cycle/**"],
             "formatter": { "enabled": false },
             "linter": { "enabled": false }

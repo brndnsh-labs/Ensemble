@@ -23,6 +23,7 @@ import {
     syncBusReverbSend,
 } from '@core/engine/engine';
 import { isPackInstalled } from '@core/engine/instrument-registry';
+import { masterChainReady } from '@core/engine/master-limiter';
 import {
     startPlatformAudioAndWakeLock,
     stopPlatformAudioAndWakeLock,
@@ -1078,7 +1079,7 @@ export async function startSection(
     }
     bringUpAudio();
     const intent = ++playIntent;
-    await prepareSounds(playedContent(), progress);
+    await readyToPlay(progress);
     if (intent !== playIntent) {
         return true;
     }
@@ -1147,7 +1148,7 @@ export async function loopSection(
     }
     bringUpAudio();
     const intent = ++playIntent;
-    await prepareSounds(playedContent(), progress);
+    await readyToPlay(progress);
     if (intent !== playIntent) {
         return;
     }
@@ -1198,12 +1199,24 @@ export async function toggle(progress: SoundProgress): Promise<void> {
     // Keep AudioContext creation on the gesture stack for mobile Safari.
     bringUpAudio();
     const intent = ++playIntent;
-    await prepareSounds(playedContent(), progress);
+    await readyToPlay(progress);
     if (intent !== playIntent) {
         return;
     }
     startBand(true);
     void styleSounds.request();
+}
+
+/**
+ * Before a start from stopped: the sounds the band will play are ready, and so is the master
+ * chain — its limiter is an audio worklet whose module loads after the context is created
+ * (`masterChainReady`, #2002), and the master passes nothing until it has.
+ */
+function readyToPlay(progress: SoundProgress): Promise<unknown> {
+    return Promise.all([
+        prepareSounds(playedContent(), progress),
+        masterChainReady(getState().playback.audio),
+    ]);
 }
 
 /** What a browser without Web Audio (or one that refuses to start it) is told, in one sentence. */
@@ -2026,12 +2039,21 @@ function sound(
     }
     const state = getState();
     const notes = freqs(state);
-    if (!notes || !state.playback.audio) {
+    const audio = state.playback.audio;
+    if (!notes || !audio) {
         return;
     }
-    const start = state.playback.audio.currentTime;
-    notes.forEach((frequency, i) => {
-        playNote(state, frequency, start + i * stagger, 0.65, { vol: 0.12 });
+    // The master passes nothing until its limiter is in (#2002): on a page's first audition that
+    // is a few milliseconds, after which this resolves at once.
+    void masterChainReady(audio).then(() => {
+        const now = getState();
+        if (now.playback.audio !== audio || now.playback.isPlaying) {
+            return;
+        }
+        const start = audio.currentTime;
+        notes.forEach((frequency, i) => {
+            playNote(now, frequency, start + i * stagger, 0.65, { vol: 0.12 });
+        });
     });
 }
 export function audition(index: number): void {

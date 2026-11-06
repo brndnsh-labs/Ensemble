@@ -141,7 +141,8 @@ test('master volume is a device preference: it persists across reload without Sa
     await openBand(page, 'Practice');
 
     const masterVolume = page.getByLabel('Master volume', { exact: true });
-    await expect(masterVolume).toHaveValue('40');
+    // Full by default: the master volume is a plain level after the limiter (#2002).
+    await expect(masterVolume).toHaveValue('100');
     await setRange(page, 'Master volume', 75);
     await expect(masterVolume).toHaveValue('75');
     await closeBand(page);

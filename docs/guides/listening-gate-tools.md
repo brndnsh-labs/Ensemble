@@ -138,7 +138,7 @@ oscillators per event).
 Every other tool here renders offline. `scripts/live-capture.ts` (#1562) records what the stand's
 real `AudioContext` plays: it serves the bridge export, opens the stand on a `mix:report` scene
 (the same link `audition-link` builds), presses Play through `window.ensemble.transport`, taps
-the master limiter through `window.ensemble.capture` for N bars of wall-clock time, presses
+the master volume (the last node before the destination) through `window.ensemble.capture` for N bars of wall-clock time, presses
 Stop, keeps recording through the release, and writes `tmp/live/<scene>-<seed>.wav` plus a
 markers file (the audio-clock time of `play`, `scheduled` and `stop`, and where each lands in
 the samples). The transport and the tap exist only in a bridge build
@@ -205,8 +205,12 @@ stand's preferences (humanize 20 against the funk style's 25) sit in that differ
 
 ## `npm run mix:report`
 
-Prints, per scene and seed, a per-stem table (peak/RMS/crest, transients, schedule pressure,
-spectral probes, stereo) and a `Findings:` line. The scene header names what played:
+Prints, per scene and seed, a per-stem table (peak/RMS/crest, integrated loudness `lufs` and
+true peak `tpDb`, transients, schedule pressure, spectral probes, stereo) and a `Findings:` line.
+Loudness and true peak are BS.1770-4 (`computeIntegratedLoudness`, `computeTruePeakDb` in
+`scripts/audio-analysis.ts`) and are measured on the node engine only; `--engine=chromium` prints
+`-` for them. ffmpeg's `ebur128=peak=true` filter on a `--write-wav` file is the independent
+check. The scene header names what played:
 `style jazz · comp piano · lead sax`.
 
 ```bash
@@ -220,6 +224,18 @@ The default scenes are `rock-backbeat`, `blues-shuffle`, `jazz-ride`, `funk-pock
 (`DEFAULT_MIX_REPORT_SCENES`). The schedule columns come from the dispatch tap, over the first
 pass: `maxVoices` (most notes sounding at once), `retriggers` (a pitch struck again before it
 ended), `steals` (a note landing with the stem's `voiceLimit` already sounding).
+
+**Loudness per style (#2002).** `scripts/scenes/loudness-styles.json` is one scene per style on
+the sounds the stand gives it (the style's packs, Auto intensity), and its `full` stem (lead
+off) is what a musician hears at first. The master's per-style make-up gain
+(`MASTER_MAKEUP_DB`, `core/config.ts`) is derived from it, to bring every style to
+−16 LUFS integrated under the −1 dBTP limiter; re-run it after a change to a
+voice, a pack's gain, a bus or the master chain, and re-derive a style that has moved by more
+than 1 LU:
+
+```bash
+npm run --silent mix:report -- --scenes-from=scripts/scenes/loudness-styles.json --loops=3 --json > loudness.json
+```
 
 ### `--calibrate-pack=<module>:<packId>` — sample-pack gain calibration
 
@@ -275,7 +291,8 @@ entries in `scripts/mix-report-utils.ts`, fields as in the settings list above) 
 the built-in catalog. Required per scene: `id`, `genreFeel`, `bpm`, `key`, and a non-empty
 `sections` array whose entries carry a `value` progression string (`'A7 | D7 | …'`, the
 chart editor's bar syntax, so `C:2 G7:2` splits a bar). `label` defaults to the id,
-`intensity` to 0.7, `timeSignature` to `4/4`; `findingThresholds` falls back to the
+`intensity` to 0.7 (`"auto"`: the band plans its own energy, as the stand does by default),
+`timeSignature` to `4/4`; `findingThresholds` falls back to the
 genre-agnostic defaults. Unknown fields pass through untouched, so an external spec's own
 metadata rides along. Mutually exclusive with `--scene`/`--scenes`/`--focus-from`.
 

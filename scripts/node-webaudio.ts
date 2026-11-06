@@ -316,11 +316,29 @@ function patchOscillator(): void {
 
 patchOscillator();
 
+/**
+ * The master limiter's worklet module (#2002) is named by `new URL(…, import.meta.url)`, which in
+ * node is a `file:` URL. The library's `addModule` reads a plain path (or `http:`/`blob:`), and
+ * would look a `file:` string up relative to its own caller, so hand it the path.
+ */
+function patchAudioWorklet(): void {
+    const proto = webaudio.AudioWorklet.prototype as AudioWorklet;
+    const nativeAddModule = proto.addModule;
+    proto.addModule = function (moduleUrl: string | URL, options?: WorkletOptions) {
+        const href = moduleUrl instanceof URL ? moduleUrl.href : moduleUrl;
+        const target = href.startsWith('file:') ? fileURLToPath(href) : href;
+        return nativeAddModule.call(this, target, options);
+    };
+}
+
+patchAudioWorklet();
+
 Object.assign(globalThis, {
     OfflineAudioContext: webaudio.OfflineAudioContext,
     AudioContext: webaudio.AudioContext,
     AudioBuffer: webaudio.AudioBuffer,
     PeriodicWave: webaudio.PeriodicWave,
+    AudioWorkletNode: webaudio.AudioWorkletNode,
 });
 
 /**

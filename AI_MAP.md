@@ -147,6 +147,8 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `core/engine/engine.ts` | Audio synthesis and instrument setup. | `initAudio`, `playNote` (re-export from `synth-chords`) |
 | `core/engine/reverb.ts` | Algorithmic Schroeder/Freeverb reverb (shared reverb return). | `createAlgorithmicReverb`, `REVERB_PRESETS` |
 | `core/engine/synth-utils.ts` | Shared WebAudio boilerplate (ramping, voices, velocity→timbre). | `rampGain`, `killActiveVoices`, `velocityTimbre` |
+| `core/engine/master-limiter.ts` | The master bus's look-ahead true-peak limiter, main-thread side (#2002): registers the worklet and wires it between the make-up gain and the master volume. | `wireMasterLimiter`, `masterChainReady`, `MASTER_LIMITER` |
+| `core/engine/master-limiter.worklet.js` | The limiter's `AudioWorkletProcessor` (plain JS, loaded as is by the browser and node renders): BS.1770 4× true-peak detection, look-ahead running minimum, release, moving-average attack. | `ensemble-master-limiter` |
 | `core/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
 | `core/engine/section-overrides.ts` | Per-section instrument-enabled overrides: whether a lane's bus is needed anywhere in the chart. | `isInstrumentEverActive` |
 | `core/engine/hash-utils.ts` | Canonical deterministic hash helpers. `scrambleHash` is stateless and seed-tuple-indexed — see `core/engine/CLAUDE.md` §27. | `scrambleHash`, `stringHash33`, `stringHash31` |

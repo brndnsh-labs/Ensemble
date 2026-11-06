@@ -1,4 +1,4 @@
-import { MIXER_GAIN_MULTIPLIERS } from '../config.js';
+import { MASTER_MAKEUP_DB, MIXER_GAIN_MULTIPLIERS } from '../config.js';
 import { MODULES } from '../constants.js';
 import { reverbSendForPack } from '../data/sound-packs.js';
 import type { GlobalContext } from '../state/playback.js';
@@ -11,9 +11,9 @@ import type {
     InstrumentVoice,
     Mutable,
 } from '../types.js';
-import { createSoftClipCurve } from './audio-graph-utils.js';
 import { audioWatchdog } from './audio-recovery.js';
 import { MODULE_BUS_KEY, packIdFromVoice } from './instrument-registry.js';
+import { wireMasterLimiter } from './master-limiter.js';
 import { ensurePacksForVoices } from './pack-runtime.js';
 import { createAlgorithmicReverb, REVERB_PRESETS } from './reverb.js';
 import { isInstrumentEverActive } from './section-overrides.js';
@@ -73,18 +73,20 @@ export function initAudio(
         // once every node exists (see assembly block after the module loop).
         let masterGain: GainNode | null = null;
         let glueCompressor: DynamicsCompressorNode | null = null;
-        let saturator: WaveShaperNode | null = null;
-        let masterLimiter: DynamicsCompressorNode | null = null;
+        let makeupGain: GainNode | null = null;
+        let volumeGain: GainNode | null = null;
         let reverb: AlgorithmicReverb | null = null;
         let reverbPreFilter: BiquadFilterNode | null = null;
         const buses: Partial<Record<string, InstrumentBus>> = {};
 
         if (playback.audio) {
+            // The bus sum's level into the glue compressor: fixed since #2002, when the master
+            // volume moved after the limiter. The fade-in from silence is the one the master
+            // always had.
             masterGain = playback.audio.createGain();
-            const initMasterVol = (playback.masterVolume || 0.4) * MIXER_GAIN_MULTIPLIERS.master;
             masterGain.gain.setValueAtTime(0.0001, playback.audio.currentTime);
             masterGain.gain.exponentialRampToValueAtTime(
-                initMasterVol,
+                MIXER_GAIN_MULTIPLIERS.master,
                 playback.audio.currentTime + 0.04,
             );
         }
@@ -126,29 +128,34 @@ export function initAudio(
             glueCompressor.attack.setValueAtTime(0.025, playback.audio.currentTime);
             glueCompressor.release.setValueAtTime(0.25, playback.audio.currentTime);
 
-            saturator = playback.audio.createWaveShaper();
-            saturator.curve = createSoftClipCurve();
-            saturator.oversample = '4x';
-
-            masterLimiter = playback.audio.createDynamicsCompressor();
-            masterLimiter.threshold.setValueAtTime(-2.0, playback.audio.currentTime);
-            masterLimiter.knee.setValueAtTime(3, playback.audio.currentTime);
-            masterLimiter.ratio.setValueAtTime(20, playback.audio.currentTime);
-            masterLimiter.attack.setValueAtTime(0.001, playback.audio.currentTime);
-            masterLimiter.release.setValueAtTime(0.15, playback.audio.currentTime);
+            // #2002: the style's make-up gain, so every style plays at about the same loudness
+            // (`MASTER_MAKEUP_DB`), then the look-ahead true-peak limiter (`master-limiter.ts`),
+            // then the master volume: a plain level after the limiter, so the slider turns the
+            // band down and never drives it into the ceiling. The soft-clip waveshaper and the
+            // brick-wall `DynamicsCompressorNode` that used to end the chain are gone: at 100%
+            // they hit 0 dBTP with audible distortion, and the slider was a drive knob.
+            makeupGain = playback.audio.createGain();
+            makeupGain.gain.setValueAtTime(makeupFor(state), playback.audio.currentTime);
+            volumeGain = playback.audio.createGain();
+            volumeGain.gain.setValueAtTime(
+                masterVolumeGain(playback.masterVolume),
+                playback.audio.currentTime,
+            );
         }
 
         if (
             masterGain &&
             glueCompressor &&
-            saturator &&
-            masterLimiter &&
+            makeupGain &&
+            volumeGain &&
             playback.audio?.destination
         ) {
             masterGain.connect(glueCompressor);
-            glueCompressor.connect(saturator);
-            saturator.connect(masterLimiter);
-            masterLimiter.connect(playback.audio.destination);
+            glueCompressor.connect(makeupGain);
+            // The limiter's module loads asynchronously; the gap between the make-up gain and
+            // the volume is closed when it has (`masterChainReady` says when).
+            void wireMasterLimiter(playback.audio, makeupGain, volumeGain);
+            volumeGain.connect(playback.audio.destination);
         }
 
         if (playback.audio && masterGain) {
@@ -411,8 +418,8 @@ export function initAudio(
         if (
             masterGain &&
             glueCompressor &&
-            saturator &&
-            masterLimiter &&
+            makeupGain &&
+            volumeGain &&
             reverb &&
             reverbPreFilter &&
             buses.chords &&
@@ -424,8 +431,8 @@ export function initAudio(
                 master: {
                     gain: masterGain,
                     glue: glueCompressor,
-                    saturator,
-                    limiter: masterLimiter,
+                    makeup: makeupGain,
+                    volume: volumeGain,
                     reverb,
                     reverbPreFilter,
                 },
@@ -550,6 +557,10 @@ export function restoreGains(state: EnsembleState) {
             m.node.gain.setTargetAtTime(target, t, 0.04);
         }
     });
+    // The style's make-up gain is a gain the graph holds too (#2002). Opening a chart sets its
+    // genre while the runtime's dispatch subscriber is off (`load`), so no genre effect runs:
+    // every rebuild restores the make-up for the style now set, as it restores the buses.
+    syncMasterMakeup(state);
 }
 
 /**
@@ -605,11 +616,34 @@ export function syncBusVolume(state: EnsembleState, module: InstrumentModule): v
 }
 
 /**
- * Live-ramp the master bus to `playback.masterVolume`. Sibling of
- * `syncBusVolume` — #1128 moved this out of v1's `Settings.tsx handleMasterVolume`
- * (which reached through a module-level `getState()` capture) into a
- * `handleEffects` case, so any non-slider writer also gets the ramp. Ramp math is preserved verbatim (exponential to target over
- * 40ms) so slider feel is unchanged.
+ * The master volume's gain: the slider's value as a plain linear level after the limiter (#2002),
+ * 1 being the band at its full calibrated loudness. A non-finite value falls back to full, and
+ * the floor keeps the exponential ramps off zero.
+ */
+function masterVolumeGain(value: number | null | undefined): number {
+    const level = typeof value === 'number' && Number.isFinite(value) ? value : 1;
+    return Math.max(0.0001, Math.min(1, level));
+}
+
+/**
+ * The make-up gain for the style playing (`groove.lastSmartGenre`, one of the 13 genre names),
+ * linear. Looked up with `Object.hasOwn` (the persisted genre is untrusted, #1266); a genre with
+ * no entry plays at 0 dB.
+ */
+function makeupFor(state: EnsembleState): number {
+    const genre = state.groove.lastSmartGenre;
+    const db =
+        typeof genre === 'string' && Object.hasOwn(MASTER_MAKEUP_DB, genre)
+            ? MASTER_MAKEUP_DB[genre as keyof typeof MASTER_MAKEUP_DB]
+            : 0;
+    return Number.isFinite(db) ? 10 ** (db / 20) : 1;
+}
+
+/**
+ * Live-ramp the master volume to `playback.masterVolume`. Sibling of `syncBusVolume` — #1128
+ * moved this out of v1's `Settings.tsx handleMasterVolume` into a `handleEffects` case, so any
+ * non-slider writer also gets the ramp. An exponential ramp over 40 ms, as it always was; since
+ * #2002 it moves the post-limiter volume, not the level into the master chain.
  */
 export function syncMasterVolume(state: EnsembleState): void {
     const { playback } = state;
@@ -617,10 +651,28 @@ export function syncMasterVolume(state: EnsembleState): void {
     if (!playback.audio || !graph) {
         return;
     }
-    const masterGain = graph.master.gain;
-    const target = Math.max(0.0001, (playback.masterVolume ?? 0.5) * MIXER_GAIN_MULTIPLIERS.master);
+    const volume = graph.master.volume;
+    const target = masterVolumeGain(playback.masterVolume);
     const t = playback.audio.currentTime;
-    masterGain.gain.cancelScheduledValues(t);
-    masterGain.gain.setValueAtTime(masterGain.gain.value, t);
-    masterGain.gain.exponentialRampToValueAtTime(target, t + 0.04);
+    volume.gain.cancelScheduledValues(t);
+    volume.gain.setValueAtTime(Math.max(0.0001, volume.gain.value), t);
+    volume.gain.exponentialRampToValueAtTime(target, t + 0.04);
+}
+
+/**
+ * Glide the master make-up gain to the style now set (#2002): on a genre change and on every
+ * `restoreGains`. The glide starts when the genre is set — at the press, since the reducer writes
+ * `lastSmartGenre` at once — not at the barline where a playing band takes the new style, so it
+ * can lead the music by up to a bar; a quarter second's time constant keeps that a fade, not a
+ * jump. Once it has settled, a repeat call changes nothing.
+ */
+export function syncMasterMakeup(state: EnsembleState): void {
+    const { playback } = state;
+    const graph = playback.audioGraph;
+    if (!playback.audio || !graph) {
+        return;
+    }
+    const t = playback.audio.currentTime;
+    graph.master.makeup.gain.cancelScheduledValues(t);
+    graph.master.makeup.gain.setTargetAtTime(makeupFor(state), t, 0.25);
 }

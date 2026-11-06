@@ -204,7 +204,8 @@ export async function renderBand(request: BandRenderRequest): Promise<BandRender
             const groove = state.groove as Mutable<EnsembleState['groove']>;
             groove.genreFeel = request.genreFeel;
             // And the genre the band's style is read from, so the soloist's timbre jitter
-            // follows the scene's style while humanize is not set (#2055), as it does live.
+            // follows the scene's style while humanize is not set (#2055), as it does live, and
+            // the master's per-style make-up gain (`MASTER_MAKEUP_DB`, #2002) is the scene's.
             groove.lastSmartGenre = request.genreFeel;
         }
         for (const pin of pins) {
@@ -250,7 +251,7 @@ export async function renderBand(request: BandRenderRequest): Promise<BandRender
 }
 
 /**
- * A tap on the live master bus (#1562): a `ScriptProcessorNode` fed by the master limiter —
+ * A tap on the live master bus (#1562): a `ScriptProcessorNode` fed by the master volume —
  * the node that feeds `destination` — copying every input block, with the audio clock of the
  * first block as the anchor so a marker taken from `currentTime` maps onto a sample index. The
  * processor's output stays silent, so the tap adds nothing to what is heard. ScriptProcessor is
@@ -310,7 +311,7 @@ function createCapture(live: BridgeLive): LiveCapture {
                     );
                 }
             };
-            current.graph.master.limiter.connect(processor);
+            current.graph.master.volume.connect(processor);
             processor.connect(audio.destination);
             return { sampleRate: audio.sampleRate };
         },
@@ -327,7 +328,7 @@ function createCapture(live: BridgeLive): LiveCapture {
                 throw new Error('capture.stop: no capture running');
             }
             processor.disconnect();
-            live.audio().graph?.master.limiter.disconnect(processor);
+            live.audio().graph?.master.volume.disconnect(processor);
             processor.onaudioprocess = null;
             const sampleRate = audio.sampleRate;
             const anchor = anchorTime ?? audio.currentTime;

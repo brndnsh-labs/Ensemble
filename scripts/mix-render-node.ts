@@ -9,12 +9,14 @@
  */
 import {
     classifyArc,
+    computeIntegratedLoudness,
     computePeak,
     computePerLoopRmsDb,
     computeRms,
     computeSpectralProbes,
     computeStereoMetrics,
     computeTransientMetrics,
+    computeTruePeakDb,
     toDb,
     toMonoFromChannels,
 } from './audio-analysis.js';
@@ -36,6 +38,10 @@ export interface MeasuredRender {
         rms: number;
         rmsDb: number;
         crestDb: number;
+        /** Integrated loudness, LUFS (BS.1770-4); null for silence. */
+        lufs: number | null;
+        /** True peak, dBTP (BS.1770-4 Annex 2). */
+        truePeakDb: number;
         probes: ReturnType<typeof computeSpectralProbes>;
         transients: ReturnType<typeof computeTransientMetrics>;
         stereo: ReturnType<typeof computeStereoMetrics>;
@@ -77,6 +83,8 @@ export async function createNodeRenderer(): Promise<NodeRenderer> {
                     rms,
                     rmsDb: toDb(rms),
                     crestDb: toDb(peak) - toDb(rms),
+                    lufs: computeIntegratedLoudness(channels, sampleRate),
+                    truePeakDb: computeTruePeakDb(channels),
                     probes: computeSpectralProbes(mono, sampleRate),
                     transients: computeTransientMetrics(mono, sampleRate),
                     stereo: computeStereoMetrics(channels),

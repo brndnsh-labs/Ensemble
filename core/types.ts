@@ -302,18 +302,19 @@ export interface AlgorithmicReverb {
 
 /**
  * The master output chain: every bus sums into `gain`, then runs
- * `gain → glue → saturator → limiter → destination`. `reverb` is the shared
- * reverb return, fed via `reverbPreFilter`.
+ * `gain → glue → makeup → limiter → volume → destination` (#2002). The limiter is an
+ * `AudioWorkletNode` wired in once its module loads (`engine/master-limiter.ts`), so it is not
+ * held here. `reverb` is the shared reverb return, fed via `reverbPreFilter`.
  */
 export interface MasterChain {
-    /** Master volume gain node — every instrument bus sums here. */
+    /** The bus sum's fixed level into the glue — every instrument bus sums here. */
     readonly gain: GainNode;
-    /** Gentle "glue" bus compressor — evens out full-band peaks before the brick-wall limiter. */
+    /** Gentle "glue" bus compressor — evens out full-band peaks before the limiter. */
     readonly glue: DynamicsCompressorNode;
-    /** Master soft-clipper / saturator. */
-    readonly saturator: WaveShaperNode;
-    /** Master safety limiter. */
-    readonly limiter: DynamicsCompressorNode;
+    /** The playing style's make-up gain, so every style lands at the same loudness. */
+    readonly makeup: GainNode;
+    /** The master volume, after the limiter: the last node before the destination. */
+    readonly volume: GainNode;
     /** The shared algorithmic reverb (replaces the old static convolver). */
     readonly reverb: AlgorithmicReverb;
     /** HPF/LPF pre-filter feeding the reverb (the node bus sends connect to). */
