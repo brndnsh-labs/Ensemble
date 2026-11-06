@@ -316,7 +316,10 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // covers kick/snare/sidestick, the hi-hat family (closed/open/pedal),
         // ride+bell/crash, toms and shaker: every articulation `drumArticulationKey`
         // can return and no other (`rev` 2, #1651, dropped four that nothing could
-        // trigger). Deterministic round-robin (#657) over each articulation's takes
+        // trigger). Three toms, high/mid/low (`rev` 3, #1998): the sources carry two,
+        // ~4 semitones apart (high ~107 Hz, low ~85 Hz), so `tom-mid` is the high
+        // tom's takes resampled 2 semitones down (~95 Hz, a slightly longer ring, as
+        // a bigger drum has). Deterministic round-robin (#657) over each articulation's takes
         // keeps repeated hits from machine-gunning. Calibrated 2026-06-22 (#662)
         // via `mix-report --calibrate-pack=groove:acoustic-kit`: pack sat ~4 dB
         // under the synth drum stem (RMS-match = 1.59×). Drums are the rhythmic
@@ -324,7 +327,7 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // which was buried under the band → 8×), so seated at the match: 1.6×.
         // Confirm by ear on ensembletest across rock/funk/jazz/blues.
         gain: 1.6,
-        rev: 2,
+        rev: 3,
         // Kit carries overhead/room — pull the send back so the drums stay tight
         // and don't wash the pocket with hall-on-room. #686 start.
         reverbSend: 0.7,

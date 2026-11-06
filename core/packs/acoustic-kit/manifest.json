@@ -93,6 +93,11 @@
             ]
         },
         {
+            "key": "tom-mid",
+            "url": "/packs/acoustic-kit/tom-mid_00.m4a",
+            "variants": ["/packs/acoustic-kit/tom-mid_01.m4a", "/packs/acoustic-kit/tom-mid_02.m4a"]
+        },
+        {
             "key": "tom-low",
             "url": "/packs/acoustic-kit/tom-low_00.m4a",
             "variants": [

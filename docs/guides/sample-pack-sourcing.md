@@ -126,6 +126,10 @@ ffmpeg -nostdin -v error -y -i in.wav -t 6 \
 - **Target peaks (dBFS) set by ear for `acoustic-kit`:** kick and snare −7; toms −8; crash −12;
   ride −13; ride bell −11; open hat −15 with a 2.2 s decay; loose hat −15 at 1.1 s; closed hat −15;
   pedal hat −19; cowbell −12; agogo −13; sidestick −13; shaker −18.
+- **A missing drum can be derived, not sourced.** The kit's sources carry two toms ~4 semitones
+  apart, so `tom-mid` is the high tom's takes resampled 2 semitones down (`asetrate` to
+  44100 × 2^(−2/12), then `aresample=44100`), which also lengthens the ring as a bigger shell
+  would (#1998).
 - An un-choked open hat piles up in hat-dense styles: disco stacked ~15 overlapping washes. The
   engine chokes the open hat on a closed or pedal hit (#679); keep the open-hat sample's decay
   natural rather than trimming it as a workaround.

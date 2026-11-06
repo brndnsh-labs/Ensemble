@@ -10,7 +10,7 @@ one elsewhere still points at the same rule.
 
 ## Drums
 
-17. **Two independent drum playback paths converge on one shared bus.** Synth voices (`synth-drums.ts`) and sample packs (`sample-voice.ts` `playSampledStrike`, native-rate, no per-voice filtering) both feed the same `drumsHP → drumsMud → drumsAir` chain in `engine.ts` `initAudio()`. Bus-level EQ is the only universal tone lever; a per-voice synth tweak (tom decay, kick envelope) never reaches an installed sample pack.
+17. **Two independent drum playback paths converge on one shared bus.** Synth voices (`synth-drums.ts`) and sample packs (`sample-voice.ts` `playSampledStrike`, native-rate, no per-voice filtering) both feed the same `drumsHP → drumsMud → drumsAir` chain in `engine.ts` `initAudio()`. Bus-level EQ is the only universal tone lever; a per-voice synth tweak (tom decay, kick envelope) never reaches an installed sample pack. The one per-hit treatment on the sampled path is the ghost snare (`ghostSnareChain`, #1998): with no soft snare take in the kit, the band's ghost stroke (`Ghost`, its `ghost` piece) strikes the snare take through a low-pass and a short decay. The sampled path also owns its share of the kick's sidechain duck (`duckKickSidechain`), so a new seam that plays the kick must call it too.
 
 ## Synth / sample / mix
 

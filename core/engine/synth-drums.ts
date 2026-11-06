@@ -176,6 +176,9 @@ const RIGHT_PANNED_INSTRUMENTS = new Set(['HiHat', 'Open', 'Crash', 'Shaker']);
 const KNOWN_SOUND_NAMES = new Set<string>([
     'Kick',
     'Snare',
+    // The band's ghost stroke (#1998): the snare, played as one. The band host names it
+    // apart so a sampled kit can damp it; the synth voice plays it as a snare.
+    'Ghost',
     'Sidestick',
     'HiHat',
     'Open',
@@ -1014,6 +1017,7 @@ export function drumArticulationKey(name: string): string | null {
         case 'Kick':
             return 'kick';
         case 'Snare':
+        case 'Ghost':
             return 'snare';
         case 'Sidestick':
             return 'sidestick';
@@ -1032,10 +1036,13 @@ export function drumArticulationKey(name: string): string | null {
         case 'Shaker':
             return 'shaker';
         default:
-            // Tom names arrive space-formed (`High Tom`/`Mid Tom`/`Low Tom`); the
-            // kit carries two tom samples, so mid folds onto the high rack tom.
+            // Tom names arrive space-formed (`High Tom`/`Mid Tom`/`Low Tom`), one
+            // sample set each (#1998: the mid tom used to fold onto the high tom).
             if (name.includes('Tom')) {
-                return name.includes('Low') ? 'tom-low' : 'tom-high';
+                if (name.includes('Low')) {
+                    return 'tom-low';
+                }
+                return name.includes('Mid') ? 'tom-mid' : 'tom-high';
             }
             return null; // no sample for it → synth
     }
@@ -1052,7 +1059,7 @@ function drumPanValue(name: string, time: number): number {
     if (RIGHT_PANNED_INSTRUMENTS.has(name)) {
         return 0.35;
     }
-    if (name === 'Snare' || name === 'Sidestick') {
+    if (isSnareName(name) || name === 'Sidestick') {
         return -0.2;
     }
     if (name.includes('Tom')) {
@@ -1134,10 +1141,18 @@ function tryPlaySampledDrum(
         groove.lastSampledHatVoice.choke(ctx.playTime); // @direct-mutation
         groove.lastSampledHatVoice = null; // @direct-mutation
     }
+    // The kick ducks the bass on a sampled kit exactly as on the synth one (#1998): the
+    // same sidechain dip, from the hit's own scheduled time, so the low end stays clear.
+    if (name === 'Kick') {
+        duckKickSidechain(state, ctx.playTime);
+    }
+    // A ghost stroke strikes through its own damping chain (#1998); every other hit goes
+    // straight to the panner.
+    const ghost = name === 'Ghost' ? ghostSnareChain(ctx.audio, ctx.panner, ctx.playTime) : null;
     // `let` (not `const`) so the onEnded closure below can reference `voice`
     // without a temporal-dead-zone hazard on playSampledStrike's synchronous bail.
     let voice: SampleVoiceHandle | null = null;
-    voice = playSampledStrike(ctx.audio, buffer, ctx.panner, ctx.playTime, {
+    voice = playSampledStrike(ctx.audio, buffer, ghost?.input ?? ctx.panner, ctx.playTime, {
         velocity: ctx.masterVol * gainForPack(packId),
         lane: 'drums',
         onEnded: () => {
@@ -1146,15 +1161,80 @@ function tryPlaySampledDrum(
             if (groove.lastSampledHatVoice === voice) {
                 groove.lastSampledHatVoice = null; // @direct-mutation
             }
+            ghost?.release();
             ctx.releasePanner();
         },
     });
+    // The ghost's tail is already silent by `stopAt`: stop the source there rather than
+    // let it play the rest of the backbeat recording into a closed envelope.
+    if (voice && ghost) {
+        voice.choke(ghost.stopAt);
+    }
     // Only the ringing hat (open) is worth choking later; closed and
     // pedal hits are already short, so they choke others but aren't tracked themselves.
     if (voice && isRingingHat(name)) {
         groove.lastSampledHatVoice = voice; // @direct-mutation
     }
     return true;
+}
+
+/**
+ * The kick's sidechain trigger: dips the bass bus for the kick's attack. Both kick paths (the
+ * synth voice and a sampled kit) call it, so installing a kit never loses the duck (#1998).
+ */
+function duckKickSidechain(state: EnsembleState, playTime: number): void {
+    const sidechain = state.playback.audioGraph?.bass.sidechain;
+    if (sidechain) {
+        duckGain(sidechain.gain, 0.45, playTime);
+    }
+}
+
+// why (#1998): the kit has one snare articulation, a backbeat take, so a ghost used to be that
+// crack 10 dB down. A real ghost is a stick dropped an inch onto the head: little wire sizzle and
+// a short, papery tail. Until the pack carries velocity layers (#2000), the backbeat take is
+// darkened and cut short instead. The low-pass takes the crack's top off (the take's spectral
+// centroid sits near 3.4 kHz); Q -3 dB keeps it free of a resonant peak (`BiquadFilterNode.Q` is
+// in dB). The take keeps its first 25 ms (the stick's contact and the head's thud), then an
+// envelope with a 40 ms time constant closes over the wires' ring on top of the take's own
+// decay: -12 dB more by 80 ms, ~-60 dB at `GHOST_STOP_S` (0.3 s), where the source stops. The
+// backbeat take on its own rings to -30 dB at ~0.15 s and plays on for 1.4 s.
+const GHOST_LOWPASS_HZ = 2800;
+const GHOST_LOWPASS_Q_DB = -3;
+const GHOST_HOLD_S = 0.025;
+const GHOST_DECAY_TC = 0.04;
+const GHOST_STOP_S = GHOST_HOLD_S + GHOST_DECAY_TC * 7;
+
+/**
+ * The damping chain a sampled ghost strikes through: a low-pass, then a short decay envelope,
+ * into the hit's panner. `stopAt` is where its tail is silent; `release` frees the two nodes.
+ */
+function ghostSnareChain(
+    audio: AudioContext,
+    destination: AudioNode,
+    playTime: number,
+): { input: AudioNode; stopAt: number; release: () => void } {
+    const filter = audio.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(GHOST_LOWPASS_HZ, playTime);
+    filter.Q.setValueAtTime(GHOST_LOWPASS_Q_DB, playTime);
+    const envelope = audio.createGain();
+    envelope.gain.setValueAtTime(1, playTime);
+    envelope.gain.setTargetAtTime(0, playTime + GHOST_HOLD_S, GHOST_DECAY_TC);
+    filter.connect(envelope);
+    envelope.connect(destination);
+    return {
+        input: filter,
+        stopAt: playTime + GHOST_STOP_S,
+        release: () => safeDisconnect([filter, envelope]),
+    };
+}
+
+/**
+ * The snare, struck as a backbeat (`Snare`) or as a ghost (`Ghost`, the band's `ghost` piece,
+ * #1998). The synth voice plays both alike, shaped by level; only a sampled kit tells them apart.
+ */
+function isSnareName(name: string): boolean {
+    return name === 'Snare' || name === 'Ghost';
 }
 
 /** Any hi-hat articulation — all of these choke a ringing open hat. */
@@ -1753,7 +1833,7 @@ function playKickSnareCrashTom(
     let panValue = 0;
     if (RIGHT_PANNED_INSTRUMENTS.has(name)) {
         panValue = 0.35;
-    } else if (name === 'Snare' || name === 'Sidestick') {
+    } else if (isSnareName(name) || name === 'Sidestick') {
         // why: widened from -0.1 to -0.2 in Epic 7 S1 to better balance the +0.35
         // hi-hat mass on the right.
         panValue = -0.2;
@@ -1792,9 +1872,7 @@ function playKickSnareCrashTom(
         const vol = masterVol * getRhythmBodyMixScale(state, 'Kick') * rr();
 
         // --- Sidechain Trigger ---
-        if (playback.audioGraph?.bass.sidechain) {
-            duckGain(playback.audioGraph.bass.sidechain.gain, 0.45, playTime);
-        }
+        duckKickSidechain(state, playTime);
 
         // 1. Beater Snap: Higher velocity = Sharper snap
         const beater = playback.audio.createOscillator();
@@ -1861,7 +1939,7 @@ function playKickSnareCrashTom(
         beater.stop(playTime + 0.1);
 
         beater.onended = () => safeDisconnect([beater, beaterGain]);
-    } else if (name === 'Snare' || name === 'Sidestick') {
+    } else if (isSnareName(name) || name === 'Sidestick') {
         const isSidestick = name === 'Sidestick';
         const vol =
             masterVol * getSnareMixScale(state, velocity) * rr() * (isSidestick ? 0.8 : 1.0);
