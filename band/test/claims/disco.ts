@@ -2,6 +2,7 @@ import type { BandEvent, DrumHit } from '../../core/types.js';
 import type { Timeline } from '../../form/timeline.js';
 import { STEP } from '../../players/grid.js';
 import { defineClaims, type Metric } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 function drumSteps(t: Timeline, events: BandEvent[], bar: number, pieces: string[]) {
     return new Set(
@@ -93,9 +94,51 @@ const compScratchAccent: Metric = (takes) => {
     return downN && upN ? upSum / upN / (downSum / downN) : 1;
 };
 
+/**
+ * Share of the 4/4 bars the lead plays in where it strikes the bar's last eighth (the "and" of
+ * 4): the push into the next One, a disco hook's lean into the downbeat the kick lands on.
+ */
+const leadPushIntoOne: Metric = (takes) => {
+    let bars = 0;
+    let hit = 0;
+    for (const { timeline: t, events } of takes) {
+        const pushed = new Map<number, boolean>();
+        for (const e of events) {
+            const bar = t.bars[e.bar];
+            if (e.lane !== 'lead' || bar.meter.name !== '4/4') {
+                continue;
+            }
+            const push = Math.round((e.tick - bar.start) / STEP) === 14;
+            pushed.set(e.bar, (pushed.get(e.bar) ?? false) || push);
+        }
+        for (const push of pushed.values()) {
+            bars++;
+            hit += push ? 1 : 0;
+        }
+    }
+    return bars ? hit / bars : 0;
+};
+
 export const disco = defineClaims({
-    metrics: { hatPedalOrOpenFillCoverage, compScratchAccent },
+    metrics: { hatPedalOrOpenFillCoverage, compScratchAccent, leadPushIntoOne },
     takes: [
+        // The known standard's guide-tone head, on disco's own figures (#2122, `head.guide` in
+        // `styles/disco.ts`).
+        guideTonesTake(
+            {
+                // 0.5: the book's `register` sets the line's home high in the instrument, so the
+                // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
+                // figures': it needs the line's headroom.
+                leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
+            },
+            [
+                // Pushed into the One: 0.24 on disco's figures, 0.11 on the shared ones (one
+                // pushed cell of six). The floor sits between. A push tied into an arrival
+                // leaves the arrival's bar unstruck, so `leadRestShare` reads 0.118 here, not
+                // 0.084: those bars sound.
+                ['leadPushIntoOne', 0.18, 0.4, 'the hook leans into the next One'],
+            ],
+        ),
         {
             take: {},
             claims: [

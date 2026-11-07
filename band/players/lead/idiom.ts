@@ -22,6 +22,7 @@ import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { barSteps, dyn, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
+import { DEFAULT_GUIDE, type GuideRhythm } from './guide-figures.js';
 import { type GuideNote, guidePitchClasses, guideToneLine, headForm } from './guide-tones.js';
 import {
     type Contour,
@@ -58,18 +59,11 @@ export interface LeadBook extends LinePalette {
          */
         form: 'period' | 'aab';
         /**
-         * The rhythm a known standard's guide-tone head is sung in (#2111): one-bar `cells`
-         * (figures), sparser than a head's own (the guide tones carry the tune, the cells give
-         * it a rhythm); `turns`, the bar after a figure that moves on (a half note at most);
-         * the phrase `endings`, its one long arrival; and the `close`, the whole note a section
-         * ends on. Unset: the guide tones are held a chord apiece.
+         * The rhythm a known standard's guide-tone head is sung in (#2111, `GuideRhythm`): its
+         * figures, turns, phrase endings and section close. Unset: the shared straight-eighth
+         * figures (`DEFAULT_GUIDE`, #2122).
          */
-        guide?: {
-            cells: readonly string[];
-            turns: readonly string[];
-            endings: readonly string[];
-            close: string;
-        };
+        guide?: GuideRhythm;
     };
     /** Chance a solo bar plays the bar before it again (a riff) rather than moving on. */
     riff: number;
@@ -837,57 +831,6 @@ function headGuideLine(ctx: BarContext, book: LeadBook, slotStart: number): Guid
           );
 }
 
-/**
- * A known standard's head phrase held a chord apiece, for a book with no guide-tone rhythm
- * (`LeadBook.head.guide`): the slot's share of the guide-tone line, every note a chord change's
- * target.
- */
-function holdGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
-    const { bars } = ctx.timeline;
-    const first = bars[slotStart];
-    const length = first.phrase.length;
-    const lastBar = bars[Math.min(bars.length, slotStart + length) - 1];
-    const from = first.start;
-    const to = lastBar.start + lastBar.meter.barTicks;
-    const home = homeOf(ctx, book);
-    const line = headGuideLine(ctx, book, slotStart).filter((n) => n.tick >= from && n.tick < to);
-    const onsets: SlotOnset[] = line.map((n) => {
-        const bar = barOf(ctx, n.tick);
-        return {
-            tick: n.tick,
-            // Held to its chord's end, but never past the phrase: the next one is struck fresh.
-            dur: Math.min(n.dur, to - n.tick),
-            step: Math.round((n.tick - bars[bar].start) / STEP),
-            chord: n.chord,
-            key: n.key,
-            change: true,
-            span: spanIndexAt(ctx.timeline, n.tick),
-            bar: bar - slotStart,
-        };
-    });
-    const kinds: BarKind[] = Array.from({ length }, () => 'line');
-    const plan: SlotPlan = {
-        kinds,
-        cells: kinds.map(() => null),
-        // The line's pitches are its own (`guideToneLine`); contour and span shape nothing here.
-        contour: 'arch',
-        centre: home,
-        span: 0,
-        // A touch under the invented head's 84: long notes under the band, not over it.
-        velocity: 78,
-        from: null,
-        riffs: kinds.map(() => false),
-        develops: null,
-        developsBar: 0,
-        restates: null,
-        loops: null,
-        peak: false,
-    };
-    // A held guide-tone head is sung too: it breathes at its phrase ends, off the last held tone.
-    takeBreath(ctx, lastBar.index, onsets, phraseBreath(ctx, slotStart));
-    return { onsets, pitches: line.map((n) => n.midi), plan };
-}
-
 /** Which part of a sung guide-tone head a phrase is (#2111). */
 type GuidePart = 'statement' | 'contrast' | 'home';
 
@@ -922,9 +865,9 @@ const GUIDE_VELOCITY: Record<GuidePart, number> = { statement: 74, contrast: 82,
  */
 function guidePlan(
     ctx: BarContext,
-    guide: NonNullable<LeadBook['head']['guide']>,
+    guide: GuideRhythm,
     slotStart: number,
-): { plan: SlotPlan; part: GuidePart } {
+): { plan: SlotPlan; part: GuidePart; handsOn: boolean } {
     const { bars } = ctx.timeline;
     const first = bars[slotStart];
     const length = first.phrase.length;
@@ -1001,7 +944,11 @@ function guidePlan(
         loops: null,
         peak: false,
     };
-    return { plan, part };
+    // A phrase that ends on a turn rather than an arrival (the contrast handing back to the
+    // last A) leads into the next phrase: its last note is no arrival of its own.
+    const last = cells.at(-1) ?? '';
+    const handsOn = last !== guide.close && !guide.endings.includes(last);
+    return { plan, part, handsOn };
 }
 
 /**
@@ -1109,6 +1056,16 @@ function moveCost(semitones: number): number {
     return d === 0 ? 50 : d <= 2 ? 0 : d === 3 ? 1 : d === 4 ? 3 : 10;
 }
 
+/**
+ * Cost of a trill in a sung guide-tone head's walk: four notes running a-b-a-b, counted across
+ * the guide tones either side (#2122). why: with two guide tones a step apart and a sparse figure,
+ * every free path was the two notes shaken back and forth (G-F-G-F), which is a horn's trill,
+ * not a tune. A neighbour note (a-b-a) stays cheap (0.6: a singer turns round a note); the
+ * trill costs more than a major 3rd's skip (3), so the walk skips a 3rd or turns the other way
+ * first, but less than a leap (10), which it still takes only when nothing else reaches.
+ */
+const TRILL = 4;
+
 /** Longest walk searched note by note; a longer one is walked in two halves. */
 const WALK_SEARCH = 7;
 
@@ -1117,8 +1074,9 @@ const WALK_SEARCH = 7;
  * `to`, its last note beside `to` (never on it), so a singer steps onto each arrival. Each note
  * comes from its own pool (`pools`: a held or strong-beat note's is its chord's tones, a short
  * weak one's the chord scale). Chosen whole, the cheapest by `moveCost`: steps where it can, a
- * repeated pitch never, a trill (a note two back again) avoided, and with more notes than the
- * distance needs it turns — `dir` first (up over the line, or down under it) and back.
+ * repeated pitch never, a note two back again avoided, a trill (`TRILL`, counted from `prior`,
+ * the line's note before `from`, through the arrival `to`) all but never, and with more notes
+ * than the distance needs it turns — `dir` first (up over the line, or down under it) and back.
  */
 function walkBetween(
     from: number,
@@ -1126,6 +1084,7 @@ function walkBetween(
     pools: readonly (readonly number[])[],
     dir: 1 | -1,
     [lo, hi]: readonly [number, number],
+    prior: number | null = null,
 ): number[] {
     const count = pools.length;
     if (count <= 0) {
@@ -1146,19 +1105,37 @@ function walkBetween(
         // A long walk: out to the far end of the turn and back, in two searched halves.
         const half = Math.ceil(count / 2);
         const peak = from + dir * Math.min(7, half);
-        const first = walkBetween(from, peak, pools.slice(0, half), dir, [lo, hi]);
+        const first = walkBetween(from, peak, pools.slice(0, half), dir, [lo, hi], prior);
         const last = first.at(-1) ?? from;
-        return [...first, ...walkBetween(last, to, pools.slice(half), -dir as 1 | -1, [lo, hi])];
+        const before = first.at(-2) ?? from;
+        return [
+            ...first,
+            ...walkBetween(last, to, pools.slice(half), -dir as 1 | -1, [lo, hi], before),
+        ];
     }
     let best: number[] = [];
     let bestCost = Number.POSITIVE_INFINITY;
     const path: number[] = [];
+    // The line as sung so far, counted back from its newest note: `prior`, `from`, the path.
+    const back = (k: number, extra: number | null): number | null => {
+        const line = extra === null ? path.length : path.length + 1;
+        const i = line - 1 - k;
+        if (extra !== null && k === 0) {
+            return extra;
+        }
+        return i >= 0 ? path[i] : i === -1 ? from : i === -2 ? prior : null;
+    };
+    // Whether the newest four notes (with `extra` after the path, the arrival) are a-b-a-b.
+    const trills = (extra: number | null = null) => {
+        const [d, c, b, a] = [0, 1, 2, 3].map((k) => back(k, extra));
+        return a !== null && a === c && b === d && a !== b;
+    };
     const search = (prev: number, cost: number) => {
         if (cost >= bestCost) {
             return;
         }
         if (path.length === count) {
-            const end = cost + (prev === to ? 50 : moveCost(to - prev));
+            const end = cost + (prev === to ? 50 : moveCost(to - prev)) + (trills(to) ? TRILL : 0);
             if (end < bestCost) {
                 bestCost = end;
                 best = [...path];
@@ -1177,7 +1154,10 @@ function walkBetween(
             // a free step the wrong way loses to a 3rd the right way, never to a leap.
             const side = 0.25 * Math.max(0, dir > 0 ? from - m : m - from);
             path.push(m);
-            search(m, cost + moveCost(m - prev) + (before === m ? 0.6 : 0) + turn + side);
+            // The trill's cost goes on the move's whole cost, after every other term: a step's
+            // is 0, so only an added cost (never a scale on one term) can outweigh it.
+            const trill = trills() ? TRILL : 0;
+            search(m, cost + moveCost(m - prev) + (before === m ? 0.6 : 0) + turn + side + trill);
             path.pop();
         }
     };
@@ -1216,23 +1196,26 @@ function walkPool(o: SlotOnset): number[] {
  *
  * A guide tone that is the next chord's too is never struck twice running: the note before it
  * gives its last eighth to a passing step (a quarter or longer), or is tied into it.
- * A book with no guide-tone rhythm holds the line a chord apiece (`holdGuideTones`).
+ * Every style sings it (#2122): a book with no guide-tone rhythm of its own takes the shared
+ * figures (`DEFAULT_GUIDE`).
  */
 function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
-    const guide = book.head.guide;
-    if (!guide) {
-        return holdGuideTones(ctx, book, slotStart);
-    }
-    const { plan, part } = guidePlan(ctx, guide, slotStart);
+    const { plan, part, handsOn } = guidePlan(ctx, book.head.guide ?? DEFAULT_GUIDE, slotStart);
     const line = headGuideLine(ctx, book, slotStart);
     // The line's note sounding at a tick: the last struck at or before it.
     const lineAt = (tick: number) =>
         line.reduce<GuideNote | undefined>((at, n) => (n.tick <= tick ? n : at), line[0]);
     const onsets = guideOnsets(ctx, slotStart, plan, lineAt);
-    const { spans } = ctx.timeline;
+    const { spans, bars } = ctx.timeline;
     const range = ctx.lead.range;
+    const lastBar = bars[Math.min(bars.length, slotStart + plan.kinds.length) - 1];
+    // A phrase that hands on (`handsOn`) aims its last notes at the next phrase's first guide
+    // tone, struck beside it: a turn leads in. why: pinned to the guide tone still sounding, a
+    // turn's last note was that tone again, struck twice over one chord across the turn's rest
+    // (the bridge's hand-back, the beat before the last A: G4 … G4 over Ebmaj7).
+    const next = handsOn ? lineAt(lastBar.start + lastBar.meter.barTicks)?.midi : undefined;
     const pitches: (number | null)[] = onsets.map((o, i) =>
-        i === 0 || o.change || i === onsets.length - 1
+        i === 0 || o.change || (i === onsets.length - 1 && next === undefined)
             ? (lineAt(Math.max(o.tick, spans[o.span].start))?.midi ?? null)
             : null,
     );
@@ -1270,9 +1253,11 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
         }
     }
     const n = onsets.length;
+    // The next phrase's guide tone stands after the last onset as the walk's last target.
+    const aims = next === undefined ? pitches : [...pitches, next];
     let a = 0;
-    for (let b = 1; b < n; b++) {
-        if (pitches[b] === null) {
+    for (let b = 1; b < aims.length; b++) {
+        if (aims[b] === null) {
             continue;
         }
         if (b - a > 1 && pitches[a] !== null) {
@@ -1281,10 +1266,12 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
             const dir: 1 | -1 = part === 'contrast' || (a + b) / 2 < n / 2 ? 1 : -1;
             const walk = walkBetween(
                 pitches[a] as number,
-                pitches[b] as number,
+                aims[b] as number,
                 onsets.slice(a + 1, b).map(walkPool),
                 dir,
                 range,
+                // The note sung before this guide tone: a trill may start there.
+                a > 0 ? pitches[a - 1] : null,
             );
             walk.forEach((m, k) => {
                 pitches[a + 1 + k] = m;
@@ -1297,13 +1284,7 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
     // beats or more (#2111: a turn is a half note at most, so a two-beat breath would leave the
     // arrival no longer than a turn). Its own endings breathed an eighth to a beat; now each
     // phrase end has the beat a singer takes, the section close included.
-    const { bars } = ctx.timeline;
-    takeBreath(
-        ctx,
-        bars[Math.min(bars.length, slotStart + plan.kinds.length) - 1].index,
-        onsets,
-        1,
-    );
+    takeBreath(ctx, lastBar.index, onsets, 1);
     const sung = pitches.map((m) => m ?? homeOf(ctx, book));
     const top = Math.max(...sung);
     const bottom = Math.min(...sung);

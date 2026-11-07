@@ -1,6 +1,7 @@
 import type { DrumHit, PitchedNote } from '../../core/types.js';
 import { STEP } from '../../players/grid.js';
 import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 export const hiphop = defineClaims({
     metrics: {
@@ -169,6 +170,20 @@ export const hiphop = defineClaims({
         },
     },
     takes: [
+        // The known standard's guide-tone head, on hip hop's own figures (#2122, `head.guide` in
+        // `styles/hiphop.ts`): a sparse sampled hook on the sixteenths.
+        guideTonesTake(
+            {
+                // Two or three notes a bar: 2.20, against 2.71 on the shared figures (and 0.90 held
+                // a chord apiece). The ceiling sits between them, so it fails on the shared set.
+                leadNotesPerBar: [2, 2.5, 'a sparse hook, two or three notes a bar'],
+            },
+            [
+                // The hook's snap (1 and its "a") and its sixteenth pushes: 0.306 of the notes
+                // on an "e" or an "a", against 0 on the shared straight-eighth figures.
+                ['leadSixteenthOffbeats', 0.2, 0.45, 'the hook snaps on the sixteenths'],
+            ],
+        ),
         {
             take: {},
             claims: [

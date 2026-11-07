@@ -9,6 +9,7 @@ import { STEP } from '../../players/grid.js';
 import { type ChordFacts, chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
@@ -395,8 +396,71 @@ export const acoustic = defineClaims({
             }
             return ratio(sum, n);
         },
+        /**
+         * Share of the lead's 4/4 bars that open on a dotted quarter: struck on the one, the
+         * next note on the "and" of 2 and none between. The folk lilt, long-short across the
+         * first half of the bar.
+         */
+        leadDottedLilt: (takes: Take[]) => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                const steps = new Map<number, Set<number>>();
+                for (const e of events) {
+                    if (e.lane !== 'lead' || t.bars[e.bar].meter.name !== '4/4') {
+                        continue;
+                    }
+                    const set = steps.get(e.bar) ?? new Set<number>();
+                    set.add(stepOf(t, e));
+                    steps.set(e.bar, set);
+                }
+                for (const set of steps.values()) {
+                    n++;
+                    const lilt =
+                        set.has(0) && set.has(6) && ![1, 2, 3, 4, 5].some((s) => set.has(s));
+                    hit += lilt ? 1 : 0;
+                }
+            }
+            return ratio(hit, n);
+        },
+        /**
+         * Share of the lead's notes struck in a bar's last beat (on 4 or its "and"): the pickups
+         * a singer-songwriter's line leans into the next bar with.
+         */
+        leadPickupShare: (takes: Take[]) => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                for (const e of events) {
+                    if (e.lane !== 'lead' || t.bars[e.bar].meter.name !== '4/4') {
+                        continue;
+                    }
+                    n++;
+                    hit += stepOf(t, e) >= 12 ? 1 : 0;
+                }
+            }
+            return ratio(hit, n);
+        },
     },
     takes: [
+        // The known standard's guide-tone head, on acoustic's own figures (#2122, `head.guide`
+        // in `styles/acoustic.ts`): a folk verse's dotted lilt and pickups.
+        guideTonesTake(
+            {
+                // 0.5: the book's `register` sets the line's home high in the instrument, so the
+                // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
+                // figures': acoustic's own figures read 0.5 as the shared ones did; it needs the
+                // line's headroom.
+                leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
+            },
+            [
+                // 0.235 of its bars open on the dotted quarter, 0.089 on the shared figures:
+                // the floor sits between them, so the shared figures fail it.
+                ['leadDottedLilt', 0.15, 0.4, 'the folk lilt: a bar opens long-short'],
+                // 0.130 of its notes on 4 or its "and", 0.063 on the shared figures.
+                ['leadPickupShare', 0.1, 0.25, 'pickups lean into the next bar'],
+            ],
+        ),
         {
             take: { colour: true },
             claims: [

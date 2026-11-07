@@ -1,7 +1,21 @@
 import { defineClaims } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 export const funk = defineClaims({
     takes: [
+        // The known standard's guide-tone head, on funk's own figures (#2122, `head.guide` in
+        // `styles/funk.ts`): a horn section's sixteenth pushes.
+        guideTonesTake({}, [
+            // The pushes land on the sixteenths: 0.361 of the notes on an "e" or an "a",
+            // against 0 on the shared straight-eighth figures (so the floor fails without
+            // funk's own). The ceiling is a line turned into a sixteenth run, not a head.
+            [
+                'leadSixteenthOffbeats',
+                0.25,
+                0.5,
+                'the horn line pushes on the sixteenths, not the eighths',
+            ],
+        ]),
         {
             take: {},
             claims: [

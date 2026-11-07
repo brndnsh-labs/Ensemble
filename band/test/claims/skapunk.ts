@@ -11,6 +11,7 @@ import { STEP } from '../../players/grid.js';
 import { fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 const CHORUS = /^(chorus|hook|refrain)/i;
 const isChorus = (b: Bar) => CHORUS.test(b.visit.label.trim());
@@ -357,6 +358,14 @@ const metrics = {
 export const skapunk = defineClaims({
     metrics,
     takes: [
+        // The known standard's guide-tone head, on ska-punk's own figures (#2122, `head.guide`
+        // in `styles/skapunk.ts`).
+        guideTonesTake({}, [
+            // The horn stabs the "and"s: 0.57 on ska-punk's figures, 0.34 on the shared
+            // ones (a straight-eighth tune's upbeats). The floor sits between, past an even
+            // line's half.
+            ['leadOffbeatShare', 0.5, 0.8, 'the head punches the "and"s with the skank'],
+        ]),
         {
             take: {},
             claims: [

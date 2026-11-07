@@ -1,7 +1,69 @@
-import { defineClaims } from '../critique/harness.js';
+import type { BandEvent } from '../../core/types.js';
+import type { Timeline } from '../../form/timeline.js';
+import { STEP } from '../../players/grid.js';
+import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
+
+const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
+const ratio = (hits: number, total: number) => (total ? hits / total : 0);
 
 export const bossa = defineClaims({
+    metrics: {
+        /**
+         * Share of the lead's attacks in 4/4 bars struck on an eighth-note offbeat (an "and"):
+         * the Jobim melody's syncopation, a note struck ahead of the beat and held across it.
+         */
+        leadOffbeatAttacks: (takes: Take[]) => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                for (const e of events) {
+                    if (e.lane !== 'lead' || t.bars[e.bar].meter.name !== '4/4') {
+                        continue;
+                    }
+                    n++;
+                    hit += stepOf(t, e) % 4 === 2 ? 1 : 0;
+                }
+            }
+            return ratio(hit, n);
+        },
+        /**
+         * Share of the lead's notes struck in a bar's last eighth that sound on over its
+         * barline: the bossa anticipation, the next bar's note sung an eighth early and tied.
+         */
+        leadTiedOverBarline: (takes: Take[]) => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                for (const e of events) {
+                    if (e.lane !== 'lead') {
+                        continue;
+                    }
+                    n++;
+                    const bar = t.bars[e.bar];
+                    const end = bar.start + bar.meter.barTicks;
+                    hit += e.tick >= end - STEP * 2 && e.tick + e.dur > end ? 1 : 0;
+                }
+            }
+            return ratio(hit, n);
+        },
+    },
     takes: [
+        // The known standard's guide-tone head, on bossa's own figures (#2122, `head.guide` in
+        // `styles/bossa.ts`): a Jobim melody's syncopation and long tones.
+        guideTonesTake({}, [
+            // 0.49 on bossa's figures, 0.30 on the shared ones (any eighth line's upbeats): the
+            // floor sits between them, so the shared figures fail it.
+            [
+                'leadOffbeatAttacks',
+                0.4,
+                0.65,
+                'the tune is struck on the "and"s, as the guitar\'s 3 + 3 + 2 is',
+            ],
+            // 0.071 on bossa's figures, 0.018 on the shared ones (whose one push is in one cell
+            // of six): the floor sits between them.
+            ['leadTiedOverBarline', 0.04, 0.15, "the next bar's note pushed and tied over"],
+        ]),
         {
             take: {},
             claims: [

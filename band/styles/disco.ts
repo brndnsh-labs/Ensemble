@@ -487,6 +487,47 @@ const discoLead = leadIdiom({
         ],
         endings: ['x---------------', 'x--x------------', 'x-x-x-----------'],
         form: 'period',
+        // A known standard's guide-tone head in disco (#2122): the guide tones sung the way a
+        // disco vocal or sax hook phrases a tune — eighths pumping with the hats, pushes on the
+        // "and" of 4 into the next One, and one soaring held note a phrase. Every figure
+        // strikes on beat 3 or an eighth before it, where a two-chord bar's second chord lands.
+        guide: {
+            cells: [
+                // why: three eighths pumping into the half on 3: "da-da-da DAH", the hook's
+                // pickup run on the hats' eighths.
+                'x-x-x---x-------',
+                // why: quarter, quarter, dotted quarter and the "and" of 4 pushed over the
+                // barline: the next chord's tone sung an eighth ahead of the floor's One.
+                'x---x---x-----x-',
+                // why: the 3-3-2 on sixteenths (as disco's own head plays it), then the half on
+                // 3: the dance syncopation under a singable line.
+                'x--x--x-x-------',
+                // why: a half, then 3, its "and" and the push into the next One: the second half
+                // of the bar pumps eighths into the barline.
+                'x-------x-x---x-',
+                // why: the One and its "and", the change on 3 and the push on the "and" of 4:
+                // a flick off the downbeat, then the line leans into the next One.
+                'x-x-----x-----x-',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4 (the bridge hands
+            // back on one, and a last-beat note would leave the phrase an eighth's breath).
+            turns: [
+                // why: four eighths into the half on 3, the busiest bar: the pump at its fullest.
+                'x-x-x-x-x-------',
+                // why: a quarter and two eighths into 3.
+                'x---x-x-x-------',
+                // why: two halves, a breath of plain time before the arrival soars.
+                'x-------x-------',
+            ],
+            endings: [
+                // why: the soaring arrival, struck on the One and held the bar: the diva's (or
+                // the tenor's) long note over the strings.
+                'x-------------..',
+                // why: a dotted half that breathes a beat before the next phrase's push.
+                'x-----------....',
+            ],
+            close: 'x-------------..',
+        },
     },
     pool: (chord) => chordPentatonic(chord),
     arrive: (chord) => guideTones(chord),
