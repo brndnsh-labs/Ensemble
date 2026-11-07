@@ -327,6 +327,57 @@ const bossaLead = leadIdiom({
         ],
         endings: ['x---------------', '..x-------------', 'x-----x---------'],
         form: 'period',
+        // A known standard's guide-tone head in bossa (#2122): the guide tones sung the way a
+        // Jobim melody phrases ("Corcovado", "The Girl from Ipanema") — long, cool tones placed
+        // on the guitar's 3+3+2, struck on an "and" and held across the beat, the next bar's
+        // note pushed an eighth early and tied over the barline. Every cell strikes on beat 3
+        // or the "and" of 2, where a two-chord bar's second chord lands (an eighth early there
+        // is the change sung ahead, `onsetsFor`'s anticipation).
+        guide: {
+            cells: [
+                // why: 3 + 3 + 2, the guitar's own figure under it: dotted quarter, dotted quarter
+                // (the "and" of 2, the change sung early), then the 2 as an eighth on 4 and the
+                // next bar's note on its "and", tied over the barline.
+                'x-----x-----x-x-',
+                // why: in late on the "and" of 1 and again on the "and" of 2, held over 3, then
+                // an eighth on 4 stepping on: the Corcovado float, the line struck off the beat
+                // and carried across it. The note on 4 is an eighth so it passes (a quarter there
+                // is held, so a chord tone, and the 3 + 3's held tones then skip by 3rds).
+                '..x---x-----x-..',
+                // why: dotted quarter, an eighth onto 3, held, and the next bar's note pushed
+                // on the "and" of 4 and tied over the barline: the Ipanema line, a long tone
+                // answered by the push.
+                'x-----x-x-----x-',
+                // why: the one, a flick on its "and", the "and" of 2 held through 3, then the
+                // push over the barline: the samba's anticipation, the change sung early.
+                'x-x---x-------x-',
+                // why: a dotted quarter, then eighths walking from the "and" of 2 to a quarter
+                // on 4: the line's one moving bar, Getz's legato eighths between long tones.
+                'x-----x-x-x-x---',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4 (a bridge hands back
+            // to the last A on a turn, and a last-beat note would leave the phrase an eighth's
+            // breath, not the beat a singer takes).
+            turns: [
+                // why: two halves, the plainest step on.
+                'x-------x-------',
+                // why: dotted quarter, an eighth onto a half on 3: the long-short sway.
+                'x-----x-x-------',
+                // why: 3 + 3, the dotted quarter and a half from the "and" of 2: the clave's
+                // first side.
+                'x-----x-------..',
+            ],
+            // The arrival, struck once and held. A pushed arrival comes from the figure before
+            // it (its "and" of 4 tied in).
+            endings: [
+                // why: landed an eighth late on the "and" of 1: the bossa singer's delayed
+                // arrival.
+                '..x-----------..',
+                // why: struck on the one and held the bar less an eighth.
+                'x-------------..',
+            ],
+            close: 'x-------------..',
+        },
     },
     pool: (chord) => chordScale(chord),
     arrive: (chord) => guideTones(chord),

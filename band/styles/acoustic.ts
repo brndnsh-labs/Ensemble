@@ -866,6 +866,46 @@ const acousticLead = leadIdiom({
         ],
         endings: ['x---------------', 'x-------x-------', 'x---x-----------'],
         form: 'period',
+        // A known standard's guide-tone head on a singer-songwriter's second guitar (#2122): the
+        // guide tones sung as a folk verse phrases — the dotted-quarter lilt (long-short over
+        // the beat, as a strummed ballad sways), quarters a lyric's syllables fall on, and a
+        // pickup on 4 leaning into the next line. Every cell strikes on beat 3 or the "and" of
+        // 2, where a two-chord bar's second chord lands.
+        guide: {
+            cells: [
+                // why: dotted quarter, eighth, half on 3: the folk lilt, the long-short a
+                // ballad's verse sways on.
+                'x-----x-x-------',
+                // why: the lilt, then a pickup eighth on 4 stepping into the next bar: the line
+                // leans into its next phrase, as a singer breathes in the next words.
+                'x-----x-x---x-..',
+                // why: two quarters and a dotted quarter, then the "and" of 4 tied over the
+                // barline: a lyric's plain syllables and its pushed rhyme word.
+                'x---x---x-----x-',
+                // why: in on beat 2 with a pickup run into 3 — "and a" — and a pickup on 4: the
+                // verse that starts after the strum's downbeat.
+                '....x-x-x---x-..',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4 (a bridge hands back
+            // to the last A on a turn, and a last-beat note would leave the phrase an eighth's
+            // breath, not the beat a singer takes).
+            turns: [
+                // why: the lilt into a half on 3.
+                'x-----x-x-------',
+                // why: quarter, quarter, half: the plain walk on.
+                'x---x---x-------',
+                // why: two halves.
+                'x-------x-------',
+            ],
+            // The arrival, struck on the one and held: a folk tune lands on the beat.
+            endings: [
+                // why: a dotted half that breathes a beat.
+                'x-----------....',
+                // why: the bar less an eighth.
+                'x-------------..',
+            ],
+            close: 'x-------------..',
+        },
     },
     pool: (chord, key) => songPentatonic(chord, key),
     // The 3rd first (the note a singer lands on), then the 5th, the root last; a 7th only

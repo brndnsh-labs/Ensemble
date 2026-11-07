@@ -1,10 +1,50 @@
-import { defineClaims } from '../critique/harness.js';
+import type { BandEvent } from '../../core/types.js';
+import type { Timeline } from '../../form/timeline.js';
+import { STEP } from '../../players/grid.js';
+import { defineClaims, type Take } from '../critique/harness.js';
 import { guideTonesTake } from './guide-tones.js';
 
+const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
+const ratio = (hits: number, total: number) => (total ? hits / total : 0);
+const GUIDE = guideTonesTake();
+
 export const country = defineClaims({
+    metrics: {
+        /**
+         * Share of the lead's 4/4 bars with a note struck on beat 4: the honky-tonk pickup, the
+         * singer's "and then" into the next bar's downbeat.
+         */
+        leadPickupOnFour: (takes: Take[]) => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                const struck = new Map<number, boolean>();
+                for (const e of events) {
+                    if (e.lane !== 'lead' || t.bars[e.bar].meter.name !== '4/4') {
+                        continue;
+                    }
+                    struck.set(e.bar, (struck.get(e.bar) ?? false) || stepOf(t, e) === 12);
+                }
+                n += struck.size;
+                hit += [...struck.values()].filter(Boolean).length;
+            }
+            return ratio(hit, n);
+        },
+    },
     takes: [
-        // The known standard's guide-tone head, on the shared figures (#2122).
-        guideTonesTake(),
+        // The known standard's guide-tone head, on country's own figures (#2122, `head.guide`
+        // in `styles/country.ts`): a honky-tonk vocal's two-beat line.
+        // (`guideTonesTake`'s `extra` takes only the shared metrics, so country's own is added
+        // to its claims here.)
+        {
+            take: GUIDE.take,
+            claims: [
+                ...GUIDE.claims,
+                // 0.330 of its bars on country's figures, 0.040 on the shared ones (whose only
+                // beat-4 note is in one cell of six): the floor sits between them.
+                ['leadPickupOnFour', 0.2, 0.5, 'a pickup on 4 into the next bar'],
+            ],
+        },
         {
             take: { colour: true },
             claims: [

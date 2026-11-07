@@ -724,6 +724,51 @@ const countryLead = leadIdiom({
         ],
         endings: ['x---------------', 'x-------x-------'],
         form: 'period',
+        // A known standard's guide-tone head in country (#2122): the guide tones sung as a
+        // honky-tonk vocal phrases ("Your Cheatin' Heart", "Hey, Good Lookin'") — two-beat
+        // figures in halves and quarters over the boom-chick, a pickup on 4 into the next
+        // bar, and one held arrival a phrase. Every cell strikes on beat 3, where a two-chord
+        // bar's second chord lands.
+        guide: {
+            cells: [
+                // why: half, quarter on 3, pickup quarter on 4: the two-beat line, the singer's
+                // "and" into the next bar's downbeat.
+                'x-------x---x---',
+                // why: a quarter, two eighths walking into 3, the pickup on 4: the verse line
+                // a honky-tonk singer fits a lyric's syllables to.
+                'x---x-x-x---x---',
+                // why: in on 2 after the band's downbeat, then 3 and the pickup on 4: a
+                // honky-tonk line that starts off the boom.
+                '....x---x---x---',
+                // why: half, then 3 and two eighths on 4 and its "and", the last tied over the
+                // barline: the pickup run into the next line's downbeat.
+                'x-------x---x-x-',
+                // why: two eighths and a quarter on 2, then the half on 3: the lyric's quick
+                // pair ("hey, good") into its long syllable.
+                'x-x-x---x-------',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4: a bridge hands
+            // back to the last A on a turn, and a note struck on 4 there would leave the phrase
+            // an eighth's breath, not the beat a singer takes (the pickups on 4 are the cells').
+            turns: [
+                // why: two halves, the boom and the chick's two-beat.
+                'x-------x-------',
+                // why: quarter, quarter, half: walking on.
+                'x---x---x-------',
+                // why: a quarter and two eighths walking up into the half on 3: the walk-up
+                // a picker fills a turn with.
+                'x---x-x-x-------',
+            ],
+            // The held arrival, struck on the one: a country tune lands on the beat, never the
+            // swing singer's late landing.
+            endings: [
+                // why: a dotted half that breathes a beat.
+                'x-----------....',
+                // why: the bar less an eighth, the long held vowel at a line's end.
+                'x-------------..',
+            ],
+            close: 'x-------------..',
+        },
     },
     // The blue third is not in the pool: a country b3 always curls up into the 3rd (the
     // approach and the bend below), and a b3 held against the chord's 3rd is a rub, not a lick.
