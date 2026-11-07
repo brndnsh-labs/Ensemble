@@ -294,13 +294,49 @@ const metrics = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of the bars the lead plays in that sing a gallop (#2122): a note on a beat, its
+     * "and" and its "a", none on its "e" — the riff's rhythm in the line.
+     */
+    leadGallopBars: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const bars = new Map<number, Set<number>>();
+            for (const e of events) {
+                if (e.lane === 'lead' && t.bars[e.bar].meter.name === '4/4') {
+                    bars.set(e.bar, (bars.get(e.bar) ?? new Set()).add(stepOf(t, e)));
+                }
+            }
+            for (const s of bars.values()) {
+                n++;
+                hit += gallops(s).length ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
 } satisfies Record<string, Metric>;
+
+/** The guide-tone head on metal's own figures (`head.guide` in `styles/metal.ts`). */
+const guide = guideTonesTake({
+    // The gallop and the two-gallop turn: 3.13 notes a bar, against 2.71 on the shared figures
+    // (rock's eighths 3.08). The floor sits between, so it fails on the shared set.
+    leadNotesPerBar: [2.9, 3.6, "a metal singer's line, the gallop in it"],
+});
 
 export const metal = defineClaims({
     metrics,
     takes: [
-        // The known standard's guide-tone head, on the shared figures (#2122).
-        guideTonesTake(),
+        // The known standard's guide-tone head, on metal's own figures (#2122).
+        {
+            ...guide,
+            claims: [
+                ...guide.claims,
+                // Measured 0.23 (the two gallop cells and the two-gallop turn); 0 on the shared
+                // figures, which never gallop. The floor sits between them.
+                ['leadGallopBars', 0.1, 0.4, "the line borrows the riff's gallop"],
+            ],
+        },
         {
             // Metal's own instrument, with the energy following the form.
             take: { comp: 'guitar' },

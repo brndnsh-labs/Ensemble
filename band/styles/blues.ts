@@ -671,6 +671,49 @@ const bluesLead = leadIdiom({
         cells: ['x-x-x-------....', '..x-x-x-----....', 'x---x-x---x-----', 'x-x---x-x-------'],
         endings: ['x---------------', 'x-x-x-----------'],
         form: 'aab',
+        // A known standard's guide-tone head in the blues (#2122): the guide tones sung the
+        // way a blues singer phrases a call — a few words, one long note to moan on, and beat
+        // 4 left open for the guitar's answer. The figures are plain eighths: the shuffle's
+        // triplet comes from the feel (swing 100), never from the cells. A twelve-bar chorus
+        // is sung aab (`headForm`): the call, the call again over the IV, then the answer on
+        // the cells the call didn't use, closed on the turnaround's long note.
+        guide: {
+            cells: [
+                // why: a dotted quarter, then the and of 2 pushed into the long call note held
+                // through 3, beat 4 open: "I woke up this MORN-ing", the band answers.
+                'x-----x-----....',
+                // why: in late off the and of 1, then 2 and the call note on 3, beat 4 open:
+                // the singer laid back behind the shuffle.
+                '..x-x---x---....',
+                // why: two quarters, then the and of 2 pushed into the long note (sung early
+                // as the change's guide tone), beat 4 open: the call leaning into its word.
+                'x---x-x-----....',
+                // why: a swung pair held into beat 2, then the note on 3, beat 4 open: the
+                // short-long of a blues lyric ("my BA-by").
+                'x-x-----x---....',
+                // why: four swung eighths, the last (the and of 2) pushed into 3 and held
+                // through 4: the one call with no gap, so the line runs on rather than stopping
+                // every bar. (Three quarters here walked up a step and straight back in a
+                // one-chord bar, a trill: `leadOscillation` read 0.088.)
+                'x-x-x-x---------',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4 (the bridge hands
+            // back on one, and a last-beat note would leave the phrase an eighth's breath).
+            turns: [
+                // why: two notes, the second held through 3 and beat 4 open: the call's tail
+                // falling off, the room the guitar answers in.
+                'x-------x---....',
+                // why: in late off the and of 1 and held, then the note on 3, beat 4 open: the
+                // second line of the call, sung behind the beat.
+                '..x-----x---....',
+                // why: a swung pair walking into the half on 3: the bar that moves the line on.
+                'x-x-x---x-------',
+            ],
+            // why: the arrival, struck once on the one: a dotted half with beat 4 the breath (the
+            // band's answer bar), or the bar less an eighth.
+            endings: ['x-----------....', 'x-------------..'],
+            close: 'x-------------..',
+        },
     },
     pool: (chord, key) => bluesPool(chord, key),
     arrive: (chord) => bluesTargets(chord),

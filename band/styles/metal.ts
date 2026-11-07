@@ -532,6 +532,51 @@ const metalLead = leadIdiom({
         ],
         endings: ['x---------------', 'x-xxx-----------', 'x-------x-------'],
         form: 'period',
+        // A known standard's guide-tone head in metal (#2122): the guide tones sung the way a
+        // classic or power-metal singer phrases a verse (Dio, Dickinson, Kiske) — mostly on
+        // the beat and declaimed rather than rock's run of syncopated pushes, the band's gallop
+        // borrowed as a pickup, and a long screamed note to arrive on. Every figure strikes on
+        // beat 3 (or an eighth before it), where a two-chord bar's second chord lands. None is
+        // written over the barline (rock's `…x-`): metal's weight is the downbeat, and the riff
+        // under it is already there.
+        guide: {
+            cells: [
+                // why: the gallop (an eighth and two sixteenths) as the line's pickup, its last
+                // sixteenth held into the half on 3 — "Run to the Hills" sung, not played.
+                'x-xx----x-------',
+                // why: a dotted quarter, then two sixteenths run up into the half on 3: the
+                // power-metal "ya-da DAAH" lift into the change.
+                'x-----xxx-------',
+                // why: quarter, eighth, then the and of 2 held through 3 (sung early as the
+                // change's guide tone, `onsetsFor`) and a quarter on 4: the declaimed verse line
+                // (Holy Diver), its one push the word it leans on. (Four plain quarters walked a
+                // step up and back twice over a one-chord bar, a trill: `leadOscillation` read
+                // 0.078 against its 0.08 ceiling.)
+                'x---x-x-----x---',
+                // why: a half, then the gallop on 3, its last sixteenth held through 4: the
+                // riff's rhythm answering the held note.
+                'x-------x-xx----',
+                // why: two eighths into a held 2, then 3 and 4 on the beat: the chorus hook's
+                // short-short-long, then the line driving on.
+                'x-x-----x---x---',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4 (the bridge hands
+            // back on one, and a last-beat note would leave the phrase an eighth's breath).
+            turns: [
+                // why: two gallops into the half on 3: the Maiden gallop, the phrase's busiest
+                // bar, the line riding the double kick for a bar.
+                'x-xxx-xxx-------',
+                // why: dotted quarter, eighth, half on 3: the heavy "DUM, da-DUM" a metal line
+                // turns on. (Three quarters here walked a step up and back, a trill.)
+                'x-----x-x-------',
+                // why: two halves: the line holds still over a bar of the riff.
+                'x-------x-------',
+            ],
+            // why: the arrival is the screamed held note, struck once on the one: the bar less
+            // an eighth, or a dotted half that breathes a beat. Metal lands on the downbeat.
+            endings: ['x-------------..', 'x-----------....'],
+            close: 'x-------------..',
+        },
     },
     pool: (chord, key) => metalScale(chord, key),
     arrive: (chord, key) => metalArrive(chord, key),

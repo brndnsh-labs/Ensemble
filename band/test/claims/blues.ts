@@ -1,10 +1,56 @@
-import { defineClaims } from '../critique/harness.js';
+import type { PitchedNote } from '../../core/types.js';
+import { STEP } from '../../players/grid.js';
+import { defineClaims, type Metric } from '../critique/harness.js';
 import { guideTonesTake } from './guide-tones.js';
 
+const metrics = {
+    /**
+     * Share of the 4/4 bars the lead strikes in that leave beat 4 silent (#2122): the call
+     * sung, then the beat the band answers in. A note counts as sounding in beat 4 if it is
+     * held more than half a sixteenth into it (the lead's lean is a few ticks).
+     */
+    leadBeatFourOpen: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
+            for (const bar of t.bars) {
+                if (bar.meter.name !== '4/4') {
+                    continue;
+                }
+                const beat4 = bar.start + STEP * 12 + STEP / 2;
+                const end = bar.start + STEP * 16;
+                if (!lead.some((e) => e.bar === bar.index)) {
+                    continue;
+                }
+                n++;
+                hit += lead.some((e) => e.tick < end && e.tick + e.dur > beat4) ? 0 : 1;
+            }
+        }
+        return n ? hit / n : 0;
+    },
+} satisfies Record<string, Metric>;
+
+/** The guide-tone head on the blues's own figures (`head.guide` in `styles/blues.ts`). */
+const guide = guideTonesTake({
+    // A call and room: 2.39 notes a bar, against 2.74 on the shared figures. The ceiling sits
+    // between them, so it fails on the shared set.
+    leadNotesPerBar: [2.1, 2.6, "a blues singer's call, sparser than the shared figures"],
+});
+
 export const blues = defineClaims({
+    metrics,
     takes: [
-        // The known standard's guide-tone head, on the shared figures (#2122).
-        guideTonesTake(),
+        // The known standard's guide-tone head, on the blues's own figures (#2122).
+        {
+            ...guide,
+            claims: [
+                ...guide.claims,
+                // Measured 0.765; 0.237 on the shared figures, whose endings alone breathe on 4.
+                // The floor sits between them.
+                ['leadBeatFourOpen', 0.5, 1, 'the call leaves beat 4 to the band'],
+            ],
+        },
         {
             take: {},
             claims: [
