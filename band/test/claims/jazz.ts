@@ -1,8 +1,11 @@
 import { leadRole } from '../../arrange/cycle.js';
 import { type FormRole, formRole } from '../../arrange/plan.js';
 import type { BandEvent, DrumHit, DrumPiece, PitchedNote } from '../../core/types.js';
-import { type Bar, sectionKey, type Timeline } from '../../form/timeline.js';
+import { type Bar, chordAt, sectionKey, type Timeline } from '../../form/timeline.js';
 import { STEP } from '../../players/grid.js';
+import { guidePitchClasses } from '../../players/lead/guide-tones.js';
+import { chordPcs } from '../../theory/chord.js';
+import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
 
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
@@ -200,6 +203,37 @@ function bridgeOverHead(takes: Take[], of: (note: PitchedNote) => number): numbe
     return lifts.length ? lifts.reduce((s, x) => s + x, 0) / lifts.length : Number.NaN;
 }
 
+/** The lead's notes in a take, in order. */
+const leadOf = (take: Take) => take.events.filter((e): e is PitchedNote => e.lane === 'lead');
+
+/**
+ * The seams of each contrast (`headForms`): the lead's last note before it and its first in
+ * it, and its last in it and the first after (#2111). Pairs a breath of two bars or more apart
+ * are not a seam.
+ */
+function contrastSeams(take: Take): [PitchedNote, PitchedNote][] {
+    const { bars } = take.timeline;
+    const notes = leadOf(take);
+    const out: [PitchedNote, PitchedNote][] = [];
+    const across = (tick: number) => {
+        const k = notes.findIndex((n) => n.tick >= tick);
+        const [a, b] = [notes[k - 1], notes[k]];
+        if (k > 0 && b && b.tick - (a.tick + a.dur) < bars[0].meter.barTicks * 2) {
+            out.push([a, b]);
+        }
+    };
+    for (const form of headForms(take)) {
+        for (const visit of form.contrast) {
+            across(bars[visit.firstBar].start);
+            const after = bars[visit.firstBar + visit.barCount];
+            if (after) {
+                across(after.start);
+            }
+        }
+    }
+    return out;
+}
+
 export const jazz = defineClaims({
     metrics: {
         /** Share of the head's A-section bars the bass plays in 2 (#2018). */
@@ -245,8 +279,105 @@ export const jazz = defineClaims({
         leadHeadRhythmRecurs: (takes) => rhythmMatch(takes, 'again'),
         /** Share of the contrast's bars (the bridge, or a last B or C) on the A's rhythm. */
         leadHeadContrastDiffers: (takes) => rhythmMatch(takes, 'contrast'),
-        /** Semitones the lead's bridge sits above its A sections, on average (#2111). */
-        leadBridgeLift: (takes) => bridgeOverHead(takes, (e) => e.midi),
+        /**
+         * Semitones the lead's first note in the bridge sits over its last note before it, on
+         * average (#2111): the lift is measured from where the A's line ended, not a home.
+         * NaN (a failed claim) with no bridge.
+         */
+        leadBridgeLift: (takes) => {
+            const lifts: number[] = [];
+            for (const take of takes) {
+                const { bars } = take.timeline;
+                const notes = leadOf(take);
+                for (const visit of take.timeline.visits) {
+                    const bar = bars[visit.firstBar];
+                    if (barsIn([take], 'bridge').every((b) => b.index !== bar.index)) {
+                        continue;
+                    }
+                    const k = notes.findIndex((n) => n.tick >= bar.start);
+                    if (k > 0) {
+                        lifts.push(notes[k].midi - notes[k - 1].midi);
+                    }
+                }
+            }
+            return lifts.length ? lifts.reduce((s, x) => s + x, 0) / lifts.length : Number.NaN;
+        },
+        /**
+         * The widest move at a seam into or out of the contrast, in semitones (#2111): the
+         * bridge lifts, and the last A comes back, by a 4th at most.
+         */
+        leadContrastSeamLeap: (takes) =>
+            Math.max(
+                0,
+                ...takes.flatMap((take) =>
+                    contrastSeams(take).map(([a, b]) => Math.abs(b.midi - a.midi)),
+                ),
+            ),
+        /**
+         * Share of the lead's notes held a quarter or longer that are not tones of their chord
+         * (#2111): its chord tones, the 3rd and 7th the guide-tone line hears in it
+         * (`guidePitchClasses`: a triad's 7th), and under a half note its natural 9th. An
+         * anticipation is judged against the chord it arrives on as well.
+         */
+        leadHeldNonChordShare: (takes) => {
+            let n = 0;
+            let hit = 0;
+            for (const take of takes) {
+                const { timeline: t } = take;
+                for (const e of leadOf(take)) {
+                    if (e.dur < STEP * 4) {
+                        continue;
+                    }
+                    const key = t.bars[e.bar].key;
+                    const fits = [chordAt(t, e.tick), chordAt(t, e.tick + STEP * 2)].some(
+                        (c) =>
+                            !!c &&
+                            [
+                                ...chordPcs(c),
+                                ...guidePitchClasses(c, key),
+                                ...(e.dur < STEP * 8 && c.scale.includes(2)
+                                    ? [mod12(c.root + 2)]
+                                    : []),
+                            ].includes(mod12(e.midi)),
+                    );
+                    n++;
+                    hit += fits ? 0 : 1;
+                }
+            }
+            return ratio(hit, n);
+        },
+        /**
+         * Share of the head's bars (its A sections and its bridge) where the lead holds a note
+         * three beats or more (#2111): how often the head sounds like whole notes. A note
+         * belongs to the bar it starts in.
+         */
+        leadLongNoteBars: (takes) => {
+            const bars = [...barsIn(takes, 'head'), ...barsIn(takes, 'bridge')];
+            const long = bars.filter((b) =>
+                b.events.some((e) => e.lane === 'lead' && e.dur >= STEP * 12),
+            );
+            return ratio(long.length, bars.length);
+        },
+        /**
+         * Share of the lead's moves across a barline, inside a phrase (less than a beat apart),
+         * that strike the same pitch again (#2111): a common tone stuttered rather than tied.
+         */
+        leadRepeatAcrossBarline: (takes) => {
+            let n = 0;
+            let hit = 0;
+            for (const take of takes) {
+                const notes = leadOf(take);
+                for (let i = 1; i < notes.length; i++) {
+                    const [a, b] = [notes[i - 1], notes[i]];
+                    if (a.bar === b.bar || b.tick - (a.tick + a.dur) >= STEP * 4) {
+                        continue;
+                    }
+                    n++;
+                    hit += a.midi === b.midi ? 1 : 0;
+                }
+            }
+            return ratio(hit, n);
+        },
         /** How much louder the lead plays its bridge than its A sections, in velocity. */
         leadBridgeLouder: (takes) => bridgeOverHead(takes, (e) => e.velocity),
     },
@@ -358,32 +489,50 @@ export const jazz = defineClaims({
             // tune's rhythm. Each claim's comment gives its value as measured, then (in
             // parentheses) on 2f772130, where the head held each guide tone a chord apiece.
             take: { lead: 'guide-tones' },
+            // Each comment gives the value as measured, then (in parentheses) on 2f772130, the
+            // head held a chord apiece, and on 24b7047f, its first sung cut. A claim marked
+            // "new" fails on at least one of them, as noted; the rest are guards that held then.
             claims: [
                 // The line chooses only guide tones at the changes. The misses are the pop
                 // chart's triads, whose 7th (the line's other guide tone) this metric doesn't
-                // count. 0.935 (0.967).
+                // count. 0.961 (0.967; 0.935).
                 ['leadChangeGuideTones', 0.9, 1, 'each change lands on its 3rd or 7th'],
-                // Two or three notes a bar between the long arrivals. 1.98 (0.90).
+                // Two or three notes a bar between the arrivals. 2.40 (0.90; 1.98).
                 ['leadNotesPerBar', 1.6, 3, 'a tune over the changes, not a chord apiece'],
-                // The long notes are the arrivals: the two-bar cell's, and a section's close.
-                // 0.145 (0.617; Stella's head was 20 whole notes in 22).
-                ['leadWholeNoteShare', 0.08, 0.3, 'whole notes only where the tune arrives'],
+                // New: one long arrival a phrase at most, at its end (#2111's review: the first
+                // cut's two-bar cells ended on a long note every other bar). 0.210 (0.580 and
+                // 0.335: both fail).
+                ['leadLongNoteBars', 0, 0.25, 'a long note a phrase, not every other bar'],
+                // Tightened with it: the issue's 0.08 floor was the first cut's every-other-bar
+                // long note, which the review ruled out. 0.054 (0.617 and 0.145: both fail).
+                ['leadWholeNoteShare', 0.03, 0.12, 'whole notes only where a phrase arrives'],
+                // New: a note held a beat or more, or struck on 1 or 3, is a chord tone, never an
+                // avoid note (`walkPool`). 0 (0; 0.176: the first cut held passing tones like A
+                // over Em7b5 for two and a half beats — fails).
+                ['leadHeldNonChordShare', 0, 0.03, 'the held notes are the harmony'],
+                // New: a common tone across a change is tied or turned, never struck again.
+                // 0.023 (0.100 and 0.099: both fail).
+                ['leadRepeatAcrossBarline', 0, 0.05, 'no stuttered common tones across a barline'],
+                // New: the bridge comes in, and the last A comes back, by a 4th at most
+                // (`SEAM`, so 5 is the bound by construction). 5 (6 and 12: both fail — the
+                // first cut lifted a 5th over a fixed home, an 11th from where the A ended).
+                ['leadContrastSeamLeap', 0, 5, 'into and out of the bridge by a 4th at most'],
                 [
                     'leadMeanInterval',
                     0,
                     2.3,
-                    'stepwise between guide tones that step or hold (1.74; 1.68)',
+                    'stepwise between guide tones that step or hold (1.90; 1.68; 1.74)',
                 ],
-                // The steps between guide tones walk the chord scale. 0.781 (0.739).
+                // The notes between guide tones walk. 0.768 (0.739; 0.781).
                 ['leadStepShare', 0.6, 1, 'mostly half and whole steps'],
-                ['leadLeapShare', 0, 0.01, 'no leaps wider than a fifth (0; 0)'],
+                ['leadLeapShare', 0, 0.01, 'no leaps wider than a fifth (0; 0; 0)'],
                 [
                     'leadMoveOverThird',
                     0,
                     0.05,
-                    'voice-led: no 4th or tritone inside a phrase (0.001; 0)',
+                    'voice-led: no 4th or tritone inside a phrase (0.011; 0; 0.001)',
                 ],
-                // No chromatic approach and no enclosure: the chord scale only. 0 (0).
+                // No chromatic approach and no enclosure: the chord scale only. 0 (0; 0).
                 [
                     'leadChromaticApproach',
                     0,
@@ -391,21 +540,21 @@ export const jazz = defineClaims({
                     'a tune steps into its chords, not chromatically',
                 ],
                 // The air is inside the cells; the empty bars are the pop chart's intro.
-                // 0.065 (0.269).
+                // 0.038 (0.269; 0.065).
                 ['leadRestShare', 0, 0.1, 'the head fills the form'],
-                ['leadLongBreath', 0, 0.02, 'the line never drops out for two bars (0; 0)'],
-                // Rhythm Changes' A2 and last A against its A1: the one bar that differs is the
-                // last A's eighth, whose Bb6 has no F7 on 3 to strike. 0.969 (0.938: the held
-                // line already followed the A's chords).
+                ['leadLongBreath', 0, 0.02, 'the line never drops out for two bars (0; 0; 0)'],
+                // Rhythm Changes' A2 and last A against its A1: the bar that differs is the
+                // last A's eighth, whose Bb6 has no F7 on 3 to strike. 0.969 (0.938; 0.969).
                 ['leadHeadRhythmRecurs', 0.9, 1, 'the A comes back in the same rhythm'],
                 // The bridge, a two-section tune's B and the bridge of the pop and minor
-                // charts against the first A, bar for bar. 0.135 (0.458).
+                // charts against the first A, bar for bar. 0.146 (0.458; 0.135).
                 ['leadHeadContrastDiffers', 0, 0.3, 'the contrast is another rhythm'],
-                // Rhythm Changes and the minor chart's bridge: each phrase starts a 5th up.
-                // 4.40 semitones (-2.38: the held line fell through the bridge's dominants).
-                ['leadBridgeLift', 2, 12, 'the bridge sings higher than the A'],
+                // The bridge's first note over the A's last: a 4th's aim from where the line
+                // came in. 4.0 (4.0; 9.5 — the first cut's 5th over a fixed home fails the
+                // ceiling).
+                ['leadBridgeLift', 2, 7, 'the bridge lifts from where the A ended'],
                 // 82 against 74 planned, plus the lift's own push (higher notes play harder).
-                // 10.8 (0.2).
+                // 8.2 (0.2; 10.8).
                 ['leadBridgeLouder', 3, 20, 'and louder'],
             ],
         },

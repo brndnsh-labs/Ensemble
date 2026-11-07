@@ -174,14 +174,20 @@ expression devices take turns rather than stack; one peak note per cycle.
     it does not pretend to know the tune: the head is the changes' guide-tone line instead —
     a 3rd or 7th a chord, each stepping to the nearest of the next chord's, a common tone held
     (`players/lead/guide-tones.ts`). Since #2111 the line is sung in a tune's rhythm (the book's
-    `head.guide` cells, `voiceGuideTones` in `players/lead/idiom.ts`): every chord change, the
-    first note and the last are the line's guide tones, and the notes between step through the
-    chord scale toward the next one, with no chromatics or enclosures. The rhythm is drawn once
-    per chorus, so every A recurs: a two-bar cell (a figure, then the long note it arrives on)
-    stated and answered with another ending, the section closing on a whole note. The contrast
-    (the bridge, or with none a last section in another letter) takes cells the A didn't use,
-    starts each phrase a 5th over the A's home and plays louder; a 12-bar chorus is a blues
-    instead (call, call, answer). A book without `head.guide` holds one guide tone a chord.
+    `head.guide` figures, turns and endings, `voiceGuideTones` in `players/lead/idiom.ts`):
+    every chord change, the first note and the last are the line's guide tones, and the notes
+    between walk toward the next one — a note held a beat or more, or on 1 or 3, is a chord
+    tone (or, under a half note, the 9th); only a short weak one is a scale step, and there are
+    no chromatics or enclosures. A common tone across a change is turned or tied, never struck
+    twice. The rhythm is drawn once per chorus, so every A recurs, pitches and all (it starts
+    where the first A did): a four-bar statement (a figure, a turn that moves on, a second
+    figure, the phrase's one long arrival) and a four-bar answer (the figure an eighth late,
+    another turn, the close). The contrast (the bridge, or with none a last section in another
+    letter) takes figures the A didn't use, starts each phrase a 4th over where the A's line
+    ended, comes back down a step over the A's opening for its last phrase, and plays louder;
+    no seam into or out of it moves more than a 4th. A 12-bar chorus (a vamp after it doesn't
+    count) is a blues instead: call, call, answer. A book without `head.guide` holds one guide
+    tone a chord.
     Solos and trades are the same either way.
   - Looping, it solos over the next three choruses and brings the head back on the fourth:
     head, solo, solo, solo, head… The three solo choruses are one arc: the first starts low and

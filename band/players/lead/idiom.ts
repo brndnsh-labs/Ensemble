@@ -22,7 +22,7 @@ import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { barSteps, dyn, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
-import { type GuideNote, guideToneLine, headForm } from './guide-tones.js';
+import { type GuideNote, guidePitchClasses, guideToneLine, headForm } from './guide-tones.js';
 import {
     type Contour,
     type LinePalette,
@@ -55,12 +55,18 @@ export interface LeadBook extends LinePalette {
          */
         form: 'period' | 'aab';
         /**
-         * The rhythm a known standard's guide-tone head is sung in (#2111): one-bar `cells`,
-         * sparser than a head's own (the guide tones carry the tune, the cells give it a
-         * rhythm), the phrase `endings` an arrival is struck in, and the `close`, the whole note
-         * a section ends on. Unset: the guide tones are held a chord apiece.
+         * The rhythm a known standard's guide-tone head is sung in (#2111): one-bar `cells`
+         * (figures), sparser than a head's own (the guide tones carry the tune, the cells give
+         * it a rhythm); `turns`, the bar after a figure that moves on (a half note at most);
+         * the phrase `endings`, its one long arrival; and the `close`, the whole note a section
+         * ends on. Unset: the guide tones are held a chord apiece.
          */
-        guide?: { cells: readonly string[]; endings: readonly string[]; close: string };
+        guide?: {
+            cells: readonly string[];
+            turns: readonly string[];
+            endings: readonly string[];
+            close: string;
+        };
     };
     /** Chance a solo bar plays the bar before it again (a riff) rather than moving on. */
     riff: number;
@@ -813,21 +819,25 @@ type GuidePart = 'statement' | 'contrast' | 'home';
 const GUIDE_VELOCITY: Record<GuidePart, number> = { statement: 74, contrast: 82, home: 78 };
 
 /**
- * A sung guide-tone head's phrase plan (#2111): which cell or ending each bar plays. The rhythm
- * is the chorus's, drawn once (`head:guide:motif`, never the pass or the section), so the
- * out-head restates the in-head and every A takes the same rhythm.
+ * A sung guide-tone head's phrase plan (#2111): which cell, turn or ending each bar plays. The
+ * rhythm is the chorus's, drawn once (`head:guide:motif`, never the pass or the section), so the
+ * out-head restates the in-head and every A takes the same rhythm — an A section, played again,
+ * is the tune coming back.
  *
- * - An A section's phrase is a two-bar cell said twice: a figure (`a`) and the long note it
- *   arrives on (the statement's ending), then the figure again and a different ending. The
- *   section's last phrase moves on to the second figure (`b`) in its third bar and closes on
- *   the whole note (`close`). A section in another letter that isn't the contrast (Stella's B,
- *   an A B A C's B) answers the A: the same shape, its two figures swapped.
- * - The contrast (the bridge, or with none an A B tune's B, an A B A C's C: `headForm`) moves
- *   through two cells the statement didn't use, with no long note until its last bar: a
- *   hand-back ending into the last A, or the close when it ends the chorus.
- * - The last A (`home`) is the A's rhythm again.
- * - A blues (`aab`): the call, the call again over the IV, then the contrast's cells as the
- *   answer, closed on the long turnaround note.
+ * - An A section is a four-bar statement and a four-bar answer. The statement is a two-bar idea
+ *   (a figure `a` and a turn that moves on) and a second figure `b` into the phrase's one long
+ *   arrival (the statement's ending). The answer says the figure again an eighth late (or as
+ *   it was, if it already starts late), turns another way and closes on the whole note.
+ *   Sixteen bars of one section alternate the two. A section in another letter that isn't the
+ *   contrast (Stella's B, an A B A C's B) answers the A with its figures swapped, and keeps that
+ *   order when it comes back last (Night and Day's last B).
+ * - The contrast (the bridge, or with none an A B tune's B, an A B A C's C: `headForm`) takes
+ *   figures and a turn the A didn't use, and its own ending; its last phrase hands back to the
+ *   last A with a turn, or closes when it ends the chorus.
+ * - A blues (`aab`): the statement as the call, the call again over the IV, then the contrast's
+ *   figures as the answer, closed on the long turnaround note.
+ *
+ * Only a phrase's last bar holds a note three beats or more: a turn is a half note at most.
  */
 function guidePlan(
     ctx: BarContext,
@@ -840,17 +850,25 @@ function guidePlan(
     const form = headForm(ctx.timeline, slotStart);
     const rng = ctx.rng('head:guide:motif', 'song');
     const [c1, c2] = twoCells(rng, guide.cells);
+    const [t1, t2] = twoCells(rng, guide.turns);
     const statementEnd = rng.pick(guide.endings);
     const unused = guide.cells.filter((c) => c !== c1 && c !== c2);
     const [k1, k2] = twoCells(rng, unused.length >= 2 ? unused : guide.cells);
-    const answerEnd =
-        guide.endings[(guide.endings.indexOf(statementEnd) + 1) % guide.endings.length];
-    // The hand-back: an ending that isn't the close, so the bridge doesn't stop where an A does.
-    const handBack = guide.endings.find((e) => e !== guide.close) ?? answerEnd;
+    const otherTurns = guide.turns.filter((t) => t !== t1 && t !== t2);
+    const kt = otherTurns.length ? rng.pick(otherTurns) : t2;
+    const otherEnds = guide.endings.filter((e) => e !== statementEnd);
+    const contrastEnd = otherEnds.length ? rng.pick(otherEnds) : statementEnd;
+    // The answer's figure: the statement's an eighth late, as a singer varies a line coming
+    // round, unless it already starts late (then as it was).
+    const late = (cell: string) => (cell.startsWith('x') ? displace(cell, 2) : cell);
     const p = first.phrase.index;
     const phrasesInVisit = bars[first.visit.firstBar + first.visit.barCount - 1].phrase.index + 1;
     const lastPhrase = p === phrasesInVisit - 1;
     const ordinal = first.visit.ordinal;
+    const statement = (a: string, b: string, closing: boolean) =>
+        closing || p % 2 === 1
+            ? [late(a), t2, b, closing ? guide.close : statementEnd]
+            : [a, t1, b, statementEnd];
     let part: GuidePart;
     let four: string[];
     if (form.form === 'aab') {
@@ -858,7 +876,7 @@ function guidePlan(
         // twelve-bar section or as three fours.
         const answer = Math.floor((slotStart - form.firstBar) / 4) % 3 === 2;
         part = answer ? 'home' : 'statement';
-        four = answer ? [k1, k2, k1, guide.close] : [c1, statementEnd, c1, answerEnd];
+        four = answer ? [k1, kt, k2, guide.close] : [c1, t1, c2, statementEnd];
     } else {
         // A chorus with no contrast section (one long A) takes its contrast in its third phrase
         // of four, as an invented head's period does.
@@ -871,13 +889,13 @@ function guidePlan(
                   : 'statement';
         if (part === 'contrast') {
             const closing = lastPhrase && !inner;
-            four = [k1, k2, k1, closing ? (ordinal === form.last ? guide.close : handBack) : k2];
+            four = closing
+                ? [late(k1), kt, k2, ordinal === form.last ? guide.close : t1]
+                : [k1, kt, k2, contrastEnd];
         } else {
-            const answers =
-                part === 'statement' &&
-                sectionKey(first.visit) !== sectionKey(bars[form.firstBar].visit);
+            const answers = sectionKey(first.visit) !== sectionKey(bars[form.firstBar].visit);
             const [a, b] = answers ? [c2, c1] : [c1, c2];
-            four = lastPhrase ? [a, statementEnd, b, guide.close] : [a, statementEnd, a, answerEnd];
+            four = statement(a, b, lastPhrase);
         }
     }
     // A phrase of another length keeps its ending bars: a longer one opens with more figures.
@@ -1014,43 +1032,42 @@ function moveCost(semitones: number): number {
 const WALK_SEARCH = 7;
 
 /**
- * The notes between two guide tones (#2111): a walk through the chord scale (`pool`) from
- * guide tone `from` toward the next one, `to`, its last note beside `to` (never on it), so a
- * singer steps onto each arrival. Chosen whole, the cheapest by `moveCost`: steps where it
- * can, a repeated pitch never, a trill (a note two back again) avoided, and with more notes
- * than the distance needs it turns — `dir` first (up over the line, or down under it) and back.
+ * The notes between two guide tones (#2111): a walk from guide tone `from` toward the next one,
+ * `to`, its last note beside `to` (never on it), so a singer steps onto each arrival. Each note
+ * comes from its own pool (`pools`: a held or strong-beat note's is its chord's tones, a short
+ * weak one's the chord scale). Chosen whole, the cheapest by `moveCost`: steps where it can, a
+ * repeated pitch never, a trill (a note two back again) avoided, and with more notes than the
+ * distance needs it turns — `dir` first (up over the line, or down under it) and back.
  */
 function walkBetween(
     from: number,
     to: number,
-    count: number,
-    pool: readonly number[],
+    pools: readonly (readonly number[])[],
     dir: 1 | -1,
     [lo, hi]: readonly [number, number],
 ): number[] {
+    const count = pools.length;
     if (count <= 0) {
         return [];
     }
-    const ladder: number[] = [];
-    for (
-        let m = Math.max(lo, Math.min(from, to) - 9);
-        m <= Math.min(hi, Math.max(from, to) + 9);
-        m++
-    ) {
-        if (pool.includes(mod12(m))) {
-            ladder.push(m);
+    const floor = Math.max(lo, Math.min(from, to) - 9);
+    const ceiling = Math.min(hi, Math.max(from, to) + 9);
+    const ladders = pools.map((pool) => {
+        const ladder: number[] = [];
+        for (let m = floor; m <= ceiling; m++) {
+            if (pool.includes(mod12(m))) {
+                ladder.push(m);
+            }
         }
-    }
-    if (!ladder.length) {
-        return Array.from({ length: count }, () => from);
-    }
+        return ladder;
+    });
     if (count > WALK_SEARCH) {
         // A long walk: out to the far end of the turn and back, in two searched halves.
         const half = Math.ceil(count / 2);
         const peak = from + dir * Math.min(7, half);
-        const first = walkBetween(from, peak, half, pool, dir, [lo, hi]);
+        const first = walkBetween(from, peak, pools.slice(0, half), dir, [lo, hi]);
         const last = first.at(-1) ?? from;
-        return [...first, ...walkBetween(last, to, count - half, pool, -dir as 1 | -1, [lo, hi])];
+        return [...first, ...walkBetween(last, to, pools.slice(half), -dir as 1 | -1, [lo, hi])];
     }
     let best: number[] = [];
     let bestCost = Number.POSITIVE_INFINITY;
@@ -1067,32 +1084,58 @@ function walkBetween(
             }
             return;
         }
-        for (const m of ladder) {
-            if (Math.abs(m - prev) > 4) {
+        for (const m of ladders[path.length]) {
+            if (Math.abs(m - prev) > 5) {
                 continue;
             }
             const before =
                 path.length >= 2 ? path[path.length - 2] : path.length === 1 ? from : null;
             const turn = path.length === 0 && Math.sign(m - from) !== dir ? 0.5 : 0;
+            // why: the walk keeps to its side of the guide tone it left (over it going up,
+            // under it going down), a quarter of a step's cost a semitone across — enough that
+            // a free step the wrong way loses to a 3rd the right way, never to a leap.
+            const side = 0.25 * Math.max(0, dir > 0 ? from - m : m - from);
             path.push(m);
-            search(m, cost + moveCost(m - prev) + (before === m ? 0.6 : 0) + turn);
+            search(m, cost + moveCost(m - prev) + (before === m ? 0.6 : 0) + turn + side);
             path.pop();
         }
     };
     search(from, 0);
-    return best.length === count ? best : Array.from({ length: count }, () => from);
+    return best.length === count ? best : pools.map(() => from);
+}
+
+/**
+ * The pitches a sung guide-tone head's note between guide tones may take (#2111). why: a note
+ * held a beat or more, or struck on 1 or 3, is heard against its chord — it is one of the
+ * chord's tones, never an avoid note (a natural 4th held over a major chord, a b9 over a
+ * minor one, a b2 over a half-diminished one). Under a half note its natural 9th may stand in
+ * for the root (a 9th is colour, not a rub: a guide tone a half step from the next one would
+ * otherwise have only a 4th's skip to a chord tone). A scale step is a passing note: only a
+ * short one (an eighth or less) off the strong beats.
+ */
+function walkPool(o: SlotOnset): number[] {
+    if (o.dur <= STEP * 2 && o.step % 8 !== 0) {
+        return chordScale(o.chord);
+    }
+    const ninth = o.dur < STEP * 8 && o.chord.scale.includes(2) ? [mod12(o.chord.root + 2)] : [];
+    // A triad's tones are its 3rd and 7th as the line hears them too (`guidePitchClasses`: the
+    // tonic's major 7th, a dominant's b7), so a triad's walk isn't left only 4ths and 3rds.
+    return [...new Set([...chordPcs(o.chord), ...guidePitchClasses(o.chord, o.key), ...ninth])];
 }
 
 /**
  * A known standard's head phrase (`BarContext.guideToneHead`), sung (#2111): its guide-tone
  * line (`guideToneLine`) in a tune's rhythm (`guidePlan`, `guideOnsets`). Every chord change,
- * the first note and the last is the line's voice-led 3rd or 7th; between them the line steps
- * through the chord scale toward the next guide tone (`walkBetween`): no chromatic approach, no
- * enclosure — a tune over the changes, not a solo. The design read (#2111) had `voiceLine` fill
- * between the guide tones; its fill reaches a target from a chord tone a 3rd or 4th away when
- * the step beside it is the note it left (a guide-tone line moves a half step a chord, so that
- * was most of them: 18% of moves inside a phrase over a minor 3rd), so the head walks its own
- * steps. A book with no guide-tone rhythm holds the line a chord apiece (`holdGuideTones`).
+ * the first note and the last is the line's voice-led 3rd or 7th; between them the line walks
+ * toward the next guide tone (`walkBetween`, `walkPool`): no chromatic approach, no enclosure —
+ * a tune over the changes, not a solo. The design read (#2111) had `voiceLine` fill between the
+ * guide tones; its fill reaches a target from a chord tone a 3rd or 4th away when the step
+ * beside it is the note it left (a guide-tone line moves a half step a chord, so that was most
+ * of them: 18% of moves inside a phrase over a minor 3rd), so the head walks its own notes.
+ *
+ * A guide tone that is the next chord's too is never struck twice running: the note before it
+ * gives its last eighth to a passing step (a quarter or longer), or is tied into it.
+ * A book with no guide-tone rhythm holds the line a chord apiece (`holdGuideTones`).
  */
 function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
     const guide = book.head.guide;
@@ -1108,13 +1151,44 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
     const { spans } = ctx.timeline;
     const range = ctx.lead.range;
     const pitches: (number | null)[] = onsets.map((o, i) =>
-        i === 0 || o.change ? (lineAt(Math.max(o.tick, spans[o.span].start))?.midi ?? null) : null,
+        i === 0 || o.change || i === onsets.length - 1
+            ? (lineAt(Math.max(o.tick, spans[o.span].start))?.midi ?? null)
+            : null,
     );
-    const n = onsets.length;
-    // The last note is the line's too: the walk before it steps back onto the guide tone.
-    if (n > 1 && pitches[n - 1] === null) {
-        pitches[n - 1] = lineAt(onsets[n - 1].tick)?.midi ?? null;
+    // A guide tone struck twice running (a common tone across a change, or the last note on
+    // the chord's own guide tone): the first gives up its last eighth to a passing note, or,
+    // too short for that, is tied into the second.
+    for (let i = 1; i < onsets.length; i++) {
+        const [o, before] = [onsets[i], onsets[i - 1]];
+        if (
+            pitches[i] === null ||
+            pitches[i] !== pitches[i - 1] ||
+            before.tick + before.dur !== o.tick
+        ) {
+            continue;
+        }
+        if (before.dur >= STEP * 4) {
+            before.dur -= STEP * 2;
+            const tick = before.tick + before.dur;
+            const bar = barOf(ctx, tick);
+            onsets.splice(i, 0, {
+                ...before,
+                tick,
+                dur: STEP * 2,
+                step: Math.round((tick - ctx.timeline.bars[bar].start) / STEP),
+                change: false,
+                bar: bar - slotStart,
+            });
+            pitches.splice(i, 0, null);
+            i++;
+        } else {
+            before.dur += o.dur;
+            onsets.splice(i, 1);
+            pitches.splice(i, 1);
+            i--;
+        }
     }
+    const n = onsets.length;
     let a = 0;
     for (let b = 1; b < n; b++) {
         if (pitches[b] === null) {
@@ -1127,8 +1201,7 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
             const walk = walkBetween(
                 pitches[a] as number,
                 pitches[b] as number,
-                b - a - 1,
-                chordScale(onsets[a + 1].chord),
+                onsets.slice(a + 1, b).map(walkPool),
                 dir,
                 range,
             );
@@ -1137,24 +1210,6 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
             });
         }
         a = b;
-    }
-    // why: a section that leaps up more than a 5th into the contrast (the bridge starts from
-    // the lifted home, `CONTRAST_LIFT`, wherever the A's line ended) breathes a whole beat at
-    // its end, as a singer breathes before the bridge: a leap that size is a new phrase after a
-    // breath, never a slur out of the close.
-    const { bars } = ctx.timeline;
-    const after = bars[slotStart + plan.kinds.length];
-    const last = onsets[n - 1];
-    const into = after ? lineAt(after.start)?.midi : undefined;
-    if (
-        last &&
-        after &&
-        into !== undefined &&
-        after.visit !== bars[slotStart].visit &&
-        after.visit.ordinal === headForm(ctx.timeline, slotStart).contrast &&
-        Math.abs(into - (pitches[n - 1] ?? into)) > 7
-    ) {
-        last.dur = Math.max(STEP * 2, Math.min(last.dur, after.start - STEP * 4 - last.tick));
     }
     const sung = pitches.map((m) => m ?? homeOf(ctx, book));
     const top = Math.max(...sung);

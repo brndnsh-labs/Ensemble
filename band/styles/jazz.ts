@@ -594,30 +594,39 @@ const jazzLead = leadIdiom({
         // cell (a held note, a beat's breath), never a bar of rest. Each has an attack on (or
         // an eighth before) beat 3, where a two-chord bar's second chord arrives.
         guide: {
+            // The figures: two or three notes a bar, every one with an attack on (or an eighth
+            // before) beat 3, where a two-chord bar's second chord arrives. A note held a beat
+            // or more is one of its chord's tones (`walkPool`), so the held notes are the
+            // harmony and only the short ones pass between; a pickup on 4 is an eighth for that
+            // reason.
             cells: [
                 // Dotted quarter, eighth, half: the Charleston figure, the commonest opening of
                 // a swing tune — the eighth steps into the half on 3.
                 'x-----x-x-------',
                 // Two quarters and a half: a plain statement, walking up or down into beat 3.
                 'x---x---x-------',
-                // Dotted quarter, then an eighth pushed over beat 3 and held: the push lands
-                // on 3's chord early (an anticipation), the swing horn's lean.
-                'x-----x---------',
                 // Half, dotted quarter, then an eighth pushed into the next bar and tied over
                 // its barline: the next chord's guide tone, an eighth early.
                 'x-------x-----x-',
-                // A lazy entry on the and of 1, then the half on 3: the phrase leans in late,
-                // as a singer does (the guide tone is still struck within an eighth of 1).
-                '..x-----x-------',
-                // A dotted half and a quarter: a long note, then a pickup into the next bar —
-                // the long-short breath of a ballad's line, two notes a bar.
-                'x-----------x---',
+                // A lazy entry on the and of 1, then 3 and a pickup on 4: the phrase leans in
+                // late, as a singer does (the guide tone is still struck within an eighth of 1).
+                '..x-----x---x-..',
+                // Dotted quarter, dotted quarter, pickup (3 + 3 + 2): the line rides across
+                // the beat.
+                'x-----x-----x-..',
+                // An eighth flicked off the downbeat, then the half on 3: a doo-dah.
+                'x-x-----x-------',
             ],
-            // The phrase-ending bar: one arrival, struck once (two strikes on one chord would
-            // be the same guide tone twice), held long — a standard's 4th and 8th bars are its
-            // long notes. On the one, breathing an eighth for the next phrase; or landed an
-            // eighth late, as a singer leans into it, and rung up to the next phrase.
-            endings: ['x-------------..', '..x-------------'],
+            // The turn: the bar after a figure, moving on — a half note at most, so the
+            // phrase's only long note is its arrival. Two halves; a quarter, a half and a
+            // pickup; a half and two pickups back in after an eighth's breath. A pickup on 4
+            // is an eighth, clipped before the barline: a passing note that steps into the
+            // next bar's guide tone, not a beat held against the chord it leaves.
+            turns: ['x-------x-------', 'x---x-------x-..', 'x-------..x-x-..'],
+            // The phrase's one long arrival, three beats or more: struck once (two strikes on
+            // one chord would be its guide tone twice). A dotted half that breathes a beat;
+            // landed an eighth late, as a singer leans into it; or the whole note.
+            endings: ['x-----------....', '..x-----------..', 'x-------------..'],
             // A section's last bar: the whole note on the one, breathing an eighth before the
             // next section.
             close: 'x-------------..',
