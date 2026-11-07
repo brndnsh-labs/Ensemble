@@ -1,6 +1,7 @@
 import { leadRole } from '../../arrange/cycle.js';
 import { type FormRole, formRole } from '../../arrange/plan.js';
-import type { BandEvent, DrumHit, PitchedNote } from '../../core/types.js';
+import type { BandEvent, DrumHit, DrumPiece, PitchedNote } from '../../core/types.js';
+import { STEP } from '../../players/grid.js';
 import { defineClaims, type Take } from '../critique/harness.js';
 
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
@@ -42,28 +43,66 @@ function bassFeel(takes: Take[], role: FormRole, two: boolean): number {
     return ratio(bars.filter((b) => bassIn(b.events).length <= 3 === two).length, bars.length);
 }
 
-/** Mean ride-stroke velocity over the time-keeping bars in `role` (no fill, no crash bar). */
-function rideVelocity(takes: Take[], role: FormRole): number {
-    let sum = 0;
-    let n = 0;
-    for (const { take, index, events } of barsIn(takes, role)) {
+/**
+ * The time-keeping bars in `role` (no crash bar, no fill bar, no tom), each as its drum hits
+ * and the sixteenth each falls on (the critique plays straight, so a step is exact).
+ */
+function timeBars(takes: Take[], role: FormRole) {
+    return barsIn(takes, role).flatMap(({ take, index, events }) => {
         const bar = take.timeline.bars[index];
         const drums = events.filter((e): e is DrumHit => e.lane === 'drums');
-        if (
+        const fill =
             bar.barInVisit === 0 ||
             bar.phrase.bar === bar.phrase.length - 1 ||
-            drums.some((d) => d.piece.startsWith('tom') || d.piece === 'crash')
-        ) {
-            continue;
-        }
-        for (const d of drums) {
-            if (d.piece === 'ride') {
-                sum += d.velocity;
+            drums.some((d) => d.piece.startsWith('tom') || d.piece === 'crash');
+        return fill
+            ? []
+            : [
+                  drums.map((d) => ({
+                      piece: d.piece,
+                      step: Math.round((d.tick - bar.start) / STEP),
+                  })),
+              ];
+    });
+}
+
+/** Mean `piece` strokes per time-keeping bar in `role`; NaN (a failed claim) with no such bar. */
+function strokesPerBar(takes: Take[], role: FormRole, piece: DrumPiece): number {
+    const bars = timeBars(takes, role);
+    const strokes = bars.reduce((n, hits) => n + hits.filter((h) => h.piece === piece).length, 0);
+    return bars.length ? strokes / bars.length : Number.NaN;
+}
+
+/**
+ * The head's bars right before a solo chorus (the next bar, or the next pass's first when the
+ * song wraps, is a solo's): the share where the bass walks into it.
+ */
+function setsUpSolo(takes: Take[]): number {
+    let n = 0;
+    let hit = 0;
+    for (const { timeline: t, events, pass = 0, trade } of takes) {
+        const roleAt = (index: number, onPass: number) =>
+            formRole(
+                t,
+                index,
+                leadRole(t, index, onPass + t.bars[index].visit.chorus, trade ?? null),
+            );
+        for (const bar of t.bars) {
+            const last = bar.index === t.bars.length - 1;
+            const next = last ? roleAt(0, pass + 1) : roleAt(bar.index + 1, pass);
+            const notes = bassIn(events.filter((e) => e.bar === bar.index)).length;
+            if (
+                bar.meter.name === '4/4' &&
+                roleAt(bar.index, pass) === 'head' &&
+                next === 'solo' &&
+                notes > 0
+            ) {
                 n++;
+                hit += notes >= 4 ? 1 : 0;
             }
         }
     }
-    return n ? sum / n : Number.NaN;
+    return ratio(hit, n);
 }
 
 export const jazz = defineClaims({
@@ -75,31 +114,46 @@ export const jazz = defineClaims({
         /** Share of the head's bridge bars the bass walks. */
         bassBridgeWalks: (takes) => bassFeel(takes, 'bridge', false),
         /**
-         * The ride under the head's A sections over the ride under the solos, mean stroke
-         * velocity: the head's soft time against the solos' full ride. NaN (a failed claim)
-         * when either has no time-keeping bar to judge.
+         * Ride strokes per time-keeping bar under the head's A sections, over the same under
+         * the solos: the head on the hat, the solos on the ride.
          */
-        rideHeadOverSolo: (takes) => rideVelocity(takes, 'head') / rideVelocity(takes, 'solo'),
+        rideHeadOverSolo: (takes) =>
+            strokesPerBar(takes, 'head', 'ride') / strokesPerBar(takes, 'solo', 'ride'),
+        /** Share of the head's A-section time bars with the closed hat on all four beats. */
+        hatOnBeatsHead: (takes) => {
+            const bars = timeBars(takes, 'head');
+            const on = bars.filter((hits) =>
+                [0, 4, 8, 12].every((x) => hits.some((h) => h.piece === 'hat' && h.step === x)),
+            );
+            return bars.length ? on.length / bars.length : Number.NaN;
+        },
+        /** Share of the head's last bars before a solo chorus where the bass walks into it. */
+        bassSetsUpSolo: setsUpSolo,
     },
     takes: [
         {
             take: {},
             claims: [
                 // The head and the solos get different grooves (#2018). This take is the head
-                // (pass 0) and the first solo chorus, on Auto (the head about 0.52, mid). Measured
-                // 0.960 / 1 / 1 / 0.766; with the change reverted 0 (the head walked from bar 1)
-                // / 1 / 1 / 0.99 (one ride across both). The head's 4% that reads as walking is a
-                // two-chord bar in 2 whose half notes each split for an approach (four notes).
+                // (pass 0) and the first solo chorus, on Auto (the head about 0.52, mid). Measured,
+                // in order: 0.827 / 1 / 1 / 0.093 / 0.907 / 1. With the change reverted: 0 (the
+                // head walked from bar 1) / 1 / 1 / 1 (one ride across both) / 0 / 1. The setup
+                // claim reads 0.063 without the setup bar, or without the wrap carrying the next
+                // pass's role (`performPass`'s `nextPlan`). The head bars that walk or ride are
+                // the setup bars, a section authored hot (the pop chart's chorus at 0.85, high,
+                // walks on the ride), and a two-chord bar in 2 whose half notes each split for an
+                // approach (four notes).
                 ['bassHeadInTwo', 0.8, 1, "the head's A sections: the bass in 2"],
                 ['bassBridgeWalks', 0.9, 1, "the head's bridge walks, for contrast"],
                 ['bassSoloWalks', 0.9, 1, 'the solos walk'],
                 [
                     'rideHeadOverSolo',
                     0,
-                    0.9,
-                    "a soft ride under the head's A sections, the full ride under the solos",
+                    0.1,
+                    "the head's A sections on the hi-hat, the ride saved for the solos",
                 ],
-                ['rideOnBeats', 0.9, 1, 'the ride carries the time on every beat'],
+                ['hatOnBeatsHead', 0.9, 1, 'the closed hat keeps the time under the head'],
+                ['bassSetsUpSolo', 0.9, 1, "the head's last bar walks into the solo"],
                 ['hatPedal24', 0.9, 1, 'hi-hat foot on 2 and 4'],
                 // Measured 0.033 today; 0.016 with the push off (the chance level: a Charleston hit
                 // that happens to carry both guide tones). The floor sits between them: a guard
@@ -112,6 +166,14 @@ export const jazz = defineClaims({
                 ],
                 ['compColour', 0.6, 1, 'rootless voicings carry 9ths and 13ths'],
                 ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
+            ],
+        },
+        {
+            take: { intensity: 0.9 },
+            claims: [
+                // A burner's head walks (#2018): the light head is below the high tier. Measured
+                // 0; 0.918 with the head in 2 at every tier.
+                ['bassHeadInTwo', 0, 0.1, 'a hot head walks on the ride from the top'],
             ],
         },
         {
@@ -218,8 +280,9 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
-                // The walk is the solos' (#2018): the head's A sections are in 2, so the walking
-                // line is judged on the three solo choruses.
+                // The walk and the ride are the solos' (#2018): the head's A sections are in 2
+                // on the hat, so the walking line and the ride are judged on the solo choruses.
+                ['rideOnBeats', 0.9, 1, 'the ride carries the time on every beat'],
                 ['bassNotesPerBeat', 0.85, 1.05, 'a walking line: one note per beat'],
                 ['bassArrivesOnBass', 0.75, 1, 'the walk lands on the chord (a 3rd now and then)'],
                 ['bassChromaticApproach', 0.3, 0.8, 'half-step approaches lead into changes'],

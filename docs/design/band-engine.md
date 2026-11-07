@@ -231,8 +231,10 @@ expression devices take turns rather than stack; one peak note per cycle.
     intro). It is there with the lead off, since the head is still the first time through. A
     section labelled Bridge is the bridge; a chart of rehearsal letters has its bridge read
     from the form, as the contrast right before the last A (A A B A's B, A B C D's C). Jazz
-    plays the head's A sections in 2 over the quiet time whatever the energy, then walks the
-    bridge and the solos on the full ride; at low energy (a ballad) it stays in 2 throughout.
+    plays the head's A sections in 2 with the drummer on the closed hi-hat (no feathered kick,
+    no snare comping) below the high tier, and walks the bridge and the solos on the ride. The
+    head's last bar before a solo walks, to set it up. A hot head (the high tier) walks on the
+    ride from the top, and at low energy (a ballad) the bass stays in 2 throughout.
   - **A counted chart** (`SemanticScore.choruses`, #1475) is one timeline holding every chorus,
     played once as pass 0. Each bar's chorus is added to the pass (`planBars`'s `passAt`), and
     every seed, a solo's arc, its opening breath and a looping book's recalled phrase are keyed
