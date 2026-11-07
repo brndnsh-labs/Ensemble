@@ -696,19 +696,21 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     // 60ms poll, so the call lands 400-460ms in. The floor is 300: it keeps 100ms below the
     // trigger for the estimate's own slack (the barline is the tightest paint's, so the measured
     // delay can under-read by that paint's lag, the 60ms poll plus a stall) and is far above what
-    // a jump in the new bar's own render (#1458 patch review P1-2) reads, ~0. The ceiling is 560:
-    // the trigger, one poll, and 100ms for a stalled frame, well inside the 1000ms bar, so it is
-    // also the "same bar it is for" check (a jump that waited for the next bar would read 1000+).
+    // a jump in the new bar's own render (#1458 patch review P1-2) reads, ~0. The ceiling is 750:
+    // the trigger and one poll (460ms) plus ~300ms for stalled frames, since the audio clock keeps
+    // running through a main-thread stall and CI's WebKit stalls 100ms+ (#2126 review). It still
+    // catches a jump that drifted late in its bar; one that waited for the next bar is never found
+    // at all (the search wants the scroll call while C3 is still active) and throws.
     const lap1 = await nextJumpDelay();
     expect(lap1, 'the jump should not fire at (or near) the downbeat').toBeGreaterThanOrEqual(300);
-    expect(lap1, 'the jump should fire within the SAME bar it is for').toBeLessThanOrEqual(560);
+    expect(lap1, 'the jump should fire within the SAME bar it is for').toBeLessThanOrEqual(750);
 
     const lap2 = await nextJumpDelay();
     expect(
         lap2,
         'the jump should fire again on lap 2, not stay spent after lap 1',
     ).toBeGreaterThanOrEqual(300);
-    expect(lap2, 'lap 2 should fire within the SAME bar it is for').toBeLessThanOrEqual(560);
+    expect(lap2, 'lap 2 should fire within the SAME bar it is for').toBeLessThanOrEqual(750);
 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
