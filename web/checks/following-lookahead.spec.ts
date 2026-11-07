@@ -185,14 +185,36 @@ type ScrollCall = {
      * coincidental match (e.g. bar 1's own ordinary row-scroll landing near `top: 0` too) can
      * satisfy even when the jump-ahead never actually fired. */
     activeId: string | null;
+    /** The band's audio clock (ms) at the instant of the call. */
+    audio: number | null;
 };
+
+type ActiveChange = { time: number; activeId: string | null; audio: number | null };
 
 /** Every `Element.scrollTo` call for the rest of the test, with the behavior it asked for and
  * which bar was active at the moment it fired. */
 async function trackScrollCalls(page: Page): Promise<void> {
     await page.addInitScript(() => {
-        const w = window as unknown as { __scrollCalls: ScrollCall[] };
+        const w = window as unknown as {
+            __scrollCalls: ScrollCall[];
+            bandClocks: AudioContext[];
+        };
         w.__scrollCalls = [];
+        // The band's own clock (as `chart-pointer.spec.ts` does): a timing assertion in wall-clock
+        // paints inherits every main-thread stall, where the audio clock keeps the bars' true
+        // length (#2126).
+        w.bandClocks = [];
+        const Native = window.AudioContext;
+        window.AudioContext = class extends Native {
+            constructor(options?: AudioContextOptions) {
+                super(options);
+                w.bandClocks.push(this);
+            }
+        };
+        const audioNow = () => {
+            const clock = w.bandClocks.at(-1);
+            return clock ? clock.currentTime * 1000 : null;
+        };
         const orig = Element.prototype.scrollTo;
         type Patchable = { scrollTo: (opts?: unknown) => void };
         (Element.prototype as unknown as Patchable).scrollTo = function (
@@ -208,6 +230,7 @@ async function trackScrollCalls(page: Page): Promise<void> {
                     top: o.top,
                     time: Date.now(),
                     activeId: active?.getAttribute('data-measure-id') ?? null,
+                    audio: audioNow(),
                 });
             }
             return (orig as (opts?: unknown) => void).call(this, opts);
@@ -216,7 +239,7 @@ async function trackScrollCalls(page: Page): Promise<void> {
         // assertion measured from the test's own poll loses the poll interval plus an `evaluate`
         // round trip on CI WebKit, which once shrank a ~400ms delay under a 250ms floor.
         const v = window as unknown as {
-            __activeChanges: { time: number; activeId: string | null }[];
+            __activeChanges: ActiveChange[];
         };
         v.__activeChanges = [];
         const watch = () => {
@@ -227,6 +250,7 @@ async function trackScrollCalls(page: Page): Promise<void> {
                         v.__activeChanges.push({
                             time: Date.now(),
                             activeId: el.getAttribute('data-measure-id'),
+                            audio: audioNow(),
                         });
                     }
                 }
@@ -244,32 +268,10 @@ async function trackScrollCalls(page: Page): Promise<void> {
     });
 }
 
-/**
- * The in-page times the playing bar became `activeId` (the last such change at or before
- * `before`, ms epoch) and then became the NEXT bar (the first change after it to a different
- * id, or null if none has landed yet).
- */
-async function activatedAround(
-    page: Page,
-    activeId: string,
-    before: number,
-): Promise<{ at: number; next: number | null } | null> {
-    const changes = await page.evaluate(
-        () =>
-            (window as unknown as { __activeChanges: { time: number; activeId: string | null }[] })
-                .__activeChanges,
+function activeChanges(page: Page): Promise<ActiveChange[]> {
+    return page.evaluate(
+        () => (window as unknown as { __activeChanges: ActiveChange[] }).__activeChanges,
     );
-    let index = -1;
-    changes.forEach((c, i) => {
-        if (c.activeId === activeId && c.time <= before) {
-            index = i;
-        }
-    });
-    if (index < 0) {
-        return null;
-    }
-    const next = changes.slice(index + 1).find((c) => c.activeId !== activeId);
-    return { at: changes[index].time, next: next?.time ?? null };
 }
 
 function scrollCalls(page: Page): Promise<ScrollCall[]> {
@@ -588,8 +590,11 @@ test('the next-bar cue strengthens only in the last felt beat, not at the downbe
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 
-/** One bar at 240bpm in 4/4, in ms. */
+/** One bar at 240bpm in 4/4, in ms OF THE BAND'S AUDIO CLOCK. */
 const BAR_MS = 1000;
+
+/** The loop's bars in playing order: `startHere(page, 'C')` plays C1 C2 C3, then the form. */
+const LAP_ORDER = ['C1', 'C2', 'C3', 'A1', 'A2', 'A3', 'A4', 'B1'];
 
 test('the jump-ahead fires in the last felt beat (not the downbeat), and fires again on the next lap', async ({
     page,
@@ -607,104 +612,105 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     await startHere(page, 'C');
 
     /**
-     * When did the jump-ahead's OWN `scrollForJump` call fire for the NEXT time C3 becomes
-     * active (relative to when this is called)? Each call starts counting fresh from the current
-     * moment, so calling this twice in a row measures two SUCCESSIVE occurrences (lap 1, then
-     * lap 2) — not "wait for two more after this point", which a call keyed on an absolute
-     * occurrence number would.
+     * How far into C3's bar, in the band's AUDIO time, did the jump-ahead's OWN `scrollForJump`
+     * call fire for the NEXT time C3 becomes active? Each call starts counting fresh from the
+     * current moment, so two calls in a row measure two SUCCESSIVE laps.
      *
-     * Reads the scroll call's own timestamp rather than polling `getBoundingClientRect()` for
-     * "is bar 1 visible yet": a `behavior: 'smooth'` scroll (this test isn't under reduced
-     * motion) takes the browser's own animation duration to visually complete, which on a 1s bar
-     * with a ~250ms last-beat window can straddle the very moment `active` flips to bar 1 —
-     * racing the animation's completion against the bar boundary, not testing when the app
-     * actually asked to scroll. The call is identified by TWO independent signals (patch review
-     * P2-3): it fired while `activeId` was STILL `'C3'` (the definitive one — a scroll that
-     * merely coincides with landing near the top of the document, e.g. bar 1's own ordinary
-     * row-scroll on ITS OWN downbeat, would never satisfy this), and its destination is near the
-     * very TOP of the document (bar 1 is first; the row-scroll effect's own calls for C3 itself
-     * land near the BOTTOM, on an 8-bar chart) — either alone could accidentally match something
-     * else; together they can't.
+     * The call is identified by TWO independent signals (patch review P2-3): it fired while
+     * `activeId` was STILL `'C3'` (the definitive one: bar 1's own row-scroll on ITS OWN downbeat
+     * would never satisfy it), and its destination is near the very TOP of the document (bar 1
+     * is first; C3's own row-scroll calls land near the BOTTOM).
      *
-     * Returns two delays, both wall-clock ms to the jump's own `scrollTo`:
-     *  - `sincePaint`: from the render that marked C3 active. The app publishes `active` off a 60ms
-     *    poll and React paints it, so that render lags the engine's real barline by the poll plus
-     *    any main-thread stall (a CI WebKit worker sharing a runner stalls for 100ms+). It can only
-     *    UNDER-state how far into the bar the jump fired.
-     *  - `sinceBarline`: from the tightest bound the two paints give on C3's real barline. C3's own
-     *    paint is at or after its barline, and the NEXT bar's paint is at or after C3's END, one
-     *    bar length later — so `min(C3 paint, next paint - BAR_MS)` is at or after the true
-     *    barline, and a delay from it is at or under the true one. Both paints must stall by the
-     *    floor's margin for it to read low; a jump firing at the downbeat reads ~0 from either.
+     * Why audio time (#2126): the jump fires off `runtime.inLastBeat()`, a read of the engine's
+     * own tick, while every wall-clock reading here is a paint, which lags the engine by the 60ms
+     * poll plus any main-thread stall (100ms+ on a shared CI WebKit), and under load the engine's
+     * bars stretch to 1.1-2.3s of wall clock. Stamped on the audio clock instead, a bar is
+     * exactly `BAR_MS` long however busy the page is, so the barline is `paint - k * BAR_MS`
+     * from ANY bar's paint, k bars away in the loop. Each such estimate is at or after the true
+     * barline (a paint is never early), so the MINIMUM over every paint recorded so far is
+     * the tightest one: a stall has to hit every paint to loosen it. The returned delay is then
+     * at or under the true one.
      */
-    async function nextJumpCallDelay(): Promise<{ sincePaint: number; sinceBarline: number }> {
+    async function nextJumpDelay(): Promise<number> {
         let lastId: string | null = null;
-        let t0 = 0;
+        let seenC3 = false;
         const deadline = Date.now() + 20_000;
         while (Date.now() < deadline) {
             const sample = await sampleChart(page);
             if (sample.activeId !== lastId) {
                 lastId = sample.activeId;
-                if (sample.activeId === 'C3' && !t0) {
-                    t0 = Date.now();
-                } else if (t0 && sample.activeId !== 'C3') {
+                if (sample.activeId === 'C3' && !seenC3) {
+                    seenC3 = true;
+                } else if (seenC3 && sample.activeId !== 'C3') {
                     break; // left C3 for the occurrence being measured
                 }
             }
             await page.waitForTimeout(30);
         }
-        if (!t0) {
+        if (!seenC3) {
             throw new Error('C3 never became active');
         }
-        // The poll saw C3 up to one interval plus a round trip late; measure from the page's
-        // own record of the change instead.
-        const around = await activatedAround(page, 'C3', t0);
-        const paintedAt = around?.at ?? t0;
+        const changes = await activeChanges(page);
+        // Positions in bars since the first paint: each step is the loop distance between
+        // consecutive ids, so a dropped paint (a stalled frame skipping a bar) still counts.
+        let position = 0;
+        let previous = -1;
+        const stamped = changes.map((c) => {
+            const index = LAP_ORDER.indexOf(c.activeId ?? '');
+            if (previous >= 0 && index >= 0) {
+                position += (index - previous + LAP_ORDER.length) % LAP_ORDER.length;
+            }
+            previous = index >= 0 ? index : previous;
+            return { ...c, index, position };
+        });
+        // The occurrence being measured: the newest C3 paint that has been left again.
+        const c3 = [...stamped]
+            .reverse()
+            .find(
+                (c) =>
+                    c.activeId === 'C3' &&
+                    stamped.some((d) => d.time > c.time && d.activeId !== 'C3'),
+            );
+        if (!c3) {
+            throw new Error('no completed C3 occurrence recorded');
+        }
         const jump = (await scrollCalls(page)).find(
             (c) =>
                 c.cls === 'chart-scroll' &&
-                c.time >= paintedAt &&
+                c.time >= c3.time &&
                 c.activeId === 'C3' &&
                 (c.top ?? 999) < 50,
         );
-        if (!jump) {
+        if (!jump || jump.audio == null) {
             throw new Error('no jump-to-bar-1 scroll call found for this occurrence');
         }
-        const barlineBound =
-            around?.next != null ? Math.min(paintedAt, around.next - BAR_MS) : paintedAt;
-        return { sincePaint: jump.time - paintedAt, sinceBarline: jump.time - barlineBound };
+        const barlines = stamped
+            .filter((c): c is typeof c & { audio: number } => c.audio != null && c.index >= 0)
+            .map((c) => c.audio - (c.position - c3.position) * BAR_MS);
+        return jump.audio - Math.min(...barlines);
     }
 
-    // A 1s bar (240bpm, 4/4): `runtime.inLastBeat()` now fires at the EARLIER of the last felt
-    // pulse (750ms in) and a fixed ~600ms real-time lead before the barline (400ms in, patch
-    // review P3-1) — so ~400ms is the actual expected trigger point at this tempo, not ~750ms.
-    // The window below is deliberately wide (patch review P3-4, after an earlier ~210ms margin
-    // proved thin under CI WebKit): comfortably below both possible trigger points at its floor,
-    // comfortably inside the bar at its ceiling, so it stays meaningful without chasing the exact
-    // millisecond either constant produces. Both ends are measured in the page, to the jump's own
-    // `scrollTo`. The regression this guards (the jump in the SAME render as the new bar, patch
-    // review P1-2) measures ~0ms from the barline; the floor sits well clear of both that and the
-    // ~400ms trigger. The floor is measured from the barline bound `nextJumpCallDelay` derives,
-    // not from C3's paint alone: that paint lags the engine by the 60ms poll plus any main-thread
-    // stall, and a stalled CI worker once read 199 here for a jump that fired on time (#1463
-    // follow-up). The ceiling can only be tightened by that lag, never broken, so it keeps the
-    // paint.
-    const lap1 = await nextJumpCallDelay();
-    expect(
-        lap1.sinceBarline,
-        'the jump should not fire at (or near) the downbeat',
-    ).toBeGreaterThanOrEqual(200);
-    expect(
-        lap1.sincePaint,
-        'the jump should fire within the SAME bar it is for',
-    ).toBeLessThanOrEqual(900);
+    // why: the window is derived from `BandHost.inLastPulse` (`lib/band-host.ts`), which is true
+    // from `min(last pulse start, barline - 600ms)`. At 240bpm the last pulse starts 750ms in and
+    // the lead is 400ms in, so the trigger is 400ms into the bar; the stand reads it off its
+    // 60ms poll, so the call lands 400-460ms in. The floor is 300: it keeps 100ms below the
+    // trigger for the estimate's own slack (the barline is the tightest paint's, so the measured
+    // delay can under-read by that paint's lag, the 60ms poll plus a stall) and is far above what
+    // a jump in the new bar's own render (#1458 patch review P1-2) reads, ~0. The ceiling is 750:
+    // the trigger and one poll (460ms) plus ~300ms for stalled frames, since the audio clock keeps
+    // running through a main-thread stall and CI's WebKit stalls 100ms+ (#2126 review). It still
+    // catches a jump that drifted late in its bar; one that waited for the next bar is never found
+    // at all (the search wants the scroll call while C3 is still active) and throws.
+    const lap1 = await nextJumpDelay();
+    expect(lap1, 'the jump should not fire at (or near) the downbeat').toBeGreaterThanOrEqual(300);
+    expect(lap1, 'the jump should fire within the SAME bar it is for').toBeLessThanOrEqual(750);
 
-    const lap2 = await nextJumpCallDelay();
+    const lap2 = await nextJumpDelay();
     expect(
-        lap2.sinceBarline,
+        lap2,
         'the jump should fire again on lap 2, not stay spent after lap 1',
-    ).toBeGreaterThanOrEqual(200);
-    expect(lap2.sincePaint).toBeLessThanOrEqual(900);
+    ).toBeGreaterThanOrEqual(300);
+    expect(lap2, 'lap 2 should fire within the SAME bar it is for').toBeLessThanOrEqual(750);
 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
