@@ -132,10 +132,45 @@ describe('the guide-tone line', () => {
 });
 
 describe('the band plays it for the head only (#2027)', () => {
-    it('as the head of a standard: one long note a chord, not a tune', () => {
+    it('as the head of a standard: the guide tones, sung in a tune’s rhythm (#2111)', () => {
+        const timeline = compileTimeline(AUTUMN);
         const head = lead('guide-tones').filter((n) => n.bar < 24);
-        expect(head.length).toBeLessThanOrEqual(24);
-        expect(head.every((n) => n.dur >= 960)).toBe(true);
+        // Two or three notes a bar, not one long note a chord.
+        expect(head.length).toBeGreaterThan(24 * 1.5);
+        // Every chord's first note is one of its guide tones: sounding as it arrives (struck
+        // on it, or pushed into it), or landed an eighth late (a swung eighth: within a beat).
+        for (let bar = 0; bar < 24; bar++) {
+            const at = bar * BAR;
+            const chord = chordAt(timeline, at)!;
+            if (bar > 0 && chordAt(timeline, at - 1)?.symbol === chord.symbol) {
+                continue; // no change here
+            }
+            const struck =
+                head.find((n) => n.tick <= at && n.tick + n.dur > at) ??
+                head.find((n) => n.tick > at && n.tick < at + 480);
+            expect(struck, `bar ${bar}`).toBeDefined();
+            expect(guidePitchClasses(chord, timeline.bars[bar].key)).toContain(mod12(struck!.midi));
+        }
+        // Whole notes only where the tune arrives: every other bar at most.
+        expect(head.filter((n) => n.dur >= BAR - 240).length).toBeLessThanOrEqual(12);
+        // The second A comes back in the first A's rhythm.
+        const rhythm = (from: number) =>
+            head.filter((n) => n.bar >= from && n.bar < from + 8).map((n) => n.tick - from * BAR);
+        expect(rhythm(8)).toEqual(rhythm(0));
+        // The B (the contrast) is another rhythm, and sings higher.
+        expect(rhythm(16)).not.toEqual(rhythm(0));
+        const mean = (from: number) => {
+            const notes = head.filter((n) => n.bar >= from && n.bar < from + 8);
+            return notes.reduce((s, n) => s + n.midi, 0) / notes.length;
+        };
+        expect(mean(16) - mean(0)).toBeGreaterThanOrEqual(2);
+    });
+
+    it('is the same head every time it comes round', () => {
+        // The notes, not their levels: a later pass plays at its own energy.
+        const notes = (pass: number) =>
+            lead('guide-tones', pass).map(({ tick, dur, midi }) => [tick, dur, midi]);
+        expect(notes(4)).toEqual(notes(0));
     });
 
     it('not on any other chart: the lead invents the head', () => {
