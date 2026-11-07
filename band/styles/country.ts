@@ -734,9 +734,9 @@ const countryLead = leadIdiom({
                 // why: half, quarter on 3, pickup quarter on 4: the two-beat line, the singer's
                 // "and" into the next bar's downbeat.
                 'x-------x---x---',
-                // why: a quarter, two eighths walking into 3, the pickup on 4: the verse line
-                // a honky-tonk singer fits a lyric's syllables to.
-                'x---x-x-x---x---',
+                // why: four quarters, the last the pickup on 4: the boom-chick two-beat sung
+                // straight, Hank's line (an eighth pair walking into 3 is rock's, not this).
+                'x---x---x---x---',
                 // why: in on 2 after the band's downbeat, then 3 and the pickup on 4: a
                 // honky-tonk line that starts off the boom.
                 '....x---x---x---',

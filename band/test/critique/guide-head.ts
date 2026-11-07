@@ -7,7 +7,7 @@
 import { leadRole } from '../../arrange/cycle.js';
 import { type FormRole, formRole } from '../../arrange/plan.js';
 import type { BandEvent, PitchedNote } from '../../core/types.js';
-import { type Bar, chordAt, sectionKey, type Timeline } from '../../form/timeline.js';
+import { type Bar, chordAt, sectionKey, spanIndexAt, type Timeline } from '../../form/timeline.js';
 import { STEP } from '../../players/grid.js';
 import { guidePitchClasses } from '../../players/lead/guide-tones.js';
 import { chordPcs } from '../../theory/chord.js';
@@ -166,6 +166,30 @@ function contrastSeams(take: Take): [PitchedNote, PitchedNote][] {
 
 /** The guide-tone head's metrics (#2111, #2122), in the shared library. */
 export const GUIDE_METRICS = {
+    /**
+     * Share of the lead's consecutive notes inside a phrase (less than a beat apart) that strike
+     * the same pitch again over the same chord, the second sung for that chord too (no change
+     * between the first's onset and an eighth into the second): a tone stuttered with nothing
+     * new under it (#2122: the bridge's hand-back turn sang G4 ... G4 over Ebmaj7). A common
+     * tone struck again for a new chord is not one.
+     */
+    leadSameChordRestrike: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const notes = events.filter((e): e is PitchedNote => e.lane === 'lead');
+            for (let i = 1; i < notes.length; i++) {
+                const [a, b] = [notes[i - 1], notes[i]];
+                if (b.tick - (a.tick + a.dur) >= STEP * 4) {
+                    continue;
+                }
+                n++;
+                const one = spanIndexAt(t, a.tick) === spanIndexAt(t, b.tick + STEP * 2);
+                hit += a.midi === b.midi && one ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     /**
      * Share of the lead's notes struck on a sixteenth between the eighths (the "e" or "a" of a
      * beat): how much of a line sits on the sixteenth grid, not the eighth one. Shared by the

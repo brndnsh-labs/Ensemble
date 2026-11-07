@@ -547,12 +547,10 @@ const metalLead = leadIdiom({
                 // why: a dotted quarter, then two sixteenths run up into the half on 3: the
                 // power-metal "ya-da DAAH" lift into the change.
                 'x-----xxx-------',
-                // why: quarter, eighth, then the and of 2 held through 3 (sung early as the
-                // change's guide tone, `onsetsFor`) and a quarter on 4: the declaimed verse line
-                // (Holy Diver), its one push the word it leans on. (Four plain quarters walked a
-                // step up and back twice over a one-chord bar, a trill: `leadOscillation` read
-                // 0.078 against its 0.08 ceiling.)
-                'x---x-x-----x---',
+                // why: four plain quarters, a syllable a beat: the declaimed verse line (Dio's
+                // Holy Diver), sung Bb A G A over its one chord. (It trilled a step up and back
+                // until the walk priced a trill, `TRILL`.)
+                'x---x---x---x---',
                 // why: a half, then the gallop on 3, its last sixteenth held through 4: the
                 // riff's rhythm answering the held note.
                 'x-------x-xx----',

@@ -27,6 +27,9 @@ const STANDARD = [
     ['leadPhraseEndsOnChordTone', 0.8, 1, 'phrases resolve (0.88–0.96)'],
     // A common tone is tied or turned, never stuttered (#2111): 0 everywhere.
     ['leadRepeatAcrossBarline', 0, 0.05, 'no stuttered common tones across a barline'],
+    // Nor one over a chord: 0 everywhere (a turn handing on struck its guide tone twice, #2122;
+    // the hand-back is proved on Autumn Leaves in `guide-tones.test.ts`).
+    ['leadSameChordRestrike', 0, 0.01, 'no tone struck twice over one chord'],
     // `SEAM`, so 5 by construction.
     ['leadContrastSeamLeap', 0, 5, 'into and out of the bridge by a 4th at most'],
     // The walk between guide tones steps: 1.85–2.03 over every style's own figures, steps

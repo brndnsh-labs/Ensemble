@@ -691,11 +691,10 @@ const bluesLead = leadIdiom({
                 // why: a swung pair held into beat 2, then the note on 3, beat 4 open: the
                 // short-long of a blues lyric ("my BA-by").
                 'x-x-----x---....',
-                // why: four swung eighths, the last (the and of 2) pushed into 3 and held
-                // through 4: the one call with no gap, so the line runs on rather than stopping
-                // every bar. (Three quarters here walked up a step and straight back in a
-                // one-chord bar, a trill: `leadOscillation` read 0.088.)
-                'x-x-x-x---------',
+                // why: three quarters and beat 4 open: the shout line, a syllable a beat and
+                // the band's answer on 4. (It walked up a step and straight back in a one-chord
+                // bar, a trill, until the walk priced a trill, `TRILL`.)
+                'x---x---x---....',
             ],
             // A turn moves on, a half note at most, and never strikes beat 4 (the bridge hands
             // back on one, and a last-beat note would leave the phrase an eighth's breath).

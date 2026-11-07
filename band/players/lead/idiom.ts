@@ -867,7 +867,7 @@ function guidePlan(
     ctx: BarContext,
     guide: GuideRhythm,
     slotStart: number,
-): { plan: SlotPlan; part: GuidePart } {
+): { plan: SlotPlan; part: GuidePart; handsOn: boolean } {
     const { bars } = ctx.timeline;
     const first = bars[slotStart];
     const length = first.phrase.length;
@@ -944,7 +944,11 @@ function guidePlan(
         loops: null,
         peak: false,
     };
-    return { plan, part };
+    // A phrase that ends on a turn rather than an arrival (the contrast handing back to the
+    // last A) leads into the next phrase: its last note is no arrival of its own.
+    const last = cells.at(-1) ?? '';
+    const handsOn = last !== guide.close && !guide.endings.includes(last);
+    return { plan, part, handsOn };
 }
 
 /**
@@ -1196,16 +1200,22 @@ function walkPool(o: SlotOnset): number[] {
  * figures (`DEFAULT_GUIDE`).
  */
 function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
-    const { plan, part } = guidePlan(ctx, book.head.guide ?? DEFAULT_GUIDE, slotStart);
+    const { plan, part, handsOn } = guidePlan(ctx, book.head.guide ?? DEFAULT_GUIDE, slotStart);
     const line = headGuideLine(ctx, book, slotStart);
     // The line's note sounding at a tick: the last struck at or before it.
     const lineAt = (tick: number) =>
         line.reduce<GuideNote | undefined>((at, n) => (n.tick <= tick ? n : at), line[0]);
     const onsets = guideOnsets(ctx, slotStart, plan, lineAt);
-    const { spans } = ctx.timeline;
+    const { spans, bars } = ctx.timeline;
     const range = ctx.lead.range;
+    const lastBar = bars[Math.min(bars.length, slotStart + plan.kinds.length) - 1];
+    // A phrase that hands on (`handsOn`) aims its last notes at the next phrase's first guide
+    // tone, struck beside it: a turn leads in. why: pinned to the guide tone still sounding, a
+    // turn's last note was that tone again, struck twice over one chord across the turn's rest
+    // (the bridge's hand-back, the beat before the last A: G4 … G4 over Ebmaj7).
+    const next = handsOn ? lineAt(lastBar.start + lastBar.meter.barTicks)?.midi : undefined;
     const pitches: (number | null)[] = onsets.map((o, i) =>
-        i === 0 || o.change || i === onsets.length - 1
+        i === 0 || o.change || (i === onsets.length - 1 && next === undefined)
             ? (lineAt(Math.max(o.tick, spans[o.span].start))?.midi ?? null)
             : null,
     );
@@ -1243,9 +1253,11 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
         }
     }
     const n = onsets.length;
+    // The next phrase's guide tone stands after the last onset as the walk's last target.
+    const aims = next === undefined ? pitches : [...pitches, next];
     let a = 0;
-    for (let b = 1; b < n; b++) {
-        if (pitches[b] === null) {
+    for (let b = 1; b < aims.length; b++) {
+        if (aims[b] === null) {
             continue;
         }
         if (b - a > 1 && pitches[a] !== null) {
@@ -1254,7 +1266,7 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
             const dir: 1 | -1 = part === 'contrast' || (a + b) / 2 < n / 2 ? 1 : -1;
             const walk = walkBetween(
                 pitches[a] as number,
-                pitches[b] as number,
+                aims[b] as number,
                 onsets.slice(a + 1, b).map(walkPool),
                 dir,
                 range,
@@ -1272,13 +1284,7 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
     // beats or more (#2111: a turn is a half note at most, so a two-beat breath would leave the
     // arrival no longer than a turn). Its own endings breathed an eighth to a beat; now each
     // phrase end has the beat a singer takes, the section close included.
-    const { bars } = ctx.timeline;
-    takeBreath(
-        ctx,
-        bars[Math.min(bars.length, slotStart + plan.kinds.length) - 1].index,
-        onsets,
-        1,
-    );
+    takeBreath(ctx, lastBar.index, onsets, 1);
     const sung = pitches.map((m) => m ?? homeOf(ctx, book));
     const top = Math.max(...sung);
     const bottom = Math.min(...sung);

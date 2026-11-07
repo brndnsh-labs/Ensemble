@@ -1,6 +1,8 @@
-import { DEFAULT_SETTINGS, type PitchedNote } from '../../core/types.js';
+import { DEFAULT_SETTINGS, type PitchedNote, type StyleId } from '../../core/types.js';
 import { chordAt, compileTimeline } from '../../form/timeline.js';
 import { performPass } from '../../perform.js';
+import { STYLES } from '../../styles/index.js';
+import { GUIDE_METRICS } from '../../test/critique/guide-head.js';
 import { score } from '../../test/scores.js';
 import { mod12 } from '../../theory/pitch.js';
 import { guidePitchClasses, guideToneLine } from './guide-tones.js';
@@ -279,4 +281,49 @@ describe('the band plays it for the head only (#2027)', () => {
     it('leaves the solos as they were', () => {
         expect(JSON.stringify(lead('guide-tones', 1))).toBe(JSON.stringify(lead(null, 1)));
     });
+});
+
+describe('every style hands the bridge back to the last A (#2122)', () => {
+    // Autumn Leaves with its last A written out as C: the bridge closes on a turn that hands on.
+    const A = 'Cm7 | F7 | Bbmaj7 | Ebmaj7 | Am7b5 | D7 | Gm7 | Gm7';
+    const handBack = compileTimeline(
+        score(
+            [
+                { label: 'A', bars: A },
+                { label: 'A', bars: A },
+                { label: 'B', bars: 'Am7b5 | D7 | Gm7 | Gm7 | Cm7 | F7 | Bbmaj7 | Ebmaj7' },
+                {
+                    label: 'C',
+                    bars: 'Am7b5 | D7 | Gm7 Gb7 | Fm7 E7 | Ebmaj7 | Am7b5 D7 | Gm7 | Gm7',
+                },
+            ],
+            { key: 'G', isMinor: true },
+        ),
+    );
+    it.each(Object.keys(STYLES) as StyleId[])(
+        '%s never strikes a tone twice over one chord',
+        (style) => {
+            for (const seed of ['one', 'two', 'three', 'four']) {
+                const { events } = performPass(
+                    handBack,
+                    {
+                        ...DEFAULT_SETTINGS,
+                        style,
+                        lead: STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead,
+                        seed,
+                        swing: 0,
+                        lanes: { ...DEFAULT_SETTINGS.lanes, lead: true },
+                        head: 'guide-tones',
+                    },
+                    { pass: 0, looping: true },
+                );
+                // The turn's last note leads into the last A's first guide tone, rather than
+                // restating the one it turned from (G4 ... G4 over Ebmaj7, the beat before the C).
+                expect(
+                    GUIDE_METRICS.leadSameChordRestrike([{ timeline: handBack, events }]),
+                    `seed ${seed}`,
+                ).toBe(0);
+            }
+        },
+    );
 });

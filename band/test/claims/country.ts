@@ -33,11 +33,20 @@ export const country = defineClaims({
     takes: [
         // The known standard's guide-tone head, on country's own figures (#2122, `head.guide`
         // in `styles/country.ts`): a honky-tonk vocal's two-beat line.
-        guideTonesTake({}, [
-            // 0.330 of its bars on country's figures, 0.040 on the shared ones (whose only
-            // beat-4 note is in one cell of six): the floor sits between them.
-            ['leadPickupOnFour', 0.2, 0.5, 'a pickup on 4 into the next bar'],
-        ]),
+        guideTonesTake(
+            {
+                // 0.051: the four-quarter two-beat line holds a chord tone every beat
+                // (`walkPool`), so it moves by a chord's 3rds and 4ths, not passing steps (0.038
+                // with an eighth pair in it). A 4th a phrase now and then is the line, not a
+                // leap; 0.07 still fails a line that jumps.
+                leadMoveOverThird: [0, 0.07, 'voice-led: a 4th now and then, no wider'],
+            },
+            [
+                // 0.330 of its bars on country's figures, 0.040 on the shared ones (whose only
+                // beat-4 note is in one cell of six): the floor sits between them.
+                ['leadPickupOnFour', 0.2, 0.5, 'a pickup on 4 into the next bar'],
+            ],
+        ),
         {
             take: { colour: true },
             claims: [
