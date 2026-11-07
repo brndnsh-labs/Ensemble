@@ -56,7 +56,8 @@ describe('Engine Bus Management', () => {
         const bus = () => ({
             gain: mockGain,
             reverb: { gain: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
-            eq: {},
+            eq: { frequency: { cancelScheduledValues: vi.fn(), setTargetAtTime: vi.fn() } },
+            shelf: null,
             panner: null,
             sidechain: null,
         });

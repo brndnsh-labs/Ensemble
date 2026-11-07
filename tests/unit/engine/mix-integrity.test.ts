@@ -69,6 +69,7 @@ vi.mock('../../../core/engine/audio-graph-utils.js', async (importOriginal) => (
 import {
     initAudio,
     restoreGains,
+    syncBusEq,
     syncMasterMakeup,
     syncMasterVolume,
 } from '../../../core/engine/engine.js';
@@ -94,7 +95,12 @@ describe('Mix & Signal Integrity Audit', () => {
             ratio: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             attack: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             release: { setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
-            frequency: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
+            frequency: {
+                value: 0,
+                setValueAtTime: vi.fn(),
+                setTargetAtTime: vi.fn(),
+                cancelScheduledValues: vi.fn(),
+            },
             delayTime: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             Q: { value: 0, setValueAtTime: vi.fn(), setTargetAtTime: vi.fn() },
             type: '',
@@ -311,6 +317,67 @@ describe('Mix & Signal Integrity Audit', () => {
         syncMasterMakeup(getState());
         expect(makeup.gain.setTargetAtTime.mock.calls.at(-1)[0]).toBe(1);
         groove.lastSmartGenre = 'Metal';
+    });
+
+    it('retunes the style-dependent bus EQ on a genre change to what a fresh initAudio sets (#2106)', () => {
+        const groove = getState().groove;
+        /** The four params the playing feel decides, read off a graph. */
+        const eqOf = (graph) => ({
+            chordsShelf: graph.chords.shelf.gain,
+            bassHighpass: graph.bass.eq.frequency,
+            bassWeight: graph.bass.shelf.gain,
+            drumsHighpass: graph.drums.eq.frequency,
+        });
+        /** What initAudio wrote: the last setValueAtTime value on each param. */
+        const freshWith = (feel) => {
+            groove.genreFeel = feel;
+            playback.audio = null;
+            initAudio(getState());
+            const out = {};
+            for (const [k, p] of Object.entries(eqOf(playback.audioGraph))) {
+                out[k] = p.setValueAtTime.mock.calls.at(-1)[0];
+            }
+            return out;
+        };
+        const rock = freshWith('Rock');
+        const jazz = freshWith('Jazz');
+        expect(jazz).toEqual({
+            chordsShelf: -5,
+            bassHighpass: 55,
+            bassWeight: -1,
+            drumsHighpass: 95,
+        });
+        expect(rock).toEqual({
+            chordsShelf: -2,
+            bassHighpass: 20,
+            bassWeight: 2,
+            drumsHighpass: 40,
+        });
+
+        // A session that starts on Rock and moves to Jazz, then back.
+        groove.genreFeel = 'Rock';
+        playback.audio = null;
+        initAudio(getState());
+        const params = eqOf(playback.audioGraph);
+        const targets = () =>
+            Object.fromEntries(
+                Object.entries(params).map(([k, p]) => [
+                    k,
+                    p.setTargetAtTime.mock.calls.at(-1)?.[0],
+                ]),
+            );
+        groove.genreFeel = 'Jazz';
+        syncBusEq(getState());
+        expect(targets()).toEqual(jazz);
+        groove.genreFeel = 'Rock';
+        syncBusEq(getState());
+        expect(targets()).toEqual(rock);
+
+        // restoreGains (every chart open) restores it too, with no genre effect having run.
+        groove.genreFeel = 'Jazz';
+        restoreGains(getState());
+        expect(targets()).toEqual(jazz);
+        groove.genreFeel = undefined;
     });
 
     it('should route the drums bus through its own highpass EQ chain', () => {
