@@ -1144,7 +1144,7 @@ function tryPlaySampledDrum(
     // The kick ducks the bass on a sampled kit exactly as on the synth one (#1998): the
     // same sidechain dip, from the hit's own scheduled time, so the low end stays clear.
     if (name === 'Kick') {
-        duckKickSidechain(state, ctx.playTime);
+        duckKickSidechain(state, ctx.playTime, ctx.hitVelocity);
     }
     // A ghost stroke strikes through its own damping chain (#1998); every other hit goes
     // straight to the panner.
@@ -1178,14 +1178,33 @@ function tryPlaySampledDrum(
     return true;
 }
 
+// why (#2102): the bass bus dips to 0.45 (about -7 dB) for a kick at or above this level, and
+// by less for a softer one. The drum voices take roughly 0-1.2 (`bandEventLevel`: velocity / 127
+// * 1.2). The kick's pattern marks land at 0.34-0.53 (ghost `g`, a jazz feathered kick), ~0.6
+// (`o`), 0.65-1.0 (`x`, with the band's energy scaling) and 0.8-1.2 (`X`, an accent). 0.9 is where
+// a normal rock/funk/disco kick at mid-to-high energy lands, so those keep the full duck the
+// electric/synth bass needs to leave the kick its low end. A feathered quarter under an upright
+// ducks about 1.8 dB instead of 7: nobody ducks an upright against a feathered kick.
+const KICK_FULL_DUCK_LEVEL = 0.9;
+const KICK_DUCK_FLOOR = 0.45;
+
+/** The bass-bus gain the kick dips to: 1 for a silent hit, `KICK_DUCK_FLOOR` at full level. */
+function kickDuckDepth(level: number): number {
+    // A non-finite level (NaN would poison the AudioParam) ducks fully, the old fixed behaviour.
+    const t = Number.isFinite(level) ? clamp01(level / KICK_FULL_DUCK_LEVEL) : 1;
+    // Lerp form (`a * (1 - t) + b * t`), so a full-level kick lands on 0.45 exactly.
+    return 1 * (1 - t) + KICK_DUCK_FLOOR * t;
+}
+
 /**
- * The kick's sidechain trigger: dips the bass bus for the kick's attack. Both kick paths (the
- * synth voice and a sampled kit) call it, so installing a kit never loses the duck (#1998).
+ * The kick's sidechain trigger: dips the bass bus for the kick's attack, deeper the harder the
+ * kick (#2102). Both kick paths (the synth voice and a sampled kit) call it, so installing a kit
+ * never loses the duck (#1998). `level` is the hit's voice level, not a gain after a curve.
  */
-function duckKickSidechain(state: EnsembleState, playTime: number): void {
+function duckKickSidechain(state: EnsembleState, playTime: number, level: number): void {
     const sidechain = state.playback.audioGraph?.bass.sidechain;
     if (sidechain) {
-        duckGain(sidechain.gain, 0.45, playTime);
+        duckGain(sidechain.gain, kickDuckDepth(level), playTime);
     }
 }
 
@@ -1872,7 +1891,7 @@ function playKickSnareCrashTom(
         const vol = masterVol * getRhythmBodyMixScale(state, 'Kick') * rr();
 
         // --- Sidechain Trigger ---
-        duckKickSidechain(state, playTime);
+        duckKickSidechain(state, playTime, velocity);
 
         // 1. Beater Snap: Higher velocity = Sharper snap
         const beater = playback.audio.createOscillator();
