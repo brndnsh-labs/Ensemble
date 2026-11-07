@@ -548,7 +548,7 @@ exclude foreign-owner data, and avoid falsely reporting cloud-save or offline-re
 
 ## Client notes moved from web/CLAUDE.md (#1937)
 
-Moved here verbatim from `web/CLAUDE.md`'s account rows (#1937, 2026-10-29), so the rows keep the map and the binding rules while the why, the history and the worked examples live here. Each heading names the row; its sentences keep their original order, and a sentence the row still holds part of appears here whole. **The code is the authority**: grep the symbol a sentence names before trusting it.
+Moved here verbatim from `web/CLAUDE.md`'s account rows (#1937, 2026-10-29), so the rows keep the map and the binding rules (since #2124 those rows live in [`web/lib/sync/CLAUDE.md`](../../web/lib/sync/CLAUDE.md)) while the why, the history and the worked examples live here. Each heading names the row; its sentences keep their original order, and a sentence the row still holds part of appears here whole. **The code is the authority**: grep the symbol a sentence names before trusting it.
 
 ### Retired text charts (#1740)
 

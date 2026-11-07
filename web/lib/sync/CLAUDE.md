@@ -1,6 +1,6 @@
 # Account and sync surfaces
 
-The account and sync rows of `web/CLAUDE.md`'s navigation table, moved here verbatim in #2124 so a stand, CSS or band-sheet task does not load them. Paths in the "Start here" column are relative to `web/`, as in that table; `web/CLAUDE.md` keeps a pointer row for each surface.
+The account and sync rows of `web/CLAUDE.md`'s navigation table, moved here verbatim in #2124 so a stand, CSS or band-sheet task does not load them. Paths in the "Start here" and "Boundary" columns are relative to `web/`, as in that table; each row's why and history is in [sync](../../../docs/design/ensemble-v2-sync.md#client-notes-moved-from-webclaudemd-1937); `web/CLAUDE.md` keeps a pointer row for each surface.
 
 | Surface | Start here | Boundary |
 | --- | --- | --- |
