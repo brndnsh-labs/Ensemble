@@ -6,7 +6,6 @@ import { guideTonesTake } from './guide-tones.js';
 
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
-const GUIDE = guideTonesTake();
 
 export const bossa = defineClaims({
     metrics: {
@@ -52,25 +51,19 @@ export const bossa = defineClaims({
     takes: [
         // The known standard's guide-tone head, on bossa's own figures (#2122, `head.guide` in
         // `styles/bossa.ts`): a Jobim melody's syncopation and long tones.
-        // (`guideTonesTake`'s `extra` takes only the shared metrics, so bossa's own are added
-        // to its claims here.)
-        {
-            take: GUIDE.take,
-            claims: [
-                ...GUIDE.claims,
-                // 0.49 on bossa's figures, 0.30 on the shared ones (any eighth line's upbeats): the
-                // floor sits between them, so the shared figures fail it.
-                [
-                    'leadOffbeatAttacks',
-                    0.4,
-                    0.65,
-                    'the tune is struck on the "and"s, as the guitar\'s 3 + 3 + 2 is',
-                ],
-                // 0.071 on bossa's figures, 0.018 on the shared ones (whose one push is in one cell
-                // of six): the floor sits between them.
-                ['leadTiedOverBarline', 0.04, 0.15, "the next bar's note pushed and tied over"],
+        guideTonesTake({}, [
+            // 0.49 on bossa's figures, 0.30 on the shared ones (any eighth line's upbeats): the
+            // floor sits between them, so the shared figures fail it.
+            [
+                'leadOffbeatAttacks',
+                0.4,
+                0.65,
+                'the tune is struck on the "and"s, as the guitar\'s 3 + 3 + 2 is',
             ],
-        },
+            // 0.071 on bossa's figures, 0.018 on the shared ones (whose one push is in one cell
+            // of six): the floor sits between them.
+            ['leadTiedOverBarline', 0.04, 0.15, "the next bar's note pushed and tied over"],
+        ]),
         {
             take: {},
             claims: [

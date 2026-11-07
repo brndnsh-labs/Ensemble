@@ -31,26 +31,26 @@ const metrics = {
     },
 } satisfies Record<string, Metric>;
 
-/** The guide-tone head on the blues's own figures (`head.guide` in `styles/blues.ts`). */
-const guide = guideTonesTake({
-    // A call and room: 2.39 notes a bar, against 2.74 on the shared figures. The ceiling sits
-    // between them, so it fails on the shared set.
-    leadNotesPerBar: [2.1, 2.6, "a blues singer's call, sparser than the shared figures"],
-});
-
 export const blues = defineClaims({
     metrics,
     takes: [
         // The known standard's guide-tone head, on the blues's own figures (#2122).
-        {
-            ...guide,
-            claims: [
-                ...guide.claims,
+        guideTonesTake(
+            {
+                // A call and room: 2.39 notes a bar, against 2.74 on the shared figures. The
+                // ceiling sits between them, so it fails on the shared set.
+                leadNotesPerBar: [
+                    2.1,
+                    2.6,
+                    "a blues singer's call, sparser than the shared figures",
+                ],
+            },
+            [
                 // Measured 0.765; 0.237 on the shared figures, whose endings alone breathe on 4.
                 // The floor sits between them.
                 ['leadBeatFourOpen', 0.5, 1, 'the call leaves beat 4 to the band'],
             ],
-        },
+        ),
         {
             take: {},
             claims: [

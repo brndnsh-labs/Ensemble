@@ -317,26 +317,23 @@ const metrics = {
     },
 } satisfies Record<string, Metric>;
 
-/** The guide-tone head on metal's own figures (`head.guide` in `styles/metal.ts`). */
-const guide = guideTonesTake({
-    // The gallop and the two-gallop turn: 3.13 notes a bar, against 2.71 on the shared figures
-    // (rock's eighths 3.08). The floor sits between, so it fails on the shared set.
-    leadNotesPerBar: [2.9, 3.6, "a metal singer's line, the gallop in it"],
-});
-
 export const metal = defineClaims({
     metrics,
     takes: [
         // The known standard's guide-tone head, on metal's own figures (#2122).
-        {
-            ...guide,
-            claims: [
-                ...guide.claims,
+        guideTonesTake(
+            {
+                // The gallop and the two-gallop turn: 3.13 notes a bar, against 2.71 on the shared
+                // figures (rock's eighths 3.08). The floor sits between, so it fails on the shared
+                // set.
+                leadNotesPerBar: [2.9, 3.6, "a metal singer's line, the gallop in it"],
+            },
+            [
                 // Measured 0.23 (the two gallop cells and the two-gallop turn); 0 on the shared
                 // figures, which never gallop. The floor sits between them.
                 ['leadGallopBars', 0.1, 0.4, "the line borrows the riff's gallop"],
             ],
-        },
+        ),
         {
             // Metal's own instrument, with the energy following the form.
             take: { comp: 'guitar' },

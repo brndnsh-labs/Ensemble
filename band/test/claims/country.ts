@@ -6,7 +6,6 @@ import { guideTonesTake } from './guide-tones.js';
 
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
-const GUIDE = guideTonesTake();
 
 export const country = defineClaims({
     metrics: {
@@ -34,17 +33,11 @@ export const country = defineClaims({
     takes: [
         // The known standard's guide-tone head, on country's own figures (#2122, `head.guide`
         // in `styles/country.ts`): a honky-tonk vocal's two-beat line.
-        // (`guideTonesTake`'s `extra` takes only the shared metrics, so country's own is added
-        // to its claims here.)
-        {
-            take: GUIDE.take,
-            claims: [
-                ...GUIDE.claims,
-                // 0.330 of its bars on country's figures, 0.040 on the shared ones (whose only
-                // beat-4 note is in one cell of six): the floor sits between them.
-                ['leadPickupOnFour', 0.2, 0.5, 'a pickup on 4 into the next bar'],
-            ],
-        },
+        guideTonesTake({}, [
+            // 0.330 of its bars on country's figures, 0.040 on the shared ones (whose only
+            // beat-4 note is in one cell of six): the floor sits between them.
+            ['leadPickupOnFour', 0.2, 0.5, 'a pickup on 4 into the next bar'],
+        ]),
         {
             take: { colour: true },
             claims: [

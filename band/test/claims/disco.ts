@@ -119,31 +119,26 @@ const leadPushIntoOne: Metric = (takes) => {
     return bars ? hit / bars : 0;
 };
 
-// The guide-tones take (#2122) with this style's own claim on its figures: added here, as
-// `guideTonesTake`'s `extra` takes only the shared metrics.
-const guide = guideTonesTake({
-    // 0.5: the book's `register` sets the line's home high in the instrument, so the
-    // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
-    // figures': it needs the line's headroom.
-    leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
-});
-
 export const disco = defineClaims({
     metrics: { hatPedalOrOpenFillCoverage, compScratchAccent, leadPushIntoOne },
     takes: [
         // The known standard's guide-tone head, on disco's own figures (#2122, `head.guide` in
         // `styles/disco.ts`).
-        {
-            ...guide,
-            claims: [
-                ...guide.claims,
+        guideTonesTake(
+            {
+                // 0.5: the book's `register` sets the line's home high in the instrument, so the
+                // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
+                // figures': it needs the line's headroom.
+                leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
+            },
+            [
                 // Pushed into the One: 0.24 on disco's figures, 0.11 on the shared ones (one
                 // pushed cell of six). The floor sits between. A push tied into an arrival
                 // leaves the arrival's bar unstruck, so `leadRestShare` reads 0.118 here, not
                 // 0.084: those bars sound.
                 ['leadPushIntoOne', 0.18, 0.4, 'the hook leans into the next One'],
             ],
-        },
+        ),
         {
             take: {},
             claims: [

@@ -1,48 +1,21 @@
-import { STEP } from '../../players/grid.js';
-import { defineClaims, type Take } from '../critique/harness.js';
+import { defineClaims } from '../critique/harness.js';
 import { guideTonesTake } from './guide-tones.js';
 
-const GUIDE = guideTonesTake();
-
 export const funk = defineClaims({
-    metrics: {
-        /**
-         * Share of the lead's notes struck on a sixteenth between the eighths (the "e" or "a"
-         * of a beat): how much of a line sits on the sixteenth grid, not the eighth one.
-         */
-        leadSixteenthOffbeats: (takes: Take[]): number => {
-            let n = 0;
-            let hit = 0;
-            for (const { timeline: t, events } of takes) {
-                for (const e of events) {
-                    if (e.lane === 'lead') {
-                        n++;
-                        hit += Math.round((e.tick - t.bars[e.bar].start) / STEP) % 2;
-                    }
-                }
-            }
-            return n ? hit / n : 0;
-        },
-    },
     takes: [
         // The known standard's guide-tone head, on funk's own figures (#2122, `head.guide` in
         // `styles/funk.ts`): a horn section's sixteenth pushes.
-        // (Appended here, not as `guideTonesTake`'s `extra`: that takes the shared metrics only.)
-        {
-            take: GUIDE.take,
-            claims: [
-                ...GUIDE.claims,
-                // The pushes land on the sixteenths: 0.361 of the notes on an "e" or an "a",
-                // against 0 on the shared straight-eighth figures (so the floor fails without
-                // funk's own). The ceiling is a line turned into a sixteenth run, not a head.
-                [
-                    'leadSixteenthOffbeats',
-                    0.25,
-                    0.5,
-                    'the horn line pushes on the sixteenths, not the eighths',
-                ],
+        guideTonesTake({}, [
+            // The pushes land on the sixteenths: 0.361 of the notes on an "e" or an "a",
+            // against 0 on the shared straight-eighth figures (so the floor fails without
+            // funk's own). The ceiling is a line turned into a sixteenth run, not a head.
+            [
+                'leadSixteenthOffbeats',
+                0.25,
+                0.5,
+                'the horn line pushes on the sixteenths, not the eighths',
             ],
-        },
+        ]),
         {
             take: {},
             claims: [

@@ -2311,7 +2311,7 @@ export interface TakeSpec {
     colour?: boolean;
 }
 
-type MetricName = keyof typeof METRICS;
+export type MetricName = keyof typeof METRICS;
 
 /** [metric, min, max, the musical claim it measures]. */
 export type Claim<M extends string = MetricName> = [

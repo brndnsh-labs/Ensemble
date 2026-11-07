@@ -14,13 +14,6 @@ import { guideTonesTake } from './guide-tones.js';
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
 
-const GUIDE = guideTonesTake({
-    // 0.5: the book's `register` sets the line's home high in the instrument, so the bridge's
-    // lift (`CONTRAST_LIFT`) has little room above it. The line's, not the figures': acoustic's
-    // own figures read 0.5 as the shared ones did; it needs the line's headroom.
-    leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
-});
-
 /** Sounding comp notes grouped by onset. */
 function onsets(events: BandEvent[]): Map<number, PitchedNote[]> {
     const out = new Map<number, PitchedNote[]>();
@@ -452,19 +445,22 @@ export const acoustic = defineClaims({
     takes: [
         // The known standard's guide-tone head, on acoustic's own figures (#2122, `head.guide`
         // in `styles/acoustic.ts`): a folk verse's dotted lilt and pickups.
-        // (`guideTonesTake`'s `extra` takes only the shared metrics, so acoustic's own are added
-        // to its claims here.)
-        {
-            take: GUIDE.take,
-            claims: [
-                ...GUIDE.claims,
+        guideTonesTake(
+            {
+                // 0.5: the book's `register` sets the line's home high in the instrument, so the
+                // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
+                // figures': acoustic's own figures read 0.5 as the shared ones did; it needs the
+                // line's headroom.
+                leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
+            },
+            [
                 // 0.235 of its bars open on the dotted quarter, 0.089 on the shared figures:
                 // the floor sits between them, so the shared figures fail it.
                 ['leadDottedLilt', 0.15, 0.4, 'the folk lilt: a bar opens long-short'],
                 // 0.130 of its notes on 4 or its "and", 0.063 on the shared figures.
                 ['leadPickupShare', 0.1, 0.25, 'pickups lean into the next bar'],
             ],
-        },
+        ),
         {
             take: { colour: true },
             claims: [

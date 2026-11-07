@@ -3,31 +3,8 @@ import { STEP } from '../../players/grid.js';
 import { defineClaims, type Take } from '../critique/harness.js';
 import { guideTonesTake } from './guide-tones.js';
 
-const GUIDE = guideTonesTake({
-    // Two or three notes a bar: 2.20, against 2.71 on the shared figures (and 0.90 held a chord
-    // apiece). The ceiling sits between them, so it fails on the shared set.
-    leadNotesPerBar: [2, 2.5, 'a sparse hook, two or three notes a bar'],
-});
-
 export const hiphop = defineClaims({
     metrics: {
-        /**
-         * Share of the lead's notes struck on a sixteenth between the eighths (the "e" or "a"
-         * of a beat): how much of a line sits on the sixteenth grid, not the eighth one.
-         */
-        leadSixteenthOffbeats: (takes: Take[]): number => {
-            let n = 0;
-            let hit = 0;
-            for (const { timeline: t, events } of takes) {
-                for (const e of events) {
-                    if (e.lane === 'lead') {
-                        n++;
-                        hit += Math.round((e.tick - t.bars[e.bar].start) / STEP) % 2;
-                    }
-                }
-            }
-            return n ? hit / n : 0;
-        },
         /**
          * The loop's second bar answers the first (S6): share of two-bar loop pairs (a
          * kick-bearing state bar immediately followed by its answer, both in the same
@@ -195,16 +172,18 @@ export const hiphop = defineClaims({
     takes: [
         // The known standard's guide-tone head, on hip hop's own figures (#2122, `head.guide` in
         // `styles/hiphop.ts`): a sparse sampled hook on the sixteenths.
-        // (Appended here, not as `guideTonesTake`'s `extra`: that takes the shared metrics only.)
-        {
-            take: GUIDE.take,
-            claims: [
-                ...GUIDE.claims,
+        guideTonesTake(
+            {
+                // Two or three notes a bar: 2.20, against 2.71 on the shared figures (and 0.90 held
+                // a chord apiece). The ceiling sits between them, so it fails on the shared set.
+                leadNotesPerBar: [2, 2.5, 'a sparse hook, two or three notes a bar'],
+            },
+            [
                 // The hook's snap (1 and its "a") and its sixteenth pushes: 0.306 of the notes
                 // on an "e" or an "a", against 0 on the shared straight-eighth figures.
                 ['leadSixteenthOffbeats', 0.2, 0.45, 'the hook snaps on the sixteenths'],
             ],
-        },
+        ),
         {
             take: {},
             claims: [

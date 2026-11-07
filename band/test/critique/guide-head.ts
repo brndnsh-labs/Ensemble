@@ -164,8 +164,26 @@ function contrastSeams(take: Take): [PitchedNote, PitchedNote][] {
     return out;
 }
 
-/** The guide-tone head's metrics (#2111), in the shared library. */
+/** The guide-tone head's metrics (#2111, #2122), in the shared library. */
 export const GUIDE_METRICS = {
+    /**
+     * Share of the lead's notes struck on a sixteenth between the eighths (the "e" or "a" of a
+     * beat): how much of a line sits on the sixteenth grid, not the eighth one. Shared by the
+     * sixteenth-feel heads (funk, neo-soul, hip hop, #2122).
+     */
+    leadSixteenthOffbeats: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const e of events) {
+                if (e.lane === 'lead') {
+                    n++;
+                    hit += Math.round((e.tick - t.bars[e.bar].start) / STEP) % 2;
+                }
+            }
+        }
+        return ratio(hit, n);
+    },
     /**
      * Share of the lead's notes held a bar less a beat or more (a whole note, less the beat
      * it breathes before the next phrase, #2024): the long arrivals (#2111). It counted to

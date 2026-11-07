@@ -8,7 +8,7 @@
  * that plays them: the values each comment gives are that spread. Jazz's own take keeps the
  * #2111 claims it was first measured with (`claims/jazz.ts`).
  */
-import type { Claim, TakeSpec } from '../critique/harness.js';
+import type { Claim, MetricName, TakeSpec } from '../critique/harness.js';
 
 const STANDARD = [
     // A rhythm, not a chord apiece (#2122): 2.66–2.82 on the shared figures; the held head it
@@ -58,12 +58,13 @@ type GuideClaim = (typeof STANDARD)[number][0];
 
 /**
  * The guide-tones take: the standard claims, with `ranges` replacing a claim's range (and,
- * given, its reason) by name, and `extra` claims of the style's own after them.
+ * given, its reason) by name, and `extra` claims after them — the shared library's or the
+ * style's own metrics (`M`, checked against the style's `metrics` by `defineClaims`).
  */
-export function guideTonesTake(
+export function guideTonesTake<M extends string = never>(
     ranges: Partial<Record<GuideClaim, readonly [min: number, max: number, why?: string]>> = {},
-    extra: Claim[] = [],
-): { take: TakeSpec; claims: Claim[] } {
+    extra: Claim<MetricName | M>[] = [],
+): { take: TakeSpec; claims: Claim<MetricName | NoInfer<M>>[] } {
     return {
         take: { lead: 'guide-tones' },
         claims: [
