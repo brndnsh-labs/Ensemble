@@ -22,6 +22,7 @@ import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { barSteps, dyn, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
+import { DEFAULT_GUIDE, type GuideRhythm } from './guide-figures.js';
 import { type GuideNote, guidePitchClasses, guideToneLine, headForm } from './guide-tones.js';
 import {
     type Contour,
@@ -58,18 +59,11 @@ export interface LeadBook extends LinePalette {
          */
         form: 'period' | 'aab';
         /**
-         * The rhythm a known standard's guide-tone head is sung in (#2111): one-bar `cells`
-         * (figures), sparser than a head's own (the guide tones carry the tune, the cells give
-         * it a rhythm); `turns`, the bar after a figure that moves on (a half note at most);
-         * the phrase `endings`, its one long arrival; and the `close`, the whole note a section
-         * ends on. Unset: the guide tones are held a chord apiece.
+         * The rhythm a known standard's guide-tone head is sung in (#2111, `GuideRhythm`): its
+         * figures, turns, phrase endings and section close. Unset: the shared straight-eighth
+         * figures (`DEFAULT_GUIDE`, #2122).
          */
-        guide?: {
-            cells: readonly string[];
-            turns: readonly string[];
-            endings: readonly string[];
-            close: string;
-        };
+        guide?: GuideRhythm;
     };
     /** Chance a solo bar plays the bar before it again (a riff) rather than moving on. */
     riff: number;
@@ -837,57 +831,6 @@ function headGuideLine(ctx: BarContext, book: LeadBook, slotStart: number): Guid
           );
 }
 
-/**
- * A known standard's head phrase held a chord apiece, for a book with no guide-tone rhythm
- * (`LeadBook.head.guide`): the slot's share of the guide-tone line, every note a chord change's
- * target.
- */
-function holdGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
-    const { bars } = ctx.timeline;
-    const first = bars[slotStart];
-    const length = first.phrase.length;
-    const lastBar = bars[Math.min(bars.length, slotStart + length) - 1];
-    const from = first.start;
-    const to = lastBar.start + lastBar.meter.barTicks;
-    const home = homeOf(ctx, book);
-    const line = headGuideLine(ctx, book, slotStart).filter((n) => n.tick >= from && n.tick < to);
-    const onsets: SlotOnset[] = line.map((n) => {
-        const bar = barOf(ctx, n.tick);
-        return {
-            tick: n.tick,
-            // Held to its chord's end, but never past the phrase: the next one is struck fresh.
-            dur: Math.min(n.dur, to - n.tick),
-            step: Math.round((n.tick - bars[bar].start) / STEP),
-            chord: n.chord,
-            key: n.key,
-            change: true,
-            span: spanIndexAt(ctx.timeline, n.tick),
-            bar: bar - slotStart,
-        };
-    });
-    const kinds: BarKind[] = Array.from({ length }, () => 'line');
-    const plan: SlotPlan = {
-        kinds,
-        cells: kinds.map(() => null),
-        // The line's pitches are its own (`guideToneLine`); contour and span shape nothing here.
-        contour: 'arch',
-        centre: home,
-        span: 0,
-        // A touch under the invented head's 84: long notes under the band, not over it.
-        velocity: 78,
-        from: null,
-        riffs: kinds.map(() => false),
-        develops: null,
-        developsBar: 0,
-        restates: null,
-        loops: null,
-        peak: false,
-    };
-    // A held guide-tone head is sung too: it breathes at its phrase ends, off the last held tone.
-    takeBreath(ctx, lastBar.index, onsets, phraseBreath(ctx, slotStart));
-    return { onsets, pitches: line.map((n) => n.midi), plan };
-}
-
 /** Which part of a sung guide-tone head a phrase is (#2111). */
 type GuidePart = 'statement' | 'contrast' | 'home';
 
@@ -922,7 +865,7 @@ const GUIDE_VELOCITY: Record<GuidePart, number> = { statement: 74, contrast: 82,
  */
 function guidePlan(
     ctx: BarContext,
-    guide: NonNullable<LeadBook['head']['guide']>,
+    guide: GuideRhythm,
     slotStart: number,
 ): { plan: SlotPlan; part: GuidePart } {
     const { bars } = ctx.timeline;
@@ -1216,14 +1159,11 @@ function walkPool(o: SlotOnset): number[] {
  *
  * A guide tone that is the next chord's too is never struck twice running: the note before it
  * gives its last eighth to a passing step (a quarter or longer), or is tied into it.
- * A book with no guide-tone rhythm holds the line a chord apiece (`holdGuideTones`).
+ * Every style sings it (#2122): a book with no guide-tone rhythm of its own takes the shared
+ * figures (`DEFAULT_GUIDE`).
  */
 function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
-    const guide = book.head.guide;
-    if (!guide) {
-        return holdGuideTones(ctx, book, slotStart);
-    }
-    const { plan, part } = guidePlan(ctx, guide, slotStart);
+    const { plan, part } = guidePlan(ctx, book.head.guide ?? DEFAULT_GUIDE, slotStart);
     const line = headGuideLine(ctx, book, slotStart);
     // The line's note sounding at a tick: the last struck at or before it.
     const lineAt = (tick: number) =>

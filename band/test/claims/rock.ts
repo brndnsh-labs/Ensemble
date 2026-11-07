@@ -1,4 +1,5 @@
 import { defineClaims } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 export const rock = defineClaims({
     takes: [
@@ -50,17 +51,13 @@ export const rock = defineClaims({
                 ['compColour', 0, 0.15, 'open triads and sevenths, not jazz extensions'],
             ],
         },
-        {
-            // A known standard's head in a style with no guide-tone rhythm: the guide tones held
-            // a chord apiece (`holdGuideTones`), on the stand's standards shelf in any genre.
-            take: { lead: 'guide-tones' },
-            claims: [
-                // It breathes at every phrase end as the invented head does (#2024): 31.88 bars
-                // before (the whole chorus held through), 3.75 now. 6 fails without the
-                // four-bar phrase's beat, as the head's claim does.
-                ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
-            ],
-        },
+        // The known standard's guide-tone head, on rock's own figures (#2122, `head.guide` in
+        // `styles/rock.ts`): the pilot of a style overriding the shared ones.
+        guideTonesTake({
+            // Driving eighths: 3.08 notes a bar, against 2.72 on the shared figures (and 0.90
+            // held a chord apiece). The floor sits between them, so it fails on the shared set.
+            leadNotesPerBar: [2.9, 3.6, "a rock singer's eighths, busier than the shared figures"],
+        }),
         {
             take: { lead: 'head' },
             claims: [

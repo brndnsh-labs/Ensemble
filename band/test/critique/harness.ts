@@ -24,6 +24,7 @@ import { STYLES } from '../../styles/index.js';
 import { chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { COLOUR_CHART, FIXTURES } from '../scores.js';
+import { GUIDE_METRICS } from './guide-head.js';
 
 const CHARTS = ['blues', 'rhythmChanges', 'popSong', 'minorFunk', 'bossa', 'romanNumerals'];
 const SEEDS = ['one', 'two', 'three', 'four'];
@@ -394,6 +395,8 @@ function motifTally(takes: Take[]): { n: number; hit: number } {
 }
 
 export const METRICS = {
+    // The guide-tone head's (#2111, #2122): judged in every style (`guideTonesTake`).
+    ...GUIDE_METRICS,
     /**
      * Share of the drummer's bars in a chorus of fours in which nothing but the drums sounds:
      * no bass, comp or lead note struck there or held into it.

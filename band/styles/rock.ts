@@ -259,6 +259,35 @@ const rockLead = leadIdiom({
         cells: ['x---x---x-x-x---', 'x-x-x---x-------', 'x-----x-x-------', 'x-x-x-x-x---x---'],
         endings: ['x---------------', 'x-------x-------'],
         form: 'period',
+        // A known standard's guide-tone head in rock (#2122): the guide tones sung the way a
+        // rock singer phrases a verse — driving eighths, the line pushed an eighth ahead of the
+        // change, and one long held arrival a phrase. Every figure strikes on beat 3 or an eighth
+        // before it, where a two-chord bar's second chord lands.
+        guide: {
+            cells: [
+                // Three eighths into a quarter and the half on 3: "da-da-da DAH", the verse
+                // line's pickup run.
+                'x-x-x---x-------',
+                // In off the and of 1, eighths driving into the half on 3: the phrase starts
+                // a beat late and catches up, as a rock vocal does.
+                '..x-x-x-x-------',
+                // Dotted quarter, eighth, dotted quarter and the and of 4 tied over the
+                // barline: the push into the next bar, the rock anticipation (`guideOnsets`
+                // ties it into the downbeat, so the next chord's guide tone arrives early).
+                'x-----x-x-----x-',
+                // Quarter, then the and of 2 pushed over beat 3 (sung early as the change's
+                // guide tone, `onsetsFor`), then 3-and and 4: the syncopated hook.
+                'x---x-x---x-x---',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4 (the bridge hands
+            // back on one, and a last-beat note would leave the phrase an eighth's breath):
+            // four driving eighths into 3, a quarter and two eighths into 3, two halves.
+            turns: ['x-x-x-x-x-------', 'x---x-x-x-------', 'x-------x-------'],
+            // The arrival, struck once on the one and held: a dotted half that breathes a
+            // beat, or the bar less an eighth. A pushed arrival comes from the figure before it.
+            endings: ['x-----------....', 'x-------------..'],
+            close: 'x-------------..',
+        },
     },
     pool: (chord, key) => pentatonicPool(chord, key),
     arrive: (chord) => fifthFirst(chord),

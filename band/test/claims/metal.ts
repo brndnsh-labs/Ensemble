@@ -5,6 +5,7 @@ import { STEP } from '../../players/grid.js';
 import { fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Metric } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 // ---------------------------------------------------------------- metal's own metrics
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
@@ -298,6 +299,8 @@ const metrics = {
 export const metal = defineClaims({
     metrics,
     takes: [
+        // The known standard's guide-tone head, on the shared figures (#2122).
+        guideTonesTake(),
         {
             // Metal's own instrument, with the energy following the form.
             take: { comp: 'guitar' },

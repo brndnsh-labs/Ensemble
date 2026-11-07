@@ -1,6 +1,7 @@
 import type { DrumHit, PitchedNote } from '../../core/types.js';
 import { STEP } from '../../players/grid.js';
 import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 export const hiphop = defineClaims({
     metrics: {
@@ -169,6 +170,8 @@ export const hiphop = defineClaims({
         },
     },
     takes: [
+        // The known standard's guide-tone head, on the shared figures (#2122).
+        guideTonesTake(),
         {
             take: {},
             claims: [

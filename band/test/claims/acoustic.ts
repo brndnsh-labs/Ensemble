@@ -9,6 +9,7 @@ import { STEP } from '../../players/grid.js';
 import { type ChordFacts, chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 const stepOf = (t: Timeline, e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
@@ -397,6 +398,13 @@ export const acoustic = defineClaims({
         },
     },
     takes: [
+        // The known standard's guide-tone head, on the shared figures (#2122).
+        guideTonesTake({
+            // 0.5: the book's `register` sets the line's home high in the instrument, so the
+            // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
+            // figures' — phase 2: acoustic gets its own figures, but this needs the line's headroom.
+            leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
+        }),
         {
             take: { colour: true },
             claims: [

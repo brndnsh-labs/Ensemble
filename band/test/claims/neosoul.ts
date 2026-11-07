@@ -2,6 +2,7 @@ import type { PitchedNote } from '../../core/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
 
@@ -70,6 +71,8 @@ export const neosoul = defineClaims({
         },
     },
     takes: [
+        // The known standard's guide-tone head, on the shared figures (#2122).
+        guideTonesTake(),
         {
             take: {},
             claims: [

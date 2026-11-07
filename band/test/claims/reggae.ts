@@ -1,5 +1,6 @@
 import { STEP } from '../../players/grid.js';
 import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 export const reggae = defineClaims({
     metrics: {
@@ -30,6 +31,13 @@ export const reggae = defineClaims({
         },
     },
     takes: [
+        // The known standard's guide-tone head, on the shared figures (#2122).
+        guideTonesTake({
+            // 0.5: the book's `register` sets the line's home high in the instrument, so the
+            // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
+            // figures' — phase 2: reggae gets its own figures, but this needs the line's headroom.
+            leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
+        }),
         {
             take: {},
             claims: [

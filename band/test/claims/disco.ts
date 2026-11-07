@@ -2,6 +2,7 @@ import type { BandEvent, DrumHit } from '../../core/types.js';
 import type { Timeline } from '../../form/timeline.js';
 import { STEP } from '../../players/grid.js';
 import { defineClaims, type Metric } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 function drumSteps(t: Timeline, events: BandEvent[], bar: number, pieces: string[]) {
     return new Set(
@@ -96,6 +97,13 @@ const compScratchAccent: Metric = (takes) => {
 export const disco = defineClaims({
     metrics: { hatPedalOrOpenFillCoverage, compScratchAccent },
     takes: [
+        // The known standard's guide-tone head, on the shared figures (#2122).
+        guideTonesTake({
+            // 0.5: the book's `register` sets the line's home high in the instrument, so the
+            // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
+            // figures' — phase 2: disco gets its own figures, but this needs the line's headroom.
+            leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
+        }),
         {
             take: {},
             claims: [

@@ -186,8 +186,15 @@ expression devices take turns rather than stack; one peak note per cycle.
     letter) takes figures the A didn't use, starts each phrase a 4th over where the A's line
     ended, comes back down a step over the A's opening for its last phrase, and plays louder;
     no seam into or out of it moves more than a 4th. A 12-bar chorus (a vamp after it doesn't
-    count) is a blues instead: call, call, answer. A book without `head.guide` holds one guide
-    tone a chord.
+    count) is a blues instead: call, call, answer. Every style sings it (#2122): a book without
+    its own `head.guide` takes the shared figures (`DEFAULT_GUIDE`,
+    `players/lead/guide-figures.ts`, the `GuideRhythm` shape a style's override takes whole) —
+    a straight-eighth pop rhythm, two to four notes a bar, a push or an attack into beat 3's
+    change, one long arrival a phrase, swung or not by the style's feel. Jazz and rock write
+    their own. The guide tones are no longer held a chord apiece anywhere. Claims: every style's
+    claims file adds the standard take (`guideTonesTake()`, `band/test/claims/guide-tones.ts`,
+    over the shared metrics in `band/test/critique/guide-head.ts`), with any range its own
+    figures move given by name.
     Solos and trades are the same either way.
   - Looping, it solos over the next three choruses and brings the head back on the fourth:
     head, solo, solo, solo, head… The three solo choruses are one arc: the first starts low and
@@ -295,11 +302,12 @@ expression devices take turns rather than stack; one peak note per cycle.
   never by leaving a note out: where the phrase's last note is struck inside it (an ending's
   beat-3 resolution) it shrinks to the beats after that note, a beat at least, and a note
   struck in the last beat sounds an eighth and leads on. A known standard's guide-tone head
-  breathes the same way: held a chord apiece, the same one or two beats; sung in a rhythm
-  (jazz), one beat, so its arrival keeps its three beats. Claim, every style's head:
-  `leadLongestRun`, the longest stretch without a beat of silence — ≤ 6 bars for a song-form
-  head and a held guide-tone head (it fails if the four-bar breath goes), ≤ 8 for the sung
-  guide-tone head and the heads whose figures already left room (funk, hip hop, blues, reggae).
+  breathes the same way, one beat, so its arrival keeps its three beats. Claim, every style's
+  head: `leadLongestRun`, the longest stretch without a beat of silence — ≤ 6 bars for a
+  song-form head and every style's guide-tone head (it fails if the four-bar breath goes, or if
+  a turn strikes beat 4: a bridge hands back on one, and a last-beat note leaves the phrase an
+  eighth's breath, so no shared or rock turn does), ≤ 8 for jazz's guide-tone head (its turns
+  have that pickup) and the heads whose figures already left room (funk, hip hop, blues, reggae).
 - **Repeated notes as riffs** (#2024, `LeadBook.repeat`: funk, ska-punk, hip hop, disco). A
   figure is stabbed or not once per solo phrase, and a head stabs up to two of its figures,
   once per section — never per note. In each bar playing a stabbed figure, a run of its notes

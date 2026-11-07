@@ -1,7 +1,10 @@
 import { defineClaims } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 export const blues = defineClaims({
     takes: [
+        // The known standard's guide-tone head, on the shared figures (#2122).
+        guideTonesTake(),
         {
             take: {},
             claims: [

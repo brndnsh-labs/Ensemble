@@ -11,6 +11,7 @@ import { STEP } from '../../players/grid.js';
 import { fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
+import { guideTonesTake } from './guide-tones.js';
 
 const CHORUS = /^(chorus|hook|refrain)/i;
 const isChorus = (b: Bar) => CHORUS.test(b.visit.label.trim());
@@ -357,6 +358,8 @@ const metrics = {
 export const skapunk = defineClaims({
     metrics,
     takes: [
+        // The known standard's guide-tone head, on the shared figures (#2122).
+        guideTonesTake(),
         {
             take: {},
             claims: [
