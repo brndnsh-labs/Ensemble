@@ -138,11 +138,27 @@ function jazzTrade(ctx: BarContext, bar: number, length: number, tier: EnergyTie
     ) as Lines;
 }
 
+/**
+ * Is this bar the light head (#2018): the head's A sections, below the high tier. The melody is
+ * the event there, so the band plays it lightly — the bass in 2, the drummer on the closed
+ * hi-hat — and opens up (the walk, the ride) for the bridge and the solos. why: not at the
+ * high tier, since a burner's head (Cherokee, Giant Steps) walks on the ride from the top, and
+ * the quiet time under a hot section would sound like the band dropping out.
+ */
+function lightHead(plan: BarContext['plan']): boolean {
+    return plan.form === 'head' && energyTier(plan.energy) !== 'high';
+}
+
 const jazzDrums = drumIdiom({
     name: 'jazz ride',
-    timekeeper: ['ride'],
+    // The hat is the time under the light head: a section's crash replaces it there too.
+    timekeeper: ['ride', 'hat'],
     fillLength: { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 4, mid: 4, high: 8 } },
-    groove(ctx, tier) {
+    groove(ctx, barTier) {
+        const head = lightHead(ctx.plan);
+        // The light head keeps the quiet time (no feathered kick, no snare comping) whatever
+        // the energy below high; the fills, the crashes and the dynamics still follow the bar.
+        const tier = head ? 'low' : barTier;
         const rng = ctx.rng('comp');
         const snare = Array.from({ length: 16 }, () => '.');
         // Comping density rises with energy; never on 2 or 4 (the hat owns those).
@@ -157,6 +173,17 @@ const jazzDrums = drumIdiom({
                 : tier === 'low'
                   ? '................'
                   : 'g...g...g...g...';
+        if (head) {
+            // why: the head on the closed hi-hat — the swing pattern played on the hat, the ride
+            // silent — and the move to the ride for the bridge and the solos is the cue a
+            // listener hears as the band opening up. A softer ride alone barely registers.
+            return {
+                hat: 'x...X.x.x...X.x.',
+                hatPedal: '....x.......x...',
+                kick,
+                snare: snare.join(''),
+            };
+        }
         return {
             ride: tier === 'low' ? 'o...x.o.o...x.o.' : 'x...X.x.x...X.x.',
             hatPedal: '....x.......x...',
@@ -169,14 +196,16 @@ const jazzDrums = drumIdiom({
         back: { ride: 'X.x.', hatPedal: 'x...' },
         strong: { ride: 'x...', kick: 'g...' },
     }),
-    fill(_ctx, steps, rng) {
+    fill(ctx, steps, rng) {
         // Snare on the swung eighths leading in, kick answering on the last "and".
         const snare: string[] = Array.from({ length: steps }, (_, i) =>
             i % 2 === 0 && rng.chance(0.75) ? 'o' : '.',
         );
         snare[steps - 2] = 'x';
         const kick = `${'.'.repeat(steps - 2)}x.`;
-        return { snare: snare.join(''), kick, ride: 'x'.padEnd(steps, '.') };
+        // The fill's first stroke is on the cymbal keeping the time: the hat under the light head.
+        const cymbal = lightHead(ctx.plan) ? 'hat' : 'ride';
+        return { snare: snare.join(''), kick, [cymbal]: 'x'.padEnd(steps, '.') };
     },
     trade: jazzTrade,
 });
@@ -216,7 +245,8 @@ function chooseApproach(
 /**
  * A walking line: the chord's bass on its arrival beat, an approach tone on the beat
  * before the next chord, and chord/scale tones in between that move toward that approach
- * without repeating. Low energy relaxes into a two-feel (half notes on the strong beats).
+ * without repeating. Low energy, and the head's A sections, relax into a two-feel (half notes
+ * on the strong beats).
  */
 const walkingBass: PitchedIdiom = {
     name: 'walking',
@@ -229,7 +259,14 @@ const walkingBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         const beats = pulses(bar);
-        const twoFeel = tier === 'low' && bar.meter.name === '4/4';
+        // In 2 at low energy (a ballad, a breakdown), and under the light head (`lightHead`,
+        // #2018): the bridge walks for contrast and the solos walk, the way a rhythm section
+        // often sets up a standard. A ballad keeps it all in 2. The head's last bar before a
+        // solo chorus walks: the bass sets up the solo over the barline instead of switching on
+        // its downbeat.
+        const twoFeel =
+            (tier === 'low' || (lightHead(plan) && ctx.next?.plan.form !== 'solo')) &&
+            bar.meter.name === '4/4';
         if (plan.ending) {
             // The held note lasts the bar in any meter (#1503); a written `G7 C` strikes both.
             const held = endingBass(ctx, (c, p) => place(bassPc(c), p), last, dyn(96, plan.energy));
@@ -292,7 +329,14 @@ const walkingBass: PitchedIdiom = {
                     ]);
                 }
                 const tail = notes[notes.length - 1];
-                if (followingChord && to - tail[0] >= 8 && rng.chance(0.35)) {
+                // Whether this half note splits is the section's (keyed by the bar's place in
+                // it, and the pass): with the head's A sections in 2 (#2018), an A2 plays its
+                // A's two-feel rhythm, as a walk's even quarters always did. Which note leads
+                // in still follows where the line is (`rng`, the bar's).
+                const splits = ctx
+                    .rng(`two:${ctx.pass}:${bar.barInVisit}:${i}`, 'section')
+                    .chance(0.35);
+                if (followingChord && to - tail[0] >= 8 && splits) {
                     const target = place(bassPc(followingChord), tail[1]);
                     notes.push([to - 4, chooseApproach(rng, target, chord, tail[1])]);
                 }

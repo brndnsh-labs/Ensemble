@@ -189,6 +189,9 @@ export function performPass(
                       ...wrapped,
                       lanes: wrapPlan.lanes,
                       lead: wrapPlan.lead,
+                      // Its form role with it: the head's last bar walks into a solo chorus
+                      // the loop wraps into (#2018).
+                      form: wrapPlan.form,
                       // The fill into the next lap is sized by that lap's own energy, so a
                       // pass resumed here (whose window has no bar 0 to read) sizes it alike.
                       energy: wrapPlan.energy,

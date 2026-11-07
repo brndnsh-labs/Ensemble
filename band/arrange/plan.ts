@@ -7,7 +7,13 @@
 
 import { INTRO_LABEL, OUTRO_LABEL } from '../../core/songbook/score-form.js';
 import type { BandSettings, Lane, TradeSettings } from '../core/types.js';
-import { type Bar, chorusBars, type Timeline } from '../form/timeline.js';
+import {
+    type Bar,
+    chorusBars,
+    type SectionVisit,
+    sectionKey,
+    type Timeline,
+} from '../form/timeline.js';
 import { type LeadRole, leadRole } from './cycle.js';
 
 export type Fill = 'none' | 'phrase' | 'section';
@@ -41,6 +47,79 @@ export interface BarPlan {
      * fours, the drums play alone.
      */
     lead: LeadRole;
+    /**
+     * Where the bar sits in the tune's form, for the rhythm section (`formRole`, #2018): the
+     * head's A sections, the head's bridge, the blowing (a solo or a trade), or the band's own
+     * bars (an intro). Read off `lead`, so it is there with the lead lane off too.
+     */
+    form: FormRole;
+}
+
+/**
+ * The rhythm section's reading of the form (#2018). A jazz band plays the head and the solos
+ * differently: the melody's A sections lightly (the bass in 2), the bridge opened up, the
+ * solos driven. The out-head is a head again.
+ */
+export type FormRole = 'head' | 'bridge' | 'solo' | 'band';
+
+const BRIDGES = new WeakMap<Timeline, Set<number>>();
+
+/**
+ * The visits (by ordinal) that are a head's bridge. A section labelled "Bridge" is one. A
+ * chart with no such label (an iReal import's rehearsal letters: All The Things You Are is
+ * A B C D, its bridge the C) reads the form instead: the bridge is the contrast right before
+ * the last A — the second-to-last section of a chorus of three or more, when it is neither
+ * the chorus's first section nor its last (the B of A A B A or of A A B C, the C of A B C
+ * D). An A B A C tune or a two-part one has none: its second-to-last section is an A again, so the whole head is in
+ * 2. The label letter alone ("B") can't say it: All The Things You Are's B is its second A.
+ * An intro and an outro are around the form, not in it.
+ */
+function bridgeVisits(timeline: Timeline): Set<number> {
+    const cached = BRIDGES.get(timeline);
+    if (cached) {
+        return cached;
+    }
+    const out = new Set<number>();
+    const choruses = new Map<number, SectionVisit[]>();
+    for (const visit of timeline.visits) {
+        const role = sectionRoleOf(visit.label);
+        if (role === 'Intro' || role === 'Outro') {
+            continue;
+        }
+        choruses.set(visit.chorus, [...(choruses.get(visit.chorus) ?? []), visit]);
+    }
+    for (const form of choruses.values()) {
+        const labelled = form.filter((v) => /^bridge/i.test(v.label.trim()));
+        if (labelled.length) {
+            for (const v of labelled) {
+                out.add(v.ordinal);
+            }
+            continue;
+        }
+        const contrast = form.at(-2);
+        if (
+            form.length >= 3 &&
+            contrast &&
+            sectionKey(contrast) !== sectionKey(form[0]) &&
+            sectionKey(contrast) !== sectionKey(form[form.length - 1])
+        ) {
+            out.add(contrast.ordinal);
+        }
+    }
+    BRIDGES.set(timeline, out);
+    return out;
+}
+
+/** The form role of bar `index`, given the lead's job there (`BarPlan.form`). */
+export function formRole(timeline: Timeline, index: number, lead: LeadRole): FormRole {
+    if (lead.kind === 'rest') {
+        return 'band';
+    }
+    if (lead.kind !== 'head') {
+        // A trade is blowing too: the player's turns and the band's are solos.
+        return 'solo';
+    }
+    return bridgeVisits(timeline).has(timeline.bars[index].visit.ordinal) ? 'bridge' : 'head';
 }
 
 /**
@@ -581,6 +660,7 @@ export function planBars(
                 ending,
             ending,
             lead,
+            form: formRole(timeline, i, lead),
         };
     }
     return plans;
