@@ -589,6 +589,39 @@ const jazzLead = leadIdiom({
         ],
         endings: ['x---------------', 'x-----------....', 'x-x-x-----------'],
         form: 'period',
+        // A known standard's guide-tone head, sung (#2111): two or three notes a bar, so the
+        // guide tones are the tune and the cells only give it a rhythm. The air is inside the
+        // cell (a held note, a beat's breath), never a bar of rest. Each has an attack on (or
+        // an eighth before) beat 3, where a two-chord bar's second chord arrives.
+        guide: {
+            cells: [
+                // Dotted quarter, eighth, half: the Charleston figure, the commonest opening of
+                // a swing tune — the eighth steps into the half on 3.
+                'x-----x-x-------',
+                // Two quarters and a half: a plain statement, walking up or down into beat 3.
+                'x---x---x-------',
+                // Dotted quarter, then an eighth pushed over beat 3 and held: the push lands
+                // on 3's chord early (an anticipation), the swing horn's lean.
+                'x-----x---------',
+                // Half, dotted quarter, then an eighth pushed into the next bar and tied over
+                // its barline: the next chord's guide tone, an eighth early.
+                'x-------x-----x-',
+                // A lazy entry on the and of 1, then the half on 3: the phrase leans in late,
+                // as a singer does (the guide tone is still struck within an eighth of 1).
+                '..x-----x-------',
+                // A dotted half and a quarter: a long note, then a pickup into the next bar —
+                // the long-short breath of a ballad's line, two notes a bar.
+                'x-----------x---',
+            ],
+            // The phrase-ending bar: one arrival, struck once (two strikes on one chord would
+            // be the same guide tone twice), held long — a standard's 4th and 8th bars are its
+            // long notes. On the one, breathing an eighth for the next phrase; or landed an
+            // eighth late, as a singer leans into it, and rung up to the next phrase.
+            endings: ['x-------------..', '..x-------------'],
+            // A section's last bar: the whole note on the one, breathing an eighth before the
+            // next section.
+            close: 'x-------------..',
+        },
     },
     pool: (chord) => bebopScale(chord),
     arrive: (chord) => guideTones(chord),

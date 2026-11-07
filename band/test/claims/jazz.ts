@@ -1,6 +1,7 @@
 import { leadRole } from '../../arrange/cycle.js';
 import { type FormRole, formRole } from '../../arrange/plan.js';
 import type { BandEvent, DrumHit, DrumPiece, PitchedNote } from '../../core/types.js';
+import { type Bar, sectionKey, type Timeline } from '../../form/timeline.js';
 import { STEP } from '../../players/grid.js';
 import { defineClaims, type Take } from '../critique/harness.js';
 
@@ -105,6 +106,100 @@ function setsUpSolo(takes: Take[]): number {
     return ratio(hit, n);
 }
 
+/** The lead notes struck in a bar, as the sixteenth each starts on: the bar's rhythm. */
+function onsetSteps(take: Take, bar: Bar): string {
+    return take.events
+        .filter((e): e is PitchedNote => e.lane === 'lead' && e.bar === bar.index)
+        .map((e) => Math.round((e.tick - bar.start) / STEP))
+        .join(' ');
+}
+
+/**
+ * Each chorus of the head (#2111) as the guide-tone head reads it: its first A (the first visit
+ * the plan calls the head's A section), the visits after it with the same letter (an A again),
+ * and its contrast — the bridge, or with none the chorus's last visit when that is another
+ * letter (an A B tune's B, an A B A C's C).
+ */
+function headForms(take: Take) {
+    const { timeline: t, pass = 0, trade } = take;
+    const roleOf = (index: number) =>
+        formRole(t, index, leadRole(t, index, pass + t.bars[index].visit.chorus, trade ?? null));
+    const choruses = new Map<number, Timeline['visits']>();
+    for (const visit of t.visits) {
+        const role = roleOf(visit.firstBar);
+        if (role === 'head' || role === 'bridge') {
+            choruses.set(visit.chorus, [...(choruses.get(visit.chorus) ?? []), visit]);
+        }
+    }
+    return [...choruses.values()].flatMap((visits) => {
+        const first = visits.find((v) => roleOf(v.firstBar) === 'head');
+        if (!first) {
+            return [];
+        }
+        const key = sectionKey(first);
+        const again = visits.filter((v) => v !== first && sectionKey(v) === key);
+        const bridges = visits.filter((v) => roleOf(v.firstBar) === 'bridge');
+        const last = visits.at(-1);
+        const contrast = bridges.length
+            ? bridges
+            : last && last !== first && sectionKey(last) !== key
+              ? [last]
+              : [];
+        return [{ first, again, contrast }];
+    });
+}
+
+/**
+ * Share of the bars of `which` visits (an A again, or the contrast) whose rhythm — the steps
+ * the lead strikes on — is the first A's, bar for bar (a contrast longer than the A is read
+ * against it from its top again). 4/4 bars only; 0 with none to judge.
+ */
+function rhythmMatch(takes: Take[], which: 'again' | 'contrast'): number {
+    let n = 0;
+    let hit = 0;
+    for (const take of takes) {
+        const { bars } = take.timeline;
+        for (const form of headForms(take)) {
+            for (const visit of form[which]) {
+                for (let j = 0; j < visit.barCount; j++) {
+                    const bar = bars[visit.firstBar + j];
+                    const a1 = bars[form.first.firstBar + (j % form.first.barCount)];
+                    if (bar.meter.name !== '4/4' || a1.meter.name !== '4/4') {
+                        continue;
+                    }
+                    if (which === 'again' && j >= form.first.barCount) {
+                        continue;
+                    }
+                    n++;
+                    hit += onsetSteps(take, bar) === onsetSteps(take, a1) ? 1 : 0;
+                }
+            }
+        }
+    }
+    return ratio(hit, n);
+}
+
+/**
+ * The mean of `of` over the lead's notes in the head's bridge, less its mean over the head's A
+ * sections, averaged over the takes that have a bridge; NaN (a failed claim) with none.
+ */
+function bridgeOverHead(takes: Take[], of: (note: PitchedNote) => number): number {
+    const lifts: number[] = [];
+    for (const take of takes) {
+        const mean = (role: FormRole) => {
+            const notes = barsIn([take], role).flatMap((b) =>
+                b.events.filter((e): e is PitchedNote => e.lane === 'lead'),
+            );
+            return notes.length ? notes.reduce((s, e) => s + of(e), 0) / notes.length : Number.NaN;
+        };
+        const lift = mean('bridge') - mean('head');
+        if (!Number.isNaN(lift)) {
+            lifts.push(lift);
+        }
+    }
+    return lifts.length ? lifts.reduce((s, x) => s + x, 0) / lifts.length : Number.NaN;
+}
+
 export const jazz = defineClaims({
     metrics: {
         /** Share of the head's A-section bars the bass plays in 2 (#2018). */
@@ -129,6 +224,31 @@ export const jazz = defineClaims({
         },
         /** Share of the head's last bars before a solo chorus where the bass walks into it. */
         bassSetsUpSolo: setsUpSolo,
+        /**
+         * Share of the lead's notes held a bar or more (a whole note, less the eighth it may
+         * breathe before the next phrase): the long arrivals (#2111).
+         */
+        leadWholeNoteShare: (takes) => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                for (const e of events) {
+                    if (e.lane === 'lead') {
+                        n++;
+                        hit += e.dur >= t.bars[e.bar].meter.barTicks - STEP * 2 ? 1 : 0;
+                    }
+                }
+            }
+            return ratio(hit, n);
+        },
+        /** Share of an A section's bars, played again, that keep the first A's rhythm (#2111). */
+        leadHeadRhythmRecurs: (takes) => rhythmMatch(takes, 'again'),
+        /** Share of the contrast's bars (the bridge, or a last B or C) on the A's rhythm. */
+        leadHeadContrastDiffers: (takes) => rhythmMatch(takes, 'contrast'),
+        /** Semitones the lead's bridge sits above its A sections, on average (#2111). */
+        leadBridgeLift: (takes) => bridgeOverHead(takes, (e) => e.midi),
+        /** How much louder the lead plays its bridge than its A sections, in velocity. */
+        leadBridgeLouder: (takes) => bridgeOverHead(takes, (e) => e.velocity),
     },
     takes: [
         {
@@ -234,28 +354,59 @@ export const jazz = defineClaims({
             ],
         },
         {
-            // A known standard's head (#2027): the changes' guide-tone line, not a tune.
+            // A known standard's head (#2027), sung (#2111): the changes' guide-tone line in a
+            // tune's rhythm. Each claim's comment gives its value as measured, then (in
+            // parentheses) on 2f772130, where the head held each guide tone a chord apiece.
             take: { lead: 'guide-tones' },
             claims: [
-                // A wiring check: the line chooses only guide tones, so this proves the take
-                // plays the guide-tone head. The voice-leading is the interval claims below.
+                // The line chooses only guide tones at the changes. The misses are the pop
+                // chart's triads, whose 7th (the line's other guide tone) this metric doesn't
+                // count. 0.935 (0.967).
                 ['leadChangeGuideTones', 0.9, 1, 'each change lands on its 3rd or 7th'],
-                ['leadNotesPerBar', 0.6, 1.5, 'one long note a chord, not a tune (0.90)'],
+                // Two or three notes a bar between the long arrivals. 1.98 (0.90).
+                ['leadNotesPerBar', 1.6, 3, 'a tune over the changes, not a chord apiece'],
+                // The long notes are the arrivals: the two-bar cell's, and a section's close.
+                // 0.145 (0.617; Stella's head was 20 whole notes in 22).
+                ['leadWholeNoteShare', 0.08, 0.3, 'whole notes only where the tune arrives'],
                 [
                     'leadMeanInterval',
                     0,
                     2.3,
-                    "voice-led: each guide tone steps to the next chord's, or holds (1.68)",
+                    'stepwise between guide tones that step or hold (1.74; 1.68)',
                 ],
-                ['leadStepShare', 0.65, 1, 'mostly half and whole steps (0.74)'],
-                ['leadLeapShare', 0, 0.01, 'no leaps wider than a fifth (0)'],
+                // The steps between guide tones walk the chord scale. 0.781 (0.739).
+                ['leadStepShare', 0.6, 1, 'mostly half and whole steps'],
+                ['leadLeapShare', 0, 0.01, 'no leaps wider than a fifth (0; 0)'],
                 [
                     'leadMoveOverThird',
                     0,
                     0.05,
-                    'voice-led: no 4th or tritone inside a phrase (0; the invented head 0.30)',
+                    'voice-led: no 4th or tritone inside a phrase (0.001; 0)',
                 ],
-                ['leadLongBreath', 0, 0.02, 'the line never drops out for two bars'],
+                // No chromatic approach and no enclosure: the chord scale only. 0 (0).
+                [
+                    'leadChromaticApproach',
+                    0,
+                    0.05,
+                    'a tune steps into its chords, not chromatically',
+                ],
+                // The air is inside the cells; the empty bars are the pop chart's intro.
+                // 0.065 (0.269).
+                ['leadRestShare', 0, 0.1, 'the head fills the form'],
+                ['leadLongBreath', 0, 0.02, 'the line never drops out for two bars (0; 0)'],
+                // Rhythm Changes' A2 and last A against its A1: the one bar that differs is the
+                // last A's eighth, whose Bb6 has no F7 on 3 to strike. 0.969 (0.938: the held
+                // line already followed the A's chords).
+                ['leadHeadRhythmRecurs', 0.9, 1, 'the A comes back in the same rhythm'],
+                // The bridge, a two-section tune's B and the bridge of the pop and minor
+                // charts against the first A, bar for bar. 0.135 (0.458).
+                ['leadHeadContrastDiffers', 0, 0.3, 'the contrast is another rhythm'],
+                // Rhythm Changes and the minor chart's bridge: each phrase starts a 5th up.
+                // 4.40 semitones (-2.38: the held line fell through the bridge's dominants).
+                ['leadBridgeLift', 2, 12, 'the bridge sings higher than the A'],
+                // 82 against 74 planned, plus the lift's own push (higher notes play harder).
+                // 10.8 (0.2).
+                ['leadBridgeLouder', 3, 20, 'and louder'],
             ],
         },
         {

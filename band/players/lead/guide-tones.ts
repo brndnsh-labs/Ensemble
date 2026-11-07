@@ -9,8 +9,20 @@
  * The line is one chain over a whole chorus, so it is voice-led across section seams too (Blue
  * Bossa's G7b9 F falls to the top's Cm7 Eb). It is pure — a function of the timeline and the
  * lead's register — so a head resumed at any barline plays the same line.
+ *
+ * Since #2111 the line is the head's skeleton, not all of it: the lead sings it in a tune's
+ * rhythm (`voiceGuideTones` in idiom.ts), striking these pitches at every change, the first note
+ * and the last, and stepping through the chord scale between them. The form it is sung in is
+ * read here (`headForm`), because the line itself lifts for the contrast.
  */
-import { type Bar, chorusBars, type Timeline } from '../../form/timeline.js';
+import { formRole, sectionRoleOf } from '../../arrange/plan.js';
+import {
+    type Bar,
+    chorusBars,
+    type SectionVisit,
+    sectionKey,
+    type Timeline,
+} from '../../form/timeline.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { type KeyContext, mod12, nearestMidi } from '../../theory/pitch.js';
 import { STEP } from '../grid.js';
@@ -90,6 +102,90 @@ const BREATH = STEP * 2;
 
 /** The 3rd starts a chorus when it lies this close to home (from two under to four over). */
 const THIRD_FIRST = { below: 2, above: 4 } as const;
+
+/**
+ * How a chorus of the head is sung (#2111). `form`: a 12-bar chorus is a blues, a call, the call
+ * again, a different answer (`aab`); any other length a song's period. `contrast`: the visit (by
+ * ordinal) that is the tune's contrast — its bridge (`formRole`, the bridge the rhythm section
+ * opens up for), or with none the chorus's last visit in a letter other than the first's (an
+ * A B tune's B, an A B A C's C). `home`: the visit after the contrast that ends the chorus (the
+ * last A of an A A B A), which brings the A's rhythm back to close. A blues has neither: its
+ * contrast is the third phrase, not a section.
+ */
+export interface HeadForm {
+    form: 'period' | 'aab';
+    contrast: number | null;
+    home: number | null;
+    /** The chorus's first bar inside the form (after an intro), and its last visit. */
+    firstBar: number;
+    last: number | null;
+}
+
+/** Bars in a chorus that make it a blues: 12, the form of every blues on the shelf. */
+const BLUES_BARS = 12;
+
+const FORMS = new WeakMap<Timeline, Map<number, HeadForm>>();
+
+/** The form of the chorus bar `index` is in (`HeadForm`). An intro and an outro are outside it. */
+export function headForm(timeline: Timeline, index: number): HeadForm {
+    const chorus = timeline.bars[index].visit.chorus;
+    let byChorus = FORMS.get(timeline);
+    if (!byChorus) {
+        byChorus = new Map();
+        FORMS.set(timeline, byChorus);
+    }
+    const cached = byChorus.get(chorus);
+    if (cached) {
+        return cached;
+    }
+    const visits: SectionVisit[] = timeline.visits.filter((v) => {
+        const role = sectionRoleOf(v.label);
+        return v.chorus === chorus && role !== 'Intro' && role !== 'Outro';
+    });
+    const bars = visits.reduce((n, v) => n + v.barCount, 0);
+    const firstBar = visits[0]?.firstBar ?? index;
+    const lastVisit = visits.at(-1)?.ordinal ?? null;
+    let out: HeadForm;
+    const bridge = visits.find(
+        (v) => formRole(timeline, v.firstBar, { kind: 'head' }) === 'bridge',
+    );
+    // A twelve-bar chorus with a bridge of its own (an eight-bar groove and a four-bar bridge)
+    // is a song, not a blues.
+    const blues = bars === BLUES_BARS && !bridge;
+    if (blues || !visits.length) {
+        out = {
+            form: blues ? 'aab' : 'period',
+            contrast: null,
+            home: null,
+            firstBar,
+            last: lastVisit,
+        };
+    } else {
+        const first = sectionKey(visits[0]);
+        const other = [...visits].reverse().find((v) => sectionKey(v) !== first);
+        const contrast = bridge ?? other ?? null;
+        const last = visits[visits.length - 1];
+        out = {
+            form: 'period',
+            contrast: contrast?.ordinal ?? null,
+            home: contrast && last.ordinal > contrast.ordinal ? last.ordinal : null,
+            firstBar,
+            last: lastVisit,
+        };
+    }
+    byChorus.set(chorus, out);
+    return out;
+}
+
+/**
+ * Semitones the line's home lifts for the contrast: a 5th. why: a bridge is where a tune climbs
+ * (a standard's bridge sits a 4th to a 5th over its A), so each of the contrast's phrases
+ * starts from the guide tone nearest the lifted home, and the last A drops back to home. A 5th,
+ * not a 4th: each phrase takes the nearest guide tone to the lifted home, either side of it,
+ * and a dominant cycle's line falls a half step a chord inside the phrase, so a 4th's aim
+ * landed most bridges only two or three semitones over the A (Rhythm Changes: 1.6 on average).
+ */
+const CONTRAST_LIFT = 7;
 
 const LINES = new WeakMap<Timeline, Map<string, GuideNote[]>>();
 
@@ -199,17 +295,30 @@ function chorusLine(
     const [lo, hi] = range;
     const notes: GuideNote[] = [];
     let prev: number | null = null;
+    // The home each phrase starts near: lifted for the contrast (`CONTRAST_LIFT`).
+    const { contrast } = headForm(timeline, firstBar);
+    let lastHome = home;
     for (const { start, end, chord, next, fresh } of pieces) {
-        const key = bars[barIndexAt(start)].key;
+        const bar = bars[barIndexAt(start)];
+        const key = bar.key;
         const pcs = guidePitchClasses(chord, key, next);
+        const centre = Math.min(
+            hi - BAND.above,
+            home + (bar.visit.ordinal === contrast ? CONTRAST_LIFT : 0),
+        );
+        // A phrase top where the home moves (into the contrast, or back out of it), and every
+        // phrase top of the lifted contrast, starts again near the new home, as a phrase
+        // outside the band does: the contrast's phrases each start up there.
+        const moved = tops.has(start) && (centre !== lastHome || centre !== home);
+        lastHome = tops.has(start) ? centre : lastHome;
         // The guide tone nearest home inside the band a phrase may start in.
         const fromHome = () =>
             nearest(
                 pcs,
-                home,
-                home,
-                Math.max(lo, home - BAND.below),
-                Math.min(hi, home + BAND.above),
+                centre,
+                centre,
+                Math.max(lo, centre - BAND.below),
+                Math.min(hi, centre + BAND.above),
             );
         let midi: number;
         if (prev === null) {
@@ -219,7 +328,10 @@ function chorusLine(
                 third >= home - THIRD_FIRST.below && third <= home + THIRD_FIRST.above
                     ? third
                     : fromHome();
-        } else if (tops.has(start) && (prev < home - BAND.below || prev > home + BAND.above)) {
+        } else if (
+            moved ||
+            (tops.has(start) && (prev < centre - BAND.below || prev > centre + BAND.above))
+        ) {
             // A phrase starting outside the band starts again near home.
             midi = fromHome();
         } else if (notes.at(-1)?.chord === chord) {
@@ -227,7 +339,7 @@ function chorusLine(
             // same tone. Its other guide tone is a 4th, 5th or tritone away — a leap, not a breath.
             midi = prev;
         } else {
-            midi = nearest(pcs, prev, home, lo, hi);
+            midi = nearest(pcs, prev, centre, lo, hi);
         }
         const previous = notes.at(-1);
         if (
