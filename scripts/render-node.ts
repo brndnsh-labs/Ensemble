@@ -55,6 +55,7 @@ for (const stem of stems) {
         voices,
         randomSeed: `${scene.id}:${seed}`,
         genreFeel: scene.genreFeel,
+        humanize: performed.settings.humanize,
         muteReverb,
     });
     const wav = encodeWav(render.channels, render.sampleRate);
