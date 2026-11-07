@@ -11,7 +11,8 @@ zone) are in [`core/engine/CLAUDE.md`](../../core/engine/CLAUDE.md).
 - A pack is a folder `core/packs/<id>/`: a `manifest.json` plus one `.m4a` per zone.
 - **Pitched pack** manifest: `{ id, name, attribution, samples: [{ key, rootMidi, url }] }`.
   `rootMidi` may be fractional — that is how a zone with a known cents error is tuned true without
-  re-encoding.
+  re-encoding. The manifest's `attribution` is an older free-text line nothing reads; the credit
+  lives in the catalog (below).
 - **Drum pack** manifest keys samples by **articulation**, not pitch (`key: "crash"`, no
   `rootMidi`), with optional round-robin `variants: [url, …]`.
 - Every `url` sits under `/packs/<id>/`. `web/scripts/offline.mjs` copies `core/packs` into the
@@ -24,25 +25,50 @@ zone) are in [`core/engine/CLAUDE.md`](../../core/engine/CLAUDE.md).
   rhythm comp), copy the bytes under a **new id** with its own manifest and calibration rather than
   adding the second lane to the first id's `instruments`. `electric-guitar-rhythm` is the
   precedent.
+- **Every pack ships a `CREDITS.txt`** in its folder, written from the catalog's `credit`, so a
+  downloaded file carries its notice; `offline.mjs` hashes it into `pack-files.json` like any
+  other pack file. After changing a credit, rewrite them with
+  `UPDATE_PACK_CREDITS=1 npm run test:vitest -- sound-credits` and commit the result.
 - **Size budget:** a pitched pack ≤ 2 MB (ceiling 3), a drum kit ≤ 5 MB (ceiling 8). Packs are
   opt-in downloads and never part of the app shell.
 
 ## Licences
 
-Only host what the licence lets us redistribute as standalone files. The record so far:
+Only host what the licence lets us redistribute as standalone files.
 
-| Source | Licence | Used for |
+**The catalog's structured credit is the one source of truth** (`SoundPack.credit` in
+`core/data/sound-packs.ts`; the licences in `core/data/sound-credits.ts`): each source's `work`,
+`author`, `source` URL and `license: { id, name, url }`, and the pack's `changes` in plain words.
+Settings → Sound credits lists it for every pack, installed or not; the lane's Mix panel shows a
+short line derived from it; each folder's `CREDITS.txt` is checked against it by
+`tests/unit/data/sound-credits.test.ts`, which also holds every licence id to the allow-list
+below and every attribution-licensed pack to naming its author, source and changes. A licence
+not on that list is a decision, not a catalog edit.
+
+**Approved licences:** CC0 1.0, **CC BY 3.0/4.0 (approved beside CC0, 2026-11-07)**,
+CC BY-NC-SA 4.0 (the Rhodes only) and GeneralUser GS's own licence. CC BY asks for the creator,
+the work's title, the licence with a link and a note of the changes: that is what `changes` is
+for, so say what was done to the files (trimmed, levelled, mixed to mono, converted to AAC,
+retuned, an amp sim).
+
+**Non-commercial packs:** an NC pack — today the Rhodes — may ship only while Ensemble stays
+non-commercial. If that ever changes, the Rhodes is replaced (or a licence bought from its
+author, who offers one).
+
+Each claim below was read at its source on 2026-11-07 (#2113):
+
+| Source | Licence, as read at the source | Used for |
 |---|---|---|
-| Salamander Grand Piano V3 (archive.org `SalamanderGrandPianoV3`) | CC-BY 3.0 | `grand` |
-| Karoryfer Weresax (`sfzinstruments/karoryfer.weresax`) | CC0 | `sax-alto` |
-| VSCO-2 Community Edition (`sgossner/VSCO-2-CE`) | CC0 | `upright-bass` (Solo Contrabass Pizz); also has section strings and brass |
-| VCSL (`sgossner/VCSL`) | CC0 | `acoustic-kit` (most articulations) |
-| Virtuosity Drums (`sfzinstruments/virtuosity_drums`) | CC0 | `acoustic-kit` (ride, bell, crash, pedal hat) |
-| FreePats Drawbar Organ (SFZ variant) | CC0 | `hammond-organ` |
-| FreePats Spanish Classical Guitar | CC0 | `nylon-guitar` |
-| FreePats Clean Electric Guitar (`-small-` variant) | CC0 | `electric-guitar-clean`, and via the amp sim below `electric-guitar-driven` / `electric-guitar-rhythm` |
-| GeneralUser GS (`mrbumpy409/GeneralUser-GS`) | permissive; allows a self-hosted local copy; credit S. Christian Collins | `clavinet` |
-| jRhodes3c (`sfzinstruments/jlearman.jRhodes3c`) | CC-BY-NC-SA (NC accepted by Brandon) | `rhodes` |
+| Salamander Grand Piano V3 (archive.org `SalamanderGrandPianoV3`) | CC BY 3.0 (the item's licence URL and its description: "Licence: CC-by http://creativecommons.org/licenses/by/3.0/ … Author: Alexander Holm") | `grand` |
+| Karoryfer Weresax (`sfzinstruments/karoryfer.weresax`) | CC0 1.0 (repo `LICENSE`) | `sax-alto` |
+| VSCO-2 Community Edition (`sgossner/VSCO-2-CE`) | CC0 1.0 (repo `LICENSE`); its `Readme.txt` also *asks* (not a condition) that the samples not be sold directly and that Versilian Studios be credited | `upright-bass` (Solo Contrabass Pizz); also has section strings and brass |
+| VCSL (`sgossner/VCSL`) | CC0 1.0 (repo `LICENSE`; README: "no royalties, no credit, no special terms") | `acoustic-kit` (most articulations) |
+| Virtuosity Drums (`sfzinstruments/virtuosity_drums`, Versilian Studios and Karoryfer Samples) | CC0 1.0 (repo `LICENSE`) | `acoustic-kit` (ride, bell, crash, pedal hat) |
+| FreePats Drawbar Organ Emulation (SFZ variant) | CC0 1.0 (its FreePats page) | `hammond-organ` |
+| FreePats Spanish Classical Guitar | CC0 1.0 (its FreePats page) | `nylon-guitar` |
+| FreePats FSBS Electric Guitar Clean #1 (`-small-` variant) | CC0 1.0 (its FreePats page) | `electric-guitar-clean`, and via the amp sim below `electric-guitar-driven` / `electric-guitar-rhythm` |
+| GeneralUser GS (`mrbumpy409/GeneralUser-GS`) | GeneralUser GS License v2.0 (`documentation/LICENSE.txt`): free to use "in your software projects, and to modify the SoundFont bank or its packaging"; no credit is required, and a site featuring it is asked to link to the author's website or host its own copy, never his download files. The author also says he "cannot be 100% sure where all of the samples originated" | `clavinet` |
+| jRhodes3c (`sfzinstruments/jlearman.jRhodes3c`) | CC BY-NC-SA 4.0 for distributing the samples "in an application" (repo `LICENSE`; GitHub shows NOASSERTION because the file is custom). The same file links the BY-NC deed and lists only BY and NC; we follow the stricter, named BY-NC-SA. Commercial use needs a licence from the author | `rhodes` |
 
 **Rejected — don't re-check:** Sonatina/SSO (CC-Sampling+, forbids serving samples standalone),
 Philharmonia (forbids as-is redistribution, MP3 only), Pianobook (EULA bars redistribution),

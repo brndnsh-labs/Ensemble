@@ -14,14 +14,19 @@
  */
 
 import type { InstrumentModule } from '../types.js';
+import { SOUND_LICENSES, type SoundCredit } from './sound-credits.js';
 
 export interface SoundPack {
     /** Pack id — matches `/packs/<id>/` and the `pack:<id>` voice value. */
     readonly id: string;
     /** Human-facing name shown in the Sounds section and the source picker. */
     readonly name: string;
-    /** License / credit line for the sampled source. */
-    readonly attribution: string;
+    /**
+     * Who made the recordings, under what licence, and what we changed (#2113). The one
+     * source of truth for Settings → Sound credits, the lane's short credit and the pack
+     * folder's `CREDITS.txt`; every licence was checked at its source before it was recorded.
+     */
+    readonly credit: SoundCredit;
     /** Approximate download size, MB — shown before install. */
     readonly approxSizeMB: number;
     /** Instrument modules whose voice can route through this pack today. */
@@ -83,7 +88,17 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'grand',
         name: 'Acoustic Grand Piano',
-        attribution: 'Salamander Grand Piano (Yamaha C5) by Alexander Holm — CC-BY 3.0',
+        credit: {
+            sources: [
+                {
+                    work: 'Salamander Grand Piano V3',
+                    author: 'Alexander Holm',
+                    source: 'https://archive.org/details/SalamanderGrandPianoV3',
+                    license: SOUND_LICENSES['CC-BY-3.0'],
+                },
+            ],
+            changes: 'trimmed, converted to AAC',
+        },
         approxSizeMB: 1.3,
         instruments: ['chords'],
         // Ear-locked 2026-06-22 (#656): grand at 8× seats it against the full band.
@@ -95,7 +110,17 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'hammond-organ',
         name: 'Drawbar Organ',
-        attribution: 'FreePats Drawbar Organ Emulation (setBfree) — CC0 1.0 (public domain)',
+        credit: {
+            sources: [
+                {
+                    work: 'FreePats Drawbar Organ Emulation',
+                    author: 'Roberto, for the FreePats project',
+                    source: 'https://freepats.zenvoid.org/Organ/electric-organ.html',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes: 'trimmed with a tail fade, levelled, converted to AAC',
+        },
         approxSizeMB: 0.8,
         instruments: ['chords'],
         // Calibrated 2026-06-22 (#663) via `mix-report --calibrate-pack=chords:hammond-organ`.
@@ -115,7 +140,17 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'clavinet',
         name: 'Clavinet',
-        attribution: 'GeneralUser GS by S. Christian Collins — permissive (host-your-own-copy)',
+        credit: {
+            sources: [
+                {
+                    work: 'GeneralUser GS (Clavinet)',
+                    author: 'S. Christian Collins',
+                    source: 'https://www.schristiancollins.com/generaluser.php',
+                    license: SOUND_LICENSES['GeneralUser-GS'],
+                },
+            ],
+            changes: 'extracted from the SoundFont, levelled, converted to AAC, retuned',
+        },
         approxSizeMB: 0.1,
         instruments: ['chords'],
         // Calibrated 2026-06-22 (#664) via `mix-report --calibrate-pack=chords:clavinet`.
@@ -136,7 +171,17 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'rhodes',
         name: 'Electric Piano (Rhodes)',
-        attribution: 'jRhodes3c (1977 Rhodes Mark I) by Jeff Learman — CC BY-NC-SA 4.0',
+        credit: {
+            sources: [
+                {
+                    work: 'jRhodes3c',
+                    author: 'Jeff Learman',
+                    source: 'https://github.com/sfzinstruments/jlearman.jRhodes3c',
+                    license: SOUND_LICENSES['CC-BY-NC-SA-4.0'],
+                },
+            ],
+            changes: 'trimmed with a tail fade, levelled, converted to AAC',
+        },
         approxSizeMB: 0.8,
         instruments: ['chords'],
         // Calibrated 2026-06-23 (#655) via `mix-report --calibrate-pack=chords:rhodes`:
@@ -161,7 +206,17 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'sax-alto',
         name: 'Alto Saxophone',
-        attribution: 'Karoryfer Weresax (alto sax) — CC0 1.0 (public domain)',
+        credit: {
+            sources: [
+                {
+                    work: 'Weresax (alto saxophone)',
+                    author: 'Karoryfer Samples',
+                    source: 'https://github.com/sfzinstruments/karoryfer.weresax',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes: 'trimmed, converted to AAC',
+        },
         approxSizeMB: 0.7,
         instruments: ['soloist'],
         // Calibrated 2026-06-22 (#658) via `mix-report --calibrate-pack=soloist:sax-alto`:
@@ -179,8 +234,17 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'nylon-guitar',
         name: 'Nylon Guitar',
-        attribution:
-            'FreePats Spanish Classical Guitar (nylon-string) by roberto@zenvoid.org — CC0 1.0 (public domain)',
+        credit: {
+            sources: [
+                {
+                    work: 'FreePats Spanish Classical Guitar',
+                    author: 'Roberto, for the FreePats project',
+                    source: 'https://freepats.zenvoid.org/Guitar/acoustic-guitar.html',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes: 'trimmed, mixed to mono, converted to AAC',
+        },
         approxSizeMB: 0.6,
         instruments: ['soloist', 'chords'],
         // Calibrated 2026-06-23 (#659) via `mix-report --calibrate-pack=soloist:nylon-guitar`:
@@ -216,8 +280,17 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'electric-guitar-clean',
         name: 'Electric Guitar (Clean)',
-        attribution:
-            'FreePats Clean Electric Guitar (Fender, bridge pickup) — CC0 1.0 (public domain)',
+        credit: {
+            sources: [
+                {
+                    work: 'FSBS Electric Guitar Clean #1 (small)',
+                    author: 'FreePats project',
+                    source: 'https://freepats.zenvoid.org/ElectricGuitar/clean-electric-guitar.html',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes: 'trimmed with a tail fade, mixed to mono, converted to AAC',
+        },
         approxSizeMB: 0.7,
         // Also a rhythm guitar: the band engine comps on it with fretboard grips and strums
         // (band/players/comp/). Its gain was calibrated on the soloist bus; unverified on
@@ -246,8 +319,18 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'electric-guitar-driven',
         name: 'Electric Guitar (Driven)',
-        attribution:
-            'FreePats Clean Electric Guitar (Fender) — CC0 1.0; overdrive + cabinet voicing applied (CC0)',
+        credit: {
+            sources: [
+                {
+                    work: 'FSBS Electric Guitar Clean #1 (small)',
+                    author: 'FreePats project',
+                    source: 'https://freepats.zenvoid.org/ElectricGuitar/clean-electric-guitar.html',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes:
+                'trimmed with a tail fade, mixed to mono, converted to AAC, + overdrive and cabinet voicing',
+        },
         approxSizeMB: 0.7,
         instruments: ['soloist'],
         // Same 13 source zones as the clean electric (#740), re-voiced through an
@@ -278,8 +361,18 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'electric-guitar-rhythm',
         name: 'Rhythm Electric (Crunch)',
-        attribution:
-            'FreePats Clean Electric Guitar (Fender) — CC0 1.0; overdrive + cabinet voicing applied (CC0)',
+        credit: {
+            sources: [
+                {
+                    work: 'FSBS Electric Guitar Clean #1 (small)',
+                    author: 'FreePats project',
+                    source: 'https://freepats.zenvoid.org/ElectricGuitar/clean-electric-guitar.html',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes:
+                'trimmed with a tail fade, mixed to mono, converted to AAC, + overdrive and cabinet voicing',
+        },
         approxSizeMB: 0.7,
         instruments: ['chords'],
         // Rhythm-guitar CHORDS voice (#698). Same 13 crunch zones as the driven
@@ -307,8 +400,24 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'acoustic-kit',
         name: 'Acoustic Drum Kit',
-        attribution:
-            'VCSL (Versilian Community Sample Library) by Versilian Studios — CC0 1.0; Virtuosity Drums (sfzinstruments) — CC0 1.0',
+        credit: {
+            sources: [
+                {
+                    work: 'VCSL (Versilian Community Sample Library)',
+                    author: 'Versilian Studios',
+                    source: 'https://github.com/sgossner/VCSL',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+                {
+                    work: 'Virtuosity Drums',
+                    author: 'Versilian Studios and Karoryfer Samples',
+                    source: 'https://github.com/sfzinstruments/virtuosity_drums',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes:
+                'trimmed, levelled, mixed to mono, converted to AAC; the mid tom is the high tom pitched down',
+        },
         approxSizeMB: 1.5,
         instruments: ['groove'],
         // First sampled *percussion* pack — keys by articulation, not pitch, and
@@ -335,8 +444,17 @@ export const SOUND_PACKS: readonly SoundPack[] = [
     {
         id: 'upright-bass',
         name: 'Upright Bass',
-        attribution:
-            'VSCO-2 Community Edition (Solo Contrabass, pizzicato) by Versilian Studios — CC0 1.0 (public domain)',
+        credit: {
+            sources: [
+                {
+                    work: 'VSCO-2 Community Edition (Solo Contrabass, pizzicato)',
+                    author: 'Versilian Studios',
+                    source: 'https://github.com/sgossner/VSCO-2-CE',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes: 'trimmed, levelled, mixed to mono, converted to AAC, retuned',
+        },
         approxSizeMB: 0.2,
         instruments: ['bass'],
         // First sampled pack on the BASS lane (#697) — plays the nearest of 8

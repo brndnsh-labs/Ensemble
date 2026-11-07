@@ -1,0 +1,15 @@
+Acoustic Drum Kit — an Ensemble sound pack (acoustic-kit)
+
+Made from:
+
+  VCSL (Versilian Community Sample Library)
+  by Versilian Studios
+  Source: https://github.com/sgossner/VCSL
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+  Virtuosity Drums
+  by Versilian Studios and Karoryfer Samples
+  Source: https://github.com/sfzinstruments/virtuosity_drums
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Changed for Ensemble: trimmed, levelled, mixed to mono, converted to AAC; the mid tom is the high tom pitched down.

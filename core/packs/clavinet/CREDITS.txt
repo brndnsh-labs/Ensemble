@@ -1,0 +1,11 @@
+Clavinet — an Ensemble sound pack (clavinet)
+
+Made from:
+
+  GeneralUser GS (Clavinet)
+  by S. Christian Collins
+  Source: https://www.schristiancollins.com/generaluser.php
+  Licence: GeneralUser GS License v2.0 — https://github.com/mrbumpy409/GeneralUser-GS/blob/main/documentation/LICENSE.txt
+  Free to use and modify in software. Get it from the author’s website.
+
+Changed for Ensemble: extracted from the SoundFont, levelled, converted to AAC, retuned.

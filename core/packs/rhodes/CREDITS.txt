@@ -1,0 +1,13 @@
+Electric Piano (Rhodes) — an Ensemble sound pack (rhodes)
+
+Made from:
+
+  jRhodes3c
+  by Jeff Learman
+  Source: https://github.com/sfzinstruments/jlearman.jRhodes3c
+  Licence: CC BY-NC-SA 4.0 — https://creativecommons.org/licenses/by-nc-sa/4.0/
+  Non-commercial use only. The adapted files are shared under the same licence.
+
+Changed for Ensemble: trimmed with a tail fade, levelled, converted to AAC.
+
+The files in this folder are adapted from the work above and are licensed under CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/). Non-commercial use only.

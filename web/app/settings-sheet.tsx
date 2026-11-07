@@ -1,6 +1,7 @@
 import type { RefObject } from 'react';
 import { INSTRUMENT_ROLES, PLAYER_INSTRUMENTS, type PlayerInstrument } from '../lib/instrument';
 import type { Palette, ThemeChoice } from '../lib/session';
+import { SOUND_PACKS } from '../lib/sounds';
 import { dialogRule } from './dialog-close';
 import './settings-sheet.css';
 
@@ -138,6 +139,56 @@ export function SettingsSheet({
                 ))}
             </fieldset>
             <p className="muted settings-note">Saved on this device only.</p>
+            <SoundCredits />
         </dialog>
+    );
+}
+
+/** Opens off the app: a credit's links are the publisher's pages and the licence deeds. */
+const EXTERNAL = { target: '_blank', rel: 'noopener noreferrer' } as const;
+
+/**
+ * Sound credits (#2113): every pack in the catalog, downloaded or not, with each recording's
+ * work, author, source and licence, and what we changed. All of it is the catalog's `credit`
+ * (`core/data/sound-packs.ts`), the same record each pack folder's `CREDITS.txt` carries.
+ */
+function SoundCredits() {
+    return (
+        <section className="settings-group" aria-labelledby="sound-credits-title">
+            <h3 id="sound-credits-title" className="settings-group-title">
+                Sound credits
+            </h3>
+            <p className="muted settings-hint">
+                The recordings behind every sound you can download, whether or not it is on this
+                device.
+            </p>
+            <ul className="sound-credits-list">
+                {SOUND_PACKS.map((pack) => (
+                    <li key={pack.id} className="sound-credit">
+                        <strong>{pack.name}</strong>
+                        {pack.credit.sources.map((source) => (
+                            <p key={source.work} className="sound-credit-line">
+                                {source.work} by {source.author} ·{' '}
+                                <a
+                                    href={source.source}
+                                    aria-label={`Source: ${source.work}`}
+                                    {...EXTERNAL}
+                                >
+                                    Source
+                                </a>{' '}
+                                ·{' '}
+                                <a href={source.license.url} {...EXTERNAL}>
+                                    {source.license.name}
+                                </a>
+                                {source.license.terms && (
+                                    <span className="muted"> · {source.license.terms}</span>
+                                )}
+                            </p>
+                        ))}
+                        <p className="muted sound-credit-line">Changed: {pack.credit.changes}.</p>
+                    </li>
+                ))}
+            </ul>
+        </section>
     );
 }

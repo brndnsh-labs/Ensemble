@@ -1,0 +1,10 @@
+Alto Saxophone — an Ensemble sound pack (sax-alto)
+
+Made from:
+
+  Weresax (alto saxophone)
+  by Karoryfer Samples
+  Source: https://github.com/sfzinstruments/karoryfer.weresax
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Changed for Ensemble: trimmed, converted to AAC.

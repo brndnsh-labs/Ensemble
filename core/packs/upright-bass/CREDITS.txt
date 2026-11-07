@@ -1,0 +1,10 @@
+Upright Bass — an Ensemble sound pack (upright-bass)
+
+Made from:
+
+  VSCO-2 Community Edition (Solo Contrabass, pizzicato)
+  by Versilian Studios
+  Source: https://github.com/sgossner/VSCO-2-CE
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Changed for Ensemble: trimmed, levelled, mixed to mono, converted to AAC, retuned.
