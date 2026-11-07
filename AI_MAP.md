@@ -6,7 +6,7 @@ This map provides a quick reference for AI agents to understand the responsibili
 
 - Start here when you need file ownership, entrypoints, or likely edit locations.
 - Use `CLAUDE.md` for operational rules, architecture, and safety conventions. (`AGENTS.md` is a pointer to it.)
-- Nested `CLAUDE.md` files (`band/CLAUDE.md`, `core/CLAUDE.md`, `core/engine/CLAUDE.md`, `tests/CLAUDE.md`) hold directory-scoped load-bearing invariants and traps — sharper than this map or the root file, auto-loaded by tooling that walks the directory tree. Read the one for a directory before editing in it.
+- Nested `CLAUDE.md` files (`band/CLAUDE.md`, `core/CLAUDE.md`, `core/engine/CLAUDE.md`, `tests/CLAUDE.md`, `web/CLAUDE.md`, `web/lib/sync/CLAUDE.md`) hold directory-scoped load-bearing invariants and traps — sharper than this map or the root file, auto-loaded by tooling that walks the directory tree. Read the one for a directory before editing in it.
 - Use `docs/README.md` for the docs index.
 - The app is `web/` (React, Next static export); its source map, handoff and delivery
   rules start at `web/CLAUDE.md`. Since #1358 everything under `core/` below is the
