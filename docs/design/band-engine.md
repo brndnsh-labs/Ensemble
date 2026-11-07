@@ -186,7 +186,11 @@ expression devices take turns rather than stack; one peak note per cycle.
     another turn, the close). The contrast (the bridge, or with none a last section in another
     letter) takes figures the A didn't use, starts each phrase a 4th over where the A's line
     ended, comes back down a step over the A's opening for its last phrase, and plays louder;
-    no seam into or out of it moves more than a 4th. A 12-bar chorus (a vamp after it doesn't
+    no seam into or out of it moves more than a 4th. The A stays where its book seats it and the
+    contrast climbs into the headroom over it, to a whole step under the instrument's top
+    (`BRIDGE_TOP`); going into the contrast, the A's last chord takes whichever of its guide
+    tones the contrast can climb from (a V7's 7th resolving down into the bridge would leave it
+    only a fall, #2123). A 12-bar chorus (a vamp after it doesn't
     count) is a blues instead: call, call, answer. Every style sings it (#2122): a book without
     its own `head.guide` takes the shared figures (`DEFAULT_GUIDE`,
     `players/lead/guide-figures.ts`, the `GuideRhythm` shape a style's override takes whole) —

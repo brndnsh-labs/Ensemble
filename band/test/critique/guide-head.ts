@@ -330,4 +330,10 @@ export const GUIDE_METRICS = {
     },
     /** How much louder the lead plays its bridge than its A sections, in velocity. */
     leadBridgeLouder: (takes) => bridgeOverHead(takes, (e) => e.velocity),
+    /**
+     * Semitones the lead's bridge sits over its A sections, mean pitch against mean pitch
+     * (#2123). `leadBridgeLift` reads one pair of notes a bridge, the seam; this reads the
+     * whole bridge, so a line that steps up at the seam and then sinks under the A fails it.
+     */
+    leadBridgeRegister: (takes) => bridgeOverHead(takes, (e) => e.midi),
 } satisfies Record<string, Metric>;

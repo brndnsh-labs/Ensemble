@@ -54,8 +54,14 @@ const STANDARD = [
     // chords differ (a change struck where the first A had none).
     ['leadHeadRhythmRecurs', 0.85, 1, 'the A comes back in the same rhythm'],
     ['leadHeadContrastDiffers', 0, 0.3, 'the contrast is another rhythm (0.04–0.16)'],
-    // From where the A ended, a 4th's aim: 4.0, where the instrument has room above the line.
+    // From where the A ended, a 4th's aim: 4.0 in every style (Rhythm Changes' bridge 3, the
+    // minor funk's 5). A sax or nylon book's line sits high (+4, +5), and read 0.5 until the
+    // bridge could climb into the headroom over the A (`BRIDGE_TOP`, #2123).
     ['leadBridgeLift', 2, 7, 'the bridge lifts from where the A ended'],
+    // The whole bridge, not its seam (#2123): 0.29 (funk) to 2.81 (neo-soul) over the A. The
+    // sax and nylon books read -0.84 to -2.29 before #2123 (the bridge sank under the A once
+    // it was in), so the floor sits between. 7 is the lift's own ceiling, a 5th.
+    ['leadBridgeRegister', 0, 7, 'and the bridge sits over the A, not just its first note'],
     // 82 against 74 planned (`GUIDE_VELOCITY`), plus the lift's push: 9.7–10.7.
     ['leadBridgeLouder', 3, 20, 'and louder'],
     ['compLeadUnison', 0, 0.1, 'the comp voices under the line, rarely on its note'],
