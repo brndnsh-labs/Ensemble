@@ -225,6 +225,14 @@ export const hiphop = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
+                // pitch for a run of its notes (in the figure's own rhythm, up to four), then moves. Measured
+                // 0.009 with no stabs, 0.130 now; the floor fails with the stabs off, the
+                // ceiling is one note hammered.
+                ['leadRepeatedNotes', 0.08, 0.2, 'a one-note hook said in rhythm, then a turn'],
+                // The head breathes at every phrase end (#2024). Measured 2.5 bars before and after:
+                // its figures already leave room at each phrase end.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['leadLongBreath', 0, 0.02, 'the hook never drops out for two bars'],
                 ['leadRestShare', 0.15, 0.4, 'the hook, then a bar of beat'],
                 ['leadInnerSpace', 0.28, 0.55, 'air inside the bar: a lick, then the beat'],
@@ -239,6 +247,11 @@ export const hiphop = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
+                // pitch for a run of its notes (in the figure's own rhythm, up to four), then moves. Measured
+                // 0.021 with no stabs, 0.111 now; the floor fails with the stabs off, the
+                // ceiling is one note hammered.
+                ['leadRepeatedNotes', 0.08, 0.2, 'a one-note hook said in rhythm, then a turn'],
                 // Measured 0.305; development off 0.211, #2012's bar fix reverted 0.310; always develops 0.55.
                 // Floor guards development off (0.211) only; this style barely sees the bar fix (0.310 vs 0.305), which blues, disco and rock guard.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
@@ -254,7 +267,6 @@ export const hiphop = defineClaims({
                 // between two line bars of a phrase, so hip hop's ceiling is near 0.3.
                 ['leadPhraseLoop', 0.12, 0.6, 'the sampled hook comes round, whole'],
                 ['leadFigureRepeats', 0.2, 0.45, 'and figures repeat bar to bar'],
-                ['leadRepeatedNotes', 0, 0.05, 'a hook, not one note hammered'],
                 ['leadRestShare', 0.15, 0.4, 'whole bars left to the beat'],
                 ['leadInnerSpace', 0.3, 0.6, 'lots of air inside the bar'],
                 ['leadNotesPerBar', 1.8, 3.5, 'a sparse hook, not a solo'],

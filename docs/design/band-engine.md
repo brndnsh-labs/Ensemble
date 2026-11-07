@@ -289,7 +289,26 @@ expression devices take turns rather than stack; one peak note per cycle.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
   lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
   any barline can resume it. Most slots leave room: a phrase plays two or three bars and
-  breathes, or plays a call and an answer with a gap between.
+  breathes, or plays a call and an answer with a gap between. A head breathes too (#2024,
+  `phraseBreath`, `takeBreath`): the last beat of a four-bar phrase is silent, and the last two
+  of an eight-bar period or a section. The breath is taken by shortening what sounds into it,
+  never by leaving a note out: where the phrase's last note is struck inside it (an ending's
+  beat-3 resolution) it shrinks to the beats after that note, a beat at least, and a note
+  struck in the last beat sounds an eighth and leads on. A known standard's guide-tone head
+  breathes the same way: held a chord apiece, the same one or two beats; sung in a rhythm
+  (jazz), one beat, so its arrival keeps its three beats. Claim, every style's head:
+  `leadLongestRun`, the longest stretch without a beat of silence — ≤ 6 bars for a song-form
+  head and a held guide-tone head (it fails if the four-bar breath goes), ≤ 8 for the sung
+  guide-tone head and the heads whose figures already left room (funk, hip hop, blues, reggae).
+- **Repeated notes as riffs** (#2024, `LeadBook.repeat`: funk, ska-punk, hip hop, disco). A
+  figure is stabbed or not once per solo phrase, and a head stabs up to two of its figures,
+  once per section — never per note. In each bar playing a stabbed figure, a run of its notes
+  says one pitch (a chord tone), up to four, then the line moves: funk's and hip hop's in the
+  figure's own sixteenths, disco's on the eighths, ska's starting and ending on an "and". A
+  run stops at a change or a target, never takes the bar's last note, and ends a note sooner
+  where the line already put the pedal next. A riff or a developed motif carries its stab with
+  it, and a looped hook comes round with its own. Claim: `leadRepeatedNotes` 0.08–0.2, head and
+  solo.
 - **Rhythm before pitch.** A phrase's rhythm is built from the style's rhythm vocabulary (cells
   on the sixteenth grid: bebop eighth-note lines, a blues call, funk stabs), and its last note
   is a long one: an arrival. The style's cells are its dialect, as the comp's cells are.

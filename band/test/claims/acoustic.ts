@@ -601,6 +601,11 @@ export const acoustic = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 20 bars before (phrase into phrase),
+                // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing.
+                ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form, like a verse'],
                 ['leadNotesPerBar', 2, 4.5, 'a singable line, not a run'],

@@ -259,8 +259,10 @@ export const jazz = defineClaims({
         /** Share of the head's last bars before a solo chorus where the bass walks into it. */
         bassSetsUpSolo: setsUpSolo,
         /**
-         * Share of the lead's notes held a bar or more (a whole note, less the eighth it may
-         * breathe before the next phrase): the long arrivals (#2111).
+         * Share of the lead's notes held a bar less a beat or more (a whole note, less the beat
+         * it breathes before the next phrase, #2024): the long arrivals (#2111). It counted to
+         * a bar less an eighth until the head took a beat's breath at every phrase end; held
+         * that strictly every arrival now reads short (0), so it counts the arrival's three beats.
          */
         leadWholeNoteShare: (takes) => {
             let n = 0;
@@ -269,7 +271,7 @@ export const jazz = defineClaims({
                 for (const e of events) {
                     if (e.lane === 'lead') {
                         n++;
-                        hit += e.dur >= t.bars[e.bar].meter.barTicks - STEP * 2 ? 1 : 0;
+                        hit += e.dur >= t.bars[e.bar].meter.barTicks - STEP * 4 ? 1 : 0;
                     }
                 }
             }
@@ -466,6 +468,11 @@ export const jazz = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 15.63 bars before (phrase into phrase),
+                // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing.
+                ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
                 ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the head is a tune: it fills the form'],
@@ -493,6 +500,10 @@ export const jazz = defineClaims({
             // head held a chord apiece, and on 24b7047f, its first sung cut. A claim marked
             // "new" fails on at least one of them, as noted; the rest are guards that held then.
             claims: [
+                // The sung guide-tone line breathes a beat at every phrase end (#2024), off its
+                // last held tone. 7.75 before, 7.63 now: a phrase that hands on with a pickup
+                // in its last beat (the bridge's turn back) keeps it, so eight is the promise.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 // The line chooses only guide tones at the changes. The misses are the pop
                 // chart's triads, whose 7th (the line's other guide tone) this metric doesn't
                 // count. 0.961 (0.967; 0.935).
@@ -504,7 +515,10 @@ export const jazz = defineClaims({
                 // 0.335: both fail).
                 ['leadLongNoteBars', 0, 0.25, 'a long note a phrase, not every other bar'],
                 // Tightened with it: the issue's 0.08 floor was the first cut's every-other-bar
-                // long note, which the review ruled out. 0.054 (0.617 and 0.145: both fail).
+                // long note, which the review ruled out. 0.054 (0.617 and 0.145: both fail), when
+                // it counted a bar less an eighth. Since #2024's breath it counts a bar less a
+                // beat: 0.078 (0.084 on main before the breath, at that count; the old cuts only
+                // read higher at the looser count, so the ceiling still fails them).
                 ['leadWholeNoteShare', 0.03, 0.12, 'whole notes only where a phrase arrives'],
                 // New: a note held a beat or more, or struck on 1 or 3, is a chord tone, never an
                 // avoid note (`walkPool`). 0 (0; 0.176: the first cut held passing tones like A

@@ -434,9 +434,17 @@ export const metal = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 20 bars before (phrase into phrase),
+                // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing.
+                ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
                 ['leadLongBreath', 0, 0.02, 'the melody never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the twin-guitar melody fills the form'],
                 ['leadNotesPerBar', 3.5, 7, "a melody in the riff's gallop"],
+                // Measured 0.020 before the head breathed at its phrase ends (#2024), 0.091 after:
+                // the beat or two of breath each phrase end takes is the whole rise, and it still
+                // sits under the ceiling.
                 ['leadInnerSpace', 0, 0.1, 'the gallop fills the bar'],
                 ['leadShortShare', 0.55, 0.9, 'eighths and sixteenths, a held note to land'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chord on the beats'],

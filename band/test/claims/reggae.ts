@@ -127,6 +127,9 @@ export const reggae = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
+                // its figures already leave room at each phrase end.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0.15, 0.4, 'a call, then a bar of room for the skank'],
                 ['leadNotesPerBar', 1.4, 3, 'few notes, long ones: a hook to hum'],
