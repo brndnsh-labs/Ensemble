@@ -355,11 +355,25 @@ const metrics = {
     },
 };
 
+// The guide-tones take (#2122) with this style's own claim on its figures: added here, as
+// `guideTonesTake`'s `extra` takes only the shared metrics.
+const guide = guideTonesTake();
+
 export const skapunk = defineClaims({
     metrics,
     takes: [
-        // The known standard's guide-tone head, on the shared figures (#2122).
-        guideTonesTake(),
+        // The known standard's guide-tone head, on ska-punk's own figures (#2122, `head.guide`
+        // in `styles/skapunk.ts`).
+        {
+            ...guide,
+            claims: [
+                ...guide.claims,
+                // The horn stabs the "and"s: 0.57 on ska-punk's figures, 0.34 on the shared
+                // ones (a straight-eighth tune's upbeats). The floor sits between, past an even
+                // line's half.
+                ['leadOffbeatShare', 0.5, 0.8, 'the head punches the "and"s with the skank'],
+            ],
+        },
         {
             take: {},
             claims: [
