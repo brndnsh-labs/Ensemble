@@ -133,6 +133,23 @@ describe('sampled kit — the kick ducks the bass (#1998)', () => {
         ]);
     });
 
+    it('a soft kick ducks the bass less than a hard one; level 0.9 and up ducks to 0.45 (#2102)', () => {
+        const depthAt = (level: number) => {
+            const { state, sidechain } = makeState();
+            playDrumSound(state, 'Kick', 1, level);
+            return sidechain.gain.calls.find((c) => c[0] === 'target')?.[1] as number;
+        };
+        const feathered = depthAt(0.31);
+        const typical = depthAt(0.7);
+        expect(feathered).toBeGreaterThan(typical);
+        expect(typical).toBeGreaterThan(0.45);
+        expect(feathered).toBeLessThan(1);
+        expect(depthAt(0.9)).toBeCloseTo(0.45, 12);
+        expect(depthAt(1.2)).toBe(depthAt(0.9));
+        // A non-finite level never reaches the AudioParam as NaN.
+        expect(depthAt(Number.NaN)).toBe(depthAt(1));
+    });
+
     it('no other sampled hit touches the sidechain', () => {
         const { state, sidechain } = makeState();
         playDrumSound(state, 'Snare', 1, 1);

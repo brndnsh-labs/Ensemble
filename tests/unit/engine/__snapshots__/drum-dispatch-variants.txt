@@ -245,7 +245,7 @@ nan-velocity / Mid Tom: 143 lines, sha1 7018675dcd829bf9fed6ff8a73be0a8bc0dc33a2
 nan-velocity / Low Tom: 143 lines, sha1 ecdbdd0f89ab4591c59130cda88e65b89fd8dcf3
 nan-velocity / Shaker: 99 lines, sha1 d709b526f33e0f7918d06f1004abdefc722ee69f
 nan-velocity / Bogus: 72 lines, sha1 639a902fe9637e2891c9009a590719b930457b1e
-late-time / Kick: 167 lines, sha1 d759fe28be122c8b1d85d2dd3fe922688609ba52
+late-time / Kick: 167 lines, sha1 7afec0d1ee682e78fb9776ec8270e28294ff9442
 late-time / Snare: 143 lines, sha1 1f950b6c91304c14c86fa368199af3d7c40d1bf7
 late-time / Sidestick: 125 lines, sha1 7b0a004d003df460f7476c8152610233cb33b836
 late-time / HiHat: 137 lines, sha1 8541c19db7eeddd85071bad9d71b4d25d633ef82
@@ -259,7 +259,7 @@ late-time / Mid Tom: 143 lines, sha1 9c81b2e8a531687bdd486b07d27b00c8421645e8
 late-time / Low Tom: 143 lines, sha1 282a469f20ba0118c320c929eb43444b808ba9d5
 late-time / Shaker: 99 lines, sha1 b936ab30dd8a2012df316b7aac19ba4a59bd0e62
 late-time / Bogus: 72 lines, sha1 5e44d896b53558fb07d52a91a93a084c7e5ad0d1
-burst / Kick: 2567 lines, sha1 14f499c3bc98bcc907454ae044105e02fb94232a
+burst / Kick: 2567 lines, sha1 7e9dde6e57e505839d703345c00f3da8cba76f7b
 burst / Snare: 1967 lines, sha1 f7eb82e61ac49fc2d596f0645eae9c37048b59af
 burst / Sidestick: 1517 lines, sha1 087163bf92342a86cecfa92fc802da3ebc7f82fa
 burst / HiHat: 1685 lines, sha1 55eb411a52faf0712c6e73b2cc3a86808442d0ec

@@ -226,7 +226,7 @@ create panner#4
 panner#4.pan.setValueAtTime(0,10.5)
 panner#4.connect(gain#2)
 gain#3.gain.cancelScheduledValues(10.5)
-gain#3.gain.setTargetAtTime(0.45,10.5,0.005)
+gain#3.gain.setTargetAtTime(0.511111111,10.5,0.005)
 gain#3.gain.setTargetAtTime(1,10.505,0.12)
 create source#5
 source#5.buffer=pack-buffer:kick
