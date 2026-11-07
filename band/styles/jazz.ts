@@ -142,7 +142,12 @@ const jazzDrums = drumIdiom({
     name: 'jazz ride',
     timekeeper: ['ride'],
     fillLength: { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 4, mid: 4, high: 8 } },
-    groove(ctx, tier) {
+    groove(ctx, barTier) {
+        // The head's A sections keep the quiet time whatever the energy (#2018): a soft ride,
+        // no feathered kick, no snare comping — the melody is the event, and the drummer moves
+        // up to the full ride when the bridge opens up and the solos start. The fills, the
+        // crashes and the dynamics still follow the bar's energy.
+        const tier = ctx.plan.form === 'head' ? 'low' : barTier;
         const rng = ctx.rng('comp');
         const snare = Array.from({ length: 16 }, () => '.');
         // Comping density rises with energy; never on 2 or 4 (the hat owns those).
@@ -216,7 +221,8 @@ function chooseApproach(
 /**
  * A walking line: the chord's bass on its arrival beat, an approach tone on the beat
  * before the next chord, and chord/scale tones in between that move toward that approach
- * without repeating. Low energy relaxes into a two-feel (half notes on the strong beats).
+ * without repeating. Low energy, and the head's A sections, relax into a two-feel (half notes
+ * on the strong beats).
  */
 const walkingBass: PitchedIdiom = {
     name: 'walking',
@@ -229,7 +235,10 @@ const walkingBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         const beats = pulses(bar);
-        const twoFeel = tier === 'low' && bar.meter.name === '4/4';
+        // In 2 at low energy (a ballad, a breakdown), and under the head's A sections at any
+        // energy (#2018): the head is played lightly, the bridge walks for contrast, the solos
+        // walk, the way a rhythm section often sets up a standard. A ballad keeps it all in 2.
+        const twoFeel = (tier === 'low' || plan.form === 'head') && bar.meter.name === '4/4';
         if (plan.ending) {
             // The held note lasts the bar in any meter (#1503); a written `G7 C` strikes both.
             const held = endingBass(ctx, (c, p) => place(bassPc(c), p), last, dyn(96, plan.energy));
@@ -292,7 +301,14 @@ const walkingBass: PitchedIdiom = {
                     ]);
                 }
                 const tail = notes[notes.length - 1];
-                if (followingChord && to - tail[0] >= 8 && rng.chance(0.35)) {
+                // Whether this half note splits is the section's (keyed by the bar's place in
+                // it, and the pass): with the head's A sections in 2 (#2018), an A2 plays its
+                // A's two-feel rhythm, as a walk's even quarters always did. Which note leads
+                // in still follows where the line is (`rng`, the bar's).
+                const splits = ctx
+                    .rng(`two:${ctx.pass}:${bar.barInVisit}:${i}`, 'section')
+                    .chance(0.35);
+                if (followingChord && to - tail[0] >= 8 && splits) {
                     const target = place(bassPc(followingChord), tail[1]);
                     notes.push([to - 4, chooseApproach(rng, target, chord, tail[1])]);
                 }

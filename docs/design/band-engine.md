@@ -226,7 +226,13 @@ expression devices take turns rather than stack; one peak note per cycle.
       fit a practice app. Trading is something the player asks for.
   - The cycle is the arrangement's (`arrange/cycle.ts`): the plan carries each bar's lead role
     (`BarPlan.lead`), so the lead, the drummer and the rhythm section agree on whose turn it
-    is.
+    is. From it the plan reads each bar's form role (`BarPlan.form`, #2018): the head's A
+    sections, the head's bridge, the solos (a trade included) or the band's own bars (an
+    intro). It is there with the lead off, since the head is still the first time through. A
+    section labelled Bridge is the bridge; a chart of rehearsal letters has its bridge read
+    from the form, as the contrast right before the last A (A A B A's B, A B C D's C). Jazz
+    plays the head's A sections in 2 over the quiet time whatever the energy, then walks the
+    bridge and the solos on the full ride; at low energy (a ballad) it stays in 2 throughout.
   - **A counted chart** (`SemanticScore.choruses`, #1475) is one timeline holding every chorus,
     played once as pass 0. Each bar's chorus is added to the pass (`planBars`'s `passAt`), and
     every seed, a solo's arc, its opening breath and a looping book's recalled phrase are keyed

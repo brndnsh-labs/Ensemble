@@ -1,20 +1,106 @@
-import { defineClaims } from '../critique/harness.js';
+import { leadRole } from '../../arrange/cycle.js';
+import { type FormRole, formRole } from '../../arrange/plan.js';
+import type { BandEvent, DrumHit, PitchedNote } from '../../core/types.js';
+import { defineClaims, type Take } from '../critique/harness.js';
+
+const ratio = (hits: number, total: number) => (total ? hits / total : 0);
+
+/**
+ * Each 4/4 bar of the takes in form role `role` (#2018), as the plan reads it: the lead's job
+ * there (the same `leadRole` the plan asks, with the bar's chorus added to the pass) and the
+ * head's bridge. With the bar's events.
+ */
+function barsIn(takes: Take[], role: FormRole) {
+    const out: { take: Take; index: number; events: BandEvent[] }[] = [];
+    for (const take of takes) {
+        const { timeline: t, events, pass = 0, trade } = take;
+        for (const bar of t.bars) {
+            const lead = leadRole(t, bar.index, pass + bar.visit.chorus, trade ?? null);
+            if (bar.meter.name === '4/4' && formRole(t, bar.index, lead) === role) {
+                out.push({
+                    take,
+                    index: bar.index,
+                    events: events.filter((e) => e.bar === bar.index),
+                });
+            }
+        }
+    }
+    return out;
+}
+
+/** The bass notes struck in a bar (a bar with none — the bass laid out — is not judged). */
+const bassIn = (events: BandEvent[]) =>
+    events.filter((e): e is PitchedNote => e.lane === 'bass' && !e.muted);
+
+/**
+ * Share of the bars in `role` the bass plays in 2 (`two`: three notes or fewer — two half notes
+ * and an approach) or walks (four or more). 0 when the takes hold no such bar, so a claim on
+ * a role the plan never gives fails rather than passing empty.
+ */
+function bassFeel(takes: Take[], role: FormRole, two: boolean): number {
+    const bars = barsIn(takes, role).filter((b) => bassIn(b.events).length > 0);
+    return ratio(bars.filter((b) => bassIn(b.events).length <= 3 === two).length, bars.length);
+}
+
+/** Mean ride-stroke velocity over the time-keeping bars in `role` (no fill, no crash bar). */
+function rideVelocity(takes: Take[], role: FormRole): number {
+    let sum = 0;
+    let n = 0;
+    for (const { take, index, events } of barsIn(takes, role)) {
+        const bar = take.timeline.bars[index];
+        const drums = events.filter((e): e is DrumHit => e.lane === 'drums');
+        if (
+            bar.barInVisit === 0 ||
+            bar.phrase.bar === bar.phrase.length - 1 ||
+            drums.some((d) => d.piece.startsWith('tom') || d.piece === 'crash')
+        ) {
+            continue;
+        }
+        for (const d of drums) {
+            if (d.piece === 'ride') {
+                sum += d.velocity;
+                n++;
+            }
+        }
+    }
+    return n ? sum / n : Number.NaN;
+}
 
 export const jazz = defineClaims({
+    metrics: {
+        /** Share of the head's A-section bars the bass plays in 2 (#2018). */
+        bassHeadInTwo: (takes) => bassFeel(takes, 'head', true),
+        /** Share of the solo bars (and trades) the bass walks: four notes or more. */
+        bassSoloWalks: (takes) => bassFeel(takes, 'solo', false),
+        /** Share of the head's bridge bars the bass walks. */
+        bassBridgeWalks: (takes) => bassFeel(takes, 'bridge', false),
+        /**
+         * The ride under the head's A sections over the ride under the solos, mean stroke
+         * velocity: the head's soft time against the solos' full ride. NaN (a failed claim)
+         * when either has no time-keeping bar to judge.
+         */
+        rideHeadOverSolo: (takes) => rideVelocity(takes, 'head') / rideVelocity(takes, 'solo'),
+    },
     takes: [
         {
             take: {},
             claims: [
+                // The head and the solos get different grooves (#2018). This take is the head
+                // (pass 0) and the first solo chorus, on Auto (the head about 0.52, mid). Measured
+                // 0.960 / 1 / 1 / 0.766; with the change reverted 0 (the head walked from bar 1)
+                // / 1 / 1 / 0.99 (one ride across both). The head's 4% that reads as walking is a
+                // two-chord bar in 2 whose half notes each split for an approach (four notes).
+                ['bassHeadInTwo', 0.8, 1, "the head's A sections: the bass in 2"],
+                ['bassBridgeWalks', 0.9, 1, "the head's bridge walks, for contrast"],
+                ['bassSoloWalks', 0.9, 1, 'the solos walk'],
+                [
+                    'rideHeadOverSolo',
+                    0,
+                    0.9,
+                    "a soft ride under the head's A sections, the full ride under the solos",
+                ],
                 ['rideOnBeats', 0.9, 1, 'the ride carries the time on every beat'],
                 ['hatPedal24', 0.9, 1, 'hi-hat foot on 2 and 4'],
-                ['bassNotesPerBeat', 0.85, 1.05, 'a walking line: one note per beat'],
-                ['bassArrivesOnBass', 0.75, 1, 'the walk lands on the chord (a 3rd now and then)'],
-                ['bassChromaticApproach', 0.3, 0.8, 'half-step approaches lead into changes'],
-                // The walk's approaches are lead-ins too: 585 measured, none leaping past a fifth.
-                ['bassApproachCount', 290, 10000, 'it does play half-step lead-ins into changes'],
-                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
-                ['bassRepeatedNotes', 0, 0.02, 'the walk keeps moving: no repeated pitches'],
-                ['bassMeanLeap', 1.5, 4.5, 'mostly stepwise, not arpeggio leaps'],
                 // Measured 0.033 today; 0.016 with the push off (the chance level: a Charleston hit
                 // that happens to carry both guide tones). The floor sits between them: a guard
                 // that the push exists, not a target (#2015 raises the real rate).
@@ -37,6 +123,10 @@ export const jazz = defineClaims({
                     0.75,
                     'two-feel: half notes, with an occasional approach on 4',
                 ],
+                // A ballad stays in 2 under the solos too (#2018): nothing at low energy changes.
+                // Measured 0.033: two-chord bars whose half notes each split for an approach.
+                ['bassSoloWalks', 0, 0.1, 'a ballad: the solos stay in 2 as well'],
+                ['bassHeadInTwo', 0.8, 1, 'and so does the head'],
                 [
                     'bassHeldNotesAreChordTones',
                     0.97,
@@ -128,6 +218,16 @@ export const jazz = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // The walk is the solos' (#2018): the head's A sections are in 2, so the walking
+                // line is judged on the three solo choruses.
+                ['bassNotesPerBeat', 0.85, 1.05, 'a walking line: one note per beat'],
+                ['bassArrivesOnBass', 0.75, 1, 'the walk lands on the chord (a 3rd now and then)'],
+                ['bassChromaticApproach', 0.3, 0.8, 'half-step approaches lead into changes'],
+                // The walk's approaches are lead-ins too: 906 measured, none leaping past a fifth.
+                ['bassApproachCount', 450, 10000, 'it does play half-step lead-ins into changes'],
+                ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
+                ['bassRepeatedNotes', 0, 0.02, 'the walk keeps moving: no repeated pitches'],
+                ['bassMeanLeap', 1.5, 4.5, 'mostly stepwise, not arpeggio leaps'],
                 ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 // Measured 0.118; development off 0.026, #2012's bar fix reverted 0.106; always develops 0.32.
                 // Floor guards development off (0.026) only; this style barely sees the bar fix (0.106 vs 0.118), which blues, disco and rock guard.
