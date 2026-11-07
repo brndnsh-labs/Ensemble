@@ -5,7 +5,7 @@
   - `track:*` — musical · synth · bundle · ui. **The load-bearing routing dimension here**: it
     picks the DoD, reviewer, and merge behavior (see doctrine-routing).
   - `lens:*` — code-review · music-theory · synth-graph · state-discipline · bundle-hygiene ·
-    test-quality · practice-ux · audio-stems-reviewer · both.
+    test-quality · practice-ux · both.
   - Static attributes, unchanged: `size/*`, `model/*`, `agent/*`, `area:*`, plus the bare
     `backlog` · `finding` · `bug` · `burndown` · `verify-by-ear` markers. `/next`'s size
     tiebreak reads the `size/*` label.
@@ -22,4 +22,7 @@
   correctly** — same issue, same number, all 224 issues and 710 PRs still here. Only the
   Forgejo-only window (#936–#1355) is renumbered; that map lives in homelab-maintenance
   `migration-maps/Ensemble-issue-map.tsv`, and those closed issues stayed behind in the
-  read-only archive at `git.brndn.zip/brandon/Ensemble-archive`.
+  read-only archive at `git.brndn.zip/brandon/Ensemble-archive`. `brandon/Ensemble` is a pull
+  mirror with issues disabled; look in `-archive`. Only the 8 issues still open at migration
+  carried over to GitHub (the map's rows), so an unmapped `#N` in 936–1355 is archive
+  provenance, not a live GitHub link.

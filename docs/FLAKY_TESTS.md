@@ -20,6 +20,14 @@ entry here).
 | **e2e-timing** | Playwright waits timing out under parallel workers, or a whole-run crash from a bad import. | `web/checks/*.spec.ts` (the v1 suite in `tests/e2e/` was deleted with the v1 app, #1358 — the 🟢 entries below that cite it are history) | Run against the built export, never a dev server; rebuild `web/out` after anything that overwrote it (`mix:report` builds it with the render bridge). Import crashes in a root-package script → `@playwright/test` is CJS; use the default import only (`import pkg; const { chromium } = pkg`). |
 | **slow-legitimate** | Passes alone on an idle box, reddens a full/CI run under load. Fails with vitest's *"test timed out"*, **not** a failed assertion — and the reported duration sits just over `testTimeout`. The work is real (a production-faithful multi-seed engine sweep), not a hang. | `tests/standards/*-critique.test.ts` | Raise the timeout at the **tightest scope that covers it** — per-test `it('...', { timeout: 60_000 }, () => {...})`, or per-file if several tests are near the line. **Never raise the global `testTimeout` in `vitest.config.ts`** (masks genuine hangs everywhere) and **never trim the sample or loosen an assertion** to buy speed — that's harness-silencing, the #1 critique-test smell. Mutation-test the knob (set it to `100`, confirm red) so you know it's honored and correctly scoped. |
 
+## Local environment traps
+
+- **WebKit playback specs hang on a headless box with no PipeWire sink.** Give it a null sink:
+  `pactl load-module module-null-sink sink_name=flake_null && pactl set-default-sink flake_null`.
+- **Keep local stress runs at 4 workers or fewer.**
+- **Under parallel CPU load, `tests/scripts/mix-render-node.test.ts`'s 90 s tests can time out**;
+  re-run it alone.
+
 ## How to read the registry
 
 - **Status** is one of: `🔴 open` (reproducing, no fix yet), `🟡 quarantined` (known-flaky, retry-on-fail or `.skip`'d pending a fix), `🟢 fixed` (root-caused and patched; kept here as a reference so the same symptom isn't re-diagnosed).

@@ -1,9 +1,9 @@
 # Ensemble v2: fresh-session handoff
 
 Read [the root guide](../CLAUDE.md) first. This guide applies to every v2 story,
-including companion changes outside this directory. It is provider-neutral: the issue,
-checked-in contracts and current branch are sufficient; do not require chat history,
-another model's private memories, or access to a sibling application's secrets.
+including companion changes outside this directory. The issue, checked-in contracts and
+current branch are sufficient; do not require chat history, another model's private memories,
+or access to a sibling application's secrets.
 
 The navigation rows below are the map and the binding rules; each row's why and history is in
 [stand notes](../docs/design/ensemble-v2-stand-notes.md),
@@ -30,17 +30,14 @@ Human gates are unchanged: a device or listening gate is still a hard stop, and 
 does not clear one. Record the commit SHA, checks and remaining gate so another agent does not
 implement the same story again.
 
-Use the local harness's installed workflow skills; their shared doctrine still supplies review,
-provenance, safety and verification rules. If those skills are unavailable, follow the same
-steps explicitly and report that limitation. Do not weaken a gate because another provider is
+Use the local harness's installed workflow skills. If those skills are unavailable, follow the
+same steps explicitly and report that limitation. Do not weaken a gate because another provider is
 executing. Generated skill copies are renderer-managed, not task-local files to patch.
 
 ## Minimum context, in order
 
 1. Current issue body, dependency receipts and relevant decision comments. Check its state
-   against the branch: open does not mean unimplemented. GitHub milestones own task status:
-   [accounts in the product](https://github.com/brndnsh-labs/Ensemble/milestone/17) and
-   [parity](https://github.com/brndnsh-labs/Ensemble/milestone/18).
+   against the branch: open does not mean unimplemented. GitHub milestones own task status.
 2. [Preview README](README.md): working behavior, commands, storage and deployment caveats.
 3. Only the contract relevant to the task:
    [product](../docs/design/ensemble-v2.md),
@@ -119,18 +116,10 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 
 ## Verification and receipt
 
-Iterate with the smallest relevant test selection; before handing off implementation, run the
-repo gates and the v2 gates affected by the story. From the repository root:
-
-```sh
-npm run validate
-npm run test:browser
-npm run test:sync
-npm run build --prefix web
-npm run test:e2e --prefix web
-```
-
-`validate` also runs the formatter: inspect its diff and do not commit unrelated formatting.
+Iterate with the smallest relevant test selection; before handing off, run the gate list in
+DOCTRINE §4 (`.claude/skills/DOCTRINE.md`) — for a v2 story that is the build plus the
+Playwright specs the change touches, and `npm run test:sync` for an IndexedDB or sync change.
+`npm run validate` also runs the formatter: inspect its diff and do not commit unrelated formatting.
 The separate sync configuration includes its browser files explicitly; register any new file
 there so both engines actually run it. Node/happy-dom is not proof of IDB transaction behavior.
 Coordinate heavy browser suites instead of competing for their ports. Emulator success is not
@@ -149,25 +138,13 @@ security review; synth or subjective music changes retain their human listening 
 
 ## Economical, cross-provider execution
 
-Use the repository's provider-neutral `model/economy`, `model/balanced`, `model/frontier` labels.
-The current routing pairs those with Haiku/Luna, Sonnet/Terra, and Opus/Sol respectively; these
-are workflow roles, not a guarantee about availability, subscription limits or equal capability.
-Precise tests/mechanical tasks fit economy; bounded implementation fits balanced. Authentication,
-concurrency, destructive migration or unresolved musical meaning requires frontier-level review
-and any applicable human decision. Escalate when the task exceeds the specified boundary.
+The `model/*` labels pick the executor's tier (DOCTRINE §3). Authentication, concurrency,
+destructive migration or unresolved musical meaning requires frontier-level review and any
+applicable human decision. Escalate when the task exceeds the specified boundary.
 
 Give each fresh session one issue. Pass this guide and that issue, not the whole conversation.
 Use one integration owner: do not run separate Claude and Codex sessions writing the same
 branch concurrently. Parallel work requires verified disjoint files and owner-controlled
 isolation/integration; shared fixtures, configs and the large app component are overlap too.
 
-Suggested prompt once a child is filed and ready:
-
-> Work on Ensemble v2 issue #NUMBER. Read CLAUDE.md and web/CLAUDE.md, then the
-> issue and its dependencies. Branch from main and run the normal cycle. A merge releases this
-> app to production, whether the story touches `core/` or only `web/`. Stay within
-> acceptance criteria, stop for unresolved decisions and human gates, and leave a test/commit
-> receipt.
-
-The broader design parents are not single implementation tasks. Pick a ready child; never run
-an unattended cycle across the entire account or full-iReal umbrella.
+A design parent is not a single implementation task: pick a ready child.

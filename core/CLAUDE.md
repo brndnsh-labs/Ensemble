@@ -18,7 +18,10 @@ stores what `captureContent` captures and the schema-2 codec accepts. Per
 `preferences` field is written only by UI dispatch or hydration, never by a runtime system
 (the old engine's conductor, trade block and worker did exactly this; they are gone, #1404, and the next runtime system sets the precedent). See that doc's read-time composition precedent
 (`isInstrumentActiveAtStep`, deleted in #1637; the example stands) and its retired violations (§5) before adding a new dispatch site
-that touches an existing document field from a runtime path.
+that touches an existing document field from a runtime path. Runtime modulation of such a field
+lands on a paired `runtime-derived` sibling, composed at the read site; none is live today (the
+last, `playback.conductorVelocity`, went with the conductor, #1437). This is the ownership-domain
+analogue of `docs/design/timing-model.md`'s one-authority-per-domain law for timing.
 
 ## The generic `SET_PARAM` write
 
@@ -88,7 +91,7 @@ that touches an existing document field from a runtime path.
     it cannot lock to a reference that moves). Any change that destabilizes tempo/timing by
     default — anywhere in this layer's transport/BPM path (the `SET_BPM` reducer,
     `playback` slice) — needs to ship **opt-in**, not default-on, even when it makes the band
-    sound more human. Tempo breathing (#1010) is the standing design in this space and is
+    sound more human. Tempo breathing (#936) is the standing design in this space and is
     **still parked** — if it ships it must be opt-in and off during practice. No
     expressive-timing toggle exists today, so there is **no prior art** here to cite: don't
     read this constraint as "we already ship opt-in tempo drift."

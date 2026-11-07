@@ -23,7 +23,7 @@ Category roles map directly: `bug` is `bug`, and `enhancement` is `enhancement`.
 - **Any judgment call** means `status:needs-decision`, with the fix pre-drafted.
 - **Unsure** means no status label.
 - **An always-brake surface** (DOCTRINE §5: synth or by-ear work, destructive data ops, the
-  state/worker contract) is never `status:ready` from these skills.
+  state contract) is never `status:ready` from these skills.
 
 So when `/to-tickets` or `/to-spec` says "apply `ready-for-agent`", apply `status:ready` only to
 the tickets that pass this gate, and route the rest per the table.

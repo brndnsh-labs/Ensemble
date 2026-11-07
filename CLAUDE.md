@@ -5,11 +5,10 @@ Operational guide for AI agents working in the Ensemble codebase. Claude Code au
 ## Primary References
 
 - **CLAUDE.md** (this file) — operational rules and architectural overview.
-- **.claude/skills/DOCTRINE.md** — the work-pipeline doctrine (§1–§9): the GitHub-backed tracker, autonomy/merge rules, gates, commit/branch conventions. The work-loop skills (`/next`, `/cycle`, `/review`, `/intake`, `/unblock`, `/scout`, `/wrap-up`, plus `/dep-update`, `/deploy-test`, `/deploy-prod`) reference it by section.
+- **.claude/skills/DOCTRINE.md** — the work-pipeline doctrine (§1–§6): the GitHub-backed tracker, autonomy/merge rules, gates, commit/branch conventions. The work-loop skills (`/next`, `/cycle`, `/review`, `/intake`, `/unblock`, `/scout`, `/wrap-up`, plus `/dep-update`, `/deploy-test`, `/deploy-prod`) reference it by section.
 - **AI_MAP.md** — file-by-file navigation index. Every path in it must exist on disk (enforced by `npm run lint:docs`).
 - **docs/README.md** — living documentation index.
 - **docs/VISION.md** — product direction and open work.
-- **docs/archive/ARCHITECTURE_FOLLOWUPS.md** — archived (May 2026): the TS-migration follow-up tracker, all items shipped. Useful historical context for *why* recent architectural decisions were made.
 - **docs/guides/** — deep-dive guides (performance, reference tuning, musical-engine patterns, bundle hygiene, listening-gate tools).
 
 If any guide drifts from live code/config, prefer live and update the docs.
@@ -58,7 +57,7 @@ engine/state rules below are about `core/` and bind every caller of it.
 
 1. **State writes** flow through `dispatch(ACTIONS.TYPE, payload)`. Never mutate state objects directly outside reducers (exception: `// @direct-mutation` in performance-critical engine code). A `document`/`preferences`-classified field (`core/songbook/state-ownership.ts`, a type-checked classification, not a persistence switch) is written **only** by user intent — a UI dispatch or hydration; a runtime system's modulation of it lives in a paired `runtime-derived` sibling field, composed at read time — see `docs/design/write-ownership.md`.
 2. **UI updates** belong in `web/app/`. A component never calls `dispatch`/`getState` itself: the engine is reached through `web/lib/runtime.ts`, which is the only v2 file that does.
-3. **Tests:** `npm test` (unit/integration) AND the v2 suite (`npm run build --prefix web`, then `npm run test:e2e --prefix web`) before concluding — for a `core/` change too, since the v2 export compiles it.
+3. **Tests:** run the gate list in DOCTRINE §4 before concluding — a `core/` change reaches the app too, since the v2 export compiles it.
 4. **Refactors:** grep the whole repo (`core/`, `web/`, `api/`, `tests/`, `scripts/`, `docs/`, `.github/`) for usages before renaming or moving anything. Update all imports in the same pass.
 5. **Typecheck** is green at the end of every task (`npm run typecheck`).
 
@@ -88,9 +87,16 @@ npm run build --prefix web     # root + v2 typecheck (web/app's tests too, #1939
 npm run test:e2e --prefix web  # v2 Playwright suite against the BUILT export (build first)
 ```
 
-`npm run depcheck` is the focused circular-import check (`biome lint --only=suspicious/noImportCycles`). The same configured rule runs as part of `npm run lint` and therefore `npm test`; CI does not run the focused command a second time. It catches **runtime cycles only** — `import type` edges are invisible to it, and that is a deliberate 2026-07-24 call (#1234), not an oversight. A type-only cycle erases at compile time and cannot cause the load-order bug this gate exists to prevent. (Verified by mutation test in #1191: a planted runtime cycle exits 1 with 3 diagnostics; a planted type-only cycle exits 0, uncaught.) Biome has no config surface to include type edges, and every TS-aware alternative (madge, dpdm, skott, dependency-cruiser) routes through the TypeScript compiler API and hits the TS7 wall. Don't assume type cycles are covered; don't hand-roll a resolver to catch them.
+`npm run depcheck` is the focused circular-import check (`biome lint --only=suspicious/noImportCycles`); the same configured rule runs inside `npm run lint` and therefore `npm test`. It catches **runtime cycles only** — `import type` edges are invisible to it, and that is deliberate (#1234): a type-only cycle erases at compile time and cannot cause the load-order bug this gate exists to prevent. Don't assume type cycles are covered; don't hand-roll a resolver to catch them.
 
 `npm run knip:prod` lists exports that only tests use. The normal `knip` cannot see them, because it treats test files as entry points, so a function whose last real caller is gone still reads as used. It is a gate (part of `npm run ci`) and its report is empty. An export a test needs but no production code calls carries `/** @internal a test seam: … */` in its doc comment, which is the marker knip's production mode skips (a re-export cannot carry one: point the test at the defining module instead). `core/songbook/state-ownership.ts` is the one unused file by design (a `satisfies`-checked classification nothing imports), so `knip.production.json` leaves it out of the project, and `web/app/test/` and `web/lib/**/test/` are test helpers it leaves out too. A new entry means either a dead export (delete it, and its last test caller) or a seam (tag it); read each one before choosing, since some are live code that a test happens to be the only caller of.
+
+Fresh checkout / worktree: a checkout needs three installs — `npm ci`, `npm ci --prefix web`,
+`npm ci --prefix api`. A git worktree has none, so symlink all three `node_modules` from the main
+checkout, and keep them through `git commit`: the husky pre-commit hook runs `npm run typecheck`,
+`npm run knip`, `npm run lint:docs` and `npx lint-staged`, and knip fails without
+`web/node_modules` ("Unlisted binaries: next web/package.json"). `api/node_modules` is needed by
+the account specs and `npm run test:api`.
 
 Targeted tests:
 
@@ -106,7 +112,7 @@ npx vitest run band/perform.test.ts -t "specific test name"
 Local-dev note: the v2 dev server serves at `http://localhost:3100/`, the same base as
 production. Offline install and sound-pack downloads only work against the built
 export, served by `node scripts/serve.mjs` in `web/` — see `web/README.md`.
-There is no local deploy script: a merge to `main` is the release (see above).
+No local *prod* deploy: a merge to `main` is the release. `scripts/deploy-test.sh` puts a pushed branch on the test host (`/deploy-test`); it needs a clean working tree.
 
 Agent-environment note: hosted agent sessions are headless unless audio/display access has been
 explicitly verified. Never claim a by-ear check from local execution. For an audible review, use
@@ -123,11 +129,10 @@ One runtime per page, independent of React mounts. `initialize()` seeds the inst
 
 ### State (`core/state.ts`, `core/state/`)
 
-- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — each a `deepSignal`. A field nothing reads gets removed, not kept as a leftover: the old engine's `conductor` and `vizState` slices, its toast/flash state and its scheduler scratch fields went that way on 2026-10-11. The soloist's per-phrase `session` went the same way. So did the fields live code read but nothing ever set to a new value, together with the branches that waited on them: `playback.step`, `sustainActive`, `heldNotes`, `debugSoloist`, `nextNoteTime` and `unswungNextNoteTime`, the lane `buffer` Maps, and `lastFreq`/`lastPlayedFreq` on bass and soloist. So did the arranger's step maps (`progression`, `totalSteps`, `stepMap`, `sectionMap`) and `ACTIONS.PROG_VALIDATED`, with the old chord parser that wrote them (#1740); `arranger.sections` stays, because the runtime mirrors the score's sections into it for `isInstrumentEverActive`. The tree holds no field that nothing sets. Don't assume a field is live because it is declared: check for a writer.
+- Domain slices: `playback`, `arranger`, `groove`, `chords`, `bass`, `soloist` — each a `deepSignal`. A field nothing reads gets removed, not kept as a leftover; so does a field nothing ever sets to a new value, together with the branches that wait on it. `arranger.sections` stays, because the runtime mirrors the score's sections into it for `isInstrumentEverActive`. The tree holds no field that nothing sets. Don't assume a field is live because it is declared: check for a writer.
 - **All writes go through `dispatch(ACTIONS.TYPE, payload)`.** Never mutate state directly in components or controllers.
 - Hosts read with `getState()` and listen with `subscribe()` (`core/state.ts`). In v2 only `lib/runtime.ts` does either; React state lives in the shell, not in the slices.
 - `core/state/state-effects.ts` owns cross-module side effects kept deliberately outside reducers.
-- **Write-ownership invariant** (`docs/design/write-ownership.md`): a `document`- or `preferences`-owned field (per `core/songbook/state-ownership.ts`'s `STATE_OWNERSHIP_MANIFEST`: a `satisfies`-checked classification that makes a new state field fail typecheck until it is classified. Nothing reads it at run time, so it does not decide what is saved: a chart stores what `captureContent` captures and the schema-2 codec accepts) is written only by user intent, never by a runtime system (conductor, trade block, worker). Runtime modulation of one lands on a paired `runtime-derived` sibling field and is composed at the read site. No such field is live today: the last, `playback.conductorVelocity`, went with the old engine's conductor (#1437), so the next runtime system to modulate a setting sets the precedent. This is the ownership-domain analogue of `docs/design/timing-model.md`'s one-authority-per-domain law for timing.
 #### `@direct-mutation` policy
 
 `// @direct-mutation` is a sanctioned escape hatch. Use it only in these categories:
@@ -179,7 +184,7 @@ The music stand: songbook home, chart sheet (edited in place: bars typed on the 
 - Musical behavior: the band engine's styles, `band/styles/` (one file per genre)
 - Styles live beside the components in `web/app/` (`style.css` plus per-surface `.css` files). `core/` holds no CSS.
 
-**Layering (documented, deliberately not gated).** The UI should reach the engine through `web/lib/runtime.ts`, data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Both were once `dependency-cruiser` rules, but at `severity: 'warn'` they never failed a build, and a 2026-07-24 measurement found only 8 sites — 7 of which are legitimate registry/policy lookups that merely live under `engine/` (`instrument-registry`, `soloist-mode-policy`, `pack-runtime`, `sample-voice`, `arc`, `note-spelling`) plus the old scheduler's sanctioned real-time state import (both since deleted with the old engine). Enforcing the rule as written would flag mostly-correct code, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
+**Layering (documented, deliberately not gated).** The UI should reach the engine through `web/lib/runtime.ts`, data/config modules and state, not by importing generative engine internals; engine modules should receive state via parameters or specific slices rather than importing the global state manager. Enforced as written, the rule would flag mostly-correct registry/policy lookups that merely live under `engine/`, so it stays prose (#1232). **If you ever want a real gate, narrow "engine" to generative modules first** — that redefinition is the actual work, not the checker.
 
 ## Musical Logic & Generative Standards
 
@@ -207,7 +212,7 @@ Each band lane keeps to its register slot — bass 23–57, keyboard comp 52–8
 - Before any rename: grep the entire repo (`core/`, `web/`, `api/`, `tests/`, `scripts/`, `docs/`, `.github/`) for every usage. Update code, tests, persistence, sharing, docs, and allowlists in the same pass.
 - A rename that touches a field saved charts or `#chart=` links carry needs a decision on stored data: the chart codec is strict, so a chart still holding the old name stops opening.
 - Split labels from logic: display labels in UI/data layer, behavior keys in engine/config layer. A pretty label should not silently become a runtime enum unless that is the intended canonical key.
-- Known alias family: `Neo-Soul`/`Neo` — the live pairing, in `GENRE_OVERRIDES` (`core/data/smart-genres.ts`). Add new aliases to that same map instead of creating one-off fixes. **`Rock`/`Shred` is NOT a live alias** — `Shred` is a retired phantom key (see the canon bullet above) with no alias map anywhere in `core/`; don't resurrect the pairing.
+- No genre alias is live: a chart's genre is one of the 13 canon names exactly (the schema-2 codec refuses anything else). Two names differ from their feel (Bossa → `'Bossa Nova'`, Ska-Punk → `'Ska'`), so read the feel off `SMART_GENRES[name].feel`. `Shred` is a retired phantom key, not an alias. If an alias is ever added, it goes in `GENRE_OVERRIDES` (`core/data/smart-genres.ts`), never as a one-off check.
 
 ### TypeScript
 
@@ -235,27 +240,20 @@ The few engine tests that need a **real `OfflineAudioContext`** (reverb-tail dec
 
 4-space indent, single quotes, 100-char line width. Run `npm run format` before finishing.
 
-Two of Biome 2.6's recommended rules are off in `biome.json`, and its Markdown and YAML formatters
-with them (2026-10-29): `usePlaywrightValidDescribeCallback` fires on `band/theory/chord.ts`'s own
-`describe` (a chord, not a suite; every `test.describe` here has its callback, and tsc would
-refuse one without). `useDomNodeTextContent` fires only on Playwright locators' `innerText()`
-in `web/checks/`, where the visible text is the point; no app code reads `innerText`. The
-Markdown formatter's first release rewrites YAML front matter in the rendered skill and agent
-files, which the-cycle manages, so it stays off until it leaves front matter alone. The YAML
-formatter would re-indent the workflows and compose files to four spaces, against the
-GitHub Actions and Compose convention they follow, so it is off as well.
+Off in `biome.json` (2026-10-29): the rules `usePlaywrightValidDescribeCallback` (it fires on `band/theory/chord.ts`'s own `describe`, a chord) and `useDomNodeTextContent` (it fires only on Playwright locators' `innerText()` in `web/checks/`).
+Off too: the Markdown formatter, because it rewrites the YAML front matter in the-cycle's rendered skill and agent files — it stays off until it leaves front matter alone; and the YAML formatter, because the workflows and compose files follow the Actions/Compose 2-space convention.
 
 ## Commit & PR Conventions
 
-Conventional Commit style, scoped where useful: `feat(soloist): ...`, `fix(ts): ...`, `chore(deps): ...`, `refactor(mobile): ...`. Keep commits focused. PRs should include a short summary, test commands run, linked issues if applicable, and screenshots/recordings for UI changes. Commit-message and PR-body trailers, branch policy, and `git add`-explicit-paths rules live in **DOCTRINE §8/§9**.
+Conventional Commit style, scoped where useful: `feat(soloist): ...`, `fix(ts): ...`, `chore(deps): ...`, `refactor(mobile): ...`. Keep commits focused. PRs should include a short summary, test commands run, linked issues if applicable, and screenshots/recordings for UI changes. Commit-message and PR-body trailers, branch policy, and `git add`-explicit-paths rules live in **DOCTRINE §6**.
 
 ## Work Pipeline (GitHub-backed)
 
-Scheduled work is tracked in **GitHub issues** on `brndnsh-labs/Ensemble` (public), routed by **labels** — **not** in markdown. A story = an issue (body holds Why/Touches/Acceptance); milestones = epics; a **closed issue is done**. All routing is labels, one namespace per dimension: `status:*` (loop state, exactly one at a time), `track:*`, `lens:*`, plus `size/*`, `model/*`, `agent/*` and `area:*` — every one of them read off `gh issue list --json labels` in a single call. The `docs/audit/` and `docs/synth-audit/` trees are a **frozen archive** of the markdown-tracked cycles — historical context, not the live tracker. The full rules are in **`.claude/skills/DOCTRINE.md`** (command-level tracker mechanics in its §7); the tracker is driven by `gh` alone. Run the pipeline with the work-loop skills (`/next`, `/cycle`, `/intake`, `/unblock`, `/scout`, `/wrap-up`, …). Forgejo (`git.brndn.zip`) is now a read-only pull mirror.
+Scheduled work is tracked in **GitHub issues** on `brndnsh-labs/Ensemble` (public), routed by **labels** — **not** in markdown. A story = an issue (body holds Why/Touches/Acceptance); milestones = epics; a **closed issue is done**. All routing is labels, one namespace per dimension: `status:*` (loop state, exactly one at a time), `track:*`, `lens:*`, plus `size/*`, `model/*`, `agent/*` and `area:*` — every one of them read off `gh issue list --json labels` in a single call. The `docs/audit/` and `docs/synth-audit/` trees are a **frozen archive** of the markdown-tracked cycles — historical context, not the live tracker. The full rules are in **`.claude/skills/DOCTRINE.md`** (command-level tracker mechanics in its §1); the tracker is driven by `gh` alone. Run the pipeline with the work-loop skills (`/next`, `/cycle`, `/intake`, `/unblock`, `/scout`, `/wrap-up`, …). Forgejo (`git.brndn.zip`) is now a read-only pull mirror.
 
-**Issue numbers `#N` are continuous up to #935.** Ensemble started on GitHub, moved to Forgejo in 2026-07 — where the counter *continued* rather than restarting — and came back on 2026-08-04 via a repo transfer that kept all 224 issues and 710 PRs at their original numbers. So a bare `#N` in an old commit or doc resolves correctly for **N ≤ 935**. Only the Forgejo-only window (#936–#1355) is renumbered; that map lives in homelab-maintenance `migration-maps/Ensemble-issue-map.tsv`. Only the **8 issues still open** at migration carried over to GitHub — those are the map's rows. Everything **closed** in that window stayed behind, readable in the read-only archive repo `git.brndn.zip/brandon/Ensemble-archive` (private + archived; `brandon/Ensemble` itself is now a pull mirror with its issue tracker disabled, so look in `-archive`, not there). So an unmapped `#N` in 936–1355 is archive provenance, not a live GitHub link.
+`#N` ≤ 935 and every GitHub-era number resolve on GitHub; 936–1355 are Forgejo-era, see DOCTRINE §1.
 
-**Autonomy posture (DOCTRINE §5/§6):** the pipeline runs **full-auto** — well-specified, gate-verifiable, non-destructive stories build → branch → PR → **auto-merge to `main`** (CI-gated, via `gh pr merge --auto --squash` — GitHub holds the merge until the required `checks`, `e2e-tests` and `v2-checks` contexts pass; no client-side polling) without a per-step nod. It **stops and surfaces** on a judgment call: a **synth or by-ear** story (the listening gate is a hard human stop → `Needs-ear`), a destructive data op (persisted sessions / share-URL schema / preset data / state migration), a state-contract design call, a P0 finding, or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy: `main` is continuously deployed to `ensemble.brndn.zip` by the CI `deploy` job once those three contexts and the two image builds pass on the merged commit (DOCTRINE §6). Because `Needs-ear`/synth work is a *pre-merge* stop, nothing un-auditioned ships. Since the cutover (#1357) a deploy is a container-tag release, so the break-glass path is a re-run of that job (`workflow_dispatch` on `main`) and an immediate rollback is the previous `ensemble-web` tag on the box. The normal correction is still roll-forward via `git revert` → PR.
+**Autonomy posture:** safe stories auto-merge via `gh pr merge --auto --squash`, held until the required `checks`, `e2e-tests` and `v2-checks` contexts pass. It **stops and surfaces** before merge on: a **synth** story, or any band-engine or audio change that changes what you hear (Brandon's listen on ensembletest, or an independent Fable taste review when he has delegated that call → `Needs-ear`); a destructive data op (persisted sessions / share-URL schema / preset data / state migration); a state-contract design call; or a genuinely ambiguous choice. A merge to `main` **is** a prod deploy, and because the listening stop is *pre-merge*, nothing un-auditioned ships. The mechanics (CD, break-glass, rollback) are DOCTRINE §5/§6.
 
 ## Agent skills
 

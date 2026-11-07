@@ -24,7 +24,7 @@ Issues live in GitHub issues on `brndnsh-labs/Ensemble`. Use the `gh` CLI.
 ## Status labels: exactly one at a time
 
 Routing is a single `status:*` label per open issue (the full table is DOCTRINE §1). Set one
-the way the pipeline does (DOCTRINE §7): clear the whole set, then add the target in a second,
+the way the pipeline does (DOCTRINE §1): clear the whole set, then add the target in a second,
 ordered call.
 
 ```

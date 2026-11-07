@@ -94,8 +94,9 @@
       "npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)",
       "npm run lint          # Biome lint + format check",
       "npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)",
-      "npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)",
-      "npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export"
+      "npm run typecheck:tests  # tsc over tests/ (its own CI gate)",
+      "npm run knip          # unused files/exports/deps",
+      "npm run build --prefix web   # a change that reaches the app: build, then only the Playwright specs it touches (see below)"
     ]
   },
   "deps": {

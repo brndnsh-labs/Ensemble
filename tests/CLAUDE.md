@@ -1,10 +1,7 @@
 # tests/ — Vitest (unit/critique), Vitest browser mode
 
-Load-bearing traps for writing/reviewing tests in this repo. There is no Playwright suite here
-any more (#1358 deleted v1's e2e suite): functional UI testing is the v2 suite in
-`web/checks/`, run with `npm run build --prefix web` then
-`npm run test:e2e --prefix web` and gated in CI by `v2-checks` — see
-`web/CLAUDE.md` § Verification. For the 5 canonical critique-test
+Load-bearing traps for writing/reviewing tests in this repo. No Playwright suite lives here: the
+app's is `web/checks/` — see `web/CLAUDE.md` § Verification. For the 5 canonical critique-test
 smells (tautology, sub-baseline threshold, mislabel, log-vs-assert mismatch, harness-silencing)
 and proven patterns (loop-awareness, final-stage multiplier, seeded mulberry32), see
 `docs/guides/musical-engine-patterns.md` — this file is sharper traps not covered there.
@@ -69,15 +66,6 @@ quality, and the notes each symbol rules out (`chord-clash.ts`).
   paths a determinism story is supposed to cover. Parameterize the test over multiple fixtures, each
   flipping a different branch prerequisite, and confirm distinct fixtures actually produce distinct
   event counts (proof they're different paths, not the same path twice).
-- **When migrating a `Math.random` pin site, pick the sweep pattern by site density and pin
-  intent** — read the pin's comment first. A deliberate gate-bypass pin (e.g. "force low to trigger
-  sustains reliably") needs a narrow same-side sweep (`[0.05, 0.1, 0.2]`), not a blanket
-  `[0.05, 0.5, 0.95]` sweep that would silence the gate at the high end and make the assertion
-  meaningless. A neutral "for stability" pin is fine with the blanket 3-point sweep. A file with
-  ~20+ pin sites is better served by `installSeededRandom()` (`tests/utils/seeded-random.ts`,
-  mulberry32) at the `describe` level than by per-test sweeps. If a migration surfaces a genuine
-  threshold failure at an extreme, that's meaningful — stop and report, don't loosen the assertion
-  to make it pass.
 - **After a read-path refactor (e.g. a consumer moving from `state.x.y` to a `CoordinationContext`
   field), a pre-existing mock can keep tests green while no longer exercising the new path** —
   because the old mock's value still happens to flow through a stale default. Verify by temporarily
@@ -102,20 +90,15 @@ quality, and the notes each symbol rules out (`chord-clash.ts`).
   assertion reports 0 calls, looking like a logic bug in the code under test). Stub both explicitly
   in `beforeEach` via `Object.defineProperty` for any happy-dom test touching browser
   feature-detection.
-- **`knip` green does not prove a module is production-reachable.** knip counts a test-file import
-  as a legitimate consumer, so a module imported only by its own dedicated test files reads as
-  "used" indefinitely — even after its last real (non-test) caller was deleted. Before trusting "a
-  bug in module X is live, knip's green": `grep -rn "from.*<module>" --exclude tests/` for a
-  non-test importer (including dynamic `import(` and worker/postMessage string registration), and
-  if the only importers are tests, ask whether the test exercises a live production path or is
-  keeping dead scaffolding green. Deleting a confirmed orphan cascades — knip will re-flag whatever
-  it was the sole consumer of; resolve that in the same pass.
+- **`npm run knip` counts test imports as consumers; `npm run knip:prod` (a gate) doesn't.** See
+  root § Commands. Deleting an orphan cascades: resolve what knip re-flags in the same pass.
 
 ## Playwright
 
 - **`@playwright/test` is CommonJS; under this repo's `"type": "module"`, only the default import
   survives Node's loader at runtime.** Today that means the root-package scripts that drive a
-  browser (`scripts/mix-report.ts` under `tsx`); `web` is a separate package without
+  browser (`scripts/mix-report.ts`, `scripts/live-capture.ts` and `scripts/webaudio-parity.ts`,
+  under `tsx`); `web` is a separate package without
   `"type": "module"`, and its specs import by name. In a root script,
   `import { chromium } from '@playwright/test'` throws `SyntaxError: Named export 'chromium' not
   found` at load time and `import * as pkg` leaves `pkg.chromium` undefined; the working form is

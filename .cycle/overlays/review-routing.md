@@ -25,8 +25,8 @@
    (b) **Threshold below random baseline** — passes on worse-than-random output.
    (c) **Metric measures the wrong thing** — the name's claim isn't what the assertion counts.
    (d) **Report/assert mismatch** — the logged `Target:` is aspirational; only the assertion guards.
-   (e) **Harness silences the engine path** — hand-built `stepInfo` omits the flag the engine
-   branches on, so the lane under test never fires.
+   (e) **Harness silences the engine path** — the claim's take never reaches the lane it names,
+   so the lane under test never fires.
 
    ### Don't re-derive the nested CLAUDE.md files
 

@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=2c8ea6e6b029 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=f732c6612d79 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 The rules every Ensemble pipeline skill shares; a skill citing `§N` means this file. **Read it
@@ -66,14 +66,14 @@ tracker is unreachable, stop, don't fall back to them.
   change's *correctness* is knowable from code; only its side-effects need an eyeball.
   These land on the morning device-verify checklist (`/wrap-up`). Pairs with `burndown`.
 - **`verify-by-ear`** — the musical analogue: a musical-correctness change whose idiom
-  *is* captured by a critique test, so it builds + auto-merges on green, but its last
-  residual is a listen pass (ships with a 🎧 checklist: genre/setting to load, what
+  *is* captured by a critique test, so the test is its correctness gate; it still waits for
+  the pre-merge listen (§5's listening brake) and ships with a 🎧 checklist (genre/setting to load, what
   changed, old-vs-new to hear). Not `needs-ear` (reserved for genuinely-subjective work
   no critique test can assert). Pairs with `burndown`.
 - **`scout`** — provenance stamp on issues filed by a `/scout` sweep, so `/unblock`
   surfaces last night's finds freshest-first.
 - **`area:*`** — surface tags inferring the executor when `agent/*` is unset:
-  `area:soloist`, `area:bass`, `area:drums`, `area:chords`, `area:harmony`,
+  `area:soloist`, `area:bass`, `area:drums`, `area:chords`,
   `area:groove`, `area:synth`, `area:state`, `area:ui`, `area:infra`.
 
 - **Routing is all labels, in one namespace-per-dimension scheme:**
@@ -83,7 +83,7 @@ tracker is unreachable, stop, don't fall back to them.
   - `track:*` — musical · synth · bundle · ui. **The load-bearing routing dimension here**: it
     picks the DoD, reviewer, and merge behavior (see doctrine-routing).
   - `lens:*` — code-review · music-theory · synth-graph · state-discipline · bundle-hygiene ·
-    test-quality · practice-ux · audio-stems-reviewer · both.
+    test-quality · practice-ux · both.
   - Static attributes, unchanged: `size/*`, `model/*`, `agent/*`, `area:*`, plus the bare
     `backlog` · `finding` · `bug` · `burndown` · `verify-by-ear` markers. `/next`'s size
     tiebreak reads the `size/*` label.
@@ -100,7 +100,10 @@ tracker is unreachable, stop, don't fall back to them.
   correctly** — same issue, same number, all 224 issues and 710 PRs still here. Only the
   Forgejo-only window (#936–#1355) is renumbered; that map lives in homelab-maintenance
   `migration-maps/Ensemble-issue-map.tsv`, and those closed issues stayed behind in the
-  read-only archive at `git.brndn.zip/brandon/Ensemble-archive`.
+  read-only archive at `git.brndn.zip/brandon/Ensemble-archive`. `brandon/Ensemble` is a pull
+  mirror with issues disabled; look in `-archive`. Only the 8 issues still open at migration
+  carried over to GitHub (the map's rows), so an unmapped `#N` in 936–1355 is archive
+  provenance, not a live GitHub link.
 
 ## §2 Filing
 
@@ -136,7 +139,7 @@ of Done and the reviewer set:
 
 | Track | DoD | Reviewer | Merge |
 | --- | --- | --- | --- |
-| **musical** | the style's critique claims in `band/test/claims/<style>.ts`, measured by `band/test/critique.test.ts` (statistical ranges, an automated oracle) | `music-theory-reviewer` | auto-merge on green; audible-but-theory-provable work ships `verify-by-ear` (§5); only genuinely-subjective feel is a `status:needs-ear` hard stop |
+| **musical** | the style's critique claims in `band/test/claims/<style>.ts`, measured by `band/test/critique.test.ts` (statistical ranges, an automated oracle) | `music-theory-reviewer` | a change that changes what you hear is **held at the merge gate** for the listen (§5's listening brake), like synth; theory-provable work carries `verify-by-ear` (§5); genuinely-subjective feel with no test is a `status:needs-ear` hard stop; a change that leaves the sound as it was auto-merges on green |
 | **synth** | a human listen on the deployed test build — `/cycle`'s Ship step opens the PR *without queueing the merge*, deploys the branch to test and runs the verdict check-in right there, no automated oracle | `synth-graph-reviewer` (graph hygiene only, not "does it sound good") | **never auto-merged** — held at the merge gate: "Works" merges, "Haven't checked" parks it as `status:needs-ear` (resume with `/cycle #<n> approved`) |
 | **bundle** | a measured KB delta (the v2 export, `web/out/_next/static/`) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
 | **ui** | the v2 suite + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
@@ -192,25 +195,35 @@ Run these before review and before shipping. Never proceed over a red gate:
 npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)
 npm run lint          # Biome lint + format check
 npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
-npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)
-npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export
+npm run typecheck:tests  # tsc over tests/ (its own CI gate)
+npm run knip          # unused files/exports/deps
+npm run build --prefix web   # a change that reaches the app: build, then only the Playwright specs it touches (see below)
 ```
 
 A spawned agent's "gates green" or "done" is a claim: re-run the gates yourself and confirm its
 files actually changed before you rely on it.
 
+**The gate list (Brandon, 2026-09-27) — the one list; root `CLAUDE.md` and `web/CLAUDE.md` point here:**
+- **Every change:** `npm run typecheck`, `npm run typecheck:tests`, `npm test`, `npm run lint`,
+  `npm run knip`.
+- **A change that reaches the app** (anything outside the `changes` job's docs/tests list in
+  `ci.yml`, `core/**` included — the v2 export compiles it): also `npm run build --prefix web`,
+  then only the Playwright specs the change touches (`(cd web && npx playwright test
+  checks/<spec>.spec.ts)`) — build FIRST, or the suite runs a stale export. A timing-sensitive
+  spec runs twice (`--repeat-each=2`).
+- **CI runs the full v2 suite.** Don't run the full local e2e by default.
+- **Extras, by what the change touches:**
+  - an IndexedDB or sync change → `npm run test:sync`, and register a new sync browser file in
+    its config (`vitest.sync.config.ts`) so both engines actually run it;
+  - a Web Audio engine change → `npm run test:browser`;
+  - a voice, bus, pack or master change → `npm run golden`, with `npm run golden -- --update`
+    and the fingerprints committed when the change is meant.
+
 `npm test`, `npm run test:browser` and the v2 suite (`npm run test:e2e --prefix
 web`) are three separate runners (node · browser-audio · the app's Playwright);
-`npm run ci` covers only the first. `npm run validate` (format + jscpd + `npm run ci`:
-typecheck, typecheck:tests, knip, `npm test`) is the full sweep — run it before shipping
-a change that touches more than one file. CI runs `checks`, `e2e-tests` (browser-mode audio guards +
+`npm run ci` (typecheck, typecheck:tests, knip, knip:prod, `npm test`) covers only the first, and
+`npm run validate` is format + jscpd + `npm run ci`. CI runs `checks`, `e2e-tests` (browser-mode audio guards +
 `test:sync`) and `v2-checks` in parallel; all three must be green to merge.
-
-**The CI gate `validate` does NOT cover — run it locally before shipping:**
-- **The v2 suite, for any diff under `core/`** (not just `web/`): the v2 export
-  compiles `core/` and its checks drive the shared controllers, codecs and engine, and
-  `v2-checks` is a required context. `npm run build --prefix web` then
-  `(cd web && npx playwright test)` — build FIRST, or the suite runs a stale export.
 
 Run the gates **sequentially from the repo root** and log an exit code per gate. The shell is
 zsh: an unquoted `$cmd` holding a command string never word-splits, so a loop over gate strings
@@ -219,7 +232,8 @@ exits 127 on every one — "never ran", which a piped `tail` reports as a pass.
 **Track-specific DoD on top of the gates:**
 - **musical** → run the band critique for the style
   (`npx vitest run band/test/critique.test.ts -t <style>`) and read its report for balance.
-  A new musical bias without a passing critique claim is not done.
+  A new musical bias without a passing critique claim is not done. A passing one still waits for
+  the pre-merge listen when the change changes the sound (§5's listening brake).
 - **synth** → the human listen on the deployed test build IS the gate — `/cycle`'s Ship step deploys
   the branch to test with the merge held (never queued unheard), not a local harness.
 - **bundle** → a measured KB delta **and** the full suite green.
@@ -325,31 +339,38 @@ notes and restatements of Brandon's words — **starts with a bold harness marke
 - An unmarked machine comment found in the wild is a defect: flag it on the issue rather
   than treating it as Brandon's word.
 
-**`verify-on-device` and `verify-by-ear` are a third state between "auto-merge" and
-"hard stop."** Both cover work whose *correctness* is knowable from code/test, where
-only a real-world sensory glance remains — build + auto-merge it, then attach a
-lightweight residual check instead of gating the merge on it:
-- `verify-on-device` — a real-device visual glance (mobile safe-area/viewport/touch
-  target); lands on the morning device-verify checklist (`/wrap-up`).
-- `verify-by-ear` — a musical-correctness change whose idiom is captured by a critique
-  test; ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new) in which
-  **every line is a link**: `npm run --silent audition-link -- --base-url=<host>/ --prog="…"
-  --genre=… [--key --ts --bpm --int --on=soloist --off=chords]` opens the scenario
-  pre-set (an unsaved `#chart=` draft) behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
-  PR's 🎧 section **and** post them as a `**[claude]**` comment on the issue. The
-  test is the correctness gate, the listen is *confirmation* — a follow-up tweak if it
-  feels off, never a rollback (musical diffs are reversible).
+**The listening brake: a change that changes what you hear stops before merge**, the same as
+Track `synth`. Any band-engine or audio change that changes the sound (a style, player, feel,
+voice, pack, bus or master change) opens its PR **without queueing the merge**, goes to
+ensembletest (`/deploy-test`), and waits for Brandon's listen there — or, when Brandon has
+delegated that call, for an independent Fable taste review (a fresh session, not the one that
+built it). A passing critique test never stands in for it. A change that leaves the sound as it
+was (a refactor, a test-only or docs diff) is not under it.
 
-**The ear gate is tiered by what the story's musical claim IS:**
+**`verify-on-device` is a third state between "auto-merge" and "hard stop."** It covers work
+whose *correctness* is knowable from code/test, where only a real-device visual glance remains
+(mobile safe-area/viewport/touch target) — build + auto-merge it, and it lands on the morning
+device-verify checklist (`/wrap-up`).
+
+**`verify-by-ear`** marks a musical-correctness change whose idiom is captured by a critique
+test: the test is the correctness gate, and the pre-merge listen above is the taste gate. It
+ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new) in which
+**every line is a link**: `npm run --silent audition-link -- --base-url=<host>/ --prog="…"
+--genre=… [--key --ts --bpm --int --on=soloist --off=chords]` opens the scenario
+pre-set (an unsaved `#chart=` draft) behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
+PR's 🎧 section **and** post them as a `**[claude]**` comment on the issue.
+
+**The ear gate is tiered by what the story's musical claim IS** — the tier picks the oracle the
+change needs before it goes to the listen:
 - **Tier 1 — structural/dynamics claims** (existence/parity across sinks, accent ordering
   like "The One outranks the pop", monotonic swell, register bounds): machine-provable —
   a critique test at the symbolic layer, plus rendered-audio evidence (`mix:verify`
-  intent → dispatch → PCM, #1351) when the claim must survive synthesis. →
+  intent → dispatch → PCM) when the claim must survive synthesis. →
   **`verify-by-ear`**.
 - **Tier 2 — idiom claims** ("reads as funk", "the comp breathes"): the critique test is
-  a statistical proxy, not proof. → **`verify-by-ear`**, backstopped by the recurring
-  post-merge listening audit (#534). A bad-gestalt miss ships, gets heard in the next
-  sweep, gets tuned forward — that trade is deliberate (static app; revert = redeploy).
+  a statistical proxy, not proof. → **`verify-by-ear`**. A bad-gestalt miss that gets past the
+  listen ships, gets heard in a later one, gets tuned forward — that trade is deliberate
+  (revert → PR, or release the previous `ensemble-web` tag).
 - **Tier 3 — taste/feel claims** ("feels alive", tempo push/drag, synth timbre): no
   honest oracle exists. → **`needs-ear` hard stop**, unchanged. `track:synth` is always
   tier 3.
@@ -385,13 +406,13 @@ instruction for a specific parked PR; ask directly before merging. `/cycle #<n> 
 is the canonical signal.
 
 **Auto-merge now means auto-deploy** (§6 is CD) — an auto-merged PR ships to prod within
-minutes. The pre-merge `status:needs-ear` stop is what keeps un-auditioned work from shipping,
+minutes. The pre-merge listening stop (`status:needs-ear` while it waits) is what keeps un-auditioned work from shipping,
 not a separate deploy gate.
 
 ## §6 Delivery
 
 **Branches.** Issue work happens on a feature branch with a PR, never on `main`.
-No minor-edit carve-out: `main` is protected against all direct pushes.
+No minor-edit carve-out: every change, however small, goes through a branch and PR — never push directly to `main`.
 Branch from freshly fetched `origin/main` (`git fetch origin && git checkout -b <slug> origin/main`),
 not local `main` — unpushed local commits otherwise fold silently into your squash. Prune merged local branches now and then
 (`git fetch --prune origin`, then `git branch -D`, since squash-merged branches never look merged).
