@@ -228,7 +228,17 @@ export function guideToneLine(
     if (cached) {
         return cached;
     }
-    const line = chorusLine(timeline, first, end, home, range);
+    // why: the contrast climbs a 4th over the A, so the A has to be seated a 4th (`CONTRAST_LIFT`)
+    // plus its own reach above home (`BAND.above`) under the lane's ceiling. A sax or nylon book
+    // lifts `home` to the ceiling's edge (`homeOf`: `hi - 7`), and a line seated there has no
+    // room to rise: the bridge read 0.5 semitones over the A, not 4. A tune with a contrast sits
+    // lower, as a player starts an A where the bridge can still climb; a home with headroom is
+    // untouched.
+    const seated =
+        headForm(timeline, first).contrast === null
+            ? home
+            : Math.min(home, range[1] - BAND.above - CONTRAST_LIFT.phrase);
+    const line = chorusLine(timeline, first, end, seated, range);
     byChorus.set(memo, line);
     return line;
 }
