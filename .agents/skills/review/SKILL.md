@@ -2,7 +2,7 @@
 name: review
 description: Independently review the current uncommitted Ensemble diff (or a named branch/PR) — correctness, plus whether it does what the issue asked — adding `/security-review` when it touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories)). Reports findings with evidence; fixing them is the caller's job. Used by /cycle, or on its own for any diff.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=d94e474bccff — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=0c654b3c1fad — managed by the-cycle; edit the template, not this file -->
 
 # /review — fresh eyes on a diff
 
@@ -45,7 +45,7 @@ the issue and the diff from scratch, and say that's what happened.
    | `core/engine/synth-*.ts`, `engine.ts` `initAudio()`, `reverb.ts`, `synth-utils.ts`, the band host's scheduling in `web/lib/band-host.ts` | **`synth-graph-reviewer`** | Web Audio graph hygiene only — NaN/0 into an `AudioParam`, nodes created but never disconnected, `exponentialRamp` from/to zero, feedback stability, per-note allocation in a hot path. **Not** "does it sound good" — that's the `status:needs-ear` gate. |
    | `core/state/**`, `web/lib/runtime.ts`, a new `ACTIONS.*`, a new `// @direct-mutation` marker, or any `signal.x = y` outside a reducer | **`state-discipline-reviewer`** | Dispatch discipline; `@direct-mutation` used outside the three sanctioned categories in CLAUDE.md; non-atomic dispatch chains; v2 UI reaching engine state outside `lib/runtime.ts`. |
    | Any diff whose *claim* is fewer bytes or "dead code removal / no behavior change", whatever the path | **`bundle-hygiene-reviewer`** | Reachable code deleted under a "dead" claim; behavior change disguised as cleanup; tree-shaking defeated. It does **not** measure — the orchestrator measures the v2 export (`web/out/_next/static/`). |
-   | `web/app/**` (UI and CSS) | the **inline pass**, against `web/CLAUDE.md` | The per-surface boundaries in its navigation table (the shell owns the `<dialog>` refs and all state; surfaces are presentational), dialog a11y, CSS. The `webkit-phone` Playwright project is emulated WebKit, not a phone — say when a finding needs `verify-on-device`. |
+   | `web/app/**` (UI and CSS) | the **inline pass**, against `web/CLAUDE.md` (and `web/lib/sync/CLAUDE.md` for an account or sync surface) | The per-surface boundaries in its navigation table (the shell owns the `<dialog>` refs and all state; surfaces are presentational), dialog a11y, CSS. The `webkit-phone` Playwright project is emulated WebKit, not a phone — say when a finding needs `verify-on-device`. |
    | A `band/test/**` claim or critique that *is* the deliverable | the **test-quality lens**, sharpened to the **five critique smells** below | — |
    | Anything else | the inline correctness pass alone | — |
 
@@ -74,6 +74,9 @@ the issue and the diff from scratch, and say that's what happened.
 
    - `web/CLAUDE.md` — the app: delivery, trust boundaries, per-surface ownership,
      verification gates.
+   - `web/lib/sync/CLAUDE.md` — the account and sync surfaces' rules (Save, delete, Keep both,
+     adopt, sign-out, collections, import); `web/CLAUDE.md` keeps only a pointer row for each, and
+     this file auto-loads only on a `web/lib/sync/` read, so read it for any account/sync diff.
    - `band/CLAUDE.md` — the band engine: its design laws, claims and critique harness.
    - `core/CLAUDE.md` — effects/reactivity, offline-render clones, build identity and
      build-time flags, the metronome product constraint, config-semantics migrations.
