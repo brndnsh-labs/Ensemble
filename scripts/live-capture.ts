@@ -416,6 +416,7 @@ export async function runLiveCapture(argv = process.argv.slice(2)): Promise<void
             voices,
             randomSeed: `${scene.id}:${options.seed}`,
             genreFeel: scene.genreFeel,
+            humanize: expected.humanize,
         };
         const offline =
             options.offline === 'page'

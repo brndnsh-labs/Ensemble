@@ -12,8 +12,10 @@
  * module are compiled out of it (`RENDER_BRIDGE_ID` is the string to grep an export for).
  */
 import { type BandEvent, type BandSettings, compileTimeline, type Lane } from '@band/index';
+import { SMART_GENRES } from '@core/data/smart-genres';
 import { isPackLoaded } from '@core/engine/instrument-registry';
 import { ensurePackLoaded, getPackZones } from '@core/engine/pack-runtime';
+import { UNSET_HUMANIZE } from '@core/songbook/humanize';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { AudioGraph, EnsembleState, InstrumentVoice, Mutable } from '@core/types';
 import { type BandRender, renderBandPasses } from './band-export';
@@ -54,6 +56,12 @@ export interface BandRenderRequest {
      * keeps the host state's genre — the slice default, Rock, for node and a chart-less page.
      */
     genreFeel?: string;
+    /**
+     * The scene's own humanize (`BandSettings.humanize`): a number the musician set, or null for
+     * the style's own amount. It reaches `groove.humanize` so the soloist's timbre jitter follows
+     * it as it does live (#2055); the band's timing and velocity already got it in the events.
+     */
+    humanize?: number | null;
 }
 
 /** One event as its voice received it: where, how long, and at what level. */
@@ -200,9 +208,17 @@ export async function renderBand(request: BandRenderRequest): Promise<BandRender
         const playback = state.playback as Mutable<EnsembleState['playback']>;
         playback.bpm = request.bpm;
         playback.bandIntensity = request.intensity;
+        const groove = state.groove as Mutable<EnsembleState['groove']>;
+        // Not set is the stored 20, the same sentinel the app keeps (`UNSET_HUMANIZE`), so a scene
+        // set to exactly 20 reads as "not set" here as it does in the app.
+        groove.humanize = request.humanize ?? UNSET_HUMANIZE;
         if (request.genreFeel) {
-            const groove = state.groove as Mutable<EnsembleState['groove']>;
-            groove.genreFeel = request.genreFeel;
+            // The feel the voices read, not the genre name: 'Bossa' is the genre, 'Bossa Nova'
+            // its feel, as `applyGenre` in the runtime writes it. An unknown name stays as given.
+            groove.genreFeel =
+                (Object.hasOwn(SMART_GENRES, request.genreFeel)
+                    ? SMART_GENRES[request.genreFeel].feel
+                    : undefined) ?? request.genreFeel;
             // And the genre the band's style is read from, so the soloist's timbre jitter
             // follows the scene's style while humanize is not set (#2055), as it does live, and
             // the master's per-style make-up gain (`MASTER_MAKEUP_DB`, #2002) is the scene's.

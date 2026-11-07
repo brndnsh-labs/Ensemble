@@ -111,6 +111,8 @@ export interface FrozenRequest {
     voices: VoicePin[];
     randomSeed: string;
     genreFeel: string;
+    /** The scene's own humanize, null when it follows the style. */
+    humanize?: number | null;
     /**
      * The length of the score's timeline in ticks when it was frozen. The render recompiles
      * the frozen score (`compileTimeline`), so a change to how a score becomes a timeline
@@ -132,6 +134,7 @@ export function freezeScene(scene: MixScene): FrozenRequest {
         voices,
         randomSeed: `${scene.id}:${SEED}`,
         genreFeel: scene.genreFeel,
+        humanize: performance.settings.humanize,
         ticks: performance.timeline.ticks,
     };
 }

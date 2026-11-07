@@ -736,6 +736,7 @@ async function renderSceneReports({
                 // the voices' own humanising repeats from run to run.
                 randomSeed: `${scene.id}:${seed}`,
                 genreFeel: scene.genreFeel,
+                humanize: performance.settings.humanize,
             };
             const measured = await backend.renderAndMeasure(
                 request,
