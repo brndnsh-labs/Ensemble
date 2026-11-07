@@ -119,13 +119,13 @@ gate evidence. Do not copy old test totals or preview SHAs into a new claim of v
 Iterate with the smallest relevant test selection; before handing off, run the gate list in
 DOCTRINE §4 (`.claude/skills/DOCTRINE.md`) — for a v2 story that is the build plus the
 Playwright specs the change touches, and `npm run test:sync` for an IndexedDB or sync change.
-`npm run validate` also runs the formatter: inspect its diff and do not commit unrelated formatting.
+If you run `npm run validate`, it also runs the formatter: inspect its diff and do not commit unrelated formatting.
 The separate sync configuration includes its browser files explicitly; register any new file
 there so both engines actually run it. Node/happy-dom is not proof of IDB transaction behavior.
 Coordinate heavy browser suites instead of competing for their ports. Emulator success is not
 physical iPhone/Edge acceptance, and audio assertions are not human by-ear approval.
 
-Test deployment is optional per story and never inferred from a push: `scripts/deploy-test.sh`
+Test deployment is optional per story, except under DOCTRINE §5's listening brake, which needs one, and never inferred from a push: `scripts/deploy-test.sh`
 releases a pushed branch's `ensemble-web` image to the test host (read the deploy-test skill
 first). Identify exact artifact/commit and
 report deployment separately from local/CI evidence. Never call an old deployed build current.
@@ -134,7 +134,7 @@ Each handoff needs: issue + commit SHA; changed surfaces; acceptance checklist w
 evidence; checks run and results; unrun/failed gates and why; deployment status; next dependency.
 Record genuine failures without editing expectations, skipping tests or asserting the intended
 behavior already exists. Auth/ownership/concurrency changes need an independent correctness and
-security review; synth or subjective music changes retain their human listening gate.
+security review; synth changes, and any change that changes what you hear, keep their pre-merge listen (DOCTRINE §5).
 
 ## Economical, cross-provider execution
 

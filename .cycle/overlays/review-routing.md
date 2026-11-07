@@ -15,6 +15,10 @@
    | A `band/test/**` claim or critique that *is* the deliverable | the **test-quality lens**, sharpened to the **five critique smells** below | — |
    | Anything else | the inline correctness pass alone | — |
 
+   **The listening brake (DOCTRINE §5) is a brake too, outside the list above:** a diff that
+   changes what you hear is a pre-merge stop for the listen — say so in the verdict — but it
+   does **not** pull in `/security-review`.
+
    ### The five critique smells (test-quality lens for `band/test/**`)
 
    Full treatment in `docs/guides/musical-engine-patterns.md` § Methodology; harness-shape traps

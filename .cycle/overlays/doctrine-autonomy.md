@@ -21,8 +21,8 @@ notes and restatements of Brandon's words — **starts with a bold harness marke
 Track `synth`. Any band-engine or audio change that changes the sound (a style, player, feel,
 voice, pack, bus or master change) opens its PR **without queueing the merge**, goes to
 ensembletest (`/deploy-test`), and waits for Brandon's listen there — or, when Brandon has
-delegated that call, for an independent Fable taste review (a fresh session, not the one that
-built it). A passing critique test never stands in for it. A change that leaves the sound as it
+delegated that call (his delegation recorded on the issue per Provenance), for an independent
+Fable taste review (a fresh session, not the one that built it). A passing critique test never stands in for it. A change that leaves the sound as it
 was (a refactor, a test-only or docs diff) is not under it.
 
 **`verify-on-device` is a third state between "auto-merge" and "hard stop."** It covers work

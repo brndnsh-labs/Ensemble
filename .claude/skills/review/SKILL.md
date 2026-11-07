@@ -2,7 +2,7 @@
 name: review
 description: Independently review the current uncommitted Ensemble diff (or a named branch/PR) — correctness, plus whether it does what the issue asked — adding `/security-review` when it touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories)). Reports findings with evidence; fixing them is the caller's job. Used by /cycle, or on its own for any diff.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=a07d07a16006 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=2aaf2ca696b7 — managed by the-cycle; edit the template, not this file -->
 
 # /review — fresh eyes on a diff
 
@@ -48,6 +48,10 @@ the issue and the diff from scratch, and say that's what happened.
    | `web/app/**` (UI and CSS) | the **inline pass**, against `web/CLAUDE.md` | The per-surface boundaries in its navigation table (the shell owns the `<dialog>` refs and all state; surfaces are presentational), dialog a11y, CSS. The `webkit-phone` Playwright project is emulated WebKit, not a phone — say when a finding needs `verify-on-device`. |
    | A `band/test/**` claim or critique that *is* the deliverable | the **test-quality lens**, sharpened to the **five critique smells** below | — |
    | Anything else | the inline correctness pass alone | — |
+
+   **The listening brake (DOCTRINE §5) is a brake too, outside the list above:** a diff that
+   changes what you hear is a pre-merge stop for the listen — say so in the verdict — but it
+   does **not** pull in `/security-review`.
 
    ### The five critique smells (test-quality lens for `band/test/**`)
 

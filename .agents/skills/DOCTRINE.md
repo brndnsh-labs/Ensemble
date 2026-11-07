@@ -1,4 +1,4 @@
-<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=d8ac513ab69a — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=DOCTRINE.md.tmpl hash=7b985231d9a9 — managed by the-cycle; edit the template, not this file -->
 # Pipeline doctrine (shared)
 
 The rules every Ensemble pipeline skill shares; a skill citing `§N` means this file. **Read it
@@ -102,8 +102,9 @@ tracker is unreachable, stop, don't fall back to them.
   `migration-maps/Ensemble-issue-map.tsv`, and those closed issues stayed behind in the
   read-only archive at `git.brndn.zip/brandon/Ensemble-archive`. `brandon/Ensemble` is a pull
   mirror with issues disabled; look in `-archive`. Only the 8 issues still open at migration
-  carried over to GitHub (the map's rows), so an unmapped `#N` in 936–1355 is archive
-  provenance, not a live GitHub link.
+  carried over to GitHub (the map's rows), so an unmapped `#N` in 936–1355 cited before 2026-08-04 is
+  archive provenance; GitHub issued its own #936–#1355 from that date (#1266, #1351 are GitHub
+  stories), so date the citation first.
 
 ## §2 Filing
 
@@ -142,7 +143,7 @@ of Done and the reviewer set:
 | **musical** | the style's critique claims in `band/test/claims/<style>.ts`, measured by `band/test/critique.test.ts` (statistical ranges, an automated oracle) | `music-theory-reviewer` | a change that changes what you hear is **held at the merge gate** for the listen (§5's listening brake), like synth; theory-provable work carries `verify-by-ear` (§5); genuinely-subjective feel with no test is a `status:needs-ear` hard stop; a change that leaves the sound as it was auto-merges on green |
 | **synth** | a human listen on the deployed test build — `/cycle`'s Ship step opens the PR *without queueing the merge*, deploys the branch to test and runs the verdict check-in right there, no automated oracle | `synth-graph-reviewer` (graph hygiene only, not "does it sound good") | **never auto-merged** — held at the merge gate: "Works" merges, "Haven't checked" parks it as `status:needs-ear` (resume with `/cycle #<n> approved`) |
 | **bundle** | a measured KB delta (the v2 export, `web/out/_next/static/`) **and** the full suite green (behavior-preserving) | `bundle-hygiene-reviewer` | auto-merge on green |
-| **ui** | the v2 suite + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green; pair with `verify-by-ear` if it routes audible voices (routing an already-approved voice isn't itself a synth hard stop) |
+| **ui** | the v2 suite + `npm run typecheck` green, no new generative behavior/synth voice/bundle-shrink claim | `state-discipline-reviewer` if it touches state, else `/code-review` | auto-merge on green, unless it changes what an audible voice plays or sounds like — then it is held for the listen (§5's listening brake); routing an already-approved voice unchanged isn't itself a stop |
 
 **Executors** (`agent/*`, sanity-checked against what the issue touches):
 - `musical-engine-implementer` — band engine behavior (`band/**`: styles, players, feel,
@@ -197,6 +198,7 @@ npm run lint          # Biome lint + format check
 npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)
 npm run typecheck:tests  # tsc over tests/ (its own CI gate)
 npm run knip          # unused files/exports/deps
+npm run knip:prod      # exports only tests use (a gate, part of npm run ci)
 npm run build --prefix web   # a change that reaches the app: build, then only the Playwright specs it touches (see below)
 ```
 
@@ -205,7 +207,7 @@ files actually changed before you rely on it.
 
 **The gate list (Brandon, 2026-09-27) — the one list; root `CLAUDE.md` and `web/CLAUDE.md` point here:**
 - **Every change:** `npm run typecheck`, `npm run typecheck:tests`, `npm test`, `npm run lint`,
-  `npm run knip`.
+  `npm run knip`, `npm run knip:prod`.
 - **A change that reaches the app** (anything outside the `changes` job's docs/tests list in
   `ci.yml`, `core/**` included — the v2 export compiles it): also `npm run build --prefix web`,
   then only the Playwright specs the change touches (`(cd web && npx playwright test
@@ -343,8 +345,8 @@ notes and restatements of Brandon's words — **starts with a bold harness marke
 Track `synth`. Any band-engine or audio change that changes the sound (a style, player, feel,
 voice, pack, bus or master change) opens its PR **without queueing the merge**, goes to
 ensembletest (`/deploy-test`), and waits for Brandon's listen there — or, when Brandon has
-delegated that call, for an independent Fable taste review (a fresh session, not the one that
-built it). A passing critique test never stands in for it. A change that leaves the sound as it
+delegated that call (his delegation recorded on the issue per Provenance), for an independent
+Fable taste review (a fresh session, not the one that built it). A passing critique test never stands in for it. A change that leaves the sound as it
 was (a refactor, a test-only or docs diff) is not under it.
 
 **`verify-on-device` is a third state between "auto-merge" and "hard stop."** It covers work

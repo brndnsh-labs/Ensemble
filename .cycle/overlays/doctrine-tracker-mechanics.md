@@ -24,5 +24,6 @@
   `migration-maps/Ensemble-issue-map.tsv`, and those closed issues stayed behind in the
   read-only archive at `git.brndn.zip/brandon/Ensemble-archive`. `brandon/Ensemble` is a pull
   mirror with issues disabled; look in `-archive`. Only the 8 issues still open at migration
-  carried over to GitHub (the map's rows), so an unmapped `#N` in 936–1355 is archive
-  provenance, not a live GitHub link.
+  carried over to GitHub (the map's rows), so an unmapped `#N` in 936–1355 cited before 2026-08-04 is
+  archive provenance; GitHub issued its own #936–#1355 from that date (#1266, #1351 are GitHub
+  stories), so date the citation first.

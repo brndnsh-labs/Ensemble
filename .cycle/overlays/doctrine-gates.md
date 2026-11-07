@@ -1,6 +1,6 @@
 **The gate list (Brandon, 2026-09-27) — the one list; root `CLAUDE.md` and `web/CLAUDE.md` point here:**
 - **Every change:** `npm run typecheck`, `npm run typecheck:tests`, `npm test`, `npm run lint`,
-  `npm run knip`.
+  `npm run knip`, `npm run knip:prod`.
 - **A change that reaches the app** (anything outside the `changes` job's docs/tests list in
   `ci.yml`, `core/**` included — the v2 export compiles it): also `npm run build --prefix web`,
   then only the Playwright specs the change touches (`(cd web && npx playwright test
