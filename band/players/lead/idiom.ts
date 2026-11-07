@@ -1052,6 +1052,16 @@ function moveCost(semitones: number): number {
     return d === 0 ? 50 : d <= 2 ? 0 : d === 3 ? 1 : d === 4 ? 3 : 10;
 }
 
+/**
+ * Cost of a trill in a sung guide-tone head's walk: four notes running a-b-a-b, counted across
+ * the guide tones either side (#2122). why: with two guide tones a step apart and a sparse figure,
+ * every free path was the two notes shaken back and forth (G-F-G-F), which is a horn's trill,
+ * not a tune. A neighbour note (a-b-a) stays cheap (0.6: a singer turns round a note); the
+ * trill costs more than a major 3rd's skip (3), so the walk skips a 3rd or turns the other way
+ * first, but less than a leap (10), which it still takes only when nothing else reaches.
+ */
+const TRILL = 4;
+
 /** Longest walk searched note by note; a longer one is walked in two halves. */
 const WALK_SEARCH = 7;
 
@@ -1060,8 +1070,9 @@ const WALK_SEARCH = 7;
  * `to`, its last note beside `to` (never on it), so a singer steps onto each arrival. Each note
  * comes from its own pool (`pools`: a held or strong-beat note's is its chord's tones, a short
  * weak one's the chord scale). Chosen whole, the cheapest by `moveCost`: steps where it can, a
- * repeated pitch never, a trill (a note two back again) avoided, and with more notes than the
- * distance needs it turns — `dir` first (up over the line, or down under it) and back.
+ * repeated pitch never, a note two back again avoided, a trill (`TRILL`, counted from `prior`,
+ * the line's note before `from`, through the arrival `to`) all but never, and with more notes
+ * than the distance needs it turns — `dir` first (up over the line, or down under it) and back.
  */
 function walkBetween(
     from: number,
@@ -1069,6 +1080,7 @@ function walkBetween(
     pools: readonly (readonly number[])[],
     dir: 1 | -1,
     [lo, hi]: readonly [number, number],
+    prior: number | null = null,
 ): number[] {
     const count = pools.length;
     if (count <= 0) {
@@ -1089,19 +1101,37 @@ function walkBetween(
         // A long walk: out to the far end of the turn and back, in two searched halves.
         const half = Math.ceil(count / 2);
         const peak = from + dir * Math.min(7, half);
-        const first = walkBetween(from, peak, pools.slice(0, half), dir, [lo, hi]);
+        const first = walkBetween(from, peak, pools.slice(0, half), dir, [lo, hi], prior);
         const last = first.at(-1) ?? from;
-        return [...first, ...walkBetween(last, to, pools.slice(half), -dir as 1 | -1, [lo, hi])];
+        const before = first.at(-2) ?? from;
+        return [
+            ...first,
+            ...walkBetween(last, to, pools.slice(half), -dir as 1 | -1, [lo, hi], before),
+        ];
     }
     let best: number[] = [];
     let bestCost = Number.POSITIVE_INFINITY;
     const path: number[] = [];
+    // The line as sung so far, counted back from its newest note: `prior`, `from`, the path.
+    const back = (k: number, extra: number | null): number | null => {
+        const line = extra === null ? path.length : path.length + 1;
+        const i = line - 1 - k;
+        if (extra !== null && k === 0) {
+            return extra;
+        }
+        return i >= 0 ? path[i] : i === -1 ? from : i === -2 ? prior : null;
+    };
+    // Whether the newest four notes (with `extra` after the path, the arrival) are a-b-a-b.
+    const trills = (extra: number | null = null) => {
+        const [d, c, b, a] = [0, 1, 2, 3].map((k) => back(k, extra));
+        return a !== null && a === c && b === d && a !== b;
+    };
     const search = (prev: number, cost: number) => {
         if (cost >= bestCost) {
             return;
         }
         if (path.length === count) {
-            const end = cost + (prev === to ? 50 : moveCost(to - prev));
+            const end = cost + (prev === to ? 50 : moveCost(to - prev)) + (trills(to) ? TRILL : 0);
             if (end < bestCost) {
                 bestCost = end;
                 best = [...path];
@@ -1120,7 +1150,10 @@ function walkBetween(
             // a free step the wrong way loses to a 3rd the right way, never to a leap.
             const side = 0.25 * Math.max(0, dir > 0 ? from - m : m - from);
             path.push(m);
-            search(m, cost + moveCost(m - prev) + (before === m ? 0.6 : 0) + turn + side);
+            // The trill's cost goes on the move's whole cost, after every other term: a step's
+            // is 0, so only an added cost (never a scale on one term) can outweigh it.
+            const trill = trills() ? TRILL : 0;
+            search(m, cost + moveCost(m - prev) + (before === m ? 0.6 : 0) + turn + side + trill);
             path.pop();
         }
     };
@@ -1225,6 +1258,8 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
                 onsets.slice(a + 1, b).map(walkPool),
                 dir,
                 range,
+                // The note sung before this guide tone: a trill may start there.
+                a > 0 ? pitches[a - 1] : null,
             );
             walk.forEach((m, k) => {
                 pitches[a + 1 + k] = m;

@@ -179,7 +179,8 @@ expression devices take turns rather than stack; one peak note per cycle.
     between walk toward the next one — a note held a beat or more, or on 1 or 3, is a chord
     tone (or, under a half note, the 9th); only a short weak one is a scale step, and there are
     no chromatics or enclosures. A common tone across a change is turned or tied, never struck
-    twice. The rhythm is drawn once per chorus, so every A recurs, pitches and all (it starts
+    twice, and the walk never trills (a-b-a-b, counted across the guide tones either side:
+    `TRILL`, #2122) — it skips a 3rd or turns the other way first. The rhythm is drawn once per chorus, so every A recurs, pitches and all (it starts
     where the first A did): a four-bar statement (a figure, a turn that moves on, a second
     figure, the phrase's one long arrival) and a four-bar answer (the figure an eighth late,
     another turn, the close). The contrast (the bridge, or with none a last section in another

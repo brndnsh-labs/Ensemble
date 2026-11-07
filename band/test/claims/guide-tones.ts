@@ -29,13 +29,17 @@ const STANDARD = [
     ['leadRepeatAcrossBarline', 0, 0.05, 'no stuttered common tones across a barline'],
     // `SEAM`, so 5 by construction.
     ['leadContrastSeamLeap', 0, 5, 'into and out of the bridge by a 4th at most'],
-    // The walk between guide tones steps: 1.87–1.99, steps 0.75–0.79, no leap over a 5th.
+    // The walk between guide tones steps: 1.85–2.03 over every style's own figures, steps
+    // 0.73–0.82, no leap over a 5th.
     ['leadMeanInterval', 0, 2.3, 'stepwise between guide tones'],
     ['leadStepShare', 0.6, 1, 'mostly half and whole steps'],
     ['leadLeapShare', 0, 0.01, 'no leaps wider than a fifth'],
-    ['leadMoveOverThird', 0, 0.05, 'voice-led: no 4th or tritone inside a phrase (0.021–0.033)'],
+    // 0.008–0.045 on the styles' figures (hip hop's sparse hook the most).
+    ['leadMoveOverThird', 0, 0.05, 'voice-led: no 4th or tritone inside a phrase'],
     ['leadChromaticApproach', 0, 0.05, 'a tune steps into its chords, not chromatically'],
-    ['leadOscillation', 0, 0.08, 'no trilling back and forth (0.027–0.053)'],
+    // The walk prices a trill (`TRILL` in `idiom.ts`): 0.014–0.046 on the styles' figures, where
+    // without it eight of them read 0.051–0.069 (hip hop the most), so 0.05 fails it.
+    ['leadOscillation', 0, 0.05, 'no trilling back and forth'],
     // The air is inside the figures (0.041–0.118: the high end is a style that lays the lead
     // out of a section); the held head read 0.20–0.27.
     ['leadRestShare', 0, 0.15, 'the head fills the form'],
