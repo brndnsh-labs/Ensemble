@@ -29,8 +29,12 @@ zone) are in [`core/engine/CLAUDE.md`](../../core/engine/CLAUDE.md).
   downloaded file carries its notice; `offline.mjs` hashes it into `pack-files.json` like any
   other pack file. After changing a credit, rewrite them with
   `UPDATE_PACK_CREDITS=1 npm run test:vitest -- sound-credits` and commit the result.
-- **Size budget:** a pitched pack ≤ 2 MB (ceiling 3), a drum kit ≤ 5 MB (ceiling 8). Packs are
-  opt-in downloads and never part of the app shell.
+- **Size budget** (Brandon's decision of 2026-11-07, #2001): a pitched pack up to about 5 MB, a
+  drum kit up to about 12–15 MB. Packs are opt-in downloads, installed once, and never part of the
+  app shell. **Decoded memory is the binding limit, not the download**: a pack decodes to raw
+  float audio, about 10–15× its AAC size. Keep it down with mono where stereo adds nothing, trimmed
+  tails on soft layers, and loudness layers only where the tone changes. Measure it (below), never
+  estimate it.
 
 ## Licences
 
@@ -69,6 +73,16 @@ Each claim below was read at its source on 2026-11-07 (#2113):
 | FreePats FSBS Electric Guitar Clean #1 (`-small-` variant) | CC0 1.0 (its FreePats page) | `electric-guitar-clean`, and via the amp sim below `electric-guitar-driven` / `electric-guitar-rhythm` |
 | GeneralUser GS (`mrbumpy409/GeneralUser-GS`) | GeneralUser GS License v2.0 (`documentation/LICENSE.txt`): free to use "in your software projects, and to modify the SoundFont bank or its packaging"; no credit is required, and a site featuring it is asked to link to the author's website or host its own copy, never his download files. The author also says he "cannot be 100% sure where all of the samples originated" | `clavinet` |
 | jRhodes3c (`sfzinstruments/jlearman.jRhodes3c`) | CC BY-NC-SA 4.0 for distributing the samples "in an application" (repo `LICENSE`; GitHub shows NOASSERTION because the file is custom). The same file links the BY-NC deed and lists only BY and NC; we follow the stricter, named BY-NC-SA. Commercial use needs a licence from the author | `rhodes` |
+| Karoryfer Growlybass (`sfzinstruments/karoryfer.growlybass`) | CC0 1.0 (repo `LICENSE`; readme: "Royalty-free for all commercial and non-commercial use.") | `electric-bass-jazz` (Squier Jazz Bass, sustain `f` layer) |
+| Karoryfer Black And Blue Basses (`sfzinstruments/karoryfer.black-and-blue-basses`) | CC0 1.0 (repo `license`; user guide: "This is free and open-source, with a CC 0 license.") | `electric-bass-fingered` (darkblack, Washburn AB-95, fingered, `mf` layer); its babyblue bass is a picked 5-string |
+
+**Looked for a better clavinet, found none (2026-11-07, #2001):** sfzinstruments has no clavinet
+(its nearest, Greg Sullivan's Pianet T, is CC BY 3.0 and a different instrument); FreePats has
+none; nothing CC0 or permissive turned up elsewhere (the D6 libraries are commercial). GeneralUser
+GS holds only the 8 clavinet samples already shipped, and they are **loop-sustain** samples (0.35–
+0.74 s with SF2 loop points): played one-shot they stop mid-ring, about 20 dB under their attack.
+Tighter spacing would have to be derived (resampled neighbours, as `tom-mid` is) and a longer
+release rendered from the loop; neither is a new source.
 
 **Rejected — don't re-check:** Sonatina/SSO (CC-Sampling+, forbids serving samples standalone),
 Philharmonia (forbids as-is redistribution, MP3 only), Pianobook (EULA bars redistribution),
@@ -96,6 +110,15 @@ harmonica was tried and scrapped: the reed buzz reads as a rattle.
   at `[smpl + start*2 : smpl + end*2]` and write each zone as a WAV at its `rate`. **Don't ignore
   byte 41**: the clavinet zones were ~30 cents flat and uneven until the manifest root became
   `rootMidi = originalPitch − corr/100` (a positive correction means the sample was recorded flat).
+  Also read the instrument's zones (`inst` → `ibag` → `igen`: generator 43 is the key range, 53 the
+  sample, 54 the loop mode) before deciding a source is thin or long enough.
+- **Karoryfer (sfzinstruments) repos are plain git, no LFS**: list a folder with
+  `gh api repos/sfzinstruments/<repo>/contents/<dir>` and pull single WAVs from
+  `raw.githubusercontent.com`. The SFZ maps (`Programs/maps/*.sfz`, or the top-level `.sfz`) give
+  each file's `pitch_keycenter`. **Both bass libraries name and map every note an octave above
+  where it sounds** (Growlybass `e2_…` and Black And Blue `darkblack_e2_…` are E1 = 28), so take
+  the root from the measurement, never the name. Black And Blue's samples carry ~25 ms of pre-note
+  noise before the pluck (its "Preroll" control): cut to the onset, or every note lands late.
 
 ## Encoding
 
@@ -119,8 +142,25 @@ ffmpeg -nostdin -v error -y -i in.wav -t 6 \
   played ~30 dB under the synth; catalog `gain` couldn't rescue it, because the envelope clamps.
   `loudnorm` brings each zone to about −6 dB peak with even loudness across zones. Calibrate the
   catalog `gain` only after that. A source that peaks at 0 dBFS gets −1 dB of true-peak headroom.
-- **Mono or stereo:** pitched packs may stay stereo. Keep stereo when the stereo field *is* the
-  sound: jRhodes3c bakes a mid-side chorus that cancels to mono. Drum hits go mono (below).
+- **Single-pass `loudnorm` is dynamic: it flattens a decaying note.** On a Growlybass note the
+  level 3–4 s in, against the first half second, went from −20.8 dB to −8.9 dB. For a plucked or
+  struck note whose decay *is* the sound, level each zone with a **static** gain instead (the RMS of
+  its first second to one target), then one shared trim so no zone peaks over −1 dBFS. The electric
+  basses were built that way (#2001).
+- **A pluck's spike can cost a whole pack's level.** The Growlybass attack rises ~23 dB above the
+  note's RMS, so peak headroom left the pack 8 dB quieter than the fingered bass, and its gain
+  would have run into `MAX_SAMPLE_PEAK`. A look-ahead peak limiter on each zone (2 ms look-ahead,
+  60 ms release, holding peaks to 15 dB over the note's RMS) touches only the first few
+  milliseconds, the way a bassist's compressor does, and won back 7.5 dB.
+- **Mono or stereo:** mono unless the stereo field *is* the sound: jRhodes3c bakes a mid-side
+  chorus that cancels to mono, so it stays stereo. A bass is mono (both electric-bass sources are
+  mono DI recordings anyway). Drum hits go mono (below).
+- **Measure decoded memory.** Sum `numberOfChannels × length × 4` bytes over every decoded buffer,
+  at the context's rate (48 kHz on most devices). node's own decoder refuses these `.m4a` files
+  (`moov` sits after `mdat`; `scripts/node-webaudio.ts` says why), so decode each through ffmpeg
+  to WAV and hand that to `decodeAudioData`, as the node render does. Measured 2026-11-07 at
+  48 kHz: `grand` 47.6 MB, `electric-bass-jazz` 13.8 MB (12 × 6 s), `electric-bass-fingered`
+  11.5 MB (12 × 5 s), `upright-bass` 3.4 MB, `clavinet` 0.8 MB.
 - **Zone spacing:** about every minor third for sustained instruments; plucked instruments get
   denser zones (every two semitones for nylon), because a plucked transient betrays pitch-shifting
   sooner than a sustained horn does.

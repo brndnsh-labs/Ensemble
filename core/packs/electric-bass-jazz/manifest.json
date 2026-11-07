@@ -1,0 +1,19 @@
+{
+    "id": "electric-bass-jazz",
+    "name": "Electric Bass (Jazz Bass)",
+    "attribution": "Karoryfer Growlybass (Squier Jazz Bass) by Karoryfer Lecolds — CC0 1.0 (public domain)",
+    "samples": [
+        { "key": "25", "rootMidi": 25.06, "url": "/packs/electric-bass-jazz/25.m4a" },
+        { "key": "28", "rootMidi": 28.23, "url": "/packs/electric-bass-jazz/28.m4a" },
+        { "key": "30", "rootMidi": 30.0, "url": "/packs/electric-bass-jazz/30.m4a" },
+        { "key": "33", "rootMidi": 32.94, "url": "/packs/electric-bass-jazz/33.m4a" },
+        { "key": "36", "rootMidi": 35.91, "url": "/packs/electric-bass-jazz/36.m4a" },
+        { "key": "39", "rootMidi": 38.99, "url": "/packs/electric-bass-jazz/39.m4a" },
+        { "key": "42", "rootMidi": 41.97, "url": "/packs/electric-bass-jazz/42.m4a" },
+        { "key": "45", "rootMidi": 45.02, "url": "/packs/electric-bass-jazz/45.m4a" },
+        { "key": "48", "rootMidi": 48.1, "url": "/packs/electric-bass-jazz/48.m4a" },
+        { "key": "51", "rootMidi": 51.06, "url": "/packs/electric-bass-jazz/51.m4a" },
+        { "key": "54", "rootMidi": 53.92, "url": "/packs/electric-bass-jazz/54.m4a" },
+        { "key": "57", "rootMidi": 57.02, "url": "/packs/electric-bass-jazz/57.m4a" }
+    ]
+}

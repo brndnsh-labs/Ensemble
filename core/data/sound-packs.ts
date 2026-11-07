@@ -491,6 +491,79 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         // room without washing out the low end. #686-style start; tune by ear.
         reverbSend: 0.6,
     },
+    {
+        id: 'electric-bass-jazz',
+        name: 'Electric Bass (Jazz Bass)',
+        credit: {
+            sources: [
+                {
+                    work: 'Growlybass (Squier Jazz Bass)',
+                    author: 'Karoryfer Lecolds',
+                    source: 'https://github.com/sfzinstruments/karoryfer.growlybass',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes:
+                'one velocity layer kept, trimmed, attack peaks limited, levelled, converted to AAC, retuned',
+        },
+        approxSizeMB: 0.9,
+        instruments: ['bass'],
+        // An electric bass for the 8 styles the upright doesn't suit (#2001). One of two
+        // candidates Brandon picks between by ear; this one is the Auto bass. Recorded direct,
+        // both pickups and every knob up, so its body sits at 200–400 Hz (the fingered
+        // Washburn's sits near 100 Hz): it reaches a tablet speaker through its overtones,
+        // the reason the issue exists. 12 mono zones from the third of four velocity layers
+        // (`f`, round robin 1), MIDI 25–57 every 3 semitones (one 2), each a full 6 s
+        // recording with its natural decay and a 0.4 s fade. Karoryfer's filenames sit an
+        // octave above the sounding pitch ("e2" is E1 = 28). Roots measured over the 400 ms
+        // after the attack, re-measured on the encoded files. Zones levelled with a static
+        // gain each (not loudnorm, which is dynamic and would flatten the decay), after a
+        // look-ahead limiter held each pluck's spike to 15 dB over the note's RMS (it rose
+        // 23 dB over it, which would have left the pack 8 dB quieter). Its staccato takes
+        // wait for #2000's articulation format. Decodes to 13.8 MB at 48 kHz.
+        // Calibrated 2026-11-07 via `mix:report --calibrate-pack=bass:electric-bass-jazz`:
+        // 13.2 dB under the synth bass at 1× (RMS-match 4.56×). Seated where the upright sits
+        // against the synth (3.4 dB under it, the upright's own calibration at 1.5×), so the
+        // band's bass level doesn't jump between a jazz chart and a rock one: 4.56 × 0.68 ≈
+        // 3.1×. In the loudness scenes the bass then sits 4.4–8.3 dB under the whole band,
+        // where the upright sits in jazz (6.5 dB); through a tablet-speaker stand-in (high-pass
+        // 150 Hz, 2nd order) 4.8–9.8 dB under it, against the synth bass's 7.3–15.3 and the
+        // upright's 14.3. Confirm by ear on ensembletest.
+        gain: 3.1,
+        // Direct-recorded, no room: a small lift like the upright's. By-ear start.
+        reverbSend: 0.6,
+    },
+    {
+        id: 'electric-bass-fingered',
+        name: 'Electric Bass (Fingered)',
+        credit: {
+            sources: [
+                {
+                    work: 'Black And Blue Basses (darkblack, Washburn AB-95)',
+                    author: 'Drogomir Smolken (Karoryfer Samples)',
+                    source: 'https://github.com/sfzinstruments/karoryfer.black-and-blue-basses',
+                    license: SOUND_LICENSES['CC0-1.0'],
+                },
+            ],
+            changes:
+                'one velocity layer kept, trimmed, the pre-note noise cut, levelled, converted to AAC, retuned',
+        },
+        approxSizeMB: 0.7,
+        instruments: ['bass'],
+        // The other electric-bass candidate (#2001): a 5-string played with the fingers on
+        // the neck pickup, a warm, round tone. Manual-select. 12 mono zones from the third of
+        // four layers (`mf`, round robin 1), MIDI 23–56 every 3 semitones, the low B string
+        // included, each its full 5 s recording with a 0.4 s fade. The source's ~25 ms of
+        // pre-note noise is cut so notes land on time. Filenames sit an octave above the
+        // sounding pitch ("b1" is B0 = 23). Its staccato and ghost takes wait for #2000's
+        // articulation format. Decodes to 11.5 MB at 48 kHz.
+        // Calibrated 2026-11-07 via `mix:report --calibrate-pack=bass:electric-bass-fingered`:
+        // 12.5 dB under the synth bass at 1× (RMS-match 4.23×), centroid matched (+48 Hz).
+        // Seated as the Jazz Bass is, 3.4 dB under the match: 2.9×. Through the tablet-speaker
+        // stand-in it reads 0.8–1.7 dB under the Jazz Bass at the same full-range level.
+        gain: 2.9,
+        reverbSend: 0.6,
+    },
 ];
 
 /** The packs that can serve as a source for `module`, in catalog order. */

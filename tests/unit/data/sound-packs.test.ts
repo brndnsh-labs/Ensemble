@@ -57,7 +57,7 @@ describe('sound-packs catalog', () => {
         for (const pack of chordPacks) {
             expect(pack.instruments).toContain('chords');
         }
-        // The upright-bass pack (#697) is the only bass-lane pack so far.
+        // The upright (#697) and the two electric basses (#2001) are the bass-lane packs.
         const bassPacks = packsForInstrument('bass');
         expect(bassPacks.map((p) => p.id)).toContain('upright-bass');
         for (const pack of bassPacks) {

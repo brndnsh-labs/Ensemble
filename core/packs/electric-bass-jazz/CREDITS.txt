@@ -1,0 +1,10 @@
+Electric Bass (Jazz Bass) — an Ensemble sound pack (electric-bass-jazz)
+
+Made from:
+
+  Growlybass (Squier Jazz Bass)
+  by Karoryfer Lecolds
+  Source: https://github.com/sfzinstruments/karoryfer.growlybass
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Changed for Ensemble: one velocity layer kept, trimmed, attack peaks limited, levelled, converted to AAC, retuned.

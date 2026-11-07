@@ -154,23 +154,26 @@ export const MIXER_GAIN_MULTIPLIERS = {
  * −1 dBTP ceiling 15 dB above it) at full master volume. Derived from measured renders, not
  * set by ear: `npm run mix:report -- --scenes-from=scripts/scenes/loudness-styles.json
  * --stems=full,full+solo` prints each style's integrated loudness and true peak; a style off
- * target by more than 1 LU is re-derived from that. A missing genre plays at 0 dB.
+ * target by more than 1 LU is re-derived from that. A missing genre plays at 0 dB. Funk, Reggae
+ * and Metal were re-derived on 2026-11-07 (#2001), when the electric Jazz Bass pack became their
+ * bass and took them 1.1 LU under the target (`--loops=3`); the other five styles it joined moved
+ * 0.4–1.0 LU and were left.
  */
 export const MASTER_MAKEUP_DB: Readonly<Record<string, number>> = Object.assign(
     Object.create(null),
     {
         Rock: 6.9,
         Jazz: 12.4,
-        Funk: 8.3,
+        Funk: 9.4,
         Disco: 7.3,
         'Hip Hop': 8.4,
         Blues: 11.1,
         'Neo-Soul': 8.8,
-        Reggae: 9.7,
+        Reggae: 10.8,
         Acoustic: 9.0,
         Bossa: 10.2,
         Country: 12.1,
-        Metal: 6.1,
+        Metal: 7.2,
         'Ska-Punk': 7.8,
     },
 );

@@ -179,14 +179,16 @@ describe('genre → sound map (#675)', () => {
         });
     });
 
-    describe('bass lane — per-genre bass (#697)', () => {
-        // Upright pizzicato for the acoustic combo; everything else keeps the
-        // synth electric (the only electric-bass voice we have).
+    describe('bass lane — per-genre bass (#697, #2001)', () => {
+        // Upright pizzicato for the acoustic combo; every other genre plays the
+        // electric Jazz Bass pack.
         const UPRIGHT_GENRES = ['Jazz', 'Blues', 'Bossa', 'Acoustic', 'Country'];
 
         it('maps every canonical genre to its decided bass voice (installed)', () => {
             for (const genre of GENRE_NAMES) {
-                const expected = UPRIGHT_GENRES.includes(genre) ? 'pack:upright-bass' : 'synth';
+                const expected = UPRIGHT_GENRES.includes(genre)
+                    ? 'pack:upright-bass'
+                    : 'pack:electric-bass-jazz';
                 expect(
                     autoVoiceForGenre(genre, 'bass', allInstalled),
                     `${genre} bass voice drifted from the locked table`,
@@ -194,9 +196,10 @@ describe('genre → sound map (#675)', () => {
             }
         });
 
-        it('falls back to synth when the upright-bass pack is NOT installed', () => {
+        it('falls back to synth when the bass pack is NOT installed', () => {
             expect(autoVoiceForGenre('Jazz', 'bass', noneInstalled)).toBe('synth');
             expect(autoVoiceForGenre('Bossa', 'bass', noneInstalled)).toBe('synth');
+            expect(autoVoiceForGenre('Funk', 'bass', noneInstalled)).toBe('synth');
         });
     });
 
@@ -217,8 +220,8 @@ describe('genre → sound map (#675)', () => {
         });
 
         it('falls back to synth for an unmapped module', () => {
-            // Funk maps no bass pack (the synth electric is its bass).
-            expect(autoVoiceForGenre('Funk', 'bass', allInstalled)).toBe('synth');
+            // Hip Hop maps no drum pack (programmed beats on the synth kit).
+            expect(autoVoiceForGenre('Hip Hop', 'groove', allInstalled)).toBe('synth');
         });
 
         it('falls back to synth for an undefined / unknown genre', () => {

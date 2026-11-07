@@ -26,8 +26,10 @@ export const GENRE_SOUND_MAP: Readonly<
     // chords keyboard, a soloist lead, a bass, and a drum kit that share the idiom.
     // (#682 chords · #694 soloist · #695 drums · #697 bass.)
     // bass — upright (#697): a pizzicato double bass for the acoustic combo
-    //   (jazz/bossa/blues walking, singer-songwriter, country); everything else
-    //   keeps the synth electric (the only electric-bass voice we have).
+    //   (jazz/bossa/blues walking, singer-songwriter, country); the other 8 play the
+    //   electric Jazz Bass (#2001): bright enough, through its overtones, to reach a
+    //   tablet speaker where the synth bass's near-sine vanished. The fingered Washburn
+    //   (`electric-bass-fingered`) is the other candidate, by hand.
     //
     // chords — the keyboard playing the changes:
     //   • grand    → acoustic-piano genres (jazz comping, singer-songwriter,
@@ -58,15 +60,17 @@ export const GENRE_SOUND_MAP: Readonly<
     Funk: {
         chords: 'pack:clavinet',
         soloist: 'pack:electric-guitar-clean',
+        bass: 'pack:electric-bass-jazz',
         groove: 'pack:acoustic-kit',
     },
     // Metal — crunch rhythm guitar on the chords (#698): the chords engine
     // reduces to power chords (root+5+oct) under this voice, since distorted
     // triads mud up. Rock keeps the grand piano (Brandon's call — stay close to
     // today's default; users can hand-override to the guitar).
-    Metal: { chords: 'pack:electric-guitar-rhythm' },
+    Metal: { chords: 'pack:electric-guitar-rhythm', bass: 'pack:electric-bass-jazz' },
     'Ska-Punk': {
         chords: 'pack:hammond-organ',
+        bass: 'pack:electric-bass-jazz',
         groove: 'pack:acoustic-kit',
     },
     Jazz: {
@@ -83,14 +87,20 @@ export const GENRE_SOUND_MAP: Readonly<
     },
     Reggae: {
         chords: 'pack:hammond-organ',
+        bass: 'pack:electric-bass-jazz',
         groove: 'pack:acoustic-kit',
     },
     Rock: {
         chords: 'pack:grand',
         soloist: 'pack:electric-guitar-driven',
+        bass: 'pack:electric-bass-jazz',
         groove: 'pack:acoustic-kit',
     },
-    Disco: { chords: 'pack:rhodes', groove: 'pack:acoustic-kit' },
+    Disco: {
+        chords: 'pack:rhodes',
+        bass: 'pack:electric-bass-jazz',
+        groove: 'pack:acoustic-kit',
+    },
     Country: {
         chords: 'pack:grand',
         soloist: 'pack:electric-guitar-clean',
@@ -110,9 +120,13 @@ export const GENRE_SOUND_MAP: Readonly<
         groove: 'pack:acoustic-kit',
     },
     // Neo-Soul — Rhodes on the keys (#655).
-    'Neo-Soul': { chords: 'pack:rhodes', groove: 'pack:acoustic-kit' },
+    'Neo-Soul': {
+        chords: 'pack:rhodes',
+        bass: 'pack:electric-bass-jazz',
+        groove: 'pack:acoustic-kit',
+    },
     // Hip Hop — Rhodes keys (#655); groove stays the synth kit (programmed beats).
-    'Hip Hop': { chords: 'pack:rhodes' },
+    'Hip Hop': { chords: 'pack:rhodes', bass: 'pack:electric-bass-jazz' },
 };
 
 /**
