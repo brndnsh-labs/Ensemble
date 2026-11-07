@@ -337,6 +337,20 @@ expression devices take turns rather than stack; one peak note per cycle.
   note, a bebop alto only long ones); a guitar bends into its landings from below (`bendIn`:
   the major 3rd from the blue third, the root or 5th from a whole step); a horn scoops now and
   then. The host plays the lead on today's soloist voices and packs.
+- **Fall-offs, releases and slides** (#2120, each a `LeadBook` chance on a seeded stream of its
+  own, so the bends and scoops a slot already chose don't move). A horn falls off a phrase's last
+  note (`fall`, 2–4 semitones, 4–5 on a note a half or longer; an eighth or longer with a beat
+  of breath after it): funk, disco, and the blues on a horn. A guitar lets a bend back down
+  (`release`: inside a phrase any bend a quarter or longer over one chord; at a phrase's arrival
+  only onto the blue third over a chord with no major 7th or the b7 over a dominant or plain
+  triad, never the 4) and slides into a landing it doesn't bend (`slideIn`: 2–3 frets below
+  mostly, 4–5 now and then, 2 above sometimes, over a thirty-second or a sixteenth): blues and
+  rock. None of them in the bar a held ending lands on. The host turns them into seconds by the
+  note's own tempo (`leadArticulation`): the fall takes the note's last eighth (at most 40% of
+  it), its level sinking to 0.4 with it; the release starts halfway and takes an eighth (at most
+  35%); the slide its ticks (at most half the note). Both soloist voices render them through one
+  placement rule (`articulationWindows` in `core/engine/sample-voice.ts`). The `.mid` export
+  carries none of them, as it carries no bend-in.
 - **The comp gives the lead its register.** While the lead sounds, a keyboard voice at or
   above it drops an octave (never below middle C), and never onto a note the lead is playing.
   A guitar grip is a hand shape and stays.

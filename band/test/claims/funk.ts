@@ -56,6 +56,11 @@ export const funk = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The horn falls off a phrase's last note (#2120, `LeadBook.fall` 0.35). Measured
+                // 0.399 (0 with no falls, the floor's failure); the ceiling is every phrase end
+                // falling, a gimmick. Only there: 0.065 of all notes fall.
+                ['leadPhraseEndFalls', 0.2, 0.6, 'the section falls off the end of a riff'],
+                ['leadFallShare', 0, 0.15, 'a fall ends a phrase, never a note inside the line'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (sixteenths: beat 1 and its "a", then the and of 2), then moves. Measured
                 // 0.006 with no stabs, 0.155 now; the floor fails with the stabs off, the
@@ -74,6 +79,10 @@ export const funk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // The horn falls off a phrase's last note (#2120, `LeadBook.fall` 0.35). Measured
+                // 0.330 (0 with no falls); 0.028 of all notes fall.
+                ['leadPhraseEndFalls', 0.2, 0.5, 'the horn falls off the end of a phrase'],
+                ['leadFallShare', 0, 0.1, 'a fall ends a phrase, never a note inside the line'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (sixteenths: beat 1 and its "a", then the and of 2), then moves. Measured
                 // 0.009 with no stabs, 0.126 now; the floor fails with the stabs off, the

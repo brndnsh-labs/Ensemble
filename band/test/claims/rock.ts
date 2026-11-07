@@ -61,6 +61,12 @@ export const rock = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // Bend-and-release (#2120, `LeadBook.release` 0.35). Measured 0.337 (0 with no
+                // releases).
+                ['leadBendReleases', 0.2, 0.55, 'a bend let back down: 4 → 5 → 4, b7 → root → b7'],
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.2). Measured 0.133
+                // on the head's few unbent landings.
+                ['leadLandingSlides', 0.05, 0.3, 'a landing slid into now and then'],
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
                 // two after an eight-bar period. Measured 20 bars before (phrase into phrase),
                 // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
@@ -77,6 +83,11 @@ export const rock = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Bend-and-release (#2120, `LeadBook.release` 0.35). Measured 0.291 (0 with no
+                // releases).
+                ['leadBendReleases', 0.15, 0.5, 'a bend let back down: 4 → 5 → 4, b7 → root → b7'],
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.2). Measured 0.229.
+                ['leadLandingSlides', 0.1, 0.4, 'a landing slid into, a position shift'],
                 ['compLeadUnison', 0, 0.15, 'the piano voices under the tune, rarely on its note'],
                 // Measured 0.149; development off 0.040, #2012's bar fix reverted 0.067; always develops 0.26.
                 // Floor sits between the bar fix reverted (0.067) and shipped: it guards #2012's bar fix and development off (0.040).

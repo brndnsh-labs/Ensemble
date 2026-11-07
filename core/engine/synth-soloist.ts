@@ -4,7 +4,15 @@ import { clampFreq, safeDisconnect } from './audio-graph-utils.js';
 import { scrambleHash } from './hash-utils.js';
 import { resolveInstrumentSource } from './instrument-registry.js';
 import { cancelAheadOnStop, releaseLaneVoices } from './lane-voices.js';
-import { playSampledNote, type SampleBend, type SampleVibrato } from './sample-voice.js';
+import {
+    articulationWindows,
+    FALL_TAPER,
+    type PitchFall,
+    type PitchRelease,
+    playSampledNote,
+    type SampleBend,
+    type SampleVibrato,
+} from './sample-voice.js';
 import {
     getSoloistVoiceLimit,
     isSoloistGuitarMode,
@@ -22,6 +30,24 @@ type SoloistState = EnsembleState['soloist'];
 // The synth lead's vibrato depth scale. The per-style table this once read it from is gone
 // (the lead has one voice); 0.8 is what its default ('scalar') entry resolved to.
 const VIBRATO_INTENSITY = 0.8;
+
+/**
+ * A lead note's pitch moves beyond the bend-in (#2120), in seconds, as the band host derives
+ * them from the note's ticks (`leadArticulation` in `web/lib/band-host.ts`). Both the synth
+ * voice and the sampled seam render each one; `articulationWindows` (`sample-voice.ts`) fits
+ * them inside the note.
+ */
+export interface LeadArticulation {
+    /** Fall-off: the pitch drops over the note's last `seconds`, the level sinking with it. */
+    readonly fall?: PitchFall;
+    /** Bend-and-release: the bend-in comes back down. Ignored without a bend-in. */
+    readonly release?: PitchRelease;
+    /**
+     * Slide-in: struck `semitones` from the written pitch (negative below) and slid to it over
+     * `seconds`. Ignored on a note that also bends in or slurs: those are its attack.
+     */
+    readonly slide?: { readonly semitones: number; readonly seconds: number };
+}
 
 interface VibratoNodes {
     vibrato: OscillatorNode;
@@ -128,6 +154,7 @@ function playSampledSolo(
     bendStartInterval: number,
     isLegato: boolean,
     prevFreq: number,
+    articulation: LeadArticulation | undefined,
 ): boolean {
     // Fold notes above the pack's sampled range down an octave (#755): the
     // soloist runs to MIDI 90 but the packs top out lower (nylon 84, sax 79,
@@ -163,6 +190,19 @@ function playSampledSolo(
     // scoop (it is mutually exclusive with legato upstream).
     let bend = toSampleBend(bendStartInterval);
     let attack: number | undefined;
+    // A slide-in (#2120) is a bend-in from further away over the time the band host gave it:
+    // the note is picked at the starting fret, so its attack is the plain one.
+    const slide = articulation?.slide;
+    if (
+        !bend &&
+        !isLegato &&
+        slide &&
+        Number.isFinite(slide.semitones) &&
+        slide.semitones !== 0 &&
+        slide.seconds > 0
+    ) {
+        bend = { fromSemitones: slide.semitones, inSeconds: slide.seconds };
+    }
     if (!bend && isLegato && packId.includes('guitar') && prevFreq > 0 && freq > 0) {
         const semis = 12 * Math.log2(prevFreq / freq);
         // ≤ a perfect 5th (mirrors the synth voice's portamento window); above
@@ -171,6 +211,17 @@ function playSampledSolo(
             bend = { fromSemitones: semis, inSeconds: 0.04 };
             attack = 0.028; // soften the re-pick transient into a slur
         }
+    }
+    // The later pitch moves (#2120). A release lets the scoop or bend down again, so it rides
+    // only on the bend-in the band wrote (`bendStartInterval`), never on a slide or a slur.
+    const release = bendStartInterval !== 0 ? articulation?.release : undefined;
+    const fall = articulation?.fall;
+    if (release || fall) {
+        bend = {
+            ...(bend ?? {}),
+            ...(release ? { release } : {}),
+            ...(fall ? { fall } : {}),
+        };
     }
 
     playSampledNote(audio, zone, dest, targetMidi, Math.max(time, audio.currentTime), {
@@ -208,6 +259,8 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
             isLegato = false,
             vibrato = false,
             noteSeed = 0,
+            ,
+            articulation,
         ] = args;
         // Mirror the synth path's previous-pitch tracking so the sample voice can
         // slur a legato run into pitch (#855). Read the predecessor BEFORE the
@@ -228,6 +281,7 @@ export function playSoloNote(...args: Parameters<typeof playSoloNoteCurrent>): v
                 bendStartInterval,
                 isLegato,
                 prevFreq,
+                articulation,
             )
         ) {
             audioState.lastRenderedFreq = freq; // @direct-mutation
@@ -251,6 +305,8 @@ function playSoloNoteCurrent(
     // chart has not set one (#2055) — the caller resolves it, since `core/` can't see the style.
     // Never the raw `groove.humanize`, whose stored 20 means "not set" (#2010).
     humanize: number = 0,
+    // The note's fall-off, bend-and-release or slide-in (#2120), in seconds. Omitted: none.
+    articulation?: LeadArticulation,
 ): void {
     const { playback, soloist } = state;
     // Guard every value that feeds an AudioParam: freq → oscillators, vol →
@@ -310,6 +366,7 @@ function playSoloNoteCurrent(
         prevFreq,
         vibrato,
         timbre,
+        articulation,
     );
 
     (soloist.audio as Mutable<typeof soloist.audio>).activeVoices.push(voiceObj); // @direct-mutation
@@ -494,6 +551,7 @@ function applySoloistEnvelope(
     duration: number,
     attack: number,
     isLegato: boolean,
+    fallFrom: number | null = null,
 ): void {
     const gain = outputGain.gain;
     const rel = soloistRelease(playTime, duration, isLegato);
@@ -504,6 +562,14 @@ function applySoloistEnvelope(
     gain.setValueAtTime(0, playTime);
     gain.setTargetAtTime(peak, playTime, attack);
     gain.setTargetAtTime(peak * 0.82, decayStart, 0.06);
+    // A fall-off (#2120) sinks the level with the pitch, toward `FALL_TAPER` of the sustain,
+    // from where the fall starts: after the decay has been aimed (or it would re-aim the level
+    // back up) and before the release takes over. The time constant is a third of the window to
+    // the note's end, so the level is most of the way down where the fall lands.
+    const end = playTime + duration;
+    if (fallFrom !== null && fallFrom > decayStart && fallFrom < rel.start && end > fallFrom) {
+        gain.setTargetAtTime(peak * 0.82 * FALL_TAPER, fallFrom, (end - fallFrom) / 3);
+    }
     gain.setTargetAtTime(0, rel.start, rel.constant);
 }
 
@@ -575,6 +641,7 @@ function playTrumpet(
     prevFreq: number,
     vibratoFlag: boolean,
     timbre: TimbreJitter,
+    articulation: LeadArticulation | undefined,
 ): void {
     const osc1 = ctx.createOscillator();
     osc1.type = 'sawtooth';
@@ -586,7 +653,7 @@ function playTrumpet(
 
     voiceObj.nodes.push(osc1, osc2);
 
-    applyPitchEnvelope(
+    const fallFrom = applyPitchEnvelope(
         state,
         osc1,
         osc2,
@@ -596,6 +663,7 @@ function playTrumpet(
         bendStartInterval,
         isLegato,
         prevFreq,
+        articulation,
     );
 
     // Velocity + intensity → brightness (epic-3-soloist S2): a harder note opens
@@ -670,7 +738,7 @@ function playTrumpet(
     const attack = (isLegato ? 0.032 : 0.02) * timbre.attackJit;
 
     // ADSR with articulation-aware release (epic-3-soloist S7).
-    applySoloistEnvelope(outputGain, vol * 1.2, playTime, duration, attack, isLegato);
+    applySoloistEnvelope(outputGain, vol * 1.2, playTime, duration, attack, isLegato, fallFrom);
 
     osc1.start(playTime);
     osc2.start(playTime);
@@ -692,10 +760,18 @@ function applyPitchEnvelope(
     bendStartInterval: number,
     isLegato: boolean,
     prevFreq: number,
-): void {
+    articulation?: LeadArticulation,
+): number | null {
     const { soloist } = state;
     const startFreq = bendStartInterval !== 0 ? freq * 2 ** (bendStartInterval / 12) : freq;
+    const slide = articulation?.slide;
+    const slides =
+        !!slide && Number.isFinite(slide.semitones) && slide.semitones !== 0 && slide.seconds > 0;
 
+    // When the attack's own pitch move has landed: the later moves start no earlier.
+    let landed = playTime;
+    // Whether the note starts on a bend the band wrote, so a release can let it down again.
+    let bent = false;
     if (isLegato && Math.abs(freq - prevFreq) < freq * 0.5) {
         // Portamento glide — long enough to read as a slur, not a fast bend
         // (epic-3-soloist S1). Guitar mode stays quicker (hammer-on feel).
@@ -704,16 +780,59 @@ function applyPitchEnvelope(
         osc2.frequency.setValueAtTime(prevFreq, playTime);
         osc1.frequency.exponentialRampToValueAtTime(freq, playTime + glideTime);
         osc2.frequency.exponentialRampToValueAtTime(freq, playTime + glideTime);
+        landed = playTime + glideTime;
     } else if (bendStartInterval !== 0) {
         osc1.frequency.setValueAtTime(startFreq, playTime);
         osc2.frequency.setValueAtTime(startFreq, playTime);
         const rampTime = Math.min(0.1, duration * 0.5);
         osc1.frequency.exponentialRampToValueAtTime(freq, playTime + rampTime);
         osc2.frequency.exponentialRampToValueAtTime(freq, playTime + rampTime);
+        landed = playTime + rampTime;
+        bent = true;
+    } else if (slides && slide) {
+        // A slide-in (#2120): struck a few frets away and slid to the written pitch over the
+        // time the band host derived from the note's ticks, never more than half the note.
+        const glide = Math.max(0.005, Math.min(slide.seconds, duration * 0.5));
+        const from = freq * 2 ** (slide.semitones / 12);
+        osc1.frequency.setValueAtTime(from, playTime);
+        osc2.frequency.setValueAtTime(from, playTime);
+        osc1.frequency.exponentialRampToValueAtTime(freq, playTime + glide);
+        osc2.frequency.exponentialRampToValueAtTime(freq, playTime + glide);
+        landed = playTime + glide;
     } else {
         osc1.frequency.setValueAtTime(freq, playTime);
         osc2.frequency.setValueAtTime(freq, playTime);
     }
+    if (!articulation?.release && !articulation?.fall) {
+        return null;
+    }
+    // The later moves (#2120), placed by the same rule as the sampled seam's. Each is anchored
+    // with a `setValueAtTime` at its start, so it ramps from there and not from the previous
+    // event, and each ramps between two positive frequencies.
+    const windows = articulationWindows(
+        playTime,
+        landed,
+        playTime + duration,
+        bent ? articulation.release : undefined,
+        articulation.fall,
+    );
+    let sitting = freq;
+    if (windows.release) {
+        for (const osc of [osc1, osc2]) {
+            osc.frequency.setValueAtTime(freq, windows.release.start);
+            osc.frequency.exponentialRampToValueAtTime(startFreq, windows.release.end);
+        }
+        sitting = startFreq;
+    }
+    if (windows.fall && articulation.fall) {
+        const bottom = sitting * 2 ** (-articulation.fall.semitones / 12);
+        for (const osc of [osc1, osc2]) {
+            osc.frequency.setValueAtTime(sitting, windows.fall.start);
+            osc.frequency.exponentialRampToValueAtTime(bottom, windows.fall.end);
+        }
+        return windows.fall.start;
+    }
+    return null;
 }
 
 function createVibrato(

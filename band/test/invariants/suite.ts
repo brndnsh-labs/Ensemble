@@ -677,6 +677,45 @@ function checkPass(
             fail(lead[i], `lead overlaps the note at ${lead[i - 1].tick}`);
         }
     }
+    // The pitch moves (#2120) are the instrument's own: a horn falls off, a guitar lets a bend
+    // down and slides. Each is a gesture of a few semitones, inside the note it moves.
+    const family = LEAD_INSTRUMENTS[settings.lead].family;
+    for (const n of lead) {
+        if (n.fall !== undefined) {
+            if (family !== 'horn') {
+                fail(n, `a ${settings.lead} falls off`);
+            }
+            if (!Number.isInteger(n.fall) || n.fall < 2 || n.fall > 5) {
+                fail(n, `falls ${n.fall} semitones`);
+            }
+        }
+        if (n.release !== undefined) {
+            if (!LEAD_INSTRUMENTS[settings.lead].bends) {
+                fail(n, `a ${settings.lead} releases a bend`);
+            }
+            if (!n.bendIn) {
+                fail(n, 'releases a bend it never made');
+            }
+        }
+        if (n.slideIn !== undefined) {
+            const { from, ticks } = n.slideIn;
+            if (family !== 'guitar') {
+                fail(n, `a ${settings.lead} slides`);
+            }
+            if (!Number.isInteger(from) || Math.abs(from) < 2 || Math.abs(from) > 5) {
+                fail(n, `slides from ${from} semitones`);
+            }
+            // A slide is a quick move of the hand, a sixteenth at most. Swing or a cut may leave
+            // the note shorter than the player wrote it; the host fits the slide into half of
+            // whatever it sounds (`leadArticulation`), so it is held to its own bound here.
+            if (!(ticks > 0) || ticks > STEP) {
+                fail(n, `slides over ${ticks} ticks`);
+            }
+            if (n.bendIn) {
+                fail(n, 'both slides and bends in');
+            }
+        }
+    }
     // Chord arrivals: the bass lands on a chord tone; comp chords carry the guide tones.
     const bass = events.filter((e): e is PitchedNote => e.lane === 'bass');
     const chords = events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);

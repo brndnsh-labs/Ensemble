@@ -140,6 +140,18 @@ export const blues = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // Bend-and-release (#2120, `LeadBook.release` 0.4): of the bends a quarter or
+                // longer, the share let back down. Measured 0.393 (0 with no releases); a phrase's
+                // arrival releases only onto the blue third or the b7, so the ceiling is well
+                // under every bend.
+                [
+                    'leadBendReleases',
+                    0.2,
+                    0.6,
+                    'the guitar bends the blue third up and lets it cry back',
+                ],
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.316.
+                ['leadLandingSlides', 0.15, 0.5, 'a landing slid into from a few frets away'],
                 // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
                 // its figures already leave room at each phrase end.
                 ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
@@ -155,6 +167,12 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Bend-and-release (#2120, `LeadBook.release` 0.4). Measured 0.303 (0 with no
+                // releases; 0.043 when a phrase's arrival never released, too rare to hear: one
+                // in eight choruses).
+                ['leadBendReleases', 0.15, 0.5, 'a bend let back down, the blues cry'],
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.262.
+                ['leadLandingSlides', 0.12, 0.45, 'a landing slid into from a few frets away'],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 // Measured 0.134; development off 0.061, #2012's bar fix reverted 0.071; always develops 0.40.
                 // Floor sits between the bar fix reverted (0.071) and shipped: it guards #2012's bar fix and development off (0.061).
@@ -182,6 +200,26 @@ export const blues = defineClaims({
                 ['leadPhraseEndsOnChordTone', 0.88, 1, 'licks end on a chord tone'],
                 ['leadArcRise', 1.6, 4, 'the solo builds'],
                 ['leadPeakIsTop', 0.85, 1, 'the peak chorus holds the top note'],
+            ],
+        },
+        // The blues on a horn (a sax lead, the jump-blues tenor) falls off its phrase ends
+        // (#2120, `LeadBook.fall` 0.45): more often than funk or disco's.
+        {
+            take: { lead: 'head', leadInstrument: 'sax' },
+            claims: [
+                // Measured 0.420 (0 with no falls); 0.091 of all notes fall.
+                ['leadPhraseEndFalls', 0.25, 0.65, 'the tenor sighs off the end of a phrase'],
+                ['leadFallShare', 0, 0.15, 'a fall ends a phrase, never a note inside the line'],
+                // A horn's scoop is not a bend it can let down.
+                ['leadBendReleases', 0, 0, 'a horn never releases a bend'],
+            ],
+        },
+        {
+            take: { lead: 'solo', leadInstrument: 'sax' },
+            claims: [
+                // Measured 0.506 (0 with no falls); 0.050 of all notes fall.
+                ['leadPhraseEndFalls', 0.3, 0.7, 'the tenor sighs off the end of a phrase'],
+                ['leadFallShare', 0, 0.1, 'a fall ends a phrase, never a note inside the line'],
             ],
         },
     ],

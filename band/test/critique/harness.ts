@@ -13,6 +13,7 @@ import {
     type CompInstrument,
     DEFAULT_SETTINGS,
     type DrumHit,
+    type LeadInstrument,
     type PitchedNote,
     type StyleId,
     type TradeSettings,
@@ -46,10 +47,11 @@ export function perform(
     lead?: 'head' | 'solo' | 'guide-tones',
     trade?: TradeSettings,
     colour = false,
+    leadInstrument?: LeadInstrument,
 ): Take[] {
     const takes: Take[] = [];
     const lanes = { ...DEFAULT_SETTINGS.lanes, bass, lead: lead !== undefined || Boolean(trade) };
-    const instrument = STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead;
+    const instrument = leadInstrument ?? STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead;
     // The lead's form spans a cycle: the head is pass 0, the solo choruses passes 1–3. Trading,
     // every pass after the head is traded: two of them are judged.
     const passes = trade ? 3 : lead ? CYCLE : 2;
@@ -2267,6 +2269,84 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of the lead's phrase ends (`phraseEnds`) an eighth or longer that fall off their
+     * pitch (`PitchedNote.fall`, #2120): a horn's fall-off where a phrase lets go.
+     */
+    leadPhraseEndFalls: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of phraseEnds(events)) {
+                if (note.dur < STEP * 2) {
+                    continue;
+                }
+                n++;
+                hit += note.fall ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of the lead's notes that fall (`PitchedNote.fall`, #2120), wherever they sit. */
+    leadFallShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of leadNotes(events)) {
+                n++;
+                hit += note.fall ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Share of the lead's bends (`bendIn`) a quarter or longer that are let back down
+     * (`PitchedNote.release`, #2120): a guitarist's bend-and-release.
+     */
+    leadBendReleases: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of leadNotes(events)) {
+                if (!note.bendIn || note.dur < STEP * 4) {
+                    continue;
+                }
+                n++;
+                hit += note.release ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Share of the lead's landings (`leadLandings`) an eighth or longer and not bent that are
+     * slid into (`PitchedNote.slideIn`, #2120): a guitarist arriving from a few frets away.
+     */
+    leadLandingSlides: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const { note } of leadLandings(t, events)) {
+                if (note.bendIn || note.dur < STEP * 2) {
+                    continue;
+                }
+                n++;
+                hit += note.slideIn ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /** Share of the lead's notes slid into (`PitchedNote.slideIn`, #2120), wherever they sit. */
+    leadSlideShare: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of leadNotes(events)) {
+                n++;
+                hit += note.slideIn ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of lead notes bent or scooped into from below. */
     leadBendShare: (takes) => {
         let n = 0;
@@ -2309,6 +2389,8 @@ export interface TakeSpec {
     trade?: TradeSettings;
     /** Judge the written-colour chart (add9, maj9, b9…) instead of the shared charts. */
     colour?: boolean;
+    /** Play the lead on this instrument instead of the style's own (a blues on a horn, #2120). */
+    leadInstrument?: LeadInstrument;
 }
 
 export type MetricName = keyof typeof METRICS;

@@ -364,6 +364,9 @@ const funkLead = leadIdiom({
     scoop: 0.2,
     // Clipped figures: vibrato only on the rare long note.
     vibrato: 12,
+    // why: the funk horn section falls off the last note of a riff (Tower of Power's drop at a
+    // phrase's end), about a third of the phrase ends that leave a tail to fall from (#2120).
+    fall: 0.35,
 });
 
 export const funk: Style = {

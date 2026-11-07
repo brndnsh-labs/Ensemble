@@ -67,6 +67,25 @@ export interface PitchedNote extends EventTiming {
      * it: a horn's scoop (1) or a guitarist's bend into the note (1 = b3 → 3, 2 = b7 → root).
      */
     bendIn?: number;
+    /**
+     * A bent lead note let back down (#2120): after bending up into the written pitch
+     * (`bendIn`), the guitarist releases the string over the note's later half, so it ends on
+     * the fretted note it started from (the blue third, the b7, the 4th). Only with `bendIn`.
+     */
+    release?: boolean;
+    /**
+     * A horn's fall-off (#2120): the note drops this many semitones (2–5) over its tail, its
+     * level tapering with it, as a phrase-ending note does in a funk, disco or blues horn line.
+     */
+    fall?: number;
+    /**
+     * A guitarist sliding into the note (#2120): struck `from` semitones away (signed: −3 is
+     * three frets below, +2 two above) and slid up or down the string to the written pitch
+     * over `ticks` — the speed of the hand, a sixteenth at most. Swing may shorten the note
+     * after the player chose it; the host fits the slide into half of what the note sounds.
+     * Never with `bendIn`: the slide is the note's articulation.
+     */
+    slideIn?: { from: number; ticks: number };
     /** A lead note held long enough to sing: the player adds vibrato. */
     vibrato?: boolean;
 }

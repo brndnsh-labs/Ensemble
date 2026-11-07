@@ -257,6 +257,11 @@ export const disco = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The horn falls off a phrase's last note (#2120, `LeadBook.fall` 0.3). Measured
+                // 0.460 on the head's few phrase ends (0 with no falls, the floor's failure); the
+                // ceiling is most phrase ends falling. Only there: 0.028 of all notes fall.
+                ['leadPhraseEndFalls', 0.2, 0.65, 'the brass drops off the end of the hook'],
+                ['leadFallShare', 0, 0.1, 'a fall ends a phrase, never a note inside the line'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (on the eighths, never two sixteenths running), then moves. Measured
                 // 0.006 with no stabs, 0.108 now; the floor fails with the stabs off, the
@@ -282,6 +287,10 @@ export const disco = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // The horn falls off a phrase's last note (#2120, `LeadBook.fall` 0.3). Measured
+                // 0.218 (0 with no falls); 0.014 of all notes fall.
+                ['leadPhraseEndFalls', 0.1, 0.4, 'the sax drops off a phrase now and then'],
+                ['leadFallShare', 0, 0.08, 'a fall ends a phrase, never a note inside the line'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (on the eighths, never two sixteenths running), then moves. Measured
                 // 0.009 with no stabs, 0.105 now; the floor fails with the stabs off, the

@@ -29,6 +29,7 @@ import {
     leadRoleAt,
     type PassMemory,
     type PassWindow,
+    type PitchedNote,
     PPQ,
     performPass,
     STYLES,
@@ -39,7 +40,7 @@ import { muteGain } from '@core/engine/mute-contract';
 import { playBassNote } from '@core/engine/synth-bass';
 import { playNote } from '@core/engine/synth-chords';
 import { playDrumSound } from '@core/engine/synth-drums';
-import { playSoloNote } from '@core/engine/synth-soloist';
+import { type LeadArticulation, playSoloNote } from '@core/engine/synth-soloist';
 import type { SemanticScore } from '@core/songbook/score-types';
 import type { EnsembleState } from '@core/types';
 import { countInBars } from './count-in';
@@ -304,6 +305,7 @@ export function playBandEvent(
             event.vibrato === true,
             event.tick,
             playedHumanize(state.groove.humanize, state.groove.lastSmartGenre),
+            leadArticulation(event, durationSeconds),
         );
         return;
     }
@@ -324,20 +326,75 @@ export function playBandEvent(
 }
 
 /**
+ * A lead note's fall-off, bend-and-release and slide-in (#2120) in seconds, for the soloist
+ * voice. The band writes them in semitones and ticks; their timing here follows the note's own
+ * tempo (its seconds over its ticks), so a fall or a release is the same share of a beat at any
+ * tempo. Undefined when the note has none of them.
+ */
+export function leadArticulation(
+    event: PitchedNote,
+    durationSeconds: number,
+): LeadArticulation | undefined {
+    if (
+        !(event.fall || event.release || event.slideIn) ||
+        !(durationSeconds > 0) ||
+        !(event.dur > 0)
+    ) {
+        return undefined;
+    }
+    const perTick = durationSeconds / event.dur;
+    const eighth = (PPQ / 2) * perTick;
+    return {
+        // why: a horn's fall-off takes the note's tail — an eighth's worth, so it reads as a
+        // gesture at any tempo, but never more than 40% of the note, so the pitch is heard
+        // before it drops (a dotted-quarter arrival keeps its first beat, an eighth its first
+        // 60%).
+        ...(event.fall
+            ? { fall: { semitones: event.fall, seconds: Math.min(eighth, durationSeconds * 0.4) } }
+            : {}),
+        // why: a guitarist holds the bend through the note's first half, then lets it down
+        // over an eighth (never more than 35% of the note), so the note rings on the fretted
+        // pitch for its last stretch. Only with the bend it releases.
+        ...(event.release && event.bendIn
+            ? {
+                  release: {
+                      at: durationSeconds * 0.5,
+                      seconds: Math.min(eighth, durationSeconds * 0.35),
+                  },
+              }
+            : {}),
+        // The slide's length is the band's (a thirty-second or a sixteenth, by how far it
+        // moves), at most half the note.
+        ...(event.slideIn
+            ? {
+                  slide: {
+                      semitones: event.slideIn.from,
+                      seconds: Math.min(event.slideIn.ticks * perTick, durationSeconds * 0.5),
+                  },
+              }
+            : {}),
+    };
+}
+
+/**
  * The lead notes that follow the one before without a gap — slurred, not re-tongued or
- * re-picked. A bent or scooped note is always attacked: the bend is its articulation.
+ * re-picked. A bent, scooped or slid note is always attacked: the bend or slide is its
+ * articulation. So is a note after one that fell or let a bend down (#2120): the slur would
+ * glide from the written pitch, where the note before no longer is.
  */
 export function legatoLeads(events: BandEvent[]): Set<BandEvent> {
     const out = new Set<BandEvent>();
     let previousEnd = Number.NEGATIVE_INFINITY;
+    let previousMoved = false;
     for (const e of events) {
         if (e.lane !== 'lead') {
             continue;
         }
-        if (!e.bendIn && Math.abs(e.tick - previousEnd) < 10) {
+        if (!e.bendIn && !e.slideIn && !previousMoved && Math.abs(e.tick - previousEnd) < 10) {
             out.add(e);
         }
         previousEnd = e.tick + e.dur;
+        previousMoved = Boolean(e.fall || e.release);
     }
     return out;
 }

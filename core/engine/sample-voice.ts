@@ -314,6 +314,10 @@ export function pickRoundRobin<T>(
  * Anchoring `releaseStart` at >= the attack end keeps a very short note from
  * inverting the ramp order. Returns `releaseStart` so callers can derive their
  * own natural-end/stop time.
+ *
+ * `taperFrom` (a fall-off, #2120): the hold ends there instead, the level sinking in a straight
+ * line to `peak · FALL_TAPER` at `releaseStart`, and the release fades from that. The caller
+ * passes it only when it lies between the attack's end and `releaseStart`.
  */
 function scheduleEnvelope(
     gain: GainNode,
@@ -322,10 +326,17 @@ function scheduleEnvelope(
     attack: number,
     hold: number,
     release: number,
+    taperFrom: number | null = null,
 ): number {
     const releaseStart = Math.max(startTime + attack, startTime + hold);
     gain.gain.setValueAtTime(0, startTime);
     gain.gain.linearRampToValueAtTime(peak, startTime + attack);
+    if (taperFrom !== null) {
+        gain.gain.setValueAtTime(peak, taperFrom);
+        gain.gain.linearRampToValueAtTime(peak * FALL_TAPER, releaseStart);
+        gain.gain.linearRampToValueAtTime(0, releaseStart + release);
+        return releaseStart;
+    }
     gain.gain.setValueAtTime(peak, releaseStart);
     gain.gain.linearRampToValueAtTime(0, releaseStart + release);
     return releaseStart;
@@ -504,6 +515,74 @@ export interface SampleBend {
      * a slow scoop. #855.
      */
     inSeconds?: number;
+    /**
+     * Bend-and-release (#2120): starting `at` seconds into the note, the pitch comes back down
+     * to where the bend-in started (`fromSemitones`) over `seconds`. Only with a bend-in.
+     */
+    release?: PitchRelease;
+    /** Fall-off (#2120): the pitch drops `semitones` over the note's last `seconds`. */
+    fall?: PitchFall;
+}
+
+/** A bend let back down (#2120): when it starts, in seconds into the note, and how long it takes. */
+export interface PitchRelease {
+    readonly at: number;
+    readonly seconds: number;
+}
+
+/** A fall-off (#2120): how far the pitch drops, in semitones, over the note's last `seconds`. */
+export interface PitchFall {
+    readonly semitones: number;
+    readonly seconds: number;
+}
+
+/**
+ * The level a falling note sinks to by the end of its fall (#2120), as a share of its peak
+ * (≈ −8 dB): a horn's fall-off is the breath going out of the note as the pitch drops, so the
+ * level goes with it rather than the note ending loud and low.
+ */
+export const FALL_TAPER = 0.4;
+
+/** The shortest pitch move worth scheduling (s): anything shorter is a click, not a gesture. */
+const MIN_PITCH_MOVE = 0.005;
+
+/**
+ * Where a lead note's later pitch moves sit (#2120), shared by the synth and sampled voices so
+ * both render the same shape. `after` is when the attack's own pitch move (a bend-in, a slide,
+ * a slur) has landed, `end` the end of the note's written length. The release starts no earlier
+ * than `after` and ends by `end`; the fall takes the note's last `fall.seconds` but starts no
+ * earlier than the release's end. A move whose window is shorter than `MIN_PITCH_MOVE`, or
+ * whose numbers are not finite and positive, is left out (null), so a note too short for its
+ * articulation plays without it and no NaN or backwards ramp reaches an `AudioParam`.
+ */
+export function articulationWindows(
+    noteStart: number,
+    after: number,
+    end: number,
+    release: PitchRelease | undefined,
+    fall: PitchFall | undefined,
+): {
+    release: { start: number; end: number } | null;
+    fall: { start: number; end: number } | null;
+} {
+    let cursor = after;
+    let releaseWindow: { start: number; end: number } | null = null;
+    if (release && Number.isFinite(release.at) && release.seconds > 0) {
+        const start = Math.max(cursor, noteStart + release.at);
+        const stop = Math.min(start + release.seconds, end);
+        if (stop - start >= MIN_PITCH_MOVE) {
+            releaseWindow = { start, end: stop };
+            cursor = stop;
+        }
+    }
+    let fallWindow: { start: number; end: number } | null = null;
+    if (fall && fall.semitones > 0 && fall.seconds > 0 && Number.isFinite(fall.semitones)) {
+        const start = Math.max(cursor, end - fall.seconds);
+        if (end - start >= MIN_PITCH_MOVE) {
+            fallWindow = { start, end };
+        }
+    }
+    return { release: releaseWindow, fall: fallWindow };
 }
 
 /**
@@ -512,8 +591,9 @@ export interface SampleBend {
  * *exponentially* between ratios because exponential-in-ratio is linear-in-pitch
  * (a musically even glide). All ratios are positive, so the exponential ramp is
  * always legal. Establishes the param's base value itself, so the caller skips
- * its own `setValueAtTime(baseRate)` when a bend is present. Returns nothing —
- * it only writes automation; the LFO vibrato sums on top.
+ * its own `setValueAtTime(baseRate)` when a bend is present. It only writes
+ * automation; the LFO vibrato sums on top. Returns when a fall-off starts (#2120),
+ * so the envelope can sink with it, or null when the note doesn't fall.
  */
 function scheduleSampleBend(
     rate: AudioParam,
@@ -521,7 +601,7 @@ function scheduleSampleBend(
     bend: SampleBend,
     startTime: number,
     hold: number,
-): void {
+): number | null {
     const ratioAt = (semis: number) => baseRate * 2 ** (semis / 12);
     const dur = Math.max(hold, 0);
 
@@ -541,6 +621,34 @@ function scheduleSampleBend(
     } else {
         rate.setValueAtTime(baseRate, startTime);
     }
+    if (!bend.release && !bend.fall) {
+        return null;
+    }
+    // The later moves (#2120): each anchored with a `setValueAtTime` at its start, so it ramps
+    // from there rather than from the previous event, and each ramp runs between two positive
+    // ratios (exponential: an even glide in pitch).
+    const windows = articulationWindows(
+        startTime,
+        from !== 0 ? bendInEnd : startTime,
+        startTime + dur,
+        from !== 0 ? bend.release : undefined,
+        bend.fall,
+    );
+    let sitting = baseRate;
+    if (windows.release) {
+        rate.setValueAtTime(baseRate, windows.release.start);
+        rate.exponentialRampToValueAtTime(ratioAt(from), windows.release.end);
+        sitting = ratioAt(from);
+    }
+    if (windows.fall && bend.fall) {
+        rate.setValueAtTime(sitting, windows.fall.start);
+        rate.exponentialRampToValueAtTime(
+            sitting * 2 ** (-bend.fall.semitones / 12),
+            windows.fall.end,
+        );
+        return windows.fall.start;
+    }
+    return null;
 }
 
 /**
@@ -597,14 +705,30 @@ export function playSampledNote(
         // A bend writes the full playbackRate timeline itself (incl. the base
         // anchor); without one we just hold the base. A vibrato LFO, if present,
         // sums on top of whichever the bend leaves on the param.
-        if (bend) {
-            scheduleSampleBend(source.playbackRate, baseRate, bend, startTime, hold);
-        } else {
+        const fallFrom = bend
+            ? scheduleSampleBend(source.playbackRate, baseRate, bend, startTime, hold)
+            : null;
+        if (!bend) {
             source.playbackRate.setValueAtTime(baseRate, startTime);
         }
 
         const gain = audio.createGain();
-        const releaseStart = scheduleEnvelope(gain, startTime, peak, attack, hold, release);
+        // A fall-off sinks the level with the pitch (#2120), from where the fall starts, when
+        // that is inside the hold (the attack has peaked, the release not begun).
+        const holdEnd = Math.max(startTime + attack, startTime + hold);
+        const taperFrom =
+            fallFrom !== null && fallFrom >= startTime + attack && fallFrom < holdEnd
+                ? fallFrom
+                : null;
+        const releaseStart = scheduleEnvelope(
+            gain,
+            startTime,
+            peak,
+            attack,
+            hold,
+            release,
+            taperFrom,
+        );
 
         // Every source of this note and the fade it plays through. One of each unless the
         // note outlasts its recording on a sustaining pack (see `SUSTAIN_CROSSFADE`).
@@ -653,6 +777,10 @@ export function playSampledNote(
             from: 0,
             attackEnd: startTime + attack,
             peak,
+            // A fall-off's taper (#2120): the hold ends at `taperFrom` and the level sinks to
+            // `releaseLevel` by the release. Without one the hold runs to the release at peak.
+            taperFrom: taperFrom ?? releaseStart,
+            releaseLevel: taperFrom === null ? peak : peak * FALL_TAPER,
             releaseStart,
             end: releaseStart + release,
         };
@@ -660,19 +788,26 @@ export function playSampledNote(
             const segment = envelope;
             // Reconstruct the scheduled value, not AudioParam.value (which is
             // the audio clock's value, wrong for lookahead and offline renders).
-            const ramping = at < segment.attackEnd || at > segment.releaseStart;
+            const ramping = at < segment.attackEnd || at > segment.taperFrom;
             const level =
                 at < segment.attackEnd
                     ? segment.from +
                       (segment.peak - segment.from) *
                           Math.max(0, (at - segment.start) / (segment.attackEnd - segment.start))
-                    : at <= segment.releaseStart
+                    : at <= segment.taperFrom
                       ? segment.peak
-                      : segment.peak *
-                        Math.max(
-                            0,
-                            1 - (at - segment.releaseStart) / (segment.end - segment.releaseStart),
-                        );
+                      : at <= segment.releaseStart
+                        ? segment.peak +
+                          (segment.releaseLevel - segment.peak) *
+                              ((at - segment.taperFrom) /
+                                  (segment.releaseStart - segment.taperFrom))
+                        : segment.releaseLevel *
+                          Math.max(
+                              0,
+                              1 -
+                                  (at - segment.releaseStart) /
+                                      (segment.end - segment.releaseStart),
+                          );
             gain.gain.cancelScheduledValues(at);
             // Preserve the truncated ramp before `at` as well as its value at
             // `at`; cancel+set alone would flatten the preceding ramp.

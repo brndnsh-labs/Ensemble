@@ -556,6 +556,9 @@ const discoLead = leadIdiom({
     scoop: 0.3,
     // why: a pop sax shakes every held note — a dotted eighth or longer — not just long ones.
     vibrato: 6,
+    // why: the disco horn line falls off its phrase ends now and then (the MFSB and Earth, Wind
+    // & Fire brass drop at the end of a hook), a little less often than funk's riffs (#2120).
+    fall: 0.3,
 });
 
 export const disco: Style = {
