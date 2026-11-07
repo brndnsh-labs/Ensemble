@@ -509,7 +509,8 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         approxSizeMB: 0.9,
         instruments: ['bass'],
         // An electric bass for the 8 styles the upright doesn't suit (#2001). One of two
-        // candidates Brandon picks between by ear; this one is the Auto bass. Recorded direct,
+        // candidates; Brandon's A/B found it harsh beside the fingered one, so it is
+        // manual-select and the fingered pack is the Auto bass. Recorded direct,
         // both pickups and every knob up, so its body sits at 200–400 Hz (the fingered
         // Washburn's sits near 100 Hz): it reaches a tablet speaker through its overtones,
         // the reason the issue exists. 12 mono zones from the third of four velocity layers
@@ -550,8 +551,9 @@ export const SOUND_PACKS: readonly SoundPack[] = [
         },
         approxSizeMB: 0.7,
         instruments: ['bass'],
-        // The other electric-bass candidate (#2001): a 5-string played with the fingers on
-        // the neck pickup, a warm, round tone. Manual-select. 12 mono zones from the third of
+        // The Auto bass for the 8 electric styles (#2001, Brandon's pick by ear over the Jazz
+        // Bass: it sits in the mix): a 5-string played with the fingers on the neck pickup, a
+        // warm, round tone. 12 mono zones from the third of
         // four layers (`mf`, round robin 1), MIDI 23–56 every 3 semitones, the low B string
         // included, each its full 5 s recording with a 0.4 s fade. The source's ~25 ms of
         // pre-note noise is cut so notes land on time. Filenames sit an octave above the
