@@ -1,0 +1,178 @@
+{
+    "schemaVersion": 2,
+    "id": "00000000-0000-4000-8000-000000002108",
+    "title": "Audition Fixture",
+    "createdAt": "2026-11-06T00:00:00.000Z",
+    "updatedAt": "2026-11-06T00:00:00.000Z",
+    "revision": 0,
+    "chart": {
+        "score": {
+            "notation": "name",
+            "key": "F",
+            "isMinor": false,
+            "meter": "4/4",
+            "grouping": null,
+            "sections": [
+                {
+                    "id": "df642f46-d81c-4f42-a54c-6460c463f5b3",
+                    "label": "A",
+                    "repeat": 1,
+                    "measures": [
+                        {
+                            "id": "c5f78c08-2581-41bf-8c49-2e3aa1f86550",
+                            "content": {
+                                "kind": "events",
+                                "events": [
+                                    {
+                                        "kind": "chord",
+                                        "symbol": "Fmaj7",
+                                        "duration": [4, 1]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "a00534b1-0a70-448d-bc6b-6795ce4bb7ab",
+                            "content": {
+                                "kind": "events",
+                                "events": [
+                                    {
+                                        "kind": "chord",
+                                        "symbol": "Dm7",
+                                        "duration": [4, 1]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "20c3b2b7-b82a-4284-b305-1fd73586076f",
+                            "content": {
+                                "kind": "events",
+                                "events": [
+                                    {
+                                        "kind": "chord",
+                                        "symbol": "Gm7",
+                                        "duration": [4, 1]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "483b73c7-7846-4e21-8974-55f337432de5",
+                            "content": {
+                                "kind": "events",
+                                "events": [
+                                    {
+                                        "kind": "chord",
+                                        "symbol": "C7",
+                                        "duration": [4, 1]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "id": "c0eac0db-ef2e-4114-9644-cb773f327980",
+                    "label": "B",
+                    "repeat": 1,
+                    "measures": [
+                        {
+                            "id": "42898cf8-4363-439e-b64a-17d871d86cd8",
+                            "content": {
+                                "kind": "events",
+                                "events": [
+                                    {
+                                        "kind": "chord",
+                                        "symbol": "Bbmaj7",
+                                        "duration": [4, 1]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "1c785cd1-8075-4878-af47-fd535b5f1b57",
+                            "content": {
+                                "kind": "events",
+                                "events": [
+                                    {
+                                        "kind": "chord",
+                                        "symbol": "Gm7",
+                                        "duration": [4, 1]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "f094195c-2ae2-4198-b9d4-0fe3381f157d",
+                            "content": {
+                                "kind": "events",
+                                "events": [
+                                    {
+                                        "kind": "chord",
+                                        "symbol": "C7",
+                                        "duration": [4, 1]
+                                    }
+                                ]
+                            }
+                        },
+                        {
+                            "id": "6d2a30db-524b-464b-b99e-6f68239de17d",
+                            "content": {
+                                "kind": "events",
+                                "events": [
+                                    {
+                                        "kind": "chord",
+                                        "symbol": "Fmaj7",
+                                        "duration": [4, 1]
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ]
+        },
+        "performance": {
+            "bpm": 90,
+            "seed": "",
+            "randomizeSeed": true
+        },
+        "band": {
+            "chords": {
+                "enabled": true,
+                "voice": "synth",
+                "autoSound": true,
+                "volume": 1,
+                "reverb": 0.3
+            },
+            "bass": {
+                "enabled": true,
+                "voice": "synth",
+                "autoSound": true,
+                "volume": 1,
+                "reverb": 0.05
+            },
+            "soloist": {
+                "enabled": false,
+                "voice": "synth",
+                "autoSound": true,
+                "mode": "monophonic",
+                "autoMode": true,
+                "volume": 1,
+                "reverb": 0.6
+            },
+            "groove": {
+                "enabled": true,
+                "voice": "synth",
+                "autoSound": true,
+                "volume": 1,
+                "reverb": 0.2,
+                "swing": 60,
+                "swingSub": "8th",
+                "humanize": 20,
+                "genre": "Jazz"
+            }
+        }
+    }
+}
