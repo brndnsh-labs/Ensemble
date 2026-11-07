@@ -71,6 +71,12 @@ export interface LeadBook extends LinePalette {
     /** Chance a solo bar plays the bar before it again (a riff) rather than moving on. */
     riff: number;
     /**
+     * Chance a figure (one of a phrase's line cells, or one of a head's) is played as a stab:
+     * its opening notes on one pitch, then the line moves (#2024). Decided per figure, so every
+     * bar that plays the figure stabs it alike: a horn riff, not a stutter. Unset: never.
+     */
+    repeat?: number;
+    /**
      * Chance a solo phrase plays the phrase before it again, whole, moved onto its chords — a
      * looped hook (hip hop's sampled lick) rather than a line that keeps moving. Unset: never.
      */
@@ -274,6 +280,11 @@ interface SlotPlan {
     /** A solo phrase that plays the last one again, whole (a looping book's hook). */
     loops: PhraseMemory | null;
     peak: boolean;
+    /**
+     * Beats (the meter's pulses) left silent at the end of the slot's last bar: the breath a
+     * head takes between its phrases (#2024). Unset: the phrase plays to the barline.
+     */
+    breath?: number;
 }
 
 /** The lead's home register: the instrument's, lifted by the book, kept inside its range. */
@@ -337,6 +348,13 @@ function headPlan(ctx: BarContext, book: LeadBook, slotStart: number): SlotPlan 
     // comes back (adapted to its chords), not only the rhythm.
     const opening = first.visit.firstBar;
     const restates = part !== 'contrast' && slotStart !== opening ? opening : null;
+    // why: a tune is sung, and a singer breathes where its phrases end (#2024): a beat at the
+    // end of a four-bar phrase that hands on to its answer (the half-cadence catch-breath), two
+    // at the end of an eight-bar period or a section (the full cadence, the real breath). The
+    // breath is taken out of the arrival's held note, so the head keeps every figure and stays
+    // a full tune — never the 2–6 bar gaps Brandon heard as dead air in the solos. A blues
+    // call already leaves its last bar to the band.
+    const closes = p % 2 === 1 || p === phrasesInVisit - 1;
     return {
         kinds,
         cells,
@@ -352,6 +370,7 @@ function headPlan(ctx: BarContext, book: LeadBook, slotStart: number): SlotPlan 
         restates,
         loops: null,
         peak: false,
+        breath: closes ? 2 : 1,
     };
 }
 
@@ -545,7 +564,26 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
     });
     // A note never outlasts the next one (the lead is one voice) or the slot.
     const lastBar = bars[Math.min(bars.length, slotStart + plan.kinds.length) - 1];
-    const slotEnd = lastBar.start + lastBar.meter.barTicks;
+    let slotEnd = lastBar.start + lastBar.meter.barTicks;
+    // The breath at a phrase end (`SlotPlan.breath`): the last bar's closing beats are silent.
+    // A bar of two pulses (6/8) breathes on its last one at most, so the arrival still sounds.
+    // Not the last bar of a performance that ends, which holds its final note, nor a bar whose
+    // notes all fall inside the breath (the phrase keeps its arrival).
+    const pulses = lastBar.meter.pulses;
+    const breathe = Math.min(plan.breath ?? 0, Math.max(1, Math.floor(pulses.length / 2)));
+    const last = plan.kinds.length - 1;
+    if (
+        breathe > 0 &&
+        slotStart + last === lastBar.index &&
+        plan.kinds[last] !== 'rest' &&
+        (ctx.looping || lastBar.index !== bars.length - 1)
+    ) {
+        const cut = lastBar.start + pulses[pulses.length - breathe];
+        if (onsets.some((o) => o.tick >= lastBar.start && o.tick < cut)) {
+            onsets.splice(0, onsets.length, ...onsets.filter((o) => o.tick < cut));
+            slotEnd = cut;
+        }
+    }
     for (let i = 0; i < onsets.length; i++) {
         const limit = onsets[i + 1]?.tick ?? slotEnd;
         onsets[i].dur = Math.max(STEP / 2, Math.min(onsets[i].dur, limit - onsets[i].tick));
@@ -1219,6 +1257,81 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
     return { onsets, pitches: sung, plan };
 }
 
+/**
+ * The most notes a stab says on its one pitch before the line moves on. why: four is a horn
+ * riff's punch ("bap-bap-bap-bap", then the turn); more is one note hammered.
+ */
+const STAB_NOTES = 4;
+
+/**
+ * The figures a phrase stabs (`LeadBook.repeat`): each of `cells`, in order, by the book's
+ * chance. Drawn once per figure, never per note or per bar (a per-step coin is arrhythmic).
+ */
+function stabCells(rng: Rng, book: LeadBook, cells: readonly (string | null)[]): Set<string> {
+    const out = new Set<string>();
+    for (const cell of new Set(cells)) {
+        if (cell !== null && rng.chance(book.repeat ?? 0)) {
+            out.add(cell);
+        }
+    }
+    return out;
+}
+
+/**
+ * Repeated notes as a rhythmic figure (#2024): in each line bar playing a stabbed figure, the
+ * bar's opening notes say its first pitch again — a funk horn's "bap-bap-bap" before the run,
+ * a ska stab on the upbeats, a one-note hip hop hook — and then the line moves on to where it
+ * was going. The repeat holds a chord tone (the first note must be one, so every beat it falls
+ * on stays on the harmony), stops at a chord change or any target (an arrival keeps the pitch
+ * the line chose), and always leaves the bar's last note to move: the figure goes somewhere.
+ * In place on `pitches`; applied last, after a riff or a restatement has copied its notes, so
+ * a riff bar stabs exactly as the bar it repeats.
+ */
+function stabFigures(
+    voiced: Voiced,
+    stabbing: ReadonlySet<string>,
+    targets: readonly boolean[],
+): void {
+    const { onsets, pitches, plan } = voiced;
+    if (!stabbing.size) {
+        return;
+    }
+    plan.kinds.forEach((kind, k) => {
+        const cell = plan.cells[k];
+        // A developed motif's bar already says the last phrase's opening, stab and all: its
+        // shape is the motif's, not this phrase's.
+        const developed = plan.develops !== null && k === plan.developsBar;
+        if (kind !== 'line' || !cell || !stabbing.has(cell) || developed) {
+            return;
+        }
+        const here = onsets.map((o, i) => (o.bar === k ? i : -1)).filter((i) => i >= 0);
+        const first = here[0];
+        if (first === undefined || here.length < 3) {
+            return;
+        }
+        const pedal = pitches[first];
+        if (!chordPcs(onsets[first].chord).includes(mod12(pedal))) {
+            return;
+        }
+        // why: the stab is the figure's first half, the line its second — a figure of four says
+        // two on one pitch and moves through two; one of eight punches four, then runs.
+        const length = Math.min(STAB_NOTES, Math.max(2, Math.floor(here.length / 2)));
+        for (let n = 1; n < length; n++) {
+            const i = here[n];
+            const before = onsets[i - 1];
+            if (
+                onsets[i].change ||
+                targets[i] ||
+                onsets[i].dur > STEP * 4 ||
+                onsets[i].tick - (before.tick + before.dur) >= STEP * 4
+            ) {
+                break;
+            }
+            pitches[i] = pedal;
+        }
+    });
+}
+
 /** A head phrase, voiced — the restatement of an opening needs the opening's own notes. */
 function voiceHead(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
     const plan = headPlan(ctx, book, slotStart);
@@ -1262,7 +1375,11 @@ function voiceHead(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
         lineRng(ctx, { kind: 'head' }, slotStart),
         carried,
     );
-    return { onsets, pitches, plan };
+    const voiced = { onsets, pitches, plan };
+    // Keyed on the section, as the tune is: a stabbed figure stabs every time the head plays it.
+    const stabRng = ctx.rng(`${headKey(ctx.timeline.bars[slotStart])}:stab`, 'song');
+    stabFigures(voiced, stabCells(stabRng, book, book.head.cells), targetsOf(onsets));
+    return voiced;
 }
 
 function voiceSolo(
@@ -1314,7 +1431,14 @@ function voiceSolo(
         const base = pitches[opening[0]];
         opening.forEach((i, n) => {
             if (n > 0 && n < (plan.develops as Motif).intervals.length + 1) {
-                const want = base + (plan.develops as Motif).intervals[n - 1];
+                const { intervals } = plan.develops as Motif;
+                const want = base + intervals[n - 1];
+                // A stabbed motif's repeated note is said again on its one pitch: the stab is
+                // what the motif is (`stabFigures`), and `adapt` would step off the note before.
+                if (intervals[n - 1] === (n > 1 ? intervals[n - 2] : 0) && !onsets[i].change) {
+                    pitches[i] = pitches[i - 1];
+                    return;
+                }
                 pitches[i] = adapt(
                     want,
                     onsets[i].chord,
@@ -1350,7 +1474,11 @@ function voiceSolo(
             }
         });
     });
-    return { onsets, pitches, plan };
+    const voiced = { onsets, pitches, plan };
+    const stabRng = ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:stab`, 'song');
+    const lines = plan.cells.filter((_, k) => plan.kinds[k] === 'line');
+    stabFigures(voiced, stabCells(stabRng, book, lines), targets);
+    return voiced;
 }
 
 /**

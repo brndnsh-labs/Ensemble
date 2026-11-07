@@ -102,6 +102,10 @@ export const country = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 20 bars before (phrase into phrase),
+                // 3.75 after.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the picker's note to the picker"],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],

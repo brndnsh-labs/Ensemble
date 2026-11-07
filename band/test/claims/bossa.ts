@@ -27,6 +27,10 @@ export const bossa = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 19.88 bars before (phrase into phrase),
+                // 3.75 after.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'a Jobim song form: the tune fills it'],
                 ['leadNotesPerBar', 2, 4, 'a lyrical tune: two to four notes a bar, long ones'],

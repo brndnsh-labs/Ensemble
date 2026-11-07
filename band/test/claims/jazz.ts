@@ -466,6 +466,10 @@ export const jazz = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 15.63 bars before (phrase into phrase),
+                // 3.75 after.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the head is a tune: it fills the form'],
@@ -493,6 +497,8 @@ export const jazz = defineClaims({
             // head held a chord apiece, and on 24b7047f, its first sung cut. A claim marked
             // "new" fails on at least one of them, as noted; the rest are guards that held then.
             claims: [
+                // The sung guide-tone line (#2111) already breathes inside eight bars (measured 7.75).
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 // The line chooses only guide tones at the changes. The misses are the pop
                 // chart's triads, whose 7th (the line's other guide tone) this metric doesn't
                 // count. 0.961 (0.967; 0.935).

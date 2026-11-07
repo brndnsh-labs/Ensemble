@@ -221,6 +221,10 @@ export const neosoul = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 16.56 bars before (phrase into phrase),
+                // 3.75 after.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],
                 ['leadNotesPerBar', 2, 4.5, 'a vocal line, not a run'],

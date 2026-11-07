@@ -528,6 +528,9 @@ const hipHopLead = leadIdiom({
     // A loop repeats (0.7): most bars play the bar before them again, adapted to the chord —
     // the hook developing slowly, the way a producer lets a sample run.
     riff: 0.7,
+    // why: a sampled hook is often one note said in rhythm and then a turn (the one-note horn
+    // or Rhodes stab a producer loops); the loop (`riff`, `loop`) brings the figure round.
+    repeat: 0.35,
     // The sample sits over the Rhodes, a minor 3rd up.
     register: 3,
     // A sampled hook comes round: half the solo phrases play the last one again, whole.

@@ -289,7 +289,16 @@ expression devices take turns rather than stack; one peak note per cycle.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
   lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
   any barline can resume it. Most slots leave room: a phrase plays two or three bars and
-  breathes, or plays a call and an answer with a gap between.
+  breathes, or plays a call and an answer with a gap between. A head breathes too (#2024): the
+  last beat of a four-bar phrase is silent, and the last two of an eight-bar period or a
+  section, taken out of the arrival's held note (`SlotPlan.breath`), so the tune keeps every
+  figure. Claim, every style's head: `leadLongestRun`, the longest stretch without a beat of
+  silence, ≤ 8 bars.
+- **Repeated notes as riffs** (#2024, `LeadBook.repeat`: funk, ska-punk, hip hop, disco). A
+  figure is stabbed or not once per phrase (a head's once per section), never per note: in each
+  bar playing it, the first half of its notes say the first pitch (a chord tone) again, up to
+  four, stopping at a change or a target, and the rest of the line moves on. A riff or a
+  developed motif carries its stab with it. Claim: `leadRepeatedNotes` 0.08–0.2, head and solo.
 - **Rhythm before pitch.** A phrase's rhythm is built from the style's rhythm vocabulary (cells
   on the sixteenth grid: bebop eighth-note lines, a blues call, funk stabs), and its last note
   is a long one: an arrival. The style's cells are its dialect, as the comp's cells are.

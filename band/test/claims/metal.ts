@@ -434,10 +434,18 @@ export const metal = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 20 bars before (phrase into phrase),
+                // 3.75 after.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['leadLongBreath', 0, 0.02, 'the melody never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the twin-guitar melody fills the form'],
                 ['leadNotesPerBar', 3.5, 7, "a melody in the riff's gallop"],
-                ['leadInnerSpace', 0, 0.1, 'the gallop fills the bar'],
+                // Measured 0.020 before the head breathed at its phrase ends (#2024), 0.103 after:
+                // the beat or two of breath each phrase end takes is the whole rise. The ceiling
+                // moves from 0.1 to 0.15 for that breath alone; a gallop with holes in it would
+                // read far above it.
+                ['leadInnerSpace', 0, 0.15, 'the gallop fills the bar, but for its breaths'],
                 ['leadShortShare', 0.55, 0.9, 'eighths and sixteenths, a held note to land'],
                 ['leadChordToneOnBeats', 0.8, 1, 'the melody sits on the chord on the beats'],
                 ['leadChangeRootFifth', 0.4, 0.75, 'roots and 5ths, like the power chords'],

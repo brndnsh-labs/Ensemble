@@ -1841,6 +1841,35 @@ export const METRICS = {
         return ratio(hit, n);
     },
     /**
+     * The longest the lead plays without a breath — no silence of a beat or more — in bars (of
+     * the bar the run starts in), the most of any take. A head is sung: a run past eight bars is
+     * a tune with nowhere to inhale (#2024).
+     */
+    leadLongestRun: (takes) => {
+        let longest = 0;
+        for (const { timeline: t, events } of takes) {
+            let start = -1;
+            let end = -1;
+            const close = () => {
+                const bar = t.bars.find(
+                    (b) => b.start <= start && start < b.start + b.meter.barTicks,
+                );
+                if (bar) {
+                    longest = Math.max(longest, (end - start) / bar.meter.barTicks);
+                }
+            };
+            for (const note of leadNotes(events)) {
+                if (start < 0 || note.tick - end >= STEP * 4) {
+                    close();
+                    start = note.tick;
+                }
+                end = Math.max(end, note.tick + note.dur);
+            }
+            close();
+        }
+        return longest;
+    },
+    /**
      * Share of four-bar solo phrases that play a phrase again — the four bars before, or the
      * same four bars of the chorus before — with the same rhythm and the same intervals (moved
      * whole): a looped hook, not a line that keeps moving.

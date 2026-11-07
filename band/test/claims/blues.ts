@@ -91,6 +91,9 @@ export const blues = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
+                // its figures already leave room at each phrase end.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0.15, 0.4, 'a call, then a bar of room for the band to answer'],

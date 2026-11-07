@@ -509,6 +509,14 @@ export const skapunk = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says its first
+                // pitch for its first half, then moves. Measured 0.012 with no stabs, 0.094 now; the
+                // floor fails with the stabs off, the ceiling is one note hammered.
+                ['leadRepeatedNotes', 0.08, 0.2, 'stabs on one note with the skank, then the line'],
+                // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
+                // two after an eight-bar period. Measured 19.88 bars before (phrase into phrase),
+                // 3.75 after.
+                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the horn line is the song: it fills the form'],
                 ['leadNotesPerBar', 3, 5.5, 'a tongued, busy tune'],
@@ -526,6 +534,10 @@ export const skapunk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says its first
+                // pitch for its first half, then moves. Measured 0.020 with no stabs, 0.161 now; the
+                // floor fails with the stabs off, the ceiling is one note hammered.
+                ['leadRepeatedNotes', 0.08, 0.2, 'stabs on one note with the skank, then the line'],
                 // Measured 0.114; development off 0.024, #2012's bar fix reverted 0.103; always develops 0.39.
                 // Floor guards development off (0.024) only; this style barely sees the bar fix (0.103 vs 0.114), which blues, disco and rock guard.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
@@ -543,9 +555,12 @@ export const skapunk = defineClaims({
                 ['leadInnerSpace', 0.2, 0.45, 'staccato stabs leave space inside the bar'],
                 ['leadChordToneOnBeats', 0.72, 1, 'the beats sit on the chord'],
                 ['leadChangeRootFifth', 0.4, 0.75, 'changes mostly land on 5ths and roots'],
+                // Measured 0.481 before the stabs (#2024), 0.384 with them: a repeated note is a
+                // move but not a step, so the stabs' 0.16 of moves come partly out of the steps.
+                // The floor moves from 0.4 to 0.35 for that alone; leaps stay capped below.
                 [
                     'leadStepShare',
-                    0.4,
+                    0.35,
                     0.85,
                     "fanfare lines: steps and the pentatonic's minor thirds",
                 ],

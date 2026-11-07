@@ -583,6 +583,9 @@ const skaPunkLead = leadIdiom({
     enclosure: 0.05,
     // Riffs repeat (0.45): a horn hook is driven home bar after bar, the way the section plays it.
     riff: 0.45,
+    // why: a ska horn line stabs the upbeats on one note with the skank before it moves
+    // (the section's unison punch); decided per figure, so the stab recurs as the riff does.
+    repeat: 0.6,
     // Little room (0.15): at these tempos the space is inside the bar (the offbeat stabs), and
     // the band's urgency doesn't leave whole bars empty.
     space: 0.15,

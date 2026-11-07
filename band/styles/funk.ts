@@ -319,6 +319,9 @@ const funkLead = leadIdiom({
     chromatic: 0.25,
     enclosure: 0.05,
     riff: 0.5,
+    // why: a funk horn section punches one note before it moves (the JB's and Tower of Power
+    // "bap-bap-bap"); with the riff (0.5) carrying a stabbed figure on, it reads as a horn riff.
+    repeat: 0.45,
     space: 0.3,
     bends: { blue: 0, root: 0 },
     scoop: 0.2,
