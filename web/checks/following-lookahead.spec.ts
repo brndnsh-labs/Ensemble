@@ -591,6 +591,9 @@ test('the next-bar cue strengthens only in the last felt beat, not at the downbe
 /** One bar at 240bpm in 4/4, in ms. */
 const BAR_MS = 1000;
 
+/** The least a jump-ahead may fire after the barline bound (see the `why:` at its use). */
+const JUMP_FLOOR_MS = 100;
+
 test('the jump-ahead fires in the last felt beat (not the downbeat), and fires again on the next lap', async ({
     page,
 }) => {
@@ -689,11 +692,21 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     // stall, and a stalled CI worker once read 199 here for a jump that fired on time (#1463
     // follow-up). The ceiling can only be tightened by that lag, never broken, so it keeps the
     // paint.
+    //
+    // why: the floor is JUMP_FLOOR_MS (100), not 200. The barline bound still carries the paint's
+    // lag (CI read 198 on lap 1 for a jump that fired on time, #2126: the min of the two paints
+    // is only tight when one of them did not stall, and under load the engine's own bars stretch
+    // to 1.1-2.3s of wall clock, so `next paint - BAR_MS` stops bounding anything). The
+    // spec cannot read the engine's tick, so the floor is sized from the regression instead: a
+    // jump in the new bar's own render fires in the same task as the paint, so it reads 0-12ms
+    // however loaded the page is, while the on-time jump reads ~385ms minus the lag (lowest
+    // measured under 4-6 spinners with 4 workers: 232). 100 sits ~8x above the regression and
+    // tolerates ~285ms of paint lag.
     const lap1 = await nextJumpCallDelay();
     expect(
         lap1.sinceBarline,
         'the jump should not fire at (or near) the downbeat',
-    ).toBeGreaterThanOrEqual(200);
+    ).toBeGreaterThanOrEqual(JUMP_FLOOR_MS);
     expect(
         lap1.sincePaint,
         'the jump should fire within the SAME bar it is for',
@@ -703,7 +716,7 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     expect(
         lap2.sinceBarline,
         'the jump should fire again on lap 2, not stay spent after lap 1',
-    ).toBeGreaterThanOrEqual(200);
+    ).toBeGreaterThanOrEqual(JUMP_FLOOR_MS);
     expect(lap2.sincePaint).toBeLessThanOrEqual(900);
 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
