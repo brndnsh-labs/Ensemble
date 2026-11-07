@@ -1,0 +1,19 @@
+{
+    "id": "electric-bass-fingered",
+    "name": "Electric Bass (Fingered)",
+    "attribution": "Karoryfer Black And Blue Basses (darkblack: Washburn AB-95, fingered) by Drogomir Smolken — CC0 1.0 (public domain)",
+    "samples": [
+        { "key": "23", "rootMidi": 22.99, "url": "/packs/electric-bass-fingered/23.m4a" },
+        { "key": "26", "rootMidi": 25.98, "url": "/packs/electric-bass-fingered/26.m4a" },
+        { "key": "29", "rootMidi": 29.03, "url": "/packs/electric-bass-fingered/29.m4a" },
+        { "key": "32", "rootMidi": 31.98, "url": "/packs/electric-bass-fingered/32.m4a" },
+        { "key": "35", "rootMidi": 35.04, "url": "/packs/electric-bass-fingered/35.m4a" },
+        { "key": "38", "rootMidi": 37.99, "url": "/packs/electric-bass-fingered/38.m4a" },
+        { "key": "41", "rootMidi": 40.96, "url": "/packs/electric-bass-fingered/41.m4a" },
+        { "key": "44", "rootMidi": 44.02, "url": "/packs/electric-bass-fingered/44.m4a" },
+        { "key": "47", "rootMidi": 46.99, "url": "/packs/electric-bass-fingered/47.m4a" },
+        { "key": "50", "rootMidi": 49.95, "url": "/packs/electric-bass-fingered/50.m4a" },
+        { "key": "53", "rootMidi": 52.94, "url": "/packs/electric-bass-fingered/53.m4a" },
+        { "key": "56", "rootMidi": 55.91, "url": "/packs/electric-bass-fingered/56.m4a" }
+    ]
+}

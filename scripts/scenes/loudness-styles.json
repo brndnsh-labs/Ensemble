@@ -20,7 +20,7 @@
             },
             {
                 "module": "bass",
-                "voice": "synth"
+                "voice": "pack:electric-bass-fingered"
             },
             {
                 "module": "chords",
@@ -86,7 +86,7 @@
             },
             {
                 "module": "bass",
-                "voice": "synth"
+                "voice": "pack:electric-bass-fingered"
             },
             {
                 "module": "chords",
@@ -119,7 +119,7 @@
             },
             {
                 "module": "bass",
-                "voice": "synth"
+                "voice": "pack:electric-bass-fingered"
             },
             {
                 "module": "chords",
@@ -152,7 +152,7 @@
             },
             {
                 "module": "bass",
-                "voice": "synth"
+                "voice": "pack:electric-bass-fingered"
             },
             {
                 "module": "chords",
@@ -218,7 +218,7 @@
             },
             {
                 "module": "bass",
-                "voice": "synth"
+                "voice": "pack:electric-bass-fingered"
             },
             {
                 "module": "chords",
@@ -251,7 +251,7 @@
             },
             {
                 "module": "bass",
-                "voice": "synth"
+                "voice": "pack:electric-bass-fingered"
             },
             {
                 "module": "chords",
@@ -383,7 +383,7 @@
             },
             {
                 "module": "bass",
-                "voice": "synth"
+                "voice": "pack:electric-bass-fingered"
             },
             {
                 "module": "chords",
@@ -416,7 +416,7 @@
             },
             {
                 "module": "bass",
-                "voice": "synth"
+                "voice": "pack:electric-bass-fingered"
             },
             {
                 "module": "chords",

@@ -217,7 +217,8 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
     await expect(page.locator('.resolved-sound')).toContainText([
         'Acoustic Drum Kit',
-        'Built-in',
+        // Funk's bass is the fingered electric bass pack (#2001).
+        'Electric Bass (Fingered)',
         'Alto Sax',
     ]);
     await closeSounds(page);

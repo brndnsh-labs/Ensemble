@@ -1,0 +1,10 @@
+Electric Bass (Fingered) — an Ensemble sound pack (electric-bass-fingered)
+
+Made from:
+
+  Black And Blue Basses (darkblack, Washburn AB-95)
+  by Drogomir Smolken (Karoryfer Samples)
+  Source: https://github.com/sfzinstruments/karoryfer.black-and-blue-basses
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Changed for Ensemble: one velocity layer kept, trimmed, the pre-note noise cut, levelled, converted to AAC, retuned.
