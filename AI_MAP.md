@@ -12,13 +12,12 @@ This map provides a quick reference for AI agents to understand the responsibili
   rules start at `web/CLAUDE.md`. Since #1358 everything under `core/` below is the
   library that app compiles through the `@core/*` alias — there is no second UI host.
 - The v2 account API is a separate standalone Node service at `api/` (sibling of
-  `web/`, not a subdirectory) — see `api/README.md`. `node:sqlite`
-  schema/migrations as of #1187; WebAuthn registration/login ceremony modules (`src/auth/`) as
-  of #1188; the session model (`src/auth/session.ts`) and the entire HTTP layer on Hono
-  (`src/http/`, `src/server.ts`) as of #1189; passkey add/list/revoke and step-up
-  re-authentication, gated by the one `isFreshlyAuthenticated` predicate (`src/auth/fresh-auth.ts`),
-  as of #1190; single-use recovery codes and a restricted recovery-only session
-  (`src/auth/recovery.ts`, `src/auth/rate-limit.ts`) as of #1191. No client wiring yet.
+  `web/`, not a subdirectory) — see `api/README.md`: `node:sqlite` schema/migrations; WebAuthn
+  registration/login ceremony modules (`src/auth/`); the session model (`src/auth/session.ts`)
+  and the HTTP layer on Hono (`src/http/`, `src/server.ts`); passkey add/list/revoke and step-up
+  re-authentication, gated by the one `isFreshlyAuthenticated` predicate (`src/auth/fresh-auth.ts`);
+  single-use recovery codes and a restricted recovery-only session
+  (`src/auth/recovery.ts`, `src/auth/rate-limit.ts`).
 - If guidance conflicts, prefer live code/config first, then realign the docs so `CLAUDE.md` and `AI_MAP.md` stay reliable.
 
 ## Core Architecture
@@ -151,7 +150,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | `core/engine/master-limiter.worklet.js` | The limiter's `AudioWorkletProcessor` (plain JS, loaded as is by the browser and node renders): BS.1770 4× true-peak detection, look-ahead running minimum, release, moving-average attack. | `ensemble-master-limiter` |
 | `core/engine/audio-graph-utils.ts` | Leaf Web Audio graph helpers — imports nothing from the engine, so `synth-utils.ts` and `sample-voice.ts` can both use them without an import cycle. | `safeDisconnect`, `createSoftClipCurve`, `clampFreq` |
 | `core/engine/section-overrides.ts` | Per-section instrument-enabled overrides: whether a lane's bus is needed anywhere in the chart. | `isInstrumentEverActive` |
-| `core/engine/hash-utils.ts` | Canonical deterministic hash helpers. `scrambleHash` is stateless and seed-tuple-indexed — see `core/engine/CLAUDE.md` §27. | `scrambleHash`, `stringHash33`, `stringHash31` |
+| `core/engine/hash-utils.ts` | Canonical deterministic hash helpers. `scrambleHash` is stateless and seed-tuple-indexed — see `core/engine/CLAUDE.md` §27. | `scrambleHash` |
 | `core/engine/soloist-mode-policy.ts` | Canonical soloist phrasing-mode rules and voice limits. | `resolveSoloistMode`, `getSoloistVoiceLimit` |
 | `core/engine/audio-recovery.ts` | Context resumption and error handling. | `audioWatchdog` |
 | `core/engine/mute-contract.ts` | Import-free leaf owning what a note's `muted` field means — the bass's numeric palm-mute amount vs the chords lanes' boolean CC-only sentinel; audible ghosts carry reduced velocity with `muted: false`. Read the field through here, never with `!muted`. | `normalizeMuteAmount`, `muteGain` |
@@ -216,7 +215,7 @@ account sync. Per-surface ownership is the navigation table in `web/CLAUDE.md`.
 | `.github/CONTRIBUTING.md` | Contributor workflow and validation checklist. |
 | `.github/SECURITY.md` | Private vulnerability reporting guidance. |
 | `.github/CODE_OF_CONDUCT.md` | Community behavior standards. |
-| `tests/` | Vitest unit, integration, critique (`standards/`) and browser-mode suites. The app's Playwright suite is `web/checks/`. |
+| `tests/` | Vitest unit, integration and browser-mode suites; `standards/` holds the genre-canon guard, the security ledger and `CRITIQUE_GUIDELINES.md`. The band's critiques live in `band/test/`; the app's Playwright suite is `web/checks/`. |
 | `tests/oracle/` | The chord-symbol oracle (#1579): `chord-reference.ts` reads a chord quality from the `@tonaljs/chord` dictionary, `chord-clash.ts` lists the notes a symbol rules out, and `chord-oracle.test.ts` holds the band's chord table and every comp chord (the standards catalog, plus one bar of every quality in every style) to them. |
 | `CLAUDE.md` | Primary operational guide and architectural rules. |
 | `AGENTS.md` | Pointer to `CLAUDE.md` for AGENTS.md-aware tools. |

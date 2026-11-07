@@ -9,12 +9,12 @@
   change's *correctness* is knowable from code; only its side-effects need an eyeball.
   These land on the morning device-verify checklist (`/wrap-up`). Pairs with `burndown`.
 - **`verify-by-ear`** — the musical analogue: a musical-correctness change whose idiom
-  *is* captured by a critique test, so it builds + auto-merges on green, but its last
-  residual is a listen pass (ships with a 🎧 checklist: genre/setting to load, what
+  *is* captured by a critique test, so the test is its correctness gate; it still waits for
+  the pre-merge listen (§5's listening brake) and ships with a 🎧 checklist (genre/setting to load, what
   changed, old-vs-new to hear). Not `needs-ear` (reserved for genuinely-subjective work
   no critique test can assert). Pairs with `burndown`.
 - **`scout`** — provenance stamp on issues filed by a `/scout` sweep, so `/unblock`
   surfaces last night's finds freshest-first.
 - **`area:*`** — surface tags inferring the executor when `agent/*` is unset:
-  `area:soloist`, `area:bass`, `area:drums`, `area:chords`, `area:harmony`,
+  `area:soloist`, `area:bass`, `area:drums`, `area:chords`,
   `area:groove`, `area:synth`, `area:state`, `area:ui`, `area:infra`.

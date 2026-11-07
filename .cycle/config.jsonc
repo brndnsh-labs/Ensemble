@@ -12,7 +12,7 @@
   "backend": "github",
   // Corrects the github backend's safe default (`auto_merge: false`), which exists
   // because branch protection isn't guaranteed — see the-cycle's docs/BACKENDS.md.
-  // Ensemble genuinely has it: `main` requires the `checks` and `e2e-tests` contexts
+  // Ensemble genuinely has it: `main` requires the `checks`, `e2e-tests` and `v2-checks` contexts
   // and blocks force-pushes and deletions, so `gh pr merge --auto` really waits rather
   // than firing on the spot. Enabled on the repo 2026-08-07 alongside
   // `delete_branch_on_merge`, which is why `--delete-branch` is no longer needed.
@@ -94,8 +94,10 @@
       "npm run typecheck     # tsc over core/ and scripts/ (npm run typecheck:tests covers tests/)",
       "npm run lint          # Biome lint + format check",
       "npm test              # mutation check + Biome + docs lint + Vitest (node/happy-dom)",
-      "npm run test:browser  # Vitest browser-mode audio guards (real OfflineAudioContext, headless Chromium)",
-      "npm run build --prefix web && npm run test:e2e --prefix web   # the app's Playwright suite (laptop + webkit-phone) against the built export"
+      "npm run typecheck:tests  # tsc over tests/ (its own CI gate)",
+      "npm run knip          # unused files/exports/deps",
+      "npm run knip:prod      # exports only tests use (a gate, part of npm run ci)",
+      "npm run build --prefix web   # a change that reaches the app: build, then only the Playwright specs it touches (see below)"
     ]
   },
   "deps": {
@@ -119,12 +121,9 @@
     // main is server-protected, and unlike every other repo in this fleet that is
     // still literally true after the 2026-08-04 GitHub flip: Ensemble is PUBLIC, and
     // a Free org can protect a public repo's branches (it cannot protect a private
-    // one at all). Required status checks are the `checks` and `e2e-tests` contexts.
+    // one at all). Required status checks are the `checks`, `e2e-tests` and `v2-checks` contexts.
     // No minor-edits-direct carve-out.
     "minor_edits_direct": false
-  },
-  "commit": {
-    "coauthor": "Claude Opus 5 <noreply@anthropic.com>"
   },
   "deploy": {
     // Since the cutover (#1357) a release is an `ensemble-web` image tag. Test: build the

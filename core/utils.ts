@@ -144,8 +144,7 @@ export function getMidi(freq: number): number | null {
 // `core/sanitize.ts` — DOM-adjacent display concerns, main-thread only, moved
 // out in #1179 so nothing DOM-shaped can drift back into this DOM-free module.
 //
-// createPRNG lives in `core/engine/hash-utils.ts` beside its `stringHash33`
-// fold and the other determinism primitives (#1179).
+// The determinism primitive, `scrambleHash`, lives in `core/engine/hash-utils.ts` (#1179).
 
 // calculateTimingOffset (the gravity-era pocket formula: globalDrive / tightness /
 // per-instrument gravity) removed in #1063 — post-#714 its output was added to the

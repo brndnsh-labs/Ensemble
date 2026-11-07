@@ -15,6 +15,10 @@
    | A `band/test/**` claim or critique that *is* the deliverable | the **test-quality lens**, sharpened to the **five critique smells** below | — |
    | Anything else | the inline correctness pass alone | — |
 
+   **The listening brake (DOCTRINE §5) is a brake too, outside the list above:** a diff that
+   changes what you hear is a pre-merge stop for the listen — say so in the verdict — but it
+   does **not** pull in `/security-review`.
+
    ### The five critique smells (test-quality lens for `band/test/**`)
 
    Full treatment in `docs/guides/musical-engine-patterns.md` § Methodology; harness-shape traps
@@ -25,8 +29,8 @@
    (b) **Threshold below random baseline** — passes on worse-than-random output.
    (c) **Metric measures the wrong thing** — the name's claim isn't what the assertion counts.
    (d) **Report/assert mismatch** — the logged `Target:` is aspirational; only the assertion guards.
-   (e) **Harness silences the engine path** — hand-built `stepInfo` omits the flag the engine
-   branches on, so the lane under test never fires.
+   (e) **Harness silences the engine path** — the claim's take never reaches the lane it names,
+   so the lane under test never fires.
 
    ### Don't re-derive the nested CLAUDE.md files
 

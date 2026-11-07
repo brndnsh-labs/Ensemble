@@ -17,31 +17,38 @@ notes and restatements of Brandon's words — **starts with a bold harness marke
 - An unmarked machine comment found in the wild is a defect: flag it on the issue rather
   than treating it as Brandon's word.
 
-**`verify-on-device` and `verify-by-ear` are a third state between "auto-merge" and
-"hard stop."** Both cover work whose *correctness* is knowable from code/test, where
-only a real-world sensory glance remains — build + auto-merge it, then attach a
-lightweight residual check instead of gating the merge on it:
-- `verify-on-device` — a real-device visual glance (mobile safe-area/viewport/touch
-  target); lands on the morning device-verify checklist (`/wrap-up`).
-- `verify-by-ear` — a musical-correctness change whose idiom is captured by a critique
-  test; ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new) in which
-  **every line is a link**: `npm run --silent audition-link -- --base-url=<host>/ --prog="…"
-  --genre=… [--key --ts --bpm --int --on=soloist --off=chords]` opens the scenario
-  pre-set (an unsaved `#chart=` draft) behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
-  PR's 🎧 section **and** post them as a `**[claude]**` comment on the issue. The
-  test is the correctness gate, the listen is *confirmation* — a follow-up tweak if it
-  feels off, never a rollback (musical diffs are reversible).
+**The listening brake: a change that changes what you hear stops before merge**, the same as
+Track `synth`. Any band-engine or audio change that changes the sound (a style, player, feel,
+voice, pack, bus or master change) opens its PR **without queueing the merge**, goes to
+ensembletest (`/deploy-test`), and waits for Brandon's listen there — or, when Brandon has
+delegated that call (his delegation recorded on the issue per Provenance), for an independent
+Fable taste review (a fresh session, not the one that built it). A passing critique test never stands in for it. A change that leaves the sound as it
+was (a refactor, a test-only or docs diff) is not under it.
 
-**The ear gate is tiered by what the story's musical claim IS:**
+**`verify-on-device` is a third state between "auto-merge" and "hard stop."** It covers work
+whose *correctness* is knowable from code/test, where only a real-device visual glance remains
+(mobile safe-area/viewport/touch target) — build + auto-merge it, and it lands on the morning
+device-verify checklist (`/wrap-up`).
+
+**`verify-by-ear`** marks a musical-correctness change whose idiom is captured by a critique
+test: the test is the correctness gate, and the pre-merge listen above is the taste gate. It
+ships with a 🎧 listen checklist (genre/setting, what changed, old-vs-new) in which
+**every line is a link**: `npm run --silent audition-link -- --base-url=<host>/ --prog="…"
+--genre=… [--key --ts --bpm --int --on=soloist --off=chords]` opens the scenario
+pre-set (an unsaved `#chart=` draft) behind a ▶ Play overlay (`docs/guides/listening-gate-tools.md`). Put the links in the
+PR's 🎧 section **and** post them as a `**[claude]**` comment on the issue.
+
+**The ear gate is tiered by what the story's musical claim IS** — the tier picks the oracle the
+change needs before it goes to the listen:
 - **Tier 1 — structural/dynamics claims** (existence/parity across sinks, accent ordering
   like "The One outranks the pop", monotonic swell, register bounds): machine-provable —
   a critique test at the symbolic layer, plus rendered-audio evidence (`mix:verify`
-  intent → dispatch → PCM, #1351) when the claim must survive synthesis. →
+  intent → dispatch → PCM) when the claim must survive synthesis. →
   **`verify-by-ear`**.
 - **Tier 2 — idiom claims** ("reads as funk", "the comp breathes"): the critique test is
-  a statistical proxy, not proof. → **`verify-by-ear`**, backstopped by the recurring
-  post-merge listening audit (#534). A bad-gestalt miss ships, gets heard in the next
-  sweep, gets tuned forward — that trade is deliberate (static app; revert = redeploy).
+  a statistical proxy, not proof. → **`verify-by-ear`**. A bad-gestalt miss that gets past the
+  listen ships, gets heard in a later one, gets tuned forward — that trade is deliberate
+  (revert → PR, or release the previous `ensemble-web` tag).
 - **Tier 3 — taste/feel claims** ("feels alive", tempo push/drag, synth timbre): no
   honest oracle exists. → **`needs-ear` hard stop**, unchanged. `track:synth` is always
   tier 3.
@@ -77,5 +84,5 @@ instruction for a specific parked PR; ask directly before merging. `/cycle #<n> 
 is the canonical signal.
 
 **Auto-merge now means auto-deploy** (§6 is CD) — an auto-merged PR ships to prod within
-minutes. The pre-merge `status:needs-ear` stop is what keeps un-auditioned work from shipping,
+minutes. The pre-merge listening stop (`status:needs-ear` while it waits) is what keeps un-auditioned work from shipping,
 not a separate deploy gate.

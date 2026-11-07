@@ -29,6 +29,7 @@ The app is a Next.js static export in [`web/`](web/README.md) that compiles the 
 ```bash
 npm ci
 npm ci --prefix web
+npm ci --prefix api
 npm run build --prefix web
 ```
 

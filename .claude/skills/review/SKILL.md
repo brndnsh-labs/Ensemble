@@ -2,7 +2,7 @@
 name: review
 description: Independently review the current uncommitted Ensemble diff (or a named branch/PR) — correctness, plus whether it does what the issue asked — adding `/security-review` when it touches an always-brake surface (Track `synth` and genuinely-subjective musical work (no critique-test oracle for the idiom, the Needs-ear stop), destructive data ops (drops/rewrites persisted sessions, share-URL schema, preset data, or a state-slice migration that breaks saved state), the state contract (a `@direct-mutation` outside the sanctioned categories)). Reports findings with evidence; fixing them is the caller's job. Used by /cycle, or on its own for any diff.
 ---
-<!-- cycle:rendered template=skills/review.md.tmpl hash=cbe77198c63c — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/review.md.tmpl hash=2aaf2ca696b7 — managed by the-cycle; edit the template, not this file -->
 
 # /review — fresh eyes on a diff
 
@@ -49,6 +49,10 @@ the issue and the diff from scratch, and say that's what happened.
    | A `band/test/**` claim or critique that *is* the deliverable | the **test-quality lens**, sharpened to the **five critique smells** below | — |
    | Anything else | the inline correctness pass alone | — |
 
+   **The listening brake (DOCTRINE §5) is a brake too, outside the list above:** a diff that
+   changes what you hear is a pre-merge stop for the listen — say so in the verdict — but it
+   does **not** pull in `/security-review`.
+
    ### The five critique smells (test-quality lens for `band/test/**`)
 
    Full treatment in `docs/guides/musical-engine-patterns.md` § Methodology; harness-shape traps
@@ -59,8 +63,8 @@ the issue and the diff from scratch, and say that's what happened.
    (b) **Threshold below random baseline** — passes on worse-than-random output.
    (c) **Metric measures the wrong thing** — the name's claim isn't what the assertion counts.
    (d) **Report/assert mismatch** — the logged `Target:` is aspirational; only the assertion guards.
-   (e) **Harness silences the engine path** — hand-built `stepInfo` omits the flag the engine
-   branches on, so the lane under test never fires.
+   (e) **Harness silences the engine path** — the claim's take never reaches the lane it names,
+   so the lane under test never fires.
 
    ### Don't re-derive the nested CLAUDE.md files
 

@@ -1,8 +1,8 @@
 ---
 name: deploy-test
-description: Deploy Ensemble to the test environment — low ceremony, for previewing a branch or an uncommitted tree before it merges. Runs the deploy, verifies the right build landed, and lists what to check from what actually shipped. Usage `/deploy-test`.
+description: Deploy Ensemble to the test environment — low ceremony, for previewing a branch before it merges. Runs the deploy, verifies the right build landed, and lists what to check from what actually shipped. Usage `/deploy-test`.
 ---
-<!-- cycle:rendered template=skills/deploy-test.md.tmpl hash=8838d061dc85 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/deploy-test.md.tmpl hash=02e433403a7f — managed by the-cycle; edit the template, not this file -->
 
 # /deploy-test — put it on the test box
 
@@ -63,8 +63,9 @@ Edge ≠ 200 with a healthy container is Caddy→`docker04` routing or the firew
 (`firewall/304.fw` in homelab-maintenance). A release that fails its health wait leaves
 the previous tag running; `journalctl -t ensemble-release` on `docker04` has the reason.
 
-1. **Sanity:** `git status -sb` — say whether you're shipping a clean branch or a dirty tree (both
-   are fine here).
+1. **Sanity:** `git status -sb` — say whether you're shipping a clean branch or a dirty tree. Some
+   deploys ship only a pushed commit (the deploy notes above say so); then commit and push the
+   branch first.
 2. **Deploy:** `./scripts/deploy-test.sh`, streaming the output.
 3. **Verify the right build landed** — read back the served revision if the build stamps one;
    otherwise check what the deploy script reports. A "successful" deploy still serving the old

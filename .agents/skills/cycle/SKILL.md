@@ -2,7 +2,7 @@
 name: cycle
 description: Build and ship Ensemble work end to end — read the issue, build it, run the gates, review it at the depth its risk deserves, fix what review finds, and open the PR (queuing server-side auto-merge for a safe story). Stops only on a brake or a real judgment call. Usage `/cycle #<n>` · `/cycle next` · `/cycle --all` · `/cycle <plain-English idea>` · add `--deploy`.
 ---
-<!-- cycle:rendered template=skills/cycle.md.tmpl hash=41e45180fad4 — managed by the-cycle; edit the template, not this file -->
+<!-- cycle:rendered template=skills/cycle.md.tmpl hash=5b566161cff2 — managed by the-cycle; edit the template, not this file -->
 
 # /cycle — build and ship
 
@@ -65,7 +65,10 @@ pre-commit docs-lint hook blocks the commit without it.
 
 Read the issue's `track:*` label; it sets the loop's tail:
 - **musical** → DoD is the **critique test** (run it, read the Critique Report); reviewer
-  `music-theory-reviewer` (+ `state-discipline-reviewer` if state changed). Safe → auto-merge on green.
+  `music-theory-reviewer` (+ `state-discipline-reviewer` if state changed). A change that changes
+  what you hear ships like **synth** below (§5's listening brake: Brandon's listen on the test
+  build, or a Fable taste review he has delegated); one that leaves the sound as it was →
+  auto-merge on green.
 - **synth** → DoD is a **human listen on the deployed test build**; reviewer `synth-graph-reviewer`
   (graph hygiene only). Pick these up freely — the loop runs the same as any other Track right up
   to the Ship step. There, **open the PR but do NOT queue the merge** (no `gh pr merge --auto`),
