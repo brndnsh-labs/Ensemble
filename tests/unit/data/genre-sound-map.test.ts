@@ -181,14 +181,14 @@ describe('genre → sound map (#675)', () => {
 
     describe('bass lane — per-genre bass (#697, #2001)', () => {
         // Upright pizzicato for the acoustic combo; every other genre plays the
-        // electric Jazz Bass pack.
+        // fingered electric bass pack.
         const UPRIGHT_GENRES = ['Jazz', 'Blues', 'Bossa', 'Acoustic', 'Country'];
 
         it('maps every canonical genre to its decided bass voice (installed)', () => {
             for (const genre of GENRE_NAMES) {
                 const expected = UPRIGHT_GENRES.includes(genre)
                     ? 'pack:upright-bass'
-                    : 'pack:electric-bass-jazz';
+                    : 'pack:electric-bass-fingered';
                 expect(
                     autoVoiceForGenre(genre, 'bass', allInstalled),
                     `${genre} bass voice drifted from the locked table`,
