@@ -80,9 +80,24 @@ Each claim below was read at its source on 2026-11-07 (#2113):
 (its nearest, Greg Sullivan's Pianet T, is CC BY 3.0 and a different instrument); FreePats has
 none; nothing CC0 or permissive turned up elsewhere (the D6 libraries are commercial). GeneralUser
 GS holds only the 8 clavinet samples already shipped, and they are **loop-sustain** samples (0.35–
-0.74 s with SF2 loop points): played one-shot they stop mid-ring, about 20 dB under their attack.
-Tighter spacing would have to be derived (resampled neighbours, as `tom-mid` is) and a longer
-release rendered from the loop; neither is a new source.
+0.74 s with SF2 loop points, instrument `Clavinet_1`, loop mode 1): played one-shot they stopped
+mid-ring, about 20 dB under their attack. **Fixed in #2116 by rendering the loop out** (below).
+Tighter spacing would have to be derived (resampled neighbours, as `tom-mid` is); not done, it
+needs an ear.
+
+**The clavinet's loop, rendered out (#2116).** A re-render is reproducible from these parameters.
+Per zone, from the `shdr` sample (32 kHz mono, loop points relative to the sample start):
+attack = `[0, endLoop)`, then the loop `[startLoop, endLoop)` repeated to 2.2 s. The loops are
+sample-accurate (the wrap step `x[startLoop] − x[endLoop−1]` is below every zone's own largest
+sample step) and short, 1–16 ms, so the pitch holds (loop tail within ±4 cents of the root). From
+the loop start an exponential decay of `max(the sample's measured dB/s, 55 / (2.2 − loopStartTime))`
+(the samples' own decay is 8–26 dB/s, GeneralUser's volume envelope 10 dB/s; the render uses
+~30–37 dB/s so the note is gone by ~2 s), then a 120 ms raised-cosine fade. Level by static gain,
+no `loudnorm`: the RMS of each zone's first 0.5 s to one common target (their geometric mean), then
+one shared −5.2 dB trim so the loudest zone peaks at −1.5 dBFS. Encode: `-ar 44100 -ac 1 -c:a aac
+-b:a 96k`. The roots are unchanged (`originalPitch − correction/100`). Result: each file is 2.2 s,
+~27 KB; a note sits −29 to −39 dB under its peak at 1 s and −62 to −70 dB at 2 s, with no 10 ms
+RMS step over 3 dB after the attack.
 
 **Rejected — don't re-check:** Sonatina/SSO (CC-Sampling+, forbids serving samples standalone),
 Philharmonia (forbids as-is redistribution, MP3 only), Pianobook (EULA bars redistribution),
@@ -160,7 +175,7 @@ ffmpeg -nostdin -v error -y -i in.wav -t 6 \
   (`moov` sits after `mdat`; `scripts/node-webaudio.ts` says why), so decode each through ffmpeg
   to WAV and hand that to `decodeAudioData`, as the node render does. Measured 2026-11-07 at
   48 kHz: `grand` 47.6 MB, `electric-bass-jazz` 13.8 MB (12 × 6 s), `electric-bass-fingered`
-  11.5 MB (12 × 5 s), `upright-bass` 3.4 MB, `clavinet` 0.8 MB.
+  11.5 MB (12 × 5 s), `upright-bass` 3.4 MB, `clavinet` 0.8 MB (before the 2.2 s render-out; 3.4 MB after: 8 zones x 2.2 s x 48 kHz x 4 B).
 - **Zone spacing:** about every minor third for sustained instruments; plucked instruments get
   denser zones (every two semitones for nylon), because a plucked transient betrays pitch-shifting
   sooner than a sustained horn does.
