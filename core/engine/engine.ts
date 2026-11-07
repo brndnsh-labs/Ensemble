@@ -248,7 +248,8 @@ export function initAudio(
             // sextet feel. Hardcoded conditional for the prototype only —
             // the long-term plumbing (per-scene mix profile) lives in
             // `tmp/overnight-s2-design.md`.
-            const isJazz = groove.genreFeel === 'Jazz';
+            const eq = busEqFor(state);
+            let busShelf: BiquadFilterNode | null = null;
 
             if (m.name === 'chords') {
                 const lowShelf = playback.audio.createBiquadFilter();
@@ -256,7 +257,7 @@ export function initAudio(
                 lowShelf.frequency.setValueAtTime(350, playback.audio.currentTime);
                 // Jazz: extra -3 dB on top of the standard -2 dB so the chord
                 // bus doesn't fight the sextet's natural low-mid space.
-                lowShelf.gain.setValueAtTime(isJazz ? -5 : -2, playback.audio.currentTime);
+                lowShelf.gain.setValueAtTime(eq.chordsShelfDb, playback.audio.currentTime);
 
                 // Presence band (synth-audit Epic 0 S5): this used to be a
                 // -2 dB *cut* at 2.5 kHz, which scooped out exactly the band
@@ -281,6 +282,7 @@ export function initAudio(
                 panner.connect(masterGain);
 
                 busPanner = panner;
+                busShelf = lowShelf;
             } else if (m.name === 'bass') {
                 const sidechain = playback.audio.createGain();
                 sidechain.gain.setValueAtTime(1.0, playback.audio.currentTime);
@@ -290,14 +292,12 @@ export function initAudio(
                 // pick electric. Push the bus highpass up from 20 → 55 Hz and
                 // flatten the +2 dB low-shelf to -1 dB so the bass sits in
                 // the upper-bass register where a jazz bass actually lives.
-                if (isJazz) {
-                    busEQ.frequency.setValueAtTime(55, playback.audio.currentTime);
-                }
+                busEQ.frequency.setValueAtTime(eq.bassHighpassHz, playback.audio.currentTime);
 
                 const weight = playback.audio.createBiquadFilter();
                 weight.type = 'lowshelf';
                 weight.frequency.setValueAtTime(100, playback.audio.currentTime);
-                weight.gain.setValueAtTime(isJazz ? -1 : 2, playback.audio.currentTime);
+                weight.gain.setValueAtTime(eq.bassWeightDb, playback.audio.currentTime);
 
                 const scoop = playback.audio.createBiquadFilter();
                 scoop.type = 'peaking';
@@ -319,6 +319,7 @@ export function initAudio(
                 definition.connect(masterGain);
 
                 busSidechain = sidechain;
+                busShelf = weight;
             } else if (m.name === 'soloist') {
                 const presence = playback.audio.createBiquadFilter();
                 presence.type = 'peaking';
@@ -353,7 +354,7 @@ export function initAudio(
                 // kick's sub-bass content. Combined with the bass-bus changes
                 // above, brings jazz-ride sub+low closer to the Miles
                 // reference (47%). Non-jazz scenes keep 40 Hz.
-                drumsHP.frequency.setValueAtTime(isJazz ? 95 : 40, playback.audio.currentTime);
+                drumsHP.frequency.setValueAtTime(eq.drumsHighpassHz, playback.audio.currentTime);
 
                 // why (low-end declutter): a bell cut in the ~120 Hz mud band where
                 // tom fundamentals (~92-188 Hz) and the kick's body (~54-174 Hz)
@@ -409,6 +410,7 @@ export function initAudio(
                 gain: gainNode,
                 reverb: reverbGain,
                 eq: busEqEntry,
+                shelf: busShelf,
                 panner: busPanner,
                 sidechain: busSidechain,
             };
@@ -561,6 +563,7 @@ export function restoreGains(state: EnsembleState) {
     // genre while the runtime's dispatch subscriber is off (`load`), so no genre effect runs:
     // every rebuild restores the make-up for the style now set, as it restores the buses.
     syncMasterMakeup(state);
+    syncBusEq(state);
 }
 
 /**
@@ -675,4 +678,51 @@ export function syncMasterMakeup(state: EnsembleState): void {
     const t = playback.audio.currentTime;
     graph.master.makeup.gain.cancelScheduledValues(t);
     graph.master.makeup.gain.setTargetAtTime(makeupFor(state), t, 0.25);
+}
+
+/**
+ * The bus EQ values that follow the playing style (#2106). Jazz plays an upright bass and a
+ * softer kick, so its bus tone differs from every other style's: the chord bus's low shelf pulls
+ * back 3 dB more, the bass bus trades its +2 dB weight shelf for -1 dB and its 20 Hz highpass for
+ * 55 Hz, and the drum bus highpass rises from 40 to 95 Hz (the reasons are at the `initAudio`
+ * sites that apply them). Keyed on `groove.genreFeel`, the feel the band is playing.
+ */
+function busEqFor(state: EnsembleState): {
+    chordsShelfDb: number;
+    bassHighpassHz: number;
+    bassWeightDb: number;
+    drumsHighpassHz: number;
+} {
+    return state.groove.genreFeel === 'Jazz'
+        ? { chordsShelfDb: -5, bassHighpassHz: 55, bassWeightDb: -1, drumsHighpassHz: 95 }
+        : { chordsShelfDb: -2, bassHighpassHz: 20, bassWeightDb: 2, drumsHighpassHz: 40 };
+}
+
+/**
+ * Glide the style-dependent bus EQ to the feel now set (#2106): on a genre change and on every
+ * `restoreGains`. `initAudio` reads the feel once per AudioContext, so without this a session
+ * that switched genre kept the EQ of the one it started on. The same shape as
+ * `syncMasterMakeup`; a short time constant keeps a filter change a glide, not a step. No-op
+ * before the audio graph exists.
+ */
+export function syncBusEq(state: EnsembleState): void {
+    const { playback } = state;
+    const graph = playback.audioGraph;
+    if (!playback.audio || !graph) {
+        return;
+    }
+    const t = playback.audio.currentTime;
+    const eq = busEqFor(state);
+    const glide = (param: AudioParam, value: number) => {
+        param.cancelScheduledValues(t);
+        param.setTargetAtTime(value, t, 0.05);
+    };
+    if (graph.chords.shelf) {
+        glide(graph.chords.shelf.gain, eq.chordsShelfDb);
+    }
+    glide(graph.bass.eq.frequency, eq.bassHighpassHz);
+    if (graph.bass.shelf) {
+        glide(graph.bass.shelf.gain, eq.bassWeightDb);
+    }
+    glide(graph.drums.eq.frequency, eq.drumsHighpassHz);
 }

@@ -1,6 +1,7 @@
 import { autoVoiceForGenre } from '../data/genre-sound-map.js';
 import { SMART_GENRES } from '../data/smart-genres.js';
 import {
+    syncBusEq,
     syncBusReverbSend,
     syncBusVolume,
     syncMasterMakeup,
@@ -159,6 +160,11 @@ export function handleEffects(
             if (action.payload?.module === 'playback' && action.payload?.param === 'masterVolume') {
                 syncMasterVolume(stateMap);
             }
+            // #2106 — a playing band's genre change stages the feel (`pendingGenreFeel`) and
+            // `syncBand` commits it as this write, not as a second `SET_GENRE_FEEL`.
+            if (action.payload?.module === 'groove' && action.payload?.param === 'genreFeel') {
+                syncBusEq(stateMap);
+            }
             break;
         }
         case ACTIONS.SET_GENRE_FEEL: {
@@ -166,6 +172,9 @@ export function handleEffects(
             // band at the same loudness. No-op before the audio graph exists. A chart opening
             // sets its genre with the runtime's subscriber off; `restoreGains` covers that.
             syncMasterMakeup(stateMap);
+            // #2106 — so does the bus EQ. Stopped, the reducer has set the feel by now; playing, it
+            // only stages it and the runtime commits it as a `SET_PARAM` (below).
+            syncBusEq(stateMap);
             break;
         }
     }

@@ -271,6 +271,8 @@ export interface InstrumentBus {
     readonly reverb: GainNode;
     /** Bus EQ entry node (highpass by default; per-instrument tone shaping follows). */
     readonly eq: BiquadFilterNode;
+    /** The low shelf the playing style retunes (#2106): chords' low shelf, bass's weight shelf; `null` on the others. */
+    readonly shelf: BiquadFilterNode | null;
     /** Stereo panner — populated for chords only, `null` otherwise. */
     readonly panner: StereoPannerNode | null;
     /** Sidechain ducking gain node — populated for bass only, `null` otherwise. */

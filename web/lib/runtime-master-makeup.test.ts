@@ -31,7 +31,8 @@ function bus() {
     return {
         gain: { gain: param(), connect: vi.fn(), disconnect: vi.fn() },
         reverb: { gain: param(), connect: vi.fn(), disconnect: vi.fn() },
-        eq: { connect: vi.fn() },
+        eq: { connect: vi.fn(), frequency: param() },
+        shelf: null,
         panner: null,
         sidechain: null,
     };
