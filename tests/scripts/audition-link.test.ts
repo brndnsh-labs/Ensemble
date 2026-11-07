@@ -61,6 +61,23 @@ describe('buildAuditionLink', () => {
         const url = await buildAuditionLink(scene, base({ baseUrl: 'http://example.com/app' }));
         expect(url.startsWith('http://example.com/app/?autoplay=1#chart=')).toBe(true);
     });
+
+    it('self-checks a link built on a relative base, as the v2 checks build them', async () => {
+        const write = process.stdout.write;
+        let out = '';
+        process.stdout.write = ((chunk: string) => {
+            out += chunk;
+            return true;
+        }) as typeof process.stdout.write;
+        try {
+            expect(await runAuditionLink(['--prog=C7 | F7', '--genre=Blues', '--base-url=/'])).toBe(
+                0,
+            );
+        } finally {
+            process.stdout.write = write;
+        }
+        expect(out.trim().startsWith('/?autoplay=1#chart=')).toBe(true);
+    });
 });
 
 describe('ad-hoc audition links', () => {

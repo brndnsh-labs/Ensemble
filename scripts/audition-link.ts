@@ -406,7 +406,10 @@ async function checkAuditionLink(
     expected: ChartDocumentV2,
     args: CliArgs,
 ): Promise<string | null> {
-    const decoded = await decodeChartLink(new URL(url).hash);
+    // Slice the fragment by hand: a relative base (`--base-url=/`, as the v2 checks use) is not
+    // a URL `new URL` accepts.
+    const hashAt = url.indexOf('#');
+    const decoded = await decodeChartLink(hashAt === -1 ? '' : url.slice(hashAt));
     if (typeof decoded !== 'object') {
         return 'the link does not decode to a schema-2 chart';
     }
