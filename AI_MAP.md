@@ -178,6 +178,7 @@ The ground-up replacement for the generative engine, the default since 2026-09-2
 | :--- | :--- | :--- |
 | `core/data/smart-genres.ts` | High-level genre configurations + the genre-naming authority (canon name, feel, and the retired groove strategy key). A genre's feel is read off its entry, `SMART_GENRES[name].feel`. | `SMART_GENRES`, `GENRE_NAMES`, `SmartGenre` |
 | `core/data/sound-packs.ts` | Catalog of installable sample packs, read by v2's `lib/sounds.ts`. | `SOUND_PACKS`, `packsForInstrument` |
+| `core/data/sound-credits.ts` | The licences a pack may carry and the credit types the catalog fills (#2113); Settings → Sound credits and each pack's `CREDITS.txt` read the catalog's credit. | `SOUND_LICENSES`, `shortCredit` |
 | `core/data/genre-sound-map.ts` | Genre → instrument sound defaults consumed by Auto-follow mode (#675). | `GENRE_SOUND_MAP`, `autoVoiceForGenre` |
 
 ## UI (the v2 app)

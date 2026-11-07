@@ -1,0 +1,10 @@
+Nylon Guitar — an Ensemble sound pack (nylon-guitar)
+
+Made from:
+
+  FreePats Spanish Classical Guitar
+  by Roberto, for the FreePats project
+  Source: https://freepats.zenvoid.org/Guitar/acoustic-guitar.html
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Changed for Ensemble: trimmed, mixed to mono, converted to AAC.

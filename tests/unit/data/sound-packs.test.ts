@@ -8,11 +8,10 @@ import {
 } from '../../../core/data/sound-packs.js';
 
 describe('sound-packs catalog', () => {
-    it('every pack has a non-empty id, name, attribution, and ≥1 instrument', () => {
+    it('every pack has a non-empty id, name, and ≥1 instrument', () => {
         for (const pack of SOUND_PACKS) {
             expect(pack.id).toMatch(/\S/);
             expect(pack.name).toMatch(/\S/);
-            expect(pack.attribution).toMatch(/\S/);
             expect(pack.approxSizeMB).toBeGreaterThan(0);
             expect(pack.instruments.length).toBeGreaterThan(0);
         }

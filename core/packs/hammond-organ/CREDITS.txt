@@ -1,0 +1,10 @@
+Drawbar Organ — an Ensemble sound pack (hammond-organ)
+
+Made from:
+
+  FreePats Drawbar Organ Emulation
+  by Roberto, for the FreePats project
+  Source: https://freepats.zenvoid.org/Organ/electric-organ.html
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Changed for Ensemble: trimmed with a tail fade, levelled, converted to AAC.

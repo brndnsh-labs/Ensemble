@@ -10,7 +10,9 @@ import { type PackManifest, setPackAssetFetcher, withRevToken } from '@core/engi
 import type { ChartSettings } from '@core/songbook/types';
 import type { InstrumentModule, InstrumentVoice } from '@core/types';
 
-export { packsForInstrument };
+/** The lane's one-line credit for a pack (#2113); Settings → Sound credits shows the whole one. */
+export { shortCredit } from '@core/data/sound-credits';
+export { packsForInstrument, SOUND_PACKS };
 export const allSoundsSizeMB = SOUND_PACKS.reduce((total, pack) => total + pack.approxSizeMB, 0);
 
 // The packs a musician downloaded live here, and app-shell upgrades never touch it. The name

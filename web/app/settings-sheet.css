@@ -90,3 +90,31 @@
 .settings-group-note {
     margin: 4px 0 0;
 }
+
+/* Sound credits (#2113): a box like the fieldsets above, holding text and links, not choices. */
+.settings-group-title {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 700;
+}
+.sound-credits-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 8px 0 0;
+    padding: 0;
+    list-style: none;
+}
+.sound-credit {
+    font-size: 14px;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.sound-credit-line {
+    margin: 2px 0 0;
+}
+.sound-credit a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}

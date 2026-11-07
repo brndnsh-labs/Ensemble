@@ -1,0 +1,10 @@
+Acoustic Grand Piano — an Ensemble sound pack (grand)
+
+Made from:
+
+  Salamander Grand Piano V3
+  by Alexander Holm
+  Source: https://archive.org/details/SalamanderGrandPianoV3
+  Licence: CC BY 3.0 — https://creativecommons.org/licenses/by/3.0/
+
+Changed for Ensemble: trimmed, converted to AAC.

@@ -192,3 +192,41 @@ test('each palette repaints the page, combines with Day and Stage, and keeps acr
         (await openSettings(page)).getByRole('radio', { name: 'Warm', exact: true }),
     ).toBeChecked();
 });
+
+test('Sound credits list every pack on a fresh device, each licence linked to its deed', async ({
+    page,
+}) => {
+    // #2113: nothing is downloaded here, and every catalog pack is still credited.
+    await seedStarters(page);
+    const sheet = await openSettings(page);
+    const credits = sheet.getByRole('region', { name: 'Sound credits' });
+    await credits.scrollIntoViewIfNeeded();
+    await expect(credits).toBeVisible();
+
+    const rhodes = credits.getByRole('listitem').filter({ hasText: 'Electric Piano (Rhodes)' });
+    await expect(rhodes).toContainText('jRhodes3c by Jeff Learman');
+    await expect(rhodes).toContainText('Changed:');
+    const license = rhodes.getByRole('link', { name: 'CC BY-NC-SA 4.0' });
+    await expect(license).toHaveAttribute(
+        'href',
+        'https://creativecommons.org/licenses/by-nc-sa/4.0/',
+    );
+    await expect(license).toHaveAttribute('target', '_blank');
+    await expect(license).toHaveAttribute('rel', 'noopener noreferrer');
+    await expect(rhodes.getByRole('link', { name: 'Source: jRhodes3c' })).toHaveAttribute(
+        'href',
+        'https://github.com/sfzinstruments/jlearman.jRhodes3c',
+    );
+
+    const grand = credits.getByRole('listitem').filter({ hasText: 'Acoustic Grand Piano' });
+    await expect(grand.getByRole('link', { name: 'CC BY 3.0' })).toHaveAttribute(
+        'href',
+        'https://creativecommons.org/licenses/by/3.0/',
+    );
+    // The kit is built from two libraries, and both are credited.
+    const kit = credits.getByRole('listitem').filter({ hasText: 'Acoustic Drum Kit' });
+    await expect(kit.getByRole('link', { name: /^Source: / })).toHaveCount(2);
+
+    // It reads on a phone: nothing in the list runs past the sheet's edge.
+    expect(await credits.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(0);
+});

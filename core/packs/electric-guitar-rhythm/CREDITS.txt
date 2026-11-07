@@ -1,0 +1,10 @@
+Rhythm Electric (Crunch) — an Ensemble sound pack (electric-guitar-rhythm)
+
+Made from:
+
+  FSBS Electric Guitar Clean #1 (small)
+  by FreePats project
+  Source: https://freepats.zenvoid.org/ElectricGuitar/clean-electric-guitar.html
+  Licence: CC0 1.0 (public domain) — https://creativecommons.org/publicdomain/zero/1.0/
+
+Changed for Ensemble: trimmed with a tail fade, mixed to mono, converted to AAC, + overdrive and cabinet voicing.

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ChartDocument } from '../lib/runtime';
-import { allSoundsSizeMB, packsForInstrument } from '../lib/sounds';
+import { allSoundsSizeMB, packsForInstrument, shortCredit } from '../lib/sounds';
 import { type Lane, visibleLanes } from './band-lanes';
 import './band-players.css';
 import { useRangeCommit } from './use-range-commit';
@@ -164,7 +164,7 @@ export function PlayersTab({
                                     disabled={busy}
                                     onCommit={(value) => onReverb(lane, value)}
                                 />
-                                {pack?.attribution && <small>{pack.attribution}</small>}
+                                {pack && <small>{shortCredit(pack)}</small>}
                             </details>
                         </div>
                     );
