@@ -214,14 +214,16 @@ export const disco = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
-                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says its first
-                // pitch for its first half, then moves. Measured 0.006 with no stabs, 0.103 now; the
-                // floor fails with the stabs off, the ceiling is one note hammered.
+                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
+                // pitch for a run of its notes (on the eighths, never two sixteenths running), then moves. Measured
+                // 0.006 with no stabs, 0.108 now; the floor fails with the stabs off, the
+                // ceiling is one note hammered.
                 ['leadRepeatedNotes', 0.08, 0.2, 'the horn pumps one note, then lifts off it'],
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
                 // two after an eight-bar period. Measured 19.88 bars before (phrase into phrase),
-                // 3.75 after.
-                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
+                // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing.
+                ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
                 ['leadLongBreath', 0, 0.02, 'the hook never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the hook fills the form'],
                 ['leadNotesPerBar', 2.5, 5.5, 'a singable hook, not a run'],
@@ -237,9 +239,10 @@ export const disco = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
-                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says its first
-                // pitch for its first half, then moves. Measured 0.009 with no stabs, 0.113 now; the
-                // floor fails with the stabs off, the ceiling is one note hammered.
+                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
+                // pitch for a run of its notes (on the eighths, never two sixteenths running), then moves. Measured
+                // 0.009 with no stabs, 0.105 now; the floor fails with the stabs off, the
+                // ceiling is one note hammered.
                 ['leadRepeatedNotes', 0.08, 0.2, 'the horn pumps one note, then lifts off it'],
                 // Measured 0.090; development off 0.034, #2012's bar fix reverted 0.029; always develops 0.33.
                 // Floor sits between the bar fix reverted (0.029) and shipped: it guards #2012's bar fix and development off (0.034).

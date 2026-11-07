@@ -319,9 +319,12 @@ const funkLead = leadIdiom({
     chromatic: 0.25,
     enclosure: 0.05,
     riff: 0.5,
-    // why: a funk horn section punches one note before it moves (the JB's and Tower of Power
-    // "bap-bap-bap"); with the riff (0.5) carrying a stabbed figure on, it reads as a horn riff.
-    repeat: 0.45,
+    // why: a funk horn section punches one note in the figure's own sixteenths before it moves
+    // (Tower of Power's push: beat 1 and its "a", then the and of 2), two to four notes, and the
+    // riff (0.5) carries the stabbed figure on bar to bar. A solo figure stabs at 0.45; the head
+    // at 0.2, since its four-note figures say a stab in half their moves (a third of its bars
+    // stabbed would be the tune hammering, not singing).
+    repeat: { chance: 0.45, head: 0.2, on: 'any' },
     space: 0.3,
     bends: { blue: 0, root: 0 },
     scoop: 0.2,

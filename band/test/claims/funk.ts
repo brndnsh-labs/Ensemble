@@ -42,9 +42,10 @@ export const funk = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
-                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says its first
-                // pitch for its first half, then moves. Measured 0.006 with no stabs, 0.131 now; the
-                // floor fails with the stabs off, the ceiling is one note hammered.
+                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
+                // pitch for a run of its notes (sixteenths: beat 1 and its "a", then the and of 2), then moves. Measured
+                // 0.006 with no stabs, 0.155 now; the floor fails with the stabs off, the
+                // ceiling is one note hammered.
                 ['leadRepeatedNotes', 0.08, 0.2, 'the horn riff punches one note, then moves'],
                 // The head breathes at every phrase end (#2024). Measured 0.75 bars before and after:
                 // its figures already leave room at each phrase end.
@@ -59,9 +60,10 @@ export const funk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
-                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says its first
-                // pitch for its first half, then moves. Measured 0.009 with no stabs, 0.118 now; the
-                // floor fails with the stabs off, the ceiling is one note hammered.
+                // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
+                // pitch for a run of its notes (sixteenths: beat 1 and its "a", then the and of 2), then moves. Measured
+                // 0.009 with no stabs, 0.126 now; the floor fails with the stabs off, the
+                // ceiling is one note hammered.
                 ['leadRepeatedNotes', 0.08, 0.2, 'the horn riff punches one note, then moves'],
                 // Measured 0.159; development off 0.039, #2012's bar fix reverted 0.142; always develops 0.37.
                 // Floor guards development off (0.039) only; this style barely sees the bar fix (0.142 vs 0.159), which blues, disco and rock guard.

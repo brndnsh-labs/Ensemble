@@ -51,12 +51,24 @@ export const rock = defineClaims({
             ],
         },
         {
+            // A known standard's head in a style with no guide-tone rhythm: the guide tones held
+            // a chord apiece (`holdGuideTones`), on the stand's standards shelf in any genre.
+            take: { lead: 'guide-tones' },
+            claims: [
+                // It breathes at every phrase end as the invented head does (#2024): 31.88 bars
+                // before (the whole chorus held through), 3.75 now. 6 fails without the
+                // four-bar phrase's beat, as the head's claim does.
+                ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
+            ],
+        },
+        {
             take: { lead: 'head' },
             claims: [
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
                 // two after an eight-bar period. Measured 20 bars before (phrase into phrase),
-                // 3.75 after.
-                ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
+                // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing.
+                ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
                 ['compLeadUnison', 0, 0.15, 'the piano voices under the tune, rarely on its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the tune fills the form'],

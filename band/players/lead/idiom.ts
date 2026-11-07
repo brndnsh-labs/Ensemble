@@ -33,6 +33,9 @@ import {
 } from './line.js';
 import { chordScale } from './palette.js';
 
+/** Where a stab's repeated notes fall in the bar (`STAB_STEPS`). */
+type StabGrid = 'any' | 'eighths' | 'upbeats';
+
 /** What a bar of a phrase does: carries the line, ends it on an arrival, or breathes. */
 type BarKind = 'line' | 'end' | 'rest';
 
@@ -71,11 +74,13 @@ export interface LeadBook extends LinePalette {
     /** Chance a solo bar plays the bar before it again (a riff) rather than moving on. */
     riff: number;
     /**
-     * Chance a figure (one of a phrase's line cells, or one of a head's) is played as a stab:
-     * its opening notes on one pitch, then the line moves (#2024). Decided per figure, so every
-     * bar that plays the figure stabs it alike: a horn riff, not a stutter. Unset: never.
+     * Repeated notes as a riff (#2024, `stabFigures`): the `chance` a solo phrase's figure (one
+     * of its line cells) is played as a stab — a run of its notes on the `on` grid said on one
+     * pitch, then the line moves — and the `head` chance for a head's figures (two at most a
+     * section). Decided per figure, so every bar that plays the figure stabs it alike: a horn
+     * riff, not a stutter. Unset: never.
      */
-    repeat?: number;
+    repeat?: { chance: number; head: number; on: StabGrid };
     /**
      * Chance a solo phrase plays the phrase before it again, whole, moved onto its chords — a
      * looped hook (hip hop's sampled lick) rather than a line that keeps moving. Unset: never.
@@ -281,8 +286,9 @@ interface SlotPlan {
     loops: PhraseMemory | null;
     peak: boolean;
     /**
-     * Beats (the meter's pulses) left silent at the end of the slot's last bar: the breath a
-     * head takes between its phrases (#2024). Unset: the phrase plays to the barline.
+     * Beats (the meter's pulses) left silent at the end of the slot's last bar, by shortening
+     * what sounds into them (`takeBreath`): the breath a head takes between its phrases (#2024).
+     * Unset: the phrase plays to the barline.
      */
     breath?: number;
 }
@@ -348,13 +354,6 @@ function headPlan(ctx: BarContext, book: LeadBook, slotStart: number): SlotPlan 
     // comes back (adapted to its chords), not only the rhythm.
     const opening = first.visit.firstBar;
     const restates = part !== 'contrast' && slotStart !== opening ? opening : null;
-    // why: a tune is sung, and a singer breathes where its phrases end (#2024): a beat at the
-    // end of a four-bar phrase that hands on to its answer (the half-cadence catch-breath), two
-    // at the end of an eight-bar period or a section (the full cadence, the real breath). The
-    // breath is taken out of the arrival's held note, so the head keeps every figure and stays
-    // a full tune — never the 2–6 bar gaps Brandon heard as dead air in the solos. A blues
-    // call already leaves its last bar to the band.
-    const closes = p % 2 === 1 || p === phrasesInVisit - 1;
     return {
         kinds,
         cells,
@@ -370,7 +369,9 @@ function headPlan(ctx: BarContext, book: LeadBook, slotStart: number): SlotPlan 
         restates,
         loops: null,
         peak: false,
-        breath: closes ? 2 : 1,
+        // The tune breathes at its phrase ends, out of the arrival's held note (`phraseBreath`);
+        // a blues call's last bar is already the band's.
+        breath: phraseBreath(ctx, slotStart),
     };
 }
 
@@ -532,6 +533,60 @@ interface SlotOnset extends Onset {
     bar: number;
 }
 
+/**
+ * How long a head breathes at the end of the phrase starting at `slotStart`, in beats (#2024).
+ * why: a tune is sung, and a singer breathes where its phrases end: a beat at the end of a
+ * four-bar phrase that hands on to its answer (the half-cadence catch-breath), two at the end of
+ * an eight-bar period or a section (the full cadence, the real breath). Never the 2–6 bar gaps
+ * Brandon heard as dead air in the solos.
+ */
+function phraseBreath(ctx: BarContext, slotStart: number): number {
+    const { bars } = ctx.timeline;
+    const first = bars[slotStart];
+    const p = first.phrase.index;
+    const phrases = bars[first.visit.firstBar + first.visit.barCount - 1].phrase.index + 1;
+    return p % 2 === 1 || p === phrases - 1 ? 2 : 1;
+}
+
+/**
+ * Take a phrase's breath in its last bar (`barIndex`): `beats` of the bar's closing pulses are
+ * left silent by shortening whatever sounds into them. No note is ever left out: a struck note
+ * is the tune. Where the phrase's last note is struck inside the breath (an ending's beat-3
+ * resolution), the breath shrinks to the beats after it — one at least — and where it is struck
+ * in the last beat itself it sounds for an eighth and the rest of the bar breathes. A bar of two
+ * pulses (6/8) breathes on its last one at most, so the arrival still sounds. The last bar of a
+ * performance that ends holds its final note instead. In place on `onsets` (in order).
+ */
+function takeBreath(
+    ctx: BarContext,
+    barIndex: number,
+    onsets: { tick: number; dur: number }[],
+    beats: number,
+): void {
+    const { bars } = ctx.timeline;
+    const bar = bars[barIndex];
+    const last = onsets.at(-1);
+    if (!bar || !last || (!ctx.looping && barIndex === bars.length - 1)) {
+        return;
+    }
+    const pulses = bar.meter.pulses;
+    const end = bar.start + bar.meter.barTicks;
+    let n = Math.min(beats, Math.max(1, Math.floor(pulses.length / 2)));
+    let cut = bar.start + pulses[pulses.length - n];
+    while (n > 1 && last.tick >= cut) {
+        n--;
+        cut = bar.start + pulses[pulses.length - n];
+    }
+    if (last.tick >= cut) {
+        cut = Math.min(end, last.tick + STEP * 2);
+    }
+    for (const o of onsets) {
+        if (o.tick < cut && o.tick + o.dur > cut) {
+            o.dur = cut - o.tick;
+        }
+    }
+}
+
 function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnset[] {
     const { bars, spans } = ctx.timeline;
     const onsets: SlotOnset[] = [];
@@ -564,29 +619,15 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
     });
     // A note never outlasts the next one (the lead is one voice) or the slot.
     const lastBar = bars[Math.min(bars.length, slotStart + plan.kinds.length) - 1];
-    let slotEnd = lastBar.start + lastBar.meter.barTicks;
-    // The breath at a phrase end (`SlotPlan.breath`): the last bar's closing beats are silent.
-    // A bar of two pulses (6/8) breathes on its last one at most, so the arrival still sounds.
-    // Not the last bar of a performance that ends, which holds its final note, nor a bar whose
-    // notes all fall inside the breath (the phrase keeps its arrival).
-    const pulses = lastBar.meter.pulses;
-    const breathe = Math.min(plan.breath ?? 0, Math.max(1, Math.floor(pulses.length / 2)));
-    const last = plan.kinds.length - 1;
-    if (
-        breathe > 0 &&
-        slotStart + last === lastBar.index &&
-        plan.kinds[last] !== 'rest' &&
-        (ctx.looping || lastBar.index !== bars.length - 1)
-    ) {
-        const cut = lastBar.start + pulses[pulses.length - breathe];
-        if (onsets.some((o) => o.tick >= lastBar.start && o.tick < cut)) {
-            onsets.splice(0, onsets.length, ...onsets.filter((o) => o.tick < cut));
-            slotEnd = cut;
-        }
-    }
+    const slotEnd = lastBar.start + lastBar.meter.barTicks;
     for (let i = 0; i < onsets.length; i++) {
         const limit = onsets[i + 1]?.tick ?? slotEnd;
         onsets[i].dur = Math.max(STEP / 2, Math.min(onsets[i].dur, limit - onsets[i].tick));
+    }
+    // The breath at a phrase end (`SlotPlan.breath`), out of the held note; a rest bar already is one.
+    const last = plan.kinds.length - 1;
+    if (plan.breath && slotStart + last === lastBar.index && plan.kinds[last] !== 'rest') {
+        takeBreath(ctx, lastBar.index, onsets, plan.breath);
     }
     // A note held into a chord change is heard against the new chord. Struck within an eighth
     // of the change it *is* the new chord, early — an anticipation, voiced for that chord and
@@ -842,6 +883,8 @@ function holdGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Voi
         loops: null,
         peak: false,
     };
+    // A held guide-tone head is sung too: it breathes at its phrase ends, off the last held tone.
+    takeBreath(ctx, lastBar.index, onsets, phraseBreath(ctx, slotStart));
     return { onsets, pitches: line.map((n) => n.midi), plan };
 }
 
@@ -1249,6 +1292,18 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
         }
         a = b;
     }
+    // The sung line breathes at every phrase end, off its last held guide tone (`takeBreath`).
+    // why: a beat, never two — the book's endings and close are its one long arrival, three
+    // beats or more (#2111: a turn is a half note at most, so a two-beat breath would leave the
+    // arrival no longer than a turn). Its own endings breathed an eighth to a beat; now each
+    // phrase end has the beat a singer takes, the section close included.
+    const { bars } = ctx.timeline;
+    takeBreath(
+        ctx,
+        bars[Math.min(bars.length, slotStart + plan.kinds.length) - 1].index,
+        onsets,
+        1,
+    );
     const sung = pitches.map((m) => m ?? homeOf(ctx, book));
     const top = Math.max(...sung);
     const bottom = Math.min(...sung);
@@ -1264,13 +1319,37 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
 const STAB_NOTES = 4;
 
 /**
- * The figures a phrase stabs (`LeadBook.repeat`): each of `cells`, in order, by the book's
- * chance. Drawn once per figure, never per note or per bar (a per-step coin is arrhythmic).
+ * Where a stab's repeated notes fall in the bar (`LeadBook.repeat.on`), by sixteenth step: the
+ * grid every note of the run sits on (`on`), and where the run may start and end (`edge`).
+ * - `any`: the figure's own rhythm — funk's sixteenth push (beat 1 and its "a"), hip hop's
+ *   one-note hook.
+ * - `eighths`: disco's pump, on the eighth-note grid, never two sixteenths running.
+ * - `upbeats`: ska's stab, on the eighths but starting and ending on an "and", so its accents
+ *   land with the skank (and-of-1, 2, and-of-2: the upbeats punched, the beat between tongued).
  */
-function stabCells(rng: Rng, book: LeadBook, cells: readonly (string | null)[]): Set<string> {
+const STAB_STEPS: Record<
+    StabGrid,
+    { on: (step: number) => boolean; edge: (step: number) => boolean }
+> = {
+    any: { on: () => true, edge: () => true },
+    eighths: { on: (step) => step % 2 === 0, edge: (step) => step % 2 === 0 },
+    upbeats: { on: (step) => step % 2 === 0, edge: (step) => step % 4 === 2 },
+};
+
+/**
+ * The figures a phrase stabs (`LeadBook.repeat`): each of `cells`, in order, by `chance`, up
+ * to `most` of them. Drawn once per figure, never per note or per bar (a per-step
+ * coin is arrhythmic).
+ */
+function stabCells(
+    rng: Rng,
+    chance: number,
+    cells: readonly (string | null)[],
+    most = Number.POSITIVE_INFINITY,
+): Set<string> {
     const out = new Set<string>();
     for (const cell of new Set(cells)) {
-        if (cell !== null && rng.chance(book.repeat ?? 0)) {
+        if (cell !== null && out.size < most && rng.chance(chance)) {
             out.add(cell);
         }
     }
@@ -1278,24 +1357,28 @@ function stabCells(rng: Rng, book: LeadBook, cells: readonly (string | null)[]):
 }
 
 /**
- * Repeated notes as a rhythmic figure (#2024): in each line bar playing a stabbed figure, the
- * bar's opening notes say its first pitch again — a funk horn's "bap-bap-bap" before the run,
- * a ska stab on the upbeats, a one-note hip hop hook — and then the line moves on to where it
- * was going. The repeat holds a chord tone (the first note must be one, so every beat it falls
- * on stays on the harmony), stops at a chord change or any target (an arrival keeps the pitch
- * the line chose), and always leaves the bar's last note to move: the figure goes somewhere.
- * In place on `pitches`; applied last, after a riff or a restatement has copied its notes, so
- * a riff bar stabs exactly as the bar it repeats.
+ * Repeated notes as a rhythmic figure (#2024): in each line bar playing a stabbed figure, a run
+ * of the figure's notes on the book's grid (`STAB_STEPS`) says one pitch — the first of them,
+ * which must be a chord tone, so every beat the run falls on stays on the harmony — and then
+ * the line moves on to where it was going. The run starts at the figure's first note on the
+ * grid's edge with the next note on the grid too, takes the notes after it while they stay on
+ * it, up to `STAB_NOTES`, stops at a chord change or any target (an arrival keeps the pitch the
+ * line chose), and is trimmed back to end on the grid's edge. It never takes the bar's last
+ * note, and it ends a note sooner where the line already put the pedal on the note after it:
+ * the figure goes somewhere. In place on `pitches`; applied last, after a riff or a
+ * restatement has copied its notes, so a riff bar stabs exactly as the bar it repeats.
  */
 function stabFigures(
     voiced: Voiced,
+    book: LeadBook,
     stabbing: ReadonlySet<string>,
     targets: readonly boolean[],
 ): void {
     const { onsets, pitches, plan } = voiced;
-    if (!stabbing.size) {
+    if (!stabbing.size || !book.repeat) {
         return;
     }
+    const grid = STAB_STEPS[book.repeat.on];
     plan.kinds.forEach((kind, k) => {
         const cell = plan.cells[k];
         // A developed motif's bar already says the last phrase's opening, stab and all: its
@@ -1305,28 +1388,52 @@ function stabFigures(
             return;
         }
         const here = onsets.map((o, i) => (o.bar === k ? i : -1)).filter((i) => i >= 0);
-        const first = here[0];
-        if (first === undefined || here.length < 3) {
-            return;
-        }
-        const pedal = pitches[first];
-        if (!chordPcs(onsets[first].chord).includes(mod12(pedal))) {
-            return;
-        }
-        // why: the stab is the figure's first half, the line its second — a figure of four says
-        // two on one pitch and moves through two; one of eight punches four, then runs.
-        const length = Math.min(STAB_NOTES, Math.max(2, Math.floor(here.length / 2)));
-        for (let n = 1; n < length; n++) {
-            const i = here[n];
-            const before = onsets[i - 1];
-            if (
-                onsets[i].change ||
-                targets[i] ||
-                onsets[i].dur > STEP * 4 ||
-                onsets[i].tick - (before.tick + before.dur) >= STEP * 4
-            ) {
-                break;
+        // The run from the bar's `n`th note: the notes after it on the grid, up to
+        // `STAB_NOTES`, never the bar's last, trimmed back to end on the grid's edge.
+        const runFrom = (n: number): number[] => {
+            const run = [here[n]];
+            for (let m = n + 1; m < Math.min(n + STAB_NOTES, here.length - 1); m++) {
+                const i = here[m];
+                const before = onsets[i - 1];
+                if (
+                    !grid.on(onsets[i].step) ||
+                    onsets[i].change ||
+                    targets[i] ||
+                    onsets[i].dur > STEP * 4 ||
+                    onsets[i].tick - (before.tick + before.dur) >= STEP * 4
+                ) {
+                    break;
+                }
+                run.push(i);
             }
+            while (run.length && !grid.edge(onsets[run[run.length - 1]].step)) {
+                run.pop();
+            }
+            return run;
+        };
+        // The first run of two notes or more that starts on the grid's edge (a ska figure's
+        // first upbeat may stand alone, its next two make the stab).
+        let run: number[] = [];
+        for (let n = 0; n + 1 < here.length - 1 && run.length < 2; n++) {
+            const i = here[n];
+            run = grid.edge(onsets[i].step) && grid.on(onsets[i].step) ? runFrom(n) : [];
+        }
+        const pedal = pitches[run[0]];
+        // The note after the run moves: where the line already put the pedal there, the run
+        // ends a note sooner (never five on one pitch, a hammer rather than a stab).
+        while (run.length >= 2 && pitches[run[run.length - 1] + 1] === pedal) {
+            run.pop();
+            while (run.length && !grid.edge(onsets[run[run.length - 1]].step)) {
+                run.pop();
+            }
+        }
+        if (run.length < 2) {
+            return;
+        }
+        if (!chordPcs(onsets[run[0]].chord).includes(mod12(pedal))) {
+            return;
+        }
+        for (const i of run) {
             pitches[i] = pedal;
         }
     });
@@ -1377,8 +1484,10 @@ function voiceHead(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
     );
     const voiced = { onsets, pitches, plan };
     // Keyed on the section, as the tune is: a stabbed figure stabs every time the head plays it.
+    // why: two figures at most — a tune's hook punches, and the rest of it sings.
     const stabRng = ctx.rng(`${headKey(ctx.timeline.bars[slotStart])}:stab`, 'song');
-    stabFigures(voiced, stabCells(stabRng, book, book.head.cells), targetsOf(onsets));
+    const hook = stabCells(stabRng, book.repeat?.head ?? 0, book.head.cells, 2);
+    stabFigures(voiced, book, hook, targetsOf(onsets));
     return voiced;
 }
 
@@ -1475,9 +1584,14 @@ function voiceSolo(
         });
     });
     const voiced = { onsets, pitches, plan };
+    // A looped hook comes round whole: its notes, stabs and all, are the source phrase's
+    // (`transpose`), so it takes no stabs of its own.
+    if (loops) {
+        return voiced;
+    }
     const stabRng = ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:stab`, 'song');
     const lines = plan.cells.filter((_, k) => plan.kinds[k] === 'line');
-    stabFigures(voiced, stabCells(stabRng, book, lines), targets);
+    stabFigures(voiced, book, stabCells(stabRng, book.repeat?.chance ?? 0, lines), targets);
     return voiced;
 }
 
