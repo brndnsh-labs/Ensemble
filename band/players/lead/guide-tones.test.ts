@@ -132,10 +132,119 @@ describe('the guide-tone line', () => {
 });
 
 describe('the band plays it for the head only (#2027)', () => {
-    it('as the head of a standard: one long note a chord, not a tune', () => {
+    it('as the head of a standard: the guide tones, sung in a tune’s rhythm (#2111)', () => {
+        const timeline = compileTimeline(AUTUMN);
         const head = lead('guide-tones').filter((n) => n.bar < 24);
-        expect(head.length).toBeLessThanOrEqual(24);
-        expect(head.every((n) => n.dur >= 960)).toBe(true);
+        // Two or three notes a bar, not one long note a chord.
+        expect(head.length).toBeGreaterThan(24 * 1.5);
+        // Every chord's first note is one of its guide tones: sounding as it arrives (struck
+        // on it, or pushed into it), or landed an eighth late (a swung eighth: within a beat).
+        for (let bar = 0; bar < 24; bar++) {
+            const at = bar * BAR;
+            const chord = chordAt(timeline, at)!;
+            if (bar > 0 && chordAt(timeline, at - 1)?.symbol === chord.symbol) {
+                continue; // no change here
+            }
+            const struck =
+                head.find((n) => n.tick <= at && n.tick + n.dur > at) ??
+                head.find((n) => n.tick > at && n.tick < at + 480);
+            expect(struck, `bar ${bar}`).toBeDefined();
+            expect(guidePitchClasses(chord, timeline.bars[bar].key)).toContain(mod12(struck!.midi));
+        }
+        // One long note a phrase at most (three beats or more), and it is the phrase's arrival:
+        // it sounds in the phrase's last bar (struck there, or pushed into it).
+        for (let phrase = 0; phrase < 6; phrase++) {
+            const longs = head.filter(
+                (n) => Math.floor(n.bar / 4) === phrase && n.dur >= (BAR * 3) / 4,
+            );
+            expect(longs.length, `phrase ${phrase}`).toBeLessThanOrEqual(1);
+            for (const n of longs) {
+                expect(n.tick + n.dur, `phrase ${phrase}`).toBeGreaterThan((phrase * 4 + 3) * BAR);
+            }
+        }
+        // The second A comes back in the first A's rhythm.
+        const rhythm = (from: number) =>
+            head.filter((n) => n.bar >= from && n.bar < from + 8).map((n) => n.tick - from * BAR);
+        expect(rhythm(8)).toEqual(rhythm(0));
+        // The B (the contrast) is another rhythm, and lifts from where the A ended — by a 4th
+        // at most.
+        expect(rhythm(16)).not.toEqual(rhythm(0));
+        const k = head.findIndex((n) => n.bar >= 16);
+        const lift = head[k].midi - head[k - 1].midi;
+        expect(lift).toBeGreaterThanOrEqual(2);
+        expect(lift).toBeLessThanOrEqual(5);
+    });
+
+    it('ties a common tone across a barline instead of striking it again (#2111)', () => {
+        // Rhythm Changes' A as the shelf writes it: Gm7's Bb is Cm7's 7th across the barline.
+        const rc = compileTimeline(
+            score(
+                [
+                    {
+                        label: 'A',
+                        bars: 'Bbmaj7 Gm7 | Cm7 F7 | Bbmaj7 Gm7 | Cm7 F7 | Bbmaj7 Bb7 | Ebmaj7 Ebm7 | Bbmaj7 F7 | Bbmaj7 F7',
+                    },
+                ],
+                { key: 'Bb' },
+            ),
+        );
+        for (const seed of ['one', 'two', 'three', 'four']) {
+            const notes = performPass(
+                rc,
+                {
+                    ...DEFAULT_SETTINGS,
+                    style: 'jazz',
+                    lead: 'sax',
+                    seed,
+                    swing: 0,
+                    lanes: { ...DEFAULT_SETTINGS.lanes, lead: true },
+                    head: 'guide-tones',
+                },
+                { pass: 0, looping: true },
+            ).events.filter((e): e is PitchedNote => e.lane === 'lead');
+            for (let i = 1; i < notes.length; i++) {
+                const [a, b] = [notes[i - 1], notes[i]];
+                if (a.bar !== b.bar && b.tick - (a.tick + a.dur) < 480) {
+                    expect(b.midi, `${seed} bar ${b.bar}`).not.toBe(a.midi);
+                }
+            }
+        }
+    });
+
+    it('sings a twelve-bar head as a blues even with a vamp after it (#2111)', () => {
+        const blues = compileTimeline(
+            score([
+                {
+                    label: 'Head',
+                    bars: 'C7 | C7 | C7 | C7 | F7 | F7 | C7 | C7 | G7 | F7 | C7 | C7',
+                },
+                { label: 'Vamp', bars: 'C7 | C7 | C7 | C7' },
+            ]),
+        );
+        const notes = performPass(
+            blues,
+            {
+                ...DEFAULT_SETTINGS,
+                style: 'jazz',
+                lead: 'sax',
+                swing: 0,
+                lanes: { ...DEFAULT_SETTINGS.lanes, lead: true },
+                head: 'guide-tones',
+            },
+            { pass: 0, looping: true },
+        ).events.filter((e): e is PitchedNote => e.lane === 'lead');
+        const rhythm = (from: number) =>
+            notes.filter((n) => n.bar >= from && n.bar < from + 4).map((n) => n.tick - from * BAR);
+        // The call, the call again over the IV, and a different answer.
+        expect(rhythm(4)).toEqual(rhythm(0));
+        expect(rhythm(8)).not.toEqual(rhythm(0));
+    });
+
+    it('is the same head every time it comes round', () => {
+        // The notes, not their levels: a later pass plays at its own energy.
+        const notes = (pass: number) =>
+            lead('guide-tones', pass).map(({ tick, dur, midi }) => [tick, dur, midi]);
+        expect(notes(4)).toEqual(notes(0));
     });
 
     it('not on any other chart: the lead invents the head', () => {
