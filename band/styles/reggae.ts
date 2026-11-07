@@ -486,6 +486,53 @@ const reggaeLead = leadIdiom({
         // A call, the same call again, a different answer, each with a bar of room for the
         // skank: the way a roots horn line (or a dub melodica) hangs a hook over the riddim.
         form: 'aab',
+        // A known standard's guide-tone head in reggae (#2122): the guide tones sung the way a
+        // roots singer phrases a tune — in after the One (the drop leaves it empty, and so
+        // does the voice), long tones floating over the skank, and the change caught on the
+        // drop. Every figure strikes on beat 3 or an eighth before it, where a two-chord bar's
+        // second chord lands; a change on the One is sung on its "and", an eighth late.
+        guide: {
+            cells: [
+                // why: in on the "and" of 1, held, then the half on the drop — the roots vocal's
+                // plainest line, two long tones over the skank.
+                '..x-----x-------',
+                // why: the "and" of 1 and beat 2 step down into the drop: a three-note call.
+                '..x-x---x-------',
+                // why: in on 2, its "and" pushed onto the drop (sung early as the change's
+                // guide tone): the line leans in late and lands with the riddim.
+                '....x-x-x-------',
+                // why: the "and" of 1, a breath, then 3 and 4: the call hangs, leaves the
+                // skank an eighth of room, and answers itself after the drop.
+                '..x---..x---x---',
+                // why: the "and" of 1, the drop, and the "and" of 4 tied over the barline —
+                // the next chord's tone floated in ahead of the One, as a singer slurs a line
+                // across the bar instead of landing on it.
+                '..x-----x-----x-',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4 (the bridge hands
+            // back on one, and a last-beat note would leave the phrase an eighth's breath).
+            turns: [
+                // why: in on 2, then the half on the drop: a short answer, the One left open.
+                '....x---x-------',
+                // why: eighths off the "and" of 1 into the drop, the phrase's busiest bar — a
+                // roots line's run is a few offbeat eighths, not a bebop line.
+                '..x-x-x-x-------',
+                // why: the "and" of 1 held, an eighth pickup on the "and" of 2 into the drop.
+                '..x---x-x-------',
+            ],
+            endings: [
+                // why: the arrival landed on the "and" of 1 and held through the skank: the
+                // roots singer's long note, in after the One (two and a half beats once the
+                // phrase breathes its last beat).
+                '..x-------------',
+                // why: or settled on the One and held the bar: the phrase's home note, the one
+                // place a roots tune fills the hole the drop leaves — three beats and more, the
+                // long arrival a phrase needs.
+                'x-------------..',
+            ],
+            // why: the section's whole note, struck on the One where the tune comes home.
+            close: 'x-------------..',
+        },
     },
     // Minor: the minor pentatonic with the chord's tones (Augustus Pablo's modal minor). Major:
     // the chord's own scale — reggae's major-key tunes are sweet, and a blue third held over a

@@ -567,6 +567,48 @@ const skaPunkLead = leadIdiom({
         // A statement, its answer, a contrast, the statement back: a ska horn line is a song's
         // whole melody, played by the section, and it fills its phrases.
         form: 'period',
+        // A known standard's guide-tone head in ska-punk (#2122): the guide tones played the
+        // way a ska horn section states a melody at a punk tempo — stabs on the "and"s with
+        // the skank, eighth pushes into the change and over the barline, and one held hit a
+        // phrase. Every figure strikes on beat 3 or an eighth before it, where a two-chord
+        // bar's second chord lands.
+        guide: {
+            cells: [
+                // why: two offbeat stabs, the "and" of 1 and of 2, then the half on 3: the horn
+                // section punching with the skank's upstroke, then holding the change.
+                '..x-..x-x-------',
+                // why: in off the "and" of 1, beat 2, 3, and the "and" of 4 pushed over the
+                // barline: the punk push, the next chord's tone hit an eighth early.
+                '..x-x---x-----x-',
+                // why: 3 + 3 + 2 with the push: dotted quarter, the "and" of 2 into 3, then the
+                // "and" of 4 tied into the next bar — the line rides across the beat.
+                'x-----x-x-----x-',
+                // why: every attack an "and" — 1, 2 (sung early as the change's guide tone) and
+                // 3: the ska horn line's syncopation, the downbeats left to the drums.
+                '..x---x---x-----',
+                // why: an eighth on the one, a stab on its "and", then the "and" of 2 into the
+                // half on 3: a horn "bap-ba … ba-DAH".
+                'x-x-..x-x-------',
+            ],
+            // A turn moves on, a half note at most, and never strikes beat 4 (the bridge hands
+            // back on one, and a last-beat note would leave the phrase an eighth's breath).
+            turns: [
+                // why: tongued eighths off the "and" of 1 into the half on 3, the busiest bar.
+                '..x-x-x-x-------',
+                // why: a half, then a stab on the "and" of 3 held: the answer leans off the beat.
+                'x-------..x-----',
+                // why: the "and" of 1 held, an eighth pickup on the "and" of 2 into 3.
+                '..x---x-x-------',
+            ],
+            endings: [
+                // why: the arrival hit on the "and" of 1 and held: a horn section's pushed
+                // long note.
+                '..x-------------',
+                // why: or struck on the one and held, the plain hit the drums crash with.
+                'x-------------..',
+            ],
+            close: 'x-------------..',
+        },
     },
     // The chord's own scale: ska grew out of jump blues and jazz (the Skatalites), but a
     // third-wave horn line is major-key and diatonic, bright rather than blue.
