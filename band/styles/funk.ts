@@ -312,6 +312,40 @@ const funkLead = leadIdiom({
         cells: ['x..x..x.x.......', '..x.x..x..x.....', 'x.x...x.x-......', 'x..x.x..x-......'],
         endings: ['x-------........', 'x.x.x-------....'],
         form: 'period',
+        // A known standard's guide-tone head in funk (#2122): the guide tones as a horn
+        // section phrases a tune — sixteenth pushes into the change, short punched notes with
+        // a sixteenth of air between, and one held arrival a phrase. Every cell strikes beat 3
+        // or a sixteenth or an eighth before it (`onsetsFor` sings a push within an eighth of
+        // a change as the new chord's guide tone, early).
+        guide: {
+            cells: [
+                // why: 1, the "a" of 1 and the "and" of 2 pushed into 3 — the 3+3+2 sixteenth
+                // figure under every Tower of Power horn line, the push held over the change.
+                'x-.x-.x-------..',
+                // why: 1, 2, then the "a" of 2 into 3: the sixteenth push a funk horn line leans
+                // on, the next chord's guide tone a sixteenth early and held.
+                'x-..x-.x------..',
+                // why: in off the "and" of 1, the "e" of 2, then 3 and its "a": the JB's
+                // horn-hit pattern, four clipped stabs with the rests between them as groove.
+                '..x-.x..x-.x-...',
+                // why: 1 and its "and", the "a" of 2 pushed into 3, a stab on 4: the punch-and-
+                // answer of a horn section's head, clipped before the barline.
+                'x-x-...x---.x-..',
+                // why: 1, its "a" held, 3, then the "a" of 4 tied over the barline — funk's
+                // anticipated One, the next bar's guide tone a sixteenth early (`guideOnsets`).
+                'x--x----x------x',
+            ],
+            // why: a turn moves on, a half note at most, and never strikes beat 4 (the bridge
+            // hands back on one and a last-beat note would leave the phrase an eighth's
+            // breath): the 3+3+2 answered on 3 and then out; 1 and the "a" of 2 pushed into a
+            // held 3; three clipped hits off the "and" of 1.
+            turns: ['x-.x-.x-x-......', 'x---...x-------.', '..x-.x..x-......'],
+            // why: funk lands on the One — the arrival struck on the downbeat and held, a
+            // dotted half that breathes a beat or the bar less an eighth; a pushed arrival
+            // comes from the figure before it (the "a" of 4 tie).
+            endings: ['x-----------....', 'x-------------..'],
+            close: 'x-------------..',
+        },
     },
     pool: (chord, key) => [...new Set([...chordScale(chord), ...bluesColour(chord, key)])],
     arrive: (chord) => fifthFirst(chord),

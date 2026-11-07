@@ -802,6 +802,36 @@ const neoLead = leadIdiom({
         ],
         endings: ['x---------------', '..x-------------', 'x--x------------'],
         form: 'period',
+        // A known standard's guide-tone head in neo-soul (#2122): the guide tones sung the way
+        // D'Angelo or Erykah Badu phrases a melody — entries a sixteenth or two late, the
+        // change anticipated by a sixteenth and hung on, the swung sixteenths (45) and the
+        // lead's 25 ms lean doing the dragging. Every cell strikes beat 3 or a sixteenth or an
+        // eighth before it, where a two-chord bar's second chord lands.
+        guide: {
+            cells: [
+                // why: in on the "a" of 1, a sixteenth pair stepping into a held 3 — the late,
+                // behind-the-beat entry of a neo-soul verse line.
+                '...x-x--x-----..',
+                // why: on the one and held, then the "a" of 2 into 3 and the "a" of 3 tied
+                // through 4: the line hanging behind the beat, as a Badu phrase floats.
+                'x-----.x---x----',
+                // why: in on the "and" of 1, then 2 and the "a" of 2 slid into 3: a phrase
+                // that starts behind the bar and catches the change a sixteenth early.
+                '..x-x--x--------',
+                // why: the one, then a breath and the "and" of 2 into 3 and its "a": the
+                // conversational vocal that talks across the beat rather than on it.
+                'x---..x-x--x----',
+            ],
+            // why: a turn moves on, a half note at most, and never strikes beat 4 (the bridge
+            // hands back on one): a late entry and the held 3; the "a" of 1 and the "e" of 2
+            // into 3; 1, its "a" and the "a" of 2 pushed into 3, the anticipation held.
+            turns: ['..x-----x-------', '...x-x--x-------', 'x--x---x-------.'],
+            // why: a neo-soul phrase lands late and hangs: the arrival a sixteenth behind the
+            // one, an eighth behind it, or on the one for the bar less an eighth. Each is still
+            // within an eighth of the change, so it is the chord's guide tone, struck once.
+            endings: ['.x------------..', '..x-----------..', 'x-------------..'],
+            close: 'x-------------..',
+        },
     },
     pool: (chord) => chordPentatonic(chord),
     arrive: (chord) => neoArrive(chord),

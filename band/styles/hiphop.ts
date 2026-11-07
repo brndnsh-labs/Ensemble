@@ -510,6 +510,40 @@ const hipHopLead = leadIdiom({
         // The hook, the hook again, a turn — each with a bar of beat after it. An 8-bar
         // section plays its four-bar hook twice, note for note: the loop.
         form: 'aab',
+        // A known standard's guide-tone head in hip hop (#2122): the guide tones as a sampled
+        // hook — two or three notes a bar on the sixteenths, room around them for the beat,
+        // and the same snap (1 and its "a") opening the hook's two main figures, so the head
+        // comes round like a loop. Every cell strikes beat 3 or a sixteenth or an eighth before
+        // it.
+        guide: {
+            cells: [
+                // why: 1, the "a" of 1, then 3 held: the dotted-eighth snap and a long note, the
+                // two-hit horn stab a producer chops and loops.
+                'x--x----x-------',
+                // why: the same snap, then the "and" of 2 pushed into 3 and let go: the hook
+                // with the beat's own push in it, and room before the bar ends.
+                'x--x--x---......',
+                // why: the one, then the "a" of 2 pushed into a held 3: the two-hit boom-bap
+                // stab, the second hit a sixteenth ahead of the bar's middle.
+                'x---...x--------',
+                // why: the hook comes in after the snare on 2 — the "and" of 2, 3 and 4 — and
+                // gets out before the next one: the sample answering the beat, not riding it.
+                '......x-x---x-..',
+                // why: the "a" of 1 and the "a" of 2 into 3: a lazy two-note hook placed off
+                // the beat, the sample sitting behind the drums.
+                '...x---x--------',
+            ],
+            // why: a turn moves on, a half note at most, and never strikes beat 4 (the bridge
+            // hands back on one): the one and the "a" of 2 slid into a held 3, the hook cut
+            // to its two hits; the "a" of 1 into a held 3; the one, then the "and" of 2 and 3.
+            // Two or three notes, so the walk between guide tones has room to step rather than
+            // trill (a sparser turn left the walk one note to bounce on, `leadOscillation`).
+            turns: ['x-----.x-------.', '...x----x-------', 'x---..x-x-------'],
+            // why: a hook's last note let ring on the one, a dotted half or the bar less an
+            // eighth: the sample's tail before the loop restarts.
+            endings: ['x-----------....', 'x-------------..'],
+            close: 'x-------------..',
+        },
     },
     // Minor: the minor pentatonic with the chord's tones (the dusty loop). Major: the chord's
     // scale, and the blue third over the I and IV (a soul record's colour).

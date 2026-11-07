@@ -1,10 +1,13 @@
 import type { PitchedNote } from '../../core/types.js';
+import { STEP } from '../../players/grid.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { defineClaims, type Take } from '../critique/harness.js';
 import { guideTonesTake } from './guide-tones.js';
 
 const ratio = (hits: number, total: number) => (total ? hits / total : 0);
+
+const GUIDE = guideTonesTake();
 
 /** Every two-note comp strike, with the chords it sounds over (its onset's and its end's). */
 function dyads(takes: Take[]) {
@@ -32,6 +35,45 @@ function dyads(takes: Take[]) {
 
 export const neosoul = defineClaims({
     metrics: {
+        /**
+         * Share of the lead's notes struck on a sixteenth between the eighths (the "e" or "a"
+         * of a beat): how much of a line sits on the sixteenth grid, not the eighth one.
+         */
+        leadSixteenthOffbeats: (takes: Take[]): number => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                for (const e of events) {
+                    if (e.lane === 'lead') {
+                        n++;
+                        hit += Math.round((e.tick - t.bars[e.bar].start) / STEP) % 2;
+                    }
+                }
+            }
+            return n ? hit / n : 0;
+        },
+        /**
+         * Of the lead's phrase entries (its first note, and each after a beat or more of
+         * silence), the share struck off the beat: a line that comes in behind the bar.
+         */
+        leadLateEntries: (takes: Take[]): number => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                let end = Number.NEGATIVE_INFINITY;
+                for (const e of events) {
+                    if (e.lane !== 'lead') {
+                        continue;
+                    }
+                    if (e.tick - end >= STEP * 4) {
+                        n++;
+                        hit += Math.round((e.tick - t.bars[e.bar].start) / STEP) % 4 ? 1 : 0;
+                    }
+                    end = Math.max(end, e.tick + e.dur);
+                }
+            }
+            return n ? hit / n : 0;
+        },
         /** Of the half-step arrivals at a change of bass note, the share led in from below. */
         bassApproachFromBelow: (takes) => {
             let n = 0;
@@ -71,8 +113,26 @@ export const neosoul = defineClaims({
         },
     },
     takes: [
-        // The known standard's guide-tone head, on the shared figures (#2122).
-        guideTonesTake(),
+        // The known standard's guide-tone head, on neo-soul's own figures (#2122, `head.guide` in
+        // `styles/neosoul.ts`): a lazy vocal line, sixteenth anticipations and late entries.
+        // (Appended here, not as `guideTonesTake`'s `extra`: that takes the shared metrics only.)
+        {
+            take: GUIDE.take,
+            claims: [
+                ...GUIDE.claims,
+                // 0.405 of the notes on an "e" or an "a" (the swing at 45 drags them), against 0
+                // on the shared straight-eighth figures; the ceiling is a run, not a sung line.
+                [
+                    'leadSixteenthOffbeats',
+                    0.25,
+                    0.55,
+                    'the line anticipates and drags on the sixteenths',
+                ],
+                // 0.655 of its phrases come in off the beat, against 0.480 on the shared
+                // figures: the floor sits between them.
+                ['leadLateEntries', 0.58, 1, 'a phrase comes in late, behind the beat'],
+            ],
+        },
         {
             take: {},
             claims: [
