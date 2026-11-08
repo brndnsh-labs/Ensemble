@@ -1645,10 +1645,12 @@ function landOnHeld(ctx: BarContext, book: LeadBook, notes: Planned[], lineVeloc
  * Whether a horn's phrase end falls off (#2120), and the stream its shape is drawn from (null:
  * it doesn't). why: a horn chart places its falls by the form — where a phrase lets go, and
  * most where a section or a chorus does (its last two bars: 1.5× the book's chance, 0.7×
- * elsewhere, a final-stage multiplier) — and a player doesn't fall off phrase after phrase:
- * straight after a fall a solo falls at a third of the chance. A head is a written tune: its
- * one draw is keyed by the section and the figure the phrase ends on, so a statement and its
- * restatement fall alike, as the arrangement wrote it, and a head never runs falls together.
+ * elsewhere, a final-stage multiplier) — and a soloist doesn't fall off phrase after phrase:
+ * straight after a fall a solo falls at a third of the chance (`fell`). A head is a written
+ * tune: its one draw is keyed by the section and the figure the phrase ends on, so a statement
+ * and its restatement fall alike, as the arrangement wrote it, and it isn't damped: a horn
+ * chart may end riff after riff with a fall (ska's does), so the head branch never reads
+ * `fell` (#2167).
  */
 function fallDraw(
     ctx: BarContext,
@@ -1757,8 +1759,23 @@ function slideStarts(chord: ChordFacts, pc: number): [number, number][] {
         // why: 5 → b7, three frets: the minor pentatonic's neighbours on one string (E → G on
         // the D string in A), the dominant's b7 reached from its fifth.
         starts.push([-3, 1]);
+        // why: R → b7, two frets down: the blues slide down onto a dominant's or minor 7th's
+        // b7 from the root above it (A → G on the high string in A), the box's other neighbour
+        // (#2167: every other landing had a start from above; the b7 had none).
+        starts.push([2, 1]);
     }
     return starts;
+}
+
+/**
+ * A position shift (a start four or five frets away) is a choice a player makes when the box
+ * offers the near slide too; it is never the only way in. why: over a maj7 in the blues the
+ * pool holds neither the 2 nor the 6 and the b7 is the wrong 7th, so the five-fret 5 → R shift
+ * was the one root slide left and came round every time the head did (#2167). A landing whose
+ * only start is the shift isn't slid into.
+ */
+function shiftNeedsNeighbour(starts: [number, number][]): [number, number][] {
+    return starts.some(([from]) => Math.abs(from) <= 3) ? starts : [];
 }
 
 function planSlot(
@@ -1991,8 +2008,8 @@ function planSlot(
                 o.dur >= STEP * 2
             ) {
                 const scale = book.pool(o.chord, o.key);
-                const starts = slideStarts(o.chord, pc).filter(([from]) =>
-                    scale.includes(mod12(midi + from)),
+                const starts = shiftNeedsNeighbour(
+                    slideStarts(o.chord, pc).filter(([from]) => scale.includes(mod12(midi + from))),
                 );
                 if (starts.length && slideRng.chance(book.slide)) {
                     const from = slideRng.weighted<number>(starts);

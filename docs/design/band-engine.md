@@ -365,9 +365,11 @@ expression devices take turns rather than stack; one peak note per cycle.
     or a sixteenth), from a scale tone a few frets away (#2139, `slideStarts`). From below:
     b7 → R (not over a maj7), 6 → R or 5 → R; 4 → 5, or 3 → 5 (b3 → 5 on a minor chord);
     5 → b7; R → b3; 2 → 3, and the one one-fret slide, b3 → 3 onto a major third (by
-    decision). From two above: 2 → R, 6 → 5, 4 → b3. A start the style's scale doesn't hold at
-    the chord (`LinePalette.pool`) isn't played, and a landing with none isn't slid into. Blues
-    and rock.
+    decision). From two above: 2 → R, 6 → 5, 4 → b3, R → b7. A start the style's scale doesn't
+    hold at the chord (`LinePalette.pool`) isn't played, and a landing with none isn't slid
+    into; a position shift of four frets or more (b3 → 5 on a minor chord, 5 → R) is drawn only beside a near start, never as the one
+    way in (#2167: over a maj7 the blues held no near start for the root, so its one root slide
+    was the five-fret swoop, every time the head came round). Blues and rock.
   - The host turns them into seconds by the note's own tempo (`leadArticulation`): a short
     fall takes its ticks (at most 40% of the note), a long one is added to the note's length so
     the voice sounds it into the rest; the release starts halfway and takes an eighth (at most
