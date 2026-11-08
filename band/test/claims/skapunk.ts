@@ -522,6 +522,18 @@ export const skapunk = defineClaims({
                 // pitch for a run of its notes (starting and ending on an "and"), then moves. Measured
                 // 0.012 with no stabs, 0.099 now; the floor fails with the stabs off, the
                 // ceiling is one note hammered.
+                // The head's trumpet falls where its phrase lets go (#2138, `LeadBook.fall` 0.3,
+                // `fallDraw`): its last note into the breath, drawn once per ending figure. Of
+                // every phrase end 0.260 fall (0 with no falls, the floor's failure).
+                ['leadPhraseEndFalls', 0.15, 0.4, 'the trumpet falls off the end of a phrase'],
+                ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.923: the head's section-end weight and its few phrase ends.
+                ['leadFallsAtSectionEnd', 0.7, 1, 'the falls close the sections'],
+                // A section played again plays its falls again (1.000 with the draw keyed by the
+                // note's own place in the song). Funk's two other head-fall claims aren't made
+                // here: this head ends no figure inside a phrase, so falling off every phrase end
+                // changes nothing (0.000), and the figure claim breaks only where this one does.
+                ['leadHeadFallsDiffer', 0, 0, 'a section played again falls where it fell'],
                 ['leadRepeatedNotes', 0.08, 0.2, 'stabs on one note with the skank, then the line'],
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
                 // two after an eight-bar period. Measured 19.88 bars before (phrase into phrase),
@@ -549,9 +561,19 @@ export const skapunk = defineClaims({
                 // pitch for a run of its notes (starting and ending on an "and"), then moves. Measured
                 // 0.020 with no stabs, 0.140 now; the floor fails with the stabs off, the
                 // ceiling is one note hammered.
+                // The solo trumpet falls off a phrase's last note (#2138, `LeadBook.fall` 0.3).
+                // Measured 0.164 (0 with no falls).
+                ['leadPhraseEndFalls', 0.09, 0.3, 'the trumpet falls off the end of a phrase'],
+                ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.632: solo falls are weighted toward section ends.
+                ['leadFallsAtSectionEnd', 0.45, 1, 'the falls close the sections'],
+                // Measured 0.024 (damped to a third straight after a fall).
+                ['leadFallsBackToBack', 0, 0.15, 'never a fall at every phrase end'],
                 ['leadRepeatedNotes', 0.08, 0.2, 'stabs on one note with the skank, then the line'],
-                // Measured 0.114; development off 0.024, #2012's bar fix reverted 0.103; always develops 0.39.
-                // Floor guards development off (0.024) only; this style barely sees the bar fix (0.103 vs 0.114), which blues, disco and rock guard.
+                // Measured 0.138 since #2138's fall draws shifted the solo stream (0.114 before);
+                // on the pre-#2138 stream: development off 0.024, #2012's bar fix reverted 0.103,
+                // always develops 0.39. Floor guards development off (0.024) only; this style
+                // barely sees the bar fix (0.103 vs 0.114), which blues, disco and rock guard.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
