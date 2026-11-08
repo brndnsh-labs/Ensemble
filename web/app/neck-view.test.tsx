@@ -69,6 +69,7 @@ interface Props {
     changeSoon?: boolean;
     playing?: boolean;
     fingers?: boolean;
+    shell?: boolean;
     onStrum?: (midis: number[]) => void;
 }
 function render({
@@ -78,6 +79,7 @@ function render({
     changeSoon = false,
     playing = false,
     fingers = false,
+    shell = false,
     onStrum,
 }: Props = {}) {
     act(() => {
@@ -90,7 +92,7 @@ function render({
                 playing={playing}
                 onStrum={onStrum}
                 notation="name"
-                prefs={{ ...prefs, fingers }}
+                prefs={{ ...prefs, fingers, shell }}
                 onPrefs={() => {}}
             />,
         );
@@ -240,6 +242,24 @@ describe('NeckView: the strong preview while the band plays (#1590)', () => {
     it('needs a slot under the playhead: a count-in draws no preview', () => {
         render({ ...playing, active: null, changeSoon: true });
         expect(ghosts()).toBe(0);
+    });
+});
+
+describe('NeckView: "Show the shell" reaches the board (#1853)', () => {
+    it('dims the notes outside the shell only while the setting is on', () => {
+        // An open G7 in first position: its doubled root and fifth sit outside the shell.
+        const open = chart([chord('G7'), chord('C')]);
+        const firstPosition = placeNeckHand(defaultNeckPreferences());
+        const grips = new Map(
+            voiceBandChart(open, firstPosition).map((v) => [v.globalIndex, v] as const),
+        );
+        const dimmed = () => host.querySelectorAll('.is-outside-shell').length;
+        render({ band: open, voiced: grips });
+        expect(text('neck-current')).toBe('G7');
+        expect(dimmed()).toBe(0);
+        render({ band: open, voiced: grips, shell: true });
+        expect(dimmed()).toBeGreaterThan(0);
+        expect(dimmed()).toBeLessThan(grips.get(0)!.notes.length);
     });
 });
 

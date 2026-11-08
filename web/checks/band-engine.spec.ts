@@ -85,8 +85,8 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     });
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
-    // Follow the chart pointer round one lap and back to the top (the return re-arming a second lap
-    // rests on `band-chart.test.ts`).
+    // Follow the chart pointer round two laps: a bar a stall hid in the first (start-up) lap
+    // still has to show in the second, so every bar is seen.
     const visits: number[] = [];
     await expect
         .poll(
@@ -103,7 +103,7 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
             },
             { timeout: 25_000, intervals: [50], message: `pointer visits: ${visits.join(' ')}` },
         )
-        .toBeGreaterThanOrEqual(1);
+        .toBeGreaterThanOrEqual(2);
     // Every bar of the form was reached, in order, before it wrapped.
     const firstLap = visits.slice(0, visits.indexOf(0, 1));
     expect(firstLap).toEqual([...firstLap].sort((a, b) => a - b));

@@ -208,8 +208,10 @@ test(`${study.name} imports and highlights exact performed visits on the compact
     await dialog.getByLabel('iReal link', { exact: true }).fill(openProtocol(study.body));
     await dialog.getByRole('button', { name: 'Review link', exact: true }).click();
     const tempo = dialog.getByLabel('Import tempo', { exact: true });
-    await tempo.fill('320');
-    await expect(tempo).toHaveValue('320');
+    // 240, not the 320 ceiling: the one-beat chords would be 187 ms, and the visit check allows
+    // no missed chord after the first wrap.
+    await tempo.fill('240');
+    await expect(tempo).toHaveValue('240');
     await dialog.getByRole('button', { name: 'Add to songbook', exact: true }).click();
     await expect(dialog).not.toBeVisible();
     await expect(page.locator('.chord')).toHaveText(study.labels);
