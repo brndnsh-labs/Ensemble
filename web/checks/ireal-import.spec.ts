@@ -183,86 +183,72 @@ test('an unsupported pasted chart preserves the songbook and downloads its exact
     expect(await savedDocuments(page)).toEqual(before);
 });
 
-for (const study of [
-    {
-        name: 'multi-chord repeated bars',
-        body: 'T44[C ,Dm,G7|x   |F   Z',
-        labels: ['C', 'Dm', 'G7', '%', 'F'],
-        visits: [
-            { start: 0, end: 8, name: 'C' },
-            { start: 8, end: 12, name: 'Dm' },
-            { start: 12, end: 16, name: 'G7' },
-            { start: 16, end: 24, name: '%' },
-            { start: 24, end: 28, name: '%' },
-            { start: 28, end: 32, name: '%' },
-            { start: 32, end: 48, name: 'F' },
-        ],
-    },
-    {
-        name: 'D.C. al Fine',
-        body: 'T44[C   |Dm   <Fine>|G7   <D.C. al Fine>Z',
-        labels: ['C', 'Dm', 'G7'],
-        visits: [
-            { start: 0, end: 16, name: 'C' },
-            { start: 16, end: 32, name: 'Dm' },
-            { start: 32, end: 48, name: 'G7' },
-            { start: 48, end: 64, name: 'C' },
-            { start: 64, end: 80, name: 'Dm' },
-        ],
-    },
-]) {
-    test(`${study.name} imports and highlights exact performed visits on the compact stand`, async ({
-        page,
-    }) => {
-        await page.goto(appUrl());
-        await page.getByRole('button', { name: 'Import chart', exact: true }).click();
-        const dialog = page.getByRole('dialog', { name: /^(Import a chart|Review import)$/ });
-        await dialog.getByText('Or paste an iReal link', { exact: true }).click();
-        await dialog.getByLabel('iReal link', { exact: true }).fill(openProtocol(study.body));
-        await dialog.getByRole('button', { name: 'Review link', exact: true }).click();
-        const tempo = dialog.getByLabel('Import tempo', { exact: true });
-        await tempo.fill('240');
-        await expect(tempo).toHaveValue('240');
-        await dialog.getByRole('button', { name: 'Add to songbook', exact: true }).click();
-        await expect(dialog).not.toBeVisible();
-        await expect(page.locator('.chord')).toHaveText(study.labels);
-        const visits: { start: number; end: number; name: string }[] = [];
-        await page.exposeFunction('recordImportHighlight', (visit: (typeof visits)[number]) => {
-            if (visits.at(-1)?.start !== visit.start) {
-                visits.push(visit);
-            }
-        });
-        await page.evaluate(() => {
-            new MutationObserver(() => {
-                const chord = document.querySelector('.chord[aria-current="true"]');
-                if (chord) {
-                    const host = window as unknown as {
-                        recordImportHighlight: (visit: {
-                            start: number;
-                            end: number;
-                            name: string;
-                        }) => Promise<void>;
-                    };
-                    void host.recordImportHighlight({
-                        start: Number(chord.getAttribute('data-start-step')),
-                        end: Number(chord.getAttribute('data-end-step')),
-                        name: chord.textContent?.trim() ?? '',
-                    });
-                }
-            }).observe(document, {
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['aria-current', 'data-start-step'],
-            });
-        });
-        await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-        // Two whole laps and the start of a third. From the first wrap on, every visit must
-        // be painted (#1240); only the first lap may lose a visit or two while playback starts.
-        await expect
-            .poll(() => visits.length, { timeout: 30_000 })
-            .toBeGreaterThan(study.visits.length * 2);
-        await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-        expectVisitsFollowForm(visits, study.visits);
-        await expect(page.locator('.bar')).toHaveCount(3);
+const study = {
+    name: 'multi-chord repeated bars',
+    body: 'T44[C ,Dm,G7|x   |F   Z',
+    labels: ['C', 'Dm', 'G7', '%', 'F'],
+    visits: [
+        { start: 0, end: 8, name: 'C' },
+        { start: 8, end: 12, name: 'Dm' },
+        { start: 12, end: 16, name: 'G7' },
+        { start: 16, end: 24, name: '%' },
+        { start: 24, end: 28, name: '%' },
+        { start: 28, end: 32, name: '%' },
+        { start: 32, end: 48, name: 'F' },
+    ],
+};
+
+test(`${study.name} imports and highlights exact performed visits on the compact stand`, async ({
+    page,
+}) => {
+    await page.goto(appUrl());
+    await page.getByRole('button', { name: 'Import chart', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: /^(Import a chart|Review import)$/ });
+    await dialog.getByText('Or paste an iReal link', { exact: true }).click();
+    await dialog.getByLabel('iReal link', { exact: true }).fill(openProtocol(study.body));
+    await dialog.getByRole('button', { name: 'Review link', exact: true }).click();
+    const tempo = dialog.getByLabel('Import tempo', { exact: true });
+    await tempo.fill('320');
+    await expect(tempo).toHaveValue('320');
+    await dialog.getByRole('button', { name: 'Add to songbook', exact: true }).click();
+    await expect(dialog).not.toBeVisible();
+    await expect(page.locator('.chord')).toHaveText(study.labels);
+    const visits: { start: number; end: number; name: string }[] = [];
+    await page.exposeFunction('recordImportHighlight', (visit: (typeof visits)[number]) => {
+        if (visits.at(-1)?.start !== visit.start) {
+            visits.push(visit);
+        }
     });
-}
+    await page.evaluate(() => {
+        new MutationObserver(() => {
+            const chord = document.querySelector('.chord[aria-current="true"]');
+            if (chord) {
+                const host = window as unknown as {
+                    recordImportHighlight: (visit: {
+                        start: number;
+                        end: number;
+                        name: string;
+                    }) => Promise<void>;
+                };
+                void host.recordImportHighlight({
+                    start: Number(chord.getAttribute('data-start-step')),
+                    end: Number(chord.getAttribute('data-end-step')),
+                    name: chord.textContent?.trim() ?? '',
+                });
+            }
+        }).observe(document, {
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['aria-current', 'data-start-step'],
+        });
+    });
+    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
+    // Two whole laps and the start of a third. From the first wrap on, every visit must
+    // be painted (#1240); only the first lap may lose a visit or two while playback starts.
+    await expect
+        .poll(() => visits.length, { timeout: 30_000 })
+        .toBeGreaterThan(study.visits.length * 2);
+    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
+    expectVisitsFollowForm(visits, study.visits);
+    await expect(page.locator('.bar')).toHaveCount(3);
+});

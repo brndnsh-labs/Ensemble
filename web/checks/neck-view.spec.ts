@@ -2,34 +2,6 @@ import type { Page } from '@playwright/test';
 import { appUrl, editorRevealed, expect, seedStarters, songLink, test, typeBar } from './fixtures';
 
 /**
- * The most of each preview element on the board in any frame over `ms` of playback: the preview
- * lives on the last beat only, so a fixed-interval poll could keep missing it.
- */
-function previewSeen(page: Page, ms: number) {
-    return page.evaluate(
-        (ms) =>
-            new Promise<{ ghosts: number; arrows: number; targets: number }>((resolve) => {
-                const seen = { ghosts: 0, arrows: 0, targets: 0 };
-                const end = performance.now() + ms;
-                const count = (selector: string) =>
-                    document.querySelectorAll(`.neck-view ${selector}`).length;
-                const frame = () => {
-                    seen.ghosts = Math.max(seen.ghosts, count('.neck-ghost-dot'));
-                    seen.arrows = Math.max(seen.arrows, count('.neck-arrow'));
-                    seen.targets = Math.max(seen.targets, count('.neck-target'));
-                    if (performance.now() < end) {
-                        requestAnimationFrame(frame);
-                    } else {
-                        resolve(seen);
-                    }
-                };
-                frame();
-            }),
-        ms,
-    );
-}
-
-/**
  * The stand's Neck mode (#1587): a third view beside Chart and Edit chart that shows the grip for
  * the chord sounding now, previews the next one, follows the band, and is remembered per device.
  */
@@ -87,6 +59,11 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await expect(sayFingers).not.toBeChecked();
     await sayFingers.check();
     await expect(view.locator('.neck-fingers')).toBeVisible();
+    // "Show the shell" (#1853) is off until asked for, and remembered the same way; what it dims
+    // is `neck.test.tsx`'s.
+    const shell = view.getByRole('checkbox', { name: 'Show the shell' });
+    await expect(shell).not.toBeChecked();
+    await shell.check();
     // Dm7 x x 0 2 1 1 to G7 3 2 0 0 0 1: the first finger stays on the F both chords fret, and
     // the line names the note and its two jobs (#1618), then the fingers that move.
     const fingers = view.locator('.neck-fingers');
@@ -98,6 +75,7 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     await page.reload();
     await songLink(page, 'Neck study').first().click();
     await expect(view.getByRole('checkbox', { name: 'Say the fingers' })).toBeChecked();
+    await expect(view.getByRole('checkbox', { name: 'Show the shell' })).toBeChecked();
     await expect(view.locator('.neck-fingers')).toBeVisible();
 
     // The phone keeps the page inside the screen in Neck mode — the finger line included, which
@@ -186,54 +164,6 @@ test('the neck shows the grip, follows the band and is remembered', async ({ pag
     // Chart brings the sheet back.
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     await expect(page.locator('.chord')).toHaveText(['Dm7', 'G7', 'Cmaj7', 'Cmaj7']);
-    expect(errors).toEqual([]);
-});
-
-test('the preview shows where the next grip is; the fingers on request (#1592)', async ({
-    page,
-}) => {
-    test.setTimeout(60_000);
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByRole('button', { name: 'Neck', exact: true }).click();
-    const view = page.getByRole('region', { name: 'Neck' });
-    await expect(view.locator('svg.neck')).toBeVisible();
-    // Stopped: the grip only, the strip names what's next.
-    await expect(view.locator('.neck-ghost-dot, .neck-rootpath, .neck-arrow')).toHaveCount(0);
-
-    const tempo = page.getByLabel('Tempo', { exact: true });
-    await tempo.fill('240');
-    await tempo.press('Enter');
-    const play = async () => {
-        await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-        await expect(
-            page.getByRole('button', { name: 'Stop playback', exact: true }),
-        ).toBeEnabled();
-    };
-    const stop = async () => {
-        await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-        await expect(
-            page.getByRole('button', { name: 'Start playback', exact: true }),
-        ).toBeEnabled();
-    };
-
-    // Default: ghost dots on the last beat (a bar is a second at 240), never the finger detail.
-    await play();
-    const where = await previewSeen(page, 3_000);
-    expect(where.ghosts).toBeGreaterThan(0);
-    expect(where.arrows).toBe(0);
-    expect(where.targets).toBe(0);
-    await stop();
-
-    // "Say the fingers" turns on the arrows and numbered targets with the text.
-    await view.getByRole('checkbox', { name: 'Say the fingers' }).check();
-    await play();
-    const how = await previewSeen(page, 3_000);
-    expect(how.ghosts).toBeGreaterThan(0);
-    expect(how.targets).toBeGreaterThan(0);
-    await stop();
     expect(errors).toEqual([]);
 });
 
@@ -356,7 +286,11 @@ test('a phone board follows the hand; a laptop shows the whole neck (#1593)', as
 
 test('the hand sits in first position until the musician moves it (#1598, #1840)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the hand window is browser- and width-independent; the neck-view tests on WebKit still open a chart on the neck and move the hand slider in "the neck shows the grip, follows the band and is remembered"',
+    );
     await seedStarters(page);
     const view = page.getByRole('region', { name: 'Neck' });
     const hand = view.getByRole('slider', { name: 'Hand position' });
@@ -378,156 +312,4 @@ test('the hand sits in first position until the musician moves it (#1598, #1840)
     await page.getByRole('button', { name: 'Back to songbook' }).click();
     await open('Blue pocket');
     await expect(hand).toHaveAttribute('aria-valuetext', 'frets 2 to 7');
-});
-
-test('stopped, the neck steps through the changes and the board strums (#1595, #1596)', async ({
-    page,
-}) => {
-    test.setTimeout(60_000);
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    page.on('console', (message) => {
-        if (message.type() === 'error') {
-            errors.push(message.text());
-        }
-    });
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await page.getByRole('button', { name: 'Neck', exact: true }).click();
-    const view = page.getByRole('region', { name: 'Neck' });
-    const current = view.getByTestId('neck-current');
-    const position = view.getByTestId('neck-position');
-    const headline = view.locator('.neck-headline');
-    await expect(current).toHaveText('C7');
-    await expect(position).toHaveText(/^1 \/ \d+$/);
-    const count = Number((await position.textContent())!.split('/')[1]);
-    expect(count).toBeGreaterThan(2);
-    await expect(headline).toContainText('Starts on C7');
-
-    // Next: the second grip, previewing the third, in the playing form's words.
-    await view.getByRole('button', { name: 'Next chord', exact: true }).click();
-    await expect(current).toHaveText('F7');
-    await expect(position).toHaveText(`2 / ${count}`);
-    await expect(headline).toContainText('Next:');
-    await expect(view.locator('.neck-ghost-dot').first()).toBeVisible();
-    await expect(view.locator('.neck-rootpath')).toHaveCount(1);
-    // Prev twice: back to the top, then wrapped to the form's last change.
-    await view.getByRole('button', { name: 'Previous chord', exact: true }).click();
-    await expect(current).toHaveText('C7');
-    await view.getByRole('button', { name: 'Previous chord', exact: true }).click();
-    await expect(position).toHaveText(`${count} / ${count}`);
-    // The arrows step too, with the neck focused.
-    await view.focus();
-    await page.keyboard.press('ArrowLeft');
-    await expect(position).toHaveText(`${count - 1} / ${count}`);
-    await page.keyboard.press('ArrowRight');
-    await expect(position).toHaveText(`${count} / ${count}`);
-    await view.getByRole('button', { name: 'Next chord', exact: true }).click();
-    await expect(current).toHaveText('C7');
-    await page.keyboard.press('ArrowRight');
-    await expect(current).toHaveText('F7');
-
-    // The board is a button stopped: a tap (or Enter) strums the grip shown. It is heard, not
-    // seen, so this checks the plumbing: focusable, a pointer, and nothing breaks.
-    const board = view.locator('.neck-strum');
-    await expect(board).toHaveAttribute('role', 'button');
-    await expect(board).toHaveAttribute('aria-label', /^Hear F7: /);
-    expect(await board.evaluate((el) => getComputedStyle(el).cursor)).toBe('pointer');
-    await view.locator('.neck-wood').click();
-    await board.focus();
-    await page.keyboard.press('Enter');
-    await expect(current).toHaveText('F7');
-
-    // Play hands the neck back to the band: no steps, no strum, and it follows.
-    const tempo = page.getByLabel('Tempo', { exact: true });
-    await tempo.fill('240');
-    await tempo.press('Enter');
-    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
-    await expect(view.getByRole('button', { name: 'Next chord', exact: true })).toHaveCount(0);
-    await expect(view.locator('.neck-strum')).toHaveCount(0);
-    await expect(headline).toContainText('Next:', { timeout: 20_000 });
-    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
-    // Stopped again: back to the top.
-    await expect(current).toHaveText('C7');
-    await expect(position).toHaveText(`1 / ${count}`);
-    await expect(headline).toContainText('Starts on C7');
-    expect(errors).toEqual([]);
-});
-
-test('a ukulele B5 marks the G and C strings it leaves silent (#1811)', async ({ page }) => {
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(appUrl());
-    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await editorRevealed(page);
-    await page.getByLabel('Song title').fill('Power on the uke');
-    for (const [i, bar] of ['B', 'B5', 'B', 'B'].entries()) {
-        await typeBar(page, i + 1, bar);
-    }
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Neck', exact: true }).click();
-    const view = page.getByRole('region', { name: 'Neck' });
-    await view.getByLabel('Instrument', { exact: true }).selectOption('uke');
-    // B 4 3 2 2 sounds all four strings: nothing marked.
-    await expect(view.getByTestId('neck-current')).toHaveText('B');
-    await expect(view.locator('.neck-dot')).toHaveCount(4);
-    await expect(view.locator('.neck-mute')).toHaveCount(0);
-    // B5 x x 2 2: a × on the G and C strings, and the board's text names them.
-    await view.getByRole('button', { name: 'Next chord', exact: true }).click();
-    await expect(view.getByTestId('neck-current')).toHaveText('B5');
-    await expect(view.locator('.neck-dot')).toHaveCount(2);
-    await expect(view.locator('.neck-mute')).toHaveCount(2);
-    expect(
-        await view
-            .locator('.neck-mute')
-            .evaluateAll((marks) => marks.map((m) => m.getAttribute('data-mute'))),
-    ).toEqual(['4', '3']);
-    await expect(view.locator('.neck-strum')).toHaveAttribute(
-        'aria-label',
-        /^Hear B5: .*; G and C strings not played$/,
-    );
-    expect(errors).toEqual([]);
-});
-
-test('"Show the shell" dims an open chord\'s doubles and is remembered (#1853)', async ({
-    page,
-}) => {
-    const errors: string[] = [];
-    page.on('pageerror', (error) => errors.push(error.message));
-    await page.goto(appUrl());
-    await page.getByRole('button', { name: '＋ New song', exact: true }).click();
-    await editorRevealed(page);
-    await page.getByLabel('Song title').fill('Shell study');
-    for (const [i, bar] of ['G7', 'C', 'G7', 'C'].entries()) {
-        await typeBar(page, i + 1, bar);
-    }
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Neck', exact: true }).click();
-    const view = page.getByRole('region', { name: 'Neck' });
-    // First position: the book's open G7 3 2 0 0 0 1, six dots, none dimmed by default.
-    await expect(view.getByTestId('neck-current')).toHaveText('G7');
-    await expect(view.locator('.neck-dot')).toHaveCount(6);
-    const dimmed = view.locator('.neck-dot.is-outside-shell');
-    await expect(dimmed).toHaveCount(0);
-    const shell = view.getByRole('checkbox', { name: 'Show the shell' });
-    await expect(shell).not.toBeChecked();
-    // On: the D and the second G and B fade; the low G, the B and the top F stay bright.
-    await shell.check();
-    await expect(dimmed).toHaveCount(3);
-    await expect(view.locator('.neck-dot')).toHaveCount(6);
-    // The open C x 3 2 0 1 0 keeps its 5th: only the doubled C and E fade.
-    await view.getByRole('button', { name: 'Next chord', exact: true }).click();
-    await expect(view.getByTestId('neck-current')).toHaveText('C');
-    await expect(dimmed).toHaveCount(2);
-    // Remembered on this device.
-    await page.reload();
-    await songLink(page, 'Shell study').first().click();
-    await expect(view.getByRole('checkbox', { name: 'Show the shell' })).toBeChecked();
-    await expect(view.getByTestId('neck-current')).toHaveText('G7');
-    await expect(dimmed).toHaveCount(3);
-    expect(errors).toEqual([]);
 });

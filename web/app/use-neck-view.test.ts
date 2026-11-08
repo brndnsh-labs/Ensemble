@@ -723,6 +723,19 @@ describe('fingersLine: a common tone and its change of job (#1618)', () => {
         }
     });
 
+    it('voices a ukulele B on all four strings and B5 on the top two, x x 2 2 (#1811)', () => {
+        // What the stand draws as no × for B and a × on the G and C strings for B5 (`neck.test.tsx`
+        // draws the marks from exactly this grip; this pins that the voicer picks it).
+        const [b, b5] = grips(['B', 'B5'], uke);
+        expect(b.notes.map((n) => `${n.string}/${n.fret}`).sort()).toEqual([
+            '1/2',
+            '2/2',
+            '3/3',
+            '4/4',
+        ]);
+        expect(b5.notes.map((n) => `${n.string}/${n.fret}`)).toEqual(['2/2', '1/2']);
+    });
+
     it('one note name on two strings: "the other C", "the two D♭s", and which one (#1691)', () => {
         const uke5 = { ...uke, home: [5, 10] as [number, number] };
         const uke2 = { ...uke, home: [2, 7] as [number, number] };

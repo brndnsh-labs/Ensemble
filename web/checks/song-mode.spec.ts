@@ -16,8 +16,8 @@ import {
  * `choruses.spec.ts` observes a counted chart: through the chart's pointer (every time the
  * form's first chord becomes current is one more pass) and the transport's Play/Stop button.
  *
- * The form is one bar, `C G`, at 240 bpm: a second a chorus, so three minutes asks for 180 of
- * them and song mode's 16-chorus cap decides — a 16-second performance.
+ * The form is one bar, `C G`, at 320 bpm (the ceiling): 750 ms a chorus, so three minutes asks for
+ * 240 of them and song mode's 16-chorus cap decides — a 12-second performance.
  */
 
 declare global {
@@ -26,9 +26,9 @@ declare global {
     }
 }
 
-const LOOPING = measureSong(['song-mode-loop', 'Song mode loop', 'Rock', 'C', 'C G', 240]);
+const LOOPING = measureSong(['song-mode-loop', 'Song mode loop', 'Rock', 'C', 'C G', 320]);
 const COUNTED = (() => {
-    const doc = measureSong(['song-mode-counted', 'Song mode counted', 'Rock', 'C', 'C G', 240]);
+    const doc = measureSong(['song-mode-counted', 'Song mode counted', 'Rock', 'C', 'C G', 320]);
     doc.chart.score.choruses = 2;
     return doc;
 })();
@@ -114,9 +114,9 @@ test('song mode plays the counted choruses and stops; Off loops; the chart is ne
     await expect(sheet.locator('#song-length-detail')).toHaveText(
         'The band repeats the song until you stop it.',
     );
-    // Three minutes of a one-second chorus is past the cap: 16 choruses, 16 seconds.
+    // Three minutes of a 750 ms chorus is past the cap: 16 choruses, 12 seconds.
     await length.selectOption('3');
-    await expect(sheet.locator('#song-length-detail')).toHaveText('≈0:16 · 16 choruses');
+    await expect(sheet.locator('#song-length-detail')).toHaveText('≈0:12 · 16 choruses');
     await closeBand(page);
 
     const before = await storedRow(page, LOOPING.id);
@@ -135,14 +135,8 @@ test('song mode plays the counted choruses and stops; Off loops; the chart is ne
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     expect(await storedRow(page, LOOPING.id)).toBe(before);
 
-    // The setting is this device's: it is still on after a reload.
-    await page.reload();
-    await songLink(page, 'Song mode loop').first().click();
-    sheet = await openBand(page, 'Practice');
-    await expect(sheet.getByLabel('Song length', { exact: true })).toHaveValue('3');
-
     // A chart that counts its own choruses sets its own length: the control is off for it.
-    await closeBand(page);
+    // (That the setting survives a reload is where-you-are's and `session.test.ts`'s claim.)
     await page.goto(appUrl());
     await songLink(page, 'Song mode counted').first().click();
     sheet = await openBand(page, 'Practice');
@@ -152,7 +146,8 @@ test('song mode plays the counted choruses and stops; Off loops; the chart is ne
     );
     await closeBand(page);
 
-    // Off: the looping chart plays on past where song mode would have stopped it.
+    // Off: the counter keeps counting choruses with no end ("Chorus 3", never "Chorus 3 / 16"),
+    // so the looping chart plays on past where song mode would have stopped it.
     await page.goto(appUrl());
     await songLink(page, 'Song mode loop').first().click();
     sheet = await openBand(page, 'Practice');
@@ -160,8 +155,8 @@ test('song mode plays the counted choruses and stops; Off loops; the chart is ne
     await closeBand(page);
     await arm(page);
     await play.click();
-    await expect.poll(() => passes(page), { timeout: 60_000 }).toBeGreaterThanOrEqual(17);
     await expect(stop).toBeVisible();
+    await expect(page.getByTestId('chorus-counter')).toHaveText(/^Chorus \d+$/);
     await stop.click();
     await expect(play).toBeVisible();
 

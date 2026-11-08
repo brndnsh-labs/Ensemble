@@ -68,6 +68,7 @@ interface Props {
     active?: number | null;
     changeSoon?: boolean;
     playing?: boolean;
+    fingers?: boolean;
     onStrum?: (midis: number[]) => void;
 }
 function render({
@@ -76,6 +77,7 @@ function render({
     active = null,
     changeSoon = false,
     playing = false,
+    fingers = false,
     onStrum,
 }: Props = {}) {
     act(() => {
@@ -88,7 +90,7 @@ function render({
                 playing={playing}
                 onStrum={onStrum}
                 notation="name"
-                prefs={prefs}
+                prefs={{ ...prefs, fingers }}
                 onPrefs={() => {}}
             />,
         );
@@ -204,6 +206,15 @@ describe('NeckView: the strong preview while the band plays (#1590)', () => {
         expect(ghosts()).toBe(0);
         render({ ...playing, active: 1, changeSoon: true });
         expect(ghosts()).toBe(splitGrips.get(2)!.notes.length);
+    });
+
+    it('draws finger arrows and numbered targets only when "Say the fingers" is on (#1592)', () => {
+        render({ ...playing, active: 0, changeSoon: true });
+        expect(ghosts()).toBeGreaterThan(0);
+        expect(host.querySelectorAll('.neck-arrow, .neck-target')).toHaveLength(0);
+        render({ ...playing, active: 0, changeSoon: true, fingers: true });
+        expect(ghosts()).toBeGreaterThan(0);
+        expect(host.querySelectorAll('.neck-target').length).toBeGreaterThan(0);
     });
 
     it('waits for the run’s last slot: no preview before the same chord again or a hold', () => {

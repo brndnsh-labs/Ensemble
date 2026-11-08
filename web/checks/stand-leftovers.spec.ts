@@ -89,6 +89,8 @@ test('Play on a scrolled chart brings the start bar into view for the count-in (
     const countdown = page.locator('.bar-countin');
     await expect(countdown).toBeVisible();
     await expect(countdown).toBeInViewport({ ratio: 0.9 });
+    // Reduced motion (emulated above): the countdown does not animate.
+    expect(await countdown.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
 });
 
 test.describe('Ctrl/⌘+S inside a menu saves (#1984, #2069)', () => {

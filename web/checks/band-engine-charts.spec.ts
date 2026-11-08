@@ -83,11 +83,12 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
     await expect(sheetBars.nth(3).locator('.fermata')).toHaveCount(1);
 
     const tempo = page.getByLabel('Tempo', { exact: true });
-    await tempo.fill('240');
+    await tempo.fill('320');
     await tempo.press('Enter');
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
-    // Follow the highlighted bar until the song has come back round to the top twice.
+    // Follow the highlighted bar round one lap and back to the top (the lap-2 ending re-arm rests
+    // on `band-chart.test.ts`).
     const visits: string[] = [];
     await expect
         .poll(
@@ -107,10 +108,10 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
             },
             { timeout: 40_000, intervals: [50], message: `bar visits: ${visits.join(' ')}` },
         )
-        .toBeGreaterThanOrEqual(2);
-    // Every bar, the held and silent ones included, lit in written order on each lap.
+        .toBeGreaterThanOrEqual(1);
+    // Every bar, the held and silent ones included, lit in written order round the lap.
     const laps = visits.slice(visits.indexOf(ids[0]), visits.lastIndexOf(ids[0]));
-    expect(laps).toEqual([...ids, ...ids]);
+    expect(laps).toEqual(ids);
 
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Start playback', exact: true })).toBeEnabled();
@@ -181,9 +182,9 @@ test('repeats and endings: the stand keeps its written bars while the band walks
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     const tempo = page.getByLabel('Tempo', { exact: true });
-    await tempo.fill('240');
+    await tempo.fill('320');
     await tempo.press('Enter');
-    await expect(tempo).toHaveValue('240');
+    await expect(tempo).toHaveValue('320');
     const bars = page.locator('.sheet .bar');
     await expect(bars).toHaveCount(4);
     await expect(page.locator('.sheet .chord')).toHaveText(['C', 'G', 'Am', 'F']);
@@ -207,13 +208,14 @@ test('repeats and endings: the stand keeps its written bars while the band walks
                 if (id !== null && visits.at(-1) !== id) {
                     visits.push(id);
                 }
-                // Two whole laps of the six-bar route after the first bar-1 visit.
+                // One whole lap of the six-bar route, and the return to bar 1, after the first
+                // bar-1 visit.
                 const first = visits.indexOf(written[0]);
                 return first < 0 ? 0 : visits.length - first;
             },
             { timeout: 40_000, intervals: [50], message: `bar visits: ${visits.join(' ')}` },
         )
-        .toBeGreaterThanOrEqual(13);
+        .toBeGreaterThanOrEqual(7);
     // Still the four written bars, in place, with nothing scrolling sideways.
     await expect(bars).toHaveCount(4);
     expect(
@@ -224,11 +226,11 @@ test('repeats and endings: the stand keeps its written bars while the band walks
     );
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 
-    // The route, from the first full lap on: 1 2 3, then 1 2 4.
+    // The route, from the first full lap on: 1 2 3, then 1 2 4, and back to 1.
     const [one, two, three, four] = written;
     const route = [one, two, three, one, two, four];
     const start = visits.indexOf(one);
-    const lap = visits.slice(start, start + route.length * 2);
-    expect(lap).toEqual([...route, ...route]);
+    const lap = visits.slice(start, start + route.length + 1);
+    expect(lap).toEqual([...route, one]);
     expect(errors).toEqual([]);
 });

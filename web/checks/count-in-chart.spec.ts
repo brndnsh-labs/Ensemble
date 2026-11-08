@@ -23,7 +23,8 @@ test('the count-in counts down large over the first bar, then the bar lights as 
     page,
 }) => {
     await openWithCountIn(page);
-    await page.locator('[data-play-toggle]').click();
+    const toggle = page.locator('[data-play-toggle]');
+    await toggle.click();
 
     const countdown = page.locator('.bar-countin');
     await expect(countdown).toBeVisible();
@@ -34,17 +35,15 @@ test('the count-in counts down large over the first bar, then the bar lights as 
     const size = await countdown.evaluate((el) => Number.parseFloat(getComputedStyle(el).fontSize));
     expect(size).toBeGreaterThanOrEqual(48);
     await expect(firstBar.locator('.bar-countin')).toHaveCount(1);
+    // The play button counts the bar down instead of showing the stop glyph, and the chart's
+    // playhead doesn't move yet: the count-in must not advance it (#1422).
+    await expect(toggle).toHaveText(/^[1-4]$/);
+    await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(0);
 
-    // The count-in ends; the playing bar takes over.
+    // The count-in ends; the band's own downbeat lands, the glyph returns to stop, and the
+    // playing bar takes over.
     await expect(countdown).toHaveCount(0, { timeout: 12_000 });
+    await expect(toggle).toHaveText('■');
     await expect(page.locator('.bar.active')).toHaveCount(1);
-});
-
-test('reduced motion: the countdown does not animate', async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: 'reduce' });
-    await openWithCountIn(page);
-    await page.locator('[data-play-toggle]').click();
-    const countdown = page.locator('.bar-countin');
-    await expect(countdown).toBeVisible();
-    expect(await countdown.evaluate((el) => getComputedStyle(el).animationName)).toBe('none');
+    await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(1);
 });

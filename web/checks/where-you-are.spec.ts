@@ -6,11 +6,12 @@ import { expect, measureSong, openBand, seedGuestDocuments, songLink, test } fro
  * clock), the bars of the player's turn tinted and named while the band trades, and the chart
  * footer saying what the device's Song length will really play.
  *
- * Four bars at 240 bpm is a four-second chorus, so each pass is quick to reach.
+ * Four bars at 240 bpm is a four-second chorus, so each pass is quick to reach; the counted chart
+ * that only counts choruses is two bars at 320 bpm (the ceiling), a 1.5-second one.
  */
 const FORM = 'C|G|Am|F';
 const COUNTED = (() => {
-    const doc = measureSong(['where-counted', 'Where counted', 'Rock', 'C', FORM, 240]);
+    const doc = measureSong(['where-counted', 'Where counted', 'Rock', 'C', 'C|G', 320]);
     doc.chart.score.choruses = 3;
     return doc;
 })();
