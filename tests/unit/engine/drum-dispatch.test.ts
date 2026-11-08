@@ -195,7 +195,6 @@ type Scenario = {
     variant: Variant;
     voice?: string;
     packKeys?: string[];
-    noAudio?: boolean;
     /** The lane count handed to the hit (the cymbal trim's input); omitted, the voice's default. */
     layers?: number;
     /** Extra hits played on the same context after the first, in order. */
@@ -224,7 +223,7 @@ async function record(scenario: Scenario): Promise<string[]> {
 
     const state = {
         playback: {
-            audio: scenario.noAudio ? null : rec.audio,
+            audio: rec.audio,
             bandIntensity: 0.7,
             audioGraph: { drums: { gain: drumsBus }, bass: { sidechain } },
         },
@@ -338,6 +337,19 @@ describe('drum dispatcher', () => {
                 await record({ name: 'Snare', variant }),
             );
         }
+    });
+
+    it('falls through to the synth voice for a hit the sample kit does not hold (yet)', async () => {
+        // A pack still loading, or one without a sidestick take: the hit must still sound, as
+        // the synth kit plays it, never go silent.
+        expect(
+            await record({
+                name: 'Sidestick',
+                variant: 'normal',
+                voice: 'pack:dispatch-test-kit',
+                packKeys: ['kick'],
+            }),
+        ).toEqual(await record({ name: 'Sidestick', variant: 'normal' }));
     });
 
     it('gives every band drum piece a synth voice, ride bell excepted (#1644)', async () => {

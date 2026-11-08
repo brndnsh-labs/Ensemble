@@ -385,6 +385,11 @@ describe('Mix & Signal Integrity Audit', () => {
         const { volume } = playback.audioGraph.master;
         // masterVolume 0.5 in the mock state.
         expect(volume.gain.setValueAtTime.mock.calls[0][0]).toBeCloseTo(0.5, 6);
+        // The bus sum into the glue stays fixed whatever the volume (#2002): golden always
+        // renders at volume 1, so only this catches a master gain that follows it.
+        expect(
+            playback.audioGraph.master.gain.gain.exponentialRampToValueAtTime.mock.calls[0][0],
+        ).toBeCloseTo(0.85, 4);
 
         playback.masterVolume = Number.NaN;
         syncMasterVolume(getState());

@@ -220,7 +220,7 @@ All `core/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.json
 
 ## Testing Standards
 
-### Adding a test (the suite was pruned in #2149–#2153; keep it lean)
+### Adding a test (the suite was pruned on 2026-11-08, #2149–#2153; keep it lean)
 
 - **A new test names the fault it catches that no existing test does** — be ready to show the mutation: break the line, name the test that goes red. Deleting a test whose claim another test already carries is ordinary work, and a story that generalises an older rule folds the old test into the new one in the same PR.
 - **Pin behaviour, not structure.** A voice is pinned by `npm run golden` and by laws (no NaN on a param, a monotonic envelope, a leak-free disconnect), never by node counts, oscillator types, `connect()` order or a snapshot of mock calls. Where golden can't hear a layer (the piano's hammer chiff), one narrow existence test stands in, and says so.
