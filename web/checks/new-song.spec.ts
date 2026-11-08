@@ -69,13 +69,7 @@ test('a nudge undone by hand on a kept new song leaves nothing unsaved (#1706)',
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
-test('leaving a new song with bars typed but not applied keeps them', async ({
-    page,
-}, testInfo) => {
-    test.skip(
-        testInfo.project.name !== 'laptop',
-        'draft-vs-kept logic is browser-independent; WebKit cover: "a title typed straight through the new song being kept lands whole" keeps a new song on WebKit',
-    );
+test('leaving a new song with bars typed but not applied keeps them', async ({ page }) => {
     await seedStarters(page);
     await newSong(page);
     await typeBar(page, 1, 'Dm7');

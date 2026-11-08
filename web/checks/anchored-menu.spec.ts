@@ -152,6 +152,9 @@ test('on a phone the menu is a sheet from the foot of the screen, closed by its 
     // It names the song it is about, since it is away from the row.
     await expect(sheet.locator('.menu-title')).toHaveText('Blue pocket');
     await expect(page.locator('.menu-backdrop')).toBeVisible();
+    // A sheet, never a modal: no open dialog, no Close button.
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
 
     // A tap on the backdrop, right over a song's row, closes the sheet — and only it: the song
     // under the tap is not opened.

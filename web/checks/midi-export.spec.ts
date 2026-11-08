@@ -221,7 +221,10 @@ test('Export MIDI during playback does not stop or glitch the band', async ({ pa
 
     const download = page.waitForEvent('download');
     await exportAs(page, 'MIDI');
-    await download;
+    // The MIDI file has its own download path (`downloadExportResult`); this is its WebKit run.
+    const file = await download;
+    expect(file.suggestedFilename()).toBe('Blue pocket.mid');
+    expect(await file.failure()).toBeNull();
 
     // Still playing: the export renders the band's own event stream offline and never touches
     // the live host, so the transport must not have stopped or needed a restart.

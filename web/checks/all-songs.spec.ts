@@ -567,7 +567,7 @@ test('after a row delete, focus goes to the next row, or the heading once the li
 }, testInfo) => {
     test.skip(
         testInfo.project.name !== 'laptop',
-        'focus after a row delete is browser-independent; WebKit cover: "the row ⋯ menu" deletes rows on WebKit',
+        'focus after a row delete is browser-independent; WebKit cover: songbook-home "deleting the last song on the home lands focus…"',
     );
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();

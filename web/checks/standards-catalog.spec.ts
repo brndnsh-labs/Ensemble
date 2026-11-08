@@ -216,13 +216,6 @@ test('a changed standard keeps its changes, marked; Keep a copy carries them', a
  * a ref captured inside `StandardsBrowser` itself would already be pointing at a removed node by
  * the time its own unmount cleanup could use it.
  */
-/**
- * Leaving returns focus to the entry point on home (#1440 review P3), not `<body>`. This view
- * swap remounts `Songbook` (and its "Browse all →" button) on every return, so the fix has
- * to be a ref the SHELL holds across that remount (`app/ensemble.tsx`'s `standardsEntryRef`) —
- * a ref captured inside `StandardsBrowser` itself would already be pointing at a removed node by
- * the time its own unmount cleanup could use it.
- */
 test('leaving the standards browser returns focus to its entry point on home', async ({ page }) => {
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Browse all →' }).click();

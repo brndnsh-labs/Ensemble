@@ -30,11 +30,7 @@ test('Back and Forward move between the songbook and All songs; the URL stays pu
     expect(page.url()).toBe(url);
 });
 
-test('Back from a song returns to the page it was opened from', async ({ page }, testInfo) => {
-    test.skip(
-        testInfo.project.name !== 'laptop',
-        'browser-independent history wiring; WebKit cover: "the in-app back button goes back in history too"',
-    );
+test('Back from a song returns to the page it was opened from', async ({ page }) => {
     await seedStarters(page);
     await page.getByRole('button', { name: /All 3 songs/ }).click();
     await songLink(page, 'Blue pocket').first().click();
@@ -101,13 +97,7 @@ test('the in-app back button goes back in history too, so Forward reopens the so
     expect(await page.evaluate(() => history.length)).toBe(length + 1);
 });
 
-test('an unsaved edit survives Back the way it survives the back button', async ({
-    page,
-}, testInfo) => {
-    test.skip(
-        testInfo.project.name !== 'laptop',
-        'browser-independent history wiring; WebKit cover: "Back on an edited standard leaves at once"',
-    );
+test('an unsaved edit survives Back the way it survives the back button', async ({ page }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket').first().click();
     await onSong(page, 'Blue pocket');

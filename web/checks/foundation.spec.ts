@@ -116,7 +116,7 @@ for (const [width, height] of [
     test(`responsive chart and editor fit ${width}x${height}`, async ({ page }, testInfo) => {
         test.skip(
             testInfo.project.name !== 'laptop',
-            'viewport sizes are set explicitly, so the layout claim is not engine-specific; WebKit cover: header-fit "a landscape phone keeps the transport on one row" and chart-fit\'s fit tests',
+            'viewport sizes are set explicitly, so the layout claim is not engine-specific; WebKit cover: usability "Edit chart, a bar and the section menu are in reach…" (four viewports), phone-fold.spec.ts, and band-sheet\'s backdrop test (focus back on Band…)',
         );
         await seedStarters(page);
         await songLink(page, 'Blue pocket', 'Blues').click();
@@ -181,7 +181,7 @@ test('file export/import is detached; invalid input never changes the active son
 }, testInfo) => {
     test.skip(
         testInfo.project.name !== 'laptop',
-        'file I/O and import validation are browser-independent; WebKit cover: semantic-chart "semantic revision conflicts keep both takes, and unsupported imports never create a partial song" imports a bad file on both projects',
+        'file I/O and import validation are browser-independent; WebKit cover: semantic-chart "unsupported imports never create a partial song" imports a bad file on both projects',
     );
     // Model slow device file I/O. Assertions must wait for import completion,
     // not confuse the disabled-during-import Save button with a finished save.

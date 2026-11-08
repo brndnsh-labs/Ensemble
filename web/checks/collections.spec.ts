@@ -117,13 +117,7 @@ test('a collection keeps its own order, and deleting it keeps every song', async
     await expect(rows(page)).toHaveCount(3);
 });
 
-test('“also delete” removes only the songs that are in no other collection', async ({
-    page,
-}, testInfo) => {
-    test.skip(
-        testInfo.project.name !== 'laptop',
-        'delete-set arithmetic is browser-independent; WebKit cover: "a collection keeps its own order, and deleting it keeps every song" runs the same Delete collection dialog on WebKit',
-    );
+test('“also delete” removes only the songs that are in no other collection', async ({ page }) => {
     await seedStarters(page);
     await openAllSongs(page);
     await addToNew(page, 'Minor swing sketch', 'Friday gig');
