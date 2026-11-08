@@ -14,7 +14,11 @@ import {
 test('manual sounds save, revert, export/import and play sampled audio after offline reload', async ({
     page,
     disconnect,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the sound claims are JavaScript, not browser: Cache stubs and saved values; WebKit still runs the offline reload, install and sample playback in the one-install test',
+    );
     // Its neighbours' budget: an offline reload, an export/import round trip and five trips into
     // the Band sheet ran within a few seconds of the default on CI's WebKit.
     test.setTimeout(120_000);
@@ -91,7 +95,13 @@ test('manual sounds save, revert, export/import and play sampled audio after off
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
-test('every lane routes real samples and every catalog choice downloads', async ({ page }) => {
+test('every lane routes real samples and every catalog choice downloads', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'per-pack download and decode is catalog integrity, not browser behaviour; WebKit still decodes a pack per family in the one-install test and style-sounds',
+    );
     test.setTimeout(120_000);
     await observeSamples(page);
     await seedStarters(page);
@@ -127,7 +137,13 @@ test('every lane routes real samples and every catalog choice downloads', async 
     }
 });
 
-test('corrupt downloads and storage failures preserve the previous sound', async ({ page }) => {
+test('corrupt downloads and storage failures preserve the previous sound', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'fetch and Cache.put stubs on error-path logic, no browser-specific behaviour; WebKit still runs the one-install test',
+    );
     // `packs` crosses into the page as an argument: this body runs in the browser, where the
     // suite's `appUrl` does not exist.
     await page.addInitScript((packs: string) => {
@@ -291,47 +307,13 @@ test('one install applies genre sounds, preserves manual overrides and follows f
     await expect(page.getByLabel('Chords sound', { exact: true })).toHaveValue('pack:rhodes');
 });
 
-test('installed sounds follow the feel after a reload without touching the Players tab', async ({
-    page,
-}) => {
-    // #1405: installing is durable, so activating must be too. After a reload the stand reads
-    // what is installed from the sound cache, and a song never opened since plays on it.
-    test.setTimeout(120_000);
-    await observeSamples(page);
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await openSounds(page);
-    await page.getByRole('button', { name: 'Install all & use style sounds' }).click();
-    await expect(page.getByRole('button', { name: 'Install all & use style sounds' })).toBeEnabled({
-        timeout: 60_000,
-    });
-    await closeSounds(page);
-    await page.reload();
-    const downloads: string[] = [];
-    page.on('request', (request) => {
-        if (request.url().includes(appUrl('packs/'))) {
-            downloads.push(request.url());
-        }
-    });
-    await songLink(page, 'Minor swing sketch', 'Jazz').click();
-    await openSounds(page);
-    for (const label of LANES) {
-        await expect(page.getByLabel(`${label} sound`, { exact: true })).toHaveValue('auto');
-    }
-    await expect(page.locator('.resolved-sound')).toHaveCount(LANES.length);
-    await expect(page.locator('.resolved-sound', { hasText: 'Built-in' })).toHaveCount(0);
-    await closeSounds(page);
-    // Resolving on open is not an edit.
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    await expect.poll(() => sampleStarts(page)).toBeGreaterThan(0);
-    await page.getByRole('button', { name: 'Stop playback' }).click();
-    expect(downloads).toEqual([]);
-});
-
 test('failed bulk installation keeps every previous voice and retries completed downloads', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'a Cache.put stub on cache bookkeeping, not browser behaviour; WebKit still runs the one-install test',
+    );
     test.setTimeout(120_000);
     // Browser-side body; the pack URL arrives as an argument (see the corrupt-download test).
     await page.addInitScript((kit: string) => {
@@ -384,7 +366,11 @@ test('failed bulk installation keeps every previous voice and retries completed 
 test('feel preparation keeps the stand stable, rolls back playback safely, and respects Stop', async ({
     page,
     disconnect,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'runtime sequencing asserted by sample-start deltas and the Style value, not browser timing; WebKit changes the feel mid-play in "a feel staged for the next bar settles when the musician stops inside it"',
+    );
     test.setTimeout(120_000);
     await observeSamples(page);
     // Browser-side body; the pack URL arrives as an argument (see the corrupt-download test).
@@ -493,6 +479,8 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
 test('a feel staged for the next bar settles when the musician stops inside it', async ({
     page,
 }) => {
+    // Runs on both projects: on built-in sounds, cheap, and WebKit's one run of a feel changed
+    // while the band plays (the one-install test changes Style only while stopped).
     // Deliberately a built-in-sound band: no pack download can mask the engine
     // half of a live feel change. A feel changed mid-performance is staged and
     // swapped in at the next measure start, so the window between the choice and

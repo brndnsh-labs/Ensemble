@@ -197,6 +197,36 @@ test('a newer version in the account is surfaced, and adopting it replaces the s
         await page.getByTestId('conflict-use-account').click();
         await expect(page.getByTestId('adopt-remote-export')).toBeVisible();
         await expect(page.getByTestId('adopt-remote-unsaved')).toBeVisible();
+
+        // Cancelling the confirm step changes nothing at all: nothing adopted, nothing discarded,
+        // and the offer still on the table.
+        await page.getByTestId('adopt-remote-cancel').click();
+        await revealEditor(page);
+        await expect(page.getByLabel('Song title')).toHaveValue('Shared tune — my words');
+        await openSongActions(page);
+        await expect(page.getByTestId('sync-local')).toHaveText('Unsaved changes');
+        await closeSongActions(page);
+        await expect(page.getByTestId('conflict-banner')).toHaveAttribute(
+            'data-conflict',
+            'candidate',
+        );
+
+        // Including across a reload, which is the only proof the DRAFT survived rather than the
+        // screen: the retained row is what the next open recovers.
+        await page.reload();
+        await expect(page.getByTestId('library-loading')).toHaveCount(0);
+        await expect(page.getByTestId('song-newer-in-account')).toHaveCount(1);
+        await openSongShowing(page, 'Shared tune', 'Shared tune — my words');
+        await revealEditor(page);
+        await expect(page.getByLabel('Song title')).toHaveValue('Shared tune — my words');
+        await expect(page.getByTestId('conflict-banner')).toHaveAttribute(
+            'data-conflict',
+            'candidate',
+        );
+
+        // Then adopt for real.
+        await page.getByTestId('conflict-use-account').click();
+        await expect(page.getByTestId('adopt-remote-export')).toBeVisible();
         await page.getByTestId('adopt-remote-confirm').click();
 
         // The account's version is the song now — under the SAME id, so there is no second row —
@@ -402,58 +432,6 @@ test('a version that arrives while the confirm step is open is refused, not adop
             page.getByRole('heading', { name: 'Shared tune v3', exact: true }),
         ).toBeVisible();
         await expect(page.getByTestId('conflict-banner')).toHaveCount(0);
-    } finally {
-        await fresh.close();
-    }
-});
-
-test('cancelling the confirm step changes nothing at all', async ({
-    page,
-    browser,
-    accountApi,
-}) => {
-    const authenticator = await addVirtualAuthenticator(page);
-    await openWithAccounts(page);
-    await signUp(page);
-
-    await newSongOnTheStand(page);
-    await saveAndUpload(page, 'Shared tune');
-
-    const passkeys = await authenticator.credentials();
-    const fresh = await browser.newContext({ baseURL: accountApi.origin });
-    try {
-        const second = await fresh.newPage();
-        const spare = await addVirtualAuthenticator(second);
-        await spare.addCredential(passkeys[0]);
-        await signInOnSecondDevice(second);
-
-        await preservedRemoteUpdate(page, second);
-
-        await page.getByTestId('conflict-use-account').click();
-        await page.getByTestId('adopt-remote-cancel').click();
-
-        // Nothing adopted, nothing discarded, and the offer still on the table.
-        await expect(page.getByLabel('Song title')).toHaveValue('Shared tune — my words');
-        await openSongActions(page);
-        await expect(page.getByTestId('sync-local')).toHaveText('Unsaved changes');
-        await closeSongActions(page);
-        await expect(page.getByTestId('conflict-banner')).toHaveAttribute(
-            'data-conflict',
-            'candidate',
-        );
-
-        // Including across a reload, which is the only proof the DRAFT survived rather than the
-        // screen: the retained row is what the next open recovers.
-        await page.reload();
-        await expect(page.getByTestId('library-loading')).toHaveCount(0);
-        await expect(page.getByTestId('song-newer-in-account')).toHaveCount(1);
-        await openSongShowing(page, 'Shared tune', 'Shared tune — my words');
-        await revealEditor(page);
-        await expect(page.getByLabel('Song title')).toHaveValue('Shared tune — my words');
-        await expect(page.getByTestId('conflict-banner')).toHaveAttribute(
-            'data-conflict',
-            'candidate',
-        );
     } finally {
         await fresh.close();
     }

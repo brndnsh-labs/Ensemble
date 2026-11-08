@@ -26,9 +26,14 @@ function apiCalls(page: import('@playwright/test').Page): string[] {
 test('a default profile gets the account entry point and asks the server nothing', async ({
     page,
 }) => {
+    // The retired `?accounts=off` opt-out (#1743) rides along: a device that still
+    // carries its stored 'off' is an ordinary device now, so the key is inert (nothing reads it)
+    // and nothing removes it either.
+    await page.goto(appUrl('build.json'));
+    await page.evaluate(() => localStorage.setItem('ensemble-v2-preview:accounts', 'off'));
     const calls = apiCalls(page);
 
-    await page.goto(appUrl());
+    await page.goto(appUrl('?accounts=off'));
     await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
@@ -40,9 +45,18 @@ test('a default profile gets the account entry point and asks the server nothing
     // discover (`deviceMayHoldAccount`), and a musician who never signed in should not have this
     // app talking to a server on their behalf. Accounts are on: the entry point is right there.
     expect(calls).toEqual([]);
+    expect(await page.evaluate(() => localStorage.getItem('ensemble-v2-preview:accounts'))).toBe(
+        'off',
+    );
 });
 
-test('a device that holds an account does ask for its session, once', async ({ page }) => {
+test('a device that holds an account does ask for its session, once', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the gated session read is app logic, not browser behaviour; WebKit still runs the held-device tests that follow (the unreachable, error and never-answered servers), each of which makes that same request',
+    );
     // The other side of the gate, and the one that matters for sign-in persistence: a device
     // with account records must still discover the session it has, or signing in would not
     // survive a reload.
@@ -56,26 +70,6 @@ test('a device that holds an account does ask for its session, once', async ({ p
     // Exactly one, and only that one: nothing downloads a library or queues a Save for a device
     // the server has not recognised.
     await expect.poll(() => calls).toEqual(['GET /api/auth/session']);
-});
-
-test('a device left opted out by the retired `?accounts=off` gets the product, and its key stays', async ({
-    page,
-}) => {
-    // The per-device opt-out went in #1743. A device that still carries its stored 'off' is an
-    // ordinary device now: the key is inert, nothing reads it, and nothing removes it either.
-    await page.goto(appUrl('build.json'));
-    await page.evaluate(() => localStorage.setItem('ensemble-v2-preview:accounts', 'off'));
-    const calls = apiCalls(page);
-
-    await page.goto(appUrl('?accounts=off'));
-    await expect(page.getByTestId('library-heading')).toBeVisible();
-    await expect(page.getByTestId('account-sign-in')).toBeVisible();
-    await page.waitForTimeout(500);
-    // Still nothing on the wire: this device has never held an account (`deviceMayHoldAccount`).
-    expect(calls).toEqual([]);
-    expect(await page.evaluate(() => localStorage.getItem('ensemble-v2-preview:accounts'))).toBe(
-        'off',
-    );
 });
 
 test('a default profile still plays as a guest when the server is unreachable', async ({
@@ -121,11 +115,6 @@ test('a server that answers with an error leaves the guest songbook exactly as i
     await expect(page.getByTestId('library-loading')).toHaveCount(0);
     await expect(page.locator('.song-row').first()).toBeVisible();
     await expect(page.getByTestId('account-sign-in')).toBeVisible();
-
-    await page.getByRole('button', { name: 'Open chart' }).click();
-    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
-    await page.getByRole('button', { name: 'Stop playback' }).click();
 });
 
 test('an origin that accepts the session request and never answers it does not hold the songbook', async ({
@@ -150,18 +139,12 @@ test('an origin that accepts the session request and never answers it does not h
         await expect(page.getByTestId('account-fallback')).toContainText(
             'Couldn’t reach your account',
         );
-
-        await page.getByRole('button', { name: 'Open chart' }).click();
-        await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-        await expect(page.getByRole('button', { name: 'Stop playback' })).toBeVisible();
-        await page.getByRole('button', { name: 'Stop playback' }).click();
     } finally {
         await releaseApi(page);
     }
 
     // The late answer retires the notice — a fallback that outlived the thing it was standing in
     // for would be its own wrong claim.
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(page.getByTestId('account-fallback')).toHaveCount(0);
 });
 

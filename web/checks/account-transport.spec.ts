@@ -12,28 +12,17 @@ import { appUrl, expect, test } from './fixtures';
  * body in a page script that merely LOOKS like `songbook.prepare()`'s output would prove the
  * fake, not this repo's frozen-request code path — also explicitly ruled out.
  *
- * So this spec proves the two properties #1261's acceptance falls back to instead, unit tests
+ * So this spec proves the one property #1261’s acceptance falls back to instead (the worker never caches /api), with unit tests
  * covering the transport/session/error-mapping logic itself (`tests/unit/songbook/account-*`).
  * It needs no passkey and no real account API, so it uses the plain guest `test` fixture, not
  * `accountTest` — nothing here is wired into the app, so there is no signed-in state to reach.
  */
 
-test('the guest app cold-starts with /api/* unreachable', async ({ page }) => {
-    // `scripts/serve.mjs` 404s every `/api/*` path until a worker calls `/__test/api?target=`
-    // (only `accountTest` does that) — the default state every OTHER spec in this suite runs
-    // under. Nothing in `app/ensemble.tsx` calls `/api/*` yet (#1261 wires no UI), so the guest
-    // app already proves "cold-starts AND plays with the API unreachable" on every green run of
-    // the rest of this suite (which does exercise playback, extensively); this assertion pins
-    // the unreachable-API precondition itself, directly, rather than relying on inference.
-    await page.goto(appUrl());
-    await expect(page.getByTestId('library-heading')).toBeVisible();
-    const status = await page.evaluate(() =>
-        fetch('/api/auth/session', { cache: 'no-store' }).then((response) => response.status),
+test('a service worker never caches an /api/ response', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'sw.js is one generated file whose /api early-return is JavaScript, not browser behaviour; account-entry’s ‘a default profile still plays as a guest when the server is unreachable’ still runs on WebKit and sees its session request leave the page',
     );
-    expect(status).toBe(404);
-});
-
-test('a service worker never caches an /api/ response', async ({ page }) => {
     await page.goto(appUrl());
     // The generated `sw.js` (`scripts/offline.mjs`) returns early for `/api` and everything
     // under it — an explicit exclusion, because at the cutover's root scope the prefix test
