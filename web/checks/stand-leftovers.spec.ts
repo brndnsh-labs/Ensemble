@@ -72,7 +72,10 @@ test('Play on a scrolled chart brings the start bar into view for the count-in (
     page,
 }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await seedGuestDocuments(page, [...starterDocuments(), longChart()]);
+    // why: at 40 BPM the count-in bar lasts six seconds. At the chart's usual 110 it lasted
+    // about two, and a slow CI runner checked the viewport after the count-in had ended
+    // ("element(s) not found").
+    await seedGuestDocuments(page, [...starterDocuments(), longChart(40)]);
     await songLink(page, 'Long chart').click();
     await openBand(page, 'Practice');
     await page.getByLabel('Count-in', { exact: true }).check();

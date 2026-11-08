@@ -35,6 +35,14 @@ entry here).
 
 ## Registry
 
+### 🟢 `web/checks/stand-leftovers.spec.ts` — "Play on a scrolled chart brings the start bar into view for the count-in (#1991)" (71)
+
+- **Class:** e2e-timing (the ruler, not the app).
+- **Symptom:** `main`'s CI on `v2-suite (2, laptop)` after #2133 (run 42457954126): `expect(locator).toBeInViewport()` failed with "element(s) not found" right after `toBeVisible()` passed on the same `.bar-countin`.
+- **Root cause:** the chart played at 110 BPM, so the one-bar count-in lasted about 2 s. A slow runner reached the viewport check after the count-in had ended and its element was gone.
+- **Fix (2026-11-08):** the test's chart plays at 40 BPM, so the count-in lasts about 6 s, as the resume-pill test beside it already does. The assertions are unchanged.
+- **Last seen:** 2026-11-08 (`main`, run 42457954126).
+
 ### 🟢 `web/checks/band-engine-charts.spec.ts` — "the band engine opens and plays holds, N.C., fermatas and off-grid lengths" (36)
 
 - **Class:** e2e-timing (the ruler, not the app).
