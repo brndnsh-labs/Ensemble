@@ -278,22 +278,23 @@ jobs:
         # playwright.config.ts. Each leg is `V2_SHARD=<shard>/<of>`, so a project's legs
         # must count 1..<of> with none missing, or its specs on the missing leg never run.
         #
-        # Four laptop legs and five WebKit (#2141, measured on the runner 2026-11-08, run
-        # 42488193831): the suite grew from 62 spec files to 100, and on 3 + 4 legs each ran
-        # 277-333s. A leg is about 75s of setup and build, then its test-seconds over three
-        # workers: laptop 2094s and WebKit 2669s deal out to about 260s a leg here. Runner
-        # minutes are free on this public repo, but every leg pays that 75s again, so each
-        # further leg buys less.
+        # Five laptop legs and four WebKit (re-dealt 2026-11-08 after the suite was pruned,
+        # #2149-#2153; measured on CI run 42500804284). The prune pinned ~100 browser-independent
+        # tests to laptop, so WebKit fell from 2669 to 1512 test-seconds and laptop (1821) became
+        # the long pole. A leg is about 85s of setup and build, then its test-seconds over three
+        # workers: this deal comes to about 210s a leg on both sides, with the same nine jobs as
+        # 4 + 5. Re-deal (`npm run shard:weights`, then the counts here) when one side's legs run
+        # visibly longer than the other's.
         include:
-          - { project: laptop, browser: chromium, shard: 1, of: 4 }
-          - { project: laptop, browser: chromium, shard: 2, of: 4 }
-          - { project: laptop, browser: chromium, shard: 3, of: 4 }
-          - { project: laptop, browser: chromium, shard: 4, of: 4 }
-          - { project: webkit-phone, browser: webkit, shard: 1, of: 5 }
-          - { project: webkit-phone, browser: webkit, shard: 2, of: 5 }
-          - { project: webkit-phone, browser: webkit, shard: 3, of: 5 }
-          - { project: webkit-phone, browser: webkit, shard: 4, of: 5 }
-          - { project: webkit-phone, browser: webkit, shard: 5, of: 5 }
+          - { project: laptop, browser: chromium, shard: 1, of: 5 }
+          - { project: laptop, browser: chromium, shard: 2, of: 5 }
+          - { project: laptop, browser: chromium, shard: 3, of: 5 }
+          - { project: laptop, browser: chromium, shard: 4, of: 5 }
+          - { project: laptop, browser: chromium, shard: 5, of: 5 }
+          - { project: webkit-phone, browser: webkit, shard: 1, of: 4 }
+          - { project: webkit-phone, browser: webkit, shard: 2, of: 4 }
+          - { project: webkit-phone, browser: webkit, shard: 3, of: 4 }
+          - { project: webkit-phone, browser: webkit, shard: 4, of: 4 }
     steps:
       - uses: actions/checkout@v7
 
