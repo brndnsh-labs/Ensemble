@@ -358,9 +358,13 @@ expression devices take turns rather than stack; one peak note per cycle.
     phrase only when the line goes on below the bent pitch; at a phrase end only onto the blue
     third over a chord with no major 7th or the b7 over a dominant or a plain triad, never the
     4. The slot's last note held into the next phrase keeps its bend. And it slides into a
-    landing (a note struck on a chord change) it doesn't bend (`slideIn`: 2–3 frets below
-    mostly, 4–5 now and then, 2 above sometimes, over a thirty-second or a sixteenth). Blues and
-    rock.
+    landing (a note struck on a chord change) it doesn't bend (`slideIn`, over a thirty-second
+    or a sixteenth), from a scale tone a few frets away (#2139, `slideStarts`). From below:
+    b7 → R (not over a maj7), 6 → R or 5 → R; 4 → 5, or 3 → 5 (b3 → 5 on a minor chord);
+    5 → b7; R → b3; 2 → 3, and the one one-fret slide, b3 → 3 onto a major third (by
+    decision). From two above: 2 → R, 6 → 5, 4 → b3. A start the style's scale doesn't hold at
+    the chord (`LinePalette.pool`) isn't played, and a landing with none isn't slid into. Blues
+    and rock.
   - The host turns them into seconds by the note's own tempo (`leadArticulation`): a short
     fall takes its ticks (at most 40% of the note), a long one is added to the note's length so
     the voice sounds it into the rest; the release starts halfway and takes an eighth (at most

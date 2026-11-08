@@ -2551,6 +2551,30 @@ export const METRICS = {
         }
         return ratio(off, slides);
     },
+    /**
+     * Of the lead's landings (`leadLandings`) on their chord's major 3rd, an eighth or longer
+     * and not bent, the share slid up one fret from the b3 (`slideIn.from` −1, #2139): the
+     * blues guitarist's blue third slid into the 3rd he didn't bend.
+     */
+    leadThirdsSlidFromBlue: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const { note, chord } of leadLandings(t, events)) {
+                if (
+                    note.bendIn ||
+                    note.dur < STEP * 2 ||
+                    chord.third !== 4 ||
+                    mod12(note.midi - chord.root) !== 4
+                ) {
+                    continue;
+                }
+                n++;
+                hit += note.slideIn?.from === -1 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of lead notes bent or scooped into from below. */
     leadBendShare: (takes) => {
         let n = 0;
