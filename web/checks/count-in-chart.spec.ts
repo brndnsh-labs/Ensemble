@@ -11,6 +11,12 @@ async function openWithCountIn(page: import('@playwright/test').Page) {
     await openBand(page, 'Practice');
     await page.getByLabel('Count-in', { exact: true }).check();
     await page.getByRole('button', { name: 'Close band' }).click();
+    // why: at 40 BPM the count-in bar lasts six seconds. At the song's own tempo it lasted about
+    // two, and a slow WebKit read the countdown's font size after the element had gone (NaN).
+    const tempo = page.getByLabel('Tempo', { exact: true });
+    await tempo.fill('40');
+    await tempo.press('Enter');
+    await expect(tempo).toHaveValue('40');
 }
 
 test('the count-in counts down large over the first bar, then the bar lights as playing', async ({
@@ -30,7 +36,7 @@ test('the count-in counts down large over the first bar, then the bar lights as 
     await expect(firstBar.locator('.bar-countin')).toHaveCount(1);
 
     // The count-in ends; the playing bar takes over.
-    await expect(countdown).toHaveCount(0, { timeout: 8000 });
+    await expect(countdown).toHaveCount(0, { timeout: 12_000 });
     await expect(page.locator('.bar.active')).toHaveCount(1);
 });
 
