@@ -177,6 +177,13 @@ export const hiphop = defineClaims({
                 // Two or three notes a bar: 2.20, against 2.71 on the shared figures (and 0.90 held
                 // a chord apiece). The ceiling sits between them, so it fails on the shared set.
                 leadNotesPerBar: [2, 2.5, 'a sparse hook, two or three notes a bar'],
+                // 0.054 with the head capped at the book's solo top (`bookReach`, #2135: a hook
+                // stays within a 6th of home). The pop song's 24-bar chorus sits at that cap,
+                // so over F → C and G → Am the line can't climb on: the two voices cross
+                // instead (A5 → E5, D5 → G5), a 4th apiece. A hook at the top of its range
+                // crossing to its other voice is the line, not a leap; 0.07 still fails a line
+                // that jumps.
+                leadMoveOverThird: [0, 0.07, 'voice-led: a 4th where the hook meets its top'],
             },
             [
                 // The hook's snap (1 and its "a") and its sixteenth pushes: 0.306 of the notes

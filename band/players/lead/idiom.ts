@@ -24,6 +24,7 @@ import { barSteps, dyn, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
 import { DEFAULT_GUIDE, type GuideRhythm } from './guide-figures.js';
 import { type GuideNote, guidePitchClasses, guideToneLine, headForm } from './guide-tones.js';
+import type { LeadProfile } from './instruments.js';
 import {
     type Contour,
     type LinePalette,
@@ -308,10 +309,21 @@ interface SlotPlan {
     breath?: number;
 }
 
-/** The lead's home register: the instrument's, lifted by the book, kept inside its range. */
+/**
+ * Where a book sits on an instrument: its `home` (the instrument's, lifted by the book's
+ * `register`, kept inside the range) and its `top`, the note its solo's peak climbs to (the
+ * instrument's top, or the book's `peak` over home). A guide-tone head is sung inside the same
+ * reach (#2123): the head never out-climbs the solo's climax.
+ */
+function bookReach(lead: LeadProfile, book: LeadBook): { home: number; top: number } {
+    const [lo, hi] = lead.range;
+    const home = Math.min(hi - 7, Math.max(lo + 5, lead.home + (book.register ?? 0)));
+    return { home, top: book.peak === undefined ? hi - 1 : Math.min(hi - 1, home + book.peak) };
+}
+
+/** The lead's home register (`bookReach`). */
 function homeOf(ctx: BarContext, book: LeadBook): number {
-    const [lo, hi] = ctx.lead.range;
-    return Math.min(hi - 7, Math.max(lo + 5, ctx.lead.home + (book.register ?? 0)));
+    return bookReach(ctx.lead, book).home;
 }
 
 /** A section's tune is keyed on its letter, so a written-out A2 or last A plays the first A's tune. */
@@ -410,8 +422,7 @@ function soloPlan(
             : soloArc(role.chorus, ctx.timeline, slotStart, tier);
     const [lo, hi] = ctx.lead.range;
     // The peak's top note: the instrument's top, or the book's reach above home.
-    const home = homeOf(ctx, book);
-    const top = book.peak === undefined ? hi - 1 : Math.min(hi - 1, home + book.peak);
+    const { home, top } = bookReach(ctx.lead, book);
     // A looping book plays its last phrase again, whole — the hook comes round.
     // The same place in the form from an earlier chorus first (a sample comes round with the
     // chords), else the phrase just played.
@@ -833,7 +844,9 @@ function lineRng(ctx: BarContext, role: LeadRole, slotStart: number): Rng {
  */
 function headGuideLine(ctx: BarContext, book: LeadBook, slotStart: number): GuideNote[] {
     const first = ctx.timeline.bars[slotStart];
-    const written = guideToneLine(ctx.timeline, first, homeOf(ctx, book), ctx.lead.range);
+    // The head is sung between the instrument's floor and the solo's top (`bookReach`).
+    const { home, top } = bookReach(ctx.lead, book);
+    const written = guideToneLine(ctx.timeline, first, home, [ctx.lead.range[0], top]);
     const split = ctx.ending?.start;
     return split === undefined
         ? written
@@ -1228,7 +1241,9 @@ function voiceGuideTones(ctx: BarContext, book: LeadBook, slotStart: number): Vo
         line.reduce<GuideNote | undefined>((at, n) => (n.tick <= tick ? n : at), line[0]);
     const onsets = guideOnsets(ctx, slotStart, plan, lineAt);
     const { spans, bars } = ctx.timeline;
-    const range = ctx.lead.range;
+    // The walk keeps to the line's own reach, under the solo's top (`bookReach`, #2123):
+    // walking over the line in a bridge, it ran on to the range's top, over a book's peak.
+    const range = [ctx.lead.range[0], bookReach(ctx.lead, book).top] as const;
     const lastBar = bars[Math.min(bars.length, slotStart + plan.kinds.length) - 1];
     // A phrase that hands on (`handsOn`) aims its last notes at the next phrase's first guide
     // tone, struck beside it: a turn leads in. why: pinned to the guide tone still sounding, a
@@ -2037,9 +2052,18 @@ function planSlot(
     return { notes, motif, trailing, phrase, phrases, fell };
 }
 
-export function leadIdiom(book: LeadBook): PitchedIdiom {
+/**
+ * A lead book's idiom, with where it sits on an instrument (`bookReach`): its home, and the top
+ * note its solo peaks on and its head never passes.
+ */
+export interface LeadIdiom extends PitchedIdiom {
+    register(lead: LeadProfile): { home: number; top: number };
+}
+
+export function leadIdiom(book: LeadBook): LeadIdiom {
     return {
         name: book.name,
+        register: (lead) => bookReach(lead, book),
         init: (): LeadMemory => ({
             slot: '',
             notes: [],

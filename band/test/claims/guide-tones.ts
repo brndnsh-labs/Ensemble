@@ -58,7 +58,7 @@ const STANDARD = [
     ['leadHeadContrastDiffers', 0, 0.3, 'the contrast is another rhythm'],
     // From where the A ended, a 4th's aim: 4.0 in every style (Rhythm Changes' bridge 3, the
     // minor funk's 5). A sax or nylon book's line sits high (+4, +5), and read 0.5 until the
-    // bridge could climb into the headroom over the A (`BRIDGE_TOP`, #2123).
+    // bridge could climb into the headroom over the A, up to the book's solo top (#2123).
     ['leadBridgeLift', 2, 7, 'the bridge lifts from where the A ended'],
     // The whole contrast, not its seam (#2123), and any contrast, not only a bridge (#2140):
     // 0.72 (ska-punk) to 2.12 (rock) over the rest of the head. That is a mean over the
