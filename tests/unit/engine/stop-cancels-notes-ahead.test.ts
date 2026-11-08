@@ -6,7 +6,17 @@
  * ahead from sounding; the other lanes still played theirs after Stop. Each voice now registers
  * its outputs with its lane (`lane-voices.ts`), and a Stop before its start cuts them.
  */
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({ zones: [] as unknown[] }));
+vi.mock('../../../core/engine/pack-runtime.js', () => ({
+    getPackZones: () => mocks.zones,
+}));
+
+import {
+    __resetPackCacheForTest,
+    registerPackBuffer,
+} from '../../../core/engine/instrument-registry.js';
 import { releaseLaneVoices } from '../../../core/engine/lane-voices.js';
 import { playSampledStrike } from '../../../core/engine/sample-voice.js';
 import { killBassNote, playBassNote } from '../../../core/engine/synth-bass.js';
@@ -90,7 +100,7 @@ function makeAudio({ offline = false } = {}) {
 
 const bus = () => ({ gain: { connect: vi.fn(), gain: param() } });
 
-function makeState(audio) {
+function makeState(audio, voice = 'synth') {
     return {
         playback: {
             audio,
@@ -98,15 +108,15 @@ function makeState(audio) {
             bandIntensity: 0.6,
             bpm: 120,
         },
-        chords: { voice: 'synth', style: 'piano', reverb: 0 },
-        bass: { voice: 'synth', style: 'rock', lastBassGain: null },
+        chords: { voice, style: 'piano', reverb: 0 },
+        bass: { voice, style: 'rock', lastBassGain: null },
         soloist: {
-            voice: 'synth',
+            voice,
             mode: 'monophonic',
             audio: { lastRenderedFreq: null, activeVoices: [] },
         },
         groove: {
-            voice: 'synth',
+            voice,
             humanize: 0,
             genreFeel: 'Rock',
             audioBuffers: { noise: { duration: 2, length: 96000 } },
@@ -257,5 +267,71 @@ describe('Stop cuts every lane’s notes scheduled ahead of the clock (#1999)', 
         expect(gain.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 0);
         expect(gain.gain.setTargetAtTime).not.toHaveBeenCalled();
         expect(source.stop.mock.calls.at(-1)[0]).toBeLessThanOrEqual(start);
+    });
+});
+
+/**
+ * Stop reaches every sampled lane (#1530). Each sampled voice joins its lane's set as it is
+ * made (`sample-voice.ts`), and each lane's kill function releases that set. Before, the host
+ * dropped the handles: a held organ chord, a sampled bass or lead note and a ringing sampled
+ * cymbal all played on after Stop. The notes above are the ones still ahead of the clock; these
+ * are the ones already sounding.
+ */
+describe('Stop silences every sampled lane (#1530)', () => {
+    const PACK = 'stop-test-pack';
+    const sampled = () => {
+        const { audio, nodes } = makeAudio();
+        const state = makeState(audio, `pack:${PACK}`);
+        const sources = () => audio.createBufferSource.mock.results.map((r) => r.value);
+        return { audio, nodes, state, sources };
+    };
+    /** The fades a stop asked for at (or within 10 ms after) the context's current time. */
+    const fadedNow = (nodes, audio) =>
+        nodes.filter((node) =>
+            node.gain.setTargetAtTime.mock.calls.some(
+                ([value, time]) =>
+                    value === 0 && time >= audio.currentTime && time < audio.currentTime + 0.01,
+            ),
+        );
+
+    beforeEach(() => {
+        __resetPackCacheForTest();
+        const buffer = { duration: 4 };
+        // One registration makes the pack "loaded"; the crash key is the kit's cymbal.
+        registerPackBuffer(PACK, 'crash', buffer);
+        mocks.zones = [{ rootMidi: 60, buffer }];
+    });
+
+    it.each([
+        ['chords', (state) => playNote(state, 261.63, 3, 8, { vol: 0.5 }), killAllPianoNotes],
+        ['bass', (state) => playBassNote(state, 110, 3, 8, 0.8, 0), killBassNote],
+        [
+            'soloist',
+            (state) => playSoloNote(state, 440, 3, 8, 0.8, 0, false, false, 1),
+            killSoloistNote,
+        ],
+        ['drums', (state) => playDrumSound(state, 'Crash', 3, 1), killDrumNote],
+    ])('a %s sample sounding at Stop is faded there', (_lane, play, kill) => {
+        const { audio, nodes, state, sources } = sampled();
+        play(state);
+        expect(sources()).toHaveLength(1);
+        // A hit is scheduled a couple of milliseconds past the clock; move the clock on so every
+        // lane's voice is sounding, not still ahead (that case is the describe above).
+        audio.currentTime += 0.01;
+        expect(fadedNow(nodes, audio)).toHaveLength(0);
+
+        kill(state);
+
+        expect(fadedNow(nodes, audio)).toHaveLength(1);
+        // Stopped within a tenth of a second of the Stop, not at the end of its hold.
+        expect(sources()[0].stop.mock.calls.at(-1)[0]).toBeLessThan(audio.currentTime + 0.1);
+    });
+
+    it('a note that has ended is not touched again', () => {
+        const { audio, nodes, state, sources } = sampled();
+        playNote(state, 261.63, 3, 0.5, { vol: 0.5 });
+        sources()[0].onended();
+        killAllPianoNotes(state);
+        expect(fadedNow(nodes, audio)).toHaveLength(0);
     });
 });

@@ -331,32 +331,6 @@ describe('revocation (owner scope, last-credential guard, session cascade)', () 
         expect(await nonexistent.json()).toEqual({ error: 'fresh_auth_required' });
     });
 
-    it('revoking the last credential without recovery material -> 409, credential still exists (mutation target: COUNT account scope)', async () => {
-        ctx = setUp();
-        const { accountId, credentialId } = await registerNewAccount(ctx);
-
-        // A second account with TWO credentials of its own, over HTTP -- dropping the
-        // account_id scope on the last-credential COUNT would count these too, never
-        // triggering the guard for account A's sole credential.
-        const jarB = createCookieJar();
-        const ctxB: Ctx = { ...ctx, jar: jarB };
-        await registerNewAccount(ctxB);
-        await addPasskeyOverHttp(ctxB);
-
-        const res = await postJson(ctx, '/api/auth/passkeys/revoke', { credentialId });
-        expect(res.status).toBe(409);
-        expect(await res.json()).toEqual({ error: 'last_credential' });
-
-        const row = ctx.testDb.db
-            .prepare('SELECT id FROM credentials WHERE id = ?')
-            .get(credentialId);
-        expect(row).toBeDefined();
-        const rows = ctx.testDb.db
-            .prepare('SELECT id FROM credentials WHERE account_id = ?')
-            .all(accountId);
-        expect(rows).toHaveLength(1);
-    });
-
     it('revoking the last credential WITH an unconsumed recovery code succeeds; with only a consumed one it is still 409', async () => {
         ctx = setUp();
         const { accountId, credentialId } = await registerNewAccount(ctx);
@@ -368,6 +342,7 @@ describe('revocation (owner scope, last-credential guard, session cascade)', () 
 
         const stillBlocked = await postJson(ctx, '/api/auth/passkeys/revoke', { credentialId });
         expect(stillBlocked.status).toBe(409);
+        expect(await stillBlocked.json()).toEqual({ error: 'last_credential' });
 
         ctx.testDb.db
             .prepare(

@@ -54,13 +54,17 @@ describe('Arranger Reducer', () => {
 
     describe('setArrangerParam', () => {
         it('should update all supported parameters', () => {
-            const params: { [K in keyof ArrangerState]?: unknown } = {
+            // Every field `ArrangerState` declares (the type is the checklist). Order matters:
+            // a meter change clears the grouping, so the grouping is written after it.
+            const params: { [K in keyof ArrangerState]: unknown } = {
                 sections: [],
                 key: 'F#',
                 timeSignature: '3/4',
                 grouping: [3, 2],
                 isMinor: true,
                 notation: 'name',
+                seed: 'abc123',
+                randomizeSeed: true,
             };
 
             for (const [param, value] of Object.entries(params) as Array<

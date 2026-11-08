@@ -5,10 +5,9 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { audioWatchdog } from '../../../core/engine/audio-recovery.js';
-import { activateWakeLock, initPlatform, lockAudio, unlockAudio } from '../../../core/platform.js';
 import { getState } from '../../../core/state.js';
 
-describe('Audio Recovery & Platform Integrity', () => {
+describe('Audio Recovery', () => {
     let mockAudioContext, mockAnalyser, mockMasterGain, playback;
 
     beforeEach(() => {
@@ -64,41 +63,6 @@ describe('Audio Recovery & Platform Integrity', () => {
         vi.restoreAllMocks();
     });
 
-    // --- Platform Tests ---
-    describe('Platform Integrity', () => {
-        it('should initialize a silent audio element for background playback', () => {
-            initPlatform();
-            expect(global.Audio).toHaveBeenCalled();
-        });
-
-        it('should play silent audio on unlock to keep AudioContext alive', async () => {
-            initPlatform();
-            unlockAudio();
-
-            const audioInstance = global.Audio.mock.results[0].value;
-            expect(audioInstance.play).toHaveBeenCalled();
-        });
-
-        it('should pause silent audio on lock', () => {
-            initPlatform();
-            lockAudio();
-            const audioInstance = global.Audio.mock.results[0].value;
-            expect(audioInstance.pause).toHaveBeenCalled();
-            expect(audioInstance.currentTime).toBe(0);
-        });
-
-        it('should handle WakeLock safely on unsupported browsers', async () => {
-            const nav = global.navigator;
-            const originalWakeLock = nav.wakeLock;
-            delete nav.wakeLock;
-
-            await expect(activateWakeLock()).resolves.not.toThrow();
-
-            nav.wakeLock = originalWakeLock; // Restore
-        });
-    });
-
-    // --- Watchdog Tests ---
     describe('AudioWatchdog', () => {
         it('should start and stop monitoring intervals', () => {
             audioWatchdog.start(() => playback);

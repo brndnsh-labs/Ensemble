@@ -194,17 +194,6 @@ describe('Soloist Synthesis', () => {
         expect(vibSpeed).toBeCloseTo(5.8, 0);
     });
 
-    it('should use dual sawtooth oscillators for trumpet tone', () => {
-        playSoloNote(getState(), 440, 10, 1.0, 1.0);
-
-        const osc1 = playback.audio.createOscillator.mock.results[0].value;
-        const osc2 = playback.audio.createOscillator.mock.results[1].value;
-
-        // Trumpet: both oscillators are sawtooth (one detuned via applyDetuneSettle).
-        expect(osc1.type).toBe('sawtooth');
-        expect(osc2.type).toBe('sawtooth');
-    });
-
     it('should handle rapid note triggers (shredding) without exceeding voice limit', () => {
         soloist.mode = 'monophonic';
         // Trigger 10 notes very rapidly

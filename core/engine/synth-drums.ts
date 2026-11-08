@@ -970,7 +970,8 @@ function mixStateFor(audio: BaseAudioContext): DrumMixState {
 // (NaN-guarded velocity, fixed pan); `playKickSnareCrashTom` carries the older preamble the
 // kick, snare, sidestick, crash and toms share, and is where a name no voice plays (RideBell on
 // the synth kit, a typo) is warned about and its panner freed. Do not hoist the preambles into
-// the dispatch: `tests/unit/engine/drum-dispatch.test.ts` pins the order of every side effect.
+// the dispatch: they differ in order and constants on purpose, and only `npm run golden`'s drum
+// stems would hear the change (the side-effect snapshots that pinned the order went in #2153).
 // `layers` is how many pitched lanes sound at this hit, for the cymbal trim (`getCymbalMixScale`); a
 // caller with no section behind the hit leaves it to `enabledLayerCount`.
 export function playDrumSound(

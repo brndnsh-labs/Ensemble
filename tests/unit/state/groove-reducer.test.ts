@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { groove, grooveReducer as grooveReducerImpl } from '../../../core/state/groove.js';
-import { ACTIONS } from '../../../core/types.js';
+import { ACTIONS, type GrooveState } from '../../../core/types.js';
 import { resetAllStateForTest } from '../../utils/reset-state.js';
 
 // Tests call grooveReducer with 1-2 args; production signature requires 2 (action object + optional playback).
@@ -65,20 +65,29 @@ describe('Groove Reducer', () => {
 
     describe('setGrooveParam', () => {
         it('should update all supported parameters', () => {
-            const params = {
+            // Every field `GrooveState` declares (the type is the checklist).
+            const params: { [K in keyof GrooveState]: unknown } = {
                 enabled: false,
+                voice: 'pack:test-kit',
+                autoSound: false,
                 volume: 0.1,
                 reverb: 0.1,
                 humanize: 50,
                 swing: 10,
                 swingSub: '16th',
+                audioBuffers: { noise: null },
                 genreFeel: 'Jazz',
+                lastHatGain: 0.8,
+                lastSampledHatVoice: null,
+                lastRideGain: 0.7,
+                lastCrashGain: 0.6,
                 lastSmartGenre: 'Jazz',
                 pendingGenreFeel: { feel: 'Funk' },
-                lastHatGain: 0.8,
             };
 
-            for (const [param, value] of Object.entries(params)) {
+            for (const [param, value] of Object.entries(params) as Array<
+                [keyof GrooveState, unknown]
+            >) {
                 grooveReducer(
                     { type: ACTIONS.SET_PARAM, payload: { module: 'groove', param, value } },
                     {},

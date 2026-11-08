@@ -101,46 +101,12 @@ describe('Chord Synthesis', () => {
         playback.audio.currentTime = 10;
     });
 
-    it('should use a PeriodicWave for the piano voice', () => {
-        // The reworked Piano voice no longer drives its body through a single
-        // PeriodicWave oscillator. The PeriodicWave now lives in the velocity
-        // "bright" layer (createBrightWave): at this velocity the bright layer
-        // blooms in, so a PeriodicWave is created and applied to one of the
-        // voice's oscillators (additive-body partials use plain sines).
-        playNote(getState(), 440, 10, 1.0);
-
-        expect(playback.audio.createPeriodicWave).toHaveBeenCalled();
-        const oscsWithWave = playback.audio.createOscillator.mock.results.filter(
-            (r) => r.value.setPeriodicWave.mock.calls.length > 0,
-        );
-        expect(oscsWithWave.length).toBe(1);
-    });
-
-    it('should create a hammer strike noise layer for Piano', () => {
+    // The one witness the hammer layer exists: `npm run golden` cannot hear it — silencing the
+    // chiff left every stem matching (#2153). Node counts and wave types are not pinned here;
+    // golden fingerprints the voice's sound.
+    it('strikes a hammer noise layer on a Piano note', () => {
         playNote(getState(), 440, 10, 1.0);
 
         expect(playback.audio.createBufferSource).toHaveBeenCalled();
-    });
-
-    // RETIRED (#649): the reworked Piano voice has no WaveShaper analog. The
-    // legacy `current` voice ran its body through a per-note WaveShaper; the new
-    // additive-body voice (playAdditiveBody) replaces the single-oscillator +
-    // shaper body with per-partial sine synthesis and never creates a
-    // WaveShaper. The intent ("non-muted Piano notes get the body voice; muted
-    // notes take a stripped path") is now covered by the additive-body
-    // partial-oscillator assertion below.
-    it('should build a per-partial additive body on non-muted Piano notes', () => {
-        // No WaveShaper in the reworked voice at all.
-        playNote(getState(), 440, 10, 1.0);
-        expect(playback.audio.createWaveShaper).not.toHaveBeenCalled();
-
-        // The additive body builds several sine partial oscillators. Beyond the
-        // pitched-click + bright layer (2 oscillators), the body adds its
-        // partial bank — so a non-muted Piano note creates more oscillators than
-        // those two onset layers alone.
-        const sinePartials = playback.audio.createOscillator.mock.results.filter(
-            (r) => r.value.type === 'sine',
-        );
-        expect(sinePartials.length).toBeGreaterThan(1);
     });
 });

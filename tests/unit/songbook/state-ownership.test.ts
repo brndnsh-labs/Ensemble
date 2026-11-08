@@ -2,22 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { STATE_OWNERSHIP_MANIFEST } from '../../../core/songbook/state-ownership.js';
 
 // The manifest's completeness is a compile-time guard (`satisfies` in state-ownership.ts); this
-// suite pins the classification decisions themselves. Its other half — classifying every field
-// v1's session writer emitted — went with that writer (#1424).
-describe('Songbook state ownership manifest (#1044)', () => {
-    it('records the settled ownership decisions exactly once', () => {
-        expect(STATE_OWNERSHIP_MANIFEST.arranger.notation).toBe('document');
-        for (const lane of ['chords', 'bass', 'soloist', 'groove'] as const) {
-            expect(STATE_OWNERSHIP_MANIFEST[lane].volume).toBe('document');
-            expect(STATE_OWNERSHIP_MANIFEST[lane].reverb).toBe('document');
-        }
-        // A chart's energy (DECISION 2026-09-26): saved with the chart, set only by the user.
-        expect(STATE_OWNERSHIP_MANIFEST.playback.bandIntensity).toBe('document');
-        expect(STATE_OWNERSHIP_MANIFEST.playback.autoIntensity).toBe('document');
-    });
+// pins the classification decisions themselves, including every field the Feel sheet
+// (`web/app/band-groove.tsx`) leans on: a `document` field saves with the chart, a `preferences`
+// one goes to the device-local key, a `runtime-derived` one is session-only.
+type Row = readonly [keyof typeof STATE_OWNERSHIP_MANIFEST, string, string];
+const OWNERS: Row[] = [
+    ['arranger', 'notation', 'document'],
+    ['groove', 'swing', 'document'],
+    ['groove', 'swingSub', 'document'],
+    ['groove', 'humanize', 'document'],
+    ...(['chords', 'bass', 'soloist', 'groove'] as const).flatMap((lane): Row[] => [
+        [lane, 'volume', 'document'],
+        [lane, 'reverb', 'document'],
+    ]),
+    // A chart's energy (DECISION 2026-09-26): saved with the chart, set only by the user.
+    ['playback', 'bandIntensity', 'document'],
+    ['playback', 'autoIntensity', 'document'],
+    ['playback', 'masterVolume', 'preferences'],
+    ['playback', 'metronome', 'runtime-derived'],
+    ['playback', 'audioGraph', 'runtime-derived'],
+    ['soloist', 'audio', 'runtime-derived'],
+];
 
-    it('keeps transport and audio handles runtime-owned', () => {
-        expect(STATE_OWNERSHIP_MANIFEST.playback.audioGraph).toBe('runtime-derived');
-        expect(STATE_OWNERSHIP_MANIFEST.soloist.audio).toBe('runtime-derived');
+describe('Songbook state ownership manifest (#1044, #1276)', () => {
+    it.each(OWNERS)('%s.%s is %s', (slice, field, owner) => {
+        expect((STATE_OWNERSHIP_MANIFEST[slice] as Record<string, string>)[field]).toBe(owner);
     });
 });

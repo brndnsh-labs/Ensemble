@@ -24,6 +24,9 @@ describe('DSP & Signal Safety', () => {
         for (let i = 1; i < curve.length; i += 100) {
             expect(curve[i]).toBeGreaterThanOrEqual(curve[i - 1]);
         }
+
+        // Built once: every saturator shares the one table.
+        expect(createSoftClipCurve()).toBe(curve);
     });
 
     describe('DSP Clamping', () => {
@@ -49,6 +52,8 @@ describe('DSP & Signal Safety', () => {
         it('should respect custom max', () => {
             expect(clampFreq(25000, 22050)).toBe(22050);
             expect(clampFreq(20000, 22050)).toBe(20000);
+            // A custom max above the default ceiling is honoured too.
+            expect(clampFreq(25000, 26000)).toBe(25000);
         });
     });
 });

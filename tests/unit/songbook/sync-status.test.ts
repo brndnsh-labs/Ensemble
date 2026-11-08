@@ -505,180 +505,149 @@ describe('the offline Save journey keeps the three results independent', () => {
 });
 
 describe('inputs that would require guessing are rejected, never defaulted', () => {
-    it('rejects absent facts rather than treating them as success', () => {
-        expect(() => projectSyncStatus({} as unknown as StatusFacts)).toThrow('local is required');
+    type Observation = NonNullable<StatusFacts['cloud']['observation']>;
+    const observed = (patch: Partial<Observation> | Record<string, unknown> = {}) =>
+        ({
+            remoteRevision: 'cloud-3',
+            pendingCount: 0,
+            conflict: 'none',
+            refused: null,
+            ...patch,
+        }) as Observation;
+    const withoutKey = (): StatusFacts => {
         const missing = facts() as unknown as Record<string, Record<string, unknown>>;
         delete missing.local.recovery;
-        expect(() => projectSyncStatus(missing as unknown as StatusFacts)).toThrow(
-            'local.recovery is required',
-        );
-    });
-
-    it('rejects unknown keys instead of silently ignoring a fact it does not model', () => {
+        return missing as unknown as StatusFacts;
+    };
+    const withExtraKey = (): StatusFacts => {
         const extra = facts() as unknown as Record<string, Record<string, unknown>>;
         extra.offline.online = true;
-        expect(() => projectSyncStatus(extra as unknown as StatusFacts)).toThrow(
-            'offline.online is not a known status fact',
-        );
-    });
-
-    it('rejects negative and unsafe counts', () => {
-        expect(() => offline({ sounds: { required: -1, verified: 0 } })).toThrow(
-            'non-negative safe integer',
-        );
-        expect(() => offline({ sounds: { required: 1.5, verified: 0 } })).toThrow(
-            'non-negative safe integer',
-        );
-        expect(() => offline({ sounds: { required: Number.NaN, verified: 0 } })).toThrow();
-        expect(() => local({ savedRevision: -1 })).toThrow('non-negative safe integer');
-    });
-
-    it('rejects verifying more than the known requirement', () => {
-        expect(() => offline({ sounds: { required: 2, verified: 3 } })).toThrow(
-            'cannot exceed offline.sounds.required',
-        );
-    });
-
-    it('rejects a conflict with an empty queue', () => {
-        expect(() =>
-            cloud({
-                observation: {
-                    remoteRevision: 'cloud-3',
-                    pendingCount: 0,
-                    conflict: 'version',
-                    refused: null,
-                },
-            }),
-        ).toThrow('conflict cannot exist with an empty pending queue');
-    });
-
-    it('rejects a refusal with an empty queue', () => {
-        expect(() =>
-            cloud({
-                observation: {
-                    remoteRevision: 'cloud-3',
-                    pendingCount: 0,
-                    conflict: 'none',
-                    refused: 'too-large',
-                },
-            }),
-        ).toThrow('refusal cannot exist with an empty pending queue');
-    });
-
-    it('rejects sending without an observed positive queue', () => {
-        expect(() =>
-            cloud({
-                observation: {
-                    remoteRevision: 'cloud-3',
-                    pendingCount: 0,
-                    conflict: 'none',
-                    refused: null,
-                },
-                activity: 'sending',
-            }),
-        ).toThrow('positive pending queue');
-        expect(() => cloud({ observation: null, activity: 'sending' })).toThrow(
-            'positive pending queue',
-        );
-    });
-
-    it('rejects an unobserved pending count inside an observation', () => {
-        expect(() =>
-            cloud({
-                observation: {
-                    remoteRevision: 'cloud-3',
-                    pendingCount: null,
-                    conflict: 'none',
-                    refused: null,
-                } as unknown as StatusFacts['cloud']['observation'],
-            }),
-        ).toThrow('must be observed');
-    });
-
-    it('validates remote revisions with the existing sync validator', () => {
-        expect(() =>
-            cloud({
-                observation: {
-                    remoteRevision: 'not a revision!',
-                    pendingCount: 0,
-                    conflict: 'none',
-                    refused: null,
-                },
-            }),
-        ).toThrow('Invalid remote revision');
-    });
-
-    it('rejects unknown enum members', () => {
-        expect(() =>
-            local({ editing: 'maybe' as unknown as StatusFacts['local']['editing'] }),
-        ).toThrow('local.editing must be one of');
-        expect(() =>
-            offline({ shell: 'probably' as unknown as StatusFacts['offline']['shell'] }),
-        ).toThrow('offline.shell must be one of');
-    });
-
-    // Every case above feeds a wrong-but-well-typed value. These feed structurally wrong
-    // shapes instead, so a guard's own strictness (not just its enum table) is on the hook.
-    it('rejects a conflict term outside the closed set, including a truthy boolean', () => {
-        for (const wrong of ['yes', true, 1]) {
-            expect(() =>
-                cloud({
-                    observation: {
-                        remoteRevision: 'cloud-3',
-                        pendingCount: 1,
-                        conflict: wrong as unknown as 'none',
-                        refused: null,
-                    },
-                }),
-            ).toThrow('must be one of: none, version, gone');
-        }
-    });
-
-    it('rejects a refusal term outside the closed set', () => {
-        expect(() =>
-            cloud({
-                observation: {
-                    remoteRevision: 'cloud-3',
-                    pendingCount: 1,
-                    conflict: 'none',
-                    refused: 'quota' as unknown as 'refused',
-                },
-            }),
-        ).toThrow('must be one of: too-large, refused');
-    });
-
-    it('rejects an unsafe integer count, not just a negative one', () => {
-        expect(() => local({ savedRevision: 2 ** 53 + 2 })).toThrow('non-negative safe integer');
-    });
-
-    it('rejects explicit undefined the same as an absent field', () => {
-        expect(() => local({ savedRevision: undefined as unknown as number })).toThrow(
-            'non-negative safe integer',
-        );
-    });
-
-    it('rejects an array standing in for a status object', () => {
-        expect(() =>
-            projectSyncStatus({ ...facts(), offline: [] as unknown as StatusFacts['offline'] }),
-        ).toThrow('offline must be a status object');
-    });
-
-    it('rejects a required fact reachable only through the prototype chain', () => {
-        // Bypasses facts()/structuredClone deliberately: a spread merge only copies OWN
-        // properties, which would silently drop the inherited key before it ever reached
-        // the guard under test, and structuredClone does not preserve custom prototypes.
-        const withoutOwnRecovery = Object.assign(Object.create({ recovery: 'none' }), {
+        return extra as unknown as StatusFacts;
+    };
+    // A required fact reachable only through the prototype chain. Bypasses facts()/structuredClone
+    // deliberately: a spread merge only copies OWN properties, which would silently drop the
+    // inherited key before it ever reached the guard under test, and structuredClone does not
+    // preserve custom prototypes.
+    const inheritedRecovery = (): StatusFacts => ({
+        local: Object.assign(Object.create({ recovery: 'none' }), {
             savedRevision: 3,
             editing: 'clean',
             lastSave: 'idle',
-        }) as StatusFacts['local'];
-        expect(() =>
-            projectSyncStatus({
-                local: withoutOwnRecovery,
-                cloud: IDLE_CLOUD,
-                offline: READY_OFFLINE,
-            }),
-        ).toThrow('local.recovery is required');
+        }) as StatusFacts['local'],
+        cloud: IDLE_CLOUD,
+        offline: READY_OFFLINE,
+    });
+
+    // [what is wrong, the call that must throw, the words its message must carry]. The first rows
+    // feed wrong-but-well-typed values; the later ones structurally wrong shapes, so a guard's own
+    // strictness (not just its enum table) is on the hook.
+    const REJECTED: [string, () => unknown, string?][] = [
+        [
+            'no facts at all',
+            () => projectSyncStatus({} as unknown as StatusFacts),
+            'local is required',
+        ],
+        ['an absent fact', () => projectSyncStatus(withoutKey()), 'local.recovery is required'],
+        [
+            'an unknown key',
+            () => projectSyncStatus(withExtraKey()),
+            'offline.online is not a known status fact',
+        ],
+        [
+            'a negative requirement',
+            () => offline({ sounds: { required: -1, verified: 0 } }),
+            'non-negative safe integer',
+        ],
+        [
+            'a fractional requirement',
+            () => offline({ sounds: { required: 1.5, verified: 0 } }),
+            'non-negative safe integer',
+        ],
+        ['a NaN requirement', () => offline({ sounds: { required: Number.NaN, verified: 0 } })],
+        ['a negative revision', () => local({ savedRevision: -1 }), 'non-negative safe integer'],
+        [
+            'verifying more than the requirement',
+            () => offline({ sounds: { required: 2, verified: 3 } }),
+            'cannot exceed offline.sounds.required',
+        ],
+        [
+            'a conflict with an empty queue',
+            () => cloud({ observation: observed({ conflict: 'version' }) }),
+            'conflict cannot exist with an empty pending queue',
+        ],
+        [
+            'a refusal with an empty queue',
+            () => cloud({ observation: observed({ refused: 'too-large' }) }),
+            'refusal cannot exist with an empty pending queue',
+        ],
+        [
+            'sending with an empty queue',
+            () => cloud({ observation: observed(), activity: 'sending' }),
+            'positive pending queue',
+        ],
+        [
+            'sending with no observation',
+            () => cloud({ observation: null, activity: 'sending' }),
+            'positive pending queue',
+        ],
+        [
+            'an unobserved pending count',
+            () => cloud({ observation: observed({ pendingCount: null }) }),
+            'must be observed',
+        ],
+        [
+            'a remote revision the sync validator refuses',
+            () => cloud({ observation: observed({ remoteRevision: 'not a revision!' }) }),
+            'Invalid remote revision',
+        ],
+        [
+            'an unknown editing member',
+            () => local({ editing: 'maybe' as unknown as StatusFacts['local']['editing'] }),
+            'local.editing must be one of',
+        ],
+        [
+            'an unknown shell member',
+            () => offline({ shell: 'probably' as unknown as StatusFacts['offline']['shell'] }),
+            'offline.shell must be one of',
+        ],
+        ...(['yes', true, 1] as const).map((wrong): [string, () => unknown, string] => [
+            `a conflict term outside the closed set (${String(wrong)})`,
+            () => cloud({ observation: observed({ pendingCount: 1, conflict: wrong as never }) }),
+            'must be one of: none, version, gone',
+        ]),
+        [
+            'a refusal term outside the closed set',
+            () => cloud({ observation: observed({ pendingCount: 1, refused: 'quota' as never }) }),
+            'must be one of: too-large, refused',
+        ],
+        [
+            'an unsafe integer count',
+            () => local({ savedRevision: 2 ** 53 + 2 }),
+            'non-negative safe integer',
+        ],
+        [
+            'an explicit undefined',
+            () => local({ savedRevision: undefined as unknown as number }),
+            'non-negative safe integer',
+        ],
+        [
+            'an array standing in for a status object',
+            () =>
+                projectSyncStatus({
+                    ...facts(),
+                    offline: [] as unknown as StatusFacts['offline'],
+                }),
+            'offline must be a status object',
+        ],
+        [
+            'a required fact reachable only through the prototype chain',
+            () => projectSyncStatus(inheritedRecovery()),
+            'local.recovery is required',
+        ],
+    ];
+
+    it.each(REJECTED)('rejects %s', (_what, call, message) => {
+        expect(call).toThrow(message);
     });
 });
 
