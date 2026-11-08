@@ -105,6 +105,7 @@ test('the bar menu: the ruler open, every other group folded, one repeat path, D
     await press(menu.getByRole('button', { name: /^Repeat or ending/ }), testInfo);
     const guide = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
     await expect(guide).toBeVisible();
+    await expect(menu).toHaveCount(0);
     await expect(guide.getByLabel('Start repeat here', { exact: true })).toHaveCount(0);
     await press(guide.getByRole('button', { name: 'Per-bar markers for A · bar 7…' }), testInfo);
     await expect(guide.getByLabel('Start repeat here', { exact: true })).toBeVisible();

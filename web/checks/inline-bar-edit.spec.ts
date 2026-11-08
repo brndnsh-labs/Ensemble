@@ -76,7 +76,7 @@ test('typing in bars applies each one on leaving it, and Save keeps them (#1723)
     await expect(field(page, 6)).toBeFocused();
     await expect(field(page, 6)).toHaveValue('D7');
     await expect(bars.nth(5)).toHaveClass(/\btyping\b/);
-    // The open field never widens the page, a phone's included.
+    // The open field never widens the page (a phone's open bar: phone-bar-edit.spec.ts).
     expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

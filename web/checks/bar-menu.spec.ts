@@ -104,7 +104,7 @@ test('the ruler sets chord lengths the field and the saved bar agree on (#1725)'
 }, testInfo) => {
     test.skip(
         testInfo.project.name !== 'laptop',
-        "the ruler's lengths and the saved bar are browser-independent; WebKit covers the bar menu's ruler in 'on a phone: ⋯ in the dock' and calm-menus' bar menu test",
+        "the ruler's lengths and the saved bar are browser-independent; WebKit drags the ruler in 'on a phone: ⋯ in the dock'",
     );
     await editAutumnLeaves(page, testInfo);
     await press(page.locator('.bar').nth(6), testInfo);
@@ -351,6 +351,28 @@ test('on a phone: ⋯ in the dock opens the sheet and keeps the draft (#1725)', 
     await expect(bars.nth(6)).toHaveClass(/\btyping\b/);
     await expect(field(page, 7)).toHaveValue('Gm7 C7');
     await expect(sheet.locator('.bar-ruler-span')).toHaveCount(2);
+    // A drag on the ruler: the pointer-capture path, the one WebKit run of it (the laptop test
+    // holds the arrow keys and the saved bar).
+    const split = sheet.getByRole('slider', { name: 'Split between Gm7 and C7' });
+    const track = await sheet.locator('.bar-ruler').boundingBox();
+    const handle = await split.boundingBox();
+    expect(track && handle).toBeTruthy();
+    if (track && handle) {
+        await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(track.x + track.width * 0.6, track.y + track.height / 2, {
+            steps: 4,
+        });
+        await page.mouse.move(track.x + track.width * 0.74, track.y + track.height / 2, {
+            steps: 4,
+        });
+        await page.mouse.up();
+    }
+    await expect(split).toHaveAttribute('aria-valuenow', '3');
+    await expect(field(page, 7)).toHaveValue('Gm7:3 C7:1');
+    await split.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(field(page, 7)).toHaveValue('Gm7 C7');
     expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

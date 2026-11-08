@@ -166,6 +166,10 @@ test('unfinished bars survive selection, errors and hidden editor; Save commits 
     expect(await documents(page)).toEqual(original);
     await leaveBar(page);
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['C', 'Dm', 'G7']);
+    // A bar of three chords never widens the page, a phone's included.
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+    );
     await typeBar(page, 1, 'C:2 Dm:1 G7:1');
     await typeBar(page, 2, 'F A7');
     // Out of the editor with bar 2 still open: pressing Chart leaves the bar, which applies it
@@ -297,6 +301,7 @@ test('unsupported imports never create a partial song', async ({ page }) => {
     // The revision conflict this test once also held is usability.spec.ts's 'a revision conflict
     // retains typed chords and allows an independent copy'.
     await editBlue(page);
+    await expect(page.locator('.bar').first().locator('.chord').first()).toBeVisible();
     const chordsBefore = await page.locator('.bar').first().locator('.chord').allTextContents();
     const source = await exportCurrent(page);
     if (source.schemaVersion !== 2) {

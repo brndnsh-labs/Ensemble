@@ -56,6 +56,13 @@ test('three chords in 4/4 wait for a split; arrows move, Enter applies (#1980)',
     await expect(choices(page)).toHaveCount(0);
     await expect(bars.nth(5)).not.toHaveClass(/\bunreadable\b/);
 
+    // A click picks one too: the choices sit inside the bar here, so the click must keep focus
+    // in the field and stay out of the bar's own handlers (the phone dock's tap is below).
+    await field(page, 6).fill('Gm7 C7 F');
+    await radios.nth(2).click();
+    await expect(field(page, 6)).toHaveValue('Gm7:1 C7:1 F:2');
+    await expect(field(page, 6)).toBeFocused();
+
     // The next Enter leaves the bar with its three chords applied.
     await page.keyboard.press('Enter');
     await expect(bars.nth(5).locator('.chord')).toHaveText(['Gm7', 'C7', 'F']);
