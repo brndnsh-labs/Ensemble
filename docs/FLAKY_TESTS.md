@@ -35,6 +35,14 @@ entry here).
 
 ## Registry
 
+### 🟢 `web/checks/count-in-chart.spec.ts` — "the count-in counts down large over the first bar, then the bar lights as playing" (16)
+
+- **Class:** e2e-timing (the ruler, not the app).
+- **Symptom:** `v2-suite (4, webkit-phone)` on #2123's branch (run 42460821028): the countdown's font size read `NaN` (`expected >= 48`), straight after `toBeVisible()` passed.
+- **Root cause:** the same as the `stand-leftovers` count-in entry below. The song's own tempo gives a count-in of about 2 s, and a slow WebKit evaluated the element after it had gone, so `getComputedStyle` returned an empty font size.
+- **Fix (2026-11-08):** both tests in the file count in at 40 BPM (about 6 s), and the count-in's end waits 12 s. The assertions are unchanged.
+- **Last seen:** 2026-11-08 (run 42460821028).
+
 ### 🟢 `web/checks/stand-leftovers.spec.ts` — "Play on a scrolled chart brings the start bar into view for the count-in (#1991)" (71)
 
 - **Class:** e2e-timing (the ruler, not the app).
