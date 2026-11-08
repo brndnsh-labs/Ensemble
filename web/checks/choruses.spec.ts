@@ -5,7 +5,9 @@ import {
     editorRevealed,
     expect,
     formLength,
+    type PointerRecorder,
     pickFormLength,
+    recordPointer,
     songLink,
     test,
 } from './fixtures';
@@ -17,46 +19,9 @@ import {
  * never by sampling the clock, so a slow CI WebKit only takes longer.
  */
 
-declare global {
-    interface Window {
-        /** The name of each chord the stand made current, in order, while armed. */
-        __chorusEvidence: { armed: boolean; current: string[] };
-    }
-}
-
-async function observePointer(page: Page) {
-    await page.addInitScript(() => {
-        const evidence = { armed: false, current: [] as string[] };
-        window.__chorusEvidence = evidence;
-        // Read the mutation RECORDS, not the DOM: a
-        // starved tab can batch two transitions, and only the records keep both.
-        new MutationObserver((records) => {
-            if (!evidence.armed) {
-                return;
-            }
-            for (const record of records) {
-                const target = record.target as Element;
-                if (
-                    target.classList?.contains('chord') &&
-                    record.attributeName === 'aria-current' &&
-                    record.oldValue !== 'true' &&
-                    target.getAttribute('aria-current') === 'true'
-                ) {
-                    evidence.current.push(target.textContent?.trim() ?? '');
-                }
-            }
-        }).observe(document, {
-            subtree: true,
-            attributes: true,
-            attributeOldValue: true,
-            attributeFilter: ['aria-current'],
-        });
-    });
-}
-
 /** How many passes of the form have started: the new song's form opens on its only C. */
-const passes = (page: Page) =>
-    page.evaluate(() => window.__chorusEvidence.current.filter((name) => name === 'C').length);
+const passes = async (pointer: PointerRecorder) =>
+    (await pointer.chordNames()).filter((name) => name === 'C').length;
 
 async function documents(page: Page): Promise<ChartDocument[]> {
     return page.evaluate(async () => {
@@ -80,20 +45,13 @@ async function documents(page: Page): Promise<ChartDocument[]> {
 const footerButton = (page: Page) => page.locator('.chart-bottom').getByRole('button');
 const formMenu = (page: Page) => page.getByRole('menu', { name: 'How many times the form plays' });
 
-async function arm(page: Page) {
-    await page.evaluate(() => {
-        window.__chorusEvidence.current = [];
-        window.__chorusEvidence.armed = true;
-    });
-}
-
 test('a chart set to 2 choruses plays two and stops; Loop plays on; the count saves (#1475)', async ({
     page,
 }) => {
     test.setTimeout(90_000);
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
-    await observePointer(page);
+    const pointer = await recordPointer(page);
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
@@ -121,16 +79,16 @@ test('a chart set to 2 choruses plays two and stops; Loop plays on; the count sa
     const stop = page.getByRole('button', { name: 'Stop playback', exact: true });
 
     // Two choruses, then the transport returns to stopped by itself.
-    await arm(page);
+    await pointer.arm();
     await play.click();
     await expect(stop).toBeVisible();
     // The footer is hidden while the band plays, and comes back saying the same thing.
     await expect(footerButton(page)).toBeHidden();
     await expect(play).toBeVisible({ timeout: 45_000 });
-    expect(await passes(page)).toBe(2);
+    expect(await passes(pointer)).toBe(2);
     await expect(footerButton(page)).toHaveText('4 bars · plays 2 times, then ends');
     // It stopped after the second chorus's last bar (F), not inside it.
-    expect(await page.evaluate(() => window.__chorusEvidence.current.at(-1))).toBe('F');
+    expect((await pointer.chordNames()).at(-1)).toBe('F');
     // Nothing more plays once it has stopped.
     await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(0);
 
@@ -148,16 +106,14 @@ test('a chart set to 2 choruses plays two and stops; Loop plays on; the count sa
     await expect(save).toBeDisabled();
     const cleared = (await documents(page)).find((d) => d.title === 'Two choruses');
     expect(cleared?.schemaVersion === 2 && 'choruses' in cleared.chart.score).toBe(false);
-    await arm(page);
+    await pointer.arm();
     await play.click();
-    await expect.poll(() => passes(page), { timeout: 45_000 }).toBeGreaterThanOrEqual(3);
+    await expect.poll(() => passes(pointer), { timeout: 45_000 }).toBeGreaterThanOrEqual(3);
     await expect(stop).toBeVisible();
     await stop.click();
     await expect(play).toBeVisible();
 
-    await page.evaluate(() => {
-        window.__chorusEvidence.armed = false;
-    });
+    await pointer.disarm();
     expect(pageErrors).toEqual([]);
 });
 
