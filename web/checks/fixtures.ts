@@ -146,7 +146,11 @@ export const test = base.extend<Record<never, never>, { previewServer: string }>
 const API_DIR = path.resolve(__dirname, '../../api');
 const API_ENTRY = path.join(API_DIR, 'dist/server.js');
 
-/** The API refuses `PORT=0`, so probe for a free port instead of asking it to pick one. */
+/**
+ * The API refuses `PORT=0`, so probe for a free port instead of asking it to pick one. The probe
+ * closes before the API binds, so another worker can take the port in between (#2146): the
+ * caller retries on `EADDRINUSE` with a fresh one.
+ */
 async function freePort(): Promise<number> {
     const probe = createServer();
     probe.listen(0, '127.0.0.1');
@@ -155,6 +159,53 @@ async function freePort(): Promise<number> {
     probe.close();
     await once(probe, 'close');
     return port;
+}
+
+/**
+ * One account API process on `port`. Its stderr is forwarded and kept; `ready` settles true on
+ * the API's own "listening on" line for this port — never a `/healthz` answer, which another
+ * worker's server holding the port could give (#2146) — or false once the process has closed,
+ * its stderr whole.
+ */
+function startApi(port: number, origin: string, data: string) {
+    const child = spawn(process.execPath, [API_ENTRY], {
+        cwd: API_DIR,
+        env: {
+            ...process.env,
+            PORT: String(port),
+            HOST: '127.0.0.1',
+            ENSEMBLE_ORIGIN: origin,
+            ENSEMBLE_RP_ID: 'localhost',
+            ENSEMBLE_RP_NAME: 'Ensemble (test harness)',
+            ENSEMBLE_DB_PATH: path.join(data, 'db.sqlite'),
+            ENSEMBLE_REGISTRATION: 'open',
+            ENSEMBLE_AUTH_IP_MODE: 'socket-only',
+            // At least 32 bytes or the API refuses to start; it keys nothing that outlives the run.
+            ENSEMBLE_AUTH_IP_SECRET: 'harness-only-'.padEnd(48, 'x'),
+        },
+        // stdout is read for the startup line only, never echoed (noise across three workers);
+        // a crash still reaches stderr.
+        stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    let stderr = '';
+    child.stderr?.on('data', (chunk: Buffer) => {
+        stderr += chunk;
+        process.stderr.write(chunk);
+    });
+    const listening = `listening on http://127.0.0.1:${port} `;
+    const ready = new Promise<boolean>((resolve) => {
+        let stdout = '';
+        child.stdout?.on('data', (chunk: Buffer) => {
+            stdout += chunk;
+            if (stdout.includes(listening)) {
+                resolve(true);
+            }
+        });
+        // Taken at spawn, so an exit before anyone waits is not missed; `close` follows the
+        // last stderr chunk.
+        child.once('close', () => resolve(false));
+    });
+    return { child, ready, stderr: () => stderr };
 }
 
 export interface AccountApi {
@@ -196,49 +247,37 @@ export const accountTest = test.extend<{ accountApi: AccountApi }>({
             );
         }
         const origin = previewServer.replace('127.0.0.1', 'localhost');
-        const port = await freePort();
         const data = mkdtempSync(path.join(tmpdir(), 'ensemble-v2-api-'));
-        const child = spawn(process.execPath, [API_ENTRY], {
-            cwd: API_DIR,
-            env: {
-                ...process.env,
-                PORT: String(port),
-                HOST: '127.0.0.1',
-                ENSEMBLE_ORIGIN: origin,
-                ENSEMBLE_RP_ID: 'localhost',
-                ENSEMBLE_RP_NAME: 'Ensemble (test harness)',
-                ENSEMBLE_DB_PATH: path.join(data, 'db.sqlite'),
-                ENSEMBLE_REGISTRATION: 'open',
-                ENSEMBLE_AUTH_IP_MODE: 'socket-only',
-                // At least 32 bytes or the API refuses to start; it keys nothing that outlives the run.
-                ENSEMBLE_AUTH_IP_SECRET: 'harness-only-'.padEnd(48, 'x'),
-            },
-            // Its startup line is noise across three workers; a crash still reaches stderr.
-            stdio: ['ignore', 'ignore', 'inherit'],
-        });
+        let child: ChildProcess | undefined;
         try {
-            const target = `http://127.0.0.1:${port}`;
-            await expect
-                .poll(
-                    async () => {
-                        if (child.exitCode !== null) {
-                            throw new Error(`account API exited with ${child.exitCode}`);
-                        }
-                        return fetch(`${target}/healthz`).then(
-                            (reply) => reply.status,
-                            () => 0,
-                        );
-                    },
-                    { timeout: 15_000 },
-                )
-                .toBe(200);
+            let target = '';
+            // A port taken between the probe and the API's bind is a harness race, not the API's
+            // fault: start again on a new port. Any other early exit fails with its own stderr.
+            for (let attempt = 1; ; attempt++) {
+                const port = await freePort();
+                const started = startApi(port, origin, data);
+                child = started.child;
+                target = `http://127.0.0.1:${port}`;
+                const timeout = new Promise<never>((_, reject) =>
+                    setTimeout(
+                        () => reject(new Error('account API did not start within 15s')),
+                        15_000,
+                    ).unref(),
+                );
+                if (await Promise.race([started.ready, timeout])) {
+                    break;
+                }
+                if (!started.stderr().includes('EADDRINUSE') || attempt === 3) {
+                    throw new Error(`account API exited with ${started.child.exitCode}`);
+                }
+            }
             await fetch(`${previewServer}/__test/api?target=${encodeURIComponent(target)}`, {
                 method: 'POST',
             });
             await use({ origin });
         } finally {
             await fetch(`${previewServer}/__test/api`, { method: 'POST' }).catch(() => {});
-            if (child.exitCode === null) {
+            if (child && child.exitCode === null) {
                 child.kill();
                 await once(child, 'exit');
             }
