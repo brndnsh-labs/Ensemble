@@ -397,6 +397,136 @@ export async function resizeTo(page: Page, width: number, height: number): Promi
     );
 }
 
+/** One time the stand made a chord or a bar current, as the page recorded it. */
+export interface PointerRecord {
+    /** Page-side `performance.now()` when the mutation was delivered. */
+    at: number;
+    /** `chord` carries `aria-current`; `bar` carries `data-active`. */
+    kind: 'chord' | 'bar';
+    /** A chord's text, empty for a bar. */
+    name: string;
+    /** A bar's `data-measure-id`, else null. */
+    id: string | null;
+    /** A chord's `data-start-step`, else null. */
+    start: string | null;
+}
+
+export interface PointerRecorder {
+    /** Clears what was recorded and starts recording. */
+    arm(): Promise<void>;
+    /** Stops recording; what was recorded stays readable. */
+    disarm(): Promise<void>;
+    /** Every chord or bar made current since `arm`, in order. */
+    records(): Promise<PointerRecord[]>;
+    /** The text of each chord made current since `arm`, in order. */
+    chordNames(): Promise<string[]>;
+}
+
+/**
+ * Records which chord or bar the stand made current (`aria-current` on a `.chord`, `data-active`
+ * on a `.bar`), for a playback spec to assert on afterwards. Call it BEFORE `page.goto`: it is an
+ * init script. `arm()` just before pressing Play, `disarm()` once the run is over.
+ *
+ * Why recording, not sampling: a spec that polls the screen on the test's own clock reads
+ * whatever happens to be current at that instant, so a loaded runner that skips a beat looks
+ * like the band skipping it, and one that reads late looks like the pointer lagging. This keeps
+ * each mutation RECORD (not the DOM's state when the observer's callback runs: a starved tab
+ * batches two transitions into one callback, and only the records keep both) with a page-side
+ * timestamp, so the spec judges what the page did and a slow machine only takes longer. That is
+ * the "ruler" class in `docs/FLAKY_TESTS.md` (e2e-timing): a spec that needs a different
+ * attribute (`data-next`, `data-start-step` changes alone) still records, not samples.
+ */
+export async function recordPointer(page: Page): Promise<PointerRecorder> {
+    await page.addInitScript(() => {
+        const state = { armed: false, records: [] as PointerRecord[] };
+        (window as unknown as { __pointerRecorder: typeof state }).__pointerRecorder = state;
+        new MutationObserver((mutations) => {
+            if (!state.armed) {
+                return;
+            }
+            const at = performance.now();
+            // A record holds only the OLD value. What a change set is the next record's old value
+            // for the same element and attribute in this batch, else the DOM now (nothing changed
+            // it since). Reading the DOM for every record would lose a visit a starved tab batched
+            // with its leaving: true then false reads false twice.
+            const newValue = (i: number) => {
+                const { target, attributeName } = mutations[i];
+                for (let j = i + 1; j < mutations.length; j++) {
+                    if (
+                        mutations[j].target === target &&
+                        mutations[j].attributeName === attributeName
+                    ) {
+                        return mutations[j].oldValue;
+                    }
+                }
+                return (target as Element).getAttribute(attributeName ?? '');
+            };
+            for (const [i, mutation] of mutations.entries()) {
+                const target = mutation.target as Element;
+                // Only a change TO current: the one that leaves it is not a visit.
+                if (mutation.oldValue === 'true' || newValue(i) !== 'true') {
+                    continue;
+                }
+                if (
+                    mutation.attributeName === 'aria-current' &&
+                    target.classList?.contains('chord')
+                ) {
+                    state.records.push({
+                        at,
+                        kind: 'chord',
+                        name: target.textContent?.trim() ?? '',
+                        id: null,
+                        start: target.getAttribute('data-start-step'),
+                    });
+                } else if (
+                    mutation.attributeName === 'data-active' &&
+                    target.classList?.contains('bar')
+                ) {
+                    state.records.push({
+                        at,
+                        kind: 'bar',
+                        name: '',
+                        id: target.getAttribute('data-measure-id'),
+                        start: null,
+                    });
+                }
+            }
+        }).observe(document, {
+            subtree: true,
+            attributes: true,
+            attributeOldValue: true,
+            attributeFilter: ['aria-current', 'data-active'],
+        });
+    });
+    const records = () =>
+        page.evaluate(() =>
+            (
+                window as unknown as { __pointerRecorder: { records: PointerRecord[] } }
+            ).__pointerRecorder.records.slice(),
+        );
+    return {
+        arm: () =>
+            page.evaluate(() => {
+                const state = (
+                    window as unknown as {
+                        __pointerRecorder: { armed: boolean; records: PointerRecord[] };
+                    }
+                ).__pointerRecorder;
+                state.records = [];
+                state.armed = true;
+            }),
+        disarm: () =>
+            page.evaluate(() => {
+                (
+                    window as unknown as { __pointerRecorder: { armed: boolean } }
+                ).__pointerRecorder.armed = false;
+            }),
+        records,
+        chordNames: async () =>
+            (await records()).filter((r) => r.kind === 'chord').map((r) => r.name),
+    };
+}
+
 /**
  * Wait for the editor to be up before typing into it (#1235). Nothing takes focus on the way in
  * (#1726: a bar opens when pressed), so the barrier is the header's title field, enabled once the
