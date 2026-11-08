@@ -5,11 +5,11 @@
  * file adds in one call.
  */
 import { leadRole } from '../../arrange/cycle.js';
-import { type FormRole, formRole } from '../../arrange/plan.js';
+import { type FormRole, formRole, sectionRoleOf } from '../../arrange/plan.js';
 import type { BandEvent, PitchedNote } from '../../core/types.js';
 import { type Bar, chordAt, sectionKey, spanIndexAt, type Timeline } from '../../form/timeline.js';
 import { STEP } from '../../players/grid.js';
-import { guidePitchClasses } from '../../players/lead/guide-tones.js';
+import { guidePitchClasses, headForm } from '../../players/lead/guide-tones.js';
 import { chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import type { Metric, Take } from './harness.js';
@@ -48,10 +48,14 @@ function onsetSteps(take: Take, bar: Bar): string {
 }
 
 /**
- * Each chorus of the head (#2111) as the guide-tone head reads it: its first A (the first visit
- * the plan calls the head's A section), the visits after it with the same letter (an A again),
- * and its contrast — the bridge, or with none the chorus's last visit when that is another
- * letter (an A B tune's B, an A B A C's C).
+ * Each chorus of the head (#2111) as the guide-tone head reads it, by the engine's own form
+ * (`headForm`, #2140), so the critique judges the sections the line is sung in: its first A (the
+ * form's first visit; an intro and an outro are around the form, not in it), the visits after
+ * it with the same letter (an A again), its contrast (the bridge, or with none the chorus's last
+ * visit in another letter: an A B tune's B, an A B A C's C) and the rest of the form, every
+ * visit but the contrast. Only the visits the plan gives the head (its A sections or its
+ * bridge) count. The contrast is `headForm`'s one visit: before #2140 every visit the plan
+ * called a bridge counted, which no fixture tells apart (none has two).
  */
 function headForms(take: Take) {
     const { timeline: t, pass = 0, trade } = take;
@@ -60,25 +64,22 @@ function headForms(take: Take) {
     const choruses = new Map<number, Timeline['visits']>();
     for (const visit of t.visits) {
         const role = roleOf(visit.firstBar);
-        if (role === 'head' || role === 'bridge') {
+        const around = sectionRoleOf(visit.label);
+        if ((role === 'head' || role === 'bridge') && around !== 'Intro' && around !== 'Outro') {
             choruses.set(visit.chorus, [...(choruses.get(visit.chorus) ?? []), visit]);
         }
     }
     return [...choruses.values()].flatMap((visits) => {
-        const first = visits.find((v) => roleOf(v.firstBar) === 'head');
-        if (!first) {
+        const form = headForm(t, visits[0].firstBar);
+        const first = visits.find((v) => v.firstBar === form.firstBar);
+        if (!first || roleOf(first.firstBar) !== 'head') {
             return [];
         }
         const key = sectionKey(first);
         const again = visits.filter((v) => v !== first && sectionKey(v) === key);
-        const bridges = visits.filter((v) => roleOf(v.firstBar) === 'bridge');
-        const last = visits.at(-1);
-        const contrast = bridges.length
-            ? bridges
-            : last && last !== first && sectionKey(last) !== key
-              ? [last]
-              : [];
-        return [{ first, again, contrast }];
+        const contrast = visits.filter((v) => v.ordinal === form.contrast);
+        const rest = visits.filter((v) => v.ordinal !== form.contrast);
+        return [{ first, again, contrast, rest }];
     });
 }
 
@@ -135,6 +136,25 @@ function bridgeOverHead(takes: Take[], of: (note: PitchedNote) => number): numbe
 
 /** The lead's notes in a take, in order. */
 const leadOf = (take: Take) => take.events.filter((e): e is PitchedNote => e.lane === 'lead');
+
+/**
+ * Semitones each head's contrast (`headForms`: the bridge, or a two-section tune's B, whatever
+ * its form role) sits over the rest of its head, mean pitch against mean pitch: one value a
+ * chorus that has a contrast. 4/4 bars only, as `barsIn` reads them.
+ */
+function contrastRegisters(take: Take): number[] {
+    const { bars } = take.timeline;
+    const notes = leadOf(take).filter((e) => bars[e.bar].meter.name === '4/4');
+    const mean = (visits: Timeline['visits']) => {
+        const ordinals = new Set(visits.map((v) => v.ordinal));
+        const inside = notes.filter((e) => ordinals.has(bars[e.bar].visit.ordinal));
+        return inside.length ? inside.reduce((s, e) => s + e.midi, 0) / inside.length : Number.NaN;
+    };
+    return headForms(take)
+        .filter((form) => form.contrast.length)
+        .map((form) => mean(form.contrast) - mean(form.rest))
+        .filter((lift) => !Number.isNaN(lift));
+}
 
 /**
  * The seams of each contrast (`headForms`): the lead's last note before it and its first in
@@ -331,9 +351,15 @@ export const GUIDE_METRICS = {
     /** How much louder the lead plays its bridge than its A sections, in velocity. */
     leadBridgeLouder: (takes) => bridgeOverHead(takes, (e) => e.velocity),
     /**
-     * Semitones the lead's bridge sits over its A sections, mean pitch against mean pitch
-     * (#2123). `leadBridgeLift` reads one pair of notes a bridge, the seam; this reads the
-     * whole bridge, so a line that steps up at the seam and then sinks under the A fails it.
+     * Semitones the lead's head contrast sits over the rest of its head, mean pitch against
+     * mean pitch, averaged over the contrasts (`contrastRegisters`); NaN (a failed claim) with
+     * none. `leadBridgeLift` reads one pair of notes a bridge, the seam; this reads the whole
+     * contrast, so a line that steps up at the seam and then sinks under the A fails it (#2123).
+     * Any contrast counts, not only a bridge: the bossa chart's B, whose seam falls a half step,
+     * sank 4 to 7 under its A unread (#2140).
      */
-    leadBridgeRegister: (takes) => bridgeOverHead(takes, (e) => e.midi),
+    leadContrastRegister: (takes) => {
+        const lifts = takes.flatMap(contrastRegisters);
+        return lifts.length ? lifts.reduce((s, x) => s + x, 0) / lifts.length : Number.NaN;
+    },
 } satisfies Record<string, Metric>;

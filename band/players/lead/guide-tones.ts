@@ -360,6 +360,9 @@ function chorusLine(
     const { contrast } = headForm(timeline, firstBar);
     // The pitch the line entered the contrast from: its lift is measured from there.
     let entry: number | null = null;
+    // Whether the seam into the contrast fell: its first guide tone sits under the entry
+    // (`climbsBack`).
+    let seamFell = false;
     // The chorus's first note, and its section: an A that comes back starts there again.
     let opening: { midi: number; section: string } | null = null;
     for (let i = 0; i < pieces.length; i++) {
@@ -369,19 +372,34 @@ function chorusLine(
         const pcs = guidePitchClasses(chord, key, next);
         const lifted = bar.visit.ordinal === contrast;
         const top = tops.has(start);
-        // A seam into, inside or out of the contrast moves a 4th at most (`SEAM`); elsewhere a
-        // phrase top may re-centre by a 5th (a ii-V chain falls a half step a chord, a 4th or
-        // more over a phrase, and the line has to climb back as fast as it fell).
+        // A seam into, inside or out of the contrast moves a 4th at most (`SEAM`; inside it a
+        // 5th once the seam into it fell, `climbsBack`); elsewhere a phrase top may re-centre
+        // by a 5th (a ii-V chain falls a half step a chord, a 4th or more over a phrase, and
+        // the line has to climb back as fast as it fell).
         const seam = lifted || bars[barIndexAt(start - 1)].visit.ordinal === contrast;
+        let entersContrast = false;
         if (!lifted) {
             entry = null;
+            seamFell = false;
         } else if (entry === null) {
             entry = prev ?? home;
+            entersContrast = true;
         }
+        // why: a seam into the contrast falls when no guide tone of its first chord lies at or
+        // over the entry within a 4th: the A's last a half step over one and a tritone under the
+        // other (the bossa's Dm6 B to Gm7's Bb, the line cliché #2123 accepted), or an entry
+        // already at the ceiling. A ii-V chain then falls a half step a chord, and at its next
+        // phrase top met that tritone again (Bb7#11's Ab to Em7's G), so the B sank 4 to 7
+        // semitones under its A (#2140). After a seam that fell, the contrast's own phrase tops
+        // re-centre by a 5th (`RECENTRE`), as any phrase top outside it may: at the breath the
+        // line crosses to the shell's other voice (Bb7's D, its 3rd, held as Em7's 7th) and
+        // climbs back toward its A. The seams into and out of the
+        // contrast, and a contrast whose seam lifted, keep the 4th.
+        const climbsBack = lifted && !entersContrast && seamFell;
         // The guide tone nearest `target` within reach of the last note.
         const toward = (target: number) => {
             const from = prev ?? target;
-            const reach = seam ? SEAM : RECENTRE;
+            const reach = seam && !climbsBack ? SEAM : RECENTRE;
             return nearest(
                 pcs,
                 target,
@@ -419,6 +437,9 @@ function chorusLine(
                 ? (opening?.midi ?? entry) + CONTRAST_LIFT.last
                 : entry + CONTRAST_LIFT.phrase;
             midi = toward(Math.min(ceiling, target));
+            if (entersContrast) {
+                seamFell = midi < entry;
+            }
         } else if (restates && opening) {
             // An A again starts where the first A did, so its line — over the same chords —
             // is the first A's: the tune comes back, not just its rhythm.

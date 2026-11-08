@@ -190,9 +190,11 @@ expression devices take turns rather than stack; one peak note per cycle.
     contrast climbs into the headroom over it, to a whole step under the instrument's top
     (`BRIDGE_TOP`); going into the contrast, the A's last chord takes whichever of its guide
     tones the contrast can climb from (a V7's 7th resolving down into the bridge would leave it
-    only a fall, #2123). A 12-bar chorus (a vamp after it doesn't
-    count) is a blues instead: call, call, answer. Every style sings it (#2122): a book without
-    its own `head.guide` takes the shared figures (`DEFAULT_GUIDE`,
+    only a fall, #2123). Where a fall is still the only voice-led way in (the bossa's Dm6 6th
+    to Gm7's 3rd), the contrast's own phrase tops may re-centre by a 5th, so it climbs back
+    toward its A rather than walking down its ii-V chain (#2140). A 12-bar chorus (a vamp
+    after it doesn't count) is a blues instead: call, call, answer. Every style sings it
+    (#2122): a book without its own `head.guide` takes the shared figures (`DEFAULT_GUIDE`,
     `players/lead/guide-figures.ts`, the `GuideRhythm` shape a style's override takes whole) —
     a straight-eighth pop rhythm, two to four notes a bar, a push or an attack into beat 3's
     change, one long arrival a phrase, swung or not by the style's feel. Jazz and rock write

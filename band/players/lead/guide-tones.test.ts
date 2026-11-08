@@ -5,7 +5,7 @@ import { STYLES } from '../../styles/index.js';
 import { GUIDE_METRICS } from '../../test/critique/guide-head.js';
 import { score } from '../../test/scores.js';
 import { mod12 } from '../../theory/pitch.js';
-import { guidePitchClasses, guideToneLine } from './guide-tones.js';
+import { guidePitchClasses, guideToneLine, headForm } from './guide-tones.js';
 
 /** #2027: a known standard's head is its guide-tone line. */
 
@@ -430,6 +430,65 @@ describe('the bridge lifts in every key, and on the shelf (#2123)', () => {
             expect(liftOf(style, nightAndDay), 'Night and Day').toBeGreaterThanOrEqual(2);
         },
     );
+
+    it('climbs back after a seam that falls: the contrast returns to where it came in (#2140)', () => {
+        // The critique's A B bossa, whose B is its contrast though no bridge: Dm6's 6th falls a
+        // half step to Gm7's 3rd (#2123's accepted seam), and the ii-V chain under the B falls
+        // a half step a chord from there. Its next phrase top met the same tritone (Bb7#11's
+        // Ab to Em7's G, its D a tritone up) and fell again, so the B sank 4 to 7 semitones
+        // under its A.
+        const bossa = (n: number) =>
+            score(
+                [
+                    {
+                        label: 'A',
+                        bars: up('Dm7 | G7 | Cmaj7 | A7b9 | Dm7 | G7 | Em7b5 A7 | Dm6', n),
+                    },
+                    {
+                        label: 'B',
+                        bars: up('Gm7 | C7 | Fmaj7 | Bb7#11 | Em7 | A7 | Dm7 G7 | Cmaj7', n),
+                    },
+                ],
+                { key: keyUp('C', n) },
+            );
+        let fell = 0;
+        for (let n = 0; n < 12; n++) {
+            const t = compileTimeline(bossa(n));
+            const { contrast } = headForm(t, 0);
+            const visit = t.visits.find((v) => v.ordinal === contrast);
+            if (!visit) {
+                throw new Error('the bossa has a contrast, its B');
+            }
+            // A sax book's home and a nylon's (71: 67 + 4, 66 + 5), a guitar's (73: 69 + 4).
+            for (const [home, range] of [
+                [71, SAX],
+                [71, [52, 81]],
+                [73, [55, 86]],
+            ] as const) {
+                const line = guideToneLine(t, t.bars[0], home, range);
+                const at = (tick: number) => line.findIndex((note) => note.tick === tick);
+                const seam = at(t.bars[visit.firstBar].start);
+                const cameFrom = line[seam - 1].midi;
+                if (line[seam].midi >= cameFrom) {
+                    continue;
+                }
+                fell++;
+                for (const top of t.bars.filter(
+                    (b) =>
+                        b.visit.ordinal === contrast &&
+                        b.phrase.bar === 0 &&
+                        b.index !== visit.firstBar,
+                )) {
+                    expect(line[at(top.start)].midi, `+${n} at ${home}`).toBeGreaterThanOrEqual(
+                        cameFrom,
+                    );
+                }
+            }
+        }
+        // The seam falls in eight keys of twelve at each of the three homes (24): a seam that
+        // stopped falling would leave nothing to judge.
+        expect(fell).toBeGreaterThanOrEqual(20);
+    });
 
     it('never reseats the A for the bridge: its line is the one it has with no bridge after it', () => {
         // The bridge climbs into the headroom over the A (`BRIDGE_TOP`); the A stays where its

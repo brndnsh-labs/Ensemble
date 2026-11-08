@@ -285,8 +285,9 @@ export const jazz = defineClaims({
                 // Rhythm Changes' A2 and last A against its A1: the bar that differs is the
                 // last A's eighth, whose Bb6 has no F7 on 3 to strike. 0.969 (0.938; 0.969).
                 ['leadHeadRhythmRecurs', 0.9, 1, 'the A comes back in the same rhythm'],
-                // The bridge, a two-section tune's B and the bridge of the pop and minor
-                // charts against the first A, bar for bar. 0.146 (0.458; 0.135).
+                // The bridge, a two-section tune's B, the pop chart's chorus and the minor
+                // chart's bridge against the first A, bar for bar. 0.143 (0.458; 0.135); 0.146
+                // while the pop chart's outro was read as its contrast (#2140).
                 ['leadHeadContrastDiffers', 0, 0.3, 'the contrast is another rhythm'],
                 // The bridge's first note over the A's last: a 4th's aim from where the line
                 // came in. 4.0 (4.0; 9.5 — the first cut's 5th over a fixed home fails the
