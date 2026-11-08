@@ -3,9 +3,10 @@ import { chordAt, compileTimeline } from '../../form/timeline.js';
 import { performPass } from '../../perform.js';
 import { STYLES } from '../../styles/index.js';
 import { GUIDE_METRICS } from '../../test/critique/guide-head.js';
-import { score } from '../../test/scores.js';
+import { FIXTURES, score } from '../../test/scores.js';
 import { mod12 } from '../../theory/pitch.js';
 import { guidePitchClasses, guideToneLine } from './guide-tones.js';
+import { LEAD_INSTRUMENTS } from './instruments.js';
 
 /** #2027: a known standard's head is its guide-tone line. */
 
@@ -391,7 +392,7 @@ describe('the bridge lifts in every key, and on the shelf (#2123)', () => {
         ],
         { key: 'C' },
     );
-    const liftOf = (style: StyleId, chart: ReturnType<typeof score>) => {
+    const headOf = (style: StyleId, chart: ReturnType<typeof score>) => {
         const timeline = compileTimeline(chart);
         const { events } = performPass(
             timeline,
@@ -406,8 +407,10 @@ describe('the bridge lifts in every key, and on the shelf (#2123)', () => {
             },
             { pass: 0, looping: true },
         );
-        return GUIDE_METRICS.leadBridgeLift([{ timeline, events, pass: 0 }]);
+        return { timeline, events, pass: 0 };
     };
+    const liftOf = (style: StyleId, chart: ReturnType<typeof score>) =>
+        GUIDE_METRICS.leadBridgeLift([headOf(style, chart)]);
 
     it.each(Object.keys(STYLES) as StyleId[])(
         '%s lifts both bridges at least a whole step, in all twelve keys',
@@ -431,11 +434,72 @@ describe('the bridge lifts in every key, and on the shelf (#2123)', () => {
         },
     );
 
+    it.each(Object.keys(STYLES) as StyleId[])(
+        '%s never sings the head over the top note its solo peaks on',
+        (style) => {
+            // The head is sung under the book's solo top (`bookReach`: its `peak` over home, or
+            // a step under the instrument's top). Before, the walk over a bridge's line ran on
+            // to the range's top: disco and reggae's sax to Bb5 (reggae's book: "a lift, not a
+            // scream", A5), the nylon to the 17th fret its book keeps off, hip hop's hook to the
+            // guitar's top.
+            const lead = STYLES[style].lead;
+            if (!lead) {
+                return;
+            }
+            const { top } = lead.idiom.register(LEAD_INSTRUMENTS[lead.prefers]);
+            const charts = [
+                ...Object.values(FIXTURES),
+                shelfRhythm,
+                nightAndDay,
+                ...Array.from({ length: 12 }, (_, n) => [rhythm(n), minorFunk(n)]).flat(),
+            ];
+            for (const chart of charts) {
+                const notes = headOf(style, chart).events.filter(
+                    (e): e is PitchedNote => e.lane === 'lead',
+                );
+                expect(Math.max(...notes.map((e) => e.midi))).toBeLessThanOrEqual(top);
+            }
+        },
+    );
+
+    it('never moves the line wider than a 5th, at any book’s reach', () => {
+        // A phrase top re-centres by a 5th at most (`RECENTRE`), a seam by a 4th, and inside a
+        // phrase the nearest guide tone is a minor 3rd away. Under a book's solo top a phrase
+        // top's window can hold only one of a chord's guide tones; the other, folded out of it,
+        // once won on nearness: hip hop's pop song fell from F5 to B4 into its verse and sang
+        // the verse a 4th low.
+        const charts = [
+            ...Object.values(FIXTURES),
+            shelfRhythm,
+            nightAndDay,
+            ...Array.from({ length: 12 }, (_, n) => [rhythm(n), minorFunk(n)]).flat(),
+        ];
+        for (const style of Object.keys(STYLES) as StyleId[]) {
+            const lead = STYLES[style].lead;
+            if (!lead) {
+                continue;
+            }
+            const instrument = LEAD_INSTRUMENTS[lead.prefers];
+            const { home, top } = lead.idiom.register(instrument);
+            for (const chart of charts) {
+                const t = compileTimeline(chart);
+                const line = guideToneLine(t, t.bars[0], home, [instrument.range[0], top]);
+                for (let i = 1; i < line.length; i++) {
+                    expect(
+                        Math.abs(line[i].midi - line[i - 1].midi),
+                        `${style}, ${line[i].chord.symbol} at ${line[i].tick}`,
+                    ).toBeLessThanOrEqual(7);
+                }
+            }
+        }
+    });
+
     it('never reseats the A for the bridge: its line is the one it has with no bridge after it', () => {
-        // The bridge climbs into the headroom over the A (`BRIDGE_TOP`); the A stays where its
-        // book seats it. Seating it lower to make room put the sax a 4th to a 6th under the comp
-        // on the shelf (#2123's first try). A sax or nylon book's home (71: 67 + 4, 66 + 5).
-        for (const range of [SAX, [52, 81] as const]) {
+        // The bridge climbs into the headroom over the A, up to the book's solo top; the A stays
+        // where its book seats it. Seating it lower to make room put the sax a 4th to a 6th under
+        // the comp on the shelf (#2123's first try). A sax or nylon book's home (71: 67 + 4,
+        // 66 + 5) and head (to its solo top: the sax's A5, the nylon's Ab5).
+        for (const range of [[53, 81] as const, [52, 80] as const]) {
             for (let n = 0; n < 12; n++) {
                 const firstA = (chart: ReturnType<typeof score>) => {
                     const t = compileTimeline(chart);
