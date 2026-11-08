@@ -1654,6 +1654,19 @@ describe('the whole band ends together (#2017)', () => {
                     for (const n of lead.filter((l) => hits.slice(0, -1).includes(l.tick))) {
                         expect(n.tick + n.dur, where).toBeLessThanOrEqual(n.tick + SHORT);
                     }
+                    // A lead in on the first stab is in on every one after it (a horn that hit
+                    // 1 and 3 but not 2 missed the arrival; found by #2017's taste review).
+                    const inOnFirst = lead.some(
+                        (l) => l.tick <= hits[0] + 1 && l.tick + l.dur > hits[0] + 1,
+                    );
+                    if (inOnFirst) {
+                        for (const hit of hits.slice(1)) {
+                            expect(
+                                lead.some((l) => Math.abs(l.tick - hit) < 1),
+                                `${where}: the lead on the stab at ${hit}`,
+                            ).toBe(true);
+                        }
+                    }
                     const final = lead.at(-1);
                     if (final && final.tick + final.dur > hits.at(-1)!) {
                         expect([final.tick, final.tick + final.dur], where).toEqual([
@@ -1809,9 +1822,11 @@ describe('a lead held from over the V into home (#2017)', () => {
             bar: 3,
         };
         const out = endWithTheBand(ctx, [held], book);
-        // Cut with the V's stab, struck again with the last hit (beat 4, home's second).
+        // Cut with the V's stab, struck again with each of home's hits (beat 3 short, beat 4
+        // ringing): in on the stabs, the lead plays every one after it.
         expect(out.map((n) => [Math.round((n.tick - bar.start) / STEP), n.dur / STEP])).toEqual([
             [0, 2],
+            [8, 2],
             [12, 4],
         ]);
         expect(out[0].midi).toBe(71);

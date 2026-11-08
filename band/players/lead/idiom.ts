@@ -2140,7 +2140,6 @@ export function endWithTheBand(
     }
     // stop, hits: each note lets go with the strike it sounds under; nothing after the last.
     const silence = tick(last.to);
-    const lastHit = tick(last.from);
     const sounding = events.filter((n) => n.tick < silence - 1);
     const kept = sounding.map((n) => {
         const under = strikes.filter((s) => tick(s.from) <= n.tick + 1).at(-1);
@@ -2152,10 +2151,15 @@ export function endWithTheBand(
         return cut(n, end);
     });
     const original = sounding.at(-1);
-    if (original && original.tick < lastHit - 1 && original.tick + original.dur >= lastHit - 1) {
-        // Held up to the band's last strike or through it: struck again with it, ringing as
-        // it does.
-        return [...kept, again(original, lastHit, silence, 0)];
+    // The band's strikes after the one the lead's last note sounds under.
+    const later = original ? strikes.filter((s) => tick(s.from) > original.tick + 1) : [];
+    const into = later[0];
+    if (original && into && original.tick + original.dur >= tick(into.from) - 1) {
+        // Held into the band's next strike: the player is in on the hits, so the note is struck
+        // again with every one of them (short with a short one, ringing with the last), not
+        // only the last. why: unison stabs are the one place everyone hits every note; a horn
+        // that hit 1 and 3 but not 2 would be the one player who missed the arrival.
+        return [...kept, ...later.map((s) => again(original, tick(s.from), tick(s.to), 0))];
     }
     return kept;
 }
