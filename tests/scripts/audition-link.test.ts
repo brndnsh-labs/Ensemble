@@ -306,6 +306,48 @@ describe('variants', () => {
     });
 });
 
+describe('--base-url hosts', () => {
+    it('resolves test, prod and local by name', async () => {
+        for (const [name, origin] of [
+            ['test', 'https://ensembletest.brndn.zip/'],
+            ['prod', 'https://ensemble.brndn.zip/'],
+            ['local', 'http://localhost:3100/'],
+        ]) {
+            const { out } = await run(['--prog=C', `--base-url=${name}`]);
+            expect(out.trim().split('\n')).toHaveLength(1);
+            expect(out.startsWith(`${origin}?autoplay=1#chart=`)).toBe(true);
+        }
+    });
+
+    it('prints an A/B row, host first in each label, the same chart on each host', async () => {
+        const { out } = await run([
+            '--prog=Em9 | A13',
+            '--genre=Funk',
+            '--bpm=84,96',
+            '--base-url=test,prod',
+            '--md',
+        ]);
+        expect(out.trim().split('\n')).toHaveLength(1);
+        expect(out).toMatch(
+            /^\[test · bpm 84\]\(https:\/\/ensembletest\.brndn\.zip\/\?autoplay=1#chart=[^)]+\) · \[test · bpm 96\]\(/,
+        );
+        expect(out).toContain('[prod · bpm 84](https://ensemble.brndn.zip/?autoplay=1#chart=');
+        const urls = linksOf(out);
+        expect(urls).toHaveLength(4);
+        const charts = await Promise.all(urls.map(chartOf));
+        expect(charts.map((c) => c.chart.performance.bpm)).toEqual([84, 96, 84, 96]);
+        expect(charts.every((c) => c.chart.band.groove.genre === 'Funk')).toBe(true);
+    });
+
+    it('keeps a literal URL, and refuses a name it does not know', async () => {
+        const { out } = await run(['--prog=C', '--base-url=https://example.test/x/']);
+        expect(out.startsWith('https://example.test/x/?autoplay=1#chart=')).toBe(true);
+        await expect(run(['--prog=C', '--base-url=staging'])).rejects.toThrow(
+            /not a URL or one of local, test, prod/,
+        );
+    });
+});
+
 describe('--md', () => {
     it('prints one markdown row of labelled links that decode', async () => {
         const { out } = await run([
@@ -332,6 +374,11 @@ describe('--md', () => {
     it('labels a single link', async () => {
         const { out } = await run(['--prog=C', '--md']);
         expect(out).toMatch(/^\[audition\]\(http/);
+    });
+
+    it('names a single link with --label', async () => {
+        const { out } = await run(['--prog=C', '--md', '--label=new, test']);
+        expect(out).toMatch(/^\[new, test\]\(http/);
     });
 });
 
