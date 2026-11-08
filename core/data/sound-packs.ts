@@ -149,21 +149,25 @@ export const SOUND_PACKS: readonly SoundPack[] = [
                     license: SOUND_LICENSES['GeneralUser-GS'],
                 },
             ],
-            changes: 'extracted from the SoundFont, levelled, converted to AAC, retuned',
+            changes:
+                'extracted from the SoundFont, loop rendered out, levelled, converted to AAC, retuned',
         },
-        approxSizeMB: 0.1,
+        approxSizeMB: 0.2,
         instruments: ['chords'],
-        // Calibrated 2026-06-22 (#664) via `mix-report --calibrate-pack=chords:clavinet`.
-        // Percussive plucked tone (short natural decay, no loop); loudnorm-leveled
-        // across the 8 zones. NOTE: the manifest roots are FRACTIONAL on purpose —
-        // the SF2 samples carry per-zone pitch-correction (mostly ~+30 cents flat,
-        // plus B1 −12 / F#2 +3), baked into `rootMidi = originalPitch − cents/100`
-        // so the seam's playbackRate tunes each zone true. Don't round them to ints.
-        // mix-report RMS-match was 5.14× (pack sat 14.2 dB under
-        // raw), but the clavinet is brighter (+193 Hz) and transient (high
-        // peak-to-RMS → reads louder than its RMS), so seated under the match: 4.5×.
-        // Confirm/nudge by ear on ensembletest (funk). Paired with SYNTH_CHORD_LEVEL.
-        gain: 4.5,
+        // Re-calibrated 2026-11-07 (#2116) via `mix:report --calibrate-pack=chords:clavinet`.
+        // The 8 GeneralUser GS zones are loop-sustain samples (0.35-0.74 s); they used to play
+        // one-shot and stop mid-ring, so the loop is now rendered out to a 2.2 s natural decay
+        // (recipe: docs/guides/sample-pack-sourcing.md). Zones are leveled by static gain, not
+        // loudnorm. A longer ring raises the pack's RMS, but the catalog still sat 4.49 dB under
+        // the synth (rock/blues/jazz/funk: 3.86/4.82/5.24/4.04 dB): RMS-match 7.55x. Seated under
+        // the match at 6.5x (-1.3 dB), as the old 4.5x sat 1.2 dB under its 5.14x match: the clav
+        // is brighter (+419 Hz) and transient, so it reads louder than its RMS. NOTE: the manifest
+        // roots are FRACTIONAL on purpose, the SF2 samples carry per-zone pitch-correction (mostly
+        // ~+30 cents flat, plus B1 -12 / F#2 +3), baked into
+        // `rootMidi = originalPitch - cents/100` so the seam's playbackRate tunes each zone
+        // true. Don't round them to ints. Confirm/nudge by ear on ensembletest (funk).
+        // Paired with SYNTH_CHORD_LEVEL.
+        gain: 6.5,
         // Bone-dry DI pluck — the driest pack; lift the send most so it doesn't
         // read pasted-on-top of the band. #686 start.
         reverbSend: 1.6,
