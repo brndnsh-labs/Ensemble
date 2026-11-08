@@ -2,7 +2,7 @@
 // packs decodes them before Play, so the first note is the real sound — not the built-in one with
 // a swap to the real one a few bars in — and each cached file is checked against its hash once.
 import type { Page } from '@playwright/test';
-import { expect, openBand, seedStarters, songLink } from './fixtures';
+import { expect, expectSaveDisabled, openBand, seedStarters, songLink } from './fixtures';
 import { closeSounds, observeSamples, sampleStarts, test } from './foundation-helpers';
 
 async function autoSoundsOn(page: Page) {
@@ -84,6 +84,8 @@ test('on a repeat visit the style’s sounds are decoded before Play and the ban
     await expect(resolvedSound(page, 'Bass')).toHaveText('Using Upright Bass');
     await expect(resolvedSound(page, 'Chords')).toHaveText('Using Acoustic Grand Piano');
     await closeSounds(page);
+    // Installed sounds resolving on open is never an unsaved change (`withLoadedSounds`).
+    await expectSaveDisabled(page);
     // The idle decode runs to its end on its own: the count settles before any press.
     let decodedBeforePlay = 0;
     await expect

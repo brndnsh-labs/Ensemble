@@ -156,7 +156,7 @@ entry here).
 - **What the trace shows:** the button was found and visible; Playwright's stable check, which counts animation frames, never got an answer. The page's JavaScript was not stuck: the teardown's evaluate answered in 5ms. The screencast's last frame is 1.5s before the click. WebKit stopped producing frames, so nothing the app did could move it.
 - **Rate:** 1 in the two weeks of CI logs (2026-10-19 to 2026-11-02); not seen locally.
 - **Next step:** if it happens again, keep the trace and check whether frames stop at the same moment (right after "Sounds installed"); if they do, look at what the install's end does to the compositor.
-- **Quarantine (2026-11-08, #2150):** the test is now laptop-only. A live-region write count does not depend on the browser, and the only failure was WebKit's compositor stopping, so pinning it retires the exposure; the stopped-frames cause itself is not fixed, and the file's WebKit test of the failed download still opens the same live region there.
+- **Quarantine (2026-11-08, #2150):** the test is now laptop-only, since a live-region write count does not depend on the browser. That reduces the exposure; it does not retire it: foundation-sounds' one-install test still runs the same Install all → `closeSounds` sequence on WebKit, where the frames stopped. The stopped-frames cause is not fixed. If it recurs, it will be there: apply the next step above to that test's trace.
 - **Last seen:** 2026-11-01.
 
 ### 🟢 `web/checks/semantic-form-editor.spec.ts` — "a form built bar by bar applies without a refusal, saves from the hidden editor, transposes and reopen offline as four written bars"

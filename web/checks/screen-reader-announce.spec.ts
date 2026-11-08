@@ -18,7 +18,7 @@ test('opening a song says its title, key and tempo in the stand toast’s live r
 test('an install writes each live region at most six times', async ({ page }, testInfo) => {
     test.skip(
         testInfo.project.name !== 'laptop',
-        'a live-region write count is browser-independent; headless WebKit stopped painting under it (the FLAKY_TESTS ledger entry this retires); WebKit still reads the live region in the failed-download test',
+        "a live-region write count is browser-independent; headless WebKit stopped painting once under it (quarantined in FLAKY_TESTS); WebKit still runs the same Install all → close in foundation-sounds' one-install test",
     );
     test.setTimeout(120_000);
     await seedStarters(page);

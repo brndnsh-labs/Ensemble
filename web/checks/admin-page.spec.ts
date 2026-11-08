@@ -18,13 +18,8 @@ test('a refused caller sees the ordinary not-found page', async ({ page }, testI
     await expect(page.getByRole('heading', { name: 'Admin' })).toHaveCount(0);
 });
 
-test('a listed account sees accounts against the cap and the account list', async ({
-    page,
-}, testInfo) => {
-    test.skip(
-        testInfo.project.name !== 'laptop',
-        'the page’s answer to a routed /api/admin/overview is React logic, not browser behaviour; the server’s gate is in the api’s own tests and no WebKit Playwright test covers the page',
-    );
+test('a listed account sees accounts against the cap and the account list', async ({ page }) => {
+    // Runs on both projects: it ends with the page's phone-width check (nothing runs sideways).
     const day = 24 * 60 * 60 * 1000;
     await page.route('**/api/admin/overview', (route) =>
         route.fulfill({

@@ -3,7 +3,7 @@ import type { CDPSession, Page } from '@playwright/test';
 /**
  * The Chromium CDP virtual authenticator, shared by every `*.chromium.spec.ts` (#1262).
  *
- * Extracted from `account-harness.chromium.spec.ts` (#1258), which first proved the setup. Only
+ * Extracted from the account-harness spec (#1258, since deleted), which first proved the setup. Only
  * Chromium has `WebAuthn.*`, which is why passkey specs carry the `.chromium` infix that
  * `playwright.config.ts` uses to keep them out of the WebKit project.
  *

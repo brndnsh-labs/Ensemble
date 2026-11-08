@@ -369,7 +369,7 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
 }, testInfo) => {
     test.skip(
         testInfo.project.name !== 'laptop',
-        'runtime sequencing asserted by sample-start deltas and the Style value, not browser timing; WebKit still plays through a feel switch in the one-install test',
+        'runtime sequencing asserted by sample-start deltas and the Style value, not browser timing; WebKit changes the feel mid-play in "a feel staged for the next bar settles when the musician stops inside it"',
     );
     test.setTimeout(120_000);
     await observeSamples(page);
@@ -478,11 +478,9 @@ test('feel preparation keeps the stand stable, rolls back playback safely, and r
 
 test('a feel staged for the next bar settles when the musician stops inside it', async ({
     page,
-}, testInfo) => {
-    test.skip(
-        testInfo.project.name !== 'laptop',
-        'engine sequencing on built-in sounds, not browser behaviour; WebKit still plays through a feel switch in the one-install test',
-    );
+}) => {
+    // Runs on both projects: on built-in sounds, cheap, and WebKit's one run of a feel changed
+    // while the band plays (the one-install test changes Style only while stopped).
     // Deliberately a built-in-sound band: no pack download can mask the engine
     // half of a live feel change. A feel changed mid-performance is staged and
     // swapped in at the next measure start, so the window between the choice and
