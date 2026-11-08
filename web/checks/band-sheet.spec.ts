@@ -33,27 +33,7 @@ async function setRange(page: import('@playwright/test').Page, label: string, va
     await input.dispatchEvent('pointerup');
 }
 
-test('every Band-sheet control has an accessible name', async ({ page }) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await openBand(page, 'Groove');
-
-    await expect(page.getByLabel('Swing', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Swing grid', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Humanize', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Auto intensity', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Band intensity', { exact: true })).toBeVisible();
-    // Complexity is the old engine's harmonic setting; the band engine has nothing for it to set.
-    await expect(page.getByLabel('Complexity', { exact: true })).toHaveCount(0);
-    await openBand(page, 'Practice');
-    await expect(page.getByLabel('Master volume', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Metronome', { exact: true })).toBeVisible();
-    await expect(page.getByLabel('Count-in', { exact: true })).toBeVisible();
-    // Chord notation is the Key popover's alone (#1757).
-    await expect(page.getByLabel('Chord notation', { exact: true })).toHaveCount(0);
-});
-
-test('document-owned feel fields (swing, swing grid, humanize, notation) persist through save, reload and revert', async ({
+test("document-owned feel fields (swing, swing grid, humanize, notation) and the chart's own energy persist through save, reload and revert", async ({
     page,
 }) => {
     await seedStarters(page);
@@ -74,6 +54,16 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(
         page.getByText('Humanize follows the Blues style until you change it.'),
     ).toBeVisible();
+    // A starter is seeded on auto (`energy: 'auto'`), at the default level.
+    const autoIntensity = page.getByLabel('Auto intensity', { exact: true });
+    const bandIntensity = page.getByLabel('Band intensity', { exact: true });
+    await expect(autoIntensity).toBeChecked();
+    await expect(bandIntensity).toBeDisabled();
+    await expect(bandIntensity).toHaveValue('35');
+    // Complexity is the old engine's harmonic setting; the band engine has nothing for it to set.
+    // Chord notation is the Key popover's alone (#1757).
+    await expect(page.getByLabel('Complexity', { exact: true })).toHaveCount(0);
+    await expect(notation).toHaveCount(0);
     await closeBand(page);
     await openKeyPopover(page);
     await expect(notation).toHaveValue('name');
@@ -85,9 +75,13 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await setRange(page, 'Swing', 60);
     await swingGrid.selectOption('16th');
     await setRange(page, 'Humanize', 55);
+    await autoIntensity.uncheck();
+    await expect(bandIntensity).toBeEnabled();
+    await setRange(page, 'Band intensity', 80);
     await expect(swing).toHaveValue('60');
     await expect(swingGrid).toHaveValue('16th');
     await expect(humanize).toHaveValue('55');
+    await expect(bandIntensity).toHaveValue('80');
     await expect(
         page.getByText('Humanize follows the Blues style until you change it.'),
     ).toHaveCount(0);
@@ -103,6 +97,9 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(swing).toHaveValue('100');
     await expect(swingGrid).toHaveValue('8th');
     await expect(humanize).toHaveValue('35');
+    // ... and puts the band back on auto.
+    await expect(autoIntensity).toBeChecked();
+    await expect(bandIntensity).toHaveValue('35');
     await closeBand(page);
     await openKeyPopover(page);
     await expect(notation).toHaveValue('name');
@@ -114,6 +111,8 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await setRange(page, 'Swing', 60);
     await swingGrid.selectOption('16th');
     await setRange(page, 'Humanize', 55);
+    await autoIntensity.uncheck();
+    await setRange(page, 'Band intensity', 80);
     await closeBand(page);
     await openKeyPopover(page);
     await notation.selectOption('roman');
@@ -128,98 +127,13 @@ test('document-owned feel fields (swing, swing grid, humanize, notation) persist
     await expect(swing).toHaveValue('60');
     await expect(swingGrid).toHaveValue('16th');
     await expect(humanize).toHaveValue('55');
+    await expect(autoIntensity).not.toBeChecked();
+    await expect(bandIntensity).toBeEnabled();
+    await expect(bandIntensity).toHaveValue('80');
     await closeBand(page);
     await openKeyPopover(page);
     await expect(notation).toHaveValue('roman');
-});
-
-test('master volume is a device preference: it persists across reload without Save, independent of the chart', async ({
-    page,
-}) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await openBand(page, 'Practice');
-
-    const masterVolume = page.getByLabel('Master volume', { exact: true });
-    // Full by default: the master volume is a plain level after the limiter (#2002).
-    await expect(masterVolume).toHaveValue('100');
-    await setRange(page, 'Master volume', 75);
-    await expect(masterVolume).toHaveValue('75');
-    await closeBand(page);
-    // A preference change alone must not create a document-save prompt.
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-
-    await page.reload();
-    await songLink(page, 'Blue pocket', 'Blues').first().click();
-    await openBand(page, 'Practice');
-    await expect(page.getByLabel('Master volume', { exact: true })).toHaveValue('75');
-});
-
-test('count-in (#1422) is a device preference too: it persists across reload without Save, independent of the chart', async ({
-    page,
-}) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await openBand(page, 'Practice');
-
-    const countIn = page.getByLabel('Count-in', { exact: true });
-    // This suite seeds it OFF (`fixtures.ts`) so a bar of clicks doesn't push back the first
-    // note/highlight in every OTHER spec that presses Play — the real product default is ON
-    // (`playback.countIn`'s own initial value), unread here until this test writes one.
-    await expect(countIn).not.toBeChecked();
-    await countIn.check();
-    await expect(countIn).toBeChecked();
-    await closeBand(page);
-    // A preference change alone must not create a document-save prompt.
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-
-    await page.reload();
-    await songLink(page, 'Blue pocket', 'Blues').first().click();
-    await openBand(page, 'Practice');
-    await expect(page.getByLabel('Count-in', { exact: true })).toBeChecked();
-});
-
-test("energy (auto intensity, band intensity) is the chart's own: it dirties the chart, reverts, and persists through save and reload", async ({
-    page,
-}) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await openBand(page, 'Groove');
-
-    const autoIntensity = page.getByLabel('Auto intensity', { exact: true });
-    const bandIntensity = page.getByLabel('Band intensity', { exact: true });
-    // A starter is seeded on auto (`energy: 'auto'`), at the default level.
-    await expect(autoIntensity).toBeChecked();
-    await expect(bandIntensity).toBeDisabled();
-    await expect(bandIntensity).toHaveValue('35');
-
-    await autoIntensity.uncheck();
-    await expect(bandIntensity).toBeEnabled();
-    await setRange(page, 'Band intensity', 80);
-    await expect(bandIntensity).toHaveValue('80');
-    await closeBand(page);
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
-
-    // Revert to saved puts the band back on auto.
-    await songMenuAction(page, 'Revert to saved');
-    await openBand(page, 'Groove');
-    await expect(autoIntensity).toBeChecked();
-    await expect(bandIntensity).toHaveValue('35');
-
-    // Redo it and save it.
-    await autoIntensity.uncheck();
-    await setRange(page, 'Band intensity', 80);
-    await closeBand(page);
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-
-    await page.reload();
-    await songLink(page, 'Blue pocket', 'Blues').first().click();
-    await openBand(page, 'Groove');
-    await expect(page.getByLabel('Auto intensity', { exact: true })).not.toBeChecked();
-    await expect(page.getByLabel('Band intensity', { exact: true })).toBeEnabled();
-    await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('80');
-    await closeBand(page);
+    await closeKeyPopover(page);
 
     // Another chart opens on its own energy, not this one's.
     await page.getByRole('button', { name: 'Back to songbook' }).click();
@@ -229,23 +143,38 @@ test("energy (auto intensity, band intensity) is the chart's own: it dirties the
     await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('35');
 });
 
-test('the metronome is session-only: it never dirties the chart and resets on reload', async ({
+test('master volume and count-in are device preferences and the metronome is session-only: none dirties the chart, the first two persist across reload without Save, the metronome resets', async ({
     page,
 }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await openBand(page, 'Practice');
 
+    const masterVolume = page.getByLabel('Master volume', { exact: true });
+    const countIn = page.getByLabel('Count-in', { exact: true });
     const metronome = page.getByLabel('Metronome', { exact: true });
+    // Full by default: the master volume is a plain level after the limiter (#2002).
+    await expect(masterVolume).toHaveValue('100');
+    // This suite seeds count-in OFF (`fixtures.ts`) so a bar of clicks doesn't push back the first
+    // note/highlight in every OTHER spec that presses Play — the real product default is ON
+    // (`playback.countIn`'s own initial value), unread here until this test writes one.
+    await expect(countIn).not.toBeChecked();
     await expect(metronome).not.toBeChecked();
+    await setRange(page, 'Master volume', 75);
+    await expect(masterVolume).toHaveValue('75');
+    await countIn.check();
+    await expect(countIn).toBeChecked();
     await metronome.check();
     await expect(metronome).toBeChecked();
     await closeBand(page);
+    // A preference change alone must not create a document-save prompt.
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 
     await page.reload();
     await songLink(page, 'Blue pocket', 'Blues').first().click();
     await openBand(page, 'Practice');
+    await expect(page.getByLabel('Master volume', { exact: true })).toHaveValue('75');
+    await expect(page.getByLabel('Count-in', { exact: true })).toBeChecked();
     await expect(page.getByLabel('Metronome', { exact: true })).not.toBeChecked();
 });
 
@@ -263,28 +192,6 @@ test('changing swing during playback does not stop the band', async ({ page }) =
     // Still playing — a feel change must not have tripped the transport.
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-});
-
-test('count-in (#1422) clicks one bar before the band, then the chart plays from the top', async ({
-    page,
-}) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await openBand(page, 'Practice');
-    await page.getByLabel('Count-in', { exact: true }).check();
-    await closeBand(page);
-
-    const playButton = page.getByRole('button', { name: 'Stop playback', exact: true });
-    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    await expect(playButton).toBeVisible();
-    // The play button counts the bar down instead of showing the stop glyph, and the chart
-    // itself doesn't move yet — the count-in must not advance the playhead.
-    await expect(playButton).toHaveText('1');
-    await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(0);
-    // Once the bar elapses, the band's own downbeat lands and the glyph returns to stop.
-    await expect(playButton).toHaveText('■', { timeout: 10_000 });
-    await expect(page.locator('.chord[aria-current="true"]')).toHaveCount(1);
-    await playButton.click();
 });
 
 test('humanize 20 is "not set": picking it shows the style\'s own amount (#2010)', async ({

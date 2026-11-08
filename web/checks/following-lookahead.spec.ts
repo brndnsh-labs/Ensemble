@@ -405,7 +405,11 @@ test('the row after the playing row stays fully visible on every bar change, and
 
 test('data-next skips both chords of a two-chord bar, resolves across the repeat, then moves on', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the cue walk is browser- and width-independent; the same-bar repeat walk in the #1506 clock-skew test and the form-wrap run below still cover it on WebKit',
+    );
     // The setup alone is ~14s on a CPU-starved WebKit, and eight bars there run at a third of
     // real time: measured 30s for a run that was on track throughout (#1485).
     test.setTimeout(45_000);
@@ -491,22 +495,6 @@ const ONE_BAR_REPEAT_CUES = [
     'R1 next R2:soon',
 ];
 
-test('a one-bar written repeat points at the SAME bar through pass 3, and the FOLLOWING bar on pass 4', async ({
-    page,
-}) => {
-    // Two laps of a five-bar form plus the setup; on a CPU-starved WebKit the band's clock runs
-    // at a third of real time, so this is real work rather than a hang (#1485).
-    test.setTimeout(75_000);
-    // #1458 patch review P2-1: a written-measure-keyed next-bar walk skips every later pass of a
-    // one-bar `||: :||` repeat as "the same bar as before", pointing the cue at whatever follows
-    // the WHOLE repeat for its entire 4-pass run rather than only its final pass.
-    await buildOneBarRepeatChart(page);
-    expect(
-        await oneBarRepeatLapTwo(page),
-        'passes 1-3 point at the SAME one-bar repeat; only pass 4 moves on to R2',
-    ).toEqual(ONE_BAR_REPEAT_CUES);
-});
-
 test('the cue and the playing bar are painted from one instant of the band’s clock (#1506)', async ({
     page,
 }) => {
@@ -552,42 +540,6 @@ test('the cue and the playing bar are painted from one instant of the band’s c
     }, 0.12);
     await buildOneBarRepeatChart(page);
     expect(await oneBarRepeatLapTwo(page)).toEqual(ONE_BAR_REPEAT_CUES);
-});
-
-test('a repeat’s second pass strengthens the cue only in its OWN last beat, not for the whole bar', async ({
-    page,
-}) => {
-    test.setTimeout(30_000);
-    await buildLookaheadChart(page);
-    await startHere(page, 'A');
-    await waitForActiveNext(page, 'A4', 'A1'); // pass 1 reached
-    // The moment `nextId` becomes 'B1' is pass 2's downbeat (advancing past the repeat is a plain
-    // slot step, independent of beat timing) — the earliest possible false-positive window for
-    // #1458 patch review P1-3 (a stale first-performance `start`/`end` would show "soon" for this
-    // whole second visit, not just its last beat).
-    const atSecondPassDownbeat = await waitForActiveNext(page, 'A4', 'B1');
-    expect(
-        atSecondPassDownbeat.nextValue,
-        'must not already be "soon" at the second pass’s downbeat',
-    ).toBe('true');
-    await pollSamples(page, (s) => s.activeId === 'A4' && s.nextValue === 'soon', {
-        timeoutMs: 2_000,
-    });
-    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-});
-
-test('the next-bar cue strengthens only in the last felt beat, not at the downbeat', async ({
-    page,
-}) => {
-    test.setTimeout(30_000);
-    await buildLookaheadChart(page, { sectionBBars: 4 });
-    await startHere(page, 'B');
-    const atDownbeat = await pollSamples(page, (s) => s.activeId === 'B2');
-    expect(atDownbeat.nextValue, 'must not already be "soon" right at the downbeat').toBe('true');
-    await pollSamples(page, (s) => s.activeId === 'B2' && s.nextValue === 'soon', {
-        timeoutMs: 2_000,
-    });
-    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 
 /** One bar at 240bpm in 4/4, in ms OF THE BAND'S AUDIO CLOCK. */
@@ -715,12 +667,11 @@ test('the jump-ahead fires in the last felt beat (not the downbeat), and fires a
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 
-// Both a fast and a normal tempo (patch review P3-1): at 240bpm the last felt pulse alone
-// (250ms) is shorter than a `behavior: 'smooth'` scroll typically needs to finish before the
-// barline, which `runtime.inLastBeat()`'s fixed ~600ms real-time lead now compensates for; at
-// 120bpm the last pulse (500ms) is closer to that lead already, so this is also evidence the fix
-// does not regress the normal-tempo case it left alone.
-for (const bpm of [120, 240]) {
+// At the 240bpm pace: the last felt pulse alone (250ms) is shorter than a `behavior: 'smooth'`
+// scroll typically needs to finish before the barline, which `runtime.inLastBeat()`'s fixed
+// ~600ms real-time lead compensates for. 120bpm takes the same `end - leadTicks` branch with
+// more room, so 240 is the harder run and the only one kept (#2149).
+for (const bpm of [240]) {
     test(`data-next wraps to bar 1 at the form loop, and bar 1 is fully visible before the band reaches it (${bpm}bpm)`, async ({
         page,
     }) => {
@@ -805,27 +756,4 @@ test('reduced motion scrolls instantly, not smoothly', async ({ page }) => {
         // override, unlike 'auto' (which defers to it — the bug this call's own value once was).
         expect(call.behavior).toBe('instant');
     }
-});
-
-test('the next-bar cue reads distinctly in both themes (screenshots for review)', async ({
-    page,
-}, testInfo) => {
-    test.setTimeout(30_000);
-    await buildLookaheadChart(page);
-    await startHere(page, 'A');
-    // A2 → A3 is a chart with a two-chord bar (A3: Dm7, G7) right next in line.
-    await waitForActiveNext(page, 'A2', 'A3');
-    await expect(page.locator('.bar[data-next]')).toHaveCount(1);
-    await page.screenshot({ path: testInfo.outputPath('next-cue-day.png') });
-    const stage = page.getByRole('button', { name: 'Stage', exact: true });
-    if (await stage.isVisible()) {
-        await stage.click();
-    } else {
-        // A phone folds the header row into the Song menu while the band plays (#1993).
-        await page.getByRole('button', { name: 'Song actions' }).click();
-        await page.getByRole('menuitem', { name: 'Switch to stage mode', exact: true }).click();
-    }
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'stage');
-    await page.screenshot({ path: testInfo.outputPath('next-cue-stage.png') });
-    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });

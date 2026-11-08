@@ -21,9 +21,9 @@ async function newTwoSectionSong(page: import('@playwright/test').Page) {
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     const tempo = page.getByLabel('Tempo', { exact: true });
-    await tempo.fill('240');
+    await tempo.fill('320');
     await tempo.press('Enter');
-    await expect(tempo).toHaveValue('240');
+    await expect(tempo).toHaveValue('320');
 }
 
 test('tapping a section letter opens a menu with Start here and Loop, and no shortcut', async ({

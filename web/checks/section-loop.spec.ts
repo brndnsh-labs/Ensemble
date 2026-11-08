@@ -13,10 +13,11 @@ import {
  * and over, as a derived chart; the transport's "Looping B ×" ends it, and a band that is playing
  * carries on into the next section rather than stopping. Nothing about it is saved.
  *
- * A (C F) · B (Dm7 G7 Em7 A7) · C (Bb Eb) at 240 bpm: a bar a second, a lap of B four.
+ * A (C F) · B (Dm7 G7 Em7 A7) · C (Bb Eb) at 320 bpm (the ceiling, `MAX_BPM`): a bar 750 ms, a lap
+ * of B three seconds.
  */
 function threeSections(id: string, title: string) {
-    const doc = measureSong([id, title, 'Rock', 'C', 'C|F|Dm7|G7|Em7|A7|Bb|Eb', 240]);
+    const doc = measureSong([id, title, 'Rock', 'C', 'C|F|Dm7|G7|Em7|A7|Bb|Eb', 320]);
     const [measures] = doc.chart.score.sections.map((section) => section.measures);
     doc.chart.score.sections = [
         { id: 'a', label: 'A', repeat: 1, measures: measures.slice(0, 2) },
@@ -26,7 +27,7 @@ function threeSections(id: string, title: string) {
     return doc;
 }
 const LOOP_STUDY = threeSections('loop-study', 'Loop study');
-const OTHER = measureSong(['loop-other', 'Other song', 'Rock', 'C', 'E|E|E|E', 240]);
+const OTHER = measureSong(['loop-other', 'Other song', 'Rock', 'C', 'E|E|E|E', 320]);
 
 const SECTION_B = ['Dm7', 'G7', 'Em7', 'A7'];
 const active = (page: Page) => page.locator('.chord[aria-current="true"]');
@@ -60,7 +61,13 @@ async function lit(page: Page, seconds: number): Promise<Set<string>> {
     return seen;
 }
 
-test('Loop plays only that section, round and round, counting its laps', async ({ page }) => {
+test('Loop plays only that section, round and round, counting its laps', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the loop walk is browser- and width-independent; WebKit still covers the same loop and its carry-on in "a loop set again and cleared while playing" and "the loop holds through Stop and Play"',
+    );
     test.setTimeout(60_000);
     await openStudy(page);
     await loopB(page);
@@ -73,21 +80,6 @@ test('Loop plays only that section, round and round, counting its laps', async (
     expect([...seen].every((chord) => SECTION_B.includes(chord))).toBe(true);
     expect(seen.has('A7')).toBe(true);
     expect(seen.has('Dm7')).toBe(true);
-    await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
-});
-
-test('clearing the loop while playing carries on into the next section', async ({ page }) => {
-    test.setTimeout(60_000);
-    await openStudy(page);
-    await loopB(page);
-    await expect(counter(page)).toHaveText(/^Lap 2$/, { timeout: 15_000 });
-    await chip(page).click();
-    await expect(chip(page)).toHaveCount(0);
-    // Never stopped: the band finishes B and goes on into C, then round the song.
-    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeVisible();
-    await expect(active(page)).toHaveText('Bb', { timeout: 10_000 });
-    await expect(counter(page)).toHaveText(/^Chorus \d+$/);
-    await expect(active(page)).toHaveText('C', { timeout: 10_000 });
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });
 
@@ -147,6 +139,9 @@ test('a loop set again and cleared while playing keeps the playhead in the secti
     await loopB(page);
     await expect(counter(page)).toHaveText(/^Lap 2$/, { timeout: 15_000 });
     await chip(page).click();
+    await expect(chip(page)).toHaveCount(0);
+    // Never stopped: the band finishes B and goes on into C, then round the song.
+    await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeVisible();
     // Until the band reaches C, every bar lit is B's: never the song's first bars.
     const order: string[] = [];
     const until = Date.now() + 8000;
@@ -164,5 +159,7 @@ test('a loop set again and cleared while playing keeps the playhead in the secti
     expect(order.slice(0, order.indexOf('Bb')).every((chord) => SECTION_B.includes(chord))).toBe(
         true,
     );
+    await expect(counter(page)).toHaveText(/^Chorus \d+$/);
+    await expect(active(page)).toHaveText('C', { timeout: 10_000 });
     await page.getByRole('button', { name: 'Stop playback', exact: true }).click();
 });

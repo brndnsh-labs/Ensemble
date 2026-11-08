@@ -72,7 +72,7 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     await page.getByRole('button', { name: 'Chart', exact: true }).click();
     await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
     const tempo = page.getByLabel('Tempo', { exact: true });
-    await tempo.fill('240');
+    await tempo.fill('320');
     await tempo.press('Enter');
     await expect(page.locator('.chord')).toHaveText(['C', 'F', 'G7', 'C']);
     const lead = page.getByRole('button', { name: 'Soloist', exact: true });
@@ -85,7 +85,8 @@ test('the band engine plays the chart round the loop and stops', async ({ page }
     });
     await page.getByRole('button', { name: 'Start playback', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Stop playback', exact: true })).toBeEnabled();
-    // Follow the chart pointer until it has come back round to the top twice.
+    // Follow the chart pointer round two laps: a bar a stall hid in the first (start-up) lap
+    // still has to show in the second, so every bar is seen.
     const visits: number[] = [];
     await expect
         .poll(
@@ -129,7 +130,7 @@ test('changing the key of a chart while it plays restarts the band in the new ke
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     const tempo = page.getByLabel('Tempo', { exact: true });
-    await tempo.fill('240');
+    await tempo.fill('320');
     await tempo.press('Enter');
     const activeBar = () =>
         page
