@@ -457,10 +457,39 @@ const SHORT_COMP_CELLS: readonly [number[], number][] = [
     [[0, 6], 1],
 ];
 
+/**
+ * The comper's push into a change (#2015). Before a chord change over the barline a strike is
+ * added to the figure on the "and" of 4, so the next chord can arrive an eighth early and tie
+ * over (the machinery's `push`): Red Garland's and Wynton Kelly's signature move behind a
+ * soloist, the change announced before the bass gets there. The chance the figure sets it up,
+ * by energy: a quiet chorus lets more changes land on the beat. A figure that already ends on
+ * the "and" of 4 (`[6, 14]`) needs no setting up.
+ */
+const PUSH_SETUP: Record<EnergyTier, number> = { low: 0.25, mid: 0.4, high: 0.45 };
+
+/** The bar's last span, ending at a chord change the comp may push into (`PUSH_SETUP`). */
+function changesOverBarline(ctx: BarContext, span: { to: number; index: number }): boolean {
+    const here = ctx.bar.spans[span.index]?.chord;
+    const next = ctx.next?.bar.spans[0];
+    return (
+        span.to >= barSteps(ctx.bar) &&
+        !!here &&
+        !!next?.chord &&
+        next.attack &&
+        next.chord.symbol !== here.symbol &&
+        // The machinery's own refusals (`compIdiom`): the final chord and a held one land on
+        // their downbeat, and nothing is pushed into a bar the comp sits out.
+        !next.fermata &&
+        !ctx.next?.plan.ending &&
+        ctx.next?.plan.lanes.comp !== false
+    );
+}
+
 function jazzComp(
     { from, to, attack }: { from: number; to: number; attack: boolean },
     tier: EnergyTier,
     rng: Rng,
+    setup = 0,
 ): Hit[] {
     if (!attack && from === 0 && tier === 'low') {
         return [];
@@ -491,18 +520,33 @@ function jazzComp(
             hits.push({ step: extra, length: 1.5, velocity: 84 });
         }
     }
+    // Set up the push: a strike on the "and" of 4 is added to the figure (`PUSH_SETUP`). Added,
+    // never moved: the Charleston keeps its "and" of 2, and the comper answers the change with
+    // one more strike, the way Garland does at the end of a phrase. Drawn after the figure's
+    // own draws, so a bar that doesn't set it up keeps the figure it drew.
+    const and4 = to - 2;
+    if (setup > 0 && length >= 8 && !hits.some((h) => h.step === and4) && rng.chance(setup)) {
+        hits.push({ step: and4, length: 1.5, velocity: 88 });
+    }
     return hits.sort((a, b) => a.step - b.step);
 }
 
 const jazzKeys = compIdiom({
     name: 'jazz comp',
     kind: 'rootless',
-    push: { low: 0.15, mid: 0.3, high: 0.4 },
+    // A strike on the "and" of 4 before a change is the new chord arriving early, most of the
+    // time (#2015): the figure sets it up (`PUSH_SETUP`), and this is the chance it is a push
+    // and not a stab of the chord that is leaving. A quiet chorus lets some land on the beat.
+    push: { low: 0.6, mid: 0.75, high: 0.85 },
+    // A mid-bar change (a ii–V in one bar) is pushed the same way: a strike in the eighth
+    // before it plays the new chord and ties over, never a stab of the outgoing chord (#2015).
+    pushInBar: true,
     // The comper and the horn share the space: a strike under a moving line may lay out,
     // and nearly every breath gets a stab (Wynton Kelly behind a soloist). The figure is
     // already sparse, so the time stays: never fewer than two strikes a bar.
     answer: { layOut: 0.6, fill: 0.9, keep: 2 },
-    rhythm: (_ctx, span, tier, rng) => jazzComp(span, tier, rng),
+    rhythm: (ctx, span, tier, rng) =>
+        jazzComp(span, tier, rng, changesOverBarline(ctx, span) ? PUSH_SETUP[tier] : 0),
 });
 
 // ---------------------------------------------------------------- guitar

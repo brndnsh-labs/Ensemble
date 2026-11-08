@@ -995,6 +995,53 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of mid-bar chord changes the comp stutters into: a sounding comp strike within the
+     * eighth before a change that still plays the OLD chord (it lacks a guide tone of the new
+     * one), #2015. A strike there that already plays the new chord is a push, not a stutter.
+     * The same tell as `compAnticipatesChange`: a change whose guide tones the old chord
+     * already has isn't counted, and a book that strikes two notes (neo-soul's guitar dyads)
+     * can't sound both guide tones, so it reads as a stutter here; claim it only on a book that
+     * voices whole chords. Mid-bar only: a strike in a bar's last eighth is the barline push's
+     * business.
+     */
+    compStabsOutgoing: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const strikes = events.filter(
+                (e): e is PitchedNote => e.lane === 'comp' && !(e as PitchedNote).muted,
+            );
+            for (const bar of t.bars) {
+                bar.spans.forEach((span, i) => {
+                    const before = bar.spans[i - 1]?.chord;
+                    if (i === 0 || !span.chord || !before || before.symbol === span.chord.symbol) {
+                        return;
+                    }
+                    const old = chordPcs(before);
+                    const root = span.chord.root;
+                    const guides = [span.chord.third, span.chord.seventh]
+                        .filter((k): k is NonNullable<typeof k> => k !== null)
+                        .map((k) => mod12(root + k));
+                    if (!guides.some((pc) => !old.includes(pc))) {
+                        return;
+                    }
+                    n++;
+                    const early = strikes.filter(
+                        (c) => c.tick >= span.start - 2 * STEP - 0.5 && c.tick < span.start - 0.5,
+                    );
+                    const playsNew = (c: PitchedNote) =>
+                        guides.every((pc) =>
+                            strikes.some(
+                                (d) => Math.abs(d.tick - c.tick) < 1 && mod12(d.midi) === pc,
+                            ),
+                        );
+                    hit += early.length && !early.some(playsNew) ? 1 : 0;
+                });
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of sounding comp onsets in 4/4 bars that fall on beat 1 or beat 3. */
     compOnOneAndThree: (takes) => {
         let n = 0;
