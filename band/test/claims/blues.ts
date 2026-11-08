@@ -59,6 +59,10 @@ export const blues = defineClaims({
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.95, 1, 'the backbeat on 2 and 4, every bar'],
                 ['kickOnOneAndThree', 0.95, 1, 'the kick grounds 1 and 3'],
+                // 0.293 of the fill bars (0.313 at high energy; 0 at low, whose fills are a
+                // two-step pickup): the shuffle's triplet fill (`tripletRun`, #2165), drawn
+                // about half the time against the eighth run and the snare pickup. 0 without it.
+                ['drumFillTriplets', 0.15, 0.5, 'some fills are the shuffle triplet, played out'],
                 [
                     'cymbalEighths',
                     0.9,
