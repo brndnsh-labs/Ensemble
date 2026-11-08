@@ -22,7 +22,11 @@ async function review(page: Page, link: string) {
 
 test('the import preview proposes the tune’s style, tempo and sections, all editable (#2004)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the import preview's proposals are browser-independent; WebKit covers the import dialog's review flow in the ireal-import studies",
+    );
     const dialog = await review(page, await fixtureLink('ladies-in-mercedes'));
     // Sections come from the rehearsal marks, not one "Chart" blob.
     await expect(dialog.getByTestId('import-sections')).toHaveText(
@@ -56,7 +60,11 @@ test('the import preview proposes the tune’s style, tempo and sections, all ed
 
 test('a mark inside a repeat stays in its section, and the preview says why (#2004)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the preview's section split is browser-independent; WebKit covers the import dialog's review flow in the ireal-import studies",
+    );
     const dialog = await review(page, await fixtureLink('one-for-my-baby'));
     await expect(dialog.getByTestId('import-sections')).toHaveText('Sections: A (16) · B (31)');
     await expect(dialog.getByLabel('Import style', { exact: true })).toHaveValue('Jazz');

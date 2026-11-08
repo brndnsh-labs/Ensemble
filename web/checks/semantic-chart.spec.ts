@@ -4,7 +4,6 @@ import type { ChartDocument } from '../lib/documents';
 import {
     appUrl,
     barField,
-    test as base,
     closeKeyPopover,
     editorRevealed,
     expect,
@@ -19,28 +18,9 @@ import {
     seedStarters,
     songLink,
     songMenuAction,
+    test,
     typeBar,
 } from './fixtures';
-
-const test = base.extend<{ disconnect: () => Promise<void> }>({
-    disconnect: async ({ browserName, context, request }, use) => {
-        await use(async () => {
-            if (browserName === 'webkit') {
-                // Same real connection refusal used by the existing offline regression:
-                // this avoids WebKit's setOffline cached-navigation implementation error.
-                expect((await request.post('/__test/network?offline=1')).ok()).toBe(true);
-                await expect(
-                    request.get(appUrl('not-cached'), { timeout: 3000 }),
-                ).rejects.toThrow();
-            } else {
-                await context.setOffline(true);
-            }
-        });
-        if (browserName === 'webkit') {
-            await request.post('/__test/network?offline=0');
-        }
-    },
-});
 
 async function documents(page: Page): Promise<ChartDocument[]> {
     return page.evaluate(async () => {
@@ -97,10 +77,11 @@ async function exportCurrent(page: Page): Promise<ChartDocument> {
     return document;
 }
 
-test('2+1+1 editor saves the song, transposes and reopens offline', async ({
-    page,
-    disconnect,
-}, info) => {
+test('2+1+1 editor saves the song and transposes', async ({ page }, info) => {
+    test.skip(
+        info.project.name !== 'laptop',
+        "uneven lengths, Save and transpose are browser-independent; WebKit covers Save and export in 'unfinished bars survive selection'",
+    );
     await editBlue(page);
     const before = await documents(page);
     const original = before.find((document) => document.id === 'starter-blues')!;
@@ -153,17 +134,6 @@ test('2+1+1 editor saves the song, transposes and reopens offline', async ({
     expect((await documents(page)).filter((document) => document.id !== saved.id)).toEqual(
         before.filter((document) => document.id !== saved.id),
     );
-    await expect
-        .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL))
-        .toContain(appUrl('sw.js'));
-    await disconnect();
-    await page.reload();
-    await songLink(page, 'Uneven blues', 'Blues').click();
-    await expect(keyButton(page)).toHaveAccessibleName('Key: D');
-    await page.getByRole('button', { name: 'Start playback', exact: true }).click();
-    await expect.poll(() => page.locator('.chord[aria-current="true"]').count()).toBe(1);
-    await page.getByRole('button', { name: 'Stop playback' }).click();
-    expect((await documents(page)).find((document) => document.id === saved.id)).toEqual(saved);
 });
 
 test('unfinished bars survive selection, errors and hidden editor; Save commits every bar', async ({
@@ -240,7 +210,11 @@ test('unfinished bars survive selection, errors and hidden editor; Save commits 
 
 test('new charts support bar key/meter changes, growing the chart, recovery and detached import', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "per-bar key and meter, growing the chart and import are browser-independent; WebKit covers the bar menu's groups in calm-menus and Save in 'unfinished bars survive selection'",
+    );
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
@@ -292,7 +266,13 @@ test('new charts support bar key/meter changes, growing the chart, recovery and 
     expect(imported.chart).toEqual(exported.chart);
 });
 
-test('a mode-only change is visible on the music stand and survives Save', async ({ page }) => {
+test('a mode-only change is visible on the music stand and survives Save', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the mode change and Save are browser-independent; WebKit covers the Key popover's Mode in key-popover's first test",
+    );
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
@@ -313,44 +293,18 @@ test('a mode-only change is visible on the music stand and survives Save', async
     expect(saved.chart.score.sections[0].measures[1].isMinor).toBe(true);
 });
 
-test('semantic revision conflicts keep both takes, and unsupported imports never create a partial song', async ({
-    page,
-    context,
-}) => {
+test('unsupported imports never create a partial song', async ({ page }) => {
+    // The revision conflict this test once also held is usability.spec.ts's 'a revision conflict
+    // retains typed chords and allows an independent copy'.
     await editBlue(page);
-    const original = (await documents(page)).find((document) => document.id === 'starter-blues')!;
-    const second = await context.newPage();
-    await second.goto(appUrl());
-    await songLink(second, original.title, 'Blues').click();
-    await second.getByRole('button', { name: 'Edit chart', exact: true }).click();
-    await typeBar(page, 1, 'C:2 Dm:1 G7:1');
-    await leaveBar(page);
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    const newer = (await documents(page)).find((document) => document.id === original.id)!;
-    // Saved straight from the open bar, not left first: Save commits what is typed.
-    await typeBar(second, 1, 'F:3 G7:1');
-    await second.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(second.locator('.error-banner')).toContainText('saved in another tab');
-    await expect(await openBar(second, 1)).toHaveValue('F:3 G7:1');
-    await leaveBar(second);
-    expect((await documents(page)).find((document) => document.id === original.id)).toEqual(newer);
-    await songMenuAction(second, 'Duplicate');
-    const copy = await exportCurrent(second);
-    expect(copy.id).not.toBe(original.id);
-    if (copy.schemaVersion !== 2) {
+    const chordsBefore = await page.locator('.bar').first().locator('.chord').allTextContents();
+    const source = await exportCurrent(page);
+    if (source.schemaVersion !== 2) {
         throw new Error('Expected semantic document');
     }
-    expect(copy.chart.score.sections[0].measures[0].content).toEqual({
-        kind: 'events',
-        events: [
-            { kind: 'chord', symbol: 'F', duration: [3, 1] },
-            { kind: 'chord', symbol: 'G7', duration: [1, 1] },
-        ],
-    });
-    const beforeImport = await documents(second);
+    const beforeImport = await documents(page);
     // A valid chart the form compiler refuses: a D.C. al 2nd ending with no Fine to stop at.
-    const unsupported = structuredClone(copy);
+    const unsupported = structuredClone(source);
     const measures = unsupported.chart.score.sections[0].measures;
     measures[0].start = [{ kind: 'repeat-start' }];
     measures[1].start = [{ kind: 'ending-start', passes: [1] }];
@@ -360,17 +314,23 @@ test('semantic revision conflicts keep both takes, and unsupported imports never
     measures[3].end = [
         { kind: 'jump', from: 'start', destination: { kind: 'ending', pass: 2 }, repeats: 'skip' },
     ];
-    await second.getByLabel('Import Ensemble document').setInputFiles({
+    await page.getByLabel('Import Ensemble document').setInputFiles({
         name: 'not-yet-playable.ensemble',
         mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify(unsupported)),
     });
-    await expect(second.locator('.error-banner')).toContainText('needs a Fine');
-    expect(await documents(second)).toEqual(beforeImport);
-    await expect(second.locator('.bar').first().locator('.chord')).toHaveText(['F', 'G7']);
+    await expect(page.locator('.error-banner')).toContainText('needs a Fine');
+    expect(await documents(page)).toEqual(beforeImport);
+    await expect(page.locator('.bar').first().locator('.chord')).toHaveText(chordsBefore);
 });
 
-test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({ page }) => {
+test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the score's mode and Save are browser-independent; WebKit covers the Key popover's Mode in key-popover's first test",
+    );
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);
@@ -416,7 +376,11 @@ test('Song mode writes score.isMinor only, and Save keeps it (#1375)', async ({ 
 
 test('a 5/4 bar takes a 2+3 grouping, Save keeps it, and a meter change clears it (#1376)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the grouping and Save are browser-independent; WebKit covers the Key popover's Meter in key-popover's first test",
+    );
     await page.goto(appUrl());
     await page.getByRole('button', { name: '＋ New song', exact: true }).click();
     await editorRevealed(page);

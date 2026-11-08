@@ -3,6 +3,7 @@ import {
     barField,
     closeKeyPopover,
     expect,
+    keyButton,
     leaveBar,
     openKeyPopover,
     test,
@@ -13,7 +14,13 @@ import {
  * anywhere on a bar (not on its chord, which still auditions) picks that bar for the editor. Since
  * #1726 the editor is the bar's own field (a laptop) or the dock (a phone), not a side panel.
  */
-test('editing rings the bar the editor holds, and a tap on a bar picks it', async ({ page }) => {
+test('editing rings the bar the editor holds, and a tap on a bar picks it', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the ring and the pick are browser-independent; WebKit covers picking a bar in 'the bar being edited and its editor are on screen together'",
+    );
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Browse all →' }).click();
     const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
@@ -84,9 +91,14 @@ test('the bar being edited and its editor are on screen together, wherever the b
     await expect(other).toHaveClass(/\bselected\b/);
 
     // The whole-song settings are the transport's Key popover (#1757).
+    // The Meter field is the popover's own, opened and closed by the Key button, so a Meter that
+    // sat on the page all along (or in another surface) cannot pass for it.
     await expect(page.getByLabel('Meter', { exact: true })).toBeHidden();
-    await openKeyPopover(page);
-    await expect(page.getByLabel('Meter', { exact: true })).toBeVisible();
+    await expect(keyButton(page)).toHaveAttribute('aria-expanded', 'false');
+    const popover = await openKeyPopover(page);
+    await expect(keyButton(page)).toHaveAttribute('aria-expanded', 'true');
+    await expect(popover.getByLabel('Meter', { exact: true })).toBeVisible();
     await closeKeyPopover(page);
+    await expect(keyButton(page)).toHaveAttribute('aria-expanded', 'false');
     await expect(page.getByLabel('Meter', { exact: true })).toBeHidden();
 });

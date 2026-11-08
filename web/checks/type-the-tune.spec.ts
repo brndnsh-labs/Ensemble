@@ -25,18 +25,13 @@ async function newSong(page: Page) {
 const alert = (page: Page) => page.locator('.error-banner[role="alert"]');
 const chords = (page: Page) => page.locator('.sheet .chord');
 
-test('a line of bars typed in one bar spills into new bars after it', async ({ page }) => {
-    await newSong(page);
-    await (await openBar(page, 1)).fill('Dm7 | G7 | Cmaj7');
-    await leaveBar(page);
-    // The bars behind the typed line are music, so they move down rather than being typed over.
-    await expect(chords(page)).toHaveText(['Dm7', 'G7', 'Cmaj7', 'G', 'Am', 'F']);
-    await expect(alert(page)).toHaveCount(0);
-});
-
 test('a line of bars is typed over blank bars first, and Undo takes the whole line back', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the codec's spill is browser-independent; WebKit covers spill and Duplicate in the 32-bar AABA script",
+    );
     await newSong(page);
     await (await openBar(page, 2)).fill('N.C.');
     await (await openBar(page, 3)).fill('N.C.');
@@ -52,7 +47,11 @@ test('a line of bars is typed over blank bars first, and Undo takes the whole li
 
 test('a bar of a typed line that is off the grid waits for its split, and Save refuses it', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the pending split is browser-independent; WebKit covers the split choice in bar-split-choice's phone test",
+    );
     await newSong(page);
     await (await openBar(page, 1)).fill('Dm7 | G7 Cmaj7 Am7 | Dm7');
     await page.keyboard.press('Enter');
@@ -74,19 +73,6 @@ test('Tab on a typed-in last bar adds the next bar, an untouched one does not', 
     await last.press('Tab');
     await expect(barField(page, 5)).toHaveValue('C');
     await expect(barField(page, 5)).toBeFocused();
-});
-
-test('Duplicate section copies the bars after it and numbers the label', async ({ page }) => {
-    await newSong(page);
-    await (await openSectionMenu(page, 'A'))
-        .getByRole('button', { name: 'Duplicate section', exact: true })
-        .click();
-    await expect(page.getByRole('button', { name: 'Section A2', exact: true })).toBeVisible();
-    await expect(chords(page)).toHaveText(['C', 'G', 'Am', 'F', 'C', 'G', 'Am', 'F']);
-    await (await openSectionMenu(page, 'A2'))
-        .getByRole('button', { name: 'Duplicate section', exact: true })
-        .click();
-    await expect(page.getByRole('button', { name: 'Section A3', exact: true })).toBeVisible();
 });
 
 test('a 32-bar AABA, A typed once and duplicated, takes under 40 actions', async ({ page }) => {

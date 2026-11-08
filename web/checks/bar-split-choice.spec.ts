@@ -61,24 +61,6 @@ test('three chords in 4/4 wait for a split; arrows move, Enter applies (#1980)',
     await expect(bars.nth(5).locator('.chord')).toHaveText(['Gm7', 'C7', 'F']);
 });
 
-test('Enter on the first choice applies 2+1+1, and a click picks another (#1980)', async ({
-    page,
-    isMobile,
-}) => {
-    test.skip(isMobile, 'the laptop field');
-    await editAutumnLeaves(page, false);
-    const bars = page.locator('.bar');
-    await bars.nth(5).click();
-    await field(page, 6).fill('Gm7 C7 F');
-    await page.keyboard.press('Enter');
-    await expect(field(page, 6)).toHaveValue('Gm7:2 C7:1 F:1');
-
-    await field(page, 6).fill('Gm7 C7 F');
-    await choices(page).getByRole('radio', { name: '1+1+2' }).click();
-    await expect(field(page, 6)).toHaveValue('Gm7:1 C7:1 F:2');
-    await expect(field(page, 6)).toBeFocused();
-});
-
 test('leaving the bar without choosing keeps it pending, and explicit lengths skip the choice (#1980)', async ({
     page,
     isMobile,

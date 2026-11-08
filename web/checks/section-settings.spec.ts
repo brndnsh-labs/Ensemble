@@ -29,7 +29,11 @@ const alert = (page: Page) => page.locator('.error-banner[role="alert"]');
 
 test('a section takes a role and sits a player out, and the letter hints it (#2021)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the role and the hint are browser-independent; WebKit covers the section menu's settings in 'a name still being typed goes in with the menu action pressed next'",
+    );
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await newSong(page);
@@ -70,7 +74,13 @@ test('a section takes a role and sits a player out, and the letter hints it (#20
     expect(pageErrors).toEqual([]);
 });
 
-test('a new section can be named, repeated and put in 6/8, and it plays', async ({ page }) => {
+test('a new section can be named, repeated and put in 6/8, and it plays', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "name, repeat and meter are browser-independent; WebKit covers the section menu's name and Add section in 'a name still being typed goes in with the menu action pressed next'",
+    );
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await newSong(page);
@@ -108,7 +118,11 @@ test('a new section can be named, repeated and put in 6/8, and it plays', async 
     expect(pageErrors).toEqual([]);
 });
 
-test('an empty section name is refused and the old name comes back', async ({ page }) => {
+test('an empty section name is refused and the old name comes back', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the refusal is browser-independent; WebKit covers the section name field in 'Enter commits a name and keeps focus in the menu'",
+    );
     await newSong(page);
     const menu = await openSectionMenu(page, 'A');
     await openSectionNames(menu);
@@ -215,8 +229,12 @@ test('Enter commits a name and keeps focus in the menu, so Esc still closes it (
     await page.keyboard.press('Escape');
     await expect(menu).toBeHidden();
     await expect(page.getByRole('button', { name: 'Section Verse', exact: true })).toBeFocused();
-    // Space on the letter is the letter's, not Play.
+    // Space on the letter is the letter's, not Play: it presses the letter, which opens its menu
+    // again, and the band does not start.
+    await page.keyboard.press('Space');
+    await expect(menu).toBeVisible();
     await expect(page.getByRole('button', { name: 'Start playback' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Stop playback' })).toHaveCount(0);
 });
 
 test('deleting a middle section puts focus on the section before it (#1726 review)', async ({

@@ -63,7 +63,11 @@ function savedSymbols(document: ChartDocument, index: number): string[] {
 
 test('typing in bars applies each one on leaving it, and Save keeps them (#1723)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'apply-on-leave is browser-independent; WebKit covers the same on the dock in phone-bar-edit',
+    );
     await editAutumnLeaves(page);
     const bars = page.locator('.bar');
 
@@ -117,7 +121,11 @@ test('typing in bars applies each one on leaving it, and Save keeps them (#1723)
 
 test('chords that do not read stay on their bar, and Save refuses them and lands there (#1723)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the refusal and landing on the bar are browser-independent; WebKit covers the refusal on the dock in semantic-chart's 'unfinished bars survive selection'",
+    );
     await editAutumnLeaves(page);
     const bars = page.locator('.bar');
 
@@ -151,7 +159,11 @@ test('chords that do not read stay on their bar, and Save refuses them and lands
 
 test('Esc puts the bar back and closes its field; Shift-Tab goes back across sections (#1723)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "Esc and Shift-Tab are a hardware keyboard's; WebKit covers leaving a bar on the dock in phone-bar-edit",
+    );
     await editAutumnLeaves(page);
     const bars = page.locator('.bar');
 

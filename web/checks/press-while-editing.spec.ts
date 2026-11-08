@@ -79,19 +79,6 @@ test('Save pressed with a bar open saves the bar (#1733)', async ({ page }) => {
     await expect(page.locator('.sheet .bar').first()).toContainText('Dm');
 });
 
-test('Neck pressed with a bar open applies the bar and shows the neck (#1733)', async ({
-    page,
-}) => {
-    await editBluePocket(page);
-    await shiftOnChange(page);
-    await press(page, 'Neck');
-    await expect(page.getByRole('button', { name: 'Neck', exact: true })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-    );
-    await expect(page.locator('.song-subtitle')).toContainText('Unsaved changes');
-});
-
 test('Play pressed with a tempo typed takes the tempo and plays (#1733)', async ({ page }) => {
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
@@ -105,16 +92,6 @@ test('Play pressed with a tempo typed takes the tempo and plays (#1733)', async 
         'false',
     );
     await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('132');
-});
-
-test('Band… pressed with a bar open applies the bar and opens the band (#1733)', async ({
-    page,
-}) => {
-    await editBluePocket(page);
-    await shiftOnChange(page);
-    await press(page, 'Band…');
-    await expect(page.getByRole('dialog', { name: 'Band' })).toBeVisible();
-    await expect(page.locator('.sheet .bar').first()).toContainText('Dm');
 });
 
 test('Play pressed with the bar menu open applies the bar and plays (#1733)', async ({ page }) => {

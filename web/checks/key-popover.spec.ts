@@ -155,7 +155,11 @@ test('focus moving elsewhere on the page closes it; focus going nowhere does not
 
 test('the picker names each key by its mode: F♯, C♯ and G♯ minor, F♯ major, and spells chords in sharps', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the key's names and chord spelling are browser-independent; WebKit covers the picker in the first test, 'each changes the song live'",
+    );
     await openBlue(page);
     const popover = await openKeyPopover(page);
     const key = popover.getByLabel('Key', { exact: true });
