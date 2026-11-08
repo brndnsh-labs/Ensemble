@@ -726,6 +726,16 @@ const bluesLead = leadIdiom({
     scoop: 0.15,
     // A blues guitarist shakes every held note.
     vibrato: 6,
+    // why: a blues horn (when the lead is a sax or a trumpet) sighs off a phrase end now and
+    // then — the jump-blues tenor's ending, saved mostly for the chorus's close (`fallDraw`
+    // weights it there), not every phrase it plays (#2120).
+    fall: 0.3,
+    // why: the bend-and-release is the blues guitar's cry — bend the blue third up to the 3rd
+    // and let it back down — on a good share of the bends inside a phrase (#2120).
+    release: 0.4,
+    // why: a blues guitarist slides into a landing as often as not when he doesn't bend it: a
+    // quarter of the unbent landings (#2120).
+    slide: 0.25,
 });
 
 export const blues: Style = {

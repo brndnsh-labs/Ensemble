@@ -159,3 +159,61 @@ describe('sampled guitar legato slur (#855)', () => {
         expect(state.soloist.audio.lastRenderedFreq).toBe(Bb4);
     });
 });
+
+// #2120 — the lead's pitch moves on the SAMPLED seam: what `playSoloNote` hands
+// `playSampledNote` as its `bend`. The automation itself is pinned in
+// lead-articulations.test.ts; this is the mapping.
+describe('sampled lead pitch moves (#2120)', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mocks.getPackZones.mockReturnValue([zone]);
+        mocks.pickZone.mockReturnValue(zone);
+        mocks.gainForPack.mockReturnValue(1);
+        mocks.resolveInstrumentSource.mockReturnValue({
+            kind: 'sample',
+            packId: 'electric-guitar-clean',
+        });
+    });
+
+    const play = (state, bendStart, legato, articulation) =>
+        playSoloNote(state, A4, 0, 0.5, 0.8, bendStart, legato, false, 0, 0, articulation);
+
+    it('renders a slide-in as a bend-in from its distance, over its own time', () => {
+        play(makeState('pack:electric-guitar-clean'), 0, false, {
+            slide: { semitones: -3, seconds: 0.06 },
+        });
+        const { bend, attack } = lastOpts();
+        expect(bend).toEqual({ fromSemitones: -3, inSeconds: 0.06 });
+        expect(attack).toBeUndefined(); // picked at the starting fret: the plain attack
+    });
+
+    it('lets the band’s bend down, and only that bend', () => {
+        const release = { at: 0.25, seconds: 0.15 };
+        play(makeState('pack:electric-guitar-clean'), -1, false, { release });
+        expect(lastOpts().bend).toEqual({ fromSemitones: -1, release });
+        // No bend-in: nothing to let down (a slide is not a bend).
+        play(makeState('pack:electric-guitar-clean'), 0, false, {
+            release,
+            slide: { semitones: -2, seconds: 0.03 },
+        });
+        expect(lastOpts().bend).toEqual({ fromSemitones: -2, inSeconds: 0.03 });
+    });
+
+    it('carries a fall on a plain note, and alongside a legato slur', () => {
+        const fall = { semitones: 3, seconds: 0.1 };
+        play(makeState('pack:electric-guitar-clean'), 0, false, { fall });
+        expect(lastOpts().bend).toEqual({ fall });
+        const state = makeState('pack:electric-guitar-clean');
+        state.soloist.audio.lastRenderedFreq = Bb4;
+        play(state, 0, true, { fall });
+        const { bend } = lastOpts();
+        expect(bend.fromSemitones).toBeCloseTo(1, 1);
+        expect(bend.inSeconds).toBe(0.04);
+        expect(bend.fall).toEqual(fall);
+    });
+
+    it('hands no bend to a note with no pitch moves', () => {
+        play(makeState('pack:electric-guitar-clean'), 0, false, undefined);
+        expect(lastOpts().bend).toBeUndefined();
+    });
+});

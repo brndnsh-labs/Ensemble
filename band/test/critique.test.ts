@@ -7,9 +7,10 @@ import type { StyleId } from '../core/types.js';
 import { CLAIMS } from './claims/index.js';
 import { METRICS, type Metric, perform, type TakeSpec } from './critique/harness.js';
 
-function label({ comp, intensity, bass, lead, trade, colour }: TakeSpec): string {
+function label({ comp, intensity, bass, lead, trade, colour, leadInstrument }: TakeSpec): string {
     const parts = [
         lead ? `lead ${lead}` : '',
+        leadInstrument ? `on a ${leadInstrument} lead` : '',
         trade ? `trading ${trade.bars}s with the ${trade.with}` : '',
         comp ? `on ${comp}` : '',
         colour ? 'on the written-colour chart' : '',
@@ -31,6 +32,7 @@ for (const style of Object.keys(CLAIMS) as StyleId[]) {
                 take.lead,
                 take.trade,
                 take.colour,
+                take.leadInstrument,
             );
             const report: string[] = [];
             it.each(claims)('%s in [%d, %d] — %s', (metric, min, max) => {

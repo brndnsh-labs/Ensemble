@@ -56,6 +56,21 @@ export const funk = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
+                // The head falls where its phrase lets go (#2120, `LeadBook.fall` 0.35, `fallDraw`):
+                // its last note into the breath, drawn once per ending figure, so a statement and
+                // its restatement fall alike. Of every phrase end (a riff's end inside a phrase
+                // too) 0.136 fall (0 with no falls, the floor's failure).
+                ['leadPhraseEndFalls', 0.08, 0.3, 'the section falls off the end of a phrase'],
+                ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.710; drawn without the section-end weight 0.441.
+                ['leadFallsAtSectionEnd', 0.58, 1, 'the falls close the sections'],
+                // A section played again plays its falls again (1.000 with the draw keyed by the
+                // note's own place in the song). It can't see a per-phrase draw; the next two can.
+                ['leadHeadFallsDiffer', 0, 0, 'a section played again falls where it fell'],
+                // 0.143 with the head's fall drawn per phrase (the slot's stream), not per figure.
+                ['leadHeadFigureFallsDiffer', 0, 0, 'the fall returns with its ending figure'],
+                // 0.354 with the head falling off every phrase end, riff ends inside it too.
+                ['leadHeadFallsInsidePhrase', 0, 0, 'the head falls only where its phrase lets go'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (sixteenths: beat 1 and its "a", then the and of 2), then moves. Measured
                 // 0.006 with no stabs, 0.155 now; the floor fails with the stabs off, the
@@ -74,6 +89,15 @@ export const funk = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
+                // The horn falls off a phrase's last note (#2120, `LeadBook.fall` 0.35, `fallDraw`).
+                // Measured 0.259 (0 with no falls).
+                ['leadPhraseEndFalls', 0.15, 0.4, 'the horn falls off the end of a phrase'],
+                ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.708; drawn without the section-end weight 0.489.
+                ['leadFallsAtSectionEnd', 0.6, 1, 'the falls close the chorus and its sections'],
+                // Measured 0.141 (0.179 with no damping after a fall: funk's phrases seldom end
+                // twice running, so this is a musical ceiling, not the damping's guard).
+                ['leadFallsBackToBack', 0, 0.25, 'never a fall at every phrase end'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (sixteenths: beat 1 and its "a", then the and of 2), then moves. Measured
                 // 0.009 with no stabs, 0.126 now; the floor fails with the stabs off, the

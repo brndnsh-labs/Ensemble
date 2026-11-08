@@ -677,6 +677,59 @@ function checkPass(
             fail(lead[i], `lead overlaps the note at ${lead[i - 1].tick}`);
         }
     }
+    // The pitch moves (#2120) are the instrument's own: a horn falls off, a guitar lets a bend
+    // down and slides. Each is a gesture of a few semitones, inside the note it moves.
+    const family = LEAD_INSTRUMENTS[settings.lead].family;
+    lead.forEach((n, i) => {
+        if (n.fall !== undefined) {
+            const { semitones, ticks, into } = n.fall;
+            if (family !== 'horn') {
+                fail(n, `a ${settings.lead} falls off`);
+            }
+            // A short fall drops 3–4 in the note's tail (an eighth at most); a long one 5–7.
+            const [lo, hi] = into ? [5, 7] : [3, 4];
+            if (!Number.isInteger(semitones) || semitones < lo || semitones > hi) {
+                fail(n, `${into ? 'a long' : 'a short'} fall of ${semitones} semitones`);
+            }
+            if (!(ticks > 0) || (!into && ticks > STEP * 2)) {
+                fail(n, `falls over ${ticks} ticks`);
+            }
+            // A long fall drops into the rest after the note, and is over before the next.
+            const next = lead[i + 1];
+            if (into && next && next.tick < n.tick + n.dur + ticks) {
+                fail(n, `falls into the note at ${next.tick}`);
+            }
+            if (n.bendIn) {
+                fail(n, 'both scoops in and falls off');
+            }
+        }
+        if (n.release !== undefined) {
+            if (!LEAD_INSTRUMENTS[settings.lead].bends) {
+                fail(n, `a ${settings.lead} releases a bend`);
+            }
+            if (!n.bendIn) {
+                fail(n, 'releases a bend it never made');
+            }
+        }
+        if (n.slideIn !== undefined) {
+            const { from, ticks } = n.slideIn;
+            if (family !== 'guitar') {
+                fail(n, `a ${settings.lead} slides`);
+            }
+            if (!Number.isInteger(from) || Math.abs(from) < 2 || Math.abs(from) > 5) {
+                fail(n, `slides from ${from} semitones`);
+            }
+            // A slide is a quick move of the hand, a sixteenth at most. Swing or a cut may leave
+            // the note shorter than the player wrote it; the host fits the slide into half of
+            // whatever it sounds (`leadArticulation`), so it is held to its own bound here.
+            if (!(ticks > 0) || ticks > STEP) {
+                fail(n, `slides over ${ticks} ticks`);
+            }
+            if (n.bendIn) {
+                fail(n, 'both slides and bends in');
+            }
+        }
+    });
     // Chord arrivals: the bass lands on a chord tone; comp chords carry the guide tones.
     const bass = events.filter((e): e is PitchedNote => e.lane === 'bass');
     const chords = events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);

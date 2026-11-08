@@ -13,11 +13,12 @@ import {
     type CompInstrument,
     DEFAULT_SETTINGS,
     type DrumHit,
+    type LeadInstrument,
     type PitchedNote,
     type StyleId,
     type TradeSettings,
 } from '../../core/types.js';
-import { chordAt, compileTimeline, type Timeline } from '../../form/timeline.js';
+import { chordAt, compileTimeline, sectionKey, type Timeline } from '../../form/timeline.js';
 import { type PassMemory, performPass } from '../../perform.js';
 import { STEP } from '../../players/grid.js';
 import { STYLES } from '../../styles/index.js';
@@ -46,10 +47,11 @@ export function perform(
     lead?: 'head' | 'solo' | 'guide-tones',
     trade?: TradeSettings,
     colour = false,
+    leadInstrument?: LeadInstrument,
 ): Take[] {
     const takes: Take[] = [];
     const lanes = { ...DEFAULT_SETTINGS.lanes, bass, lead: lead !== undefined || Boolean(trade) };
-    const instrument = STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead;
+    const instrument = leadInstrument ?? STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead;
     // The lead's form spans a cycle: the head is pass 0, the solo choruses passes 1–3. Trading,
     // every pass after the head is traded: two of them are judged.
     const passes = trade ? 3 : lead ? CYCLE : 2;
@@ -2267,6 +2269,288 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of the lead's phrase ends (`phraseEnds`) an eighth or longer that fall off their
+     * pitch (`PitchedNote.fall`, #2120): a horn's fall-off where a phrase lets go.
+     */
+    leadPhraseEndFalls: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of phraseEnds(events)) {
+                if (note.dur < STEP * 2) {
+                    continue;
+                }
+                n++;
+                hit += note.fall ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Of the lead's falls (#2120), the share on a note that is not a phrase end (another note
+     * less than a beat after it): a fall inside the line, where the next note needs the pitch.
+     */
+    leadFallsInsideLine: (takes) => {
+        let falls = 0;
+        let inside = 0;
+        for (const { events } of takes) {
+            const ends = new Set(phraseEnds(events));
+            for (const note of leadNotes(events)) {
+                if (note.fall) {
+                    falls++;
+                    inside += ends.has(note) ? 0 : 1;
+                }
+            }
+        }
+        return ratio(inside, falls);
+    },
+    /**
+     * Of the lead's phrase ends (an eighth or longer) that fall (#2120), the share whose phrase
+     * end before also fell: falls back to back, phrase after phrase, are a tic.
+     */
+    leadFallsBackToBack: (takes) => {
+        let falls = 0;
+        let twice = 0;
+        for (const { events } of takes) {
+            const ends = phraseEnds(events).filter((n) => n.dur >= STEP * 2);
+            ends.forEach((note, i) => {
+                if (note.fall && i > 0) {
+                    falls++;
+                    twice += ends[i - 1].fall ? 1 : 0;
+                }
+            });
+        }
+        return ratio(twice, falls);
+    },
+    /**
+     * Of the lead's falls (#2120), the share in the last two bars of a section pass — where a
+     * section or a chorus closes, which is where a horn chart puts its falls.
+     */
+    leadFallsAtSectionEnd: (takes) => {
+        let falls = 0;
+        let closing = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const note of leadNotes(events)) {
+                if (note.fall) {
+                    const bar = t.bars[note.bar];
+                    falls++;
+                    closing += bar.index >= bar.visit.firstBar + bar.visit.barCount - 2 ? 1 : 0;
+                }
+            }
+        }
+        return ratio(closing, falls);
+    },
+    /**
+     * Of a head's falls (#2120), the share not on its phrase's last note (the note before the
+     * breath, the last of the phrase slot's four bars): a head falls where its phrase lets go,
+     * never off a riff's end inside the phrase.
+     */
+    leadHeadFallsInsidePhrase: (takes) => {
+        let falls = 0;
+        let inside = 0;
+        for (const { timeline: t, events } of takes) {
+            const notes = leadNotes(events);
+            // The last note of each phrase slot (keyed by the slot's first bar).
+            const last = new Map<number, PitchedNote>();
+            for (const note of notes) {
+                last.set(note.bar - t.bars[note.bar].phrase.bar, note);
+            }
+            for (const note of notes) {
+                if (note.fall) {
+                    falls++;
+                    inside += last.get(note.bar - t.bars[note.bar].phrase.bar) === note ? 0 : 1;
+                }
+            }
+        }
+        return ratio(inside, falls);
+    },
+    /**
+     * In a head, of the phrase endings that end on the same figure (the same section, the same
+     * rhythm in the bar the phrase's last note sounds in, that note not scooped) and could fall,
+     * the share whose fall disagrees with another ending on that figure (#2120): the head's fall
+     * is drawn once per figure, so it returns with it. The one disagreement allowed is the
+     * form's: a figure that falls at a section's close (1.5× the chance) and not in mid-section
+     * (0.7×), never the other way round, and never a different depth.
+     */
+    leadHeadFigureFallsDiffer: (takes) => {
+        let endings = 0;
+        let differ = 0;
+        for (const { timeline: t, events } of takes) {
+            const notes = leadNotes(events);
+            const last = new Map<number, PitchedNote>();
+            for (const note of notes) {
+                last.set(note.bar - t.bars[note.bar].phrase.bar, note);
+            }
+            const byFigure = new Map<string, { closes: boolean; fall: number }[]>();
+            for (const note of last.values()) {
+                if (note.bendIn) {
+                    continue;
+                }
+                const bar = t.bars[note.bar];
+                const rhythm = notes
+                    .filter((n) => n.bar === note.bar)
+                    .map((n) => `${n.tick - bar.start}/${n.dur}`)
+                    .join(',');
+                const key = `${sectionKey(bar.visit)}|${rhythm}`;
+                const closes = bar.index >= bar.visit.firstBar + bar.visit.barCount - 2;
+                byFigure.set(key, [
+                    ...(byFigure.get(key) ?? []),
+                    { closes, fall: note.fall?.semitones ?? 0 },
+                ]);
+            }
+            for (const group of byFigure.values()) {
+                if (group.length < 2 || group.every((e) => !e.fall)) {
+                    continue;
+                }
+                const depths = new Set(group.filter((e) => e.fall).map((e) => e.fall));
+                const midFalls = group.some((e) => !e.closes && e.fall);
+                const closeHolds = group.some((e) => e.closes && !e.fall);
+                const sameClassDiffers = [true, false].some(
+                    (closes) =>
+                        new Set(group.filter((e) => e.closes === closes).map((e) => e.fall > 0))
+                            .size > 1,
+                );
+                endings += group.length;
+                differ +=
+                    depths.size > 1 || (midFalls && closeHolds) || sameClassDiffers
+                        ? group.length
+                        : 0;
+            }
+        }
+        return ratio(differ, endings);
+    },
+    /**
+     * In a head, of the bars a section plays again (the same section's same bar, as an AABA's
+     * A sections do), the share whose falls differ from one time to the next (#2120): a section
+     * played again plays its falls again. It does not tell a fall drawn per figure from one drawn
+     * per phrase (a repeated section's phrases share their index too):
+     * `leadHeadFigureFallsDiffer` does.
+     */
+    leadHeadFallsDiffer: (takes) => {
+        let repeated = 0;
+        let differ = 0;
+        for (const { timeline: t, events } of takes) {
+            const heard = new Map<string, string[]>();
+            for (const bar of t.bars) {
+                const key = `${sectionKey(bar.visit)}:${bar.index - bar.visit.firstBar}`;
+                const falls = leadNotes(events)
+                    .filter((n) => n.bar === bar.index && n.fall)
+                    .map((n) => `${n.tick - bar.start}:${n.fall?.semitones}`)
+                    .join(',');
+                heard.set(key, [...(heard.get(key) ?? []), falls]);
+            }
+            for (const times of heard.values()) {
+                if (times.length > 1 && times.some((f) => f !== '')) {
+                    repeated++;
+                    differ += new Set(times).size > 1 ? 1 : 0;
+                }
+            }
+        }
+        return ratio(differ, repeated);
+    },
+    /**
+     * Of the bends let down at a phrase end (#2120), the share that leave the phrase on a note
+     * a blues or rock player doesn't rest on: anything but the blue third over a chord with no
+     * major 7th, or the b7 over a dominant or a plain triad (the 4, a b7 over a major 7th).
+     */
+    leadArrivalReleaseOffRest: (takes) => {
+        let released = 0;
+        let off = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const note of phraseEnds(events)) {
+                // The let-down note sounds in the note's second half: against the chord there
+                // (an anticipation, struck just before a change, is the incoming chord's).
+                const chord = chordAt(t, note.tick + note.dur - 1);
+                if (!note.release || !note.bendIn || !chord) {
+                    continue;
+                }
+                released++;
+                const letDown = mod12(note.midi - note.bendIn - chord.root);
+                const rests =
+                    (letDown === 3 && chord.seventh !== 11) ||
+                    (letDown === 10 &&
+                        (chord.seventh === 10 || (chord.seventh === null && !chord.sixth)));
+                off += rests ? 0 : 1;
+            }
+        }
+        return ratio(off, released);
+    },
+    /**
+     * Of the bends let down inside a phrase (#2120), the share the line then climbs from — to a
+     * note at or above the bent pitch: up, down and up again, where a player holds the bend.
+     */
+    leadReleaseClimbs: (takes) => {
+        let released = 0;
+        let climbs = 0;
+        for (const { events } of takes) {
+            const ends = new Set(phraseEnds(events));
+            const notes = leadNotes(events);
+            notes.forEach((note, i) => {
+                const next = notes[i + 1];
+                if (!note.release || ends.has(note) || !next) {
+                    return;
+                }
+                released++;
+                climbs += next.midi >= note.midi ? 1 : 0;
+            });
+        }
+        return ratio(climbs, released);
+    },
+    /**
+     * Share of the lead's bends (`bendIn`) a quarter or longer that are let back down
+     * (`PitchedNote.release`, #2120): a guitarist's bend-and-release.
+     */
+    leadBendReleases: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of leadNotes(events)) {
+                if (!note.bendIn || note.dur < STEP * 4) {
+                    continue;
+                }
+                n++;
+                hit += note.release ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Share of the lead's landings (`leadLandings`) an eighth or longer and not bent that are
+     * slid into (`PitchedNote.slideIn`, #2120): a guitarist arriving from a few frets away.
+     */
+    leadLandingSlides: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const { note } of leadLandings(t, events)) {
+                if (note.bendIn || note.dur < STEP * 2) {
+                    continue;
+                }
+                n++;
+                hit += note.slideIn ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Of the lead's slides (#2120), the share not on a landing (`leadLandings`, a note struck
+     * on a chord change): a slide aims at an arrival, never a passing note.
+     */
+    leadSlidesOffLanding: (takes) => {
+        let slides = 0;
+        let off = 0;
+        for (const { timeline: t, events } of takes) {
+            const landings = new Set(leadLandings(t, events).map(({ note }) => note));
+            for (const note of leadNotes(events)) {
+                if (note.slideIn) {
+                    slides++;
+                    off += landings.has(note) ? 0 : 1;
+                }
+            }
+        }
+        return ratio(off, slides);
+    },
     /** Share of lead notes bent or scooped into from below. */
     leadBendShare: (takes) => {
         let n = 0;
@@ -2309,6 +2593,8 @@ export interface TakeSpec {
     trade?: TradeSettings;
     /** Judge the written-colour chart (add9, maj9, b9…) instead of the shared charts. */
     colour?: boolean;
+    /** Play the lead on this instrument instead of the style's own (a blues on a horn, #2120). */
+    leadInstrument?: LeadInstrument;
 }
 
 export type MetricName = keyof typeof METRICS;

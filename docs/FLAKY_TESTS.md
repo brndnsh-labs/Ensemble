@@ -35,6 +35,22 @@ entry here).
 
 ## Registry
 
+### 🟢 `web/checks/stand-leftovers.spec.ts` — "Play on a scrolled chart brings the start bar into view for the count-in (#1991)" (71)
+
+- **Class:** e2e-timing (the ruler, not the app).
+- **Symptom:** `main`'s CI on `v2-suite (2, laptop)` after #2133 (run 42457954126): `expect(locator).toBeInViewport()` failed with "element(s) not found" right after `toBeVisible()` passed on the same `.bar-countin`.
+- **Root cause:** the chart played at 110 BPM, so the one-bar count-in lasted about 2 s. A slow runner reached the viewport check after the count-in had ended and its element was gone.
+- **Fix (2026-11-08):** the test's chart plays at 40 BPM, so the count-in lasts about 6 s, as the resume-pill test beside it already does. The assertions are unchanged.
+- **Last seen:** 2026-11-08 (`main`, run 42457954126).
+
+### 🟢 `web/checks/band-engine-charts.spec.ts` — "the band engine opens and plays holds, N.C., fermatas and off-grid lengths" (36)
+
+- **Class:** e2e-timing (the ruler, not the app).
+- **Symptom:** `main`'s CI on `v2-suite (1, webkit-phone)` for #2130's merge (run 42456663684): `expect(laps).toEqual([...ids, ...ids])` received one lap (the four ids once) instead of two. The same code passed that shard on the PR.
+- **Root cause:** the watch counted laps as sightings of bar 1 after the first poll (`i > 0`), which assumes the first poll lands on bar 1. A stalled WebKit that missed bar 1 at the start saw bar 2 first, so its first sighting of bar 1 counted as a lap. The watch stopped one lap early, and the slice from first to last bar 1 held one lap.
+- **Fix (2026-11-08):** laps are counted from the first sighting of bar 1 (`sightings − 1`), so two full laps are always watched before the order is checked. The order assertion is unchanged.
+- **Last seen:** 2026-11-08 (`main`, run 42456663684).
+
 ### 🟢 `web/checks/fixtures.ts` `openBand` / `expectSaveDisabled` — "locator.click: Test timeout … waiting for getByRole('menuitem', { name: 'Band…' })"
 
 - **Class:** e2e-timing (a race in the helper, not the app).
