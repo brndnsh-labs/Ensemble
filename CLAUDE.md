@@ -220,6 +220,13 @@ All `core/` source is `.ts`/`.tsx` (migration complete May 2026). `tsconfig.json
 
 ## Testing Standards
 
+### Adding a test (the suite was pruned in #2149–#2153; keep it lean)
+
+- **A new test names the fault it catches that no existing test does** — be ready to show the mutation: break the line, name the test that goes red. Deleting a test whose claim another test already carries is ordinary work, and a story that generalises an older rule folds the old test into the new one in the same PR.
+- **Pin behaviour, not structure.** A voice is pinned by `npm run golden` and by laws (no NaN on a param, a monotonic envelope, a leak-free disconnect), never by node counts, oscillator types, `connect()` order or a snapshot of mock calls. Where golden can't hear a layer (the piano's hammer chiff), one narrow existence test stands in, and says so.
+- **One layer per claim.** A matrix of cases lives in the lowest test that reaches it; the layer above asserts its own mapping once. A Playwright claim that depends on neither the browser nor the screen size runs on `laptop` only: `test.skip(testInfo.project.name !== 'laptop', '<the WebKit test still covering the mechanism>')`.
+- **The third `it` that differs only in data is an `it.each`.**
+
 ### Critique claims (`band/test/`)
 
 The **Definition of Done** for musicality. Each style's claims (`band/test/claims/<style>.ts`) are statistical ranges the critique harness measures (`band/test/critique.test.ts`); the invariant suite (in `band/test/`) holds every style to the band's laws. When you change a style or a player, run them — never replace a range with a rigid snapshot. `band/CLAUDE.md` has the details. The old engine's critique suite in `tests/standards/` went with it; what remains there are the genre canon guard and the security ledger.
