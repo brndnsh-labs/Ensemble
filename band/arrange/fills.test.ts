@@ -130,7 +130,7 @@ describe('a short counted chart counts its choruses as laps (#2071, from #2009)'
             'none',
             'none',
         ]);
-        expect(seams.at(-1)?.ending).toBe(true);
+        expect(seams.at(-1)?.ending).not.toBeNull();
         // The same boundaries the loop marks, sized alike.
         expect(seams[3].fillOrdinal).toBe(1);
         // Only the 16-bar top crashes once the song is going.
@@ -247,7 +247,7 @@ describe('a fill is sized by the bigger tier of here and where it leads', () => 
             fillStart(
                 {
                     bar: timeline.bars[3],
-                    plan: { fill: 'section', energy, level: energy, ending: false, fillOrdinal: 0 },
+                    plan: { fill: 'section', energy, level: energy, ending: null, fillOrdinal: 0 },
                     next: next === null ? null : { plan: { energy: next } },
                 } as unknown as BarContext,
                 book,

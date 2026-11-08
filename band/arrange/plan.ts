@@ -14,6 +14,7 @@ import {
     sectionKey,
     type Timeline,
 } from '../form/timeline.js';
+import type { EndingGesture } from '../styles/types.js';
 import { type LeadRole, leadRole } from './cycle.js';
 
 export type Fill = 'none' | 'phrase' | 'section';
@@ -38,10 +39,17 @@ export interface BarPlan {
      * whose fills are not repeats of one another.
      */
     fillOrdinal: number;
-    /** Crash on this bar's downbeat: a new section, or the downbeat after a phrase fill. */
+    /**
+     * Crash on this bar's downbeat: a new section, or the downbeat after a phrase fill. Never
+     * on the ending bar, whose cymbal (or none) is its book's (`DrumBook.ending`).
+     */
     crash: boolean;
-    /** The final bar of a performance that does not loop: play a held ending. */
-    ending: boolean;
+    /**
+     * The final bar of a performance that does not loop: the held ending, in the style's
+     * gesture (`Style.endingGesture`, #2017), which every lane reads here. Null on every other
+     * bar.
+     */
+    ending: EndingGesture | null;
     /**
      * The lead's job in this bar (`arrange/cycle.ts`). On the drummer's turn in a chorus of
      * fours, the drums play alone.
@@ -413,6 +421,9 @@ export function leadRoleAt(
     return leadRole(timeline, index, pass, tradeThatHappens(settings, drumSolos));
 }
 
+/** The ending a caller that names no style plays (`planBars`'s `endingGesture`): held, no set-up. */
+const HELD: EndingGesture = { kind: 'hold', setup: false };
+
 /**
  * Plans for the bars in `window`, indexed by bar index (bars outside it are absent).
  * `next` is resolved in performance order: a looping pass's last bar leads back to the top of
@@ -436,6 +447,7 @@ export function planBars(
         planned = window.to,
         drumSolos = false,
         arcShape,
+        endingGesture = HELD,
         keepsHighLine = false,
     }: {
         pass: number;
@@ -445,6 +457,11 @@ export function planBars(
         drumSolos?: boolean;
         /** The style's own shape of the jam arc (`Style.jamArc`); absent, the full arc. */
         arcShape?: JamArcShape;
+        /**
+         * The style's ending gesture (`Style.endingGesture`, #2017); absent, the plain held
+         * ending with no set-up.
+         */
+        endingGesture?: EndingGesture;
         /**
          * The style's groove changes at the high tier (`Style.keepsHighLine`, #1789, #1794): no
          * lift (the build into a bigger section, the jam arc, the pass lift) moves a bar across
@@ -502,6 +519,13 @@ export function planBars(
             // Trading with the drummer, his turn is a solo, not a fill; the true end of a
             // non-looping song plays a held ending instead.
             return 'none';
+        }
+        if (!looping && index === window.to - 2 && endingGesture.setup) {
+            // The bar before the end sets the ending up (#2017): a section-sized fill whatever
+            // the form gives it, so the band arrives at its last hit together, the way a rock
+            // or funk drummer rolls the band into the final chord. A style that ends without
+            // one (a bossa, a beat that just cuts) plays its time into the end.
+            return 'section';
         }
         const next = isLast ? (looping ? bars[0] : null) : bars[index + 1];
         const visitEnd = bar.barInVisit === bar.visit.barCount - 1;
@@ -587,7 +611,7 @@ export function planBars(
             lanes.bass = false;
             lanes.comp = false;
         }
-        const ending = !looping && isLast;
+        const ending = !looping && isLast ? endingGesture : null;
         // `fillAt` already carries the "trading with the drummer, or the true end of a
         // non-looping song, gets no fill" guard (the same `isLast`/`looping`/`lead` this bar
         // just computed), so bar `i`'s own fill is just its own answer — the loop and the
@@ -653,11 +677,12 @@ export function planBars(
                       : !isLast && chorusSeam(i)
                         ? lapFillOrdinal(passAt(i, pass), chorusLap)
                         : 0,
+            // The ending bar's cymbal is its book's line (`DrumBook.ending`): a soft ending, a
+            // reggae or a funk stop has none, so the bar before doesn't lift into a crash nobody
+            // plays.
             crash:
-                (arrival && !(lapTop && priorFill !== 'section')) ||
-                afterFill ||
-                afterDrums ||
-                ending,
+                ((arrival && !(lapTop && priorFill !== 'section')) || afterFill || afterDrums) &&
+                !ending,
             ending,
             lead,
             form: formRole(timeline, i, lead),

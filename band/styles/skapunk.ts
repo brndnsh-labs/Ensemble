@@ -104,6 +104,9 @@ const skaPunkDrums = drumIdiom({
     // Fast snare rolls: a beat of sixteenths into a phrase, two beats (or a bar-half at full
     // tilt) into a new section.
     fillLength: { phrase: { low: 2, mid: 4, high: 4 }, section: { low: 4, mid: 4, high: 8 } },
+    // why: the one big hit is the crash, the kick and the snare together on 1, punk's whole
+    // kit at once.
+    ending: () => ({ crash: 'X', kick: 'X', snare: 'X' }),
     groove(ctx, tier) {
         if (modeAt(ctx) === 'punk') {
             const chorus = CHORUS.test(ctx.bar.visit.label.trim());
@@ -672,4 +675,7 @@ export const skapunk: Style = {
     lead: { idiom: skaPunkLead, prefers: 'trumpet' },
     // why: a ska or punk chorus is triads under the horns; the ending holds the I (or i).
     ending: { major: '', minor: 'm' },
+    // why: ska-punk ends on one big hit: the band rolls in (the set-up fill), slams the One
+    // together and stops.
+    endingGesture: { kind: 'stop', setup: true },
 };

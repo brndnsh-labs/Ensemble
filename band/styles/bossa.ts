@@ -36,6 +36,8 @@ const bossaDrums = drumIdiom({
     name: 'bossa clave',
     timekeeper: ['hat', 'ride'],
     fillLength: { phrase: { low: 0, mid: 0, high: 2 }, section: { low: 2, mid: 2, high: 4 } },
+    // why: no cymbal at all: the cross-stick's last click with a soft surdo kick on 1.
+    ending: () => ({ rim: 'x', kick: 'o' }),
     groove(ctx, tier) {
         // The clave cycles by bar within the section visit so it realigns at each section.
         const clave = BOSSA_CLAVE[ctx.bar.barInVisit % 2];
@@ -432,4 +434,7 @@ export const bossa: Style = {
     // dominant tonic (a blues) the major 7th would contradict the b7 the chart wrote: the I9,
     // the nylon's colour on a dominant (#1502).
     ending: { major: 'maj7', minor: 'm6', dominant: '9' },
+    // why: a bossa ends softly, no fill and no crash: the nylon's last voicing is let ring
+    // under the voice, the quiet close of a Getz/Gilberto-era record, not a band hit.
+    endingGesture: { kind: 'soft', setup: false },
 };

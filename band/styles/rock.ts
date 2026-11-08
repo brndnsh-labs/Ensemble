@@ -43,6 +43,9 @@ const rockDrums = drumIdiom({
     name: 'rock backbeat',
     timekeeper: ['hat', 'ride', 'hatOpen'],
     fillLength: { phrase: { low: 2, mid: 4, high: 4 }, section: { low: 4, mid: 4, high: 8 } },
+    // why: rock's last hit is the crash, the kick and the floor tom together on 1 (the big
+    // low thud under the cymbal), left to ring out with the band's chord.
+    ending: () => ({ crash: 'X', kick: 'X', tomLow: 'X' }),
     groove(ctx, tier) {
         const kick = ctx.rng('kick', 'section').weighted(ROCK_KICKS.map(([k, w]) => [k, w[tier]]));
         // A lift in the last bar before a new section: open the hat on the "and of 4".
@@ -322,4 +325,7 @@ export const rock: Style = {
     lead: { idiom: rockLead, prefers: 'overdrive' },
     // why: rock's harmony is the triad: the band ends on the plain I, or i in a minor key.
     ending: { major: '', minor: 'm' },
+    // why: the rock ending: the drummer rolls the band into its last chord (the set-up
+    // fill), every hand hits 1 together and the chord rings out, the cymbal with it.
+    endingGesture: { kind: 'hold', setup: true },
 };

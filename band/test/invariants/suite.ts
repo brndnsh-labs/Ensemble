@@ -38,6 +38,12 @@ const BASS_REGISTER = [23, 57] as const;
  * a finger-plucked guitar). Rhodes and clav play the keyboard book exactly as the piano does.
  */
 const INSTRUMENTS: CompInstrument[] = ['piano', 'organ', 'guitar', 'nylon'];
+
+/** A style whose last chord is struck short (`EndingGesture`: a stop, #2017). */
+const shortEnding = (styleId: StyleId) => STYLES[styleId].endingGesture.kind === 'stop';
+/** A style whose last bar sounds its chord throughout (#2017): every gesture but the short ones and the hits. */
+const ringsThrough = (styleId: StyleId) =>
+    ['hold', 'soft', 'button'].includes(STYLES[styleId].endingGesture.kind);
 /**
  * With a bassist in the band, a guitar stays off the low strings (below C3) — except for a
  * note that doubles the bass's own job: the chord's bass, root or fifth, in a grip whose
@@ -214,19 +220,27 @@ function defineEndings(styles: StyleId[]): void {
                             }
                         }
                         // And the bass's held note lasts to it, in every meter: five beats in
-                        // 5/4, not four. (Funk's ending is a short hit, a half note at most:
-                        // `endingBass`'s cap.)
+                        // 5/4, not four. A short ending (a stop, #2017) is struck where home
+                        // arrives, and lasts an eighth from there.
                         const last = timeline.bars[timeline.bars.length - 1];
-                        const due =
-                            last.start +
-                            (styleId === 'funk'
-                                ? Math.min(last.meter.barTicks, 8 * STEP)
-                                : last.meter.barTicks);
+                        const arrival = (
+                            heldEnding(timeline, last.index, style.ending) ?? last
+                        ).spans
+                            .filter((span) => span.chord)
+                            .at(-1)!.start;
                         const held = events
                             .filter(
                                 (e): e is PitchedNote => e.lane === 'bass' && e.bar === last.index,
                             )
                             .at(-1);
+                        const due = shortEnding(styleId)
+                            ? Math.min(arrival + 2 * STEP, last.start + last.meter.barTicks)
+                            : last.start + last.meter.barTicks;
+                        if (shortEnding(styleId) && held && Math.abs(held.tick - arrival) > 1) {
+                            problems.push(
+                                `${where}: the stop is struck at ${held.tick}, not ${arrival}`,
+                            );
+                        }
                         if (!held || Math.abs(held.tick + held.dur - due) > 1) {
                             problems.push(
                                 `${where}: the held bass ends at ${held ? held.tick + held.dur : 'nothing'}, not ${due}`,
@@ -306,7 +320,11 @@ function defineVamps(styles: StyleId[]): void {
                                 problems.push(`${seed} ${label}: bar ${bar.index} silent`);
                                 continue;
                             }
-                            if (!holds) {
+                            // A short ending's last bar (a stop, the hits) is struck, not
+                            // held through (#2017).
+                            const ending =
+                                label === 'ending' && bar.index === timeline.bars.length - 1;
+                            if (!holds || (ending && !ringsThrough(styleId))) {
                                 continue;
                             }
                             // Held through: every tick of every chord is under a sounding note.

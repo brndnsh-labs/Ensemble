@@ -66,6 +66,9 @@ const acousticDrums = drumIdiom({
     timekeeper: ['hat', 'ride'],
     // Sparing fills: a quiet section just picks up into the next; toms only when it drives.
     fillLength: { phrase: { low: 0, mid: 0, high: 2 }, section: { low: 2, mid: 2, high: 4 } },
+    // why: a soft tap on the snare with the bass drum on 1 (with the brush or the stick the
+    // section played), no cymbal.
+    ending: () => ({ kick: 'o', snare: 'o' }),
     groove(ctx, tier) {
         if (tier === 'low') {
             return ctx.rng('quiet', 'section').weighted(QUIET);
@@ -963,4 +966,7 @@ export const acoustic: Style = {
     lead: { idiom: acousticLead, prefers: 'nylon' },
     // why: an acoustic strum ends on the open tonic triad (or its minor), left ringing.
     ending: { major: '', minor: 'm' },
+    // why: an acoustic band ends on the last strum left to ring, the drummer's brushes
+    // barely touching it: no fill, no crash.
+    endingGesture: { kind: 'soft', setup: false },
 };

@@ -433,6 +433,35 @@ key's tonic, in the colour the genre ends on (`Style.ending`, a chord-symbol suf
 `theory/chord.ts`): I6 for jazz, Imaj7 for bossa, I9 for the blues, I6/9 for funk, Imaj7 for
 disco and hip hop, Imaj9 for neo-soul, the power chord for metal and the triad for the rest;
 in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the minor triad).
+- **Each genre ends in its own gesture (#2017, 2026-11-08).** The chord is the held ending's;
+  how the band plays it is the style's `endingGesture` (`styles/types.ts`), one decision in the
+  plan (`BarPlan.ending` carries it) that every lane reads, the drums first. `hold` strikes 1
+  and rings to the bar's end (rock, disco, the blues, country); `stop` strikes 1 for an eighth
+  and leaves silence (funk's dead stop, hip hop's cut, ska-punk's one big hit, reggae's hit on
+  the One); `soft` rings with no crash, the comp at 72 and the bass at four fifths of its
+  weight (bossa, neo-soul, acoustic); `button` rings, then one short unison hit on the "and"
+  of 4, struck harder than the chord it ends (`BUTTON_LIFT`: jazz's "doo-bop"); `hits` stabs
+  on the gesture's beats, the last ringing (metal's 1, 2 and 3). The hits are beats, the bar's
+  pulses (`pulses`), so a 6/8 stabs its two dotted quarters; a bar with room for fewer keeps
+  its last, ringing hit. Bass and comp take their strikes from `endingStrikes`
+  (`players/grid.ts`), country's picked root with them; the kit plays its book's last bar
+  (`DrumBook.ending`, a 16-step line per piece, each with its why) instead of the crash and
+  kick every style shared. Blues and country end on the same kick and crash: no country-only
+  last hit was found that the book could stand behind, so the pair is left for the ear. The
+  other eleven differ. The lead lets go with the band: in a stop nothing sounds past the
+  band's eighth; in the hits a note held over the stabs lets go with its stab and is struck
+  again with the last; in a button a lead still sounding there plays it with the band
+  (`endWithTheBand`, `players/lead/idiom.ts`). A style with `setup` gets a fill in the bar
+  before (`fillAt`), its biggest section fill whatever the bar's energy (`fillStart`), the roll
+  or pickup that brings the band to its last hit; one without plays its time into the end.
+  The ending bar carries no plan crash (its cymbal, or none, is the book's), so the bar before
+  never lifts into a crash the ending doesn't play. A sustaining organ keeps the gesture's
+  lengths (`sustain` leaves the ending bar alone). With a bar that gets home itself (`| G7
+  C |`), the gesture is measured from where the I lands: the V is struck on 1 (held to the I
+  where the gesture rings, an eighth where it is short), the book's line moves to the I with
+  the book's own kick under the V (never louder than the I), and only the button stays on the
+  last "and" (no button when the I lands there). `arrange/ending.test.ts` lists the thirteen
+  drum bars and holds every lane to its gesture.
 - **The family is the chart's, the colour the style's (#1502).** The ending takes its family
   from the chart's own tonic (`tonicFamily`), so a colour never changes what the tonic is.
   Every chord on the tonic counts for its family by how long it lasts, unless it only passes
@@ -533,13 +562,15 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   standard whose ending moves when its key is forced to C.
 - **Only the ending bar's harmony changes.** The bar before it hears the resolved bar as its
   next, so its approach notes walk into the tonic (a walking bass's line toward its next
-  chord, a lead-in); its chords, the comp (which never anticipates an ending) and the drums are
-  unchanged, and every bar before it is byte-identical. The lead's last note is chosen against
+  chord, a lead-in); its chords and the comp (which never anticipates an ending) are
+  unchanged, the drums too unless the style sets its ending up (the fill above, #2017), and
+  every bar before it is byte-identical. The lead's last note is chosen against
   the written chord and then moved to the nearest of the tonic's resting tones
   (`LeadBook.settle`, rank-weighted as any phrase's last note is), so the line into it is
   unchanged. A lead phrase planned under another style's ending is replanned when the style changes: its slot is keyed by the resolved chord.
-- **The held chord lasts the bar, in any meter**, and nothing rings past the band's last
-  barline: a bass that held four beats overran a 3/4, 6/8 or 7/8 ending (#1503). The invariant
+- **The held chord lasts the bar, in any meter** (an eighth, in a short gesture), and nothing
+  rings past the band's last barline: a bass that held four beats overran a 3/4, 6/8 or 7/8
+  ending (#1503). The invariant
   suite ends a chart in every meter it plays (`METER_ENDINGS`) to hold it.
 - The invariant suite judges a pass that ends against the chord it plays there (`asPlayed`);
   `arrange/ending.test.ts` holds every style to the tonic on turnaround endings, and to the
