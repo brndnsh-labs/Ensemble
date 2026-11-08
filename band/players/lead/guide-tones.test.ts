@@ -327,3 +327,124 @@ describe('every style hands the bridge back to the last A (#2122)', () => {
         },
     );
 });
+
+describe('the bridge lifts in every key, and on the shelf (#2123)', () => {
+    const NAMES = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+    const LETTER: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+    /** A chart's chord roots (and slash basses) moved up `n` semitones. */
+    const up = (bars: string, n: number) =>
+        bars.replace(/(^|[\s|/])([A-G])([b#]?)/g, (_m, before, letter, accidental) => {
+            const shift = accidental === 'b' ? -1 : accidental === '#' ? 1 : 0;
+            return before + NAMES[mod12(LETTER[letter] + shift + n)];
+        });
+    const keyUp = (key: string, n: number) => NAMES[mod12(NAMES.indexOf(key) + n)];
+    // The critique's two charts with a bridge (`FIXTURES` in `test/scores.ts`), as text.
+    const RHYTHM_A = 'Bb^7 G7 | Cm7 F7 | Dm7 G7 | Cm7 F7 | Bb^7 Bb7 | Eb^7 Eo7 | Dm7 G7 | Cm7 F7';
+    const rhythm = (n: number, bridge = 'D7 | D7 | G7 | G7 | C7 | C7 | F7 | F7') =>
+        score(
+            [
+                { label: 'A', bars: up(RHYTHM_A, n), repeat: 2 },
+                { label: bridge.startsWith('D7') ? 'B' : 'A', bars: up(bridge, n) },
+                { label: 'A', bars: up(RHYTHM_A, n) },
+            ],
+            { key: keyUp('Bb', n) },
+        );
+    const minorFunk = (n: number) =>
+        score(
+            [
+                {
+                    label: 'Groove',
+                    bars: up('Em9 | Em9 | Em9 | A13 | Em9 | Em9 | Cmaj7 B7#9 | Em9', n),
+                },
+                { label: 'Bridge', bars: up('Am9 | Am9 | Cmaj7 | B7alt', n) },
+            ],
+            { key: keyUp('E', n), isMinor: true },
+        );
+    // Two tunes off the shelf (`web/lib/standards.ts`) whose bridge fell from the A: Rhythm
+    // Changes, where the A before the bridge resolves to Bbmaj7 (disco, reggae and acoustic fell
+    // a step: the lift's aim lay a tritone up, out of a seam's reach), and Night and Day, whose
+    // Bb7 7th resolved a half step down into the bridge's Ebmaj7 (rock, metal and the sax and
+    // nylon books fell a half step: its other guide tone was a tritone up).
+    const SHELF_A = 'Bbmaj7 Gm7 | Cm7 F7 | Bbmaj7 Gm7 | Cm7 F7 | Bbmaj7 Bb7 | Ebmaj7 Ebm7';
+    const shelfRhythm = score(
+        [
+            { label: 'A', bars: `${SHELF_A} | Bbmaj7 F7 | Bbmaj7 F7` },
+            { label: 'A', bars: `${SHELF_A} | Bbmaj7 F7 | Bbmaj7` },
+            { label: 'Bridge', bars: 'D7 | D7 | G7 | G7 | C7 | C7 | F7 | F7' },
+            { label: 'A', bars: `${SHELF_A} | Bbmaj7 F7 | Bbmaj7 F7` },
+        ],
+        { key: 'Bb' },
+    );
+    const STELLA_A = 'Abmaj7 | G7 | Cmaj7 | Cmaj7 | Abmaj7 | G7 | Cmaj7 | Cmaj7';
+    const B = 'F#m7b5 | Fm7 | Em7 | Ebdim7 | Dm7 | G7';
+    const nightAndDay = score(
+        [
+            { label: 'A', bars: STELLA_A },
+            { label: 'B', bars: `${B} | Cmaj7 | Cmaj7` },
+            { label: 'A', bars: STELLA_A },
+            { label: 'B', bars: `${B} | Cmaj7 | Bb7` },
+            {
+                label: 'Bridge',
+                bars: 'Ebmaj7 | Ebmaj7 | Cmaj7 | Cmaj7 | Ebmaj7 | Ebmaj7 | Cmaj7 | Cmaj7',
+            },
+            { label: 'B', bars: `${B} | C6 | C6` },
+        ],
+        { key: 'C' },
+    );
+    const liftOf = (style: StyleId, chart: ReturnType<typeof score>) => {
+        const timeline = compileTimeline(chart);
+        const { events } = performPass(
+            timeline,
+            {
+                ...DEFAULT_SETTINGS,
+                style,
+                lead: STYLES[style].lead?.prefers ?? DEFAULT_SETTINGS.lead,
+                seed: 'one',
+                swing: 0,
+                lanes: { ...DEFAULT_SETTINGS.lanes, lead: true },
+                head: 'guide-tones',
+            },
+            { pass: 0, looping: true },
+        );
+        return GUIDE_METRICS.leadBridgeLift([{ timeline, events, pass: 0 }]);
+    };
+
+    it.each(Object.keys(STYLES) as StyleId[])(
+        '%s lifts both bridges at least a whole step, in all twelve keys',
+        (style) => {
+            // The critique's charts lift 3 and 5 in every style and key. Before #2123 the minor
+            // funk in E (its own key) fell 2 for the sax and nylon books: their line sat at the
+            // ceiling the lift was capped by, and only that key's guide tones met it.
+            for (let n = 0; n < 12; n++) {
+                expect(liftOf(style, rhythm(n)), `Rhythm Changes +${n}`).toBeGreaterThanOrEqual(2);
+                expect(liftOf(style, minorFunk(n)), `minor funk +${n}`).toBeGreaterThanOrEqual(2);
+            }
+        },
+    );
+
+    it.each(Object.keys(STYLES) as StyleId[])(
+        '%s lifts the bridges of Rhythm Changes and Night and Day off the shelf',
+        (style) => {
+            // 3 or 4, and 5, in every style.
+            expect(liftOf(style, shelfRhythm), 'Rhythm Changes').toBeGreaterThanOrEqual(2);
+            expect(liftOf(style, nightAndDay), 'Night and Day').toBeGreaterThanOrEqual(2);
+        },
+    );
+
+    it('never reseats the A for the bridge: its line is the one it has with no bridge after it', () => {
+        // The bridge climbs into the headroom over the A (`BRIDGE_TOP`); the A stays where its
+        // book seats it. Seating it lower to make room put the sax a 4th to a 6th under the comp
+        // on the shelf (#2123's first try). A sax or nylon book's home (71: 67 + 4, 66 + 5).
+        for (const range of [SAX, [52, 81] as const]) {
+            for (let n = 0; n < 12; n++) {
+                const firstA = (chart: ReturnType<typeof score>) => {
+                    const t = compileTimeline(chart);
+                    return guideToneLine(t, t.bars[0], 71, range)
+                        .filter((note) => note.tick < 8 * BAR)
+                        .map((note) => note.midi);
+                };
+                expect(firstA(rhythm(n)), `+${n}`).toEqual(firstA(rhythm(n, RHYTHM_A)));
+            }
+        }
+    });
+});

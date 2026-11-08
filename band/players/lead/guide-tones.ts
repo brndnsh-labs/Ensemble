@@ -192,6 +192,26 @@ export function headForm(timeline: Timeline, index: number): HeadForm {
 const CONTRAST_LIFT = { phrase: 5, last: 2 } as const;
 
 /**
+ * How far under the instrument's top the contrast's guide tones may climb, in semitones: a whole
+ * step. why: the A keeps a 5th's margin under the top (`BAND.above`) so that the bridge has
+ * somewhere to go, and the bridge spends it — up to an alto's Ab5 (its palm-key top, the range
+ * running to Bb5), a nylon string's G5 at the 15th fret, a trumpet's Ab5; the walk between the
+ * guide tones already reached the range's top around them. Capped at the A's own margin
+ * (`hi - BAND.above`, an alto's Eb5), a line seated high (a sax or nylon book's +4 or +5) had no
+ * room to rise and the bridge fell (#2123). A minor 3rd under the top still clipped the nylon's
+ * bridge in E minor (an Am9 G5 one over it); a whole step leaves every bridge of the fixtures in
+ * all twelve keys its lift.
+ */
+const BRIDGE_TOP = 2;
+
+/**
+ * The widest move inside a phrase, in semitones: a minor 3rd. why: the nearest guide tone of the
+ * next chord always lies within one (two guide tones are a 4th, 5th or tritone apart), so a line
+ * that keeps to it is voice-led; a choice between the two voices is only made inside it.
+ */
+const INNER = 3;
+
+/**
  * The widest move the line makes at a phrase top, re-centring or lifting: a 4th. why: a phrase
  * struck fresh may start somewhere new, but a tune doesn't leap a 6th or more between two of
  * its phrases (the head's seams into and out of the bridge most of all): a line that has
@@ -308,6 +328,33 @@ function chorusLine(
         }
     });
     const [lo, hi] = range;
+    // The highest guide tone the contrast aims for (`BRIDGE_TOP`).
+    const ceiling = hi - BRIDGE_TOP;
+    // The A's last guide tone before the contrast, from `from`: of the guide tones a voice-led
+    // move away (`INNER`), the nearest one the contrast's first chord (`into`) can rise from —
+    // one of its guide tones at or over it, within a seam (`SEAM`) and under the ceiling. why: a
+    // guide-tone line is two voices, the 3rds' and the 7ths', and going into a bridge a player
+    // takes the voice that leaves the bridge somewhere to climb. The lift aims a 4th up with a
+    // 4th's reach, so the one entry it can't climb from is a half step over one of the bridge
+    // chord's guide tones and a tritone under the other: a V7's 7th that would resolve down
+    // into the bridge (Night and Day's Bb7 Ab, to Ebmaj7's G, its D a tritone up). Every other
+    // entry has a guide tone in reach at or over it. With neither voice able to climb, the
+    // nearest, as anywhere.
+    const leanIn = (pcs: number[], from: number, into: number[]): number => {
+        const voices = pcs
+            .flatMap((pc) => [-12, 0, 12].map((o) => nearestMidi(pc, from, lo, hi) + o))
+            .filter((m) => m >= lo && m <= hi && Math.abs(m - from) <= INNER)
+            .sort(
+                (a, b) =>
+                    Math.abs(a - from) - Math.abs(b - from) ||
+                    Math.abs(a - home) - Math.abs(b - home) ||
+                    a - b,
+            );
+        const climbs = voices.find((m) =>
+            into.some((pc) => m + mod12(pc - m) <= Math.min(ceiling, m + SEAM)),
+        );
+        return climbs ?? nearest(pcs, from, home, lo, hi);
+    };
     const notes: GuideNote[] = [];
     let prev: number | null = null;
     const { contrast } = headForm(timeline, firstBar);
@@ -315,7 +362,8 @@ function chorusLine(
     let entry: number | null = null;
     // The chorus's first note, and its section: an A that comes back starts there again.
     let opening: { midi: number; section: string } | null = null;
-    for (const { start, end, chord, next, fresh } of pieces) {
+    for (let i = 0; i < pieces.length; i++) {
+        const { start, end, chord, next, fresh } = pieces[i];
         const bar = bars[barIndexAt(start)];
         const key = bar.key;
         const pcs = guidePitchClasses(chord, key, next);
@@ -370,7 +418,7 @@ function chorusLine(
             const target = last
                 ? (opening?.midi ?? entry) + CONTRAST_LIFT.last
                 : entry + CONTRAST_LIFT.phrase;
-            midi = toward(Math.min(hi - BAND.above, target));
+            midi = toward(Math.min(ceiling, target));
         } else if (restates && opening) {
             // An A again starts where the first A did, so its line — over the same chords —
             // is the first A's: the tune comes back, not just its rhythm.
@@ -383,14 +431,16 @@ function chorusLine(
             // The same chord struck again (held past `LONGEST` bars, or over a phrase top): the
             // same tone. Its other guide tone is a 4th, 5th or tritone away — a leap, not a breath.
             midi = prev;
+        } else if (lifted && entry !== null) {
+            midi = nearest(pcs, prev, entry + CONTRAST_LIFT.phrase, lo, hi);
         } else {
-            midi = nearest(
-                pcs,
-                prev,
-                lifted && entry !== null ? entry + CONTRAST_LIFT.phrase : home,
-                lo,
-                hi,
-            );
+            // The A's last chord before the contrast leans into it (`leanIn`).
+            const after = pieces[i + 1];
+            const afterBar = after && bars[barIndexAt(after.start)];
+            midi =
+                afterBar && afterBar.visit.ordinal === contrast
+                    ? leanIn(pcs, prev, guidePitchClasses(after.chord, afterBar.key, after.next))
+                    : nearest(pcs, prev, home, lo, hi);
         }
         const previous = notes.at(-1);
         if (

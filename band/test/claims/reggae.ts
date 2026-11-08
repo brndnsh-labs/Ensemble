@@ -33,19 +33,11 @@ export const reggae = defineClaims({
     takes: [
         // The known standard's guide-tone head, on reggae's own figures (#2122, `head.guide` in
         // `styles/reggae.ts`).
-        guideTonesTake(
-            {
-                // 0.5: the book's `register` sets the line's home high in the instrument, so the
-                // bridge's lift (`CONTRAST_LIFT`) has little room above it. The line's, not the
-                // figures': it needs the line's headroom.
-                leadBridgeLift: [0, 7, 'the bridge does not fall from where the A ended'],
-            },
-            [
-                // In after the One: 0.24 on reggae's figures (only the arrivals settle on it),
-                // 0.76 on the shared ones, which strike the downbeat. The ceiling sits between.
-                ['leadOnTheOne', 0, 0.4, 'the head comes in after the One, like the drop'],
-            ],
-        ),
+        guideTonesTake({}, [
+            // In after the One: 0.24 on reggae's figures (only the arrivals settle on it),
+            // 0.76 on the shared ones, which strike the downbeat. The ceiling sits between.
+            ['leadOnTheOne', 0, 0.4, 'the head comes in after the One, like the drop'],
+        ]),
         {
             take: {},
             claims: [
