@@ -53,15 +53,23 @@ const STANDARD = [
     // The rhythm is the chorus's (`guidePlan`): 0.906–1. A later A that differs is a bar whose
     // chords differ (a change struck where the first A had none).
     ['leadHeadRhythmRecurs', 0.85, 1, 'the A comes back in the same rhythm'],
-    ['leadHeadContrastDiffers', 0, 0.3, 'the contrast is another rhythm (0.04–0.16)'],
+    // The engine's contrast (`headForm`, #2140): the pop chart's chorus against its verse, not
+    // its outro against its intro. 0.04–0.18.
+    ['leadHeadContrastDiffers', 0, 0.3, 'the contrast is another rhythm'],
     // From where the A ended, a 4th's aim: 4.0 in every style (Rhythm Changes' bridge 3, the
     // minor funk's 5). A sax or nylon book's line sits high (+4, +5), and read 0.5 until the
     // bridge could climb into the headroom over the A (`BRIDGE_TOP`, #2123).
     ['leadBridgeLift', 2, 7, 'the bridge lifts from where the A ended'],
-    // The whole bridge, not its seam (#2123): 0.29 (funk) to 2.81 (neo-soul) over the A. The
-    // sax and nylon books read -0.84 to -2.29 before #2123 (the bridge sank under the A once
-    // it was in), so the floor sits between. 7 is the lift's own ceiling, a 5th.
-    ['leadBridgeRegister', 0, 7, 'and the bridge sits over the A, not just its first note'],
+    // The whole contrast, not its seam (#2123), and any contrast, not only a bridge (#2140):
+    // 0.72 (ska-punk) to 2.12 (rock) over the rest of the head. That is a mean over the
+    // fixtures' contrasts, and it passes only because the bridges and the pop chorus sit over
+    // their A: the bossa's B itself still sits under its A at the high book homes (69, 71, 73),
+    // 1.1 to 2.4 under where it was 5.0 to 6.2 before #2140 climbed it back. Its first phrase
+    // is held there by #2123's falling seam; every contrast over its A on every take is #2161.
+    // With the B walking down from that seam, ska-punk read -0.21, blues -0.17 and country
+    // -0.08, so 0 fails it (a thin guard: `guide-tones.test.ts` holds the climb itself). 7 is
+    // the lift's own ceiling, a 5th.
+    ['leadContrastRegister', 0, 7, 'and the contrast sits over the A, not just its first note'],
     // 82 against 74 planned (`GUIDE_VELOCITY`), plus the lift's push: 9.7–10.7.
     ['leadBridgeLouder', 3, 20, 'and louder'],
     ['compLeadUnison', 0, 0.1, 'the comp voices under the line, rarely on its note'],
