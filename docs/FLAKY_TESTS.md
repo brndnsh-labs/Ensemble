@@ -34,6 +34,15 @@ entry here).
 - **Last seen** is when the flake last actually failed (not when the entry was edited).
 
 ## Registry
+### 🟢 `web/checks/fixtures.ts` `accountTest` — "account API exited with 1" after `listen EADDRINUSE` (any account spec)
+
+- **Class:** e2e-timing, in the harness.
+- **Symptom:** PR #2145's `v2-suite (2, laptop)` (run 42494516169): `Error: listen EADDRINUSE: address already in use 127.0.0.1:42099`, then `account API exited with 1` in `account-collections.chromium.spec.ts`, before the test began.
+- **Root cause:** the API refuses `PORT=0`, so `freePort()` binds port 0, reads the number and closes it, and the API binds it a moment later. Another worker's preview server, API or browser can take the port in between. The harness starts one API per test, so the race runs hundreds of times per CI run. It was also worse than a failure: had the port's taker been another worker's API, the old `/healthz` poll could have answered 200 from the wrong process.
+- **Fix (2026-11-08, #2146):** `startApi` waits for the API's own `listening on http://127.0.0.1:<port>` line, not `/healthz`. If the process closes first and its stderr says `EADDRINUSE`, it starts again on a fresh port (3 tries). Any other early exit still fails at once with the API's stderr.
+- **Before / after:** forced: a server held the first probed port, and the API hit `EADDRINUSE`, retried and both tests passed. With a too-short secret, the test fails at once with "account API exited with 1". Every account spec on `laptop`: 53 passed.
+- **Last seen:** 2026-11-08.
+
 
 ### 🟢 `web/checks/count-in-chart.spec.ts` — "the count-in counts down large over the first bar, then the bar lights as playing" (16)
 
