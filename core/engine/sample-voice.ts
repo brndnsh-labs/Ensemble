@@ -460,6 +460,7 @@ function attachSampleVibrato(
     spec: SampleVibrato,
     startTime: number,
     endTime: number,
+    fade: { start: number; end: number } | null = null,
 ): AudioNode[] {
     if (!(spec.depthCents > 0) || !(spec.rateHz > 0) || !Number.isFinite(baseRate)) {
         return [];
@@ -489,9 +490,15 @@ function attachSampleVibrato(
     lfo.frequency.setValueAtTime(spec.rateHz, startTime);
 
     const lfoGain = audio.createGain();
-    lfoGain.gain.setValueAtTime(0, startTime);
-    lfoGain.gain.setValueAtTime(0, startTime + delay);
-    lfoGain.gain.linearRampToValueAtTime(depthRatio, startTime + delay + ramp);
+    // A fall-off fades the depth out again across the fall (#2120).
+    scheduleDepth(
+        lfoGain.gain,
+        startTime,
+        startTime + delay,
+        startTime + delay + ramp,
+        depthRatio,
+        fade,
+    );
 
     lfo.connect(lfoGain);
     lfoGain.connect(rate);
@@ -583,6 +590,44 @@ export function articulationWindows(
         }
     }
     return { release: releaseWindow, fall: fallWindow };
+}
+
+/**
+ * A modulation depth that fades in after the attack (0 from `time` to `start`, then a straight
+ * line to `full` at `rampEnd`) and, under a fall-off (#2120), fades out again across the fall:
+ * a horn stops its vibrato as the note drops, and a vibrato left running would wobble the fall.
+ * The schedule is built whole, never cancelled: the fade-in stops where the fall starts (at the
+ * level its line had reached by then), then a straight line to 0 at the fall's end. A fall that
+ * starts before the vibrato would leaves it at 0. With no fall it is exactly the fade-in alone.
+ * Shared by the synth voice's vibrato taps and the sampled seam's LFO depth.
+ */
+export function scheduleDepth(
+    param: AudioParam,
+    time: number,
+    start: number,
+    rampEnd: number,
+    full: number,
+    fade: { start: number; end: number } | null,
+): void {
+    param.setValueAtTime(0, time);
+    param.setValueAtTime(0, start);
+    if (!fade) {
+        param.linearRampToValueAtTime(full, rampEnd);
+        return;
+    }
+    if (fade.start <= start) {
+        return;
+    }
+    if (fade.start < rampEnd) {
+        param.linearRampToValueAtTime(
+            full * ((fade.start - start) / (rampEnd - start)),
+            fade.start,
+        );
+    } else {
+        param.linearRampToValueAtTime(full, rampEnd);
+        param.setValueAtTime(full, fade.start);
+    }
+    param.linearRampToValueAtTime(0, fade.end);
 }
 
 /**
@@ -830,6 +875,7 @@ export function playSampledNote(
                   vibrato,
                   startTime,
                   naturalEnd,
+                  fallFrom !== null ? { start: fallFrom, end: startTime + hold } : null,
               )
             : [];
 

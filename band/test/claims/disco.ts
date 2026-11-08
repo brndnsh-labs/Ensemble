@@ -257,11 +257,14 @@ export const disco = defineClaims({
         {
             take: { lead: 'head' },
             claims: [
-                // The horn falls off a phrase's last note (#2120, `LeadBook.fall` 0.3). Measured
-                // 0.460 on the head's few phrase ends (0 with no falls, the floor's failure); the
-                // ceiling is most phrase ends falling. Only there: 0.028 of all notes fall.
-                ['leadPhraseEndFalls', 0.2, 0.65, 'the brass drops off the end of the hook'],
-                ['leadFallShare', 0, 0.1, 'a fall ends a phrase, never a note inside the line'],
+                // The head falls where its phrase lets go (#2120, `LeadBook.fall` 0.3, `fallDraw`),
+                // drawn once per ending figure. Of every phrase end 0.180 fall (0 with no falls).
+                ['leadPhraseEndFalls', 0.1, 0.35, 'the brass drops off the end of the hook'],
+                ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.889 (18 falls); drawn without the section-end weight 0.650.
+                ['leadFallsAtSectionEnd', 0.77, 1, 'the falls close the sections'],
+                // 1.000 when the fall was drawn per phrase rather than per ending figure.
+                ['leadHeadFallsDiffer', 0, 0, 'a section played again falls where it fell'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (on the eighths, never two sixteenths running), then moves. Measured
                 // 0.006 with no stabs, 0.108 now; the floor fails with the stabs off, the
@@ -287,10 +290,14 @@ export const disco = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
-                // The horn falls off a phrase's last note (#2120, `LeadBook.fall` 0.3). Measured
-                // 0.218 (0 with no falls); 0.014 of all notes fall.
-                ['leadPhraseEndFalls', 0.1, 0.4, 'the sax drops off a phrase now and then'],
-                ['leadFallShare', 0, 0.08, 'a fall ends a phrase, never a note inside the line'],
+                // The horn falls off a phrase's last note (#2120, `LeadBook.fall` 0.3, `fallDraw`).
+                // Measured 0.133 (0 with no falls).
+                ['leadPhraseEndFalls', 0.07, 0.3, 'the sax drops off a phrase now and then'],
+                ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.636; drawn without the section-end weight 0.432.
+                ['leadFallsAtSectionEnd', 0.53, 1, 'the falls close the chorus and its sections'],
+                // Measured 0.070; 0.130 with no damping after a fall.
+                ['leadFallsBackToBack', 0, 0.11, 'seldom two falls running'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (on the eighths, never two sixteenths running), then moves. Measured
                 // 0.009 with no stabs, 0.105 now; the floor fails with the stabs off, the

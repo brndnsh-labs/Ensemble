@@ -12,6 +12,7 @@ import {
     playSampledNote,
     type SampleBend,
     type SampleVibrato,
+    scheduleDepth,
 } from './sample-voice.js';
 import {
     getSoloistVoiceLimit,
@@ -214,7 +215,10 @@ function playSampledSolo(
     }
     // The later pitch moves (#2120). A release lets the scoop or bend down again, so it rides
     // only on the bend-in the band wrote (`bendStartInterval`), never on a slide or a slur.
-    const release = bendStartInterval !== 0 ? articulation?.release : undefined;
+    const release =
+        Number.isFinite(bendStartInterval) && bendStartInterval !== 0
+            ? articulation?.release
+            : undefined;
     const fall = articulation?.fall;
     if (release || fall) {
         bend = {
@@ -426,6 +430,7 @@ function attachVibrato(
     outputGain: GainNode,
     vol: number,
     filterFreq: AudioParam | null,
+    fade: { start: number; end: number } | null,
 ): void {
     const { vibrato, vibGain, depthModNodes } = createVibrato(
         state,
@@ -437,6 +442,7 @@ function attachVibrato(
         vol,
         filterFreq,
         vibratoFlag,
+        fade,
     );
     vibrato.connect(vibGain);
     vibGain.connect(osc1.frequency);
@@ -554,7 +560,14 @@ function applySoloistEnvelope(
     fallFrom: number | null = null,
 ): void {
     const gain = outputGain.gain;
-    const rel = soloistRelease(playTime, duration, isLegato);
+    const end = playTime + duration;
+    // A note that falls off (#2120) is released where its fall lands — the note's end — never
+    // mid-fall, and quickly (`FALL_RELEASE_TC`): the fall has already taken its level down, and
+    // the oscillators stop 0.2 s after the end.
+    const falling = fallFrom !== null && end > fallFrom;
+    const rel = falling
+        ? { start: end, constant: FALL_RELEASE_TC }
+        : soloistRelease(playTime, duration, isLegato);
     // The decay must land before the release re-aims the param — an
     // out-of-order setTargetAtTime would swell the note back up. Clamp it
     // between playTime and just before the release.
@@ -562,16 +575,21 @@ function applySoloistEnvelope(
     gain.setValueAtTime(0, playTime);
     gain.setTargetAtTime(peak, playTime, attack);
     gain.setTargetAtTime(peak * 0.82, decayStart, 0.06);
-    // A fall-off (#2120) sinks the level with the pitch, toward `FALL_TAPER` of the sustain,
-    // from where the fall starts: after the decay has been aimed (or it would re-aim the level
-    // back up) and before the release takes over. The time constant is a third of the window to
-    // the note's end, so the level is most of the way down where the fall lands.
-    const end = playTime + duration;
-    if (fallFrom !== null && fallFrom > decayStart && fallFrom < rel.start && end > fallFrom) {
+    // A fall-off sinks the level with the pitch, toward `FALL_TAPER` of the sustain, from where
+    // the fall starts: only after the decay has been aimed (or the decay would re-aim the level
+    // back up). The time constant is a third of the fall, so the level is most of the way down
+    // where the fall lands.
+    if (falling && fallFrom !== null && fallFrom > decayStart) {
         gain.setTargetAtTime(peak * 0.82 * FALL_TAPER, fallFrom, (end - fallFrom) / 3);
     }
     gain.setTargetAtTime(0, rel.start, rel.constant);
 }
+
+/**
+ * The release after a fall-off (#2120), a `setTargetAtTime` constant: ~0.2 s to −70 dB of the
+ * tapered level, inside the 0.2 s the oscillators sound past the note's end.
+ */
+const FALL_RELEASE_TC = 0.05;
 
 /**
  * Attack-time unison settle (epic-3-soloist S6). osc2 starts ~20c wider than
@@ -724,6 +742,8 @@ function playTrumpet(
         outputGain,
         vol,
         filter.frequency,
+        // The vibrato fades out across a fall-off (#2120).
+        fallFrom !== null ? { start: fallFrom, end: playTime + duration } : null,
     );
 
     osc1.connect(filter);
@@ -845,6 +865,7 @@ function createVibrato(
     vol: number,
     filterFreq: AudioParam | null,
     forceVibrato: boolean = false,
+    fade: { start: number; end: number } | null = null,
 ): VibratoNodes {
     const { soloist, playback } = state;
     const intensity = Number.isFinite(playback.bandIntensity) ? playback.bandIntensity : 0.5;
@@ -892,15 +913,26 @@ function createVibrato(
     // below (#1999). It was an exponential ramp from 0, which Web Audio holds AT 0 for the whole
     // ramp and then jumps to the end value: the vibrato snapped on half a second into the note.
     const rampEnd = time + vibDelay + (isLongNote ? 0.35 : 0.18);
-    vibGain.gain.setValueAtTime(0, time);
-    vibGain.gain.setValueAtTime(0, time + vibDelay);
-    vibGain.gain.linearRampToValueAtTime(Math.max(0.001, finalVibDepth), rampEnd);
+    // A fall-off fades it out again across the fall (#2120, `scheduleDepth`).
+    scheduleDepth(
+        vibGain.gain,
+        time,
+        time + vibDelay,
+        rampEnd,
+        Math.max(0.001, finalVibDepth),
+        fade,
+    );
 
     const depthMod = ctx.createOscillator();
     depthMod.type = 'sine';
     depthMod.frequency.setValueAtTime(0.12, time);
     const depthModGain = ctx.createGain();
     depthModGain.gain.setValueAtTime(finalVibDepth * 0.2, time);
+    // The slow depth wobble sums onto the depth itself, so it fades with it.
+    if (fade) {
+        depthModGain.gain.setValueAtTime(finalVibDepth * 0.2, fade.start);
+        depthModGain.gain.linearRampToValueAtTime(0, fade.end);
+    }
     depthMod.connect(depthModGain);
     depthModGain.connect(vibGain.gain);
 
@@ -921,9 +953,14 @@ function createVibrato(
     if (vibRuns) {
         // Amplitude tremolo — small, correlated with the pitch rise.
         const ampDepthGain = ctx.createGain();
-        ampDepthGain.gain.setValueAtTime(0, time);
-        ampDepthGain.gain.setValueAtTime(0, time + vibDelay);
-        ampDepthGain.gain.linearRampToValueAtTime(Math.max(0.0001, vol * 0.04), rampEnd);
+        scheduleDepth(
+            ampDepthGain.gain,
+            time,
+            time + vibDelay,
+            rampEnd,
+            Math.max(0.0001, vol * 0.04),
+            fade,
+        );
         vibrato.connect(ampDepthGain);
         ampDepthGain.connect(outputGain.gain);
         couplingNodes.push(ampDepthGain);
@@ -931,9 +968,14 @@ function createVibrato(
         // Timbral wobble — correlated cutoff movement on the voice's filter.
         if (filterFreq) {
             const cutoffDepthGain = ctx.createGain();
-            cutoffDepthGain.gain.setValueAtTime(0, time);
-            cutoffDepthGain.gain.setValueAtTime(0, time + vibDelay);
-            cutoffDepthGain.gain.linearRampToValueAtTime(Math.max(1, freq * 0.05), rampEnd);
+            scheduleDepth(
+                cutoffDepthGain.gain,
+                time,
+                time + vibDelay,
+                rampEnd,
+                Math.max(1, freq * 0.05),
+                fade,
+            );
             vibrato.connect(cutoffDepthGain);
             cutoffDepthGain.connect(filterFreq);
             couplingNodes.push(cutoffDepthGain);

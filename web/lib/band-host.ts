@@ -294,18 +294,20 @@ export function playBandEvent(
         // scoop starts below the written pitch and glides up into it; the per-note seed keys
         // the voice's timbral humanising to the note's place in the song, scaled by the
         // humanize the band plays (the style's own while the chart hasn't set one, #2055).
+        // A long fall-off sounds past the written length, into the rest (#2120).
+        const { seconds, articulation } = leadArticulation(event, durationSeconds);
         playSoloNote(
             state,
             hz(event.midi),
             time,
-            durationSeconds,
+            seconds,
             level,
             -(event.bendIn ?? 0),
             legato,
             event.vibrato === true,
             event.tick,
             playedHumanize(state.groove.humanize, state.groove.lastSmartGenre),
-            leadArticulation(event, durationSeconds),
+            articulation,
         );
         return;
     }
@@ -329,28 +331,34 @@ export function playBandEvent(
  * A lead note's fall-off, bend-and-release and slide-in (#2120) in seconds, for the soloist
  * voice. The band writes them in semitones and ticks; their timing here follows the note's own
  * tempo (its seconds over its ticks), so a fall or a release is the same share of a beat at any
- * tempo. Undefined when the note has none of them.
+ * tempo. `seconds` is how long the voice sounds the note: its written length, and a long fall's
+ * drop into the rest after it. No `articulation` when the note has none of them.
  */
 export function leadArticulation(
     event: PitchedNote,
     durationSeconds: number,
-): LeadArticulation | undefined {
+): { seconds: number; articulation?: LeadArticulation } {
     if (
         !(event.fall || event.release || event.slideIn) ||
         !(durationSeconds > 0) ||
         !(event.dur > 0)
     ) {
-        return undefined;
+        return { seconds: durationSeconds };
     }
     const perTick = durationSeconds / event.dur;
     const eighth = (PPQ / 2) * perTick;
-    return {
-        // why: a horn's fall-off takes the note's tail — an eighth's worth, so it reads as a
-        // gesture at any tempo, but never more than 40% of the note, so the pitch is heard
-        // before it drops (a dotted-quarter arrival keeps its first beat, an eighth its first
-        // 60%).
-        ...(event.fall
-            ? { fall: { semitones: event.fall, seconds: Math.min(eighth, durationSeconds * 0.4) } }
+    const fallTicks = event.fall && event.fall.ticks > 0 ? event.fall.ticks : 0;
+    // why: a long fall (a held note's) sounds the note's whole written length and then drops
+    // into the rest over its own ticks; a short one takes the note's tail — its ticks (an
+    // eighth), but never more than 40% of the note, so the pitch is heard before it drops (an
+    // eighth note keeps its first 60%).
+    const fallSeconds = event.fall?.into
+        ? fallTicks * perTick
+        : Math.min(fallTicks * perTick, durationSeconds * 0.4);
+    const into = event.fall?.into && fallSeconds > 0 ? fallSeconds : 0;
+    const articulation: LeadArticulation = {
+        ...(event.fall && fallSeconds > 0
+            ? { fall: { semitones: event.fall.semitones, seconds: fallSeconds } }
             : {}),
         // why: a guitarist holds the bend through the note's first half, then lets it down
         // over an eighth (never more than 35% of the note), so the note rings on the fretted
@@ -374,6 +382,7 @@ export function leadArticulation(
               }
             : {}),
     };
+    return { seconds: durationSeconds + into, articulation };
 }
 
 /**

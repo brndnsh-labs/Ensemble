@@ -102,7 +102,7 @@ function printBars(timeline: Timeline, events: BandEvent[], count: number) {
                 // A fall-off (#2120) marks the note's end: ↘ and how far it drops.
                 const held =
                     n.lane === 'lead'
-                        ? `/${Math.round(n.dur / 120)}${n.vibrato ? '~' : ''}${n.fall ? `↘${n.fall}` : ''}`
+                        ? `/${Math.round(n.dur / 120)}${n.vibrato ? '~' : ''}${n.fall ? `↘${n.fall.semitones}${n.fall.into ? '…' : ''}` : ''}`
                         : '';
                 const name = `${NOTE[n.midi % 12]}${Math.floor(n.midi / 12) - 1}${mark}${held}`;
                 byStep.set(cell(n), [...(byStep.get(cell(n)) ?? []), name]);

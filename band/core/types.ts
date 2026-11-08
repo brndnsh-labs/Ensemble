@@ -74,10 +74,12 @@ export interface PitchedNote extends EventTiming {
      */
     release?: boolean;
     /**
-     * A horn's fall-off (#2120): the note drops this many semitones (2–5) over its tail, its
-     * level tapering with it, as a phrase-ending note does in a funk, disco or blues horn line.
+     * A horn's fall-off (#2120), as a phrase-ending note does in a funk, disco or blues horn
+     * line: the pitch drops `semitones` over `ticks`, its level sinking with it. A short fall
+     * (3–4, over an eighth) takes the note's own tail; a long one (`into`: 5–7, a held note's)
+     * starts where the written length ends and falls into the rest after it.
      */
-    fall?: number;
+    fall?: { semitones: number; ticks: number; into?: boolean };
     /**
      * A guitarist sliding into the note (#2120): struck `from` semitones away (signed: −3 is
      * three frets below, +2 two above) and slid up or down the string to the written pitch

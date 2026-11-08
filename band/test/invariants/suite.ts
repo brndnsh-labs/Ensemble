@@ -680,13 +680,27 @@ function checkPass(
     // The pitch moves (#2120) are the instrument's own: a horn falls off, a guitar lets a bend
     // down and slides. Each is a gesture of a few semitones, inside the note it moves.
     const family = LEAD_INSTRUMENTS[settings.lead].family;
-    for (const n of lead) {
+    lead.forEach((n, i) => {
         if (n.fall !== undefined) {
+            const { semitones, ticks, into } = n.fall;
             if (family !== 'horn') {
                 fail(n, `a ${settings.lead} falls off`);
             }
-            if (!Number.isInteger(n.fall) || n.fall < 2 || n.fall > 5) {
-                fail(n, `falls ${n.fall} semitones`);
+            // A short fall drops 3–4 in the note's tail (an eighth at most); a long one 5–7.
+            const [lo, hi] = into ? [5, 7] : [3, 4];
+            if (!Number.isInteger(semitones) || semitones < lo || semitones > hi) {
+                fail(n, `${into ? 'a long' : 'a short'} fall of ${semitones} semitones`);
+            }
+            if (!(ticks > 0) || (!into && ticks > STEP * 2)) {
+                fail(n, `falls over ${ticks} ticks`);
+            }
+            // A long fall drops into the rest after the note, and is over before the next.
+            const next = lead[i + 1];
+            if (into && next && next.tick < n.tick + n.dur + ticks) {
+                fail(n, `falls into the note at ${next.tick}`);
+            }
+            if (n.bendIn) {
+                fail(n, 'both scoops in and falls off');
             }
         }
         if (n.release !== undefined) {
@@ -715,7 +729,7 @@ function checkPass(
                 fail(n, 'both slides and bends in');
             }
         }
-    }
+    });
     // Chord arrivals: the bass lands on a chord tone; comp chords carry the guide tones.
     const bass = events.filter((e): e is PitchedNote => e.lane === 'bass');
     const chords = events.filter((e): e is PitchedNote => e.lane === 'comp' && !e.muted);

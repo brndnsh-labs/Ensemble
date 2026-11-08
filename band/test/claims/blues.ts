@@ -141,17 +141,20 @@ export const blues = defineClaims({
             take: { lead: 'head' },
             claims: [
                 // Bend-and-release (#2120, `LeadBook.release` 0.4): of the bends a quarter or
-                // longer, the share let back down. Measured 0.393 (0 with no releases); a phrase's
-                // arrival releases only onto the blue third or the b7, so the ceiling is well
-                // under every bend.
+                // longer, the share let back down. Measured 0.271 (0 with no releases): inside a
+                // phrase only when the line goes on below the bent pitch, at a phrase end only
+                // onto the blue third or the b7.
                 [
                     'leadBendReleases',
-                    0.2,
-                    0.6,
+                    0.15,
+                    0.5,
                     'the guitar bends the blue third up and lets it cry back',
                 ],
-                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.316.
-                ['leadLandingSlides', 0.15, 0.5, 'a landing slid into from a few frets away'],
+                ['leadArrivalReleaseOffRest', 0, 0, 'a phrase ends on the blue third or the b7'],
+                ['leadReleaseClimbs', 0, 0, 'the line goes on down from a let-down bend'],
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.373.
+                ['leadLandingSlides', 0.2, 0.55, 'a landing slid into from a few frets away'],
+                ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
                 // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
                 // its figures already leave room at each phrase end.
                 ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
@@ -167,12 +170,15 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
-                // Bend-and-release (#2120, `LeadBook.release` 0.4). Measured 0.303 (0 with no
-                // releases; 0.043 when a phrase's arrival never released, too rare to hear: one
-                // in eight choruses).
-                ['leadBendReleases', 0.15, 0.5, 'a bend let back down, the blues cry'],
-                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.262.
-                ['leadLandingSlides', 0.12, 0.45, 'a landing slid into from a few frets away'],
+                // Bend-and-release (#2120, `LeadBook.release` 0.4). Measured 0.240 (0 with no
+                // releases; a phrase's arrival never releasing was too rare to hear, one in eight
+                // choruses).
+                ['leadBendReleases', 0.12, 0.45, 'a bend let back down, the blues cry'],
+                ['leadArrivalReleaseOffRest', 0, 0, 'a phrase ends on the blue third or the b7'],
+                ['leadReleaseClimbs', 0, 0, 'the line goes on down from a let-down bend'],
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.260.
+                ['leadLandingSlides', 0.15, 0.45, 'a landing slid into from a few frets away'],
+                ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 // Measured 0.134; development off 0.061, #2012's bar fix reverted 0.071; always develops 0.40.
                 // Floor sits between the bar fix reverted (0.071) and shipped: it guards #2012's bar fix and development off (0.061).
@@ -202,14 +208,18 @@ export const blues = defineClaims({
                 ['leadPeakIsTop', 0.85, 1, 'the peak chorus holds the top note'],
             ],
         },
-        // The blues on a horn (a sax lead, the jump-blues tenor) falls off its phrase ends
-        // (#2120, `LeadBook.fall` 0.45): more often than funk or disco's.
+        // The blues on a horn (a sax lead, the jump-blues tenor) falls off a phrase end now and
+        // then, mostly where the chorus closes (#2120, `LeadBook.fall` 0.3, `fallDraw`).
         {
             take: { lead: 'head', leadInstrument: 'sax' },
             claims: [
-                // Measured 0.420 (0 with no falls); 0.091 of all notes fall.
-                ['leadPhraseEndFalls', 0.25, 0.65, 'the tenor sighs off the end of a phrase'],
-                ['leadFallShare', 0, 0.15, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.160 (0 with no falls; 0.420 at the first cut's 0.45, a tic).
+                ['leadPhraseEndFalls', 0.08, 0.35, 'the tenor sighs off the end of a phrase'],
+                ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.750; drawn without the section-end weight 0.471.
+                ['leadFallsAtSectionEnd', 0.6, 1, 'the falls close the chorus'],
+                // 1.000 when the fall was drawn per phrase rather than per ending figure.
+                ['leadHeadFallsDiffer', 0, 0, 'a section played again falls where it fell'],
                 // A horn's scoop is not a bend it can let down.
                 ['leadBendReleases', 0, 0, 'a horn never releases a bend'],
             ],
@@ -217,9 +227,13 @@ export const blues = defineClaims({
         {
             take: { lead: 'solo', leadInstrument: 'sax' },
             claims: [
-                // Measured 0.506 (0 with no falls); 0.050 of all notes fall.
-                ['leadPhraseEndFalls', 0.3, 0.7, 'the tenor sighs off the end of a phrase'],
-                ['leadFallShare', 0, 0.1, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.221 (0 with no falls; 0.506 at the first cut's 0.45, a tic).
+                ['leadPhraseEndFalls', 0.12, 0.35, 'the tenor sighs off the end of a phrase'],
+                ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
+                // Measured 0.443; drawn without the section-end weight 0.235.
+                ['leadFallsAtSectionEnd', 0.35, 1, 'the falls close the chorus'],
+                // Measured 0.083; 0.351 with no damping after a fall (the first cut ran five).
+                ['leadFallsBackToBack', 0, 0.2, 'never falling off phrase after phrase'],
             ],
         },
     ],
