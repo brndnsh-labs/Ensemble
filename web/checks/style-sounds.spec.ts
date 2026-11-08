@@ -117,7 +117,11 @@ test('a fresh device gets the style’s sounds on Play and the band moves onto t
 
 test('a style change while playing fetches the new style’s sounds and keeps playing', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'fetching the new style’s sounds is app logic, not browser behaviour; WebKit still runs the fresh-device Play test',
+    );
     test.setTimeout(120_000);
     await autoSoundsOn(page);
     await observeSamples(page);
@@ -145,7 +149,11 @@ test('a style change while playing fetches the new style’s sounds and keeps pl
 
 test('a lane saved on Built-in keeps it while the others move onto the style’s sounds', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'a saved Built-in lane is saved-document logic, not browser behaviour; WebKit still runs the fresh-device Play test',
+    );
     test.setTimeout(90_000);
     await autoSoundsOn(page);
     const requested = packRequests(page);
@@ -171,7 +179,11 @@ test('a lane saved on Built-in keeps it while the others move onto the style’s
 
 test('with Save-Data on, the stand offers the sounds instead of downloading them', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'navigator.connection is stubbed on both browsers and the offer is app logic; WebKit still runs the fresh-device Play test',
+    );
     test.setTimeout(90_000);
     await autoSoundsOn(page);
     await page.addInitScript(() => {

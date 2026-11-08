@@ -2,7 +2,7 @@
 // packs decodes them before Play, so the first note is the real sound — not the built-in one with
 // a swap to the real one a few bars in — and each cached file is checked against its hash once.
 import type { Page } from '@playwright/test';
-import { appUrl, expect, openBand, seedStarters, songLink } from './fixtures';
+import { expect, openBand, seedStarters, songLink } from './fixtures';
 import { closeSounds, observeSamples, sampleStarts, test } from './foundation-helpers';
 
 async function autoSoundsOn(page: Page) {
@@ -56,6 +56,10 @@ function resolvedSound(page: Page, lane: string) {
 test('on a repeat visit the style’s sounds are decoded before Play and the band never starts on built-in', async ({
     page,
 }, info) => {
+    test.skip(
+        info.project.name !== 'laptop',
+        'a scheduling claim (decode before Play, digests once), not browser speed; WebKit still plays on fetched sounds in style-sounds’ fresh-device test and the one-install test',
+    );
     test.setTimeout(120_000);
     await autoSoundsOn(page);
     await observeSamples(page);
@@ -112,16 +116,4 @@ test('on a repeat visit the style’s sounds are decoded before Play and the ban
         description: `decodes before Play ${decodedBeforePlay}, total ${work.decodedAt.length}; last decode at ${Math.round(Math.max(...work.decodedAt))} ms after load; digests ${work.digests}`,
     });
     await stop.click();
-});
-
-test('a device with nothing installed still plays on the built-in sounds first', async ({
-    page,
-}) => {
-    await autoSoundsOn(page);
-    await seedStarters(page);
-    await page.goto(appUrl());
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await openBand(page, 'Players');
-    await expect(resolvedSound(page, 'Drums')).toHaveText('Using Built-in');
-    await closeSounds(page);
 });

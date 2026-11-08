@@ -15,7 +15,11 @@ test('opening a song says its title, key and tempo in the stand toast’s live r
     await expect(region).toHaveAttribute('data-empty', 'true');
 });
 
-test('an install writes each live region at most six times', async ({ page }) => {
+test('an install writes each live region at most six times', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'a live-region write count is browser-independent; headless WebKit stopped painting under it (the FLAKY_TESTS ledger entry this retires); WebKit still reads the live region in the failed-download test',
+    );
     test.setTimeout(120_000);
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();

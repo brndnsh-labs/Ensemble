@@ -66,7 +66,11 @@ function stored(page: Page): Promise<unknown[]> {
 
 test('an old text-chart file is refused in plain words, and nothing is imported', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the refusal is the codec’s answer, not browser behaviour (codec.test.ts and documents-validate.test.ts hold it); no WebKit Playwright test covers it, the unit tests do',
+    );
     await seedStarters(page);
     await expect(page.locator('main.home')).toBeVisible();
     const before = await stored(page);
@@ -80,7 +84,11 @@ test('an old text-chart file is refused in plain words, and nothing is imported'
     expect(await stored(page)).toEqual(before);
 });
 
-test('an old text-chart link is refused in plain words, not opened', async ({ page }) => {
+test('an old text-chart link is refused in plain words, not opened', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the refusal is the codec’s answer, not browser behaviour (codec.test.ts and documents-validate.test.ts hold it); no WebKit Playwright test covers it, the unit tests do',
+    );
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(appUrl(await encodeChartLink(textChart() as unknown as ChartDocumentV2)));
@@ -92,7 +100,11 @@ test('an old text-chart link is refused in plain words, not opened', async ({ pa
 
 test('a text chart left in the songbook is left out of it, and the rest still opens', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the refusal is the codec’s answer, not browser behaviour (codec.test.ts and documents-validate.test.ts hold it); no WebKit Playwright test covers it, the unit tests do',
+    );
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await seedGuestDocuments(page, [...starterDocuments(), textChart()]);

@@ -19,7 +19,11 @@ import { expect, seedStarters, songLink, test } from './fixtures';
 test.describe('telemetry (#1389)', () => {
     test('on the prod path (build flag + host both satisfied via the test override), sends a pathname-only pageview and the allow-listed events', async ({
         page,
-    }) => {
+    }, testInfo) => {
+        test.skip(
+            testInfo.project.name !== 'laptop',
+            'the gate and allow-list are JavaScript in lib/telemetry.ts (telemetry.test.ts holds them), not browser behaviour; csp.spec.ts’s violation test still runs on WebKit with the same page',
+        );
         await page.route('https://umami.brndn.zip/telemetry.js', (route) =>
             route.fulfill({
                 contentType: 'application/javascript',
@@ -100,7 +104,11 @@ test.describe('telemetry (#1389)', () => {
 
     test('installs no tracker at all in this suite’s own build (no NEXT_PUBLIC_TELEMETRY, non-canonical host, no override)', async ({
         page,
-    }) => {
+    }, testInfo) => {
+        test.skip(
+            testInfo.project.name !== 'laptop',
+            'the gate is JavaScript in lib/telemetry.ts (telemetry.test.ts holds it), not browser behaviour; csp.spec.ts’s violation test still runs on WebKit with the same page',
+        );
         let requested = false;
         await page.route('https://umami.brndn.zip/telemetry.js', (route) => {
             requested = true;

@@ -149,13 +149,14 @@ entry here).
 - **After:** 80/80 on laptop under contention (this study and its D.C. al Fine twin, 40 each).
 - **Last seen:** 2026-11-01 19:05.
 
-### 🔴 `web/checks/screen-reader-announce.spec.ts` — "an install writes each live region at most six times" (18)
+### 🟡 `web/checks/screen-reader-announce.spec.ts` — "an install writes each live region at most six times" (18)
 
 - **Class:** e2e-timing, outside the app (headless WebKit stopped rendering).
 - **Symptom:** once, `webkit-phone`, PR #2065's run (2026-11-01): `closeSounds`'s "Close band" click waited 110s for the button to be stable.
 - **What the trace shows:** the button was found and visible; Playwright's stable check, which counts animation frames, never got an answer. The page's JavaScript was not stuck: the teardown's evaluate answered in 5ms. The screencast's last frame is 1.5s before the click. WebKit stopped producing frames, so nothing the app did could move it.
 - **Rate:** 1 in the two weeks of CI logs (2026-10-19 to 2026-11-02); not seen locally.
 - **Next step:** if it happens again, keep the trace and check whether frames stop at the same moment (right after "Sounds installed"); if they do, look at what the install's end does to the compositor.
+- **Quarantine (2026-11-08, #2150):** the test is now laptop-only. A live-region write count does not depend on the browser, and the only failure was WebKit's compositor stopping, so pinning it retires the exposure; the stopped-frames cause itself is not fixed, and the file's WebKit test of the failed download still opens the same live region there.
 - **Last seen:** 2026-11-01.
 
 ### 🟢 `web/checks/semantic-form-editor.spec.ts` — "a form built bar by bar applies without a refusal, saves from the hidden editor, transposes and reopen offline as four written bars"

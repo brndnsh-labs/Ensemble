@@ -12,7 +12,11 @@ import { appUrl, expect, seedStarters, songLink, test } from './fixtures';
 test.describe('Content-Security-Policy (#1395)', () => {
     test('the built page carries a script/connect CSP with no script-src unsafe-inline', async ({
         page,
-    }) => {
+    }, testInfo) => {
+        test.skip(
+            testInfo.project.name !== 'laptop',
+            'the meta tag is baked into the export and is the same bytes in every browser; the violation test below still runs on WebKit and would fail on a too-narrow policy',
+        );
         await page.goto(appUrl());
 
         const content = await page

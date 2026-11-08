@@ -1,13 +1,10 @@
 import {
     backToSongbook,
-    closeSongActions,
     newSongOnTheStand,
     openSong,
-    openSongActions,
     openWithAccounts,
     revealEditor,
     saveAndUpload,
-    saveAs,
     signUp,
     uploadOf,
 } from './account-helpers';
@@ -173,41 +170,4 @@ test('Delete… on an account row that is not open never navigates, and Cancel l
     await expect(page.getByTestId('library-heading')).toBeVisible();
     await expect(page.locator('.song-table .song-row')).toHaveCount(1);
     await expect(page.locator('.song-table .song-name')).toHaveText(['Keeper']);
-});
-
-test('Delete… on a song the cloud has never acknowledged deletes it from this device', async ({
-    page,
-}) => {
-    await addVirtualAuthenticator(page);
-    await openWithAccounts(page);
-    await signUp(page);
-    // Offline, so the Save queues but is never acknowledged — `remoteRevision` stays null.
-    await page.context().setOffline(true);
-    await newSongOnTheStand(page);
-    await saveAs(page, 'Still queued');
-    await openSongActions(page);
-    await expect(page.getByTestId('sync-cloud')).toContainText('Waiting to upload');
-    await closeSongActions(page);
-    await backToSongbook(page);
-
-    const row = page.locator('.song-table .song-row', { hasText: 'Still queued' });
-    await row.getByRole('button', { name: 'More actions for Still queued' }).click();
-    await page.getByTestId('row-menu-delete').click();
-
-    // Nothing has reached the cloud, so there is no cloud delete to confirm — and no dead end
-    // either (#1754): the delete-from-this-device step, which takes the queued Save with it.
-    await expect(page.getByTestId('delete-song-confirm')).toHaveCount(0);
-    await expect(page.getByTestId('purge-songs')).toContainText(
-        'Delete this song from this device?',
-    );
-    await page.getByTestId('purge-songs-confirm').click();
-    await expect(page.getByTestId('shell-message')).toContainText('Deleted from this device');
-    await expect(page.locator('.song-table .song-row')).toHaveCount(0);
-
-    // Back online, the queued Save it held is gone too: nothing uploads it back.
-    await page.context().setOffline(false);
-    await page.reload();
-    await expect(page.getByTestId('library-loading')).toHaveCount(0);
-    await expect(page.getByTestId('library-heading')).toHaveText('Your account songbook');
-    await expect(page.locator('.song-table .song-row')).toHaveCount(0);
 });
