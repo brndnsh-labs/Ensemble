@@ -88,6 +88,25 @@ export const blues = defineClaims({
                 ['compColour', 0.5, 1, 'rootless 9ths and 13ths over the dominants'],
                 ['compOffbeatShare', 0.3, 0.8, 'stabs and pushes on the "and"s'],
                 ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
+                // 0.491 (0.25 at low energy, 0.73 at high): the "and"-of-4 push into the IV, the
+                // V and the turnaround (`KEYS_PUSH`), and since #2015 the "and"-of-2 stab before
+                // a mid-bar change plays the new chord too (`pushInBar`). 0.21 before, with the
+                // mid-bar changes stuttered into. High energy pushes most changes (0.73), so the
+                // ceiling leaves it room.
+                [
+                    'compAnticipatesChange',
+                    0.35,
+                    0.6,
+                    'the push into the change plays the new chord',
+                ],
+                // 0.958 before #2015: the mid-tier figures' "and"-of-2 stab played the leaving
+                // chord into nearly every mid-bar change (the turnaround's two-chord bars).
+                [
+                    'compStabsOutgoing',
+                    0,
+                    0,
+                    'the strike before a mid-bar change is the new chord, not a stutter',
+                ],
             ],
         },
         {
@@ -197,10 +216,14 @@ export const blues = defineClaims({
                     "a phrase now and then says the last one's opening again",
                 ],
                 ['leadMotifOpenings', 120, 10000, 'enough phrase openings to judge the rate on'],
-                // 1.0 is no response (the comp as busy in the breaths as under the line), so the floor
-                // sits above it: breath density 1.29 (0.94 with the answer off), line density 0.138
-                // (0.165).
-                ['compBreathDensity', 1.1, 2, "call and response: the piano in the guitar's gaps"],
+                // Breath density 0.946 (0.459 with the answer off): the answer doubles it, and the
+                // floor sits at their midpoint. Line density 0.135 (0.158). Before #2015 it read
+                // 1.30 (0.94 with the answer off). The guitar's breaths of a dotted quarter or more
+                // fall almost all in the turnaround's two-chord bars (728 of 758 breath steps),
+                // and there a mid-bar change was struck twice, the leaving chord on the "and" of 2
+                // and the arrival on 3; one push now does the work of both, so the strikes in
+                // those breaths went 132 → 92 while the ones under the line went 576 → 526.
+                ['compBreathDensity', 0.7, 2, "call and response: the piano in the guitar's gaps"],
                 ['compLineDensity', 0.1, 0.145, 'the piano thins under the licks'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo leaves space between licks'],

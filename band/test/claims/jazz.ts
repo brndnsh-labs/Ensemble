@@ -133,14 +133,25 @@ export const jazz = defineClaims({
                 ['hatOnBeatsHead', 0.9, 1, 'the closed hat keeps the time under the head'],
                 ['bassSetsUpSolo', 0.9, 1, "the head's last bar walks into the solo"],
                 ['hatPedal24', 0.9, 1, 'hi-hat foot on 2 and 4'],
-                // Measured 0.033 today; 0.016 with the push off (the chance level: a Charleston hit
-                // that happens to carry both guide tones). The floor sits between them: a guard
-                // that the push exists, not a target (#2015 raises the real rate).
+                // 0.337 (0.21 at low energy, 0.39 at high): before a change the figure lands on
+                // the "and" of 4 and plays the new chord there, tied over (`PUSH_SETUP` and
+                // `push` in `styles/jazz.ts`, #2015), and a mid-bar change is pushed the same
+                // way. 0.033 before, when only a figure that happened to end on the "and" of 4
+                // could push. Not every change: a comper lets some land on the beat.
                 [
                     'compAnticipatesChange',
-                    0.025,
-                    0.5,
+                    0.25,
+                    0.45,
                     'a comp hit an eighth before a change already plays the new chord',
+                ],
+                // 0.138 before #2015: a two-beat figure's "and"-of-2 stab played the leaving
+                // chord an eighth before the change on 3 (a stutter). `pushInBar` makes that
+                // strike the new chord's arrival.
+                [
+                    'compStabsOutgoing',
+                    0,
+                    0,
+                    'the strike before a mid-bar change is the new chord, not a stutter',
                 ],
                 ['compColour', 0.6, 1, 'rootless voicings carry 9ths and 13ths'],
                 ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
@@ -352,7 +363,10 @@ export const jazz = defineClaims({
                 ['compBreathDensity', 1.1, 2, "the comper talks in the soloist's breaths"],
                 ['compAnswersBreaths', 0.4, 0.7, 'a stab of its own in most of them, not all'],
                 ['compAnswerLift', 1, 12, 'an answer speaks up in the hole'],
-                ['compLineDensity', 0.1, 0.116, 'a little thinner under the line'],
+                // 0.123 since #2015 (0.113 before): the push into a change is one more strike
+                // (`PUSH_SETUP`), and a change under the line still gets it; breath density 1.35
+                // says the comp still leans back under the line and talks in the holes.
+                ['compLineDensity', 0.1, 0.13, 'a little thinner under the line'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes between phrases'],
                 ['leadShortShare', 0.6, 0.95, 'bebop: running eighth-note lines'],

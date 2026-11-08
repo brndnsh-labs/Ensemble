@@ -257,7 +257,10 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                         nextFirst.chord &&
                         nextFirst.chord.symbol !== chord.symbol &&
                         !span.fermata &&
-                        // The final chord lands on its downbeat, never early.
+                        // The final chord lands on its downbeat, never early; so does a held
+                        // one: the band hits a fermata together, on 1, with the crash (#2015
+                        // found jazz's push arriving an eighth before the hold).
+                        !nextFirst.fermata &&
                         !ctx.next?.plan.ending &&
                         // Nor into a bar the comp sits out (the drummer's four).
                         ctx.next?.plan.lanes.comp !== false &&
@@ -282,7 +285,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     return;
                 }
                 // Anticipate a mid-bar change: the hit an eighth before it plays the new chord.
-                if (book.pushInBar) {
+                // Not a held one: a fermata is struck on its beat, together.
+                if (book.pushInBar && !span.fermata) {
                     for (const hit of planned) {
                         if (!hit.muted && hit.step >= from - TIE_STEPS && hit.step < from) {
                             hit.chord = span.chord;

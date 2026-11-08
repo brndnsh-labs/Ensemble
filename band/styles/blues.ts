@@ -450,6 +450,10 @@ const bluesKeysRootless = compIdiom({
     // with its colours, and the bass has the root.
     kind: 'rootless',
     push: KEYS_PUSH,
+    // A mid-bar change (a quick IV, the turnaround's two chords) is pushed too: the stab on the
+    // "and" before it plays the new chord and ties over, never the chord that is leaving (#2015;
+    // before, the figures' "and"-of-2 stab played the old chord into nearly every such change).
+    pushInBar: true,
     // The piano answers the guitar's licks in the space between them (call and response);
     // the boogie pump below is a groove and keeps its figure.
     answer: { layOut: 0.45, fill: 0.6 },
@@ -468,6 +472,7 @@ const bluesKeysPump = compIdiom({
     name: 'blues comp (pump)',
     kind: 'close',
     push: KEYS_PUSH,
+    pushInBar: true,
     rhythm: (ctx, span, tier) => bluesKeysRhythm(ctx, span, tier),
 });
 

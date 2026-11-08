@@ -84,8 +84,11 @@ place, so genres can be written side by side without touching each other. Adding
 composing existing idioms. An influence, such as rock with a Motown bass, is a style that
 borrows another family's idiom. Shared machinery does everything that isn't the idiom itself:
 - `players/drums/kit.ts`: fills, crashes, endings, odd-meter cells.
-- `players/comp/idiom.ts` (`compIdiom`): voice leading, anticipations tied over the barline,
-  strokes and scratches, one chord at a time.
+- `players/comp/idiom.ts` (`compIdiom`): voice leading, anticipations tied over the barline
+  (a book's `push`) and, where a book pushes in the bar (`pushInBar`: bossa, neo-soul, and since
+  #2015 the jazz and blues keyboards), the strike in the eighth before a mid-bar change plays the
+  new chord and ties over it, never a stab of the one leaving; strokes and scratches, one chord
+  at a time. The jazz comper sets its push up: before a change the figure lands on the "and" of 4.
 - `players/bass/line.ts`: register and approach notes.
 
 ### The comp: what the style plays, how the instrument plays it
