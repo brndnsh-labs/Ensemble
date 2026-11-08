@@ -120,6 +120,7 @@ entry here).
 - **Root cause:** both read the chart's step before the resize had re-fitted it. Phone-fold failed only at 520, the first height after 844: it read `7` (844's step) after a 250ms wait, and the 520 re-fit (`3`, the scrolling size) landed during Play, which read as the stand re-fitting for Play. Usability read straight after `setViewportSize` and got the previous, landscape size's step.
 - **Fix (2026-11-03, #2084):** a shared `resizeTo` in `fixtures.ts`: set the viewport, wait until the page reports it, then two frames, so `useChartFit`'s `ResizeObserver` re-fit has run. The fold's hold in `use-chart-fit.ts` is unchanged.
 - **Before / after:** phone-fold, contention, 10 repeats: 1 failed before, exactly CI's "playing at 520". After: 40/40 under contention. Usability: not reproduced in 10 before; 40/40 on `webkit-phone` under contention after.
+- **Fewer chances (#2142):** phone-fold now reads the step at all 20 heights with `resizeTo` and no playback, then plays and stops only beside each step change and at the smallest and largest height. The claim (Play/Stop never changes the step) is unchanged; it just gets a handful of timing windows instead of 40.
 - **Last seen:** 2026-11-01 (main push `e171ea36`, run 41362341528).
 
 ### 🟢 `web/checks/account-retired-text-chart.chromium.spec.ts` — "sign-out and account deletion name a song this app can no longer open…" (172)

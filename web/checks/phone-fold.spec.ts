@@ -174,7 +174,9 @@ test('landscape phone: mute chips are 12px and inside the screen (#1993)', async
  * #1784 holds through the fold: the room the header's second row frees while the band plays is not
  * a resize of the stand, so the chart's step (`data-fit`) is the same stopped, playing and
  * stopped again. Swept over heights so some window sits on a step's edge whatever the fonts:
- * without the hold, the ~55px the fold frees tips a step at one of them.
+ * without the hold, the ~55px the fold frees tips a step at one of them. The step is read at
+ * every height without playback; Play/Stop runs only beside each step change and at the extremes
+ * (#2142).
  */
 test('the chart keeps its step through the fold at every phone height (#1784, #1993)', async ({
     page,
@@ -194,14 +196,30 @@ test('the chart keeps its step through the fold at every phone height (#1784, #1
     const scroll = page.locator('.chart-scroll[data-fit]');
     await expect(scroll).toBeVisible();
     const fit = () => scroll.getAttribute('data-fit');
-    const steps = new Set<string | null>();
+    // Pass 1, no playback: the step at every height, each read once that height's re-fit has run
+    // (`resizeTo` waits for it; a fixed wait read the PREVIOUS height's step on a loaded runner,
+    // and the re-fit then landed during Play and read as the stand re-fitting for it, #2083).
+    const heights: number[] = [];
     for (let height = 520; height <= 900; height += 20) {
-        // A real resize re-fits: take the stopped step only once that re-fit has run. A fixed
-        // wait read the PREVIOUS height's step on a loaded runner, and the re-fit then landed
-        // during Play and read as the stand re-fitting for it (#2083).
+        heights.push(height);
+    }
+    const stepAt: Array<string | null> = [];
+    for (const height of heights) {
+        await resizeTo(page, 390, height);
+        stepAt.push(await fit());
+    }
+    // Pass 2: Play and Stop only where a step could tip. The fold frees ~55px, so a missing hold
+    // shows at a height beside a step's edge: both sides of every change, plus the extremes.
+    const playAt = heights.filter(
+        (_, i) =>
+            i === 0 ||
+            i === heights.length - 1 ||
+            stepAt[i] !== stepAt[i - 1] ||
+            stepAt[i] !== stepAt[i + 1],
+    );
+    for (const height of playAt) {
         await resizeTo(page, 390, height);
         const stopped = await fit();
-        steps.add(stopped);
         await play(page);
         await expect(
             page.getByRole('button', { name: 'Stop playback', exact: true }),
@@ -216,5 +234,5 @@ test('the chart keeps its step through the fold at every phone height (#1784, #1
         expect(await fit(), `stopped again at ${height}`).toBe(stopped);
     }
     // The sweep crossed at least one step edge, or it proved nothing.
-    expect(steps.size).toBeGreaterThan(1);
+    expect(new Set(stepAt).size).toBeGreaterThan(1);
 });
