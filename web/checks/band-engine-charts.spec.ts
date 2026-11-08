@@ -100,7 +100,10 @@ test('the band engine opens and plays holds, N.C., fermatas and off-grid lengths
                 if (id !== null && visits.at(-1) !== id) {
                     visits.push(id);
                 }
-                return visits.filter((v, i) => v === ids[0] && i > 0).length;
+                // Laps are counted from the first time bar 1 is seen, not from the first poll:
+                // a stalled WebKit can miss bar 1 at the start, and counting that late first
+                // sighting as a return ended the watch one lap early.
+                return Math.max(0, visits.filter((v) => v === ids[0]).length - 1);
             },
             { timeout: 40_000, intervals: [50], message: `bar visits: ${visits.join(' ')}` },
         )
