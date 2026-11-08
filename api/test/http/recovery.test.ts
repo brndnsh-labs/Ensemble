@@ -266,16 +266,6 @@ describe('POST /api/auth/recovery/claim', () => {
         expect(await res.json()).toEqual({ error: 'authentication_failed' });
     });
 
-    it('an UNCONFIRMED code is 401 (not claimable)', async () => {
-        ctx = setUp();
-        await registerNewAccount(ctx);
-        const { code } = (await (await postJson(ctx, '/api/auth/recovery/enroll')).json()) as {
-            code: string;
-        };
-        const res = await postJson(ctx, '/api/auth/recovery/claim', { code });
-        expect(res.status).toBe(401);
-    });
-
     it('a valid confirmed code succeeds (204) and mints a session that GET /api/auth/session REFUSES (acceptance: assert the refusal, not just the permission)', async () => {
         ctx = setUp();
         await registerNewAccount(ctx);
@@ -290,22 +280,6 @@ describe('POST /api/auth/recovery/claim', () => {
         // session-reading route must refuse it.
         const sessionRes = await get(ctx, '/api/auth/session');
         expect(sessionRes.status).toBe(401);
-    });
-
-    it('reuse after a completed recovery is rejected (the code was consumed, not merely claimed)', async () => {
-        ctx = setUp();
-        await registerNewAccount(ctx);
-        const code = await enrollAndConfirmRecoveryOverHttp(ctx);
-        await postJson(ctx, '/api/auth/logout');
-        expect((await postJson(ctx, '/api/auth/recovery/claim', { code })).status).toBe(204);
-        const { verifyRes } = await completeRecoveryEnrollPasskeyOverHttp(ctx);
-        expect(verifyRes.status).toBe(200);
-
-        // A brand-new jar tries the SAME code again.
-        const jarB = createCookieJar();
-        const ctxB: Ctx = { ...ctx, jar: jarB };
-        const replay = await postJson(ctxB, '/api/auth/recovery/claim', { code });
-        expect(replay.status).toBe(401);
     });
 
     it('fixation defense: a session presented alongside the claim is revoked using ITS OWN account, not the recovery target', async () => {

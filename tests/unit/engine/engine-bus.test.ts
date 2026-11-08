@@ -86,25 +86,15 @@ describe('Engine Bus Management', () => {
     });
 
     describe('Individual Bus Killers', () => {
-        it('should kill chord bus', () => {
-            killChordBus(state);
+        it.each([
+            ['chord', killChordBus],
+            ['bass', killBassBus],
+            ['soloist', killSoloistBus],
+            ['drum', killDrumBus],
+        ] as const)('should kill %s bus', (_name, kill) => {
+            kill(state);
             expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalledWith(10.0);
             expect(mockGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 10.0, 0.005);
-        });
-
-        it('should kill bass bus', () => {
-            killBassBus(state);
-            expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalled();
-        });
-
-        it('should kill soloist bus', () => {
-            killSoloistBus(state);
-            expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalled();
-        });
-
-        it('should kill drum bus', () => {
-            killDrumBus(state);
-            expect(mockGain.gain.cancelScheduledValues).toHaveBeenCalled();
         });
     });
 

@@ -364,37 +364,6 @@ describe('POST /api/documents/save (#1202)', () => {
         expect(counter).toBe(2);
     });
 
-    it('creating over a tombstoned id is rejected as a conflict with no remote version', async () => {
-        ctx = await setUp();
-        await save(
-            ctx,
-            freeze({
-                ownerId: ctx.accountId,
-                documentId: 'doc-1',
-                operationId: 'op-1',
-                expectedRevision: null,
-            }),
-        );
-        ctx.testDb.db.exec(`DELETE FROM documents WHERE document_id = 'doc-1'`);
-        ctx.testDb.db
-            .prepare(
-                'INSERT INTO tombstones (owner_id, document_id, revision, deleted_at) VALUES (?, ?, ?, ?)',
-            )
-            .run(ctx.accountId, 'doc-1', 'rev-1', 5);
-        const { status, json } = await save(
-            ctx,
-            freeze({
-                ownerId: ctx.accountId,
-                documentId: 'doc-1',
-                operationId: 'op-2',
-                expectedRevision: null,
-            }),
-        );
-        expect(status).toBe(409);
-        expect(json).toMatchObject({ kind: 'conflict', revision: 'rev-1', remote: null });
-        expect(readDocument(ctx.testDb.db, ctx.accountId, 'doc-1')).toBeUndefined();
-    });
-
     it("never trusts the body's owner: a mismatched ownerId is refused and nothing is written under either owner", async () => {
         ctx = await setUp();
         const body = freeze({

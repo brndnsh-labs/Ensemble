@@ -1,7 +1,5 @@
 /* eslint-disable */
 import { describe, expect, it } from 'vitest';
-import { clampFreq, createSoftClipCurve } from '../../../core/engine/audio-graph-utils.js';
-
 import {
     getFrequency,
     getMidi,
@@ -14,32 +12,6 @@ import {
 } from '../../../core/utils.js';
 
 describe('Utility Functions', () => {
-    describe('DSP Utility Functions', () => {
-        it('should create and cache a soft clip curve', () => {
-            const curve1 = createSoftClipCurve();
-            expect(curve1).toBeInstanceOf(Float32Array);
-            expect(curve1.length).toBe(44100);
-
-            // Check that it's monotonic cubic: f(x) = (3x - x^3) / 2
-            // At x=-1 (i=0), f(-1) = (-3 + 1)/2 = -1
-            expect(curve1[0]).toBeCloseTo(-1, 5);
-            // At x=1 (i=44099), f(1) ~ 1
-            expect(curve1[44099]).toBeCloseTo(1, 4);
-            // At x=0 (i=22050), f(0) = 0
-            expect(curve1[22050]).toBeCloseTo(0, 5);
-
-            const curve2 = createSoftClipCurve();
-            expect(curve1).toBe(curve2); // Should be exactly the same cached instance
-        });
-
-        it('should clamp frequencies correctly', () => {
-            expect(clampFreq(-100)).toBe(0);
-            expect(clampFreq(440)).toBe(440);
-            expect(clampFreq(25000)).toBe(24000); // Default max
-            expect(clampFreq(25000, 26000)).toBe(25000); // Custom max
-        });
-    });
-
     describe('normalizeKey', () => {
         it('should normalize C# to its enharmonic equivalent Db for consistent internal key representation', () => {
             expect(normalizeKey('C#')).toBe('Db');

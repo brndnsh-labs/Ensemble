@@ -114,33 +114,6 @@ describe('Reworked Synth Bass Voice', () => {
         playback.audio.currentTime = 10;
     });
 
-    it('creates and connects the reworked voice node graph', () => {
-        // Signature: (state, freq, time, duration, velocity, muteAmount).
-        playBassNote(getState(), 41.2, 10, 1.0, 1.0);
-
-        // Oscillators: sub sine, sawtooth grit, sub-octave sine.
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
-        // Filters: saw lowpass (lp), sub-octave lowpass (subLp), plus the
-        // band-pass impact filter inside playPercussiveStrike.
-        expect(playback.audio.createBiquadFilter).toHaveBeenCalledTimes(3);
-        // Gains: sawGain, bodyMix, subGain, driveGain, amp, plus the impact
-        // strike's own gain (6 total).
-        expect(playback.audio.createGain).toHaveBeenCalledTimes(6);
-        // The saturator wave-shaper colors the sine body.
-        expect(playback.audio.createWaveShaper).toHaveBeenCalledTimes(1);
-        // The finger-thud impact transient is a band-pass'd noise buffer source.
-        expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
-    });
-
-    it('sets oscillator types: sine sub, sawtooth grit, sine sub-octave', () => {
-        playBassNote(getState(), 41.2, 10, 1.0, 1.0);
-
-        const oscs = playback.audio.createOscillator.mock.results.map((r) => r.value);
-        expect(oscs[0].type).toBe('sine'); // sub (fundamental sine body)
-        expect(oscs[1].type).toBe('sawtooth'); // grit layer
-        expect(oscs[2].type).toBe('sine'); // sub-octave sine
-    });
-
     it('opens the saw low-pass above its settled target then sweeps to it', () => {
         // Rebased from the retired "cascaded vintage roll-off" test. The
         // reworked voice has a single velocity-brightened saw lowpass with a

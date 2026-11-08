@@ -24,6 +24,9 @@ describe('DSP & Signal Safety', () => {
         for (let i = 1; i < curve.length; i += 100) {
             expect(curve[i]).toBeGreaterThanOrEqual(curve[i - 1]);
         }
+
+        // Built once: every saturator shares the one table.
+        expect(createSoftClipCurve()).toBe(curve);
     });
 
     describe('DSP Clamping', () => {

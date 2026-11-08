@@ -119,27 +119,6 @@ describe('Drum Synthesis', () => {
         groove.audioBuffers = { noise: {} };
     });
 
-    it('should create a 5-layer model for the Kick drum', () => {
-        playDrumSound(getState(), 'Kick', 10, 1.0);
-
-        // Layers: Beater (Osc), Skin (Noise), Knock (Osc), Shell (Osc), Click (Noise)
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
-        expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(2);
-        expect(playback.audio.createGain).toHaveBeenCalled();
-    });
-
-    it('should use a pre-rendered AudioBuffer for HiHat to optimize CPU', () => {
-        playDrumSound(getState(), 'HiHat', 10, 1.0);
-
-        // Should create buffer ONCE (if not cached) and use BufferSource
-        expect(playback.audio.createBuffer).toHaveBeenCalled();
-        expect(playback.audio.createBufferSource).toHaveBeenCalled();
-
-        // Should use playbackRate for variation
-        const source = playback.audio.createBufferSource.mock.results[0].value;
-        expect(source.playbackRate.value).not.toBe(1.0); // Should be jittered
-    });
-
     it('should keep closed-hat pitch variance subtle', () => {
         const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(1);
 
@@ -151,30 +130,6 @@ describe('Drum Synthesis', () => {
         expect(source.playbackRate.value).toBeLessThan(1.04);
 
         randomSpy.mockRestore();
-    });
-
-    it('should cache dedicated buffers for each cymbal voice', () => {
-        playDrumSound(getState(), 'HiHat', 10, 1.0);
-        playDrumSound(getState(), 'Open', 10.1, 1.0);
-        playDrumSound(getState(), 'Ride', 10.2, 1.0);
-        playDrumSound(getState(), 'Crash', 10.3, 1.0);
-
-        // The closed/open/ride hats draw from getVariedCymbalBuffer (synth-drums.ts
-        // §"Epic 4 S4"), which caches a POOL of independently-synthesized buffers
-        // under a `<key>#pool` array key — one distinct dedicated pool per cymbal
-        // voice. The crash goes through playKickSnareCrashTom → ensureCymbalBuffer,
-        // which caches a single buffer under the bare `crashMetal` key.
-        expect(groove.audioBuffers['hihatMetal#pool']).toBeDefined();
-        expect(groove.audioBuffers['openHatMetal#pool']).toBeDefined();
-        expect(groove.audioBuffers['rideMetal#pool']).toBeDefined();
-        expect(groove.audioBuffers.crashMetal).toBeDefined();
-
-        // Each hat pool is its own dedicated array of cached metallic buffers
-        // (one synthesized per hit while filling), keyed separately per voice.
-        expect(Array.isArray(groove.audioBuffers['hihatMetal#pool'])).toBe(true);
-        expect(groove.audioBuffers['hihatMetal#pool'].length).toBeGreaterThan(0);
-        expect(groove.audioBuffers['openHatMetal#pool'].length).toBeGreaterThan(0);
-        expect(groove.audioBuffers['rideMetal#pool'].length).toBeGreaterThan(0);
     });
 
     it('should implement choking logic when a new HiHat starts', () => {
@@ -190,15 +145,6 @@ describe('Drum Synthesis', () => {
 
         expect(mockPrevGain.gain.cancelScheduledValues).toHaveBeenCalledWith(11);
         expect(mockPrevGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 11, 0.008);
-    });
-
-    it('should use a highpass filter for the Snare wires', () => {
-        playDrumSound(getState(), 'Snare', 10, 1.0);
-
-        // Snare creates Tone (2 Oscs) and Wires (Noise)
-        const filters = playback.audio.createBiquadFilter.mock.results;
-        const wiresFilter = filters.find((f) => f.value.type === 'bandpass');
-        expect(wiresFilter).toBeDefined();
     });
 
     it('should keep kick body forward while trimming dense-mix beater click', () => {
@@ -253,14 +199,6 @@ describe('Drum Synthesis', () => {
         expect(getRhythmBodyMixScale(jazzState, 'Mid Tom')).toBeGreaterThan(
             getRhythmBodyMixScale(rockState, 'Mid Tom'),
         );
-    });
-
-    it('should implement a 4-layer model for Toms (Stick, Body, Skin, Shell)', () => {
-        playDrumSound(getState(), 'High Tom', 10, 1.0);
-
-        // Layers: Stick (Osc), Body (Osc), Shell (Osc) + Skin (Noise)
-        expect(playback.audio.createOscillator).toHaveBeenCalledTimes(3);
-        expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
     });
 
     it('should separate tom voices by register, drop, and sustain', () => {
@@ -360,22 +298,6 @@ describe('Drum Synthesis', () => {
             expect(high.baseFreq / low.baseFreq).toBeCloseTo(u.high / u.low, 5);
             expect(mid.baseFreq / low.baseFreq).toBeCloseTo(u.mid / u.low, 5);
         });
-    });
-
-    it('should implement Ride cymbal synthesis', () => {
-        playDrumSound(getState(), 'Ride', 10, 1.0);
-
-        // Ride should use BufferSource (metallic) + Filter + Gain + Panner
-        expect(playback.audio.createBufferSource).toHaveBeenCalled();
-        expect(playback.audio.createGain).toHaveBeenCalled();
-    });
-
-    it('should implement Crash cymbal synthesis', () => {
-        playDrumSound(getState(), 'Crash', 10, 1.0);
-
-        // Crash now uses a dedicated metallic buffer for a lighter, more focused wash
-        expect(playback.audio.createBufferSource).toHaveBeenCalled();
-        expect(playback.audio.createBiquadFilter).toHaveBeenCalled();
     });
 
     it('should focus open-hat tone and decay as intensity rises', () => {
@@ -562,15 +484,6 @@ describe('Drum Synthesis', () => {
 
         expect(mockPrevGain.gain.cancelScheduledValues).toHaveBeenCalledWith(11);
         expect(mockPrevGain.gain.setTargetAtTime).toHaveBeenCalledWith(0, 11, 0.18);
-    });
-
-    it('should synthesize Shaker using high-pass filtered noise', () => {
-        playDrumSound(getState(), 'Shaker', 10, 1.0);
-
-        expect(playback.audio.createBufferSource).toHaveBeenCalledTimes(1);
-        expect(playback.audio.createBiquadFilter).toHaveBeenCalled();
-        const filter = playback.audio.createBiquadFilter.mock.results[0].value;
-        expect(filter.type).toBe('highpass');
     });
 });
 

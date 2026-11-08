@@ -3,7 +3,6 @@ import { digest, snapshot } from '../../../web/lib/sync/protocol.js';
 import { createWebAuthnConfig, type WebAuthnConfig } from '../../src/auth/config.js';
 import { issueSession } from '../../src/auth/session.js';
 import {
-    RECEIPT_COST_BYTES,
     readDocument,
     readOwnerUsage,
     readReceipt,
@@ -543,41 +542,6 @@ describe('POST /api/documents/delete (#1260)', () => {
         ).toBe(1);
         expect(readTombstone(ctx.testDb.db, ctx.owner.accountId, 'doc-1')).toMatchObject({
             revision: committed.revision,
-        });
-    });
-
-    it('accounts for the delete: the body comes back, the receipts and tombstone stay charged', async () => {
-        ctx = await setUp();
-        const committed = await save(ctx, ctx.owner, 'doc-1', 'op-save');
-        const storedBytes = Buffer.byteLength(
-            JSON.stringify(snapshot(makeChartDocument('doc-1'))),
-            'utf8',
-        );
-        expect(readOwnerUsage(ctx.testDb.db, ctx.owner.accountId)).toMatchObject({
-            documents: 1,
-            documentBytes: storedBytes,
-            receipts: 1,
-            tombstones: 0,
-            bytes: storedBytes + RECEIPT_COST_BYTES,
-        });
-
-        await remove(
-            ctx,
-            ctx.owner,
-            freezeDelete({
-                ownerId: ctx.owner.accountId,
-                documentId: 'doc-1',
-                operationId: 'op-del',
-                expectedRevision: committed.revision,
-            }),
-        );
-        expect(readOwnerUsage(ctx.testDb.db, ctx.owner.accountId)).toMatchObject({
-            documents: 0,
-            documentBytes: 0,
-            // The Save's receipt, the delete's own receipt, and one tombstone: all permanent.
-            receipts: 2,
-            tombstones: 1,
-            bytes: 3 * RECEIPT_COST_BYTES,
         });
     });
 

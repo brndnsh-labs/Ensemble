@@ -71,10 +71,16 @@ describe('Platform Utilities', () => {
         const playSpy = vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
         const pauseSpy = vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => {});
 
+        const rewindSpy = vi.spyOn(HTMLMediaElement.prototype, 'currentTime', 'set');
+
         initPlatform();
         unlockAudio();
         unlockAudio(); // Hit the else branch (already unlocked)
         lockAudio();
+
+        // Locking rewinds the silent track, so the next unlock starts it from the top.
+        expect(rewindSpy).toHaveBeenCalledWith(0);
+        rewindSpy.mockRestore();
 
         expect(playSpy).toHaveBeenCalledTimes(2);
         expect(pauseSpy).toHaveBeenCalledTimes(1);
