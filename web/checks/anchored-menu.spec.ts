@@ -44,7 +44,11 @@ async function alignedTo(page: Page, trigger: Locator) {
 
 test('the row ⋯ opens a list of rows with Delete… last, after a divider, and no modal', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the menu\'s rows and divider are DOM structure, browser-independent; WebKit cover: "a choice closes the menu and runs; Delete… still asks first" and all-songs "the row ⋯ menu" open the same menu on WebKit',
+    );
     const { menu } = await openRowMenu(page);
     await expect(menu.getByRole('menuitem')).toHaveText([
         '★ Star',

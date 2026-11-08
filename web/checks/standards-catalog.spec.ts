@@ -29,7 +29,11 @@ async function documents(page: Page): Promise<ChartDocument[]> {
 
 test('a fresh device has zero saved songs and all 28 standards in the catalog', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'catalog filtering and empty storage are browser-independent; WebKit cover: "opening a standard lands an unsaved draft" and "a changed standard keeps its changes" open the same catalog on WebKit',
+    );
     await page.goto(appUrl());
     await expect(page.getByTestId('library-heading')).toBeVisible();
     // Nothing seeded: no song rows and no Continue card (only a real song earns one) — the
@@ -114,43 +118,6 @@ test('opening a standard lands an unsaved draft that plays and changes key/feel;
 });
 
 /**
- * A shared draft — a standard here, a `#chart=` link in `share-link.spec.ts` — belongs to no
- * songbook yet, so it never takes a song's recovery slot (its changes are kept under a draft key
- * of their own since #1979). `draft()` used to write one anyway on every edit, keyed under
- * the standard's own catalog id (`ensemble-v2-preview:recovery:<writer>:standard-…`) — a slot
- * nothing but a Save, which this never is, ever clears, so "Older drafts (N)" grew by one per
- * edited-but-unsaved visit.
- */
-test('editing an open standard writes nothing to recovery storage', async ({ page }) => {
-    await page.goto(appUrl());
-    await page.getByRole('button', { name: 'Browse all →' }).click();
-    const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
-    await row.getByRole('button', { name: 'Open' }).click();
-    await expect(page.getByRole('heading', { name: '12-Bar Blues', exact: true })).toBeVisible();
-
-    // Every one of these routes through `draft()`.
-    await pickSongKey(page, 'D');
-    await page.getByLabel('Tempo', { exact: true }).fill('140');
-    await page.getByLabel('Tempo', { exact: true }).press('Enter');
-    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
-
-    await expect
-        .poll(() =>
-            page.evaluate(
-                () =>
-                    Object.keys(localStorage).filter((key) =>
-                        key.startsWith('ensemble-v2-preview:recovery:'),
-                    ).length,
-            ),
-        )
-        .toBe(0);
-
-    await songMenuAction(page, 'More');
-    await expect(songMenu(page, 'more')).toBeVisible();
-    await expect(page.getByText(/Older drafts \(/)).toHaveCount(0);
-});
-
-/**
  * A changed standard keeps its changes on this device (#1979), as a song keeps its draft: Back
  * asks nothing, the next open (a reload too) lands them marked "Changed", Revert to original lets
  * them go, and Keep a copy carries them into the songbook and leaves the standard as it came.
@@ -198,8 +165,29 @@ test('a changed standard keeps its changes, marked; Keep a copy carries them', a
     await expect(subtitle).toContainText('Changed · Keep a copy');
     await expect.poll(sharedDrafts).toBe(1);
 
+    // A shared draft — a standard here, a `#chart=` link in `share-link.spec.ts` — belongs to no
+    // songbook yet, so it never takes a song's recovery slot (its changes are kept under the draft
+    // key counted above since #1979). `draft()` used to write one anyway on every edit, keyed under
+    // the standard's own catalog id, a slot nothing but a Save ever clears, so "Older drafts (N)"
+    // grew by one per edited-but-unsaved visit. Every one of these edits routes through `draft()`.
+    await page.getByLabel('Tempo', { exact: true }).fill('140');
+    await page.getByLabel('Tempo', { exact: true }).press('Enter');
+    await page.getByLabel('Style', { exact: true }).selectOption('Jazz');
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () =>
+                    Object.keys(localStorage).filter((key) =>
+                        key.startsWith('ensemble-v2-preview:recovery:'),
+                    ).length,
+            ),
+        )
+        .toBe(0);
+
     // Revert to original: the standard as it came, and nothing kept.
     await songMenuAction(page, 'More');
+    await expect(songMenu(page, 'more')).toBeVisible();
+    await expect(page.getByText(/Older drafts \(/)).toHaveCount(0);
     await songMenu(page, 'more').getByRole('menuitem', { name: 'Revert to original' }).click();
     await expect(firstChord).toHaveText(['C7']);
     await expect(subtitle).toContainText('From the standards · not saved');
@@ -221,6 +209,13 @@ test('a changed standard keeps its changes, marked; Keep a copy carries them', a
     await expect(subtitle).toContainText('From the standards · not saved');
 });
 
+/**
+ * Leaving returns focus to the entry point on home (#1440 review P3), not `<body>`. This view
+ * swap remounts `Songbook` (and its "Browse all →" button) on every return, so the fix has
+ * to be a ref the SHELL holds across that remount (`app/ensemble.tsx`'s `standardsEntryRef`) —
+ * a ref captured inside `StandardsBrowser` itself would already be pointing at a removed node by
+ * the time its own unmount cleanup could use it.
+ */
 /**
  * Leaving returns focus to the entry point on home (#1440 review P3), not `<body>`. This view
  * swap remounts `Songbook` (and its "Browse all →" button) on every return, so the fix has

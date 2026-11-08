@@ -13,7 +13,11 @@ const newSong = async (page: import('@playwright/test').Page) => {
     await expect(page.locator('.song-subtitle')).toContainText('New song');
 };
 
-test('a New song backed straight out of leaves nothing behind', async ({ page }) => {
+test('a New song backed straight out of leaves nothing behind', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'draft-vs-kept logic is browser-independent; WebKit cover: "a title typed straight through the new song being kept lands whole" keeps a new song on WebKit',
+    );
     await seedStarters(page);
     await newSong(page);
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
@@ -29,7 +33,11 @@ test('a New song backed straight out of leaves nothing behind', async ({ page })
     await expect(page.getByRole('button', { name: /All 3 songs/ })).toBeVisible();
 });
 
-test('the first change keeps a new song, and it survives a reload', async ({ page }) => {
+test('the first change keeps a new song, and it survives a reload', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'draft-vs-kept logic is browser-independent; WebKit cover: "a title typed straight through the new song being kept lands whole" keeps a new song on WebKit',
+    );
     await seedStarters(page);
     await newSong(page);
     await page.getByRole('button', { name: 'Faster' }).click();
@@ -46,7 +54,11 @@ test('the first change keeps a new song, and it survives a reload', async ({ pag
 
 test('a nudge undone by hand on a kept new song leaves nothing unsaved (#1706)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'draft comparison is browser-independent; WebKit cover: "a title typed straight through the new song being kept lands whole" keeps a new song on WebKit',
+    );
     await seedStarters(page);
     await newSong(page);
     await page.getByRole('button', { name: 'Faster' }).click();
@@ -57,7 +69,13 @@ test('a nudge undone by hand on a kept new song leaves nothing unsaved (#1706)',
     await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
 });
 
-test('leaving a new song with bars typed but not applied keeps them', async ({ page }) => {
+test('leaving a new song with bars typed but not applied keeps them', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'draft-vs-kept logic is browser-independent; WebKit cover: "a title typed straight through the new song being kept lands whole" keeps a new song on WebKit',
+    );
     await seedStarters(page);
     await newSong(page);
     await typeBar(page, 1, 'Dm7');
@@ -67,7 +85,11 @@ test('leaving a new song with bars typed but not applied keeps them', async ({ p
     await expect(page.locator('.bar').first().locator('.chord')).toHaveText(['Dm7']);
 });
 
-test('Save on a new song commits it as it stands', async ({ page }) => {
+test('Save on a new song commits it as it stands', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'draft-vs-kept logic is browser-independent; WebKit cover: "a title typed straight through the new song being kept lands whole" also presses Save on WebKit',
+    );
     await seedStarters(page);
     await newSong(page);
     await typeBar(page, 1, 'Dm7');
@@ -79,7 +101,11 @@ test('Save on a new song commits it as it stands', async ({ page }) => {
 
 test('a new song the store refuses stays an unsaved draft the musician can still leave', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'a stubbed IndexedDB put failure is browser-independent; WebKit cover: usability "a failed Save retains typed chords through recovery, navigation and retry" covers a store failure on WebKit',
+    );
     await seedStarters(page);
     await newSong(page);
     await page.evaluate(() => {

@@ -107,7 +107,13 @@ test('More holds Revert to saved; the song settings are the Key popover’s, Cho
     await closeKeyPopover(page);
 });
 
-test('Export… offers each format by a plain name and writes the song file', async ({ page }) => {
+test('Export… offers each format by a plain name and writes the song file', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the dialog\'s rows and file name are browser-independent; WebKit cover: usability "export and Duplicate include a typed bar" and all-songs "the row ⋯ menu" both download a song file on WebKit',
+    );
     await openBlue(page);
     await songMenuAction(page, 'Export…');
     const dialog = exportDialog(page);
@@ -126,7 +132,11 @@ test('Export… offers each format by a plain name and writes the song file', as
     await expect(dialog).toBeHidden();
 });
 
-test('Export… offers the original source when the song kept one', async ({ page }) => {
+test('Export… offers the original source when the song kept one', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the original-source row and file name are browser-independent; WebKit cover: usability "export and Duplicate include a typed bar" opens the same Export dialog on WebKit',
+    );
     const [blues, ...rest] = starterDocuments();
     await seedGuestDocuments(page, [
         { ...blues, importSource: { format: 'irealb', text: 'irealb://Blue%20pocket' } },

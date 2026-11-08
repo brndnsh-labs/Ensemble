@@ -55,7 +55,11 @@ const lane = (page: import('@playwright/test').Page, name: string) =>
 
 test('an audition link opens as an unsaved draft with its genre, key, meter and tempo', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'link decoding into fields is browser-independent; WebKit cover: "autoplay=1 hints and starts the band on the first gesture" opens an audition link on WebKit',
+    );
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await page.goto(
@@ -82,7 +86,11 @@ test('an audition link opens as an unsaved draft with its genre, key, meter and 
 
 test('an audition link opens at its fixed intensity with the named parts switched', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'link decoding into band settings is browser-independent; WebKit cover: "autoplay=1 hints and starts the band on the first gesture" opens an audition link on WebKit',
+    );
     await page.goto(await auditionLink({ intensity: 0.82, on: ['soloist'], off: ['chords'] }));
     await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
 
@@ -97,7 +105,13 @@ test('an audition link opens at its fixed intensity with the named parts switche
     await expect(page.getByLabel('Band intensity', { exact: true })).toHaveValue('82');
 });
 
-test('a link that switches nothing leaves the genre defaults untouched', async ({ page }) => {
+test('a link that switches nothing leaves the genre defaults untouched', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'link decoding is browser-independent; WebKit cover: "autoplay=1 hints and starts the band on the first gesture" opens an audition link on WebKit',
+    );
     await page.goto(await auditionLink());
     await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
     await expect(lane(page, 'Bass')).toHaveAttribute('aria-pressed', 'true');
@@ -124,7 +138,11 @@ test('autoplay=1 hints and starts the band on the first gesture, not before', as
     expect(errors).toEqual([]);
 });
 
-test('a link without autoplay never shows the tap-to-play hint', async ({ page }) => {
+test('a link without autoplay never shows the tap-to-play hint', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'hint wiring is browser-independent; WebKit cover: "autoplay=1 hints and starts the band on the first gesture, not before" asserts the hint\'s presence and timing on WebKit',
+    );
     await page.goto(await auditionLink());
     await expect(page.getByRole('heading', { name: 'Audition' })).toBeVisible();
     await expect(page.getByTestId('stand-toast')).not.toContainText('tap anywhere to play');

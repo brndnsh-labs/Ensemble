@@ -171,6 +171,10 @@ async function readSettledMidi(path: string): Promise<{ bytes: Buffer; parsed: P
 test('Export MIDI downloads a valid multi-track file matching the chart', async ({
     page,
 }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the MIDI bytes come from the band engine, not the browser; WebKit cover: "Export MIDI during playback does not stop or glitch the band" runs the same export on WebKit',
+    );
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();

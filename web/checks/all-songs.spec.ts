@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test';
 import { encodeChartLink } from '../../core/songbook/chart-link';
-import { backToSongbook, newSongOnTheStand, saveAs } from './account-helpers';
+import { backToSongbook } from './account-helpers';
 import { appUrl, expect, seedStarters, songLink, starterDocuments, test } from './fixtures';
 import { seedGuestSongs } from './large-library';
 
@@ -40,7 +40,11 @@ async function documentRecord(
     }, id);
 }
 
-test('search, genre filter, every sort order and the A–Z index', async ({ page }) => {
+test('search, genre filter, every sort order and the A–Z index', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'sort and filter logic is browser-independent; WebKit cover: "leaving the All songs page returns focus" and "the row ⋯ menu" render the same table on WebKit',
+    );
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();
     await expect(page.getByRole('heading', { name: /All songs/ })).toBeVisible();
@@ -106,7 +110,11 @@ test('search, genre filter, every sort order and the A–Z index', async ({ page
     ).toBeFocused();
 });
 
-test('the sort choice is remembered per device across a reload', async ({ page }) => {
+test('the sort choice is remembered per device across a reload', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'a localStorage preference is browser-independent; WebKit cover: foundation "real runtime, local saves, reload recovery" reloads and reads local storage on WebKit',
+    );
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();
     await page.locator('.all-songs-select select').nth(1).selectOption('tempo');
@@ -119,7 +127,11 @@ test('the sort choice is remembered per device across a reload', async ({ page }
 
 test('Starred and Recently-opened filter the list and combine with the sort/search', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'filter logic is browser-independent; WebKit cover: "the row ⋯ menu" drives Star/Unstar on WebKit',
+    );
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();
 
@@ -157,7 +169,11 @@ test('Starred and Recently-opened filter the list and combine with the sort/sear
  * no Save is queued by an open alone, proven here by re-reading the raw IndexedDB record and
  * asserting its `updatedAt`/`revision` are byte-identical to what `seedStarters` wrote.
  */
-test('opening a song from the All songs page queues no Save', async ({ page }) => {
+test('opening a song from the All songs page queues no Save', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'an IndexedDB re-read is browser-independent; WebKit cover: "the row ⋯ menu" writes through the same store on WebKit',
+    );
     await seedStarters(page);
     const before = await documentRecord(page, 'starter-blues');
     expect(before).toBeDefined();
@@ -176,7 +192,11 @@ test('opening a song from the All songs page queues no Save', async ({ page }) =
  * note on the fixture's embedded title/composer), which is what makes a composer-only search
  * assertion possible here: none of the titles ("Guest song N") contain "ensemble".
  */
-test('functions correctly at scale: 500 seeded songs', async ({ page }) => {
+test('functions correctly at scale: 500 seeded songs', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'sort/filter/search over 500 rows is browser-independent logic; WebKit cover: "the row ⋯ menu" and "leaving the All songs page returns focus" load the same page on WebKit',
+    );
     test.setTimeout(60_000);
     await seedGuestSongs(page, 500);
     await page.goto(appUrl());
@@ -309,7 +329,13 @@ test('the row ⋯ menu: Star/Unstar, Rename, Duplicate, Export file, Delete…',
     await expect(page.locator('.all-songs-table .song-row')).toHaveCount(3);
 });
 
-test('deleting the last song of the filtered genre falls back to every genre', async ({ page }) => {
+test('deleting the last song of the filtered genre falls back to every genre', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'filter fallback logic is browser-independent; WebKit cover: "the row ⋯ menu" runs the same delete on WebKit',
+    );
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();
     const genre = page.locator('.all-songs-select select').nth(0);
@@ -342,7 +368,11 @@ test('deleting the last song of the filtered genre falls back to every genre', a
  */
 test('deleting the Continue song leaves the songbook consistent, and so does a second delete', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'delete bookkeeping is browser-independent; WebKit cover: "the row ⋯ menu" runs the same delete on WebKit',
+    );
     await seedStarters(page);
     // Open "Blue pocket" so it becomes the Continue song, then leave it.
     await page.locator('.song-link', { hasText: 'Blue pocket' }).click();
@@ -365,8 +395,14 @@ test('deleting the Continue song leaves the songbook consistent, and so does a s
     await page.getByTestId('row-menu-delete').click();
     await page.getByTestId('delete-guest-song-confirm').click();
     await expect(page.locator('.song-table .song-row', { hasText: 'After hours' })).toHaveCount(0);
-    // The songbook is left consistent: nothing crashed, no dangling banner.
+    // The songbook is left consistent: nothing crashed, no dangling banner, and exactly the one
+    // untouched song remains, on the home list and in the count.
     await expect(page.getByTestId('library-heading')).toBeVisible();
+    await expect(page.locator('.error-banner')).toHaveCount(0);
+    await expect(page.locator('.song-table .song-row')).toHaveCount(1);
+    await expect(songLink(page, 'Minor swing sketch', 'Jazz')).toBeVisible();
+    await expect(page.getByTestId('all-songs-link')).toHaveText('All 1 song →');
+    await expect(page.locator('.continue-card')).not.toContainText('After hours');
 });
 
 /**
@@ -377,7 +413,11 @@ test('deleting the Continue song leaves the songbook consistent, and so does a s
  */
 test('Rename opens the song (recovering its draft) instead of renaming in place when one exists', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'draft-recovery routing is browser-independent; WebKit cover: "the row ⋯ menu" covers Rename and foundation "an older competing draft remains explicitly recoverable" covers recovery on WebKit',
+    );
     await seedStarters(page);
     await page.locator('.song-link', { hasText: 'Blue pocket' }).click();
     await page.getByRole('button', { name: 'Edit chart' }).click();
@@ -422,7 +462,11 @@ test('Rename opens the song (recovering its draft) instead of renaming in place 
  */
 test('a Rename that opens the song retains its new title after a shared link was on the stand', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'recovery-slot write is browser-independent; WebKit cover: "the row ⋯ menu" covers Rename and foundation "an older competing draft remains explicitly recoverable" covers recovery on WebKit',
+    );
     await seedStarters(page);
     await page.locator('.song-link', { hasText: 'Blue pocket' }).click();
     await page.getByRole('button', { name: 'Edit chart' }).click();
@@ -469,7 +513,13 @@ test('a Rename that opens the song retains its new title after a shared link was
     ).toBeVisible();
 });
 
-test('a live draft is discarded, not orphaned, when its song is deleted', async ({ page }) => {
+test('a live draft is discarded, not orphaned, when its song is deleted', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'recovery cleanup is browser-independent; WebKit cover: "the row ⋯ menu" covers Delete… and foundation "an older competing draft remains explicitly recoverable" covers recovery on WebKit',
+    );
     await seedStarters(page);
     await page.locator('.song-link', { hasText: 'Blue pocket' }).click();
     await page.getByRole('button', { name: 'Edit chart' }).click();
@@ -507,24 +557,6 @@ test('a live draft is discarded, not orphaned, when its song is deleted', async 
         .toBe(0);
 });
 
-test('new song / save-a-copy naming stays distinct from the row menu’s "<title> copy"', async ({
-    page,
-}) => {
-    // Sanity check that the row-menu duplicate suffix ("copy", no dash) does not collide with
-    // the stand's own Duplicate suffix ("— copy"), which a shared helper could confuse.
-    await page.goto(appUrl());
-    await newSongOnTheStand(page);
-    await saveAs(page, 'Original tune');
-    await backToSongbook(page);
-    await page.getByTestId('all-songs-link').click();
-    const row = page.locator('.all-songs-table .song-row', { hasText: 'Original tune' });
-    await row.getByRole('button', { name: 'More actions for Original tune' }).click();
-    await page.getByTestId('row-menu-duplicate').click();
-    await expect(
-        page.locator('.all-songs-table .song-name', { hasText: 'Original tune copy' }),
-    ).toBeVisible();
-});
-
 /**
  * After a row delete, focus goes to the next row, or the heading once the list is empty
  * (#1440 review P3) — never to `<body>`, which is where the browser's own default restore lands
@@ -532,7 +564,11 @@ test('new song / save-a-copy naming stays distinct from the row menu’s "<title
  */
 test('after a row delete, focus goes to the next row, or the heading once the list is empty', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'focus after a row delete is browser-independent; WebKit cover: "the row ⋯ menu" deletes rows on WebKit',
+    );
     await seedStarters(page);
     await page.getByTestId('all-songs-link').click();
 

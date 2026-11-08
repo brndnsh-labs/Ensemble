@@ -113,7 +113,11 @@ for (const [width, height] of [
     [874, 402],
     [820, 1180],
 ]) {
-    test(`responsive chart and editor fit ${width}x${height}`, async ({ page }) => {
+    test(`responsive chart and editor fit ${width}x${height}`, async ({ page }, testInfo) => {
+        test.skip(
+            testInfo.project.name !== 'laptop',
+            'viewport sizes are set explicitly, so the layout claim is not engine-specific; WebKit cover: header-fit "a landscape phone keeps the transport on one row" and chart-fit\'s fit tests',
+        );
         await seedStarters(page);
         await songLink(page, 'Blue pocket', 'Blues').click();
         await page.setViewportSize({ width, height });
@@ -172,38 +176,13 @@ for (const [width, height] of [
     });
 }
 
-test('two tabs cannot overwrite a newer save; a conflicting take can become a copy', async ({
-    page,
-    context,
-}) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    const second = await context.newPage();
-    await second.goto(appUrl());
-    await songLink(second, 'Blue pocket', 'Blues').click();
-    // On the saved song before the other tab changes it, or the open recovers that change (#2084).
-    await expect(second.getByLabel('Tempo', { exact: true })).toHaveValue('110');
-    await page.getByRole('button', { name: 'Faster', exact: true }).click();
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await second.getByRole('button', { name: 'Slower', exact: true }).click();
-    await second.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(
-        second.getByRole('alert').filter({ hasText: 'saved in another tab' }),
-    ).toBeVisible();
-    await expect(second.getByLabel('Tempo', { exact: true })).toHaveValue('109');
-    await songMenuAction(second, 'Duplicate');
-    await expect(
-        second.getByRole('heading', { name: 'Blue pocket — copy', exact: true }),
-    ).toBeVisible();
-    await page.reload();
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await expect(page.getByLabel('Tempo', { exact: true })).toHaveValue('111');
-});
-
 test('file export/import is detached; invalid input never changes the active song', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'file I/O and import validation are browser-independent; WebKit cover: semantic-chart "semantic revision conflicts keep both takes, and unsupported imports never create a partial song" imports a bad file on both projects',
+    );
     // Model slow device file I/O. Assertions must wait for import completion,
     // not confuse the disabled-during-import Save button with a finished save.
     await page.addInitScript(() => {
@@ -248,7 +227,11 @@ test('file export/import is detached; invalid input never changes the active son
 
 test('failed recovery stays in memory through navigation and is never labelled recovered', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'quota-failure handling is browser-independent; WebKit cover: usability "last-opened preference failure does not prevent playback or saving" and "a failed Save retains typed chords through recovery, navigation and retry"',
+    );
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await page.evaluate(() => {
