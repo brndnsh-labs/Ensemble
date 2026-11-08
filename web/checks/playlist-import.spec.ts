@@ -143,7 +143,11 @@ test('a playlist imports as a collection named after it, holding its playable so
 
 test('duplicates import anyway with the checkbox, and a re-import adds to the same collection', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'import dedupe logic is browser-independent; WebKit cover: "a playlist imports as a collection named after it" runs the same import dialog on WebKit',
+    );
     await seedStarters(page);
     const dialog = await reviewLink(page, FRIDAY);
     await dialog.getByRole('checkbox', { name: 'Import duplicates anyway' }).check();
@@ -171,7 +175,11 @@ test('duplicates import anyway with the checkbox, and a re-import adds to the sa
 
 test('reading a long playlist can be cancelled, and cancelling writes nothing (review R5)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'cancel-while-reading logic is browser-independent; WebKit cover: "a playlist imports as a collection named after it" runs the same import dialog on WebKit',
+    );
     await seedStarters(page);
     // 2,000 tunes of 16 bars: seconds of reading and checking, sliced, with progress shown.
     const long = playlist(
@@ -205,7 +213,11 @@ test('reading a long playlist can be cancelled, and cancelling writes nothing (r
 
 test('a retry after the collection failed to save never imports the songs twice (review R8)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'failure-and-retry logic is browser-independent; WebKit cover: "a playlist imports as a collection named after it" runs the same import dialog on WebKit',
+    );
     await seedStarters(page);
     const dialog = await reviewLink(page, FRIDAY);
     await expect(dialog.getByTestId('playlist-counts')).toHaveText(
@@ -267,7 +279,11 @@ test('a retry after the collection failed to save never imports the songs twice 
     await expect(rows(page)).toHaveText(['Second line', 'Blue pocket', 'Night walk']);
 });
 
-test('one song can still be picked from a playlist', async ({ page }) => {
+test('one song can still be picked from a playlist', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'song picking logic is browser-independent; WebKit cover: "a playlist imports as a collection named after it" runs the same import dialog on WebKit',
+    );
     await seedStarters(page);
     const dialog = await reviewLink(page, FRIDAY);
     await dialog.getByRole('radio', { name: /Choose one song/ }).check();

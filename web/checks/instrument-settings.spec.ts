@@ -60,7 +60,13 @@ async function withoutClipboard(page: import('@playwright/test').Page) {
     });
 }
 
-test('every per-instrument sound control has a lane-scoped accessible name', async ({ page }) => {
+test('every per-instrument sound control has a lane-scoped accessible name', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'accessible names are DOM attributes, browser-independent; WebKit cover: "bass volume persists through save, reload, revert and a share link" drives the same controls by name on WebKit',
+    );
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await openSounds(page);

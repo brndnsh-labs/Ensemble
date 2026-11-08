@@ -44,7 +44,11 @@ async function alignedTo(page: Page, trigger: Locator) {
 
 test('the row ⋯ opens a list of rows with Delete… last, after a divider, and no modal', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'the menu\'s rows and divider are DOM structure, browser-independent; WebKit cover: "a choice closes the menu and runs; Delete… still asks first" and all-songs "the row ⋯ menu" open the same menu on WebKit',
+    );
     const { menu } = await openRowMenu(page);
     await expect(menu.getByRole('menuitem')).toHaveText([
         '★ Star',
@@ -148,6 +152,9 @@ test('on a phone the menu is a sheet from the foot of the screen, closed by its 
     // It names the song it is about, since it is away from the row.
     await expect(sheet.locator('.menu-title')).toHaveText('Blue pocket');
     await expect(page.locator('.menu-backdrop')).toBeVisible();
+    // A sheet, never a modal: no open dialog, no Close button.
+    await expect(page.locator('dialog[open]')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Close', exact: true })).toHaveCount(0);
 
     // A tap on the backdrop, right over a song's row, closes the sheet — and only it: the song
     // under the tap is not opened.

@@ -38,12 +38,16 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
     expect(link).toContain(appUrl('#chart='));
     await page.getByRole('button', { name: 'Close', exact: true }).click();
 
-    // "Opening it in a fresh browser" — a separate page/tab sharing no app state.
+    // "Opening it in a fresh browser" — a separate page/tab sharing no app state — from a link
+    // pasted after a query string, which only the hash is stripped from.
     const fresh = await context.newPage();
     await withoutClipboard(fresh);
-    await fresh.goto(link);
+    await fresh.goto(appUrl(`?utm_source=email${new URL(link).hash}`));
     await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
     await expect(fresh.locator('.song-subtitle')).toContainText('Opened from a shared link');
+    // Only the hash goes: a reload must not reopen the link over live work.
+    expect(new URL(fresh.url()).search).toBe('?utm_source=email');
+    expect(new URL(fresh.url()).hash).toBe('');
     const keepACopy = fresh.getByRole('button', { name: 'Keep a copy', exact: true });
     await expect(keepACopy).toBeEnabled();
 
@@ -59,48 +63,6 @@ test('shares a link that reopens as an unsaved draft; Keep a copy persists it an
     await fresh.reload();
     await expect(fresh.locator('main.home')).toBeVisible();
     await expect(fresh.locator('main.workspace')).toHaveCount(0);
-});
-
-/**
- * The same recovery-storage leak `standards-catalog.spec.ts` guards for a standard: a shared
- * `#chart=` draft belongs to no songbook yet, so editing it before "Keep a copy" must not write a
- * song recovery slot under the link's song id that nothing but a Save ever clears. Its changes
- * are kept under a draft key of their own (#1979), below.
- */
-test('editing an opened share link before Keep a copy writes nothing to recovery storage', async ({
-    page,
-    context,
-}) => {
-    await withoutClipboard(page);
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await songMenuAction(page, 'Copy link');
-    const link = await page.getByTestId('share-link-fallback').inputValue();
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
-
-    const fresh = await context.newPage();
-    await withoutClipboard(fresh);
-    await fresh.goto(link);
-    await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
-
-    await pickSongKey(fresh, 'D');
-    await fresh.getByLabel('Tempo', { exact: true }).fill('140');
-    await fresh.getByLabel('Tempo', { exact: true }).press('Enter');
-
-    await expect
-        .poll(() =>
-            fresh.evaluate(
-                () =>
-                    Object.keys(localStorage).filter((key) =>
-                        key.startsWith('ensemble-v2-preview:recovery:'),
-                    ).length,
-            ),
-        )
-        .toBe(0);
-
-    await songMenuAction(fresh, 'More');
-    await expect(songMenu(fresh, 'more')).toBeVisible();
-    await expect(fresh.getByText(/Older drafts \(/)).toHaveCount(0);
 });
 
 /**
@@ -128,6 +90,26 @@ test('the same share link opened again keeps its changes, marked (#1979)', async
     await tempo.fill('137');
     await tempo.press('Enter');
     await expect(fresh.locator('.song-subtitle')).toContainText('Changed · Keep a copy');
+    // The same recovery-storage leak `standards-catalog.spec.ts` guards for a standard: a shared
+    // draft belongs to no songbook yet, so editing it before "Keep a copy" must not write a song
+    // recovery slot under the link's song id that nothing but a Save ever clears. Its changes are
+    // kept under a draft key of their own, which the reopening below lands.
+    await pickSongKey(fresh, 'D');
+    await expect
+        .poll(() =>
+            fresh.evaluate(
+                () =>
+                    Object.keys(localStorage).filter((key) =>
+                        key.startsWith('ensemble-v2-preview:recovery:'),
+                    ).length,
+            ),
+        )
+        .toBe(0);
+    await songMenuAction(fresh, 'More');
+    await expect(songMenu(fresh, 'more')).toBeVisible();
+    await expect(fresh.getByText(/Older drafts \(/)).toHaveCount(0);
+    await fresh.keyboard.press('Escape');
+    await expect(songMenu(fresh, 'more')).toBeHidden();
     await fresh.getByRole('button', { name: 'Back to songbook' }).click();
     await expect(fresh.locator('main.home')).toBeVisible();
 
@@ -231,25 +213,4 @@ test('an old v1 `?s=` or `?prog=` link opens the songbook and is ignored, URL un
         await expect(page.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
     }
     expect(errors).toEqual([]);
-});
-
-test('a `#chart=` link is consumed and leaves the rest of the query string', async ({
-    page,
-    context,
-}) => {
-    await withoutClipboard(page);
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket', 'Blues').click();
-    await songMenuAction(page, 'Copy link');
-    const hash = new URL(await page.getByTestId('share-link-fallback').inputValue()).hash;
-    await page.getByRole('button', { name: 'Close', exact: true }).click();
-
-    const fresh = await context.newPage();
-    await withoutClipboard(fresh);
-    await fresh.goto(appUrl(`?utm_source=email${hash}`));
-    await expect(fresh.getByRole('heading', { name: 'Blue pocket' })).toBeVisible();
-    await expect(fresh.locator('.song-subtitle')).toContainText('Opened from a shared link');
-    // Only the hash goes: a reload must not reopen the link over live work.
-    expect(new URL(fresh.url()).search).toBe('?utm_source=email');
-    expect(new URL(fresh.url()).hash).toBe('');
 });

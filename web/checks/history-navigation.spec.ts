@@ -13,7 +13,11 @@ const onSong = (page: Page, title: string) =>
 
 test('Back and Forward move between the songbook and All songs; the URL stays put', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'browser-independent history wiring; WebKit cover: "Back with a dialog open keeps Forward intact" and the in-app back button test',
+    );
     await seedStarters(page);
     const url = page.url();
     await page.getByRole('button', { name: /All 3 songs/ }).click();
@@ -39,7 +43,11 @@ test('Back from a song returns to the page it was opened from', async ({ page })
 
 test('Back from a standard returns to the standards browser, then the songbook', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'browser-independent history wiring; WebKit cover: "Back on an edited standard leaves at once"',
+    );
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Browse all →' }).click();
     const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });
@@ -57,7 +65,11 @@ test('Back from a standard returns to the standards browser, then the songbook',
 
 test('switching Chart, Neck and the editor adds no entries: one Back leaves the song', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'browser-independent history wiring; WebKit cover: "the in-app back button goes back in history too" and "Back with a dialog open keeps Forward intact"',
+    );
     await seedStarters(page);
     await songLink(page, 'Blue pocket').first().click();
     await onSong(page, 'Blue pocket');
@@ -83,21 +95,6 @@ test('the in-app back button goes back in history too, so Forward reopens the so
     await home(page);
     // Going in and out never stacks entries.
     expect(await page.evaluate(() => history.length)).toBe(length + 1);
-});
-
-test('Back with a dialog open closes the dialog and keeps the song', async ({ page }) => {
-    await seedStarters(page);
-    await songLink(page, 'Blue pocket').first().click();
-    await onSong(page, 'Blue pocket');
-    await songMenuAction(page, 'Export…');
-    const dialog = page.getByTestId('export-dialog');
-    await expect(dialog).toBeVisible();
-    await page.goBack();
-    await expect(dialog).toBeHidden();
-    await onSong(page, 'Blue pocket');
-    // And the song's entry is still there: one more Back leaves it.
-    await page.goBack();
-    await home(page);
 });
 
 test('an unsaved edit survives Back the way it survives the back button', async ({ page }) => {

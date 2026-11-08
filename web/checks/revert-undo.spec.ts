@@ -23,7 +23,11 @@ const undoButton = (page: import('@playwright/test').Page) =>
 
 test('Continue is tagged while the song has unsaved changes; Revert to saved offers Undo', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'revert and Undo logic is browser-independent; WebKit cover: standards-catalog "a changed standard keeps its changes, marked" reverts to original and delete-undo\'s Undo tests run the same toast on WebKit',
+    );
     await seedStarters(page);
     await songLink(page, 'Minor swing sketch', 'Jazz').click();
     await page.getByRole('button', { name: 'Back to songbook' }).click();
@@ -61,7 +65,11 @@ test('Continue is tagged while the song has unsaved changes; Revert to saved off
     await expect(page.getByTestId('continue-unsaved')).toHaveCount(0);
 });
 
-test('Revert to original offers the same Undo', async ({ page }) => {
+test('Revert to original offers the same Undo', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'revert and Undo logic is browser-independent; WebKit cover: standards-catalog "a changed standard keeps its changes, marked" reverts to original and delete-undo\'s Undo tests run the same toast on WebKit',
+    );
     await page.goto(appUrl());
     await page.getByRole('button', { name: 'Browse all →' }).click();
     const row = page.locator('.standards-table .song-row', { hasText: '12-Bar Blues' });

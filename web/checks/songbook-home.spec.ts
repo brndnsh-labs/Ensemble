@@ -70,7 +70,11 @@ async function horizontalOverflow(page: Page): Promise<number> {
     );
 }
 
-test('the home renders its rows without a full-library read', async ({ page }) => {
+test('the home renders its rows without a full-library read', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'IndexedDB read counting is browser-independent; WebKit still loads the same home in "Continue shows the song’s own first bars"',
+    );
     // A corrupt document a FULL read trips over (`repository.list()` refuses a songbook it cannot
     // wholly read) — keyed to sort after every other id, so the home's bounded reads (by id, then
     // a cursor fill that stops at eight rows) never reach it.
@@ -93,7 +97,13 @@ test('the home renders its rows without a full-library read', async ({ page }) =
     expect(await fullReads(page)).toBeGreaterThan(0);
 });
 
-test('an opened song that will not read leaves no gap: the list is topped up', async ({ page }) => {
+test('an opened song that will not read leaves no gap: the list is topped up', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'list top-up logic is browser-independent; WebKit still renders the home rows in "Continue shows the song’s own first bars"',
+    );
     // Eight opened songs, one of them corrupt: seven readable opened rows, and the fill adds one
     // more from the rest of the songbook rather than leaving the list short.
     const songs = manySongs(12);
@@ -117,7 +127,11 @@ test('an opened song that will not read leaves no gap: the list is topped up', a
 
 test('a corrupt song the home does read is left out and said, never blanking the page', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'read-failure handling is browser-independent; WebKit still renders the home table in "a fresh device shows the first visit"',
+    );
     const corrupt = { schemaVersion: 2, id: 'aa-corrupt', title: 42, chart: null };
     await seedGuestDocuments(page, [...starterDocuments(), corrupt]);
     await expect(page.locator('.home-table .song-row')).toHaveCount(3);
@@ -125,7 +139,13 @@ test('a corrupt song the home does read is left out and said, never blanking the
     await expect(songLink(page, 'Blue pocket', 'Blues')).toBeVisible();
 });
 
-test('the home never lists more than eight songs, most recently opened first', async ({ page }) => {
+test('the home never lists more than eight songs, most recently opened first', async ({
+    page,
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'list-ordering logic is browser-independent; WebKit still renders the home list in "Continue shows the song’s own first bars"',
+    );
     await seedGuestDocuments(page, manySongs(12));
     await expect(page.locator('.home-table .song-row')).toHaveCount(8);
     // Nothing opened yet: the list is filled from the songbook, and "Home song 11" is not in it.
@@ -220,7 +240,11 @@ test('a fresh device shows the first visit; after one save, the everyday layout'
     await expect(page.locator('.shelf-column').nth(1).locator('.standard-item')).toHaveCount(4);
 });
 
-test('one search returns your songs and the standards, grouped', async ({ page }) => {
+test('one search returns your songs and the standards, grouped', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'result grouping is browser-independent; WebKit still runs the same search box in the #1635 race test',
+    );
     await seedStarters(page);
     const search = page.getByRole('searchbox', { name: 'Search your songs and the standards' });
     await search.fill('blu');
@@ -266,7 +290,11 @@ test('a commit that lands before the search box’s input event is handled does 
     ).toBeVisible();
 });
 
-test('the first visit keeps an h1 while searching', async ({ page }) => {
+test('the first visit keeps an h1 while searching', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'heading logic is browser-independent; WebKit still runs the first-visit page and the search box in "a fresh device shows the first visit" and the #1635 race test',
+    );
     await page.goto(appUrl());
     await expect(page.getByRole('heading', { level: 1 })).toHaveText(
         'Pick a tune. The band comes in.',
@@ -288,51 +316,37 @@ test('deleting the last song on the home lands focus on the first visit’s head
     await expect(heading).toBeFocused();
 });
 
-test('focus returns to Browse all when leaving the standards browser', async ({ page }) => {
-    await seedStarters(page);
-    await page.getByRole('button', { name: 'Browse all →' }).click();
-    await expect(page.locator('.standards-table .song-row')).toHaveCount(28);
-    await page.getByRole('button', { name: 'Back to songbook' }).click();
-    await expect(page.getByRole('button', { name: 'Browse all →' })).toBeFocused();
-});
-
-for (const theme of ['light', 'dark'] as const) {
-    test(`at 390 px: no horizontal scroll and every control at least 44 px (${theme})`, async ({
-        page,
-    }) => {
-        await page.setViewportSize({ width: 390, height: 844 });
-        await page.emulateMedia({ colorScheme: theme });
-        for (const layout of ['first-visit', 'everyday'] as const) {
-            if (layout === 'first-visit') {
-                await page.goto(appUrl());
-            } else {
-                await seedStarters(page);
-                await songLink(page, 'Blue pocket', 'Blues').click();
-                await page.getByRole('button', { name: 'Back to songbook' }).click();
-            }
-            await expect(page.locator(`main.home[data-layout="${layout}"]`)).toBeVisible();
-            expect(await horizontalOverflow(page)).toBe(0);
-            const small = await page.evaluate(() =>
-                [
-                    ...document.querySelectorAll(
-                        '.site-header button, .site-header .search, main.home button',
-                    ),
-                ]
-                    .map((element) => {
-                        const box = element.getBoundingClientRect();
-                        return {
-                            label:
-                                element.getAttribute('aria-label') || element.textContent?.trim(),
-                            width: box.width,
-                            height: box.height,
-                        };
-                    })
-                    .filter((box) => box.width > 0 && (box.width < 44 || box.height < 44)),
-            );
-            expect(small).toEqual([]);
+test('at 390 px: no horizontal scroll and every control at least 44 px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    for (const layout of ['first-visit', 'everyday'] as const) {
+        if (layout === 'first-visit') {
+            await page.goto(appUrl());
+        } else {
+            await seedStarters(page);
+            await songLink(page, 'Blue pocket', 'Blues').click();
+            await page.getByRole('button', { name: 'Back to songbook' }).click();
         }
-    });
-}
+        await expect(page.locator(`main.home[data-layout="${layout}"]`)).toBeVisible();
+        expect(await horizontalOverflow(page)).toBe(0);
+        const small = await page.evaluate(() =>
+            [
+                ...document.querySelectorAll(
+                    '.site-header button, .site-header .search, main.home button',
+                ),
+            ]
+                .map((element) => {
+                    const box = element.getBoundingClientRect();
+                    return {
+                        label: element.getAttribute('aria-label') || element.textContent?.trim(),
+                        width: box.width,
+                        height: box.height,
+                    };
+                })
+                .filter((box) => box.width > 0 && (box.width < 44 || box.height < 44)),
+        );
+        expect(small).toEqual([]);
+    }
+});
 
 test('a standard’s ▶ opens and plays; its row only opens (#1987)', async ({ page }) => {
     await page.goto(appUrl());

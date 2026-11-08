@@ -150,7 +150,11 @@ test('“also delete” removes only the songs that are in no other collection',
 
 test('Starred is a built-in collection: no rename, no delete, not offered to “Add to”', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'built-in collection rules are browser-independent; WebKit cover: "New collection, then Rename, from the All songs page" runs the same collection menu on WebKit',
+    );
     await seedStarters(page);
     await openAllSongs(page);
     await page.getByRole('button', { name: 'Star Blue pocket' }).click();
@@ -207,7 +211,11 @@ test('New collection, then Rename, from the All songs page', async ({ page }) =>
  */
 test('“also delete” decides at confirm time, not from the count the dialog opened with', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'confirm-time recount is browser-independent; WebKit cover: "a collection keeps its own order, and deleting it keeps every song" runs the same Delete collection dialog on WebKit',
+    );
     await seedStarters(page);
     await openAllSongs(page);
     await addToNew(page, 'Minor swing sketch', 'Friday gig');
@@ -263,7 +271,11 @@ test('“also delete” decides at confirm time, not from the count the dialog o
  */
 test('“also delete” never deletes a song that arrived after the dialog opened', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        'confirm-time recount is browser-independent; WebKit cover: "a collection keeps its own order, and deleting it keeps every song" runs the same Delete collection dialog on WebKit',
+    );
     await seedStarters(page);
     await openAllSongs(page);
     await addToNew(page, 'Minor swing sketch', 'Friday gig');
