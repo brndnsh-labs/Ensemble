@@ -40,8 +40,15 @@ type SwingSub = (typeof SWING_SUBS)[number];
 /** `--int`: a fixed level (clamped 0-1), or the chart's own `'auto'` energy. */
 type Intensity = number | 'auto';
 
+/** A base URL, and the name a listen menu shows for it (`test`, `prod`, or the URL itself). */
+interface Host {
+    label: string;
+    url: string;
+}
+
 /** The flags that take a comma list; a run prints one link per combination of them. */
 interface Variants {
+    host?: Host[];
     genre?: string[];
     bpm?: number[];
     intensity?: Intensity[];
@@ -71,6 +78,8 @@ interface CliArgs {
     variants?: Variants;
     /** Print the links as one markdown row. */
     md?: boolean;
+    /** `--label=`: the markdown label of a run that prints one link (default `audition`). */
+    label?: string | null;
     /** `--density` was named, which the link ignores. */
     retiredDensity?: boolean;
     on?: Part[];
@@ -85,6 +94,27 @@ interface CliArgs {
 // path; `?autoplay=1` arms playback on the first gesture. `?seed=` is not carried: the chart's
 // seed re-rolls on every play (`randomizeSeed`), so it could only ever be a line that does nothing.
 const DEFAULT_BASE_URL = 'http://localhost:3100/';
+
+// `--base-url` names, so an A/B against what is live is one flag: `--base-url=test,prod` prints
+// the branch on the audition box beside main on the site, each labelled by its name.
+const HOSTS: Readonly<Record<string, string>> = Object.assign(Object.create(null), {
+    local: DEFAULT_BASE_URL,
+    test: 'https://ensembletest.brndn.zip/',
+    prod: 'https://ensemble.brndn.zip/',
+});
+
+function parseHost(value: string): Host {
+    const named = HOSTS[value];
+    if (named) {
+        return { label: value, url: named };
+    }
+    if (!/^(https?:\/\/|\/)/.test(value)) {
+        throw new Error(
+            `--base-url: "${value}" is not a URL or one of ${Object.keys(HOSTS).join(', ')}`,
+        );
+    }
+    return { label: value, url: value };
+}
 
 function parseParts(flag: string, value: string): Part[] {
     return value
@@ -157,7 +187,9 @@ function parseArgs(argv: string[]): CliArgs {
         } else if (arg.startsWith('--seed=')) {
             out.seed = arg.slice('--seed='.length);
         } else if (arg.startsWith('--base-url=')) {
-            out.baseUrl = arg.slice('--base-url='.length);
+            const list = parseList('--base-url', arg.slice('--base-url='.length), parseHost);
+            out.variants = { ...out.variants, host: list };
+            out.baseUrl = list[0].url;
         } else if (arg.startsWith('--prog=')) {
             out.prog = arg.slice('--prog='.length);
         } else if (arg.startsWith('--genre=')) {
@@ -197,6 +229,8 @@ function parseArgs(argv: string[]): CliArgs {
             out.chart = arg.slice('--chart='.length);
         } else if (arg === '--md') {
             out.md = true;
+        } else if (arg.startsWith('--label=')) {
+            out.label = arg.slice('--label='.length);
         } else if (arg.startsWith('--density=')) {
             if (!(DENSITIES as readonly string[]).includes(arg.slice('--density='.length))) {
                 throw new Error(`--density: expected one of ${DENSITIES.join(', ')}`);
@@ -223,16 +257,20 @@ function printUsage(): void {
     process.stderr.write(
         [
             'Usage:',
-            '  npm run --silent audition-link -- --scene=<id> [--seed=<seed>] [--base-url=<url>] [--no-autoplay]',
+            '  npm run --silent audition-link -- --scene=<id> [--base-url=test,prod] [--no-autoplay]',
             '  npm run --silent audition-link -- --prog="Cm7 | Cm7#5" --genre=Jazz [--key=C] [--ts=6/8] [--bpm=120]',
             '      [--int=0.35] [--on=soloist,…] [--off=chords,…]',
             '  npm run --silent audition-link -- --chart=<chart.json> [--bpm=66] [--int=0.3,auto]',
-            '      [--swing=60] [--swing-sub=8th,16th] [--humanize=20] [--md]',
+            '      [--swing=60] [--swing-sub=8th,16th] [--humanize=20] [--md] [--label=new]',
             '',
+            `  --base-url takes a URL or a name (${Object.keys(HOSTS).join(', ')}; default local) and a comma`,
+            '  list too: --base-url=test,prod --md prints the branch on the audition box beside main on the',
+            '  site, one markdown row, each link labelled "test" / "prod" — a listen menu\'s A/B cell.',
             '  --scene, --prog and --chart are mutually exclusive. --chart loads a schema-2 chart',
             "  (checked by the app's own validator); the other flags apply on top of it.",
             '  --genre, --bpm, --int (a number, or auto), --swing and --swing-sub take comma lists:',
-            '  one labelled link per combination. --md prints them as one markdown row.',
+            '  one labelled link per combination. --md prints them as one markdown row; --label names',
+            '  a lone link there (default "audition").',
             '  Every link is decoded and checked before it is printed.',
             '',
             '  The link is a #chart= schema-2 chart (an unsaved draft); --prog bars are |-separated.',
@@ -449,6 +487,10 @@ async function checkAuditionLink(
 function expandVariants(args: CliArgs): Array<{ label: string; args: CliArgs }> {
     const v = args.variants ?? {};
     let combos: Array<{ parts: string[]; patch: Partial<CliArgs> }> = [{ parts: [], patch: {} }];
+    // The host first, so a row reads `test · bpm 90`, `prod · bpm 90`.
+    if (v.host && v.host.length > 1) {
+        combos = v.host.map((host) => ({ parts: [host.label], patch: { baseUrl: host.url } }));
+    }
     const add = <T>(
         list: T[] | undefined,
         label: string,
@@ -546,7 +588,7 @@ export async function runAuditionLink(
         links.push({ label: variant.label, url });
     }
     if (args.md) {
-        const row = links.map((link) => `[${link.label || 'audition'}](${link.url})`);
+        const row = links.map((link) => `[${link.label || args.label || 'audition'}](${link.url})`);
         process.stdout.write(`${row.join(' · ')}\n`);
     } else if (links.length === 1 && !links[0].label) {
         process.stdout.write(`${links[0].url}\n`);

@@ -453,6 +453,17 @@ npm run --silent audition-link -- --chart=tests/fixtures/audition/two-section-ch
 # → [sub 8th · int 0.3](http://…#chart=…) · [sub 8th · int auto](…) · [sub 16th · int 0.3](…) · …
 ```
 
+**An A/B against what is live.** `--base-url` takes a name as well as a URL — `local` (the
+default dev server), `test` (`ensembletest.brndn.zip`, where `/deploy-test` puts a branch) and
+`prod` (`ensemble.brndn.zip`, `main`) — and a comma list: one link per host, the host leading
+each label. Before a merge, `test` is the new sound and `prod` the old, so one call gives a
+listen menu's whole A/B cell. `--label` names a lone `--md` link (default `audition`).
+
+```bash
+npm run --silent audition-link -- --base-url=test,prod --prog="Em9 | A13" --genre=Funk --md
+# → [test](https://ensembletest.brndn.zip/?autoplay=1#chart=…) · [prod](https://ensemble.brndn.zip/?autoplay=1#chart=…)
+```
+
 Every link is decoded with `decodeChartLink` before it is printed and must be the chart that
 was built with each override in place; otherwise the run exits non-zero.
 
