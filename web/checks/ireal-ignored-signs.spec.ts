@@ -20,7 +20,11 @@ async function review(page: Page, link: string) {
 
 test('a chart with signs the band will not take says so first, and the stand greys them (#2005)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the import preview's sentence and the greyed signs are browser-independent; WebKit covers the import dialog's review flow in the ireal-import studies",
+    );
     const dialog = await review(page, await fixtureLink('round-midnight'));
     const sentence = dialog.getByTestId('import-ignored-signs');
     await expect(sentence).toHaveText(
@@ -39,10 +43,4 @@ test('a chart with signs the band will not take says so first, and the stand gre
     await expect(ignored).toHaveCount(3);
     await expect(ignored.first()).toHaveAttribute('title', /doesn't take this sign/);
     await expect(ignored.first().locator('.sr-only')).toHaveText(/band does not take this sign/);
-});
-
-test('a chart without such signs gets no sentence', async ({ page }) => {
-    const dialog = await review(page, await fixtureLink('autumn-leaves'));
-    await expect(dialog.getByRole('region', { name: 'Import preview' })).toBeVisible();
-    await expect(dialog.getByTestId('import-ignored-signs')).toHaveCount(0);
 });

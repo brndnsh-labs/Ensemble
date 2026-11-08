@@ -24,7 +24,11 @@ async function newSong(page: Page) {
 
 const alert = (page: Page) => page.locator('.error-banner[role="alert"]');
 
-test('a new song can be put in 3/4, and it plays', async ({ page }) => {
+test('a new song can be put in 3/4, and it plays', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the meter change is browser-independent; WebKit covers the Meter control in 'a bar whose written lengths cannot follow blocks the change' and key-popover's first test",
+    );
     const pageErrors: string[] = [];
     page.on('pageerror', (error) => pageErrors.push(error.message));
     await newSong(page);

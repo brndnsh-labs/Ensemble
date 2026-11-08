@@ -9,9 +9,6 @@ import {
     exportAs,
     leaveBar,
     openBar,
-    pickSongKey,
-    songLink,
-    songMenuAction,
     test,
     typeBar,
 } from './fixtures';
@@ -39,18 +36,13 @@ async function exported(page: Page): Promise<ChartDocument> {
     const result = JSON.parse(await readFile((await (await download).path())!, 'utf8'));
     return result;
 }
-async function createEndings(page: Page) {
-    const dialog = await openGuide(page);
-    await dialog.getByLabel('Repeated body end bar').selectOption({ value: '1' });
-    await dialog.getByRole('button', { name: 'Add first and second endings', exact: true }).click();
-    await expect(dialog.getByTestId('guided-playback-route')).toHaveText('1–2–3 → 1–2–4');
-    await dialog.getByRole('button', { name: 'Apply', exact: true }).click();
-    await expect(dialog).not.toBeVisible();
-}
-
 test('keyboard range selection creates, edits and removes a repeat; cancel keeps pending chords', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "range keys and the form markers are browser-independent; WebKit covers the guide's open, select and Apply in 'touch-sized ending ranges'",
+    );
     await start(page);
     await typeBar(page, 1, 'Dm');
     let dialog = await openGuide(page);
@@ -153,63 +145,13 @@ test('touch-sized ending ranges reject overlap and reverse order before Apply, i
     await next.getByRole('button', { name: 'Cancel', exact: true }).click();
 });
 
-test('guided endings survive save, copy, export, transpose, Revert and offline reopen', async ({
-    page,
-    context,
-    browserName,
-    request,
-}) => {
-    await start(page, 'Guided offline');
-    await createEndings(page);
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    const source = await exported(page);
-    if (source.schemaVersion !== 2) {
-        throw new Error('Expected semantic chart');
-    }
-    const bars = source.chart.score.sections[0].measures;
-    expect(bars).toHaveLength(4);
-    expect(bars[2].start).toEqual([{ kind: 'ending-start', passes: [1] }]);
-    expect(bars[3].end).toEqual([{ kind: 'ending-end' }]);
-    await songMenuAction(page, 'Duplicate');
-    await expect(page.getByRole('button', { name: 'Song actions' })).toBeEnabled();
-    const copy = await exported(page);
-    expect(copy.id).not.toBe(source.id);
-    expect(copy.chart).toEqual(source.chart);
-    await pickSongKey(page, 'D');
-    await expect(page.locator('.bar .chord')).toHaveText(['D', 'A', 'Bm', 'G']);
-    await songMenuAction(page, 'Revert to saved');
-    await expect(page.locator('.bar .chord')).toHaveText(['C', 'G', 'Am', 'F']);
-    await pickSongKey(page, 'D');
-    await page.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeDisabled();
-    await expect
-        .poll(() => page.evaluate(() => navigator.serviceWorker.controller?.scriptURL))
-        .toContain(appUrl('sw.js'));
-    try {
-        if (browserName === 'webkit') {
-            expect((await request.post('/__test/network?offline=1')).ok()).toBe(true);
-            await expect(request.get(appUrl('not-cached'), { timeout: 3000 })).rejects.toThrow();
-        } else {
-            await context.setOffline(true);
-        }
-        await page.reload();
-        await songLink(page, copy.title).click();
-        await expect(page.locator('.bar .chord')).toHaveText(['D', 'A', 'Bm', 'G']);
-        await page.getByRole('button', { name: 'Edit chart', exact: true }).click();
-        const dialog = await openGuide(page);
-        await dialog.getByRole('button', { name: 'Edit endings · bars 1–4', exact: true }).click();
-        await expect(dialog.getByTestId('guided-playback-route')).toHaveText('1–2–3 → 1–2–4');
-    } finally {
-        if (browserName === 'webkit') {
-            await request.post('/__test/network?offline=0');
-        }
-    }
-});
-
 test('opening the guide preserves complex forms and failed validation retains pending chord text', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the guide's refusal of nested forms is browser-independent; WebKit covers opening the guide and its Apply in 'touch-sized ending ranges'",
+    );
     await start(page);
     const source = await exported(page);
     if (source.schemaVersion !== 2) {

@@ -53,8 +53,28 @@ test('Ctrl+S with nothing to save does nothing', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'laptop', 'a hardware keyboard');
     await newSong(page);
     await expect(save(page)).toBeDisabled();
+    // The key is taken even with nothing to save (`useStandKeys`): the browser's Save Page must not
+    // open. Disabled Save alone cannot tell a taken key from an unbound one, so the page's own
+    // keydown is watched for `defaultPrevented`.
+    await page.evaluate(() => {
+        const taken: boolean[] = [];
+        Object.assign(window, { __saveKeyTaken: taken });
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 's') {
+                taken.push(event.defaultPrevented);
+            }
+        });
+    });
     await page.keyboard.press('Control+s');
+    await expect
+        .poll(() =>
+            page.evaluate(
+                () => (window as unknown as { __saveKeyTaken: boolean[] }).__saveKeyTaken,
+            ),
+        )
+        .toEqual([true]);
     await expect(save(page)).toBeDisabled();
+    await expect(page.locator('.song-subtitle')).not.toContainText('Unsaved');
 });
 
 test('Ctrl+S on a bar with an unchosen split is refused like Save (#1980)', async ({

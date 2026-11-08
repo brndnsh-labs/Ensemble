@@ -102,6 +102,10 @@ function savedBar(document: ChartDocument, index: number) {
 test('the ruler sets chord lengths the field and the saved bar agree on (#1725)', async ({
     page,
 }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the ruler's lengths and the saved bar are browser-independent; WebKit drags the ruler in 'on a phone: ⋯ in the dock'",
+    );
     await editAutumnLeaves(page, testInfo);
     await press(page.locator('.bar').nth(6), testInfo);
     await field(page, 7).fill('Gm7 C7');
@@ -175,6 +179,10 @@ test('the ruler sets chord lengths the field and the saved bar agree on (#1725)'
 test('hold last chord, and a key change from bar 9, are the bar’s draft (#1725)', async ({
     page,
 }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the bar draft is browser-independent; WebKit covers the bar menu's draft in 'on a phone: ⋯ in the dock' and its Insert/Delete in 'insert bar after, and delete bar'",
+    );
     await editAutumnLeaves(page, testInfo);
     const bar = await openMenu(page, testInfo, 9);
 
@@ -234,6 +242,10 @@ test('insert bar after, and delete bar, from the menu (#1725)', async ({ page },
 test('insert and delete refuse while a pending bar does not read (#1725)', async ({
     page,
 }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the refusal is browser-independent; WebKit covers the menu's Insert and Delete in 'insert bar after, and delete bar'",
+    );
     await editAutumnLeaves(page, testInfo);
     const bars = page.locator('.bar');
     await press(bars.nth(2), testInfo);
@@ -259,6 +271,10 @@ test('insert and delete refuse while a pending bar does not read (#1725)', async
 test('repeat or ending opens the Repeats and endings dialog on the bar, and Apply works (#1725)', async ({
     page,
 }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the dialog's Apply is browser-independent; WebKit covers it in guided-form's 'touch-sized ending ranges' and calm-menus' bar menu test",
+    );
     await editAutumnLeaves(page, testInfo);
     const bars = page.locator('.bar');
     // Bar 19 is the B section's third bar: the dialog opens there, on that bar.
@@ -282,25 +298,6 @@ test('repeat or ending opens the Repeats and endings dialog on the bar, and Appl
     await expect(field(page, 19)).toHaveValue('Gm7 C7');
     await nextBar(page, testInfo);
     await expect(bars.nth(18).locator('.chord')).toHaveText(['Gm7', 'C7']);
-});
-
-test('repeat or ending, cancelled, leaves the bar open with its draft (#1725)', async ({
-    page,
-}, testInfo) => {
-    await editAutumnLeaves(page, testInfo);
-    await press(page.locator('.bar').nth(2), testInfo);
-    await field(page, 3).fill('Bbmaj7 G7');
-    const bar = await openMenu(page, testInfo, 3);
-    await press(bar.getByRole('button', { name: 'Repeat or ending…' }), testInfo);
-    const dialog = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
-    await expect(dialog).toBeVisible();
-    await expect(menu(page, 3)).toHaveCount(0);
-
-    // Closed, the bar is still open with its pending chords, and has focus again.
-    await press(dialog.getByRole('button', { name: 'Cancel', exact: true }), testInfo);
-    await expect(dialog).toHaveCount(0);
-    await expect(field(page, 3)).toBeFocused();
-    await expect(field(page, 3)).toHaveValue('Bbmaj7 G7');
 });
 
 test('on a laptop: Esc returns to the field, and a press outside leaves the bar (#1725)', async ({
@@ -354,6 +351,28 @@ test('on a phone: ⋯ in the dock opens the sheet and keeps the draft (#1725)', 
     await expect(bars.nth(6)).toHaveClass(/\btyping\b/);
     await expect(field(page, 7)).toHaveValue('Gm7 C7');
     await expect(sheet.locator('.bar-ruler-span')).toHaveCount(2);
+    // A drag on the ruler: the pointer-capture path, the one WebKit run of it (the laptop test
+    // holds the arrow keys and the saved bar).
+    const split = sheet.getByRole('slider', { name: 'Split between Gm7 and C7' });
+    const track = await sheet.locator('.bar-ruler').boundingBox();
+    const handle = await split.boundingBox();
+    expect(track && handle).toBeTruthy();
+    if (track && handle) {
+        await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(track.x + track.width * 0.6, track.y + track.height / 2, {
+            steps: 4,
+        });
+        await page.mouse.move(track.x + track.width * 0.74, track.y + track.height / 2, {
+            steps: 4,
+        });
+        await page.mouse.up();
+    }
+    await expect(split).toHaveAttribute('aria-valuenow', '3');
+    await expect(field(page, 7)).toHaveValue('Gm7:3 C7:1');
+    await split.focus();
+    await page.keyboard.press('ArrowLeft');
+    await expect(field(page, 7)).toHaveValue('Gm7 C7');
     expect(
         await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

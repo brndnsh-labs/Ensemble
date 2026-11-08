@@ -91,7 +91,11 @@ test('typed chords are unsaved work: Save includes every edited section without 
 
 test('a practice nudge is said apart from a chart change, and both wait for Save (#1706)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the status wording and Save are browser-independent; WebKit covers Save's keep in 'typed chords are unsaved work'",
+    );
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     const status = page.locator('.song-subtitle > span').first();
@@ -144,7 +148,11 @@ test('export and Duplicate include a typed bar but do not overwrite the original
 
 test('a queued close event cannot shut a dialog that has already been reopened (#1402)', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "a dialog's close event is browser-independent; WebKit covers the Export dialog's close in dialog-rules' stand test",
+    );
     await seedStarters(page);
     await songLink(page, 'Blue pocket', 'Blues').click();
     await songMenuAction(page, 'Export…');
@@ -250,7 +258,11 @@ test('a tempo typed the moment a song opens is not overwritten by the field moun
 
 test('Continue remembers opened songs and recovered setup without changing saved timestamps', async ({
     page,
-}) => {
+}, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the Continue card's bookkeeping is browser-independent; WebKit covers reload and 'Open chart' in 'a failed Save retains typed chords'",
+    );
     await seedStarters(page);
     await expect(page.locator('.continue-card')).toContainText('From your songbook');
     await songLink(page, 'Blue pocket', 'Blues').click();

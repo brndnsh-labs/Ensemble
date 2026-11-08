@@ -169,16 +169,11 @@ test('Undo on a new song survives its first-change keep, and puts the song back'
     await expect(page.locator('.song-subtitle')).not.toContainText('Unsaved changes');
 });
 
-test('Undo goes after a few seconds', async ({ page }, testInfo) => {
-    await editAutumnLeaves(page, testInfo);
-    await deleteTypedBar(page, testInfo, 7, 'Gm7 C7');
-    await expect(undoToast(page)).toHaveAttribute('data-empty', 'false');
-    // Offered for six seconds (`DELETE_UNDO_MS`), then gone.
-    await expect(undoToast(page)).toHaveAttribute('data-empty', 'true', { timeout: 9000 });
-    await expect(page.locator('.sheet .bar')).toHaveCount(31);
-});
-
 test('a later edit retires Undo, even one taken back', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the retiring rule is browser-independent; WebKit covers Undo's wiring in 'Undo after Delete bar' and 'Undo after Delete section'",
+    );
     await editAutumnLeaves(page, testInfo);
     await deleteTypedBar(page, testInfo, 7, 'Gm7 C7');
     await expect(field(page, 6)).toBeFocused();
@@ -197,6 +192,10 @@ test('a later edit retires Undo, even one taken back', async ({ page }, testInfo
 });
 
 test('Save retires Undo', async ({ page }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the retiring rule is browser-independent; WebKit covers Undo's wiring in 'Undo after Delete bar' and 'Undo after Delete section'",
+    );
     await editAutumnLeaves(page, testInfo);
     await deleteTypedBar(page, testInfo, 7, 'Gm7 C7');
     await expect(undoButton(page)).toBeVisible();

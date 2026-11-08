@@ -1,5 +1,13 @@
 import type { Locator, Page, TestInfo } from '@playwright/test';
-import { appUrl, expect, openSectionMenu, openSectionNames, phoneWidth, test } from './fixtures';
+import {
+    appUrl,
+    expect,
+    openSectionContext,
+    openSectionMenu,
+    openSectionNames,
+    phoneWidth,
+    test,
+} from './fixtures';
 
 /**
  * #1758 — calmer bar and section menus. The ruler is the bar menu's one open group; every other
@@ -97,9 +105,15 @@ test('the bar menu: the ruler open, every other group folded, one repeat path, D
     await press(menu.getByRole('button', { name: /^Repeat or ending/ }), testInfo);
     const guide = page.getByRole('dialog', { name: 'Repeats and endings', exact: true });
     await expect(guide).toBeVisible();
+    await expect(menu).toHaveCount(0);
     await expect(guide.getByLabel('Start repeat here', { exact: true })).toHaveCount(0);
     await press(guide.getByRole('button', { name: 'Per-bar markers for A · bar 7…' }), testInfo);
     await expect(guide.getByLabel('Start repeat here', { exact: true })).toBeVisible();
+    // The per-bar markers fit the screen: no sideways scroll, on a phone above all.
+    await guide.locator('.form-controls').scrollIntoViewIfNeeded();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+    );
     await press(guide.getByRole('button', { name: 'Done', exact: true }), testInfo);
     await expect(guide).toHaveCount(0);
     await expect(field(page, 7)).toBeFocused();
@@ -109,6 +123,10 @@ test('the bar menu: the ruler open, every other group folded, one repeat path, D
 test('the section menu: its groups folded, Delete section last after a divider', async ({
     page,
 }, testInfo) => {
+    test.skip(
+        testInfo.project.name !== 'laptop',
+        "the menu's structure is browser-independent; WebKit covers the section sheet in 'on a phone the section menu slides up'",
+    );
     await editAutumnLeaves(page, testInfo);
     const menu = await openSectionMenu(page, 'B');
     await expectAllFolded(menu);
@@ -125,6 +143,9 @@ test('the section menu: its groups folded, Delete section last after a divider',
     // Unfolded, the name is there to type, as before.
     await openSectionNames(menu);
     await expect(menu.getByLabel('Section name')).toHaveValue('B');
+    // And the meter, folded above, is a real field in its own group: not folded away by being absent.
+    await openSectionContext(menu);
+    await expect(menu.getByLabel('Section meter')).toBeVisible();
 });
 
 test('on a laptop the menus are popovers, with no backdrop', async ({ page }, testInfo) => {
