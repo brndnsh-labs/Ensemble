@@ -89,6 +89,8 @@ const neoKit = drumIdiom({
     // The loop barely fills: a phrase end plays through below high energy, and even a new
     // section gets only a beat or two of pickup. A busy fill breaks the loop's spell.
     fillLength: { phrase: { low: 0, mid: 0, high: 2 }, section: { low: 2, mid: 2, high: 4 } },
+    // why: the pocket's last kick and an open hat breathing out on 1, soft, no crash.
+    ending: () => ({ kick: 'o', hatOpen: 'o' }),
     groove(ctx, tier) {
         const kick = ctx.rng('kick', 'section').weighted(NEO_KICKS.map(([k, w]) => [k, w[tier]]));
         const ghostSet = ctx.rng('ghost', 'section').pick(NEO_GHOSTS);
@@ -885,4 +887,7 @@ export const neosoul: Style = {
     // seventh would be the one chord in the tune without its colour. On a dominant tonic the
     // 9th sits over the chart's b7, not a major 7th (#1502).
     ending: { major: 'maj9', minor: 'm9', dominant: '9' },
+    // why: neo-soul lets the last chord bloom and fade, the loop never breaking into a fill
+    // or a crash (a D'Angelo track ends on the Rhodes ringing).
+    endingGesture: { kind: 'soft', setup: false },
 };

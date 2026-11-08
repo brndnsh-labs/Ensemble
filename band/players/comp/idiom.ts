@@ -11,7 +11,7 @@ import type { Bar } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { at, barSteps, dyn, endingSpans, STEP, spanSteps } from '../grid.js';
+import { at, BUTTON_LIFT, barSteps, dyn, endingStrikes, STEP, spanSteps } from '../grid.js';
 import { type GripShape, grip } from './fretboard.js';
 import { type LeadOver, type VoicingKind, voice } from './voicing.js';
 
@@ -203,19 +203,33 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // style's quality (`arrange/ending.ts`), the same chord the bass holds. A bar
                 // that gets home itself (`| G7 C |`) strikes each chord where it is written,
                 // the V on 1 and the I held from 3 (#1502); the last rings to the bar's end
-                // (a written stop cuts it, `perform.ts`).
-                const spans = endingSpans(ctx);
+                // (a written stop cuts it, `perform.ts`). The style's gesture shapes the
+                // strikes (`endingStrikes`, #2017): held, an eighth, a button, the hits.
+                // why: a soft ending lets the chord go at a gentle 72, every other strikes it
+                // with the band's 92 (the held ending's weight since #1482).
+                const weight = plan.ending.kind === 'soft' ? 72 : 92;
+                const strikes = endingStrikes(ctx);
                 let held: string | null = null;
-                spans.forEach(({ span, from, to }, i) => {
-                    if (!span.chord) {
-                        return;
+                for (const { span, from, to, first, accent } of strikes) {
+                    const chord = span.chord!;
+                    if (first) {
+                        // One voicing a chord, placed under what the lead sings over each of its
+                        // strikes; a re-strike (the button, a hit) presses the same shape again.
+                        const sounds = strikes
+                            .filter((s) => s.span === span)
+                            .map((s) => [s.from, s.to] as const);
+                        prev = place(chord, prev, sounds);
                     }
-                    const until = spans[i + 1]?.span.chord ? to : total;
-                    prev = place(span.chord, prev, [[from, until]]);
                     // The held ending sounds its whole chord: nothing is left to the lead.
-                    chordAt(prev, from, until - from, 92, shape && { stroke: 'down' });
-                    held = span.chord.symbol;
-                });
+                    chordAt(
+                        prev!,
+                        from,
+                        to - from,
+                        accent ? weight + BUTTON_LIFT : weight,
+                        shape && { stroke: 'down' },
+                    );
+                    held = chord.symbol;
+                }
                 return {
                     events,
                     memory: { voicing: prev, pushed: null, chord: held, bar: bar.index },
@@ -257,7 +271,10 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                         nextFirst.chord &&
                         nextFirst.chord.symbol !== chord.symbol &&
                         !span.fermata &&
-                        // The final chord lands on its downbeat, never early.
+                        // The final chord lands on its downbeat, never early; so does a held
+                        // one: the band hits a fermata together, on 1, with the crash (#2015
+                        // found jazz's push arriving an eighth before the hold).
+                        !nextFirst.fermata &&
                         !ctx.next?.plan.ending &&
                         // Nor into a bar the comp sits out (the drummer's four).
                         ctx.next?.plan.lanes.comp !== false &&
@@ -282,7 +299,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     return;
                 }
                 // Anticipate a mid-bar change: the hit an eighth before it plays the new chord.
-                if (book.pushInBar) {
+                // Not a held one: a fermata is struck on its beat, together.
+                if (book.pushInBar && !span.fermata) {
                     for (const hit of planned) {
                         if (!hit.muted && hit.step >= from - TIE_STEPS && hit.step < from) {
                             hit.chord = span.chord;

@@ -7,12 +7,13 @@
 import { type EnergyTier, energyTier, fillTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
 import type { DrumHit, DrumPiece } from '../../core/types.js';
-import type { BarContext, DrumIdiom } from '../../styles/types.js';
+import type { BarContext, DrumIdiom, EndingGesture } from '../../styles/types.js';
 import {
     at,
     barSteps,
     dyn,
     endingSpans,
+    endingStep,
     fitCell,
     isCommonTime,
     pulses,
@@ -30,6 +31,12 @@ export interface DrumBook {
     cells(ctx: BarContext, tier: EnergyTier): Record<'down' | 'back' | 'strong', Lines>;
     /** Fill vocabulary, written over the last `steps` sixteenths of the bar. */
     fill(ctx: BarContext, steps: number, rng: Rng): Lines;
+    /**
+     * The style's last bar (#2017): 16-step lines for a 4/4 bar that is home on its downbeat,
+     * in the gesture the whole band ends in (`Style.endingGesture`). The kit moves them with
+     * the chord the band ends on (`endingStep`), in any meter.
+     */
+    ending(ctx: BarContext, gesture: EndingGesture): Lines;
     /** The cymbal that keeps time (crashes replace it on arrivals). */
     timekeeper: DrumPiece[];
     /** How many sixteenths a section fill / phrase fill takes at each tier. */
@@ -68,7 +75,14 @@ export function fillStart(ctx: BarContext, book: DrumBook): number | null {
     const total = barSteps(bar);
     // Sized by where the music is going: the bigger tier of this bar and the one it leads into.
     const tier = fillTier(plan.energy, ctx.next?.plan.energy ?? null);
-    const sized = Math.min(book.fillLength[plan.fill][tier], total - 4);
+    // why: the set-up into an ending is sized to the ending, not to the bar's energy (#2017):
+    // the band's last arrival gets the style's biggest section fill, so a quiet song still
+    // rolls into its final hit rather than ticking a two-step pickup into it.
+    const setup = plan.fill === 'section' && ctx.next?.plan.ending?.setup === true;
+    const sized = Math.min(
+        setup ? book.fillLength.section.high : book.fillLength[plan.fill][tier],
+        total - 4,
+    );
     // A short loop's fill at the smaller boundary (odd ordinal: 16, 48… bars) is the shorter
     // pickup, and the full fill marks the bigger one (32, 64…): the size follows the form's
     // hierarchy, so a drummer vamping four bars doesn't play the same run each time (#2009).
@@ -115,20 +129,42 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
                     bar: bar.index,
                 });
             if (plan.ending) {
-                // A bar that gets home itself (`| G7 C |`): the band strikes the V on 1 and the
-                // I on 3 (#1502). why: the crash is the ending's one arrival, so it goes where
-                // the I lands, with the kick; the V on 1 is a hit the drummer catches with the
-                // kick alone. Two crashes two beats apart would announce the end twice, the
-                // first time under the chord that isn't it. Any other ending crashes on 1.
+                // The style's own last bar (`DrumBook.ending`, #2017). A bar that gets home
+                // itself (`| G7 C |`): the band strikes the V on 1 and the I on 3 (#1502).
+                // why: the ending's arrival is the I, so the book's line moves to where the I
+                // lands; the V on 1 is a hit the drummer catches with the kick alone. Two
+                // crashes two beats apart would announce the end twice, the first time under
+                // the chord that isn't it.
                 const held = endingSpans(ctx)
                     .filter(({ span }) => span.chord)
                     .at(-1);
                 const arrival = held && held.from > 0 ? held.from : 0;
+                // Nothing is struck in a written rest after home (`G7:2 N.C.:2`).
+                const end = held ? held.to : total;
+                const lines = book.ending(ctx, plan.ending);
                 if (arrival > 0) {
-                    hit('kick', 0, 110);
+                    // why: the kick under the V is the book's own downbeat kick, at its level
+                    // (a bossa's soft surdo, not a rock kick): never louder than the I it leads
+                    // to. A line with no kick on 1 catches the V at the softest stroke the
+                    // line plays there.
+                    const downbeat = Object.values(lines).flatMap((line) =>
+                        readLine(line.slice(0, 1)).map(([, velocity]) => velocity),
+                    );
+                    const kick = readLine((lines.kick ?? '').slice(0, 1))[0]?.[1];
+                    hit('kick', 0, kick ?? Math.min(...downbeat, 110));
                 }
-                hit('crash', arrival, 118);
-                hit('kick', arrival, 110);
+                for (const [piece, line] of Object.entries(lines) as [DrumPiece, string][]) {
+                    for (const [step, velocity] of readLine(line.slice(0, 16))) {
+                        const placed = endingStep(plan.ending, step, arrival, bar, end);
+                        if (placed !== null && placed < end) {
+                            hit(
+                                piece === 'snare' && velocity < 50 ? 'ghost' : piece,
+                                placed,
+                                velocity,
+                            );
+                        }
+                    }
+                }
                 return { events, memory: null };
             }
             const tier = energyTier(plan.energy);

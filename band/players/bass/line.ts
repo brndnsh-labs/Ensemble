@@ -5,7 +5,7 @@ import type { Bar, BarSpan } from '../../form/timeline.js';
 import type { BarContext } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12, nearestMidi } from '../../theory/pitch.js';
-import { at, barSteps, endingSpans, STEP } from '../grid.js';
+import { at, BUTTON_LIFT, endingStrikes, STEP } from '../grid.js';
 
 /**
  * The bass register (MIDI). Hard limits sit inside the band's slot (23–57); `home` is the
@@ -100,53 +100,48 @@ export function bassNote(
 }
 
 /**
- * The held ending's bass (`plan.ending`, `arrange/ending.ts`): one note on each chord the
- * ending bar strikes (`endingSpans`), held to the next — the resolved tonic alone on the
- * downbeat, or a written `| G7 C |`'s V on 1 and its I from 3 (#1502). A chord on the same
- * bass note as the one before (`Csus4 Cmaj7`) is no new note: the bass holds its root while
- * the chord resolves above it. `pitch` places a chord's bass note as the style's line would
- * (near `prev`, the note before it); `steps` caps how long a note rings (funk's short ending).
- * Returns the notes and the last pitch placed.
+ * The held ending's bass (`plan.ending`, `arrange/ending.ts`): one note on each strike of the
+ * ending (`endingStrikes`), shaped by the style's gesture (#2017) — the resolved tonic held from
+ * the downbeat, cut to an eighth, re-struck on a button or on the hits; a written `| G7 C |`'s
+ * V on 1 and its I from 3 (#1502). A chord on the same bass note as the one before (`Csus4
+ * Cmaj7`) is no new note in an ending that rings: the bass holds its root while the chord
+ * resolves above it (a short ending strikes it again). The button is struck harder. `pitch` places a chord's bass note as
+ * the style's line would (near `prev`, the note before it). Returns the notes and the last
+ * pitch placed.
  */
 export function endingBass(
     ctx: BarContext,
     pitch: (chord: ChordFacts, prev: number | null) => number,
     prev: number | null,
     velocity: number,
-    steps = Number.POSITIVE_INFINITY,
 ): { events: PitchedNote[]; last: number | null } {
     const { bar } = ctx;
-    // Each struck note: where it starts, its pitch, and the step it rings to.
-    const notes: { from: number; midi: number; to: number }[] = [];
+    const kind = ctx.plan.ending?.kind ?? 'hold';
+    // why: a soft ending is the band letting the last chord go quietly (a bossa's, an acoustic
+    // strum's): the bass plays it at about four fifths of the style's own ending weight.
+    const weight = kind === 'soft' ? Math.round(velocity * 0.8) : velocity;
     let last = prev;
-    const spans = endingSpans(ctx);
-    spans.forEach(({ span, from, to }, i) => {
-        const chord = span.chord;
-        if (!chord) {
-            return;
-        }
-        // The last chord rings on to the bar's end (the band's last barline), cut short only by
-        // a written stop (`perform.ts`); a chord before it rings until the next is struck.
-        const until = spans[i + 1]?.span.chord ? to : barSteps(bar);
-        const midi = pitch(chord, last);
+    const rings = kind === 'hold' || kind === 'soft' || kind === 'button';
+    let pitched: { chord: ChordFacts; midi: number } | null = null;
+    // Each struck note: where it starts, its pitch, the step it rings to, and whether it is the
+    // button (`BUTTON_LIFT`: struck harder than the chord it ends).
+    const notes: { from: number; midi: number; to: number; accent: boolean }[] = [];
+    for (const { span, from, to, first, accent } of endingStrikes(ctx)) {
+        const chord = span.chord!;
+        // A re-strike (the button, a hit) plays the note the chord already has.
+        const midi: number = !first && pitched?.chord === chord ? pitched.midi : pitch(chord, last);
+        pitched = { chord, midi };
         const held = notes.at(-1);
-        // (A bass that plays the ending as short hits, funk's, strikes it again instead: held
-        // through, its note would stop before the chord it is under resolves.)
-        if (
-            held &&
-            held.to === from &&
-            mod12(held.midi) === mod12(midi) &&
-            until - held.from <= steps
-        ) {
-            held.to = until;
-            return;
+        if (first && rings && held && held.to === from && mod12(held.midi) === mod12(midi)) {
+            held.to = to;
+            continue;
         }
-        notes.push({ from, midi, to: until });
+        notes.push({ from, midi, to, accent });
         last = midi;
-    });
+    }
     return {
         events: notes.map((n) =>
-            bassNote(bar, n.from, n.midi, Math.min(steps, n.to - n.from), velocity),
+            bassNote(bar, n.from, n.midi, n.to - n.from, n.accent ? weight + BUTTON_LIFT : weight),
         ),
         last,
     };

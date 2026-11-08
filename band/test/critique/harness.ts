@@ -995,6 +995,53 @@ export const METRICS = {
         }
         return ratio(hit, n);
     },
+    /**
+     * Share of mid-bar chord changes the comp stutters into: a sounding comp strike within the
+     * eighth before a change that still plays the OLD chord (it lacks a guide tone of the new
+     * one), #2015. A strike there that already plays the new chord is a push, not a stutter.
+     * The same tell as `compAnticipatesChange`: a change whose guide tones the old chord
+     * already has isn't counted, and a book that strikes two notes (neo-soul's guitar dyads)
+     * can't sound both guide tones, so it reads as a stutter here; claim it only on a book that
+     * voices whole chords. Mid-bar only: a strike in a bar's last eighth is the barline push's
+     * business.
+     */
+    compStabsOutgoing: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const strikes = events.filter(
+                (e): e is PitchedNote => e.lane === 'comp' && !(e as PitchedNote).muted,
+            );
+            for (const bar of t.bars) {
+                bar.spans.forEach((span, i) => {
+                    const before = bar.spans[i - 1]?.chord;
+                    if (i === 0 || !span.chord || !before || before.symbol === span.chord.symbol) {
+                        return;
+                    }
+                    const old = chordPcs(before);
+                    const root = span.chord.root;
+                    const guides = [span.chord.third, span.chord.seventh]
+                        .filter((k): k is NonNullable<typeof k> => k !== null)
+                        .map((k) => mod12(root + k));
+                    if (!guides.some((pc) => !old.includes(pc))) {
+                        return;
+                    }
+                    n++;
+                    const early = strikes.filter(
+                        (c) => c.tick >= span.start - 2 * STEP - 0.5 && c.tick < span.start - 0.5,
+                    );
+                    const playsNew = (c: PitchedNote) =>
+                        guides.every((pc) =>
+                            strikes.some(
+                                (d) => Math.abs(d.tick - c.tick) < 1 && mod12(d.midi) === pc,
+                            ),
+                        );
+                    hit += early.length && !early.some(playsNew) ? 1 : 0;
+                });
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of sounding comp onsets in 4/4 bars that fall on beat 1 or beat 3. */
     compOnOneAndThree: (takes) => {
         let n = 0;
@@ -1590,6 +1637,29 @@ export const METRICS = {
                     n++;
                     hit += steps.get(beat + 2)?.[0]?.midi === on.midi + 12 ? 1 : 0;
                 }
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Share of fill bars (as `kickFourOnFloorInFills` counts them) whose snare and toms play a
+     * triplet: a beat's first three sixteenths all struck (#2165). At swing 100 those land at
+     * 0, 1/3 and 2/3 of the beat, the shuffle's own subdivision; a groove never strikes the
+     * "e", so three in a row is a fill's figure and nothing else's.
+     */
+    drumFillTriplets: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const groove = new Set(grooveBars(t, events).map((b) => b.index));
+            for (const b of t.bars) {
+                const drums = events.some((e) => e.lane === 'drums' && e.bar === b.index);
+                if (b.meter.name !== '4/4' || !drums || groove.has(b.index) || b.barInVisit === 0) {
+                    continue;
+                }
+                n++;
+                const s = drumSteps(t, events, b.index, ['snare', 'tomHigh', 'tomMid', 'tomLow']);
+                hit += [0, 4, 8, 12].some((x) => s.has(x) && s.has(x + 1) && s.has(x + 2)) ? 1 : 0;
             }
         }
         return ratio(hit, n);
@@ -2529,6 +2599,46 @@ export const METRICS = {
                 }
                 n++;
                 hit += note.slideIn ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Slides onto a maj7's root by a position shift (`slideIn.from` four or five semitones),
+     * a count (#2167). why: in the blues the pool holds neither the 2 nor the 6 at a maj7 and
+     * the b7 is the wrong 7th, so the five-fret 5 → R shift was the only root slide there and
+     * came round every time the head did (9 in the head, 4 in the solo). A shift is drawn only
+     * beside a near start (`shiftNeedsNeighbour` in `idiom.ts`), so what is left is the
+     * shift chosen now and then where the key's blues scale holds the chord's 6 (6 → R).
+     */
+    leadMaj7RootShiftSlides: (takes) => {
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const note of leadNotes(events)) {
+                const chord = chordAt(t, note.tick);
+                if (
+                    note.slideIn &&
+                    Math.abs(note.slideIn.from) >= 4 &&
+                    chord?.seventh === 11 &&
+                    mod12(note.midi - chord.root) === 0
+                ) {
+                    hit++;
+                }
+            }
+        }
+        return hit;
+    },
+    /** Of the lead's slides, the share that start above the landing (`slideIn.from` > 0). */
+    leadSlidesFromAbove: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of leadNotes(events)) {
+                if (!note.slideIn) {
+                    continue;
+                }
+                n++;
+                hit += note.slideIn.from > 0 ? 1 : 0;
             }
         }
         return ratio(hit, n);

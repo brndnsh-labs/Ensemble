@@ -59,6 +59,10 @@ export const blues = defineClaims({
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.95, 1, 'the backbeat on 2 and 4, every bar'],
                 ['kickOnOneAndThree', 0.95, 1, 'the kick grounds 1 and 3'],
+                // 0.293 of the fill bars (0.313 at high energy; 0 at low, whose fills are a
+                // two-step pickup): the shuffle's triplet fill (`tripletRun`, #2165), drawn
+                // about half the time against the eighth run and the snare pickup. 0 without it.
+                ['drumFillTriplets', 0.15, 0.5, 'some fills are the shuffle triplet, played out'],
                 [
                     'cymbalEighths',
                     0.9,
@@ -88,6 +92,25 @@ export const blues = defineClaims({
                 ['compColour', 0.5, 1, 'rootless 9ths and 13ths over the dominants'],
                 ['compOffbeatShare', 0.3, 0.8, 'stabs and pushes on the "and"s'],
                 ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
+                // 0.491 (0.25 at low energy, 0.73 at high): the "and"-of-4 push into the IV, the
+                // V and the turnaround (`KEYS_PUSH`), and since #2015 the "and"-of-2 stab before
+                // a mid-bar change plays the new chord too (`pushInBar`). 0.21 before, with the
+                // mid-bar changes stuttered into. High energy pushes most changes (0.73), so the
+                // ceiling leaves it room.
+                [
+                    'compAnticipatesChange',
+                    0.35,
+                    0.6,
+                    'the push into the change plays the new chord',
+                ],
+                // 0.958 before #2015: the mid-tier figures' "and"-of-2 stab played the leaving
+                // chord into nearly every mid-bar change (the turnaround's two-chord bars).
+                [
+                    'compStabsOutgoing',
+                    0,
+                    0,
+                    'the strike before a mid-bar change is the new chord, not a stutter',
+                ],
             ],
         },
         {
@@ -156,6 +179,10 @@ export const blues = defineClaims({
                 // (0.373 before #2139: a landing with no scale-tone start isn't slid into).
                 ['leadLandingSlides', 0.2, 0.55, 'a landing slid into from a few frets away'],
                 ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
+                // 1 (9 before #2167, nine of the head's ten root slides over a maj7): the shift
+                // is drawn only beside a near start, and the head restates each A, so one swoop
+                // came round every time. The one left sits beside a 6 → R the key allows.
+                ['leadMaj7RootShiftSlides', 0, 2, 'the five-fret swoop onto a maj7 root is rare'],
                 // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
                 // its figures already leave room at each phrase end.
                 ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
@@ -181,6 +208,12 @@ export const blues = defineClaims({
                 // (0.260 before #2139: a landing with no scale-tone start isn't slid into).
                 ['leadLandingSlides', 0.15, 0.45, 'a landing slid into from a few frets away'],
                 ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
+                // 0 (4 before #2167, four of the solo's five root slides over a maj7).
+                ['leadMaj7RootShiftSlides', 0, 1, 'the five-fret swoop onto a maj7 root is rare'],
+                // 0.110 (0.031 before #2167, all of them 4 → b3; 0.048 with R → b7 out): the b7
+                // now has a start from above too (R → b7), the blues slide down onto a dominant's
+                // b7. Mostly from below still: the box's neighbours sit under the landing.
+                ['leadSlidesFromAbove', 0.08, 0.3, 'some slides come down onto the landing'],
                 // The one-fret slide (#2139): of the unbent landings on a major 3rd, the share slid
                 // up from the b3. Measured 0.157 (0 with b3 → 3 out of `slideStarts`). The ceiling
                 // is the book's chance (`LeadBook.slide` 0.25), which the share passes only if
@@ -197,10 +230,14 @@ export const blues = defineClaims({
                     "a phrase now and then says the last one's opening again",
                 ],
                 ['leadMotifOpenings', 120, 10000, 'enough phrase openings to judge the rate on'],
-                // 1.0 is no response (the comp as busy in the breaths as under the line), so the floor
-                // sits above it: breath density 1.29 (0.94 with the answer off), line density 0.138
-                // (0.165).
-                ['compBreathDensity', 1.1, 2, "call and response: the piano in the guitar's gaps"],
+                // Breath density 0.946 (0.459 with the answer off): the answer doubles it, and the
+                // floor sits at their midpoint. Line density 0.135 (0.158). Before #2015 it read
+                // 1.30 (0.94 with the answer off). The guitar's breaths of a dotted quarter or more
+                // fall almost all in the turnaround's two-chord bars (728 of 758 breath steps),
+                // and there a mid-bar change was struck twice, the leaving chord on the "and" of 2
+                // and the arrival on 3; one push now does the work of both, so the strikes in
+                // those breaths went 132 → 92 while the ones under the line went 576 → 526.
+                ['compBreathDensity', 0.7, 2, "call and response: the piano in the guitar's gaps"],
                 ['compLineDensity', 0.1, 0.145, 'the piano thins under the licks'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 ['leadRestShare', 0.2, 0.5, 'the solo leaves space between licks'],

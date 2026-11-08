@@ -111,6 +111,7 @@ export function performPass(
         planned: lookLimit + 1,
         drumSolos,
         arcShape: style.jamArc,
+        endingGesture: style.endingGesture,
         keepsHighLine: style.keepsHighLine,
     });
     // Where the pass wraps, the next bar belongs to the next pass, whose lanes can differ (the
@@ -128,6 +129,7 @@ export function performPass(
               planned: 1,
               drumSolos,
               arcShape: style.jamArc,
+              endingGesture: style.endingGesture,
               keepsHighLine: style.keepsHighLine,
           })[0]
         : undefined;
@@ -180,7 +182,7 @@ export function performPass(
         const wrapped = plans[nextIndex] ?? {
             ...plan,
             crash: nextIndex >= 0,
-            ending: false,
+            ending: null,
             fill: 'none',
         };
         const nextPlan =
@@ -456,6 +458,11 @@ function sustain(
         until.set(tick, Math.min(rest ? rest.start : next, out ? out.start : next));
     });
     return events.map((e) => {
+        // The ending bar's lengths are its gesture's (#2017): a stop and the hits are
+        // short on an organ too, and a held ending already rings to the bar's end.
+        if (plans[e.bar]?.ending) {
+            return e;
+        }
         const end = e.lane === 'comp' && !e.muted ? until.get(e.tick) : undefined;
         return end !== undefined && e.lane === 'comp' && end - e.tick > e.dur
             ? { ...e, dur: end - e.tick }

@@ -29,6 +29,7 @@ import {
     barSteps,
     dyn,
     endingSpans,
+    endingStrikes,
     isCommonTime,
     pulses,
     STEP,
@@ -72,6 +73,10 @@ const countryDrums = drumIdiom({
     // Country drummers fill sparingly: a pickup, rarely a run. Quiet sections just pick up
     // into the next section.
     fillLength: { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 2, mid: 4, high: 4 } },
+    // why: kick and crash on 1 under the ringing chord. This is the blues book's line too: no
+    // country-only last hit is written here that I can stand behind, so the two are left the
+    // same (#2017) for the ear to rule on.
+    ending: () => ({ crash: 'X', kick: 'X' }),
     groove(ctx, tier) {
         if (tier === 'low') {
             return {
@@ -567,26 +572,34 @@ const countryGuitar: PitchedIdiom = {
                 bar: bar.index,
             });
         if (plan.ending) {
-            // Each chord the ending strikes (`G7 C`: both) gets its root under it, when the hand
-            // can hold both; the last rings to the bar's end.
-            const spans = endingSpans(ctx);
-            spans.forEach(({ span, from, to }, i) => {
-                const chord = span.chord;
+            // Each strike of the ending (`endingStrikes`: `G7 C`'s both, the gesture's own
+            // re-strikes) gets its chord's root under it, when the hand can hold both, as long
+            // and as hard as the strum it is picked with.
+            for (const { span, from, to } of endingStrikes(ctx)) {
+                const chord = span.chord!;
                 const tick = at(bar, from);
-                const grip = out.events.filter((e) => e.tick === tick).map((e) => e.midi);
-                if (!chord || !grip.length) {
-                    return;
+                const strum = out.events.filter((e) => e.tick === tick);
+                const grip = strum.map((e) => e.midi);
+                if (!grip.length) {
+                    continue;
                 }
                 const root = nearestMidi(chord.bass, 45, LO, HI);
-                const until = spans[i + 1]?.span.chord ? to : barSteps(bar);
                 if (
                     !grip.includes(root) &&
                     root < Math.min(...grip) &&
                     isPlayable([root, ...grip])
                 ) {
-                    pick(tick, root, (until - from) * STEP, 92);
+                    booms.push({
+                        lane: 'comp',
+                        tick,
+                        dur: (to - from) * STEP,
+                        midi: root,
+                        velocity: Math.max(...strum.map((e) => e.velocity)),
+                        offsetMs: 0,
+                        bar: bar.index,
+                    });
                 }
-            });
+            }
         } else {
             const { boom } = beatsOf(ctx);
             const tier = energyTier(plan.energy);
@@ -826,4 +839,7 @@ export const country: Style = {
     // why: country ends on the plain I triad (the piano adds its own 6th to a I,
     // `withSixths`), or i in a minor key.
     ending: { major: '', minor: 'm' },
+    // why: the country band picks up into its last chord (the snare pickup, the set-up fill)
+    // and lets it ring, the steel and the guitar hanging over the crash.
+    endingGesture: { kind: 'hold', setup: true },
 };
