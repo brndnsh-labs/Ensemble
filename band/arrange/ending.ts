@@ -8,7 +8,8 @@
  * final bar is not already home, the band plays that bar on the key's tonic, in the quality
  * its genre ends on (`Style.ending`: I6 for swing, I9 for the blues, the triad for rock, the
  * minor equivalents in a minor key), and bass, comp and the lead's last note all hear that one
- * chord.
+ * chord. How the band plays it (held, a stop, a button, the hits) is the style's gesture
+ * (`Style.endingGesture`, #2017), which `BarPlan.ending` carries; this module is only the chord.
  *
  * Only the ending bar's harmony changes. The bar before it keeps its chords; its approach
  * notes aim at the chord the band is about to hold (`perform.ts` hands it the resolved bar as

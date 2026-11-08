@@ -193,7 +193,7 @@ describe('the jam arc across a counted performance', () => {
                     landed++;
                 }
             }
-            expect(plans[timeline.bars.length - 1].ending, name).toBe(true);
+            expect(plans[timeline.bars.length - 1].ending, name).not.toBeNull();
         }
         // The fixtures hold both an outro (popSongThree) and a last-chorus coda (bluesCoda).
         expect(landed).toBeGreaterThan(0);

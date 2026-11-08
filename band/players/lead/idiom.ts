@@ -20,7 +20,7 @@ import {
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { barSteps, dyn, STEP } from '../grid.js';
+import { at, BUTTON_LIFT, barSteps, dyn, ENDING_SHORT, endingStrikes, STEP } from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
 import { DEFAULT_GUIDE, type GuideRhythm } from './guide-figures.js';
 import { type GuideNote, guidePitchClasses, guideToneLine, headForm } from './guide-tones.js';
@@ -2070,6 +2070,97 @@ function planSlot(
 }
 
 /**
+ * The lead's notes in the ending bar, let go with the band's gesture (#2017). A held or soft
+ * ending is the lead's long last note as planned (`landOnHeld`). In a stop or the hits the
+ * band falls silent after each strike, and a lead holding on over that silence is the one
+ * player who didn't stop: each note lets go where the band's strike it sounds under lets go
+ * (`| G7:2 C:2 |`'s V too, not only home), a note struck in a silence between strikes is a
+ * pickup of an eighth at most into the next, and none starts after the band's last strike. A
+ * note that was held up to the band's last strike lets go with its own and is struck again
+ * with the last (home's eighth in a stop, the ringing last hit). In a button, a lead still
+ * sounding there plays it with the band, short and accented (`BUTTON_LIFT`); one that has
+ * already let go stays out (the soloist's choice: the band's button is enough). A re-strike
+ * of a note first struck before home (held from over the V) is sung on the home chord's
+ * resting tone nearest it (`settle`), as the landing is: never the V's leading tone against
+ * the I.
+ * @internal a test seam: the re-strike's pitch, which no chart reaches today.
+ */
+export function endWithTheBand(
+    ctx: BarContext,
+    events: PitchedNote[],
+    book: LeadBook,
+): PitchedNote[] {
+    const gesture = ctx.plan.ending;
+    if (!gesture || gesture.kind === 'hold' || gesture.kind === 'soft' || !events.length) {
+        return events;
+    }
+    const strikes = endingStrikes(ctx);
+    const last = strikes.at(-1);
+    if (!last) {
+        return events;
+    }
+    const tick = (step: number) => at(ctx.bar, step);
+    // Where home is struck: a note from before it is the V's.
+    const home = tick(strikes.find((s) => s.span === last.span)!.from);
+    const cut = (n: PitchedNote, end: number): PitchedNote => {
+        const dur = Math.max(STEP / 2, Math.min(n.dur, end - n.tick));
+        const { vibrato: _held, ...rest } = n;
+        return dur >= STEP * book.vibrato && n.vibrato
+            ? { ...rest, dur, vibrato: true }
+            : { ...rest, dur };
+    };
+    const again = (n: PitchedNote, from: number, to: number, lift: number): PitchedNote => ({
+        lane: 'lead',
+        tick: from,
+        dur: to - from,
+        midi:
+            n.tick < home - 1 && last.span.chord
+                ? nearestRanked(book.settle(last.span.chord, ctx.bar.key), n.midi, ctx.lead.range)
+                : n.midi,
+        velocity: Math.min(127, n.velocity + lift),
+        offsetMs: 0,
+        bar: n.bar,
+    });
+    if (gesture.kind === 'button') {
+        const button = strikes.find((s) => s.accent);
+        if (!button) {
+            return events;
+        }
+        const struck = tick(button.from);
+        const kept = events.filter((n) => n.tick < struck - 1);
+        const final = kept.at(-1);
+        if (!final || final.tick + final.dur < struck - 1) {
+            return kept;
+        }
+        return [
+            ...kept.slice(0, -1),
+            cut(final, struck),
+            again(final, struck, tick(button.to), BUTTON_LIFT),
+        ];
+    }
+    // stop, hits: each note lets go with the strike it sounds under; nothing after the last.
+    const silence = tick(last.to);
+    const lastHit = tick(last.from);
+    const sounding = events.filter((n) => n.tick < silence - 1);
+    const kept = sounding.map((n) => {
+        const under = strikes.filter((s) => tick(s.from) <= n.tick + 1).at(-1);
+        const next = strikes.find((s) => tick(s.from) > n.tick + 1);
+        const end =
+            under && n.tick < tick(under.to) - 1
+                ? tick(under.to)
+                : Math.min(n.tick + ENDING_SHORT * STEP, next ? tick(next.from) : silence);
+        return cut(n, end);
+    });
+    const original = sounding.at(-1);
+    if (original && original.tick < lastHit - 1 && original.tick + original.dur >= lastHit - 1) {
+        // Held up to the band's last strike or through it: struck again with it, ringing as
+        // it does.
+        return [...kept, again(original, lastHit, silence, 0)];
+    }
+    return kept;
+}
+
+/**
  * A lead book's idiom, with where it sits on an instrument (`bookReach`): its home, and the top
  * note its solo peaks on and its head never passes.
  */
@@ -2126,7 +2217,7 @@ export function leadIdiom(book: LeadBook): LeadIdiom {
                     fell: planned.fell,
                 };
             }
-            const events: PitchedNote[] = next.notes
+            const planned: PitchedNote[] = next.notes
                 .filter((n) => n.bar === bar.index)
                 .map((n) => ({
                     lane: 'lead',
@@ -2142,6 +2233,7 @@ export function leadIdiom(book: LeadBook): LeadIdiom {
                     ...(n.slideIn ? { slideIn: n.slideIn } : {}),
                     ...(n.vibrato ? { vibrato: true } : {}),
                 }));
+            const events = endWithTheBand(ctx, planned, book);
             const last = events.at(-1)?.midi ?? next.last;
             return { events, memory: { ...next, last } };
         },

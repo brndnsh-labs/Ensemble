@@ -51,6 +51,9 @@ const funkDrums = drumIdiom({
     name: 'funk sixteenths',
     timekeeper: ['hat', 'hatOpen'],
     fillLength: { phrase: { low: 2, mid: 2, high: 4 }, section: { low: 4, mid: 4, high: 4 } },
+    // why: the dead stop is kick, snare and a closed hat on 1, no cymbal: a crash would ring
+    // on over the silence the stop is for.
+    ending: () => ({ kick: 'X', snare: 'X', hat: 'X' }),
     groove(ctx, tier) {
         const kick = ctx.rng('kick', 'section').weighted(FUNK_KICKS.map(([k, w]) => [k, w[tier]]));
         const ghosts = tier === 'low' ? '' : ctx.rng('ghost', 'section').pick(FUNK_GHOSTS);
@@ -129,13 +132,12 @@ const funkBass: PitchedIdiom = {
         let last = memory.last;
         let land: number | null = null;
         if (plan.ending) {
-            // A half note at most: the funk ending is a short hit, not a held note.
+            // The funk ending is the dead stop (`endingGesture`): the bass hits it and lets go.
             const held = endingBass(
                 ctx,
                 (c, p) => place(bassPc(c), p),
                 last,
                 dyn(108, plan.energy),
-                8,
             );
             events.push(...held.events);
             return { events, memory: { last } };
@@ -388,4 +390,7 @@ export const funk: Style = {
     // of IV (#1502): it ends on the 6/9 instead, the horn section's final hit, which keeps the
     // 9th and has no 7th to argue with the tune's.
     ending: { major: '69', minor: 'm9', dominant: '9' },
+    // why: the funk ending is the dead stop, the JB's hit on the One and then silence, set
+    // up by a fill that brings the whole band to it.
+    endingGesture: { kind: 'stop', setup: true },
 };

@@ -118,6 +118,10 @@ const metalDrums = drumIdiom({
     timekeeper: ['hat', 'hatOpen', 'ride', 'crash'],
     // Metal fills are tom runs in sixteenths, the double kick often going on under them.
     fillLength: { phrase: { low: 2, mid: 4, high: 4 }, section: { low: 4, mid: 8, high: 8 } },
+    // why: the kit stabs with the band on 1, 2 and 3 (`endingGesture.at`), kick and snare on
+    // each; the crash only on the last, left to ring: crashes on the short stabs would wash
+    // over the silence the band cuts between them.
+    ending: () => ({ crash: '........X', kick: 'X...X...X', snare: 'X...X...X' }),
     groove(ctx, tier) {
         const { bar, plan } = ctx;
         if (blasts(ctx)) {
@@ -619,4 +623,7 @@ export const metal: Style = {
     // instrument families), so the final chord is the tonic's power chord in either mode, and
     // the lead settles on its root or fifth rather than a third the band leaves out.
     ending: { major: '5', minor: '5' },
+    // why: metal ends on unison stabs, the whole band hitting the tonic on beats 1, 2 and 3,
+    // each cut to an eighth, out of a tom run (the set-up fill); the last stab rings.
+    endingGesture: { kind: 'hits', at: [0, 1, 2], setup: true },
 };

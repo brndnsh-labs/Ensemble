@@ -142,6 +142,11 @@ export interface Style {
      */
     ending: EndingQuality;
     /**
+     * How the band ends a pass that does not loop (#2017): the gesture every lane plays the
+     * held ending's chord in (`BarPlan.ending`), and whether the bar before sets it up.
+     */
+    endingGesture: EndingGesture;
+    /**
      * How deep the song-mode jam arc (`BandSettings.arc`, #1785) moves this style. Absent, the
      * full arc.
      */
@@ -155,6 +160,20 @@ export interface Style {
      * of the line too.
      */
     keepsHighLine?: true;
+}
+
+/** How the band ends a performance that does not loop (#2017): the gesture every lane reads off `BarPlan.ending`. */
+export interface EndingGesture {
+    /**
+     * hold: strike 1 and ring to the bar's end. stop: strike 1 and stop (an eighth). soft: ring,
+     * no crash, quietly. button: ring from 1, then one short, accented unison hit on the "and"
+     * of 4. hits: unison hits on the beats `at`, short, the last one ringing.
+     */
+    kind: 'hold' | 'stop' | 'soft' | 'button' | 'hits';
+    /** Beats of the unison hits, counted from 0, for `hits` (e.g. [0, 1, 2]: beats 1, 2, 3). */
+    at?: number[];
+    /** The bar before gets a set-up fill, the style's biggest section fill. */
+    setup: boolean;
 }
 
 /**
