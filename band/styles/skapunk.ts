@@ -640,6 +640,11 @@ const skaPunkLead = leadIdiom({
     scoop: 0.1,
     // Straight tone: only a note held most of a bar gets the trumpet's shake.
     vibrato: 12,
+    // why: third-wave and ska-jazz horn sections drop off the last note of a hook into the
+    // breath — up to three phrase ends in ten, fewer once the form's weighting has its say
+    // (`fallDraw`). A touch lighter than funk's 0.35: the offbeat stab is ska's signature, and
+    // a fall softens it, so it stays an accent rather than a habit (#2138).
+    fall: 0.3,
 });
 
 export const skapunk: Style = {
