@@ -586,8 +586,10 @@ function applySoloistEnvelope(
 }
 
 /**
- * The release after a fall-off (#2120), a `setTargetAtTime` constant: ~0.2 s to −70 dB of the
- * tapered level, inside the 0.2 s the oscillators sound past the note's end.
+ * The release after a fall-off (#2120), a `setTargetAtTime` constant. The oscillators stop
+ * 0.2 s past the note's end, four constants (e⁻⁴): the level is then about −35 dB under where
+ * the release started, about −44 dB under the note's peak (measured in a real render, −34.7 and
+ * −43.8) — some 10 dB cleaner than a note without a fall at the same stop.
  */
 const FALL_RELEASE_TC = 0.05;
 

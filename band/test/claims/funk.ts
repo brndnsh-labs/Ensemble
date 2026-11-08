@@ -64,8 +64,13 @@ export const funk = defineClaims({
                 ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
                 // Measured 0.710; drawn without the section-end weight 0.441.
                 ['leadFallsAtSectionEnd', 0.58, 1, 'the falls close the sections'],
-                // 1.000 when the fall was drawn per phrase rather than per ending figure.
+                // A section played again plays its falls again (1.000 with the draw keyed by the
+                // note's own place in the song). It can't see a per-phrase draw; the next two can.
                 ['leadHeadFallsDiffer', 0, 0, 'a section played again falls where it fell'],
+                // 0.143 with the head's fall drawn per phrase (the slot's stream), not per figure.
+                ['leadHeadFigureFallsDiffer', 0, 0, 'the fall returns with its ending figure'],
+                // 0.354 with the head falling off every phrase end, riff ends inside it too.
+                ['leadHeadFallsInsidePhrase', 0, 0, 'the head falls only where its phrase lets go'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (sixteenths: beat 1 and its "a", then the and of 2), then moves. Measured
                 // 0.006 with no stabs, 0.155 now; the floor fails with the stabs off, the

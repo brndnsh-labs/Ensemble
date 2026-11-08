@@ -218,8 +218,14 @@ export const blues = defineClaims({
                 ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
                 // Measured 0.750; drawn without the section-end weight 0.471.
                 ['leadFallsAtSectionEnd', 0.6, 1, 'the falls close the chorus'],
-                // 1.000 when the fall was drawn per phrase rather than per ending figure.
+                // A section played again plays its falls again (1.000 with the draw keyed by the
+                // note's own place in the song). It can't see a per-phrase draw; the next two can.
                 ['leadHeadFallsDiffer', 0, 0, 'a section played again falls where it fell'],
+                // 0.667 with the head's fall drawn per phrase (the slot's stream): the AAB call's
+                // ending figure returns in its second phrase.
+                ['leadHeadFigureFallsDiffer', 0, 0, 'the fall returns with its ending figure'],
+                // 0.333 with the head falling off every phrase end.
+                ['leadHeadFallsInsidePhrase', 0, 0, 'the head falls only where its phrase lets go'],
                 // A horn's scoop is not a bend it can let down.
                 ['leadBendReleases', 0, 0, 'a horn never releases a bend'],
             ],

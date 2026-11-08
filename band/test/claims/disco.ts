@@ -263,8 +263,13 @@ export const disco = defineClaims({
                 ['leadFallsInsideLine', 0, 0, 'a fall ends a phrase, never a note inside the line'],
                 // Measured 0.889 (18 falls); drawn without the section-end weight 0.650.
                 ['leadFallsAtSectionEnd', 0.77, 1, 'the falls close the sections'],
-                // 1.000 when the fall was drawn per phrase rather than per ending figure.
+                // A section played again plays its falls again (1.000 with the draw keyed by the
+                // note's own place in the song). It can't see a per-phrase draw; the next two can,
+                // though on disco's charts both read 0 with those defects planted too — funk's
+                // and blues's heads are where they bite (0.143/0.667, 0.354/0.333).
                 ['leadHeadFallsDiffer', 0, 0, 'a section played again falls where it fell'],
+                ['leadHeadFigureFallsDiffer', 0, 0, 'the fall returns with its ending figure'],
+                ['leadHeadFallsInsidePhrase', 0, 0, 'the head falls only where its phrase lets go'],
                 // Repeated notes as a riff (#2024, `LeadBook.repeat`): a stabbed figure says one
                 // pitch for a run of its notes (on the eighths, never two sixteenths running), then moves. Measured
                 // 0.006 with no stabs, 0.108 now; the floor fails with the stabs off, the

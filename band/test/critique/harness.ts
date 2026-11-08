@@ -2342,9 +2342,90 @@ export const METRICS = {
         return ratio(closing, falls);
     },
     /**
+     * Of a head's falls (#2120), the share not on its phrase's last note (the note before the
+     * breath, the last of the phrase slot's four bars): a head falls where its phrase lets go,
+     * never off a riff's end inside the phrase.
+     */
+    leadHeadFallsInsidePhrase: (takes) => {
+        let falls = 0;
+        let inside = 0;
+        for (const { timeline: t, events } of takes) {
+            const notes = leadNotes(events);
+            // The last note of each phrase slot (keyed by the slot's first bar).
+            const last = new Map<number, PitchedNote>();
+            for (const note of notes) {
+                last.set(note.bar - t.bars[note.bar].phrase.bar, note);
+            }
+            for (const note of notes) {
+                if (note.fall) {
+                    falls++;
+                    inside += last.get(note.bar - t.bars[note.bar].phrase.bar) === note ? 0 : 1;
+                }
+            }
+        }
+        return ratio(inside, falls);
+    },
+    /**
+     * In a head, of the phrase endings that end on the same figure (the same section, the same
+     * rhythm in the bar the phrase's last note sounds in, that note not scooped) and could fall,
+     * the share whose fall disagrees with another ending on that figure (#2120): the head's fall
+     * is drawn once per figure, so it returns with it. The one disagreement allowed is the
+     * form's: a figure that falls at a section's close (1.5× the chance) and not in mid-section
+     * (0.7×), never the other way round, and never a different depth.
+     */
+    leadHeadFigureFallsDiffer: (takes) => {
+        let endings = 0;
+        let differ = 0;
+        for (const { timeline: t, events } of takes) {
+            const notes = leadNotes(events);
+            const last = new Map<number, PitchedNote>();
+            for (const note of notes) {
+                last.set(note.bar - t.bars[note.bar].phrase.bar, note);
+            }
+            const byFigure = new Map<string, { closes: boolean; fall: number }[]>();
+            for (const note of last.values()) {
+                if (note.bendIn) {
+                    continue;
+                }
+                const bar = t.bars[note.bar];
+                const rhythm = notes
+                    .filter((n) => n.bar === note.bar)
+                    .map((n) => `${n.tick - bar.start}/${n.dur}`)
+                    .join(',');
+                const key = `${sectionKey(bar.visit)}|${rhythm}`;
+                const closes = bar.index >= bar.visit.firstBar + bar.visit.barCount - 2;
+                byFigure.set(key, [
+                    ...(byFigure.get(key) ?? []),
+                    { closes, fall: note.fall?.semitones ?? 0 },
+                ]);
+            }
+            for (const group of byFigure.values()) {
+                if (group.length < 2 || group.every((e) => !e.fall)) {
+                    continue;
+                }
+                const depths = new Set(group.filter((e) => e.fall).map((e) => e.fall));
+                const midFalls = group.some((e) => !e.closes && e.fall);
+                const closeHolds = group.some((e) => e.closes && !e.fall);
+                const sameClassDiffers = [true, false].some(
+                    (closes) =>
+                        new Set(group.filter((e) => e.closes === closes).map((e) => e.fall > 0))
+                            .size > 1,
+                );
+                endings += group.length;
+                differ +=
+                    depths.size > 1 || (midFalls && closeHolds) || sameClassDiffers
+                        ? group.length
+                        : 0;
+            }
+        }
+        return ratio(differ, endings);
+    },
+    /**
      * In a head, of the bars a section plays again (the same section's same bar, as an AABA's
-     * A sections do), the share whose falls differ from one time to the next (#2120): a head is
-     * a written tune, and its falls come back with it.
+     * A sections do), the share whose falls differ from one time to the next (#2120): a section
+     * played again plays its falls again. It does not tell a fall drawn per figure from one drawn
+     * per phrase (a repeated section's phrases share their index too):
+     * `leadHeadFigureFallsDiffer` does.
      */
     leadHeadFallsDiffer: (takes) => {
         let repeated = 0;
