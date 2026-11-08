@@ -300,6 +300,12 @@ const rockLead = leadIdiom({
     scoop: 0,
     // Every held rock-guitar note gets vibrato.
     vibrato: 6,
+    // why: the rock lead bends and lets go (the 4 → 5 → 4 and b7 → root → b7 licks), a little
+    // less often than the blues player's cry (#2120).
+    release: 0.35,
+    // why: a rock guitarist slides into a landing now and then, more often a pentatonic
+    // position shift than an ornament: a fifth of the unbent landings (#2120).
+    slide: 0.2,
 });
 
 export const rock: Style = {

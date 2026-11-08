@@ -337,6 +337,32 @@ expression devices take turns rather than stack; one peak note per cycle.
   note, a bebop alto only long ones); a guitar bends into its landings from below (`bendIn`:
   the major 3rd from the blue third, the root or 5th from a whole step); a horn scoops now and
   then. The host plays the lead on today's soloist voices and packs.
+- **Fall-offs, releases and slides** (#2120, each a `LeadBook` chance on a seeded stream of its
+  own, so the bends and scoops a slot already chose don't move). None of them in the bar a held
+  ending lands on.
+  - A horn falls off a phrase end (`fall`): an eighth or longer, a beat of breath after it,
+    never a note that scooped in. A note a half or longer takes the long fall (`into`: it sounds
+    its whole length, then drops 5–7 into the rest over about a quarter, a sixteenth short of
+    the next note); a shorter one drops 3–4 in its own tail. Falls go by the form (`fallDraw`):
+    1.5× the book's chance in a section's last two bars, 0.7× elsewhere, and a solo straight
+    after a fall at a third of it; a head falls only off a phrase's last note, drawn once per
+    section and ending figure, so a section played again falls where it fell. Funk, disco and
+    the blues on a horn.
+  - A guitar lets a bend back down (`release`, a quarter or longer over one chord): inside a
+    phrase only when the line goes on below the bent pitch; at a phrase end only onto the blue
+    third over a chord with no major 7th or the b7 over a dominant or a plain triad, never the
+    4. The slot's last note held into the next phrase keeps its bend. And it slides into a
+    landing (a note struck on a chord change) it doesn't bend (`slideIn`: 2–3 frets below
+    mostly, 4–5 now and then, 2 above sometimes, over a thirty-second or a sixteenth). Blues and
+    rock.
+  - The host turns them into seconds by the note's own tempo (`leadArticulation`): a short
+    fall takes its ticks (at most 40% of the note), a long one is added to the note's length so
+    the voice sounds it into the rest; the release starts halfway and takes an eighth (at most
+    35%); the slide its ticks (at most half the note). Both soloist voices render them through
+    one placement rule (`articulationWindows` in `core/engine/sample-voice.ts`): the level sinks
+    to 0.4 across a fall and is released only where the fall lands, and the vibrato fades out
+    across it (`scheduleDepth`). The `.mid` export carries none of them, as it carries no
+    bend-in.
 - **The comp gives the lead its register.** While the lead sounds, a keyboard voice at or
   above it drops an octave (never below middle C), and never onto a note the lead is playing.
   A guitar grip is a hand shape and stays.

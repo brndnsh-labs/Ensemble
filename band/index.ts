@@ -13,6 +13,7 @@ export type {
     DrumPiece,
     Lane,
     LeadInstrument,
+    PitchedNote,
     StyleId,
 } from './core/types.js';
 export { DEFAULT_SETTINGS, PPQ } from './core/types.js';

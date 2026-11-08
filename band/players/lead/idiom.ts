@@ -8,7 +8,7 @@ import { isIntroLabel } from '../../../core/songbook/score-form.js';
 import type { LeadRole } from '../../arrange/cycle.js';
 import { energyTier } from '../../arrange/plan.js';
 import type { Rng } from '../../core/random.js';
-import type { PitchedNote } from '../../core/types.js';
+import { type PitchedNote, PPQ } from '../../core/types.js';
 import {
     type Bar,
     chordAt,
@@ -109,6 +109,22 @@ export interface LeadBook extends LinePalette {
      * every held note; a bebop alto plays mostly straight tone and saves it for long ones.
      */
     vibrato: number;
+    /**
+     * A horn's fall-off (#2120, `PitchedNote.fall`): the chance a phrase's last note — an
+     * eighth or longer, a beat of breath after it — drops off its pitch. Horns only (a guitar
+     * lets a bend down instead). Unset: never.
+     */
+    fall?: number;
+    /**
+     * A guitarist's bend-and-release (#2120, `PitchedNote.release`): the chance a bent note
+     * inside a phrase (a quarter or longer, another note after it) is let back down. Unset: never.
+     */
+    release?: number;
+    /**
+     * A guitarist's slide into a landing (#2120, `PitchedNote.slideIn`): the chance a landing
+     * that is not bent is slid into from a few frets away. Unset: never.
+     */
+    slide?: number;
 }
 
 /** A planned note, with the bar it sounds in. */
@@ -119,6 +135,9 @@ interface Planned {
     velocity: number;
     bar: number;
     bendIn?: number;
+    release?: boolean;
+    fall?: PitchedNote['fall'];
+    slideIn?: { from: number; ticks: number };
     vibrato?: boolean;
 }
 
@@ -147,6 +166,8 @@ export interface LeadMemory {
      * does — on a loop's next lap, or a counted chart's next chorus.
      */
     phrases: Record<number, PhraseMemory>;
+    /** Whether the last phrase end fell off (#2120): a solo seldom falls twice running. */
+    fell: boolean;
 }
 
 /**
@@ -1620,6 +1641,62 @@ function landOnHeld(ctx: BarContext, book: LeadBook, notes: Planned[], lineVeloc
     });
 }
 
+/**
+ * Whether a horn's phrase end falls off (#2120), and the stream its shape is drawn from (null:
+ * it doesn't). why: a horn chart places its falls by the form — where a phrase lets go, and
+ * most where a section or a chorus does (its last two bars: 1.5× the book's chance, 0.7×
+ * elsewhere, a final-stage multiplier) — and a player doesn't fall off phrase after phrase:
+ * straight after a fall a solo falls at a third of the chance. A head is a written tune: its
+ * one draw is keyed by the section and the figure the phrase ends on, so a statement and its
+ * restatement fall alike, as the arrangement wrote it, and a head never runs falls together.
+ */
+function fallDraw(
+    ctx: BarContext,
+    chance: number,
+    role: LeadRole,
+    plan: SlotPlan,
+    o: SlotOnset,
+    fell: boolean,
+    fallRng: Rng,
+): Rng | null {
+    const bar = ctx.timeline.bars[barOf(ctx, o.tick)];
+    const sectionEnd = bar.index >= bar.visit.firstBar + bar.visit.barCount - 2;
+    const place = sectionEnd ? 1.5 : 0.7;
+    if (role.kind === 'head') {
+        const figure = ctx.rng(`${headKey(bar)}:fall:${plan.cells[o.bar] ?? ''}`, 'song');
+        return figure.chance(Math.min(1, chance * place)) ? figure : null;
+    }
+    return fallRng.chance(Math.min(1, chance * place * (fell ? 1 / 3 : 1))) ? fallRng : null;
+}
+
+/**
+ * How a phrase end falls (#2120). why: a note held a half or longer takes the section's long
+ * fall — it sounds its full length, then drops 5–7 semitones into the rest after it, over about
+ * a quarter (a sixteenth short of the next note, which a phrase end leaves a beat away at
+ * least). A shorter note drops 3–4 within its own tail, over an eighth (the host keeps it to the
+ * note's last 40%); a 2-semitone drop that short reads as a flat note, not a fall.
+ */
+function fallShape(rng: Rng, dur: number, gap: number): NonNullable<Planned['fall']> {
+    if (dur >= STEP * 8) {
+        return {
+            semitones: rng.weighted<number>([
+                [5, 1],
+                [6, 1],
+                [7, 1],
+            ]),
+            ticks: Math.min(PPQ, gap - STEP),
+            into: true,
+        };
+    }
+    return {
+        semitones: rng.weighted<number>([
+            [3, 2],
+            [4, 1],
+        ]),
+        ticks: STEP * 2,
+    };
+}
+
 function planSlot(
     ctx: BarContext,
     book: LeadBook,
@@ -1632,6 +1709,7 @@ function planSlot(
     trailing: number;
     phrase: PhraseMemory | null;
     phrases: Record<number, PhraseMemory>;
+    fell: boolean;
 } {
     // The player's turn, or trading with the drummer (the player is the soloist): no lead.
     if (
@@ -1644,6 +1722,8 @@ function planSlot(
             trailing: memory.trailing,
             phrase: memory.phrase,
             phrases: memory.phrases,
+            // A slot of silence ends any run of falls.
+            fell: false,
         };
     }
     let voiced: Voiced;
@@ -1659,11 +1739,23 @@ function planSlot(
     const guideTones = role.kind === 'head' && ctx.guideToneHead;
     // Keyed like the line: a head's articulation returns with it.
     const first = ctx.timeline.bars[slotStart];
-    const rng =
+    const articulationKey =
         role.kind === 'head'
-            ? ctx.rng(`${headKey(first)}:${first.phrase.index}:articulation`, 'song')
-            : ctx.rng(`solo:${ctx.pass}:${placeOf(ctx, slotStart)}:articulation`, 'song');
+            ? `${headKey(first)}:${first.phrase.index}:articulation`
+            : `solo:${ctx.pass}:${placeOf(ctx, slotStart)}:articulation`;
+    const rng = ctx.rng(articulationKey, 'song');
+    // Fall-offs, releases and slides (#2120) each draw from a stream of their own, so adding
+    // them reshuffles none of the bends, scoops or vibrato the slot already chose.
+    const fallRng = ctx.rng(`${articulationKey}:fall`, 'song');
+    const releaseRng = ctx.rng(`${articulationKey}:release`, 'song');
+    const slideRng = ctx.rng(`${articulationKey}:slide`, 'song');
+    const { bars } = ctx.timeline;
+    const lastBar = bars[bars.length - 1];
+    const slotEnd =
+        bars[slotStart + plan.kinds.length]?.start ?? lastBar.start + lastBar.meter.barTicks;
     const targets = targetsOf(onsets);
+    // Whether the last phrase end fell (#2120): a fall right after a fall is a tic.
+    let fell = memory.fell;
     // The held ending (`arrange/ending.ts`): where the pass resolves its final turnaround to
     // the tonic, the lead's note in that bar is sung against the tonic. It moves to the
     // nearest of the tonic's resting tones (`settle`, ranked as any phrase's last note is), so
@@ -1744,6 +1836,104 @@ function planSlot(
         if (o.dur >= STEP * book.vibrato && (ctx.lead.bends || !note.bendIn)) {
             note.vibrato = true;
         }
+        // The pitch moves of #2120. Never in the bar the pass ends on: the held ending is an
+        // arrival with the band, sung on its pitch.
+        if (note.bar !== final?.index) {
+            const next = onsets[i + 1];
+            const end = o.tick + o.dur;
+            // A phrase end: a beat or more of silence after it before the slot's next note
+            // (the head's breath, a solo's rest), or before the slot ends.
+            const ends = (next ? next.tick : slotEnd) - end >= STEP * 4;
+            const sameChord = chordAt(ctx.timeline, end - 1)?.symbol === o.chord.symbol;
+            // why: a horn player falls off the last note of a phrase — the funk and disco
+            // section's drop at the end of a riff, a blues horn's sigh — never a note inside the
+            // line, where the next note needs the pitch. An eighth or longer, so there is a tail
+            // to fall from, and never a note that scooped in: the scoop is its way in, and a
+            // short arrival that scoops and falls has no pitch of its own left to hear.
+            const candidate =
+                ctx.lead.family === 'horn' &&
+                !!book.fall &&
+                ends &&
+                o.dur >= STEP * 2 &&
+                !note.bendIn &&
+                // A head falls only where its phrase lets go: its last note, into the breath.
+                (role.kind !== 'head' || i === onsets.length - 1);
+            const shapeRng =
+                candidate && book.fall
+                    ? fallDraw(ctx, book.fall, role, plan, o, fell, fallRng)
+                    : null;
+            if (shapeRng) {
+                note.fall = fallShape(shapeRng, o.dur, (next ? next.tick : slotEnd) - end);
+            }
+            if (ends) {
+                // A phrase end that didn't fall breaks a run of falls as one that did starts it.
+                fell = note.fall !== undefined;
+            }
+            // why: the blues and rock guitarist's bend-and-release — bend up into the note,
+            // hold it, let it back down onto the fretted note it started from (3 → b3,
+            // root → b7, 5 → 4). Inside a phrase the next note moves on from the let-down one,
+            // so any bend may release. A phrase's arrival (a beat of breath after it, or held to
+            // the slot's end) is left on the let-down note, so it releases only onto a note a
+            // blues or rock player rests on: the blue third over a chord with no major 7th
+            // (Albert King's cry), the b7 over a dominant or a plain triad (the mixolydian
+            // rock ending) — never the 4. A guitar only (a horn's scoop is not a bend it can let
+            // go), a quarter or longer so the bend, the hold and the release are each heard, and
+            // over one chord, so the let-down note is heard against the chord it was bent over.
+            // The slot's last note held to its end runs on into the next phrase, whose first
+            // note this slot can't see: it neither rests nor knows where the line goes, so it
+            // holds its bend.
+            const arrival = ends;
+            const letDown = mod12(midi - (note.bendIn ?? 0) - o.chord.root);
+            const restsOn =
+                (letDown === 3 && o.chord.seventh !== 11) ||
+                (letDown === 10 &&
+                    (o.chord.seventh === 10 || (o.chord.seventh === null && !o.chord.sixth)));
+            // Inside a phrase the line goes on from the let-down note: only to a note below the
+            // bent pitch (3 → b3 → 2, root → b7 → 5). A line that climbs on keeps the bend held
+            // rather than going up, down and up again.
+            const nextMidi = sung[i + 1];
+            const goesDown = next !== undefined && nextMidi !== undefined && nextMidi < midi;
+            if (
+                ctx.lead.bends &&
+                note.bendIn &&
+                book.release &&
+                o.dur >= STEP * 4 &&
+                sameChord &&
+                (arrival ? restsOn : goesDown) &&
+                releaseRng.chance(book.release)
+            ) {
+                note.release = true;
+            }
+            // why: a guitarist slides into a landing from a few frets away — mostly from below
+            // (two or three frets, now and then four or five), sometimes down from two above —
+            // where a horn would tongue it. Only a landing — a note struck on a chord change,
+            // the arrival the slide aims at — not already bent (the bend is that note's
+            // articulation), an eighth or longer so the slide arrives with time to ring. A
+            // two-fret slide takes a thirty-second, a longer one a sixteenth: the hand moves at
+            // about a fret every 20–30 ms at a medium tempo.
+            const span = ctx.timeline.spans[o.span];
+            const landing =
+                !!span?.chord &&
+                Math.abs(o.tick - span.start) < 1 &&
+                ctx.timeline.spans[o.span - 1]?.chord?.symbol !== span.chord.symbol;
+            if (
+                ctx.lead.family === 'guitar' &&
+                book.slide &&
+                landing &&
+                !note.bendIn &&
+                o.dur >= STEP * 2 &&
+                slideRng.chance(book.slide)
+            ) {
+                const from = slideRng.weighted<number>([
+                    [-2, 3],
+                    [-3, 3],
+                    [-4, 1.5],
+                    [-5, 1],
+                    [2, 1.5],
+                ]);
+                note.slideIn = { from, ticks: Math.abs(from) <= 2 ? STEP / 2 : STEP };
+            }
+        }
         return note;
     });
     landOnHeld(ctx, book, notes, plan.velocity);
@@ -1778,7 +1968,7 @@ function planSlot(
         role.kind !== 'head' && phrase
             ? { ...memory.phrases, [placeOf(ctx, slotStart)]: phrase }
             : memory.phrases;
-    return { notes, motif, trailing, phrase, phrases };
+    return { notes, motif, trailing, phrase, phrases, fell };
 }
 
 export function leadIdiom(book: LeadBook): PitchedIdiom {
@@ -1792,6 +1982,7 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
             trailing: 0,
             phrase: null,
             phrases: {},
+            fell: false,
         }),
         play(ctx: BarContext, memory: LeadMemory) {
             const { bar } = ctx;
@@ -1825,6 +2016,7 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
                     trailing: planned.trailing,
                     phrase: planned.phrase,
                     phrases: planned.phrases,
+                    fell: planned.fell,
                 };
             }
             const events: PitchedNote[] = next.notes
@@ -1838,6 +2030,9 @@ export function leadIdiom(book: LeadBook): PitchedIdiom {
                     offsetMs: 0,
                     bar: n.bar,
                     ...(n.bendIn ? { bendIn: n.bendIn } : {}),
+                    ...(n.release ? { release: true } : {}),
+                    ...(n.fall ? { fall: n.fall } : {}),
+                    ...(n.slideIn ? { slideIn: n.slideIn } : {}),
                     ...(n.vibrato ? { vibrato: true } : {}),
                 }));
             const last = events.at(-1)?.midi ?? next.last;

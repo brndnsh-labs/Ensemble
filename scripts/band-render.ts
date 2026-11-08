@@ -95,10 +95,15 @@ function printBars(timeline: Timeline, events: BandEvent[], count: number) {
                       : n.stroke === 'up'
                         ? '↑'
                         : n.bendIn
-                          ? `⤴${n.bendIn}`
-                          : '';
+                          ? `⤴${n.bendIn}${n.release ? '⤵' : ''}`
+                          : n.slideIn
+                            ? `⟋${n.slideIn.from > 0 ? '+' : ''}${n.slideIn.from}`
+                            : '';
+                // A fall-off (#2120) marks the note's end: ↘ and how far it drops.
                 const held =
-                    n.lane === 'lead' ? `/${Math.round(n.dur / 120)}${n.vibrato ? '~' : ''}` : '';
+                    n.lane === 'lead'
+                        ? `/${Math.round(n.dur / 120)}${n.vibrato ? '~' : ''}${n.fall ? `↘${n.fall.semitones}${n.fall.into ? '…' : ''}` : ''}`
+                        : '';
                 const name = `${NOTE[n.midi % 12]}${Math.floor(n.midi / 12) - 1}${mark}${held}`;
                 byStep.set(cell(n), [...(byStep.get(cell(n)) ?? []), name]);
             }
