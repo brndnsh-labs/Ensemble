@@ -1697,6 +1697,70 @@ function fallShape(rng: Rng, dur: number, gap: number): NonNullable<Planned['fal
     };
 }
 
+/**
+ * Where a guitarist's slide into a landing may start (#2139), as `[semitones from the landing,
+ * weight]`: a neighbouring note of the box, mostly below the landing and sometimes above it,
+ * or a chord tone a position shift away, by what the landing is to its chord. A landing that is
+ * none of these (a tension, a 6th) is not slid into. The caller keeps only the starts the
+ * style's scale holds at the chord (`LinePalette.pool`), so a slide never starts on a chromatic
+ * note picked by distance (#2120's table gave b2 → 3 and b6 → b7).
+ */
+function slideStarts(chord: ChordFacts, pc: number): [number, number][] {
+    const starts: [number, number][] = [];
+    if (pc === 4 && chord.third === 4) {
+        // why: b3 → 3, one fret: the blues player's blue third slid up to the major third —
+        // the same cry as the half-step bend (`bends.blue`), the finger moving instead of the
+        // string pushed. The one one-fret slide, by decision (#2139).
+        starts.push([-1, 1]);
+        // why: 2 → 3, two frets: the major pentatonic's neighbours, the country and Southern
+        // rock slide into the third (where the style's scale holds the 2, a rock major key's),
+        // as often as the b3 where both are held.
+        starts.push([-2, 1]);
+    }
+    if (pc === 3 && chord.third === 3) {
+        // why: R → b3, three frets: the minor pentatonic's neighbours on one string (A → C on
+        // the G string in A minor), the minor chord's third reached from its root.
+        starts.push([-3, 3]);
+        // why: 4 → b3, two frets down: the minor pentatonic's slide back onto the third.
+        starts.push([2, 1]);
+    }
+    if (pc === 0) {
+        if (chord.seventh !== 11) {
+            // why: b7 → R, two frets: the minor pentatonic's neighbour below the root — most of a
+            // blues or rock player's slides into a root. Not over a maj7, where the b7 is the
+            // wrong 7th (as a release never rests on it there, `restsOn`).
+            starts.push([-2, 3]);
+        }
+        // why: 6 → R, three frets: the major pentatonic's neighbour below the root.
+        starts.push([-3, 2]);
+        if (chord.fifth === 7) {
+            // why: 5 → R, five frets: a position shift up the string onto the root, now and then
+            // (only from a perfect 5th, not an augmented chord's #5).
+            starts.push([-5, 1]);
+        }
+        // why: 2 → R, two frets down: the slide onto the root from the note above it.
+        starts.push([2, 1]);
+    }
+    if (pc === 7 && chord.fifth === 7) {
+        // why: 4 → 5, two frets: the pentatonic box's neighbours, the commoner way into a 5th.
+        starts.push([-2, 2]);
+        if (chord.third !== null) {
+            // why: 3 → 5 (b3 → 5 on a minor chord, four frets): a position shift from the third
+            // to the fifth, the chord's own tones, less often.
+            starts.push([chord.third - 7, 1]);
+        }
+        // why: 6 → 5, two frets down: the major pentatonic's slide back onto the fifth, a rock
+        // and country move.
+        starts.push([2, 1]);
+    }
+    if (pc === 10 && chord.seventh === 10) {
+        // why: 5 → b7, three frets: the minor pentatonic's neighbours on one string (E → G on
+        // the D string in A), the dominant's b7 reached from its fifth.
+        starts.push([-3, 1]);
+    }
+    return starts;
+}
+
 function planSlot(
     ctx: BarContext,
     book: LeadBook,
@@ -1904,13 +1968,16 @@ function planSlot(
             ) {
                 note.release = true;
             }
-            // why: a guitarist slides into a landing from a few frets away — mostly from below
-            // (two or three frets, now and then four or five), sometimes down from two above —
-            // where a horn would tongue it. Only a landing — a note struck on a chord change,
-            // the arrival the slide aims at — not already bent (the bend is that note's
-            // articulation), an eighth or longer so the slide arrives with time to ring. A
-            // two-fret slide takes a thirty-second, a longer one a sixteenth: the hand moves at
-            // about a fret every 20–30 ms at a medium tempo.
+            // why: a guitarist slides into a landing where a horn would tongue it, along the
+            // string from a neighbouring note of the box, mostly below and sometimes above, or a
+            // position shift away (`slideStarts`): a scale tone of the style at this chord and
+            // key (`LinePalette.pool`), so the slide is two notes of the scale joined, never a
+            // chromatic smear (#2139). A landing with no such start isn't slid into. Only a
+            // landing — a note struck on a chord change, the arrival the slide aims at — not
+            // already bent (the bend is that note's articulation), an eighth or longer so the
+            // slide arrives with time to ring. A one- or two-fret slide takes a thirty-second, a
+            // longer one a sixteenth: the hand moves at about a fret every 20–30 ms at a medium
+            // tempo.
             const span = ctx.timeline.spans[o.span];
             const landing =
                 !!span?.chord &&
@@ -1921,17 +1988,16 @@ function planSlot(
                 book.slide &&
                 landing &&
                 !note.bendIn &&
-                o.dur >= STEP * 2 &&
-                slideRng.chance(book.slide)
+                o.dur >= STEP * 2
             ) {
-                const from = slideRng.weighted<number>([
-                    [-2, 3],
-                    [-3, 3],
-                    [-4, 1.5],
-                    [-5, 1],
-                    [2, 1.5],
-                ]);
-                note.slideIn = { from, ticks: Math.abs(from) <= 2 ? STEP / 2 : STEP };
+                const scale = book.pool(o.chord, o.key);
+                const starts = slideStarts(o.chord, pc).filter(([from]) =>
+                    scale.includes(mod12(midi + from)),
+                );
+                if (starts.length && slideRng.chance(book.slide)) {
+                    const from = slideRng.weighted<number>(starts);
+                    note.slideIn = { from, ticks: Math.abs(from) <= 2 ? STEP / 2 : STEP };
+                }
             }
         }
         return note;

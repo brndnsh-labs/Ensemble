@@ -66,8 +66,9 @@ export const rock = defineClaims({
                 ['leadBendReleases', 0.1, 0.4, 'a bend let back down: 4 → 5 → 4, b7 → root → b7'],
                 ['leadArrivalReleaseOffRest', 0, 0, 'a phrase never ends on the let-down 4'],
                 ['leadReleaseClimbs', 0, 0, 'the line goes on down from a let-down bend'],
-                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.2). Measured 0.133
-                // on the head's few unbent landings.
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.2). Measured 0.126
+                // on the head's few unbent landings (0.133 before #2139: a landing with no
+                // scale-tone start isn't slid into).
                 ['leadLandingSlides', 0.05, 0.3, 'a landing slid into now and then'],
                 ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
@@ -91,9 +92,18 @@ export const rock = defineClaims({
                 ['leadBendReleases', 0.1, 0.4, 'a bend let back down: 4 → 5 → 4, b7 → root → b7'],
                 ['leadArrivalReleaseOffRest', 0, 0, 'a phrase never ends on the let-down 4'],
                 ['leadReleaseClimbs', 0, 0, 'the line goes on down from a let-down bend'],
-                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.2). Measured 0.268.
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.2). Measured 0.255
+                // (0.268 before #2139: a landing with no scale-tone start isn't slid into).
                 ['leadLandingSlides', 0.15, 0.45, 'a landing slid into, a position shift'],
                 ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
+                // The one-fret slide (#2139), where rock's scale holds the blue third
+                // (`bluesColour`, over the I in a major key): of the unbent landings on a major
+                // 3rd, the share slid up from the b3 (2 → 3 takes the other slides). Measured 0.094 (0 with
+                // b3 → 3 out of `slideStarts`). The ceiling is the book's chance (`LeadBook.slide`
+                // 0.2), which the share passes only if slides are drawn past it: 0.388 with the
+                // chance ungated. Not claimed on the head: none in its four seeds, its few unbent
+                // 3rds slid from the 2.
+                ['leadThirdsSlidFromBlue', 0.03, 0.2, 'the blue third slid up into the 3rd'],
                 ['compLeadUnison', 0, 0.15, 'the piano voices under the tune, rarely on its note'],
                 // Measured 0.149; development off 0.040, #2012's bar fix reverted 0.067; always develops 0.26.
                 // Floor sits between the bar fix reverted (0.067) and shipped: it guards #2012's bar fix and development off (0.040).

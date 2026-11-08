@@ -152,7 +152,8 @@ export const blues = defineClaims({
                 ],
                 ['leadArrivalReleaseOffRest', 0, 0, 'a phrase ends on the blue third or the b7'],
                 ['leadReleaseClimbs', 0, 0, 'the line goes on down from a let-down bend'],
-                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.373.
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.362
+                // (0.373 before #2139: a landing with no scale-tone start isn't slid into).
                 ['leadLandingSlides', 0.2, 0.55, 'a landing slid into from a few frets away'],
                 ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
                 // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
@@ -176,9 +177,15 @@ export const blues = defineClaims({
                 ['leadBendReleases', 0.12, 0.45, 'a bend let back down, the blues cry'],
                 ['leadArrivalReleaseOffRest', 0, 0, 'a phrase ends on the blue third or the b7'],
                 ['leadReleaseClimbs', 0, 0, 'the line goes on down from a let-down bend'],
-                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.260.
+                // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.252
+                // (0.260 before #2139: a landing with no scale-tone start isn't slid into).
                 ['leadLandingSlides', 0.15, 0.45, 'a landing slid into from a few frets away'],
                 ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
+                // The one-fret slide (#2139): of the unbent landings on a major 3rd, the share slid
+                // up from the b3. Measured 0.157 (0 with b3 → 3 out of `slideStarts`). The ceiling
+                // is the book's chance (`LeadBook.slide` 0.25), which the share passes only if
+                // slides are drawn past it: 0.820 with the chance ungated.
+                ['leadThirdsSlidFromBlue', 0.06, 0.25, 'the blue third slid up into the 3rd'],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 // Measured 0.134; development off 0.061, #2012's bar fix reverted 0.071; always develops 0.40.
                 // Floor sits between the bar fix reverted (0.071) and shipped: it guards #2012's bar fix and development off (0.061).

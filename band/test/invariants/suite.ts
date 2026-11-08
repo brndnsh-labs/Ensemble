@@ -19,7 +19,7 @@ import {
     type TradeSettings,
 } from '../../core/types.js';
 import { MAX_CHARACTER_MS } from '../../feel/feel.js';
-import { compileTimeline, type Timeline } from '../../form/timeline.js';
+import { chordAt, compileTimeline, type Timeline } from '../../form/timeline.js';
 import { type PassMemory, performPass } from '../../perform.js';
 import { isPlayable } from '../../players/comp/fretboard.js';
 import { COMP_INSTRUMENTS } from '../../players/comp/instruments.js';
@@ -28,7 +28,7 @@ import { LEAD_INSTRUMENTS } from '../../players/lead/instruments.js';
 import { feelFor, STYLE_IDS, STYLES } from '../../styles/index.js';
 import type { Feel } from '../../styles/types.js';
 import { type ChordFacts, chordPcs, fifthOf } from '../../theory/chord.js';
-import { mod12 } from '../../theory/pitch.js';
+import { type KeyContext, mod12 } from '../../theory/pitch.js';
 import { COUNTED_FIXTURES, FIXTURES, METER_ENDINGS, VAMP_FIXTURES } from '../scores.js';
 
 const SEEDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
@@ -75,6 +75,23 @@ function doublesTheBass(midi: number, grip: number[], chord: ChordFacts | null |
         (pc === chord.bass || pc === chord.root || pc === fifth)
     );
 }
+/**
+ * The scale tones under a guitarist's hand at a chord, in a key (#2139), as pitch classes: the
+ * chord's own tones and scale (`ChordFacts.scale`), and the key's blues scale and, in a major
+ * key, its major pentatonic — the boxes a blues or rock player moves through. A slide
+ * (`PitchedNote.slideIn`) starting on any other note starts on a chromatic one. Read
+ * independently of the styles' own pools (`LinePalette.pool`); it holds the blues and rock pools.
+ */
+function handScale(chord: ChordFacts, key: KeyContext): Set<number> {
+    // The blues scale is 1 b3 4 b5 5 b7; the major pentatonic 1 2 3 5 6.
+    const boxes = key.minor ? [0, 3, 5, 6, 7, 10] : [0, 3, 5, 6, 7, 10, 2, 4, 9];
+    return new Set([
+        ...chordPcs(chord),
+        ...chord.scale.map((d) => mod12(chord.root + d)),
+        ...boxes.map((d) => mod12(key.tonic + d)),
+    ]);
+}
+
 /**
  * The styles whose comp plays power chords on purpose, and so the only ones where a power
  * chord (`isPowerChord`) is exempt from the guide-tone rule:
@@ -716,8 +733,20 @@ function checkPass(
             if (family !== 'guitar') {
                 fail(n, `a ${settings.lead} slides`);
             }
-            if (!Number.isInteger(from) || Math.abs(from) < 2 || Math.abs(from) > 5) {
+            // The hand moves two to five frets along the string from a scale tone of the chord
+            // and key (`handScale`). One fret only from the blue third up to a major third:
+            // b3 → 3 is the one one-fret slide, by decision (#2139).
+            const chord = chordAt(timeline, n.tick);
+            const blueThird = from === -1 && chord?.third === 4 && mod12(n.midi - chord.root) === 4;
+            if (
+                !Number.isInteger(from) ||
+                Math.abs(from) > 5 ||
+                (Math.abs(from) < 2 && !blueThird)
+            ) {
                 fail(n, `slides from ${from} semitones`);
+            }
+            if (!chord || !handScale(chord, timeline.bars[n.bar].key).has(mod12(n.midi + from))) {
+                fail(n, `slides from ${from}, off the scale under the hand`);
             }
             // A slide is a quick move of the hand, a sixteenth at most. Swing or a cut may leave
             // the note shorter than the player wrote it; the host fits the slide into half of
