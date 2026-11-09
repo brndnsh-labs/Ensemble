@@ -139,6 +139,8 @@ const boomBapBook: DrumBook = {
     name: 'boom-bap',
     timekeeper: ['hat', 'hatOpen'],
     fillLength: FILL_LENGTH,
+    // why: the loop's last boom, the kick alone on 1, no snare and no cymbal: the beat cuts.
+    ending: () => ({ kick: 'X' }),
     groove(ctx, tier) {
         // why: 'song' scope — the record's one beat, not a per-section re-roll. Hats and
         // ghosts (below) stay per-section: the layers that thin and thicken with energy.
@@ -617,4 +619,7 @@ export const hiphop: Style = {
     // tonic seventh, major or minor — and on a dominant tonic its own seventh, the b7, not a
     // major 7th the loop never had (#1502).
     ending: { major: 'maj7', minor: 'm7', dominant: '7' },
+    // why: a beat ends the way a record cut does: the loop stops on the One, no fill
+    // announcing it, the last chord clipped short.
+    endingGesture: { kind: 'stop', setup: false },
 };

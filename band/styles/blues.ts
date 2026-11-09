@@ -109,6 +109,9 @@ const shuffleKit = drumIdiom({
     // A quiet blues plays through its phrase ends; a turnaround gets a snare pickup, a new
     // chorus a bar-end run.
     fillLength: { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 2, mid: 4, high: 8 } },
+    // why: the shuffle's bass drum and the crash on 1 under the ringing I9, no snare: the
+    // backbeat stops with the shuffle. Country's book plays the same line (see country).
+    ending: () => ({ crash: 'X', kick: 'X' }),
     groove(ctx, tier) {
         const kick = ctx.rng('kick', 'section').weighted(BLUES_KICKS.map(([k, w]) => [k, w[tier]]));
         if (tier === 'low') {
@@ -835,4 +838,7 @@ export const blues: Style = {
     // on its im9. A blues band ends a non-blues tune on its I9 too: that b7 is the genre's
     // own sound, not a change of the tonic's job (#1502).
     ending: { major: '9', minor: 'm9', dominant: '9' },
+    // why: the blues band rolls into the I9 (the set-up fill) and lets it ring, the guitar's
+    // last chord hanging over the crash.
+    endingGesture: { kind: 'hold', setup: true },
 };

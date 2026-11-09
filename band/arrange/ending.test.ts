@@ -15,11 +15,15 @@ import {
 } from '../core/types.js';
 import { chorusBars, compileTimeline, type Timeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
+import { dyn, readLine, STEP } from '../players/grid.js';
+import { endWithTheBand } from '../players/lead/idiom.js';
 import { STYLE_IDS, STYLES } from '../styles/index.js';
+import type { BarContext, EndingGesture } from '../styles/types.js';
 import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
 import { chordPcs } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import { heldEnding } from './ending.js';
+import { fullWindow, planBars } from './plan.js';
 
 const SEEDS = ['a', 'b', 'c'];
 
@@ -34,6 +38,74 @@ function settingsFor(style: StyleId, seed: string): BandSettings {
     };
 }
 
+/** A short ending strike (a stop, a hit, the button): an eighth, in ticks. */
+const SHORT = 2 * STEP;
+/** The gestures whose last strike is short (#2017). */
+const SHORT_KINDS = new Set<EndingGesture['kind']>(['stop']);
+/** The gestures in which a chord before home rings into it (`| G7 C |`'s V held to the I). */
+const RINGS_INTO_HOME = new Set<EndingGesture['kind']>(['hold', 'soft', 'button']);
+
+/**
+ * Where an ending strikes home, as steps of a 4/4 bar, written out by gesture kind (#2017)
+ * rather than read back from the engine: home's own strike (`arrival`), then the button's
+ * short hit on the "and" of 4, or the hits' beats (quarters, in 4/4) measured from home, as
+ * many as fit.
+ */
+function homeSteps(style: StyleId, arrival: number): number[] {
+    const gesture = STYLES[style].endingGesture;
+    if (gesture.kind === 'button') {
+        return arrival < 14 ? [arrival, 14] : [arrival];
+    }
+    if (gesture.kind === 'hits') {
+        return [...new Set([0, ...(gesture.at ?? [])])]
+            .map((beat) => beat * 4 + arrival)
+            .filter((step) => step < 16);
+    }
+    return [arrival];
+}
+
+/**
+ * Each style's last bar on the kit (`DrumBook.ending`, #2017), written out by hand: the book's
+ * lines, which the kit plays as written on a bar that is home on its downbeat.
+ */
+const ENDING_DRUMS: Record<StyleId, Record<string, string>> = {
+    rock: { crash: 'X', kick: 'X', tomLow: 'X' },
+    metal: { crash: '........X', kick: 'X...X...X', snare: 'X...X...X' },
+    funk: { kick: 'X', snare: 'X', hat: 'X' },
+    disco: { crash: 'X', kick: 'X', snare: 'X', shaker: 'x' },
+    hiphop: { kick: 'X' },
+    blues: { crash: 'X', kick: 'X' },
+    jazz: { ride: 'X', kick: 'x.............X.', snare: '..............X.' },
+    bossa: { rim: 'x', kick: 'o' },
+    neosoul: { kick: 'o', hatOpen: 'o' },
+    acoustic: { kick: 'o', snare: 'o' },
+    country: { crash: 'X', kick: 'X' },
+    reggae: { kick: 'X', rim: 'X' },
+    skapunk: { crash: 'X', kick: 'X', snare: 'X' },
+};
+/**
+ * The styles whose books play the same last bar (their why-comments say so). Blues and country
+ * end on the same kick and crash: no country-only last hit was found to write (#2017), so this
+ * pair waits on the ear rather than an invented difference.
+ */
+const SHARED_ENDINGS = [['blues', 'country']];
+
+/**
+ * The pieces a book's last bar strikes where home lands (`arrival`), sorted: its downbeat's.
+ * In the hits, a bar with room for fewer of them drops the first, so home takes the strokes
+ * of the first hit that still fits (the last one alone: metal's crash).
+ */
+function homeStrokesOf(style: StyleId, arrival: number) {
+    const gesture = STYLES[style].endingGesture;
+    const beats = [...new Set([0, ...(gesture.at ?? [])])];
+    const step =
+        gesture.kind === 'hits' ? 4 * beats[beats.length - homeSteps(style, arrival).length] : 0;
+    return Object.entries(ENDING_DRUMS[style])
+        .filter(([, line]) => (line[step] ?? '.') !== '.')
+        .map(([piece]) => piece)
+        .sort();
+}
+
 /** The pitched notes the pass plays in its last bar, by lane. */
 function lastBar(timeline: Timeline, events: BandEvent[]) {
     const index = timeline.bars.length - 1;
@@ -41,6 +113,12 @@ function lastBar(timeline: Timeline, events: BandEvent[]) {
     const lane = (name: PitchedNote['lane']) => notes.filter((n) => n.lane === name);
     return { bass: lane('bass'), comp: lane('comp'), lead: lane('lead') };
 }
+
+/**
+ * The pitch classes a lane strikes, in the order first struck: what chord it plays, whatever
+ * the ending's rhythm (a button or the hits strike the tonic again, #2017).
+ */
+const struckPcs = (notes: PitchedNote[]) => [...new Set(notes.map((n) => mod12(n.midi)))];
 
 const pcsOf = (notes: PitchedNote[]) =>
     new Set(notes.filter((n) => !n.muted).map((n) => mod12(n.midi)));
@@ -104,10 +182,7 @@ function expectResolved(
     const bar = timeline.bars.at(-1)!;
     const { pcs, defining } = expectedChord(style, bar.key.tonic, family);
     const { bass, comp, lead } = lastBar(timeline, events);
-    expect(
-        bass.map((n) => mod12(n.midi)),
-        `${where}: the bass holds the tonic`,
-    ).toEqual([bar.key.tonic]);
+    expect(struckPcs(bass), `${where}: the bass holds the tonic`).toEqual([bar.key.tonic]);
     const sounding = pcsOf(comp);
     expect(sounding.size, `${where}: the comp plays the last chord`).toBeGreaterThan(0);
     for (const pc of defining) {
@@ -467,10 +542,7 @@ describe('an ending already home, or written, is played as written', () => {
                     looping: false,
                 });
                 const { bass, comp } = lastBar(timeline, events);
-                expect(
-                    bass.map((n) => mod12(n.midi)),
-                    style,
-                ).toEqual([chord.bass]);
+                expect(struckPcs(bass), style).toEqual([chord.bass]);
                 // The comp sounds the written chord's own tones (its colour kept), within the
                 // tones the chart writes there.
                 const sounding = pcsOf(comp);
@@ -545,29 +617,50 @@ describe('an ending already home, or written, is played as written', () => {
                             { pass: 0, looping: false },
                         );
                         const played = lastBar(timeline, events);
-                        // Funk's ending is short hits (a half note at most), so its bass strikes
-                        // the C again under the resolution rather than letting it stop short.
-                        const notes =
-                            style === 'funk' && line.length === 1 ? [line[0], line[0]] : line;
+                        // Home is struck in the style's gesture (#2017): its button or hits
+                        // strike it again after the I lands. An ending that rings holds the sus's
+                        // root through its resolution; a short one strikes the C again under it.
+                        const { kind } = STYLES[style].endingGesture;
+                        const again = homeSteps(style, (home.start - bar.start) / STEP).length - 1;
+                        const merged = line.length === 1 && RINGS_INTO_HOME.has(kind);
                         expect(
-                            played.bass.map((n) => [n.tick, mod12(n.midi)]),
+                            played.bass.map((n) => mod12(n.midi)),
                             `${where}: the bass`,
-                        ).toEqual(notes.map((pc, k) => [k === 0 ? bar.start : home.start, pc]));
-                        // The bass's last note rings to the end of the bar, its first (when it
-                        // moves) up to the change.
-                        expect(played.bass.at(-1)!.tick + played.bass.at(-1)!.dur, where).toBe(end);
-                        if (notes.length > 1) {
-                            // (Funk's ending hits last a half note at most.)
+                        ).toEqual([line[0], ...Array(again + (merged ? 0 : 1)).fill(line.at(-1))]);
+                        const ticks = played.bass.map((n) => n.tick);
+                        expect(ticks[0], `${where}: the V on 1`).toBe(bar.start);
+                        if (!merged) {
+                            expect(ticks[1], `${where}: the I where it is written`).toBe(
+                                home.start,
+                            );
+                        }
+                        expect(
+                            ticks.slice(merged ? 1 : 2).every((t) => t > home.start),
+                            `${where}: home struck again after it lands`,
+                        ).toBe(true);
+                        // The bass's last note rings to the end of the bar (an eighth, in a short
+                        // ending), its first (when it moves) up to the change.
+                        const final = played.bass.at(-1)!;
+                        expect(final.tick + final.dur, where).toBe(
+                            SHORT_KINDS.has(kind) ? final.tick + SHORT : end,
+                        );
+                        if (line.length > 1) {
                             expect(played.bass[0].dur, where).toBe(
-                                Math.min(home.start - bar.start, style === 'funk' ? 960 : Infinity),
+                                RINGS_INTO_HOME.has(kind) ? home.start - bar.start : SHORT,
                             );
                         }
                         const chords = played.comp.filter((n) => !n.muted);
                         const at1 = chords.filter((n) => n.tick === bar.start);
                         const at3 = chords.filter((n) => n.tick === home.start);
-                        expect(at1.length + at3.length, `${where}: only two strikes`).toBe(
-                            chords.length,
-                        );
+                        const later = chords.filter((n) => n.tick > home.start);
+                        expect(
+                            at1.length + at3.length + later.length,
+                            `${where}: struck on 1, where home lands, and after it`,
+                        ).toBe(chords.length);
+                        expect(
+                            new Set(later.map((n) => n.tick)).size,
+                            `${where}: home's strikes after it lands`,
+                        ).toBe(again);
                         const tones = (chord: typeof struck.chord) =>
                             new Set([
                                 ...chordPcs(chord!),
@@ -597,15 +690,23 @@ describe('an ending already home, or written, is played as written', () => {
                                 `${where}: ${symbol}'s 3rd`,
                             ).toBe(true);
                         }
-                        // The drummer catches the arrival with the band: one crash, where the I
-                        // lands, and a kick under the V.
+                        // The drummer catches the arrival with the band: the book's last bar
+                        // moves to where the I lands (no crash under the V), and a kick alone
+                        // catches the V.
                         const kit = events.filter((e) => e.lane === 'drums' && e.bar === bar.index);
                         expect(
                             kit
-                                .filter((e) => e.lane === 'drums' && e.piece === 'crash')
-                                .map((e) => e.tick),
-                            `${where}: one crash, on 3`,
-                        ).toEqual([home.start]);
+                                .filter((e) => e.tick < home.start)
+                                .map((e) => e.lane === 'drums' && e.piece),
+                            `${where}: the kick alone under the V`,
+                        ).toEqual(['kick']);
+                        expect(
+                            kit
+                                .filter((e) => e.tick === home.start)
+                                .map((e) => e.lane === 'drums' && e.piece)
+                                .sort(),
+                            `${where}: the book's downbeat, where the I lands`,
+                        ).toEqual(homeStrokesOf(style, (home.start - bar.start) / STEP));
                         expect(
                             kit.some(
                                 (e) =>
@@ -617,13 +718,15 @@ describe('an ending already home, or written, is played as written', () => {
                         ).toBe(true);
                         // The lead resolves with the band: its last note is struck where the I
                         // arrives (or rings into it), on a tone of the I, held to the end.
+                        // In a stop it lets go with the band's eighth (#2017); in the button
+                        // and the hits it plays the band's last strike, ringing to the end.
                         const sung = played.lead.at(-1);
                         if (sung) {
                             leads++;
                             expect(
                                 sung.tick + sung.dur,
-                                `${where}: the lead ends with the bar`,
-                            ).toBe(end);
+                                `${where}: the lead ends with the band`,
+                            ).toBe(SHORT_KINDS.has(kind) ? home.start + SHORT : end);
                             expect(
                                 sung.tick + sung.dur > home.start &&
                                     chordPcs(home.chord!).includes(mod12(sung.midi)),
@@ -655,25 +758,32 @@ describe('an ending already home, or written, is played as written', () => {
         expect(leads).toBeGreaterThan(40);
     });
 
-    it('a last bar of one chord, resolved or home, is struck once on its downbeat', () => {
-        // `| … | G7 |` resolves to the tonic, `| … | C |` is home: neither is split.
+    it('a last bar of one chord, resolved or home, is struck from its downbeat, only where its gesture strikes', () => {
+        // `| … | G7 |` resolves to the tonic, `| … | C |` is home: neither is split. The
+        // gesture strikes home again only on its button or its hits (#2017). Straight, so the
+        // button's "and" of 4 is on the grid.
         for (const bars of ['C | Am7 | Dm7 | G7', 'C | Am7 | Dm7 | C']) {
             const timeline = compileTimeline(score([{ label: 'A', bars }]));
             const bar = timeline.bars[3];
             for (const style of STYLE_IDS) {
-                const { events } = performPass(timeline, settingsFor(style, 'a'), {
-                    pass: 0,
-                    looping: false,
-                });
+                const { events } = performPass(
+                    timeline,
+                    { ...settingsFor(style, 'a'), swing: 0 },
+                    { pass: 0, looping: false },
+                );
                 const played = lastBar(timeline, events);
                 expect(
                     new Set([...played.bass, ...played.comp].map((n) => n.tick)),
                     `${style} ${bars}`,
-                ).toEqual(new Set([bar.start]));
+                ).toEqual(new Set(homeSteps(style, 0).map((at) => bar.start + at * STEP)));
                 expect(
                     events.filter((e) => e.lane === 'drums' && e.bar === 3).map((e) => e.tick),
                     `${style} ${bars}`,
-                ).toEqual([bar.start, bar.start]);
+                ).toEqual(
+                    Object.values(ENDING_DRUMS[style])
+                        .flatMap((line) => readLine(line).map(([at]) => bar.start + at * STEP))
+                        .sort((a, b) => a - b),
+                );
             }
         }
     });
@@ -702,15 +812,18 @@ describe('an ending already home, or written, is played as written', () => {
                 looping: false,
             });
             const { bass, comp, lead } = lastBar(timeline, events);
-            expect(
-                bass.map((n) => mod12(n.midi)),
-                style,
-            ).toEqual([0]);
+            expect(struckPcs(bass), style).toEqual([0]);
             for (const n of [...bass, ...comp, ...lead]) {
                 // Struck before the rest, and silent by it (a strum's roll may land a hair
                 // late; the note still ends at the rest).
                 expect(n.tick + n.dur, `${style} ${n.lane}`).toBeLessThanOrEqual(rest + 1);
             }
+            // Nor does the kit strike in the rest: metal's third stab and jazz's button fall
+            // inside it, and are not played (#2017).
+            expect(
+                events.filter((e) => e.lane === 'drums' && e.bar === bar.index && e.tick >= rest),
+                `${style} drums`,
+            ).toEqual([]);
         }
     });
 
@@ -739,10 +852,9 @@ describe('an ending already home, or written, is played as written', () => {
                 });
                 // The F blues runs on to its bar 5, `Gm7 C7`: that C7 is the V7 of the F7 it
                 // opens on, and it ends on F (#1521; it used to resolve into C).
-                expect(
-                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
-                    `${style} ${bars}`,
-                ).toEqual([timeline.bars.length === 4 ? written.bass : 5]);
+                expect(struckPcs(lastBar(timeline, events).bass), `${style} ${bars}`).toEqual([
+                    timeline.bars.length === 4 ? written.bass : 5,
+                ]);
             }
         }
         // An F tune ending on its ii–V and an A minor tune ending on E7 used to hold their
@@ -784,10 +896,9 @@ describe('an ending already home, or written, is played as written', () => {
                     pass: 0,
                     looping: false,
                 });
-                expect(
-                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
-                    `${style} ${bars}`,
-                ).toEqual([root]);
+                expect(struckPcs(lastBar(timeline, events).bass), `${style} ${bars}`).toEqual([
+                    root,
+                ]);
             }
         }
         // A tune that opens on its V doesn't end at home on it: `G7 | C | F | G7` in C resolves.
@@ -814,10 +925,7 @@ describe('an ending already home, or written, is played as written', () => {
                     pass: 0,
                     looping: false,
                 });
-                expect(
-                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
-                    `${style} ${bars}`,
-                ).toEqual([0]);
+                expect(struckPcs(lastBar(timeline, events).bass), `${style} ${bars}`).toEqual([0]);
             }
         }
         // One that reaches the opening chord later in the bar gets home itself: `D7 G` strikes
@@ -848,10 +956,9 @@ describe('an ending already home, or written, is played as written', () => {
                     pass: 0,
                     looping: false,
                 });
-                expect(
-                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
-                    `${style} ${bars}`,
-                ).toEqual([root]);
+                expect(struckPcs(lastBar(timeline, events).bass), `${style} ${bars}`).toEqual([
+                    root,
+                ]);
             }
         }
         // A minor key's dorian i7–IV7 is its tonic: `Em7 | A7` in E minor ends on Em.
@@ -880,10 +987,9 @@ describe('an ending already home, or written, is played as written', () => {
                     pass: 0,
                     looping: false,
                 });
-                expect(
-                    lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
-                    `${style} ${bars}`,
-                ).toEqual([tonic]);
+                expect(struckPcs(lastBar(timeline, events).bass), `${style} ${bars}`).toEqual([
+                    tonic,
+                ]);
             }
         }
     });
@@ -924,10 +1030,7 @@ describe('an ending already home, or written, is played as written', () => {
                 pass: 0,
                 looping: false,
             });
-            expect(
-                lastBar(timeline, events).bass.map((n) => mod12(n.midi)),
-                style,
-            ).toEqual([1]);
+            expect(struckPcs(lastBar(timeline, events).bass), style).toEqual([1]);
         }
     });
 
@@ -956,10 +1059,7 @@ describe('an ending already home, or written, is played as written', () => {
                 looping: false,
             });
             const { bass } = lastBar(timeline, events);
-            expect(
-                bass.map((n) => mod12(n.midi)),
-                style,
-            ).toEqual([8]);
+            expect(struckPcs(bass), style).toEqual([8]);
         }
         // The same chart uncounted never takes its coda, so it has no written ending: an
         // export's last bar is the form's G7, resolved.
@@ -1014,12 +1114,20 @@ describe('a chart typed without its key, read one chord at a time (#1521)', () =
                         ),
                         `${where}: the V in the bass`,
                     ).toBe(true);
-                    const held = bass.at(-1)!;
+                    // The I struck where it is written (and, in a button or the hits, again
+                    // after it: #2017), its last note ringing to the end of the bar, or an
+                    // eighth in a short ending.
+                    const held = bass.find((n) => n.tick >= home.start)!;
                     expect([held.tick, mod12(held.midi)], `${where}: the I`).toEqual([
                         home.start,
                         home.chord!.root,
                     ]);
-                    expect(held.tick + held.dur, where).toBe(bar.start + bar.meter.barTicks);
+                    const final = bass.at(-1)!;
+                    expect(final.tick + final.dur, where).toBe(
+                        SHORT_KINDS.has(STYLES[style].endingGesture.kind)
+                            ? final.tick + SHORT
+                            : bar.start + bar.meter.barTicks,
+                    );
                     expect(
                         comp.some((n) => !n.muted && n.tick === home.start),
                         `${where}: the comp strikes the I`,
@@ -1278,3 +1386,451 @@ function minorGroove() {
         isMinor: true,
     });
 }
+
+describe('every style ends in its own gesture, set up or not (#2017)', () => {
+    // The blues fixture's last bar is a turnaround the band resolves, home on its downbeat.
+    // Straight and unhumanized, so every strike sits on the grid the players write on.
+    const timeline = compileTimeline(FIXTURES.blues);
+    const bar = timeline.bars.at(-1)!;
+    const before = timeline.bars.at(-2)!;
+    const straight = (style: StyleId, seed: string): BandSettings => ({
+        ...settingsFor(style, seed),
+        swing: 0,
+        humanize: 0,
+    });
+    const planOf = (style: StyleId, looping: boolean) =>
+        planBars(timeline, straight(style, 'a'), {
+            pass: 0,
+            looping,
+            window: fullWindow(timeline),
+            endingGesture: STYLES[style].endingGesture,
+            keepsHighLine: STYLES[style].keepsHighLine,
+        });
+    const kitIn = (events: BandEvent[], index: number) =>
+        events
+            .filter((e) => e.lane === 'drums' && e.bar === index)
+            .map((e) => [e.lane === 'drums' ? e.piece : '', e.tick, e.velocity] as const)
+            .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+    const step = (tick: number) => Math.round((tick - bar.start) / STEP);
+
+    it.each(STYLE_IDS)("%s: the kit's last bar is its book's ending", (style) => {
+        // Catches a kit that ignores the book (the crash and kick every style shared before
+        // #2017) and a book whose line drifts from the table above.
+        const { energy } = planOf(style, false)[bar.index];
+        const expected = Object.entries(ENDING_DRUMS[style])
+            .flatMap(([piece, line]) =>
+                readLine(line).map(
+                    ([at, velocity]) =>
+                        [piece, bar.start + at * STEP, dyn(velocity, energy)] as const,
+                ),
+            )
+            .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+        for (const seed of SEEDS) {
+            const { events } = performPass(timeline, straight(style, seed), {
+                pass: 0,
+                looping: false,
+            });
+            expect(kitIn(events, bar.index), `${style}/${seed}`).toEqual(expected);
+        }
+    });
+
+    it('no two styles end on the same drum bar, but the two that say so; a soft end crashes nowhere', () => {
+        // Catches two books collapsing into one ending (the issue's bossa on metal's crash), and
+        // a soft ending that crashes.
+        const key = (style: StyleId) => JSON.stringify(Object.entries(ENDING_DRUMS[style]).sort());
+        for (const [i, a] of STYLE_IDS.entries()) {
+            for (const b of STYLE_IDS.slice(i + 1)) {
+                const shared = SHARED_ENDINGS.some((pair) => pair.includes(a) && pair.includes(b));
+                expect(key(a) === key(b), `${a} and ${b}`).toBe(shared);
+            }
+            if (STYLES[a].endingGesture.kind === 'soft') {
+                expect(Object.keys(ENDING_DRUMS[a]), a).not.toContain('crash');
+            }
+        }
+    });
+
+    it.each(STYLE_IDS)('%s: bass and comp strike the last chord in its gesture', (style) => {
+        // Catches a lane that holds every ending (the bass or the comp ignoring the gesture),
+        // and a sustaining organ ringing a short ending out (`sustain` in perform.ts).
+        const gesture = STYLES[style].endingGesture;
+        // [onset, end] steps of each strike, written out by kind.
+        const expected =
+            gesture.kind === 'stop'
+                ? [[0, 2]]
+                : gesture.kind === 'button'
+                  ? [
+                        [0, 14],
+                        [14, 16],
+                    ]
+                  : gesture.kind === 'hits'
+                    ? homeSteps(style, 0).map((at, k, all) => [
+                          at,
+                          k === all.length - 1 ? 16 : at + 2,
+                      ])
+                    : [[0, 16]];
+        const { energy } = planOf(style, false)[bar.index];
+        for (const comp of new Set([STYLES[style].prefers, 'organ'] as const)) {
+            for (const seed of SEEDS) {
+                const where = `${style}/${comp}/${seed}`;
+                const { events } = performPass(
+                    timeline,
+                    { ...straight(style, seed), comp },
+                    { pass: 0, looping: false },
+                );
+                const played = lastBar(timeline, events);
+                const strikes = (notes: PitchedNote[]) => [
+                    ...new Map(
+                        notes
+                            .filter((n) => !n.muted)
+                            .map((n) => [step(n.tick), [step(n.tick), step(n.tick + n.dur)]]),
+                    ).values(),
+                ];
+                expect(
+                    played.bass.map((n) => [step(n.tick), step(n.tick + n.dur)]),
+                    `${where}: the bass`,
+                ).toEqual(expected);
+                expect(strikes(played.comp), `${where}: the comp's strikes`).toEqual(expected);
+                for (const n of played.comp.filter((c) => !c.muted)) {
+                    // Every voice of a strike lasts as the strike does.
+                    expect(
+                        expected.some(
+                            ([from, to]) => from === step(n.tick) && to === step(n.tick + n.dur),
+                        ),
+                        `${where}: comp ${n.midi}@${step(n.tick)}`,
+                    ).toBe(true);
+                }
+                if (gesture.kind === 'button') {
+                    // The button is the accent: struck harder than the chord it ends.
+                    const [chord, button] = expected.map(([from]) =>
+                        played.comp.filter((n) => !n.muted && step(n.tick) === from),
+                    );
+                    for (const n of button) {
+                        expect(n.velocity, `${where}: the comp's button`).toBe(dyn(104, energy));
+                    }
+                    expect(chord[0].velocity, `${where}: the held chord`).toBe(dyn(92, energy));
+                    expect(played.bass[1].velocity, `${where}: the bass's button`).toBe(
+                        played.bass[0].velocity + 12,
+                    );
+                }
+                if (gesture.kind === 'soft') {
+                    // Quietly: the comp at 72 where a held ending strikes at 92, the bass at
+                    // four fifths of what its style ends on (none ends louder than 96).
+                    for (const n of played.comp.filter((c) => !c.muted)) {
+                        expect(n.velocity, `${where}: the comp lets go`).toBe(dyn(72, energy));
+                    }
+                    expect(played.bass[0].velocity, `${where}: the bass`).toBeLessThanOrEqual(
+                        Math.round(dyn(96, energy) * 0.8),
+                    );
+                }
+            }
+        }
+    });
+
+    it.each(STYLE_IDS)('%s: the bar before sets the ending up, or plays its time', (style) => {
+        // Catches a set-up that never comes (`fillAt` ignoring `setup`), and one played in a
+        // style that ends without it.
+        const fill = (events: BandEvent[]) =>
+            new Set(
+                events
+                    .filter(
+                        (e) =>
+                            e.lane === 'drums' &&
+                            e.bar === before.index &&
+                            /^(snare|ghost|tom)/.test(e.piece) &&
+                            e.tick >= before.start + 12 * STEP,
+                    )
+                    .map((e) => (e.lane === 'drums' ? `${e.piece}@${e.tick}` : '')),
+            );
+        // The bar before plays its time when the song goes round: there is nothing to set up.
+        expect(planOf(style, true)[before.index].fill, style).toBe('none');
+        for (const seed of SEEDS) {
+            const where = `${style}/${seed}`;
+            const ending = performPass(timeline, straight(style, seed), {
+                pass: 0,
+                looping: false,
+            });
+            const looping = performPass(timeline, straight(style, seed), {
+                pass: 0,
+                looping: true,
+            });
+            if (STYLES[style].endingGesture.setup) {
+                expect(planOf(style, false)[before.index].fill, where).toBe('section');
+                const time = fill(looping.events);
+                expect(
+                    [...fill(ending.events)].some((hit) => !time.has(hit)),
+                    `${where}: a snare or tom figure into the end`,
+                ).toBe(true);
+            } else {
+                expect(kitIn(ending.events, before.index), `${where}: its time`).toEqual(
+                    kitIn(looping.events, before.index),
+                );
+            }
+        }
+    });
+});
+
+describe('a button needs room before it (#2017)', () => {
+    it('home arriving on the last eighth rings alone, struck once', () => {
+        // Catches a button laid on top of the I's own strike (two strikes on one tick, the
+        // first lasting nothing) when the I lands where the button would. In 7/8 the bar's
+        // last eighth is its seventh: `G7:6 C:1` brings C home there.
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'C | F | Dm7 | G7:6 C:1' }], { meter: '7/8' }),
+        );
+        const bar = timeline.bars[3];
+        const home = bar.spans[1];
+        const { events } = performPass(
+            timeline,
+            { ...settingsFor('jazz', 'a'), swing: 0 },
+            { pass: 0, looping: false },
+        );
+        const { bass, comp } = lastBar(timeline, events);
+        for (const notes of [bass, comp.filter((n) => !n.muted)]) {
+            const atHome = notes.filter((n) => n.tick >= home.start);
+            expect(new Set(atHome.map((n) => n.tick))).toEqual(new Set([home.start]));
+            for (const n of atHome) {
+                expect(n.tick + n.dur).toBe(bar.start + bar.meter.barTicks);
+            }
+        }
+    });
+});
+
+describe('the whole band ends together (#2017)', () => {
+    const straight = (style: StyleId, seed: string): BandSettings => ({
+        ...settingsFor(style, seed),
+        lanes: { drums: true, bass: true, comp: true, lead: true },
+        swing: 0,
+        humanize: 0,
+    });
+
+    it.each(['funk', 'metal', 'jazz'] as const)('%s: the lead lets go with the band', (style) => {
+        // Catches a lead holding a note over the band's silence (a half note over a funk stop,
+        // over the silence after its stab on the V of `G7:2 C:2`, or between metal's stabs),
+        // and a lead that misses the button it is holding into.
+        const gesture = STYLES[style].endingGesture;
+        let restrikes = 0;
+        for (const bars of [
+            FIXTURES.blues,
+            score([{ label: 'A', bars: 'C | F | Dm7 | G7 C' }]),
+            score([{ label: 'A', bars: 'C | F | Dm7 | G7:2 C:2' }]),
+        ]) {
+            const timeline = compileTimeline(bars);
+            const bar = timeline.bars.at(-1)!;
+            const home = (heldEnding(timeline, bar.index, STYLES[style].ending) ?? bar).spans
+                .filter((span) => span.chord)
+                .at(-1)!;
+            const arrival = (home.start - bar.start) / STEP;
+            const hits = homeSteps(style, arrival).map((at) => bar.start + at * STEP);
+            const end = bar.start + bar.meter.barTicks;
+            for (const seed of SEEDS) {
+                const where = `${style}/${seed} ${bar.index + 1} bars`;
+                const { events } = performPass(timeline, straight(style, seed), {
+                    pass: 0,
+                    looping: false,
+                });
+                const { bass, lead } = lastBar(timeline, events);
+                const sung = lead.filter((n) => n.tick + n.dur > home.start);
+                if (gesture.kind !== 'button') {
+                    // Each lead note lets go where the band's strike it sounds under does (the
+                    // bass strikes with the band); one struck in a silence between strikes is
+                    // an eighth at most.
+                    for (const n of lead) {
+                        const under = bass.filter((b) => b.tick <= n.tick).at(-1);
+                        expect(
+                            n.tick + n.dur,
+                            `${where}: lead ${n.midi}@${n.tick}`,
+                        ).toBeLessThanOrEqual(
+                            Math.max(under ? under.tick + under.dur : 0, n.tick + SHORT),
+                        );
+                    }
+                }
+                if (gesture.kind === 'stop') {
+                    // Nothing sounds past the band's eighth.
+                    for (const n of lead) {
+                        expect(n.tick + n.dur, where).toBeLessThanOrEqual(home.start + SHORT);
+                    }
+                } else if (gesture.kind === 'hits') {
+                    // A note struck on a stab lets go with it; the last rings with the last hit.
+                    for (const n of lead.filter((l) => hits.slice(0, -1).includes(l.tick))) {
+                        expect(n.tick + n.dur, where).toBeLessThanOrEqual(n.tick + SHORT);
+                    }
+                    // A lead in on the first stab is in on every one after it (a horn that hit
+                    // 1 and 3 but not 2 missed the arrival; found by #2017's taste review).
+                    const inOnFirst = lead.some(
+                        (l) => l.tick <= hits[0] + 1 && l.tick + l.dur > hits[0] + 1,
+                    );
+                    if (inOnFirst) {
+                        for (const hit of hits.slice(1)) {
+                            expect(
+                                lead.some((l) => Math.abs(l.tick - hit) < 1),
+                                `${where}: the lead on the stab at ${hit}`,
+                            ).toBe(true);
+                        }
+                    }
+                    const final = lead.at(-1);
+                    if (final && final.tick + final.dur > hits.at(-1)!) {
+                        expect([final.tick, final.tick + final.dur], where).toEqual([
+                            hits.at(-1),
+                            end,
+                        ]);
+                        restrikes++;
+                    }
+                } else {
+                    // Nothing crosses the button: a lead sounding there plays it, accented.
+                    const button = hits.at(-1)!;
+                    for (const n of lead) {
+                        expect(n.tick < button && n.tick + n.dur > button, where).toBe(false);
+                    }
+                    const struck = lead.find((n) => n.tick === button);
+                    if (struck) {
+                        const before = lead[lead.indexOf(struck) - 1];
+                        expect([struck.dur, struck.midi], where).toEqual([SHORT, before.midi]);
+                        expect(struck.velocity, where).toBe(Math.min(127, before.velocity + 12));
+                        expect(before.tick + before.dur, where).toBe(button);
+                        restrikes++;
+                    }
+                }
+                expect(sung.length, `${where}: the lead sings the ending`).toBeGreaterThan(0);
+            }
+        }
+        // The last hit and the button are not vacuous: the lead plays them.
+        if (gesture.kind !== 'stop') {
+            expect(restrikes, style).toBeGreaterThan(0);
+        }
+    });
+
+    it('the kick under the V is never louder than where the I lands', () => {
+        // Catches a fixed loud kick catching the V of a soft ending (a bossa's v110 kick
+        // under the V, against the I's rim and soft surdo).
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'C | F | Dm7 | G7:2 C:2' }]));
+        const bar = timeline.bars[3];
+        const home = bar.spans[1].start;
+        for (const style of STYLE_IDS) {
+            const { events } = performPass(timeline, straight(style, 'a'), {
+                pass: 0,
+                looping: false,
+            });
+            const kit = events.filter((e) => e.lane === 'drums' && e.bar === bar.index);
+            const loudest = (hits: typeof kit) => Math.max(...hits.map((e) => e.velocity));
+            expect(loudest(kit.filter((e) => e.tick < home)), style).toBeLessThanOrEqual(
+                loudest(kit.filter((e) => e.tick === home)),
+            );
+        }
+    });
+
+    it("metal's hits are the beats of the bar, in 6/8 too", () => {
+        // Catches hits written as 4/4 sixteenths falling across a 6/8's two dotted-quarter
+        // beats, and a bar too short for three hits losing the last one's crash.
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'C | Am7 | Dm7 | G7', meter: '6/8' }]),
+        );
+        const bar = timeline.bars[3];
+        const steps = (notes: { tick: number }[]) => [
+            ...new Set(notes.map((n) => Math.round((n.tick - bar.start) / STEP))),
+        ];
+        for (const seed of SEEDS) {
+            const { events } = performPass(timeline, straight('metal', seed), {
+                pass: 0,
+                looping: false,
+            });
+            const { bass, comp } = lastBar(timeline, events);
+            const kit = events.filter((e) => e.lane === 'drums' && e.bar === bar.index);
+            expect(steps(bass), seed).toEqual([0, 6]);
+            expect(steps(comp.filter((n) => !n.muted)), seed).toEqual([0, 6]);
+            expect(steps(kit), seed).toEqual([0, 6]);
+            expect(
+                steps(kit.filter((e) => e.lane === 'drums' && e.piece === 'crash')),
+                seed,
+            ).toEqual([6]);
+        }
+    });
+
+    it('the set-up is the biggest section fill, however quiet the band', () => {
+        // Catches a set-up sized by the bar's energy: a quiet song's last arrival ticking a
+        // two-step pickup into it.
+        const timeline = compileTimeline(FIXTURES.blues);
+        const before = timeline.bars.at(-2)!;
+        let shorter = 0;
+        for (const style of STYLE_IDS.filter((id) => STYLES[id].endingGesture.setup)) {
+            const start = (intensity: number, ending: boolean) => {
+                const settings = { ...straight(style, 'a'), intensity };
+                const plans = planBars(timeline, settings, {
+                    pass: 0,
+                    looping: false,
+                    window: fullWindow(timeline),
+                    endingGesture: STYLES[style].endingGesture,
+                });
+                const next = plans[before.index + 1];
+                return STYLES[style].drums.fillStart({
+                    bar: before,
+                    plan: plans[before.index],
+                    next: {
+                        bar: timeline.bars.at(-1)!,
+                        plan: ending ? next : { ...next, ending: null },
+                    },
+                } as unknown as BarContext);
+            };
+            expect(start(0.1, true), style).toBe(start(1, true));
+            // A plain section fill at that level would be shorter, for some styles.
+            if ((start(0.1, false) ?? 16) > (start(1, true) ?? 16)) {
+                shorter++;
+            }
+        }
+        expect(shorter).toBeGreaterThan(0);
+    });
+});
+
+describe('a lead held from over the V into home (#2017)', () => {
+    it('is struck again on the home chord, not on the V note it held', () => {
+        // Catches a re-strike that repeats the held pitch: a B held from over G7 struck again
+        // on the band's last hit, a major 7th against the C. No chart reaches it today (the
+        // landing moves a note crossing into home first, `landOnHeld`), so the seam is
+        // driven directly: metal's hits on `| G7 C |`, the lead holding B through the bar.
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'C | F | Dm7 | G7 C' }]));
+        const bar = heldEnding(timeline, 3, STYLES.metal.ending)!;
+        const plan = planBars(
+            timeline,
+            { ...DEFAULT_SETTINGS, style: 'metal' },
+            {
+                pass: 0,
+                looping: false,
+                window: fullWindow(timeline),
+                endingGesture: STYLES.metal.endingGesture,
+            },
+        )[3];
+        const home = bar.spans[1].chord!;
+        // A book that settles on the chord's root, third and fifth, in that order.
+        const book = {
+            vibrato: 4,
+            settle: (chord: typeof home) =>
+                [0, chord.third ?? 4, 7].map((i) => mod12(chord.root + i)),
+        } as unknown as Parameters<typeof endWithTheBand>[2];
+        const ctx = {
+            timeline,
+            bar,
+            plan,
+            ending: bar,
+            lead: { range: [55, 84] },
+        } as unknown as BarContext;
+        const held: PitchedNote = {
+            lane: 'lead',
+            tick: bar.start,
+            dur: bar.meter.barTicks,
+            midi: 71,
+            velocity: 90,
+            offsetMs: 0,
+            bar: 3,
+        };
+        const out = endWithTheBand(ctx, [held], book);
+        // Cut with the V's stab, struck again with each of home's hits (beat 3 short, beat 4
+        // ringing): in on the stabs, the lead plays every one after it.
+        expect(out.map((n) => [Math.round((n.tick - bar.start) / STEP), n.dur / STEP])).toEqual([
+            [0, 2],
+            [8, 2],
+            [12, 4],
+        ]);
+        expect(out[0].midi).toBe(71);
+        expect(chordPcs(home)).toContain(mod12(out[1].midi));
+        expect(out[1].midi).toBe(72);
+    });
+});

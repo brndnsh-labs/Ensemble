@@ -39,6 +39,10 @@ const discoDrums = drumIdiom({
     // A quiet band barks the open hat into a new phrase; a driving one rolls the snare or runs
     // the toms (the Philly fill) into a new section.
     fillLength: { phrase: { low: 2, mid: 2, high: 4 }, section: { low: 4, mid: 8, high: 8 } },
+    // why: the band's last hit: crash, the four on the floor's last kick and the backbeat's
+    // snare together on 1, and the percussionist's shaker with them (a disco band carries a
+    // percussionist, and his last stroke is the band's).
+    ending: () => ({ crash: 'X', kick: 'X', snare: 'X', shaker: 'x' }),
     groove(ctx, tier) {
         if (tier === 'low') {
             // Thinner: closed eighths (no open hat yet), a softer kick still on every beat, and
@@ -592,4 +596,7 @@ export const disco: Style = {
     // vamp, a blues) the major 7th would contradict the chart's b7: the I9, Chic's dominant
     // chord (#1502).
     ending: { major: 'maj7', minor: 'm7', dominant: '9' },
+    // why: a disco band ends on its last chord held under the crash, rolled in by the snare
+    // roll or the Philly tom run of a section change (the set-up fill).
+    endingGesture: { kind: 'hold', setup: true },
 };

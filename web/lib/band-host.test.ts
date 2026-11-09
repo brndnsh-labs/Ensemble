@@ -376,9 +376,10 @@ describe('BandHost counted choruses', () => {
         const { events, timeline } = await host.render(band);
         const bassIn = (index: number) =>
             events.flatMap((e) => (e.lane === 'bass' && e.bar === index ? [e.midi % 12] : []));
-        // The first chorus's ii–V leads round to the top; the last one's resolves to C.
+        // The first chorus's ii–V leads round to the top; the last one's resolves to C (struck
+        // again on jazz's button, #2017).
         expect(bassIn(1).some((pc) => pc === 2 || pc === 7)).toBe(true);
-        expect(bassIn(timeline.bars.length - 1)).toEqual([0]);
+        expect(new Set(bassIn(timeline.bars.length - 1))).toEqual(new Set([0]));
     });
 
     it('plays every chorus, the coda only in the last, and stops at the end of its final bar', () => {

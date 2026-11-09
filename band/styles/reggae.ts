@@ -76,6 +76,9 @@ const reggaeDrums = drumIdiom({
     // Reggae fills are short and late: a quiet band barely fills at all, and even a section
     // change is a beat of rimshots or toms, never a bar-long run.
     fillLength: { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 2, mid: 4, high: 4 } },
+    // why: the one drop's own pair, the kick and the cross-stick, moved onto the One for the
+    // band's last hit; no crash.
+    ending: () => ({ kick: 'X', rim: 'X' }),
     groove(ctx, tier) {
         if (tier === 'high') {
             // The riddim is the tune's, not the section's: a band commits to steppers or
@@ -603,4 +606,8 @@ export const reggae: Style = {
     lead: { idiom: reggaeLead, prefers: 'sax' },
     // why: the skank plays triads, so the ending holds the I (or i) triad.
     ending: { major: '', minor: 'm' },
+    // why: the reggae ending: the drummer brings the band in on a beat of rimshots or toms
+    // (Carlton Barrett's pickup, the set-up fill), bass and chord hit the One together, short,
+    // and the band drops out.
+    endingGesture: { kind: 'stop', setup: true },
 };

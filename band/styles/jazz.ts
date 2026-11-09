@@ -154,6 +154,9 @@ const jazzDrums = drumIdiom({
     // The hat is the time under the light head: a section's crash replaces it there too.
     timekeeper: ['ride', 'hat'],
     fillLength: { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 4, mid: 4, high: 8 } },
+    // why: the ride rings with the held chord on 1 over a soft kick, then the button: snare
+    // and kick together on the "and" of 4.
+    ending: () => ({ ride: 'X', kick: 'x.............X.', snare: '..............X.' }),
     groove(ctx, barTier) {
         const head = lightHead(ctx.plan);
         // The light head keeps the quiet time (no feathered kick, no snare comping) whatever
@@ -714,4 +717,7 @@ export const jazz: Style = {
     // without the major 7th's half-step rub. In minor, the minor 6th (dorian's) that closes a
     // minor standard.
     ending: { major: '6', minor: 'm6' },
+    // why: the swing ending's button: the band holds the last chord, then plays one short
+    // unison hit on the "and" of 4 (the "bop" after the "doo-") with no fill before it.
+    endingGesture: { kind: 'button', setup: false },
 };
