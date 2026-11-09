@@ -96,19 +96,34 @@ export const neosoul = defineClaims({
     takes: [
         // The known standard's guide-tone head, on neo-soul's own figures (#2122, `head.guide` in
         // `styles/neosoul.ts`): a lazy vocal line, sixteenth anticipations and late entries.
-        guideTonesTake({}, [
-            // 0.405 of the notes on an "e" or an "a" (the swing at 45 drags them), against 0
-            // on the shared straight-eighth figures; the ceiling is a run, not a sung line.
+        guideTonesTake(
+            {
+                // 0.060 with the head capped at the book's solo top (`bookReach`, #2135; the
+                // guitar's, a half step under its top). The pop song's 24-bar chorus sits at
+                // that cap, so over C and G → C the line can't climb on: it turns on the triad
+                // instead (G5 → B5 → C6 → G5), a major 3rd up and a 4th back down. A line
+                // turning on the chord at the top of its range is the line, not a leap; 0.08
+                // still fails a line that jumps.
+                leadMoveOverThird: [
+                    0,
+                    0.08,
+                    'voice-led: a 3rd or 4th where the line meets its top',
+                ],
+            },
             [
-                'leadSixteenthOffbeats',
-                0.25,
-                0.55,
-                'the line anticipates and drags on the sixteenths',
+                // 0.405 of the notes on an "e" or an "a" (the swing at 45 drags them), against 0
+                // on the shared straight-eighth figures; the ceiling is a run, not a sung line.
+                [
+                    'leadSixteenthOffbeats',
+                    0.25,
+                    0.55,
+                    'the line anticipates and drags on the sixteenths',
+                ],
+                // 0.655 of its phrases come in off the beat, against 0.480 on the shared
+                // figures: the floor sits between them.
+                ['leadLateEntries', 0.58, 1, 'a phrase comes in late, behind the beat'],
             ],
-            // 0.655 of its phrases come in off the beat, against 0.480 on the shared
-            // figures: the floor sits between them.
-            ['leadLateEntries', 0.58, 1, 'a phrase comes in late, behind the beat'],
-        ]),
+        ),
         {
             take: {},
             claims: [

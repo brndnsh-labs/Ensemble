@@ -190,8 +190,9 @@ expression devices take turns rather than stack; one peak note per cycle.
     letter) takes figures the A didn't use, starts each phrase a 4th over where the A's line
     ended, comes back down a step over the A's opening for its last phrase, and plays louder;
     no seam into or out of it moves more than a 4th. The A stays where its book seats it and the
-    contrast climbs into the headroom over it, to a whole step under the instrument's top
-    (`BRIDGE_TOP`); going into the contrast, the A's last chord takes whichever of its guide
+    contrast climbs into the headroom over it, up to the note the book's solo peaks on (its
+    `peak`, or a step under the instrument's top) and never past it: the whole head is sung
+    under that top, walk included; going into the contrast, the A's last chord takes whichever of its guide
     tones the contrast can climb from (a V7's 7th resolving down into the bridge would leave it
     only a fall, #2123). Where a fall is still the only voice-led way in (the bossa's Dm6 6th
     to Gm7's 3rd), the contrast's own phrase tops may re-centre by a 5th, so it climbs back

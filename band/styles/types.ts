@@ -16,6 +16,7 @@ import type {
 } from '../core/types.js';
 import type { Bar, Timeline } from '../form/timeline.js';
 import type { CompProfile } from '../players/comp/instruments.js';
+import type { LeadIdiom } from '../players/lead/idiom.js';
 import type { LeadProfile } from '../players/lead/instruments.js';
 
 /** Everything an idiom may know when it plays one bar. All of it is read-only. */
@@ -132,7 +133,7 @@ export interface Style {
      * The lead: the style's soloist, and the instrument it is heard on by default. Absent,
      * the style has no lead yet and the lane stays silent.
      */
-    lead?: { idiom: PitchedIdiom; prefers: LeadInstrument };
+    lead?: { idiom: LeadIdiom; prefers: LeadInstrument };
     /**
      * The tonic chord a held ending plays when the chart's last bar points back to the top (a
      * ii–V, a V7): the quality the genre ends on, written as a chord-symbol suffix (`6`,

@@ -192,19 +192,6 @@ export function headForm(timeline: Timeline, index: number): HeadForm {
 const CONTRAST_LIFT = { phrase: 5, last: 2 } as const;
 
 /**
- * How far under the instrument's top the contrast's guide tones may climb, in semitones: a whole
- * step. why: the A keeps a 5th's margin under the top (`BAND.above`) so that the bridge has
- * somewhere to go, and the bridge spends it — up to an alto's Ab5 (its palm-key top, the range
- * running to Bb5), a nylon string's G5 at the 15th fret, a trumpet's Ab5; the walk between the
- * guide tones already reached the range's top around them. Capped at the A's own margin
- * (`hi - BAND.above`, an alto's Eb5), a line seated high (a sax or nylon book's +4 or +5) had no
- * room to rise and the bridge fell (#2123). A minor 3rd under the top still clipped the nylon's
- * bridge in E minor (an Am9 G5 one over it); a whole step leaves every bridge of the fixtures in
- * all twelve keys its lift.
- */
-const BRIDGE_TOP = 2;
-
-/**
  * The widest move inside a phrase, in semitones: a minor 3rd. why: the nearest guide tone of the
  * next chord always lies within one (two guide tones are a 4th, 5th or tritone apart), so a line
  * that keeps to it is voice-led; a choice between the two voices is only made inside it.
@@ -229,7 +216,8 @@ const LINES = new WeakMap<Timeline, Map<string, GuideNote[]>>();
  * the first chord's 3rd (or the guide tone nearest `home`). A common tone held into the next
  * chord is held through; a note never crosses a phrase's first barline (each phrase is struck
  * fresh, and a phrase is the lead's planning slot), and a chord held past `LONGEST` bars is
- * struck again on the same tone.
+ * struck again on the same tone. `range` is the head's: the instrument's floor to the top note
+ * the book's solo peaks on (`bookReach` in idiom.ts), which no note of the line passes.
  */
 export function guideToneLine(
     timeline: Timeline,
@@ -327,12 +315,18 @@ function chorusLine(
             at = cut;
         }
     });
+    // why: `hi` is the head's top, the note the book's solo peaks on (`guideToneLine`), and the
+    // contrast may climb all the way to it. The A keeps a 5th's margin under it (`BAND.above`) so
+    // that the bridge has somewhere to go, and the bridge spends it, up to where the book's own
+    // climax goes and no further: an alto's A5 for a book with no peak of its own, reggae's horn
+    // a 7th over home (its peak is "a lift, not a scream"), the nylon's Ab5, under the 17th fret
+    // its book keeps off. Capped at the A's own margin (`hi - BAND.above`, an alto's Eb5), a line
+    // seated high (a sax or nylon book's +4 or +5) had no room to rise and the bridge fell
+    // (#2123).
     const [lo, hi] = range;
-    // The highest guide tone the contrast aims for (`BRIDGE_TOP`).
-    const ceiling = hi - BRIDGE_TOP;
     // The A's last guide tone before the contrast, from `from`: of the guide tones a voice-led
     // move away (`INNER`), the nearest one the contrast's first chord (`into`) can rise from —
-    // one of its guide tones at or over it, within a seam (`SEAM`) and under the ceiling. why: a
+    // one of its guide tones at or over it, within a seam (`SEAM`) and under the top. why: a
     // guide-tone line is two voices, the 3rds' and the 7ths', and going into a bridge a player
     // takes the voice that leaves the bridge somewhere to climb. The lift aims a 4th up with a
     // 4th's reach, so the one entry it can't climb from is a half step over one of the bridge
@@ -351,7 +345,7 @@ function chorusLine(
                     a - b,
             );
         const climbs = voices.find((m) =>
-            into.some((pc) => m + mod12(pc - m) <= Math.min(ceiling, m + SEAM)),
+            into.some((pc) => m + mod12(pc - m) <= Math.min(hi, m + SEAM)),
         );
         return climbs ?? nearest(pcs, from, home, lo, hi);
     };
@@ -388,7 +382,8 @@ function chorusLine(
         // why: a seam into the contrast falls when no guide tone of its first chord lies at or
         // over the entry within a 4th: the A's last a half step over one and a tritone under the
         // other (the bossa's Dm6 B to Gm7's Bb, the line cliché #2123 accepted), or an entry
-        // already at the ceiling. A ii-V chain then falls a half step a chord, and at its next
+        // so near the head's top (`hi`, the book's solo top) that neither fits under it. A ii-V
+        // chain then falls a half step a chord, and at its next
         // phrase top met that tritone again (Bb7#11's Ab to Em7's G), so the B sank 4 to 7
         // semitones under its A (#2140). After a seam that fell, the contrast's own phrase tops
         // re-centre by a 5th (`RECENTRE`), as any phrase top outside it may: at the breath the
@@ -436,7 +431,7 @@ function chorusLine(
             const target = last
                 ? (opening?.midi ?? entry) + CONTRAST_LIFT.last
                 : entry + CONTRAST_LIFT.phrase;
-            midi = toward(Math.min(ceiling, target));
+            midi = toward(Math.min(hi, target));
             if (entersContrast) {
                 seamFell = midi < entry;
             }
@@ -490,15 +485,19 @@ function chorusLine(
 
 /**
  * The guide tone nearest `anchor`, placed in [lo, hi]. On a tie, the one nearer `home`, so a
- * line falling chord by chord (a ii-V chain's half steps) leans back up instead of sinking.
+ * line falling chord by chord (a ii-V chain's half steps) leans back up instead of sinking. A
+ * guide tone with no place in a narrow window (a phrase top's reach, under the head's top) is
+ * folded out of it by `nearestMidi`, and is only taken when neither has one: why: taken
+ * anyway, it could win on nearness and leap past the reach (a hip hop line at its top fell
+ * from F5 to B4, a tritone, where E5 lay inside the window, #2123).
  */
 function nearest(pcs: number[], anchor: number, home: number, lo: number, hi: number): number {
-    return pcs
-        .map((pc) => nearestMidi(pc, anchor, lo, hi))
-        .sort(
-            (a, b) =>
-                Math.abs(a - anchor) - Math.abs(b - anchor) ||
-                Math.abs(a - home) - Math.abs(b - home) ||
-                a - b,
-        )[0];
+    const placed = pcs.map((pc) => nearestMidi(pc, anchor, lo, hi));
+    const inside = placed.filter((m) => m >= lo && m <= hi);
+    return (inside.length ? inside : placed).sort(
+        (a, b) =>
+            Math.abs(a - anchor) - Math.abs(b - anchor) ||
+            Math.abs(a - home) - Math.abs(b - home) ||
+            a - b,
+    )[0];
 }
