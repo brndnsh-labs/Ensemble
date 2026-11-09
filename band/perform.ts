@@ -23,7 +23,7 @@ import {
 import { COMP_INSTRUMENTS } from './players/comp/instruments.js';
 import { LEAD_INSTRUMENTS } from './players/lead/instruments.js';
 import { feelFor, STYLES } from './styles/index.js';
-import type { BarContext, DrumIdiom, PitchedIdiom } from './styles/types.js';
+import type { BarContext, DrumIdiom, EndingGesture, PitchedIdiom } from './styles/types.js';
 import { nearestMidi } from './theory/pitch.js';
 
 /**
@@ -504,13 +504,18 @@ const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
  * lead's note if it struck one there, all ringing to the end of the (stretched) span. A fermata on a hold ties over: nothing new is
  * struck, and the notes already sounding are extended through it.
  *
+ * On the bar a performance ends on (`plan.ending`) the band is already playing its style's
+ * ending gesture (#2017), and a fermata written there holds that gesture instead (#2175): the
+ * kit's line stays the book's ending, and each pitched lane's last strike in the span rings to
+ * the span's end. A fermata elsewhere, or in a performance that loops, is held as above.
+ *
  * The events are indexed by tick once, so a fermata costs a search and the events it replaces,
  * not a scan of the whole pass (#1665): a chart may write tens of thousands of them.
  */
 function holdFermatas(
     events: BandEvent[],
     timeline: Timeline,
-    plans: { lanes: Record<Lane, boolean> }[],
+    plans: { lanes: Record<Lane, boolean>; ending: EndingGesture | null }[],
     lastBassBefore: number | undefined,
 ): BandEvent[] {
     const held: { span: ChordSpan; barIndex: number; plan: (typeof plans)[number] }[] = [];
@@ -565,6 +570,46 @@ function holdFermatas(
 
     for (const { span, barIndex, plan } of held) {
         const from = slots.get(span.start)!;
+        if (plan.ending && !span.tied) {
+            // The ending bar's fermata holds the style's gesture (#2175), not the crash and
+            // kick every style once shared: the kit keeps its book's ending line (a bossa's
+            // soft rim and surdo crash nowhere), and each pitched lane's last strike in the
+            // span rings to the span's end. why: a fermata means "hold this", and what a band
+            // holds is the note it is playing when it reaches it, so the one chord of a hold
+            // or a soft ending is held as it was, a stop's eighth becomes its hit held, the
+            // button plays as written (its eighth already ends the bar, stretched only in
+            // time), and the last of the hits rings on while the hits before it stay short.
+            // The simplest rule a chart can rely on, and the same for every gesture.
+            const struck: number[] = [];
+            for (let slot = from; slot < ticks.length && ticks[slot] < span.end; slot++) {
+                struck.push(...live[slot]);
+            }
+            // why: a lead note that lasts half the bar or longer under the fermata is sung, not
+            // stopped, so it gets the vibrato a long note has (`endWithTheBand` strips it from
+            // the eighth it cut), whether the hold stretched it or the gesture wrote it long
+            // (metal's last hit, a `| G7 C |` landing). Half a bar in ticks is a whole bar in
+            // time under the stretch, past every book's own threshold (4–12 sixteenths).
+            const longHold = timeline.bars[barIndex].meter.barTicks / 2;
+            for (const lane of ['bass', 'comp', 'lead'] as const) {
+                const notes = struck.filter((i) => {
+                    const e = out[i]!;
+                    return e.lane === lane && !(e as PitchedNote).muted;
+                });
+                const lastTick = notes.reduce((tick, i) => Math.max(tick, out[i]!.tick), -1);
+                for (const i of notes) {
+                    const e = out[i] as PitchedNote;
+                    if (e.tick === lastTick) {
+                        const dur = Math.max(e.dur, span.end - e.tick);
+                        out[i] = {
+                            ...e,
+                            dur,
+                            ...(lane === 'lead' && dur >= longHold ? { vibrato: true } : {}),
+                        };
+                    }
+                }
+            }
+            continue;
+        }
         const atStart = live[from].map((i) => out[i]!);
         const compAtStart = atStart.filter((e): e is PitchedNote => e.lane === 'comp');
         // The lead's note on the fermata is held with the band; anything after it goes.
