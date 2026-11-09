@@ -28,7 +28,16 @@ import {
     place,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
-import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
+import {
+    drumIdiom,
+    type FillPlace,
+    type FillShape,
+    type Lines,
+    pickTurn,
+    playFill,
+    strike,
+    type Turn,
+} from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, type Pulse, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { chordScale, pentatonicPool, restingTones, rootFirst } from '../players/lead/palette.js';
@@ -70,6 +79,63 @@ function openAt(hat: string, step: number): Lines {
         hatOpen: `${'.'.repeat(step)}x${'.'.repeat(15 - step)}`,
     };
 }
+
+/** The stick that plays the drop: the cross-stick of the one drop, the snare of a riddim. */
+const stick = (t: Lines): 'rim' | 'snare' => (t.rim ? 'rim' : 'snare');
+
+/**
+ * How the one drop turns round in the second and fourth bars of a phrase (#2022), one per
+ * section: a cross-stick click on the "and" of 4, a pickup into the empty One (Carlton Barrett's
+ * commonest variation); the drop echoed on the "and" of 3; or the hat lifted on the "and" of 4 in
+ * a section that doesn't already lift every bar. Beat 1 stays a hole — the answer is all in the
+ * back half — and the drop on 3 stays where it is.
+ */
+const REGGAE_TURNS: readonly (readonly [Turn, number])[] = [
+    [(t) => ({ ...t, [stick(t)]: strike(t[stick(t)], 14, 'o') }), 2],
+    [(t) => ({ ...t, [stick(t)]: strike(t[stick(t)], 10, 'o') }), 2],
+    [(t) => (t.hat && !t.hatOpen ? { ...t, ...openAt(t.hat, 14) } : t), 1],
+];
+
+/*
+ * Reggae's fills (#2022), written at 2 and 4 sixteenths: short and late, a one-drop pickup into
+ * the bar after, never a bar-long run (the beat's space is the point).
+ */
+// A cross-stick pickup, quiet to loud.
+const RIM_PICKUP: FillShape = { 2: { rim: 'oX' }, 4: { rim: '.oxX' } };
+// The drop: the time stops and a rimshot and the kick land together on the "a" of 4.
+const DROP: FillShape = { 2: { rim: '.X' }, 4: { rim: '...X', kick: '...x' } };
+// The toms answer the cross-stick: "a-di-dum", high tom then floor.
+const TOM_PICKUP: FillShape = {
+    2: { tomHigh: 'o.', tomLow: '.X' },
+    4: { rim: 'x...', tomHigh: '..o.', tomLow: '...X' },
+};
+// A drag on the snare: a ghost into a soft stroke into the accent.
+const SNARE_DRAG: FillShape = { 2: { snare: 'oX' }, 4: { snare: '.goX' } };
+// Cross-stick sixteenths, building.
+const RIM_ROLL: FillShape = { 2: { rim: 'xX' }, 4: { rim: 'ooxX' } };
+
+/**
+ * Which fills a reggae drummer plays where (#2022): a phrase end is a pickup or the drop, a
+ * section end the toms, the drag or the roll, the top of the form (and the set-up into the
+ * band's last hit) the toms or the drag. why: the one drop's pickups are on the cross-stick; the
+ * drums themselves, toms and snare, are kept for the bigger boundaries.
+ */
+const REGGAE_FILLS: Record<FillPlace, readonly (readonly [FillShape, number])[]> = {
+    phrase: [
+        [RIM_PICKUP, 3],
+        [DROP, 2],
+    ],
+    section: [
+        [TOM_PICKUP, 2],
+        [SNARE_DRAG, 2],
+        [RIM_ROLL, 1],
+        [RIM_PICKUP, 1],
+    ],
+    top: [
+        [TOM_PICKUP, 3],
+        [SNARE_DRAG, 1],
+    ],
+};
 
 const reggaeDrums = drumIdiom({
     name: 'reggae one drop',
@@ -124,8 +190,10 @@ const reggaeDrums = drumIdiom({
             strong: drop,
         };
     },
-    fill: (_ctx, steps, rng) =>
-        steps <= 2 ? { snare: snareFigure(steps, rng) } : tomRun(steps, rng, 2),
+    // why: a quiet one drop never answers (no lift, no pickups, as its groove says): its space
+    // is the groove.
+    answer: (ctx, tier, time) => (tier === 'low' ? time : pickTurn(ctx, time, REGGAE_TURNS)),
+    fill: (ctx, steps) => playFill(ctx, steps, REGGAE_FILLS),
 });
 
 // ================================================================ bass

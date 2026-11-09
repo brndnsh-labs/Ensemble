@@ -21,7 +21,13 @@ import {
     nextChord,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
-import { type DrumBook, drumIdiom, fillStart, type Lines } from '../players/drums/kit.js';
+import {
+    answerBar,
+    type DrumBook,
+    drumIdiom,
+    fillStart,
+    type Lines,
+} from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import {
@@ -36,8 +42,8 @@ import { nearestMidi } from '../theory/pitch.js';
 import type { BarContext, PitchedIdiom, Style } from './types.js';
 
 // ================================================================ the loop's shape
-/** Whether this bar is the second of the two-bar loop: the bar that answers. */
-const answerBar = (ctx: BarContext) => ctx.bar.barInVisit % 2 === 1;
+// The second bar of the two-bar loop is the bar that answers: the kit's own answer bar
+// (`answerBar`), the second of each pair in the section.
 
 const TIER_RANK: Record<EnergyTier, number> = { low: 0, mid: 1, high: 2 };
 
@@ -145,10 +151,7 @@ const boomBapBook: DrumBook = {
     groove(ctx, tier) {
         // why: 'song' scope — the record's one beat, not a per-section re-roll. Hats and
         // ghosts (below) stay per-section: the layers that thin and thicken with energy.
-        const loop = ctx.rng('kick', 'song').pick(KICK_LOOPS);
-        // The core loop is the same at every energy; only a quiet band plays it as a one-bar
-        // loop (no answer), because the answer is a gesture and a quiet band makes none.
-        const kick = tier !== 'low' && answerBar(ctx) ? loop[1] : loop[0];
+        const kick = ctx.rng('kick', 'song').pick(KICK_LOOPS)[0];
         // Hip hop's snare is hard on 2 and 4 at any energy (a quiet band just hits softer).
         const back = tier === 'low' ? '....x.......x...' : '....X.......X...';
         const ghosts = tier === 'high' ? ctx.rng('ghost', 'section').pick(GHOSTS) : '';
@@ -160,17 +163,27 @@ const boomBapBook: DrumBook = {
             tier === 'high' || ctx.rng('hats', 'section').chance(0.5)
                 ? HATS.sixteenths
                 : HATS.eighths;
+        return { hat, kick, snare };
+    },
+    answer(ctx, tier, time) {
+        // The core loop is the same at every energy; only a quiet band plays it as a one-bar
+        // loop (no answer), because the answer is a gesture and a quiet band makes none.
+        if (tier === 'low') {
+            return time;
+        }
+        const kick = ctx.rng('kick', 'song').pick(KICK_LOOPS)[1];
         // The loud answer bar opens the hat on the "and" of 4: the half-open "tss" that
         // turns the loop round. One hand, one cymbal: the closed hat leaves that step.
-        if (tier === 'high' && answerBar(ctx)) {
+        if (tier === 'high') {
+            const hat = time.hat ?? '';
             return {
                 hat: `${hat.slice(0, 14)}.${hat.slice(15)}`,
                 hatOpen: '..............o.',
                 kick,
-                snare,
+                snare: time.snare,
             };
         }
-        return { hat, kick, snare };
+        return { ...time, kick };
     },
     cells(ctx, tier) {
         // Other meters: kick on the downbeat pulse (and its "and" on a strong pulse), the

@@ -75,6 +75,12 @@ export const country = defineClaims({
                     'the chick on 2 and 4 (snare, or cross-stick when quiet)',
                 ],
                 ['kickOnOne', 0.95, 1, 'the boom on the One'],
+                // The answer bar (#2022): a pickup on the "and" of 4, the chick doubled, or the
+                // boom doubled. Measured 0.981; 0 with no answer. The floor sits midway.
+                ['grooveAnswers', 0.49, 1, 'the two-step turns round at the phrase’s second bar'],
+                // The answer is the section's (#2022): one turn for all its answer bars. Measured 1.000;
+                // 0.614 with each answer bar drawing its own. The floor sits midway.
+                ['answerHolds', 0.81, 1, 'a section turns its bars round one way'],
                 [
                     'ghostsPerBar',
                     1,
