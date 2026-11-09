@@ -2581,6 +2581,46 @@ export const METRICS = {
         return ratio(hit, n);
     },
     /**
+     * Slides onto a maj7's root by a position shift (`slideIn.from` four or five semitones),
+     * a count (#2167). why: in the blues the pool holds neither the 2 nor the 6 at a maj7 and
+     * the b7 is the wrong 7th, so the five-fret 5 → R shift was the only root slide there and
+     * came round every time the head did (9 in the head, 4 in the solo). A shift is drawn only
+     * beside a near start (`shiftNeedsNeighbour` in `idiom.ts`), so what is left is the
+     * shift chosen now and then where the key's blues scale holds the chord's 6 (6 → R).
+     */
+    leadMaj7RootShiftSlides: (takes) => {
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            for (const note of leadNotes(events)) {
+                const chord = chordAt(t, note.tick);
+                if (
+                    note.slideIn &&
+                    Math.abs(note.slideIn.from) >= 4 &&
+                    chord?.seventh === 11 &&
+                    mod12(note.midi - chord.root) === 0
+                ) {
+                    hit++;
+                }
+            }
+        }
+        return hit;
+    },
+    /** Of the lead's slides, the share that start above the landing (`slideIn.from` > 0). */
+    leadSlidesFromAbove: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            for (const note of leadNotes(events)) {
+                if (!note.slideIn) {
+                    continue;
+                }
+                n++;
+                hit += note.slideIn.from > 0 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
      * Of the lead's slides (#2120), the share not on a landing (`leadLandings`, a note struck
      * on a chord change): a slide aims at an arrival, never a passing note.
      */

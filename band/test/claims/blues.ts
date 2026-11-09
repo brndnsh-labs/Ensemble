@@ -175,6 +175,10 @@ export const blues = defineClaims({
                 // (0.373 before #2139: a landing with no scale-tone start isn't slid into).
                 ['leadLandingSlides', 0.2, 0.55, 'a landing slid into from a few frets away'],
                 ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
+                // 1 (9 before #2167, nine of the head's ten root slides over a maj7): the shift
+                // is drawn only beside a near start, and the head restates each A, so one swoop
+                // came round every time. The one left sits beside a 6 → R the key allows.
+                ['leadMaj7RootShiftSlides', 0, 2, 'the five-fret swoop onto a maj7 root is rare'],
                 // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
                 // its figures already leave room at each phrase end.
                 ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
@@ -200,6 +204,12 @@ export const blues = defineClaims({
                 // (0.260 before #2139: a landing with no scale-tone start isn't slid into).
                 ['leadLandingSlides', 0.15, 0.45, 'a landing slid into from a few frets away'],
                 ['leadSlidesOffLanding', 0, 0, 'a slide aims at a landing, never a passing note'],
+                // 0 (4 before #2167, four of the solo's five root slides over a maj7).
+                ['leadMaj7RootShiftSlides', 0, 1, 'the five-fret swoop onto a maj7 root is rare'],
+                // 0.110 (0.031 before #2167, all of them 4 → b3; 0.048 with R → b7 out): the b7
+                // now has a start from above too (R → b7), the blues slide down onto a dominant's
+                // b7. Mostly from below still: the box's neighbours sit under the landing.
+                ['leadSlidesFromAbove', 0.08, 0.3, 'some slides come down onto the landing'],
                 // The one-fret slide (#2139): of the unbent landings on a major 3rd, the share slid
                 // up from the b3. Measured 0.157 (0 with b3 → 3 out of `slideStarts`). The ceiling
                 // is the book's chance (`LeadBook.slide` 0.25), which the share passes only if
