@@ -2048,3 +2048,159 @@ describe('a fermata on the last bar holds the gesture, not the shared crash (#21
         }
     });
 });
+
+describe('a lead note tied into the ending bar lets go with the band (#2176)', () => {
+    // The guide-tone head ties its "and" of 4 into the downbeat (`guideOnsets`), the ending
+    // bar's too: a note struck in the bar before and held through the last bar, which the
+    // ending bar's own cut never saw (it was emitted a bar earlier). The seeds are ones where
+    // the head ties in on the pop song; the first expectation keeps each case non-vacuous.
+    const tiedIn = (style: StyleId, seed: string) => {
+        const timeline = compileTimeline(FIXTURES.popSong);
+        const bar = timeline.bars.at(-1)!;
+        const { events } = performPass(
+            timeline,
+            {
+                ...settingsFor(style, seed),
+                head: 'guide-tones',
+                lanes: { drums: true, bass: true, comp: true, lead: true },
+                swing: 0,
+                humanize: 0,
+            },
+            { pass: 0, looping: false },
+        );
+        const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
+        const tied = lead.filter((n) => n.bar === bar.index - 1 && n.tick + n.dur > bar.start);
+        expect(tied, `${style}/${seed}: the head ties into the last bar`).toHaveLength(1);
+        return { bar, tied: tied[0], inBar: lead.filter((n) => n.bar === bar.index) };
+    };
+
+    it("funk: a stop cuts it at the band's eighth, and it is not struck again on the one", () => {
+        const { bar, tied, inBar } = tiedIn('funk', 'a');
+        expect(tied.tick).toBeLessThan(bar.start);
+        expect(tied.tick + tied.dur).toBe(bar.start + SHORT);
+        expect(inBar).toEqual([]);
+    });
+
+    it('jazz: held to the button, it plays the button with the band', () => {
+        const { bar, tied, inBar } = tiedIn('jazz', 'f');
+        const button = bar.start + 14 * STEP;
+        expect(tied.tick + tied.dur).toBe(button);
+        expect(inBar.map((n) => [n.tick, n.dur, n.midi, n.velocity, n.bar])).toEqual([
+            [button, SHORT, tied.midi, Math.min(127, tied.velocity + 12), bar.index],
+        ]);
+    });
+
+    it('bossa: a soft ending lets it ring to the end, as planned', () => {
+        const { bar, tied, inBar } = tiedIn('bossa', 'a');
+        expect(tied.tick + tied.dur).toBe(bar.start + bar.meter.barTicks);
+        expect(inBar).toEqual([]);
+    });
+
+    it('funk: under a written fermata on the last bar the band holds, and so does the tie', () => {
+        // The fermata is the chart's own ending (`holdFermatas`), not the style's gesture: the
+        // bar before leaves the tie ringing to the bar's end, and the ending bar strikes
+        // nothing again. Seed d is one where the head ties in on this chart.
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'C | F | Dm7 G7 | C', fermataBars: [3] }]),
+        );
+        const bar = timeline.bars.at(-1)!;
+        const { events } = performPass(
+            timeline,
+            {
+                ...settingsFor('funk', 'd'),
+                head: 'guide-tones',
+                lanes: { drums: true, bass: true, comp: true, lead: true },
+                swing: 0,
+                humanize: 0,
+            },
+            { pass: 0, looping: false },
+        );
+        const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
+        const tied = lead.filter((n) => n.bar === bar.index - 1 && n.tick + n.dur > bar.start);
+        expect(tied, 'the head ties into the last bar').toHaveLength(1);
+        expect(tied[0].tick + tied[0].dur).toBe(bar.start + bar.meter.barTicks);
+        expect(lead.filter((n) => n.bar === bar.index)).toEqual([]);
+    });
+
+    it('jazz: under a written fermata the tie is cut at the button, and the button ends the bar', () => {
+        // A fermata on the ending bar holds the gesture's last strike (#2175): the button is
+        // played as written, so the tie lets go at 14 and the lead's button note is what the
+        // hold rings on, ending the bar with the band. Seed k is one where the head ties in.
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'C | F | Dm7 G7 | C', fermataBars: [3] }]),
+        );
+        const bar = timeline.bars.at(-1)!;
+        const { events } = performPass(
+            timeline,
+            {
+                ...settingsFor('jazz', 'k'),
+                head: 'guide-tones',
+                lanes: { drums: true, bass: true, comp: true, lead: true },
+                swing: 0,
+                humanize: 0,
+            },
+            { pass: 0, looping: false },
+        );
+        const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
+        const tied = lead.filter((n) => n.bar === bar.index - 1 && n.tick + n.dur > bar.start);
+        expect(tied, 'the head ties into the last bar').toHaveLength(1);
+        const button = bar.start + 14 * STEP;
+        expect(tied[0].tick + tied[0].dur).toBe(button);
+        const inBar = lead.filter((n) => n.bar === bar.index);
+        expect(inBar.map((n) => [n.tick, n.tick + n.dur, n.midi, n.velocity])).toEqual([
+            [
+                button,
+                bar.start + bar.meter.barTicks,
+                tied[0].midi,
+                Math.min(127, tied[0].velocity + 12),
+            ],
+        ]);
+    });
+
+    it('metal: cut with the first hit, then in on every hit after it (the seam)', () => {
+        // No metal chart ties into its last bar today, so the seam is driven directly: a G
+        // struck on the "and" of 4 of the bar before `| G7 |`'s resolved C5 and held through
+        // the bar. It counts as struck on the barline: it lets go with the first hit, is not
+        // struck again there, and plays the hits on 2 and 3, the last ringing to the end.
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'C | F | Dm7 | G7' }]));
+        const bar = heldEnding(timeline, 3, STYLES.metal.ending)!;
+        const plan = planBars(
+            timeline,
+            { ...DEFAULT_SETTINGS, style: 'metal' },
+            {
+                pass: 0,
+                looping: false,
+                window: fullWindow(timeline),
+                endingGesture: STYLES.metal.endingGesture,
+            },
+        )[3];
+        const book = {
+            vibrato: 4,
+            settle: (chord: { root: number }) => [chord.root, mod12(chord.root + 7)],
+        } as unknown as Parameters<typeof endWithTheBand>[2];
+        const ctx = {
+            timeline,
+            bar,
+            plan,
+            ending: bar,
+            lead: { range: [55, 84] },
+        } as unknown as BarContext;
+        const tied: PitchedNote = {
+            lane: 'lead',
+            tick: bar.start - 2 * STEP,
+            dur: 18 * STEP,
+            midi: 67,
+            velocity: 90,
+            offsetMs: 0,
+            bar: 2,
+        };
+        const out = endWithTheBand(ctx, [tied], book);
+        expect(
+            out.map((n) => [Math.round((n.tick - bar.start) / STEP), n.dur / STEP, n.midi, n.bar]),
+        ).toEqual([
+            [-2, 4, 67, 2],
+            [4, 2, 67, 3],
+            [8, 8, 67, 3],
+        ]);
+    });
+});

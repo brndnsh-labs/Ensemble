@@ -18,7 +18,7 @@ import {
     spanIndexAt,
     type Timeline,
 } from '../../form/timeline.js';
-import type { BarContext, PitchedIdiom } from '../../styles/types.js';
+import type { BarContext, EndingGesture, PitchedIdiom } from '../../styles/types.js';
 import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { at, BUTTON_LIFT, barSteps, dyn, ENDING_SHORT, endingStrikes, STEP } from '../grid.js';
@@ -2525,7 +2525,17 @@ function planSlot(
  * of a note first struck before home (held from over the V) is sung on the home chord's
  * resting tone nearest it (`settle`), as the landing is: never the V's leading tone against
  * the I.
- * @internal a test seam: the re-strike's pitch, which no chart reaches today.
+ *
+ * A note struck in the bar before and tied over the barline (#2176: the guide-tone head's
+ * "and" of 4 tied into the downbeat, `guideOnsets`) is the downbeat's note, struck early, so
+ * it counts as struck on the barline (`struckAt`): it lets go where the band's first strike
+ * does (a stop's eighth, the first hit), is not struck again on the one (a tie is a tie), and
+ * from there is an ending-bar note — in on the hits after, re-struck with each of them; still
+ * sounding at the button, it plays it. `events` is every lead note sounding in the bar, in
+ * order of striking, the tied one first; each bar emits the part of the result that falls in
+ * it (`play`: the bar before cuts the tied note, the ending bar plays its re-strikes).
+ * @internal a test seam: the re-strike's pitch, which no chart reaches today, and the hits a
+ * tied note is cut on, which no metal chart reaches.
  */
 export function endWithTheBand(
     ctx: BarContext,
@@ -2542,6 +2552,8 @@ export function endWithTheBand(
         return events;
     }
     const tick = (step: number) => at(ctx.bar, step);
+    // Where a note counts as struck: a note tied in from the bar before, on the barline.
+    const struckAt = (n: PitchedNote) => Math.max(n.tick, ctx.bar.start);
     // Where home is struck: a note from before it is the V's.
     const home = tick(strikes.find((s) => s.span === last.span)!.from);
     const cut = (n: PitchedNote, end: number): PitchedNote => {
@@ -2556,12 +2568,13 @@ export function endWithTheBand(
         tick: from,
         dur: to - from,
         midi:
-            n.tick < home - 1 && last.span.chord
+            struckAt(n) < home - 1 && last.span.chord
                 ? nearestRanked(book.settle(last.span.chord, ctx.bar.key), n.midi, ctx.lead.range)
                 : n.midi,
         velocity: Math.min(127, n.velocity + lift),
         offsetMs: 0,
-        bar: n.bar,
+        // The re-strike is this bar's, whichever bar the note it repeats was struck in.
+        bar: ctx.bar.index,
     });
     if (gesture.kind === 'button') {
         const button = strikes.find((s) => s.accent);
@@ -2584,8 +2597,8 @@ export function endWithTheBand(
     const silence = tick(last.to);
     const sounding = events.filter((n) => n.tick < silence - 1);
     const kept = sounding.map((n) => {
-        const under = strikes.filter((s) => tick(s.from) <= n.tick + 1).at(-1);
-        const next = strikes.find((s) => tick(s.from) > n.tick + 1);
+        const under = strikes.filter((s) => tick(s.from) <= struckAt(n) + 1).at(-1);
+        const next = strikes.find((s) => tick(s.from) > struckAt(n) + 1);
         const end =
             under && n.tick < tick(under.to) - 1
                 ? tick(under.to)
@@ -2594,7 +2607,7 @@ export function endWithTheBand(
     });
     const original = sounding.at(-1);
     // The band's strikes after the one the lead's last note sounds under.
-    const later = original ? strikes.filter((s) => tick(s.from) > original.tick + 1) : [];
+    const later = original ? strikes.filter((s) => tick(s.from) > struckAt(original) + 1) : [];
     const into = later[0];
     if (original && into && original.tick + original.dur >= tick(into.from) - 1) {
         // Held into the band's next strike: the player is in on the hits, so the note is struck
@@ -2604,6 +2617,56 @@ export function endWithTheBand(
         return [...kept, ...later.map((s) => again(original, tick(s.from), tick(s.to), 0))];
     }
     return kept;
+}
+
+/**
+ * Whether a lead note tied into `bar`, the ending bar, rings uncut under a written fermata on
+ * its downbeat: only in a stop. A fermata on the ending bar holds each lane's last strike in
+ * the span (`holdFermatas`, perform.ts, #2175); in a stop the band's one eighth is that strike,
+ * held, and a tie cut with it would leave the lead the one player silent under the hold — so
+ * the tie is the lead's held note. A button or the hits are played as written and held on
+ * their last strike, so the tie is cut and re-struck as in any ending bar (`endWithTheBand`)
+ * and its last re-strike is what the fermata holds. A fermata later in the bar (`| G7:2 C:2 |`
+ * with the hold on the C) is not the barline's: the gesture cuts the tie with the V's strike.
+ */
+function tieHeldUnderFermata(bar: Bar, gesture: EndingGesture | null): boolean {
+    return (
+        gesture?.kind === 'stop' &&
+        !!bar.spans.find((s) => s.start <= bar.start && s.end > bar.start)?.fermata
+    );
+}
+
+/**
+ * The bar before the ending (#2176): a lead note struck here and tied over the barline into
+ * the ending bar (`ctx.next.plan.ending`) is cut as that bar's gesture cuts it
+ * (`endWithTheBand`, given the note as the ending bar sees it), so nothing rings over a stop
+ * or past the first hit; the re-strikes it earns there are the ending bar's to play. A hold or
+ * a soft ending leaves it ringing as planned, so does a stop under a written fermata on the
+ * ending bar's downbeat (`tieHeldUnderFermata`), and a bar before anything else is untouched.
+ * Both halves — this bar cutting what it played, the ending bar re-striking from the slot's
+ * memory — rely on the crossing note being the one the slot planned and this bar played: a
+ * note in the plan with its `bar` before the ending bar and its end past the barline.
+ */
+function letGoBeforeTheBand(ctx: BarContext, events: PitchedNote[], book: LeadBook): PitchedNote[] {
+    const ahead = ctx.next;
+    if (!ahead?.plan.ending || tieHeldUnderFermata(ahead.bar, ahead.plan.ending)) {
+        return events;
+    }
+    const barline = ahead.bar.start;
+    const tied = events.filter((n) => n.tick + n.dur > barline + 1);
+    if (!tied.length) {
+        return events;
+    }
+    const nextCtx: BarContext = {
+        ...ctx,
+        bar: ahead.bar,
+        plan: ahead.plan,
+        rng: ahead.rng,
+        next: null,
+        heard: { drums: [], bass: [], lead: [] },
+    };
+    const cut = endWithTheBand(nextCtx, tied, book).filter((n) => n.tick < barline);
+    return [...events.filter((n) => !tied.includes(n)), ...cut].sort((a, b) => a.tick - b.tick);
 }
 
 /**
@@ -2677,17 +2740,26 @@ export function leadIdiom(book: LeadBook): LeadIdiom {
                 ...(n.slideIn ? { slideIn: n.slideIn } : {}),
                 ...(n.vibrato ? { vibrato: true } : {}),
             });
-            const events = endWithTheBand(
-                ctx,
-                next.notes.filter((n) => n.bar === bar.index).map(toEvent),
-                book,
+            // The ending bar's gesture is played on every lead note sounding in it, one tied in
+            // from the bar before included (#2176; that bar cut it, `letGoBeforeTheBand`): only
+            // what is struck in this bar is emitted here. A stop under a fermata on the
+            // downbeat holds the tie uncut, so it earns no re-strike (the bar before and this
+            // one agree, `tieHeldUnderFermata`).
+            const own = next.notes.filter((n) => n.bar === bar.index);
+            const tied =
+                ctx.plan.ending && !tieHeldUnderFermata(bar, ctx.plan.ending)
+                    ? next.notes.filter((n) => n.bar < bar.index && n.tick + n.dur > bar.start + 1)
+                    : [];
+            const events = endWithTheBand(ctx, [...tied, ...own].map(toEvent), book).filter(
+                (n) => n.tick >= bar.start,
             );
             // The last pitch this slot played: a pickup into the next slot (below) is that
             // slot's, planned from this memory, so it never moves it.
             const last = events.at(-1)?.midi ?? next.last;
             const after = { ...next, last };
             const pickup = pickupAhead(ctx, book, role, after).map(toEvent);
-            return { events: pickup.length ? [...events, ...pickup] : events, memory: after };
+            const played = pickup.length ? [...events, ...pickup] : events;
+            return { events: letGoBeforeTheBand(ctx, played, book), memory: after };
         },
     };
 }

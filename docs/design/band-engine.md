@@ -498,7 +498,12 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   other eleven differ. The lead lets go with the band: in a stop nothing sounds past the
   band's eighth; in the hits a note held over the stabs lets go with its stab and is struck
   again with the last; in a button a lead still sounding there plays it with the band
-  (`endWithTheBand`, `players/lead/idiom.ts`). A style with `setup` gets a fill in the bar
+  (`endWithTheBand`, `players/lead/idiom.ts`). A note tied in from the bar before (the
+  guide-tone head's "and" of 4 into the downbeat) is the downbeat's note struck early, so it
+  counts as struck on the barline: it lets go with the band's first strike (cut in the bar
+  before, `letGoBeforeTheBand`), is not struck again on the one, and from there is an
+  ending-bar note — in on the hits after it, playing the button it is still sounding at — while
+  a hold or a soft ending lets it ring as planned (#2176). A style with `setup` gets a fill in the bar
   before (`fillAt`), its biggest section fill whatever the bar's energy (`fillStart`), the roll
   or pickup that brings the band to its last hit; one without plays its time into the end.
   The ending bar carries no plan crash (its cymbal, or none, is the book's), so the bar before
