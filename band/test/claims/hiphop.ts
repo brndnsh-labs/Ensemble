@@ -222,6 +222,34 @@ export const hiphop = defineClaims({
                 ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its root (or slash note)'],
                 ['compColour', 0.6, 1, 'the sampled-jazz Rhodes: 9ths and 13ths'],
                 ['compStrikesPerBar', 1, 3, 'a sparse loop: a chord or two a bar, never a pulse'],
+                // Measured 0.048 (#2025), 1.000 before: the loop's Rhodes spreads a seventh
+                // chord (a low shell, its colour stacked in 4ths), where it played the jazz
+                // piano's rootless voicing note for note.
+                [
+                    'compSharedWithJazz',
+                    0,
+                    0.3,
+                    "the record's own Rhodes chord, not the jazz piano's voicing",
+                ],
+                // Measured 55.3 (#2025), 60.4 with the one-hand voicing (the ceiling sits
+                // midway). The floor: a left hand at C3–D3 on every chord would crowd the sub.
+                ['compMeanLowest', 50, 57.5, 'a left-hand shell low under the chord'],
+                // Measured 1.46 semitones (#2025), 0.65 with the one-hand voicing: a spread's
+                // stack has fewer places to stand than a rootless voicing, so its top moves
+                // more. 2.06 when a one-hand voicing after a spread was led to its left hand
+                // (`compTopLeapAtChange`); the ceiling sits midway.
+                ['compTopVoiceMotion', 0, 1.75, 'the top line led smoothly, hand by hand'],
+                // Measured 0.164 (#2025), 0.004 with the one-hand voicing; 0.270 led voice for
+                // voice from the bottom (the top dropping a 5th to a spread's left hand). The
+                // ceiling sits midway. What is left is the spread's own: few places to stand
+                // (a shell under B3, a stack within a 4th of it), so G7alt into Cm7 or F7 into
+                // Bbmaj7 still leaps a 5th on top.
+                [
+                    'compTopLeapAtChange',
+                    0,
+                    0.22,
+                    'the top line moves by step or skip at a change, led from the right hand',
+                ],
             ],
         },
         {
@@ -242,6 +270,24 @@ export const hiphop = defineClaims({
             take: { lead: 'solo', comp: 'rhodes' },
             claims: [
                 ['compLeadUnison', 0, 0.15, "the Rhodes leaves the guitar's note to the guitar"],
+                // Measured 9.5 semitones (#2025): under a sounding line the spread closes up to
+                // the one-hand rootless voicing; 14.5 when it stays spread over the line. The
+                // ceiling sits midway.
+                [
+                    'compSpanUnderLead',
+                    0,
+                    12,
+                    "under the guitar's line the Rhodes plays compact, out of its register",
+                ],
+                // Measured 0 (#2025). 0.089 when each strike chose its own hands, closing up
+                // under the line on one and spreading again on the next; the ceiling sits
+                // midway.
+                [
+                    'compHandsChangeInBar',
+                    0,
+                    0.045,
+                    'a chord struck twice in a bar keeps its hands: spread, or closed up',
+                ],
             ],
         },
         {

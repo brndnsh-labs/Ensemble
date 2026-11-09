@@ -21,7 +21,7 @@ These are non-negotiable in this codebase. Verify each one when relevant:
 
 - **Final-stage weight multipliers dominate.** For weight-based pickers, a new bias must be applied as `weight *= mult` AFTER all additive bonuses, not as a scalar on one factor's `+= bonus`. Additive multipliers get washed out by competing simultaneous biases. If you see a new bias landing on an additive bonus line, flag it.
 - **Deterministic seeded phrasing.** Every band choice draws from `ctx.rng(purpose, scope)`; a raw `Math.random()` or a clock breaks the band's determinism law (`band/CLAUDE.md`) and produces incoherent loops.
-- **Register slots:** bass 23–57, keyboard comp 52–84 (`docs/design/band-engine.md`); the band's invariant suite (in `band/test/`) checks every style against its lane ranges.
+- **Register slots:** bass 23–57, keyboard comp 48–84 (one-hand voicings from E3; only a spread's left-hand shell goes lower) (`docs/design/band-engine.md`); the band's invariant suite (in `band/test/`) checks every style against its lane ranges.
 - **Critique tests are the Definition of Done.** Statistical ranges, not binary snapshots. If a change replaces a range with a rigid equality on a generative output, that is almost always wrong.
 
 ## The five critique-test smells (audit them every time)

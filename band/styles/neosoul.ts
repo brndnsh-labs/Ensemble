@@ -448,16 +448,16 @@ const plainTriad = (chord: ChordFacts) =>
     !chord.sixth &&
     chord.tensions.length === 0;
 
-type ColourKind = Extract<VoicingKind, 'drop2' | 'rootless' | 'close'>;
+type ColourKind = Extract<VoicingKind, 'drop2' | 'rootless' | 'close' | 'spread'>;
 
 /**
  * The voicing kind for one chord, in order of preference: over a plain triad the open 6/9
  * (the `drop2` kind: 3-5-6-9 spread into 4ths and 5ths, E-A-D-G over C — the quartal colour);
- * over a seventh chord the rootless 3-7-9-13 (the Rhodes left hand of Poyser and Glasper, with
- * the chart's written 11ths and 13ths seated); and where the scale owns neither colour, the
- * plain close chord. Chosen per chord, so a chord whose scale can't afford a colour never
- * costs its neighbours theirs, and an anticipation is voiced for the chord it plays. Reused
- * kinds, not a new one: between them they already are the neo-soul keyboard's colours.
+ * over a seventh chord the book's own (the Rhodes' two-handed `spread`, the guitar's rootless
+ * grip), then the rootless 3-7-9-13 with the chart's written 11ths and 13ths seated; and where
+ * the scale owns no colour, the plain close chord. Chosen per chord, so a chord whose scale
+ * can't afford a colour never costs its neighbours theirs, and an anticipation is voiced for
+ * the chord it plays.
  */
 function colourKind(chord: ChordFacts, prefer: ColourKind[]): ColourKind {
     const order: ColourKind[] = plainTriad(chord) ? ['drop2', ...prefer] : prefer;
@@ -528,11 +528,15 @@ const KEYS_PUSH: Record<EnergyTier, number> = { low: 0.1, mid: 0.25, high: 0.35 
 
 /**
  * The Rhodes: one rhythm, each chord voiced with the richest colour its scale allows (see
- * `colourKind`).
+ * `colourKind`). A seventh chord is spread across two hands (#2025): the left hand's shell
+ * low, the colour stacked in 4ths over it — the neo-soul keyboard's own sound, where the
+ * rootless one-hand voicing is the jazz pianist's. Under a sounding lead it closes up to that
+ * rootless voicing, out of the line's way (`keyboardKind`); a triad keeps its 6/9.
  */
 const neoKeys: PitchedIdiom = compIdiom({
     name: 'neo-soul rhodes',
-    kind: (chord) => colourKind(chord, ['rootless']),
+    kind: (chord) =>
+        colourKind(chord, chord.seventh === null ? ['rootless'] : ['spread', 'rootless']),
     push: KEYS_PUSH,
     // A lazy re-strike in the eighth before a mid-bar change is the new chord arriving early
     // and tied over the change: the drag the figures are written for (see `KEYS_FIGURES`).

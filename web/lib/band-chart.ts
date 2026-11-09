@@ -218,7 +218,7 @@ export function sectionSteps(chart: BandChart, id: string): { start: number; end
 }
 
 /**
- * A tapped chord's notes: close position in the keys' register slot (52–84), the root lowest
+ * A tapped chord's notes: close position from the keys' one-hand floor (E3) up, the root lowest
  * unless the chart names another bass, which goes under it.
  */
 export function auditionMidis(chord: ChordFacts): number[] {

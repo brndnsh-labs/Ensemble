@@ -174,6 +174,20 @@ export const neosoul = defineClaims({
                     'a half step into a root slides up from below far more than it falls',
                 ],
                 ['compColour', 0.6, 1, 'lush voicings: 9ths, 13ths, 6/9s'],
+                // Measured 0.048 (#2025): the Rhodes spreads a seventh chord across two hands,
+                // a low shell under its colour in 4ths. 0.988 before, when it borrowed the jazz
+                // piano's rootless voicing note for note; the rest are the changes it still
+                // plays compact (an altered dominant has no 4ths to stack) and lands the same.
+                [
+                    'compSharedWithJazz',
+                    0,
+                    0.3,
+                    "its own voicings: on a seventh chord it rarely plays the jazz piano's notes",
+                ],
+                // Measured 54.5 (#2025): the spread's shell stands in the octave under middle C,
+                // against 59.2 with the one-hand voicing (the ceiling sits midway). The floor:
+                // a left hand at C3–D3 on every chord would sit on the bass's register.
+                ['compMeanLowest', 50, 56.5, 'a left hand low under the chord, off the bass'],
                 [
                     'compNotesInScale',
                     0.99,
@@ -196,6 +210,17 @@ export const neosoul = defineClaims({
                     'lazily syncopated: re-strikes on the "e"s and "a"s',
                 ],
                 ['compTopVoiceMotion', 0, 3, 'smooth voice leading'],
+                // Measured 0.164 (#2025), 0.004 with the one-hand voicing. Led voice for voice
+                // from the bottom, a one-hand voicing after a spread met its left hand and the
+                // top dropped a 5th (0.271); the ceiling sits midway. What is left is the
+                // spread's own: it has few places to stand (a shell under B3, a stack within a
+                // 4th of it), so G7alt into Cm7 or F7 into Bbmaj7 still leaps a 5th on top.
+                [
+                    'compTopLeapAtChange',
+                    0,
+                    0.22,
+                    'the top line moves by step or skip at a change, led from the right hand',
+                ],
             ],
         },
         {
@@ -270,6 +295,25 @@ export const neosoul = defineClaims({
             take: { lead: 'solo', comp: 'rhodes' },
             claims: [
                 ['compLeadUnison', 0, 0.15, "the Rhodes leaves the guitar's note to the guitar"],
+                // Measured 10.9 semitones (#2025): under a sounding line the spread closes up to
+                // the one-hand rootless voicing; 15.3 when it stays spread over the line. The
+                // ceiling sits midway.
+                [
+                    'compSpanUnderLead',
+                    0,
+                    13,
+                    "under the guitar's line the Rhodes plays compact, out of its register",
+                ],
+                // Measured 0.004 (#2025; the base engine reads 0.003, the floor of the metric:
+                // a voice the lead's octave drops below it widens a one-hand voicing past an
+                // octave). 0.135 when each strike chose its own hands, closing up under the
+                // line on one and spreading again on the next; the ceiling sits midway.
+                [
+                    'compHandsChangeInBar',
+                    0,
+                    0.07,
+                    'a chord struck twice in a bar keeps its hands: spread, or closed up',
+                ],
             ],
         },
         {

@@ -13,7 +13,7 @@ import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { at, BUTTON_LIFT, barSteps, dyn, endingStrikes, STEP, spanSteps } from '../grid.js';
 import { type GripShape, grip } from './fretboard.js';
-import { type LeadOver, type VoicingKind, voice } from './voicing.js';
+import { keyboardKind, type LeadOver, type VoicingKind, voice } from './voicing.js';
 
 export interface Hit {
     step: number;
@@ -50,6 +50,9 @@ interface CompMemory {
     /** A sustaining instrument struck its last chord after that bar's downbeat: it has been
      * held for less than a bar. */
     fresh?: boolean;
+    /** The voicing the hands hold is a keyboard `spread` (two hands), led from its right
+     * hand (`cost` in voicing.ts). */
+    spread?: true;
 }
 
 export interface CompBook {
@@ -143,18 +146,27 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             // The comp hears the lead before it plays (perform.ts), so each placement knows
             // which lead notes will sound over it, from the strike to where the hand lets go
             // (a step range in this bar), and sits under them (#2014).
+            const leadFor = (sounds: readonly (readonly [number, number])[]) =>
+                leadOver(
+                    ctx.heard.lead,
+                    sounds.map(([from, to]) => [at(bar, from), at(bar, to)] as const),
+                );
+            // Whether the keyboard voicing the hand holds is a spread: the next is led from
+            // its right hand.
+            let spread = !!memory.spread;
             const place = (
                 chord: ChordFacts,
                 prev: number[] | null,
                 sounds: readonly (readonly [number, number])[] = [],
+                kind = kindOf(chord),
             ) => {
-                const lead = leadOver(
-                    ctx.heard.lead,
-                    sounds.map(([from, to]) => [at(bar, from), at(bar, to)] as const),
-                );
-                return shape
-                    ? grip(chord, kindOf(chord), shape, prev, lead)
-                    : voice(chord, kindOf(chord), prev, lead);
+                const lead = leadFor(sounds);
+                if (shape) {
+                    return grip(chord, kind, shape, prev, lead);
+                }
+                const placed = voice(chord, kind, prev, lead, spread);
+                spread = keyboardKind(chord, kind, lead) === 'spread';
+                return placed;
             };
             const tier = energyTier(plan.energy);
             const total = barSteps(bar);
@@ -238,7 +250,13 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 }
                 return {
                     events,
-                    memory: { voicing: prev, pushed: null, chord: held, bar: bar.index },
+                    memory: {
+                        voicing: prev,
+                        pushed: null,
+                        chord: held,
+                        bar: bar.index,
+                        ...(spread ? { spread: true as const } : {}),
+                    },
                 };
             }
             const legato = ctx.instrument.legato && !book.percussive;
@@ -473,15 +491,46 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                       : total - hit.step;
                 return legato ? room : Math.min(hit.length, room);
             };
+            // The strikes of one chord from planned hit `i` on, as step ranges: until a strike on
+            // another chord (a scratch is pitchless).
+            const soundsFrom = (i: number) => {
+                const sounds: [number, number][] = [];
+                for (let k = i; k < planned.length && planned[k].chord === planned[i].chord; k++) {
+                    if (!planned[k].muted) {
+                        sounds.push([planned[k].step, planned[k].step + lengthOf(k)]);
+                    }
+                }
+                return sounds;
+            };
+            // The keyboard's kind for the chord being struck, chosen on its first strike.
+            let decided: { chord: ChordFacts; kind: VoicingKind } | null = null;
             planned.forEach((hit, i) => {
                 const length = lengthOf(i);
                 if (!shape) {
                     // A pianist re-voices every strike, leading from the last one. An organ
                     // re-articulating the chord it holds keeps its shape.
-                    prev =
-                        hit.again && prev
-                            ? prev
-                            : place(hit.chord, prev, [[hit.step, hit.step + length]]);
+                    // why: but the hands are chosen once for the chord, against what the lead
+                    // sounds over any of its strikes (`keyboardKind`): a spread that closed up
+                    // under the line on one strike and opened out again on the next would
+                    // change hands inside one chord (#2025).
+                    if (!(hit.again && prev)) {
+                        if (decided?.chord !== hit.chord) {
+                            decided = {
+                                chord: hit.chord,
+                                kind: keyboardKind(
+                                    hit.chord,
+                                    kindOf(hit.chord),
+                                    leadFor(soundsFrom(i)),
+                                ),
+                            };
+                        }
+                        prev = place(
+                            hit.chord,
+                            prev,
+                            [[hit.step, hit.step + length]],
+                            decided.kind,
+                        );
+                    }
                 } else if (!prev || (hit.chord !== held && (!hit.muted || !ahead))) {
                     // A guitarist holds a grip and moves to the next as its chord arrives, so a
                     // scratch on that chord's first sixteenth deadens the new shape. After an
@@ -489,13 +538,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     // that, it never jumps back to the old shape for one sixteenth.
                     // The grip sounds at each strike until one on another chord: those
                     // strikes are what the lead hears it against (a scratch is pitchless).
-                    const sounds: [number, number][] = [];
-                    for (let k = i; k < planned.length && planned[k].chord === hit.chord; k++) {
-                        if (!planned[k].muted) {
-                            sounds.push([planned[k].step, planned[k].step + lengthOf(k)]);
-                        }
-                    }
-                    prev = place(hit.chord, prev, sounds);
+                    prev = place(hit.chord, prev, soundsFrom(i));
                     held = hit.chord;
                 }
                 if (!hit.muted) {
@@ -522,6 +565,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     ...(leadUntil !== undefined ? { leadUntil } : {}),
                     bar: bar.index,
                     ...(fresh ? { fresh } : {}),
+                    ...(spread ? { spread: true as const } : {}),
                 },
             };
         },

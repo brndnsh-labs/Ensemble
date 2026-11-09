@@ -45,7 +45,7 @@ The engine's pitch picker chooses between candidate notes weighted by ~15 simult
 `npm test` runs Vitest silently. `npx vitest run band/test/critique.test.ts -t <style>` prints the style's report with each measured value.
 
 ### Register slotting reminder
-If a claim inspects emitted MIDI numbers, the contract is `docs/design/band-engine.md`'s register slots (bass 23–57, keyboard comp 52–84), which the invariant suite already enforces. Don't write claims that violate a slot.
+If a claim inspects emitted MIDI numbers, the contract is `docs/design/band-engine.md`'s register slots (bass 23–57, keyboard comp 48–84 (one-hand voicings from E3; only a spread's left-hand shell goes lower)), which the invariant suite already enforces. Don't write claims that violate a slot.
 
 ## Standard workflow for a critique-test story
 

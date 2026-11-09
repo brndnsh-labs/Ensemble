@@ -20,16 +20,33 @@ export interface Slot {
     pull?: number;
 }
 
-/** The keyboard comp's register slot. */
-const KEYS: Slot = { lo: 52, hi: 84, top: 72 };
+/**
+ * The keyboard comp's register slot: the instrument's whole range (`COMP_INSTRUMENTS`), down to
+ * C3, where a `spread` voicing's left-hand shell sits (#2025).
+ */
+const KEYS: Slot = { lo: 48, hi: 84, top: 72 };
+
+/**
+ * Where a one-hand voicing sits (every kind but `spread`): E3 up. why: a close or rootless
+ * voicing stacks 2nds and 3rds from its bottom note, and under E3 those are mud (a minor 2nd's
+ * low-interval limit is E3, a major 2nd's Eb3: `LOW_INTERVAL_LIMIT`). Only the spread's open
+ * shell — a 5th, a tritone or a 7th at the bottom — belongs below it. It is also where every
+ * one-hand voicing sat before the floor came down, so their placements are unchanged.
+ */
+const ONE_HAND: Slot = { ...KEYS, lo: 52 };
 
 /**
  * `power`: root and fifth (and octave), whatever the chord's quality — the distorted rhythm
  * guitar's chord, since a third beating against root and fifth under drive turns to mud.
  * The fifth is the chord's own (`fifthOf`): a diminished chord gets the tritone power chord,
  * an augmented one the #5, so the chart's quality still speaks where it lives in the 5th.
+ *
+ * `spread`: the two-handed neo-soul keyboard voicing (#2025) — a low left-hand shell (R–7, or
+ * 3–7 either way up) and the colour stacked in 4ths above it in the right hand, five notes (see
+ * `spreadCandidates`). Keyboards only; a seventh chord's voicing, which falls back to the
+ * compact `rootless` where it has no 4ths to stack, or under a sounding lead (`keyboardKind`).
  */
-export type VoicingKind = 'close' | 'rootless' | 'stab' | 'drop2' | 'shell' | 'power';
+export type VoicingKind = 'close' | 'rootless' | 'stab' | 'drop2' | 'shell' | 'power' | 'spread';
 
 const has = (chord: ChordFacts, n: number) => chord.intervals.some((i) => mod12(i) === n);
 
@@ -204,7 +221,44 @@ export function voicingTones(chord: ChordFacts, kind: VoicingKind): number[] {
             const top = chord.family === 'half-diminished' ? 0 : ninth(chord);
             return [...new Set([third ?? 7, fifthSeat(chord), colour, top])];
         }
+        case 'spread': {
+            // The palette `spreadCandidates` places five tones of: the shell's root, 3rd and
+            // 7th, and the colours the right hand may stack. A palette, not a voicing: the
+            // kind is a keyboard's only. A guitar book never asks for it — `grip` would try to
+            // finger every tone of it (a guitar's two-handed colour is its rootless grip).
+            return [...new Set([0, third ?? 7, colour ?? fifth, ...spreadColours(chord)])];
+        }
     }
+}
+
+/**
+ * The tones a spread voicing's right hand may stack, as semitones above the root: the rootless
+ * voicing's own (the 3rd, the 7th, the 9th and the 13th or 5th, with every written or implied
+ * alteration already seated — one colour authority), the root, the 5th, and the natural 13th.
+ * why: the 4ths stack needs a scale-wide palette to find three 4ths in — the right hand's
+ * colours are chosen by stacking, not by seat. The root may sit on top (Dm9 as F-C | E-A-D);
+ * a root a minor 9th over the 7th is left to `cost`. The 5th is left out where an altered
+ * tone (b5/#11, b13) holds its seat, as the rootless voicing leaves it. The natural 13th joins
+ * on a major or minor chord whose scale owns it (Ionian, Lydian, Dorian): Cmaj7 as C-B | E-A-D
+ * is the neo-soul major 13th, while an Aeolian or Phrygian minor's b13 is an avoid note.
+ */
+function spreadColours(chord: ChordFacts): number[] {
+    const rootless = voicingTones(chord, 'rootless');
+    const third = chord.third ?? (has(chord, 5) ? 5 : has(chord, 2) ? 2 : null);
+    const altered = rootless.some((t) => t === 6 || t === 8);
+    const thirteenth =
+        (chord.family === 'major' || chord.family === 'minor') &&
+        chord.scale.includes(9) &&
+        chord.fifth !== 8;
+    return [
+        ...new Set([
+            ...rootless,
+            0,
+            ...(third === null ? [] : [third]),
+            ...(altered ? [] : [fifthOf(chord)]),
+            ...(thirteenth ? [9] : []),
+        ]),
+    ];
 }
 
 function candidates(tones: number[], kind: VoicingKind): number[][] {
@@ -255,8 +309,26 @@ export const LOW_INTERVAL_LIMIT: Record<number, number> = {
     11: 41, // M7: F2
 };
 
-/** How good a placement is (lower is better): register, voice leading, and clashes. */
-export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot: Slot): number {
+/**
+ * Which of two keyboard voicings are `spread`s (two hands: the first two notes the left
+ * hand's shell, the rest the right hand's stack). See `cost`.
+ */
+export interface Hands {
+    prev: boolean;
+    v: boolean;
+}
+
+/**
+ * How good a placement is (lower is better): register, voice leading, and clashes. `hands`
+ * says which of the two voicings are spreads, for the voice leading between them.
+ */
+export function cost(
+    v: number[],
+    prev: number[] | null,
+    chord: ChordFacts,
+    slot: Slot,
+    hands?: Hands,
+): number {
     let c = 0;
     const top = v[v.length - 1];
     // Register: out of the slot is forbidden in effect; the top voice aims for the sweet spot.
@@ -268,10 +340,29 @@ export function cost(v: number[], prev: number[] | null, chord: ChordFacts, slot
     c += Math.abs(top - slot.top) * (slot.pull ?? 0.35);
     // Voice leading: the smallest total movement from the last chord.
     if (prev?.length) {
-        const n = Math.min(prev.length, v.length);
         const a = [...prev].sort((x, y) => x - y);
-        for (let i = 0; i < n; i++) {
-            c += Math.abs(v[i] - a[i]) * 0.5;
+        if (hands && (hands.prev || hands.v)) {
+            // why: a spread is led hand by hand (#2025). Matched voice for voice from the
+            // bottom, a four-note one-hand voicing after a five-note spread is led to the
+            // spread's left hand, and the top line drops a 5th or more (Cmaj7 as C3-B3 |
+            // E4-A4-D5, then A7b9 as Bb3-Db4-F4-G4: D5 to G4). A pianist leads the top line
+            // with the right hand: the right hand's stack meets the one-hand voicing's top
+            // voices, matched from the top down, and the left hand's shell moves to the next
+            // shell (from a one-hand voicing it is free: there was no left hand to lead).
+            if (hands.prev && hands.v) {
+                c += (Math.abs(v[0] - a[0]) + Math.abs(v[1] - a[1])) * 0.5;
+            }
+            const right = hands.v ? v.slice(2) : v;
+            const before = hands.prev ? a.slice(2) : a;
+            const n = Math.min(right.length, before.length);
+            for (let i = 1; i <= n; i++) {
+                c += Math.abs(right[right.length - i] - before[before.length - i]) * 0.5;
+            }
+        } else {
+            const n = Math.min(prev.length, v.length);
+            for (let i = 0; i < n; i++) {
+                c += Math.abs(v[i] - a[i]) * 0.5;
+            }
         }
         c += Math.abs(top - a[a.length - 1]) * 0.6;
     }
@@ -371,7 +462,7 @@ export function leadCost(v: number[], lead: readonly LeadOver[]): number {
 function powerCandidates(chord: ChordFacts): number[][] {
     const fifth = fifthOf(chord);
     const out: number[][] = [];
-    for (let root = KEYS.lo; root + 12 <= KEYS.hi; root++) {
+    for (let root = ONE_HAND.lo; root + 12 <= ONE_HAND.hi; root++) {
         if (mod12(root) === chord.root) {
             // why: matches voicingTones' power-chord rule — an augmented #5 (or an altered
             // dominant's b13) has no clean fifth to stack, so keys play root and octave alone.
@@ -382,30 +473,173 @@ function powerCandidates(chord: ChordFacts): number[][] {
 }
 
 /**
- * Place a chord's voicing near the previous one, under the lead notes sounding over it.
- * Deterministic.
+ * The highest note a spread voicing's left-hand shell may stand on: B3. why: the shell is the
+ * left hand's, in the octave under middle C (C3–B3, from the keyboard's floor), the register a
+ * neo-soul keyboardist puts it in — low enough to sound under the right hand as its own
+ * layer, high enough over the bass (which lives around D2) not to thicken its line. Each pitch
+ * class has one foot there, so the voice leading chooses between shells and stacks, not
+ * octaves.
+ */
+const SHELL_TOP = 59;
+
+/**
+ * The widest the hands part, from the shell's upper note to the stack's lowest: a perfect 4th.
+ * why: no wider than the 4ths stacked above it, so the notes read as one ladder of open
+ * intervals, not a low shell and a high chord with a hole between them (a gap of a 5th or more
+ * is two voicings). It also holds a 3–7 spread to an octave and a 4th to an octave and a 6th
+ * (17–21 semitones): a 4th to a 5th of shell, a 4th at most, and two 4ths. An R–7 shell is
+ * a 7th wide, so its spread runs to two octaves (Cmaj7 as C3-B3 | E4-A4-D5).
+ */
+const HAND_GAP = 5;
+
+/**
+ * The families a spread voices: the seventh chords whose colours stack in 4ths (a 7sus4's
+ * R-4-5-b7-9 is a stack of 4ths already). A half-diminished or diminished chord keeps the
+ * rootless voicing: its b5 breaks the stack, and its compact form is the one that names it.
+ */
+const SPREAD_FAMILIES = new Set<ChordFacts['family']>(['major', 'minor', 'dominant', 'sus']);
+
+/**
+ * A keyboard spread voicing (#2025): five notes, two hands. The left hand holds a shell — the
+ * root and the 7th (R–7), or the 3rd (a sus chord's 4th) and the 7th either way up (3–7, 7–3)
+ * — standing in the octave under middle C (`SHELL_TOP`). The right hand stacks three of the
+ * chord's colours in perfect 4ths (`spreadColours`), starting within a 4th over the shell
+ * (`HAND_GAP`), and never doubling a shell tone: Cmaj7 as C3-B3 | E4-A4-D5 (3-13-9), Dm7 as
+ * F3-C4 | E4-A4-D5 (9-5-R), G7 as F3-B3 | E4-A4-D5 (13-9-5), C7 as E3-Bb3 | D4-G4-C5.
+ * why the 4ths: a stack of 4ths names no triad, so the right hand sounds colour (the open,
+ * unresolved sound of McCoy Tyner's and Herbie Hancock's 4ths over a shell, which neo-soul
+ * keyboard players inherited) while the shell carries the harmony — where
+ * the jazz pianist's one-hand rootless voicing packs 3rds and 2nds into one octave. why the
+ * 7–3 shell too: a pitch class has one foot in the shell's octave, so with only R–7 and 3–7 a
+ * chord rooted high in it (G7, A7, Bb) could only spread high (G7 as B3-F4 | A4-D5-G5), and
+ * the voicing after it — a compact one under the lead included — was led up after it, onto
+ * the soloist's line. Every shell and stack is a candidate, voice-led by `cost` like any other
+ * kind; a chord with no stack (an altered dominant's b9/b13 hold no three 4ths, a
+ * half-diminished chord isn't one of `SPREAD_FAMILIES`) has none, and `voice` falls back to
+ * the rootless voicing.
+ */
+function spreadCandidates(chord: ChordFacts): number[][] {
+    if (chord.seventh === null || !SPREAD_FAMILIES.has(chord.family)) {
+        return [];
+    }
+    const colours = spreadColours(chord);
+    const third = chord.third ?? (has(chord, 5) ? 5 : has(chord, 2) ? 2 : null);
+    const seventh = chord.seventh;
+    // The left hand's shells, [foot, the tone above it]: R–7, 3–7, and 3–7 the other way up.
+    const shells: [number, number][] = [[0, seventh]];
+    if (third !== null) {
+        shells.push([third, seventh], [seventh, third]);
+    }
+    const out: number[][] = [];
+    for (const [foot, partner] of shells) {
+        const shell = [mod12(chord.root + foot), mod12(chord.root + partner)];
+        for (let low = KEYS.lo; low <= SHELL_TOP; low++) {
+            if (mod12(low) !== shell[0]) {
+                continue;
+            }
+            const upper = low + 1 + mod12(shell[1] - (low + 1));
+            for (const x of colours) {
+                const stack = [x, x + 5, x + 10].map((t) => mod12(chord.root + t));
+                if (
+                    stack.some(
+                        (pc) => !colours.includes(mod12(pc - chord.root)) || shell.includes(pc),
+                    )
+                ) {
+                    continue;
+                }
+                const first = upper + 1 + mod12(stack[0] - (upper + 1));
+                if (first - upper > HAND_GAP || first + 10 > KEYS.hi) {
+                    continue;
+                }
+                // why: a stack note a minor 9th over a shell note is the one clash a voicing
+                // never holds off a dominant (`cost`'s rule) — the 9-5-R stack over a 3–7
+                // shell puts a major 7th's root a minor 9th over its 7th (Cmaj7 as E3-B3 |
+                // D4-G4-C5). The right hand leaves that top note out (E3-B3 | D4-G4, the
+                // spread maj9); a stack that would lose an inner note isn't a stack.
+                const clash = (m: number) =>
+                    chord.family !== 'dominant' && (m - low === 13 || m - upper === 13);
+                const hand = [first, first + 5, first + 10];
+                if (hand.slice(0, 2).some(clash)) {
+                    continue;
+                }
+                out.push([low, upper, ...(clash(hand[2]) ? hand.slice(0, 2) : hand)]);
+            }
+        }
+    }
+    return out;
+}
+
+/**
+ * The kind a keyboard plays a chord in: a `spread` closes up into the compact rootless voicing
+ * under a sounding lead line (#2057), and where the chord has no 4ths to stack
+ * (`spreadCandidates`); every other kind is itself. `lead` is what sounds over all of the
+ * chord's strikes in the bar: the caller decides once per chord there (`compIdiom`), so a
+ * chord struck twice in a bar never changes hands between its strikes. (A chord pushed over
+ * the barline is decided again in the bar it ties into: the push hears only its own bar's
+ * lead.)
+ * why: a spread reaches from C3 to the high 70s, so it straddles a soloist's register — the
+ * line would sound inside the chord, not over it — and its five voices leave the search fewer
+ * ways to clear the lead's note. A pianist behind a singer plays small. Where the lead
+ * breathes, or there is no lead, the spread plays.
+ */
+export function keyboardKind(
+    chord: ChordFacts,
+    kind: VoicingKind,
+    lead: readonly LeadOver[],
+): VoicingKind {
+    return kind === 'spread' && (lead.length > 0 || !spreadCandidates(chord).length)
+        ? 'rootless'
+        : kind;
+}
+
+/**
+ * Place a chord's voicing near the previous one, under the lead notes sounding over it. A
+ * `spread` under a lead plays rootless (`keyboardKind`). `prevSpread`: the previous voicing is
+ * a spread, led from its right hand (`cost`). Deterministic.
  */
 export function voice(
     chord: ChordFacts,
     kind: VoicingKind,
     prev: number[] | null,
     lead: readonly LeadOver[] = [],
+    prevSpread = false,
 ): number[] {
+    if (kind === 'spread') {
+        if (keyboardKind(chord, kind, lead) !== 'spread') {
+            return voice(chord, 'rootless', prev, lead, prevSpread);
+        }
+        const shapes = spreadCandidates(chord);
+        let best = shapes[0];
+        let bestCost = Infinity;
+        for (const v of shapes) {
+            const c = cost(v, prev, chord, KEYS, { prev: prevSpread, v: true });
+            if (c < bestCost) {
+                best = v;
+                bestCost = c;
+            }
+        }
+        return best;
+    }
     const pcs = voicingTones(chord, kind).map((n) => mod12(chord.root + n));
+    // why: after a spread, a one-hand voicing is led from its right hand (`cost`), so the top
+    // line keeps its place — except under a sounding lead, where the hands close up because
+    // the line is there (#2057): the right hand comes down to the left, under the line, so the
+    // voicing is led from the bottom, voice for voice, as from any other.
+    const hands = prevSpread && !lead.length ? { prev: true, v: false } : undefined;
     let best: number[] | null = null;
     let bestCost = Infinity;
     for (const v of kind === 'power' ? powerCandidates(chord) : candidates(pcs, kind)) {
         // why: a voice out of the register is cut below, and with it maybe a guide tone. The
         // lead's costs can add past the register's own (two voices on the line), so under a
         // lead an out-of-register placement isn't a candidate at all.
-        if (lead.length && v.some((m) => m < KEYS.lo || m > KEYS.hi)) {
+        if (lead.length && v.some((m) => m < ONE_HAND.lo || m > ONE_HAND.hi)) {
             continue;
         }
-        const c = cost(v, prev, chord, KEYS) + leadCost(v, lead);
+        const c = cost(v, prev, chord, ONE_HAND, hands) + leadCost(v, lead);
         if (c < bestCost) {
             best = v;
             bestCost = c;
         }
     }
-    return (best ?? [60, 64, 67]).filter((m) => m >= KEYS.lo && m <= KEYS.hi);
+    return (best ?? [60, 64, 67]).filter((m) => m >= ONE_HAND.lo && m <= ONE_HAND.hi);
 }
