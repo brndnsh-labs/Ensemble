@@ -10,7 +10,7 @@
  */
 import { energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';
-import { chordAt } from '../form/timeline.js';
+import { type Bar, chordAt } from '../form/timeline.js';
 import {
     BASS,
     bassNote,
@@ -21,7 +21,7 @@ import {
     place,
     sectionPlace,
 } from '../players/bass/line.js';
-import { isPlayable } from '../players/comp/fretboard.js';
+import { isPlayable, pullOffs } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import {
@@ -74,8 +74,8 @@ const countryDrums = drumIdiom({
     // into the next section.
     fillLength: { phrase: { low: 0, mid: 2, high: 4 }, section: { low: 2, mid: 4, high: 4 } },
     // why: kick and crash on 1 under the ringing chord. This is the blues book's line too: no
-    // country-only last hit is written here that I can stand behind, so the two are left the
-    // same (#2017) for the ear to rule on.
+    // country-only last hit is written here that I can stand behind (#2017). A country ending
+    // is told by its walk-up and stinger, not its last hit (#2177, below).
     ending: () => ({ crash: 'X', kick: 'X' }),
     groove(ctx, tier) {
         if (tier === 'low') {
@@ -129,10 +129,32 @@ const countryDrums = drumIdiom({
     },
 });
 
+// ================================================================ the ending's walk-up and stinger
+// A country ending is not its last drum hit (that is the blues's crash and kick, above): it is
+// the bass walking up into the last chord and the guitar's stinger over it (#2177). Both live
+// here, in the country bass and guitar, because no other style plays them. (A Nashville *tag*,
+// the last line played again before the end, is another thing, and is not built.)
+
+/**
+ * The chord the walk-up plays into and the stinger over (#2177): the ending bar's one chord,
+ * struck on its downbeat (a resolved turnaround, a last bar already home, a fermata's written
+ * chord). Null for a bar that gets home itself (`| G7 C |`): its written V–I is the chart's own
+ * figure into the end, played as written, and the I arrives with no downbeat to walk to.
+ */
+function finalChord(ctx: BarContext, bar: Bar): ChordFacts | null {
+    const chords = endingSpans({ ...ctx, bar }).filter(({ span }) => span.chord);
+    return chords.length === 1 && chords[0].from === 0 ? chords[0].span.chord : null;
+}
+
 // ================================================================ bass
 interface CountryBassMemory extends LineMemory {
     /** Where a walk-up pointed: the next chord arrives exactly there, not an octave off. */
     land: number | null;
+    /**
+     * How hard the walk-up into an ending struck its last note (#2177): the ending's root is
+     * struck at least as hard, so the landing is the accent, not the note before it.
+     */
+    walkedIn: number | null;
     /**
      * A chord whose root the last one-boom bar (a waltz bar) played: if the chord holds, the
      * next bar's boom alternates to its fifth.
@@ -210,6 +232,112 @@ function stepInto(root: number, target: number, chord: ChordFacts): number | nul
     );
 }
 
+/** A note of the walk-up into the end: its step, pitch and weight. */
+type PickupNote = { step: number; midi: number; velocity: number };
+
+/**
+ * The walk-up into a country ending (#2177): in the bar before it the bass walks into the last
+ * chord's root on the one, every time rather than on the line's coin toss — the run a two-beat
+ * bassist plays into a change (Marshall Grant's under the Tennessee Two, the boom-chick's own
+ * bassist). `chord` is the bar's last chord, struck at step `from` on `root` and held to the
+ * barline; the run takes the beats after it, so a chord struck on 3 (`C7 A7`'s A7) keeps its
+ * root there and walks with the run's last note alone.
+ * - From the IV it walks down the fourth, as Grant does: F, E-D → C (`walk`, the line's own).
+ * - From anywhere else it climbs 5-6-7 into the root: over the V, "G, A-B → C", the G held
+ *   through 2; over the I, its root, then the fifth below on 2 (the boom's own drop); over the
+ *   ii, D, then G A B → C. The 7 is the chord's own b7 of the key where the bar sounds it (C7's
+ *   Bb: a blues's 5-6-b7-1), else the leading tone (A7's B, its 9th, into C); the 6 is the
+ *   chord's own step below the 7.
+ * - A root that already sits inside the run (the vi's A, the bVII's Bb) keeps the two-beat's
+ *   boom, root on 1 and fifth on 3, and walks in on 4 from above it: the run's own note, or
+ *   the key's leading tone where the run has none there (A, E, B → C; Bb, F, B → C, the
+ *   bVII's chromatic walk-in). Dropping to the 5 under it would turn the line round on its
+ *   way up; holding it all bar sounds like the bass dropped out.
+ * Null where there is no ending chord to walk into (`finalChord`) or no beat for the run:
+ * outside 4/4, or a last chord struck on 4 or off the beat.
+ */
+function pickup(
+    ctx: BarContext,
+    chord: ChordFacts,
+    root: number,
+    from: number,
+    to: number,
+): { notes: PickupNote[]; target: number } | null {
+    const next = ctx.next;
+    const into = next?.plan.ending && next.plan.lanes.bass ? finalChord(ctx, next.bar) : null;
+    if (
+        !into ||
+        !next?.bar.spans[0]?.attack ||
+        !isCommonTime(ctx.bar) ||
+        to !== barSteps(ctx.bar) ||
+        from % 4 !== 0 ||
+        from > 8
+    ) {
+        return null;
+    }
+    const pc = bassPc(into);
+    // The bar's own root at the boom's weight (100). why: the run after it swells into the
+    // landing as the line's own walk does (96, then 102 on 4, old engine #941); the 5 is the
+    // boom's fifth weight (92), where it is a new note.
+    const struck: PickupNote = { step: from, midi: root, velocity: 100 };
+    const after = (run: PickupNote[]) => run.filter((n) => n.step > from);
+    if (mod12(root - pc) === 5 && root - 5 >= BASS.lo) {
+        // `walk` always answers across a fourth: the two steps down from the IV to the I.
+        const [three, two] = walk(root, root - 5, chord)!;
+        return {
+            notes: [
+                struck,
+                ...after([
+                    { step: 8, midi: three, velocity: 96 },
+                    { step: 12, midi: two, velocity: 102 },
+                ]),
+            ],
+            target: root - 5,
+        };
+    }
+    // The 5 a fourth under the target, both inside the bass's range.
+    const five = nearestMidi(mod12(pc + 7), root, BASS.lo, BASS.hi - 5);
+    const target = five + 5;
+    const tones = chordPcs(chord);
+    const seven = tones.includes(mod12(target - 2)) ? target - 2 : target - 1;
+    const inChord = (m: number) =>
+        tones.includes(mod12(m)) || chord.scale.includes(mod12(m - chord.root));
+    const six = [seven - 2, seven - 1].find((m) => m > five && inChord(m)) ?? seven - 2;
+    const run: PickupNote[] = [
+        { step: 4, midi: five, velocity: 92 },
+        { step: 8, midi: six, velocity: 96 },
+        { step: 12, midi: seven, velocity: 102 },
+    ];
+    if (five < root && root < target) {
+        // A root inside the run keeps the two-beat's boom, its fifth on 3, and walks in on 4
+        // with the run's note above it, or the key's leading tone where the run has none there
+        // (the bVII's chromatic walk-in, Bb … B → C).
+        const above = run.find((n) => n.step === 12 && n.midi > root);
+        return {
+            notes: [
+                struck,
+                ...after([
+                    {
+                        step: 8,
+                        midi: nearestMidi(fifthPc(chord), root, BASS.lo, BASS.hi),
+                        velocity: 92,
+                    },
+                    above ?? { step: 12, midi: target - 1, velocity: 102 },
+                ]),
+            ],
+            target,
+        };
+    }
+    return {
+        notes: [
+            struck,
+            // Over the V the 5 is the root already sounding: it holds through 2.
+            ...after(run).filter((n) => n.midi !== root),
+        ],
+        target,
+    };
+}
+
 /**
  * The boom-chick bass: root on 1, the fifth on 3 — the fifth *below* the root where the
  * register allows (the old engine's deep-register call), leaving 2 and 4 to the chick. Into a
@@ -220,7 +348,7 @@ function stepInto(root: number, target: number, chord: ChordFacts): number | nul
  */
 const countryBass: PitchedIdiom = {
     name: 'boom-chick',
-    init: (): CountryBassMemory => ({ last: null, land: null, alternate: null }),
+    init: (): CountryBassMemory => ({ last: null, land: null, alternate: null, walkedIn: null }),
     play(ctx, memory: CountryBassMemory) {
         const { bar, plan } = ctx;
         const tier = energyTier(plan.energy);
@@ -228,14 +356,24 @@ const countryBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let { last } = memory;
         if (plan.ending) {
+            // A walk into the ending (the walk-up, `pickup`, #2177) arrives where it pointed, not an
+            // octave off: its target is the first note of the bar's chord.
+            let land = memory.land;
             const held = endingBass(
                 ctx,
-                (c, p) => place(bassPc(c), p),
+                (c, p) => {
+                    const pc = bassPc(c);
+                    const arrive = land !== null && mod12(land) === pc ? land : place(pc, p);
+                    land = null;
+                    return arrive;
+                },
                 last,
-                dyn(100, plan.energy),
+                // why: the ending's root at the line's own weight (100), or harder where a
+                // walk-up's last note came in hotter (its 102, read at the bar before's energy).
+                Math.max(dyn(100, plan.energy), memory.walkedIn ?? 0),
             );
             events.push(...held.events);
-            return { events, memory: { last, land: null, alternate: null } };
+            return { events, memory: { last, land: null, alternate: null, walkedIn: null } };
         }
         const common = isCommonTime(bar);
         const booms = pulses(bar)
@@ -246,6 +384,7 @@ const countryBass: PitchedIdiom = {
         const nextAttack = ctx.next?.bar.spans[0]?.attack ?? false;
         let land = memory.land;
         let alternate: string | null = null;
+        let walkedIn: number | null = null;
         spans.forEach(({ span, from, to }, i) => {
             const chord = span.chord;
             if (!chord) {
@@ -290,7 +429,14 @@ const countryBass: PitchedIdiom = {
             const following = spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
             const followingAttacks = spans[i + 1]?.span.attack ?? nextAttack;
             const rng = ctx.rng(`walk${i}`);
-            if (
+            // The walk-up into a country ending (#2177), at any energy: like the kit's set-up
+            // fill above it, the band picks up into its end even in a ballad.
+            const walkUp = i === spans.length - 1 ? pickup(ctx, chord, root, from, to) : null;
+            if (walkUp) {
+                notes.splice(0, notes.length, ...walkUp.notes.map((n) => ({ ...n, legato: true })));
+                land = walkUp.target;
+                walkedIn = dyn(walkUp.notes.at(-1)!.velocity, plan.energy);
+            } else if (
                 tier !== 'low' &&
                 common &&
                 following &&
@@ -355,7 +501,7 @@ const countryBass: PitchedIdiom = {
         });
         return {
             events,
-            memory: { last, land, alternate } satisfies CountryBassMemory,
+            memory: { last, land, alternate, walkedIn } satisfies CountryBassMemory,
         };
     },
 };
@@ -537,6 +683,110 @@ const boomChick = compIdiom({
 });
 
 /**
+ * How long the stinger's 6th sounds before it falls to the 5th, in sixteenths: an eighth.
+ * why: the steel's pedal comes up in about an eighth at a two-step's tempo, quick enough to
+ * read as one gesture with the band's hit, slow enough for the 6th to be heard as a note.
+ */
+const STING_STEPS = 2;
+const STING = STING_STEPS * STEP;
+/**
+ * How far past the hand's span the stinger's struck 6th alone may reach, in frets (`pullOffs`).
+ * why: the ending lick is the one place a Telecaster player stretches the pinky for a grace
+ * note, and it lasts an eighth, so one fret is the honest reach (open C's A at e5 over B1).
+ * Off (0) pending #2195: the invariant suite holds every guitar chord to the three-fret span,
+ * and loosening that oracle for a grace note is Brandon's call. Until then the stinger keeps
+ * the span like every other chord, and open C has none.
+ */
+const STRETCH = 0;
+/**
+ * The pull-off's weight against the strum. why: a left-hand pull-off sounds a little under
+ * the picked notes around it, about a tenth softer, so it reads as the hand, not a new pick.
+ */
+const PULL_OFF = 0.9;
+
+/**
+ * The stinger on a country ending (#2177): the rhythm guitar ends on the 6 → 5 fall. The pedal
+ * steel's signature ending is the A pedal let up on the last chord — on the E9 neck it raises
+ * the 5th a whole step to the 6th, so releasing it drops 6 → 5 over the held chord (Buddy
+ * Emmons, Lloyd Green); the Bakersfield Telecaster pickers (Don Rich with Buck Owens) bent and
+ * released it the same way. On the boom-chick guitar it is a pull-off: the 6th struck with the
+ * chord on the downbeat, pulled off to the 5th an eighth later, which rings to the end. The 6th
+ * is the chord's own scale step above the 5th: the major 6th on a major chord (the honky-tonk
+ * sixth the piano adds, `withSixths`), the b6 in a minor key (A minor's F → E).
+ *
+ * It sings on top, or it is not played: the fall is in the chord's top two voices, never under
+ * it, and on one string of the chord as the hand holds it (`pullOffs`): a string sounds one
+ * note, so the fall takes a string the chord leaves free, or one whose note it can spare — the
+ * 5th it falls back to, or a doubled root or 5th, never the only 3rd — and the hand inside its
+ * reach (`STRETCH`, off pending #2195). E pulls its B string off from the C# (B2 → B0),
+ * A minor its top string from the F (e1 → e0); G, whose open shape holds its only 5th at the
+ * bottom, gives the fall its doubled top G's string (E5 → D5, e12 → e10, over the open
+ * strings). Open C's and open D's grips have no sting: C's top G (e3) can't reach the A at e5
+ * over B1 without the stretch, and D's only 5th is an inner voice. Only on home, the tonic: a
+ * written V7 held under a fermata is not where the band stings, and its 6th sits under the b7. Nor where the 6th rubs a half step under a
+ * chord note.
+ */
+function sting(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
+    const chord = finalChord(ctx, ctx.bar);
+    const sixth = chord?.scale.find((d) => d === 8 || d === 9);
+    if (chord?.fifth !== 7 || sixth === undefined || chord.root !== ctx.bar.key.tonic) {
+        return events;
+    }
+    const strum = events.filter((e) => e.tick === ctx.bar.start && !e.muted);
+    const pitches = strum.map((e) => e.midi);
+    const top = strum.reduce<PitchedNote | null>((t, e) => (t && t.midi >= e.midi ? t : e), null);
+    if (!top || top.dur <= STING) {
+        return events;
+    }
+    const up = (fifth: number) => fifth + sixth - 7;
+    // A note the chord can spare: one whose pitch class it sounds again elsewhere.
+    const spare = (m: number) => pitches.filter((p) => mod12(p - m) === 0).length > 1;
+    const [, hi] = ctx.instrument.range;
+    // Each 5th the fall could land on, from the top of the instrument down.
+    for (let fifth = nearestMidi(mod12(chord.root + 7), hi, 0, hi); fifth > 0; fifth -= 12) {
+        if (up(fifth) > hi || pitches.includes(up(fifth))) {
+            continue;
+        }
+        // The 6th never rubs a half step (or a ninth) under a chord note.
+        if (pitches.some((p) => p > up(fifth) && mod12(p - up(fifth)) === 1)) {
+            continue;
+        }
+        const option = pullOffs(pitches, up(fifth), fifth, STRETCH).find(
+            ({ replaces }) =>
+                (replaces === null && !pitches.includes(fifth)) ||
+                replaces === fifth ||
+                (replaces !== null && spare(replaces) && !pitches.includes(fifth)),
+        );
+        if (!option) {
+            continue;
+        }
+        const kept = strum.filter((e) => e.midi !== option.replaces);
+        // In the top two voices, or not at all: lower 5ths only sink further.
+        if (kept.filter((e) => e.midi > fifth).length > 1) {
+            return events;
+        }
+        const template = strum.find((e) => e.midi === option.replaces) ?? top;
+        // The pull-off is no pick stroke: the left hand sounds it, so it rolls with no strum.
+        const { stroke: _, ...pulled } = template;
+        const fall: PitchedNote[] = [
+            { ...template, midi: up(fifth), dur: STING },
+            {
+                ...pulled,
+                midi: fifth,
+                tick: template.tick + STING,
+                dur: template.dur - STING,
+                velocity: Math.round(template.velocity * PULL_OFF),
+            },
+        ];
+        return [
+            ...events.filter((e) => !(e.tick === top.tick && e.midi === option.replaces)),
+            ...fall,
+        ];
+    }
+    return events;
+}
+
+/**
  * The bass-strum guitar (T3 — this is Luther Perkins' Johnny Cash sound, not the Carter
  * Family's own style, which picks the *melody* on the bass strings): with no bassist, the
  * guitarist picks the boom — the root on 1, the fifth on 3, on the low strings — and strums
@@ -551,8 +801,11 @@ const countryGuitar: PitchedIdiom = {
     play(ctx, memory) {
         const out = boomChick.play(ctx, memory);
         const { bar, plan } = ctx;
+        // The last chord ends on the stinger (#2177), with a bassist or without: over the
+        // whole chord the hand holds, the picked bass note under it too.
+        const stung = (events: PitchedNote[]) => (plan.ending ? sting(ctx, events) : events);
         if (plan.lanes.bass) {
-            return out;
+            return { ...out, events: stung(out.events) };
         }
         // Where a bass note may sit: the 6th and 5th strings in first position (E2–Eb3).
         const LO = 40;
@@ -690,7 +943,7 @@ const countryGuitar: PitchedIdiom = {
             );
             return cut ? { ...e, dur: cut.tick - e.tick } : e;
         });
-        return { events, memory: out.memory };
+        return { events: stung(events), memory: out.memory };
     },
 };
 

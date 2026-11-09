@@ -85,8 +85,9 @@ const ENDING_DRUMS: Record<StyleId, Record<string, string>> = {
 };
 /**
  * The styles whose books play the same last bar (their why-comments say so). Blues and country
- * end on the same kick and crash: no country-only last hit was found to write (#2017), so this
- * pair waits on the ear rather than an invented difference.
+ * end on the same kick and crash: no country-only last hit was found to write (#2017). A
+ * country ending is told instead by the bass's walk-up into the one and the guitar's stinger
+ * (#2177, below), not by its last drum bar.
  */
 const SHARED_ENDINGS = [['blues', 'country']];
 
@@ -2203,4 +2204,326 @@ describe('a lead note tied into the ending bar lets go with the band (#2176)', (
             [8, 8, 67, 3],
         ]);
     });
+});
+
+describe('country ends on a walk-up and a stinger (#2177)', () => {
+    // Country shares the blues's last drum bar (`SHARED_ENDINGS`); what is its own is the bass's
+    // walk into the one and the guitar's stinger over the last chord.
+    // Straight and unhumanized, so every note sits on the grid the players write on.
+    const straight = (seed: string, intensity: number | null = null): BandSettings => ({
+        ...settingsFor('country', seed),
+        swing: 0,
+        humanize: 0,
+        intensity,
+    });
+    const bassIn = (events: BandEvent[], index: number) =>
+        events.filter((e): e is PitchedNote => e.lane === 'bass' && e.bar === index);
+    const inC = (bars: string) => score([{ label: 'A', bars }]);
+    /**
+     * Each chart's bar before the end, written out by hand: from the step its last chord is
+     * struck, each bass note's step and its distance in semitones from the root the ending
+     * lands on.
+     */
+    const walkUps: Record<
+        string,
+        { chart: SemanticScore; walk: [number, number][]; seeds?: string[] }
+    > = {
+        // Over the V: "G, A-B → C", the G held through 2.
+        V: {
+            chart: inC('C | F | G7 | Dm7 G7'),
+            walk: [
+                [0, -5],
+                [8, -3],
+                [12, -1],
+            ],
+        },
+        // The same into a last bar already home.
+        'V, home written': {
+            chart: inC('C | F | G7 | C'),
+            walk: [
+                [0, -5],
+                [8, -3],
+                [12, -1],
+            ],
+        },
+        // Over the I: its root, the fifth below on 2, then the run: C, G A B → C.
+        I: {
+            chart: inC('C | F | C | Dm7 G7'),
+            walk: [
+                [0, 0],
+                [4, -5],
+                [8, -3],
+                [12, -1],
+            ],
+        },
+        // From the IV it walks down the fourth: F, E-D → C.
+        IV: {
+            chart: inC('C | Am7 | Fmaj7 | G7'),
+            walk: [
+                [0, 5],
+                [8, 4],
+                [12, 2],
+            ],
+        },
+        // In E: A, G#-F# → E.
+        'IV in E': {
+            chart: score([{ label: 'A', bars: 'E | B7 | A | B7' }], { key: 'E' }),
+            walk: [
+                [0, 5],
+                [8, 4],
+                [12, 2],
+            ],
+        },
+        // The vi's root is inside the run: the boom, root and fifth, then B on 4: A, E, B → C.
+        vi: {
+            chart: inC('C | F | Am | Dm7 G7'),
+            walk: [
+                [0, -3],
+                [8, -8],
+                [12, -1],
+            ],
+        },
+        // The bVII (country rock's cadence) is the run's b7 already: the boom, then the
+        // leading tone walks in chromatically, Bb, F, B → C.
+        bVII: {
+            chart: inC('C | F | Bb | Dm7 G7'),
+            walk: [
+                [0, -2],
+                [8, -7],
+                [12, -1],
+            ],
+        },
+        // Over the ii: D, then G A B → C.
+        ii: {
+            chart: inC('C | F | Dm7 | Dm7 G7'),
+            walk: [
+                [0, -10],
+                [4, -5],
+                [8, -3],
+                [12, -1],
+            ],
+        },
+        // In E, the ii's run reaches the top of the range: F#, B C# D# → E3. The landing is
+        // where the walk pointed: placed from the D# alone it fell an octave, to E2.
+        'ii in E': {
+            chart: score([{ label: 'A', bars: 'E | A | F#m7 | B7' }], { key: 'E' }),
+            walk: [
+                [0, -10],
+                [4, -5],
+                [8, -3],
+                [12, -1],
+            ],
+        },
+        // `C7 A7`: the A7 struck on 3 keeps its root there and walks with the leading tone
+        // alone (A7's 9th): A, B → C.
+        'two-beat A7': {
+            chart: FIXTURES.blues,
+            walk: [
+                [8, -3],
+                [12, -1],
+            ],
+        },
+        // In A minor, over E7: E, F#-G# → A.
+        'minor V': {
+            chart: score([{ label: 'A', bars: 'Am | Dm7 | E7 | E7' }], { key: 'A', isMinor: true }),
+            walk: [
+                [0, -5],
+                [8, -3],
+                [12, -1],
+            ],
+        },
+    };
+
+    it.each(Object.entries(walkUps))(
+        '%s: the bass walks into the root on the one, at any energy',
+        (name, { chart, walk, seeds = SEEDS }) => {
+            // Catches a walk-up left to the line's coin toss (the regular walk plays about half
+            // the time, never in the ballad), one aimed at the chord the ending replaces, a
+            // line that turns round under a root already inside the run, and a landing an
+            // octave off the walk.
+            const timeline = compileTimeline(chart);
+            const bar = timeline.bars.at(-1)!;
+            const before = timeline.bars.at(-2)!;
+            const from = walk[0][0];
+            for (const intensity of [null, 0.1, 0.9]) {
+                for (const seed of seeds) {
+                    const where = `${name}/${seed}/${intensity}`;
+                    const { events } = performPass(timeline, straight(seed, intensity), {
+                        pass: 0,
+                        looping: false,
+                    });
+                    const landing = bassIn(events, bar.index)[0];
+                    expect(landing.tick, `${where}: the root on the one`).toBe(bar.start);
+                    expect(mod12(landing.midi), `${where}: the root`).toBe(bar.key.tonic);
+                    // The landing is the accent: struck at least as hard as the note into it.
+                    expect(
+                        landing.velocity,
+                        `${where}: the landing's weight`,
+                    ).toBeGreaterThanOrEqual(bassIn(events, before.index).at(-1)!.velocity);
+                    expect(
+                        bassIn(events, before.index)
+                            .filter((n) => n.tick >= before.start + from * STEP)
+                            .map((n) => [
+                                Math.round((n.tick - before.start) / STEP),
+                                n.midi - landing.midi,
+                            ]),
+                        `${where}: the walk-up`,
+                    ).toEqual(walk);
+                }
+            }
+        },
+    );
+
+    it('a pass that goes round plays its own line there, not the walk-up', () => {
+        // Catches the walk-up played into a chord the band does not end on. The chart ends home
+        // on its C either way; a ballad's line never walks, so its bar before strikes nothing on
+        // beat 4, where the walk-up always does.
+        const timeline = compileTimeline(walkUps['V, home written'].chart);
+        const before = timeline.bars.at(-2)!;
+        for (const seed of SEEDS) {
+            const fourth = (looping: boolean) =>
+                bassIn(
+                    performPass(timeline, straight(seed, 0.1), { pass: 0, looping }).events,
+                    before.index,
+                ).filter((n) => n.tick >= before.start + 12 * STEP);
+            expect(fourth(false).length, `${seed}: the walk-up`).toBe(1);
+            expect(fourth(true), `${seed}: going round`).toEqual([]);
+        }
+    });
+
+    /** Open strings, low E to high E: a stung grip below is written string by string. */
+    const OPEN: Record<string, number> = { E: 40, A: 45, D: 50, G: 55, B: 59, e: 64 };
+    /** A string and fret (`e12`) as a pitch. */
+    const fretted = (at: string) => OPEN[at[0]] + Number(at.slice(1));
+    /**
+     * The stung last chord in each key, written out by hand as the hand holds it, one note per
+     * string: the chord struck on the one with the 6th in it, and the string and fret its 5th is
+     * pulled off to. Null: the grip has no sting (open C's top G at e3 can't reach the A at e5
+     * over B1 inside the hand's span, the stretch off pending #2195; open D's only 5th is an
+     * inner voice and no string on top reaches one; G without a bassist frets its picked G2 at
+     * E3, out of reach of the high fall, #2191).
+     */
+    const stung: Record<
+        string,
+        { chart: SemanticScore; bass: [string, string] | null; alone: [string, string] | null }
+    > = {
+        C: { chart: inC('C | F | G7 | Dm7 G7'), bass: null, alone: null },
+        // Open G holds its only 5th at the bottom (D0): the fall takes the doubled top G's
+        // string, high over the open strings, E5 → D5.
+        G: {
+            chart: score([{ label: 'A', bars: 'G | C | D7 | D7' }], { key: 'G' }),
+            bass: ['D0 G0 B0 e12', 'e10'],
+            alone: null,
+        },
+        D: {
+            chart: score([{ label: 'A', bars: 'D | G | A7 | A7' }], { key: 'D' }),
+            bass: null,
+            alone: null,
+        },
+        // The B string's C# pulled off to the open B, under the open top E.
+        E: {
+            chart: score([{ label: 'A', bars: 'E | A | B7 | B7' }], { key: 'E' }),
+            bass: ['D2 G1 B2 e0', 'B0'],
+            alone: ['E0 D2 G1 B2 e0', 'B0'],
+        },
+        // The b6 on the top string pulled off to the open E.
+        'A minor': {
+            chart: score([{ label: 'A', bars: 'Am | Dm7 | E7 | E7' }], { key: 'A', isMinor: true }),
+            bass: ['D2 G2 B1 e1', 'e0'],
+            alone: ['A0 D2 G2 B1 e1', 'e0'],
+        },
+    };
+
+    it.each(Object.entries(stung))(
+        '%s: the guitar stings the last chord on one string, on top',
+        (name, { chart, bass, alone }) => {
+            // Catches a stinger that never plays, one buried under the chord, one that takes a
+            // string the chord is already sounding (five notes on G's four-string grip: its B
+            // string can't ring the open B and the fretted E at once), one out of the hand's reach,
+            // a 6th that rings on over the 5th, and a pull-off as loud as the strum.
+            const timeline = compileTimeline(chart);
+            const bar = timeline.bars.at(-1)!;
+            const end = bar.start + bar.meter.barTicks;
+            const fall = bar.start + 2 * STEP;
+            for (const [withBass, shape] of [
+                [true, bass],
+                [false, alone],
+            ] as const) {
+                for (const comp of ['guitar', 'nylon'] as const) {
+                    for (const seed of SEEDS) {
+                        const where = `${name}/${comp}/${withBass ? 'bass' : 'no bass'}/${seed}`;
+                        const settings = {
+                            ...straight(seed),
+                            comp,
+                            // No lead: a grip leaves out a voice on the lead's pitch, which would
+                            // make the written shapes depend on the solo's last note.
+                            lanes: {
+                                ...settingsFor('country', seed).lanes,
+                                bass: withBass,
+                                lead: false,
+                            },
+                        };
+                        const { events } = performPass(timeline, settings, {
+                            pass: 0,
+                            looping: false,
+                        });
+                        const comped = lastBar(timeline, events).comp.filter((n) => !n.muted);
+                        const hit = comped.filter((n) => n.tick === bar.start);
+                        const after = comped.filter((n) => n.tick > bar.start);
+                        if (!shape) {
+                            expect(after, `${where}: no stinger`).toEqual([]);
+                            continue;
+                        }
+                        const [held, to] = shape;
+                        const strings = held.split(' ');
+                        expect(
+                            hit.map((n) => n.midi).sort((x, y) => x - y),
+                            `${where}: the chord, one note per string`,
+                        ).toEqual(strings.map(fretted).sort((x, y) => x - y));
+                        // The 6th is the note on the fall's own string, struck for an eighth.
+                        const six = hit.find(
+                            (n) => n.midi === fretted(strings.find((at) => at[0] === to[0])!),
+                        )!;
+                        expect(six.tick + six.dur, `${where}: the 6th lets go`).toBe(fall);
+                        expect(
+                            mod12(six.midi - fretted(to)) === 2 ||
+                                mod12(six.midi - fretted(to)) === 1,
+                            `${where}: a 6th over its 5th`,
+                        ).toBe(true);
+                        expect(
+                            after.map((n) => [n.tick, n.midi, n.tick + n.dur, n.velocity]),
+                            `${where}: pulled off to the 5th, ringing, a tenth softer`,
+                        ).toEqual([[fall, fretted(to), end, Math.round(six.velocity * 0.9)]]);
+                        expect(mod12(fretted(to) - bar.key.tonic), `${where}: the 5th`).toBe(7);
+                        expect(
+                            hit.filter((n) => n !== six && n.midi > fretted(to)).length,
+                            `${where}: in the top two voices`,
+                        ).toBeLessThanOrEqual(1);
+                    }
+                }
+            }
+        },
+    );
+
+    it.each(['G7', 'G'])(
+        'no stinger where the band does not end home: a written %s under a fermata',
+        (last) => {
+            // Catches a sting on a chord that is not the tonic: G7's 6th, E, under its F, and the
+            // plain V's, a 6th with nothing to rub that is still not where the band comes home.
+            const timeline = compileTimeline(
+                score([{ label: 'A', bars: `C | F | Dm7 | ${last}`, fermataBars: [3] }]),
+            );
+            const bar = timeline.bars.at(-1)!;
+            for (const seed of SEEDS) {
+                const { events } = performPass(
+                    timeline,
+                    { ...straight(seed), comp: 'guitar' },
+                    { pass: 0, looping: false },
+                );
+                const comped = lastBar(timeline, events).comp.filter((n) => !n.muted);
+                expect(comped.length, seed).toBeGreaterThan(0);
+                expect(new Set(comped.map((n) => n.tick)), seed).toEqual(new Set([bar.start]));
+            }
+        },
+    );
 });
