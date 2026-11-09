@@ -109,7 +109,12 @@ function leadPairs(events: BandEvent[]): [PitchedNote, PitchedNote][] {
     return pairs;
 }
 
-/** The lead notes struck on a real chord change (a different chord from the span before). */
+/**
+ * The lead notes that land a real chord change (a different chord from the span before): the
+ * note struck on it, or an anticipation — struck within an eighth before it and sounding over
+ * it (a pushed arrival, #2164, or a note sung ahead of a mid-bar change), which the line voices
+ * as that chord's (`onsetsFor`). The lead is one voice, so a change has one landing at most.
+ */
 function leadLandings(t: Timeline, events: BandEvent[]) {
     const notes = leadNotes(events);
     const out: {
@@ -121,7 +126,13 @@ function leadLandings(t: Timeline, events: BandEvent[]) {
         if (!span.chord || t.spans[i - 1]?.chord?.symbol === span.chord.symbol) {
             return;
         }
-        const k = notes.findIndex((n) => Math.abs(n.tick - span.start) < 1);
+        const k = notes.findIndex(
+            (n) =>
+                Math.abs(n.tick - span.start) < 1 ||
+                (n.tick < span.start &&
+                    n.tick >= span.start - STEP * 2 &&
+                    n.tick + n.dur > span.start + 1),
+        );
         if (k >= 0) {
             out.push({ note: notes[k], chord: span.chord, before: notes[k - 1] });
         }
@@ -1997,52 +2008,61 @@ export const METRICS = {
         return longest;
     },
     /**
-     * Share of the form's four-bar phrases the lead opens that it opens early (#2164): a pickup.
-     * A phrase of the form (a bar that starts one, past the take's first) is opened by the
-     * first note struck from the last beat of the bar before through its own first bar after
-     * an eighth or more of silence — a phrase entering, not the line before running on. It
-     * opens early when that note is struck before the barline and the line runs on from it,
-     * with no beat's breath, into the phrase's bar. Phrases the lead enters later than its
-     * first bar, or not at all, aren't judged.
+     * Of the lead's phrase entries, the share that enter on the last beat of a bar (#2164): a
+     * pickup. An entry is the take's first note, a note after a beat or more of silence, or a
+     * pickup (`leadPickups`: struck in a bar's last beat after an eighth or more of silence,
+     * running on into the next bar) — every phrase, wherever in the form it starts, a call's
+     * answer and a phrase entering late included.
      */
     leadPhrasesStartEarly: (takes) => {
         let n = 0;
         let hit = 0;
         for (const { timeline: t, events } of takes) {
             const notes = leadNotes(events);
-            for (const bar of t.bars) {
-                if (bar.index === 0 || bar.phrase.bar !== 0) {
-                    continue;
-                }
-                const before = t.bars[bar.index - 1];
-                const from = before.start + (before.meter.pulses.at(-1) ?? 0);
-                const to = bar.start + bar.meter.barTicks;
-                const i = notes.findIndex((m, j) => {
-                    const prev = notes[j - 1];
-                    return (
-                        m.tick >= from &&
-                        m.tick < to &&
-                        (!prev || m.tick - (prev.tick + prev.dur) >= STEP * 2)
-                    );
-                });
-                if (i < 0) {
-                    continue;
+            const pickups = leadPickups(t, notes);
+            notes.forEach((note, i) => {
+                const prev = notes[i - 1];
+                const bar = t.bars[note.bar];
+                // A pickup into the form's next phrase, out of the breath at this one's end.
+                const pickup =
+                    pickups.has(note) &&
+                    (prev === undefined || !pickups.has(prev)) &&
+                    bar.phrase.bar === bar.phrase.length - 1;
+                if (prev && note.tick - (prev.tick + prev.dur) < STEP * 4 && !pickup) {
+                    return;
                 }
                 n++;
-                if (notes[i].tick >= bar.start) {
-                    continue;
-                }
-                let j = i;
-                while (
-                    notes[j + 1] &&
-                    notes[j].tick + notes[j].dur <= bar.start &&
-                    notes[j + 1].tick - (notes[j].tick + notes[j].dur) < STEP * 4
+                hit += note.tick >= bar.start + (bar.meter.pulses.at(-1) ?? 0) ? 1 : 0;
+            });
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Of the lead's pickups into the form's phrases (`leadPickups`, in a phrase's last bar,
+     * #2164), the share that climb into the note they lead to: the pickup's last note below it.
+     * (A line's own last-beat figure after an eighth's rest, inside a phrase, isn't one.)
+     */
+    leadPickupsClimb: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const notes = leadNotes(events);
+            const pickups = leadPickups(t, notes);
+            notes.forEach((note, i) => {
+                const next = notes[i + 1];
+                const { phrase } = t.bars[note.bar];
+                if (
+                    !pickups.has(note) ||
+                    phrase.bar !== phrase.length - 1 ||
+                    !next ||
+                    pickups.has(next) ||
+                    next.midi === note.midi
                 ) {
-                    j++;
+                    return;
                 }
-                hit +=
-                    notes[j].tick >= bar.start || notes[j].tick + notes[j].dur > bar.start ? 1 : 0;
-            }
+                n++;
+                hit += note.midi < next.midi ? 1 : 0;
+            });
         }
         return ratio(hit, n);
     },

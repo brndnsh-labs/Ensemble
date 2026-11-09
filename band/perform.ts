@@ -34,7 +34,17 @@ import { nearestMidi } from './theory/pitch.js';
  * `at` is the song tick the memory stands at — the barline before the next bar to play — so a
  * pass that begins somewhere else (a loop's wrap back to its top) knows the performance jumped.
  */
-export type PassMemory = Record<Lane, unknown> & { lastBass?: number; at?: number };
+export type PassMemory = Record<Lane, unknown> & {
+    lastBass?: number;
+    at?: number;
+    /**
+     * The lead's notes struck before the barline and still sounding across it (a pushed arrival
+     * tied over it, #2164; a head's held note) — what the keyboard yields its register to there
+     * (`yieldToLead`), carried as `lastBass` is, since a pass resumed on the barline never plays
+     * the bar that struck them.
+     */
+    leadSounding?: PitchedNote[];
+};
 
 export interface PassOptions {
     /**
@@ -298,7 +308,9 @@ export function performPass(
     // The bar after the last one played is planned only so it knows where it leads; nothing
     // below may write into it.
     const played = through < window.to ? plans.slice(0, through) : plans;
-    const yielded = instrument.family === 'keyboard' ? yieldToLead(events) : events;
+    // The lead notes sounding into the window from before it, as the bar before heard them.
+    const carried = options.memory?.leadSounding ?? [];
+    const yielded = instrument.family === 'keyboard' ? yieldToLead(events, carried) : events;
     const fermatas = holdFermatas(yielded, timeline, played, options.memory?.lastBass);
     // Each snapshot (and the memory the next pass continues from) takes the last bass note
     // sounded before its barline, after the fermatas have been held — what the full pass's
@@ -315,6 +327,15 @@ export function performPass(
         snapshots[i].lastBass = lastBass;
     }
     memory.lastBass = bassLine.at(-1)?.midi ?? lastBass;
+    // And the lead notes sounding across its barline, struck before it — in this window or
+    // carried into it — so a resume there yields the keyboard to them as the full pass does.
+    const leadLine = [...carried, ...events.filter((e): e is PitchedNote => e.lane === 'lead')];
+    for (let i = window.from; i < through; i++) {
+        const at = bars[i].start;
+        snapshots[i].leadSounding = leadLine.filter((n) => n.tick < at && n.tick + n.dur > at);
+    }
+    // The next pass starts its lap afresh: nothing of this one's lead sounds into it.
+    memory.leadSounding = undefined;
     const lastPlayed = bars[through - 1];
     memory.at = lastPlayed.start + lastPlayed.meter.barTicks;
     // Where the last strike's hold may reach. A chunk that looked past its end and stopped
@@ -362,9 +383,10 @@ export function performPass(
  * instead. The chord keeps its pitch classes either way. A guitar's grip is its hand shape, so
  * it stays. (The comp voiced each chord against the lead it heard already — `leadCost` in
  * `players/comp/voicing.ts` — and left out a voice the line sits on; this settles the rest.)
+ * `carried`: the lead notes struck before the window and sounding into it (`leadSounding`).
  */
-function yieldToLead(events: BandEvent[]): BandEvent[] {
-    const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
+function yieldToLead(events: BandEvent[], carried: readonly PitchedNote[]): BandEvent[] {
+    const lead = [...carried, ...events.filter((e): e is PitchedNote => e.lane === 'lead')];
     if (!lead.length) {
         return events;
     }

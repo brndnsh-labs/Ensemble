@@ -548,7 +548,13 @@ export const skapunk = defineClaims({
                 // quarters on the beat, none. The ska tune leans past half onto the offbeats.
                 ['leadOffbeatShare', 0.55, 0.8, 'syncopated: the tune pushes the "and"s'],
                 ['leadChordToneOnBeats', 0.72, 1, 'the beats sit on the chord'],
-                ['leadChangeRootFifth', 0.5, 0.85, 'the fanfare lands 5ths and roots on changes'],
+                // Measured 0.495: 0.513 counting only a note struck on its change, before a note
+                // sung within an eighth ahead of a change and over it counted as that change's
+                // landing (#2164, `leadLandings`) — the tune's anticipations land roots and 5ths
+                // less often than its downbeats. Still about half, where a guide-tone line's
+                // changes land a root or 5th a quarter of the time (jazz's solo 0.247, bossa's
+                // head 0.262).
+                ['leadChangeRootFifth', 0.45, 0.85, 'the fanfare lands 5ths and roots on changes'],
                 ['leadPhraseEndsOnChordTone', 0.95, 1, 'phrases end on a chord tone'],
                 ['leadLeapShare', 0, 0.05, 'no wide leaps inside a phrase'],
                 ['leadOscillation', 0, 0.04, 'no trilling back and forth'],

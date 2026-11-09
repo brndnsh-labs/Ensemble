@@ -207,14 +207,15 @@ export const jazz = defineClaims({
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
                 // two after an eight-bar period. Measured 15.63 bars before (phrase into phrase),
                 // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
-                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing. Still 3.75 with
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing. 4.00 with
                 // pickups (#2164): the catch-breath before one, an eighth, is the phrase's breath.
                 ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
-                // Pickups (#2164, `LeadBook.pickup`, head 0.4): of the form's phrases the head
-                // opens, the share it opens on the "and" of 4 or a beat early. Measured 0.300 (0 on
-                // main, and with pickups off); the tune's two-beat period breath is where most
-                // can go. Ceiling: a tune that picks up every phrase is a mannerism.
-                ['leadPhrasesStartEarly', 0.25, 0.45, 'a phrase now and then comes in early'],
+                // Pickups (#2164, `LeadBook.pickup`, head 0.7): of the phrases the head enters,
+                // the share it enters on the last beat of the bar before. Measured 0.265 (0 on
+                // main, and with pickups off). A head's first phrase, and its phrases entering on
+                // beat 2, can't pick up, so a head that picks up every phrase it can reads 0.306:
+                // the ceiling fails it, a tune leading into every phrase being a mannerism.
+                ['leadPhrasesStartEarly', 0.25, 0.3, 'a phrase now and then comes in early'],
                 ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the head is a tune: it fills the form'],
@@ -349,7 +350,7 @@ export const jazz = defineClaims({
                 ['bassRepeatedNotes', 0, 0.02, 'the walk keeps moving: no repeated pitches'],
                 ['bassMeanLeap', 1.5, 4.5, 'mostly stepwise, not arpeggio leaps'],
                 ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
-                // Measured 0.115 since #2164 (0.118 before); development off 0.022 (0.026 before), #2012's bar fix reverted 0.106; always develops 0.32.
+                // Measured 0.132 since #2164 (0.118 before); development off 0.023 (0.026 before), #2012's bar fix reverted 0.106; always develops 0.32.
                 // Floor guards development off (0.026) only; this style barely sees the bar fix (0.106 vs 0.118), which blues, disco and rock guard.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
@@ -375,23 +376,34 @@ export const jazz = defineClaims({
                 ['compLineDensity', 0.1, 0.13, 'a little thinner under the line'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 // Pickups (#2164, `LeadBook.pickup` 0.85 of the phrases that would enter on the
-                // one): measured 0.296 (0 on main, and with pickups off). The rest enter late, on
-                // the "and" of 1 or on 2, as the cells write.
-                ['leadPhrasesStartEarly', 0.25, 0.45, 'a bebop line enters on the "and" of 4'],
-                // Pushed arrivals (#2164, `LeadBook.pushes`): of the barlines a line runs across,
-                // the share tied over as one note. Measured 0.261 (0 on main, and with pushes off).
-                ['leadBarlineTies', 0.1, 0.45, 'a run leans over the barline into the change'],
+                // one): of the phrases the solo enters, the share entered on the last beat of the
+                // bar before. Measured 0.224 (0.021 on main and with pickups off, the cells' own
+                // last-beat entries). About half the solo's entries are late, on the "and" of 1
+                // or on 2, as the cells write, and a pass's first phrase can't pick up, so a solo
+                // that picks up every phrase it can reads 0.281: the ceiling fails it. Short of
+                // the story's 25%: that reading needs the late entries to pick up too.
+                ['leadPhrasesStartEarly', 0.2, 0.26, 'a bebop line enters on the "and" of 4'],
+                // Of the pickups into the form's phrases, the share whose last note is below the
+                // note it leads into (`pickupDraws` 0.6, and the approaches all from below).
+                // Measured 0.806: 0.716 with the direction inverted, 0.567 with the approaches
+                // off, 1 always from below.
+                ['leadPickupsClimb', 0.75, 0.95, 'a pickup climbs into its phrase'],
+                // Pushed arrivals (#2164, `LeadBook.pushes` 0.5 a barline): of the barlines a line
+                // runs across, the share tied over as one note. Measured 0.143 (0 on main, and with
+                // pushes off; 0.261 pushing every one it can, which the ceiling fails).
+                ['leadBarlineTies', 0.1, 0.2, 'a run leans over the barline into the change'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes between phrases'],
                 ['leadShortShare', 0.6, 0.95, 'bebop: running eighth-note lines'],
                 ['leadChordToneOnBeats', 0.72, 1, 'chord tones on the beats of a run'],
                 ['leadChangeGuideTones', 0.6, 1, 'changes land on guide tones'],
-                // Measured 0.176 (0.289 before #2164; 0.059 with chromatic approaches and
-                // enclosures off). A pickup steps into its phrase by scale (0.274 with pickups
-                // off), and a pushed arrival is struck before its change, no landing here (0.225
-                // with pushes off). The floor sits midway: chromatic approaches off still fail it.
+                // Measured 0.206 (0.252 on main; 0.050 with the line's chromatic approaches and
+                // enclosures off). A pickup's last note approaches its phrase by the book's
+                // chances (`LeadBook.pickup.approaches`; 0.149 without, the scale walked in). A
+                // pushed arrival is the change's landing (`leadLandings`), approached from beat 4,
+                // a chord tone by rule: 0.269 with pushes off, 0.177 pushing every barline.
                 [
                     'leadChromaticApproach',
-                    0.12,
+                    0.2,
                     0.6,
                     'out-of-scale half-step approaches and enclosures',
                 ],

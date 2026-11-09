@@ -186,9 +186,13 @@ export const blues = defineClaims({
                 // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
                 // its figures already leave room at each phrase end.
                 ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
-                // Pickups (#2164, `LeadBook.pickup`, head 0.5): of the form's phrases the head opens,
-                // the share its call comes in on 4. Measured 0.313 (0 on main, and with pickups off).
+                // Pickups (#2164, `LeadBook.pickup`, head 0.5): of the phrases the head enters,
+                // the share its call comes in on 4. Measured 0.270 (0 on main; 0.066 with pickups
+                // off, the pushed figure's "and" of 4; 0.550 picking up every call it can).
                 ['leadPhrasesStartEarly', 0.25, 0.5, 'a call now and then starts on 4'],
+                // Pushed arrivals (#2164, `LeadBook.pushes` 0.4): measured 0.092 (0 on main, and
+                // with pushes off; 0.191 pushing every barline it can).
+                ['leadBarlineTies', 0.03, 0.15, "the call's last word leans into the next bar"],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0.15, 0.4, 'a call, then a bar of room for the band to answer'],
@@ -206,11 +210,20 @@ export const blues = defineClaims({
                 // choruses).
                 ['leadBendReleases', 0.12, 0.45, 'a bend let back down, the blues cry'],
                 // Pickups (#2164, `LeadBook.pickup` 0.65 of the phrases that would enter on the
-                // one): measured 0.309 (0 on main, and with pickups off).
-                ['leadPhrasesStartEarly', 0.25, 0.5, 'a lick starts on 4'],
-                // Pushed arrivals (#2164, `LeadBook.pushes`): measured 0.151 (0 on main, and with
-                // pushes off).
-                ['leadBarlineTies', 0.1, 0.35, "a lick's last eighth leans into the next bar"],
+                // one): of the phrases the solo enters, the share entered on the last beat of the
+                // bar before. Measured 0.265 (0 on main, and with pickups off; 0.415 picking up
+                // every phrase it can, which the ceiling fails).
+                ['leadPhrasesStartEarly', 0.25, 0.4, 'a lick starts on 4'],
+                // Of the pickups into the form's phrases, the share whose last note is below the
+                // note it leads into (`pickupDraws` 0.6). Measured 0.712: 0.288 with the direction
+                // inverted, 1 always from below.
+                ['leadPickupsClimb', 0.55, 0.9, 'a pickup climbs into its lick'],
+                // Pushed arrivals (#2164, `LeadBook.pushes` 0.4 a barline): measured 0.057 (0 on
+                // main, and with pushes off). Most of the line's crossings run on from a note held
+                // to the barline, which can't be pushed: pushing every barline it can reads only
+                // 0.157, which the ceiling fails. Short of the story's 10%, at the blues player's
+                // restruck one.
+                ['leadBarlineTies', 0.03, 0.12, "a lick's last eighth leans into the next bar"],
                 ['leadArrivalReleaseOffRest', 0, 0, 'a phrase ends on the blue third or the b7'],
                 ['leadReleaseClimbs', 0, 0, 'the line goes on down from a let-down bend'],
                 // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.252
@@ -229,7 +242,7 @@ export const blues = defineClaims({
                 // slides are drawn past it: 0.820 with the chance ungated.
                 ['leadThirdsSlidFromBlue', 0.06, 0.25, 'the blue third slid up into the 3rd'],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
-                // Measured 0.116 since #2164 (0.134 before); development off 0.052 (0.061 before), #2012's bar fix reverted 0.071; always develops 0.40.
+                // Measured 0.134 since #2164 (0.134 before); development off 0.050 (0.061 before), #2012's bar fix reverted 0.071; always develops 0.40.
                 // Floor sits between the bar fix reverted (0.071) and shipped: it guards #2012's bar fix and development off (0.061).
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [

@@ -633,6 +633,10 @@ const jazzLead = leadIdiom({
             '..x-x-x-x-------',
             'x-----x-x---x---',
             '....x-x-x-x-x---',
+            // why: the Charleston (dotted quarter, the "and" of 2), then 3 held and the "and"
+            // of 4 pushed over the barline into the next bar: the swing tune's anticipation,
+            // the next phrase word sung an eighth early (`LeadBook.pushes`).
+            'x-----x-x-----x-',
         ],
         endings: ['x---------------', 'x-----------....', 'x-x-x-----------'],
         form: 'period',
@@ -691,15 +695,25 @@ const jazzLead = leadIdiom({
     // Bebop alto is mostly straight tone: vibrato only on a half note or longer.
     vibrato: 8,
     // why: a bebop line seldom starts on the one (#2164). Its cells already enter late, on the
-    // "and" of 1 or on 2; a phrase that would enter on the one is led in from beat 4 at 0.85
-    // (so about 30% of the solo's phrases pick up, the story's floor 25%): the eighth before the
+    // "and" of 1 or on 2; a phrase that would enter on the one is led in from beat 4 at 0.85,
+    // nearly always — the downbeat entry is the one a bebop player avoids: the eighth before the
     // barline stepping onto its first note (the commonest pickup, so twice weighted), two
-    // eighths on 4, or a triplet on 4 turning into it. A tune picks up less: 0.4 of a head's
-    // phrases, keyed by the tune so it comes back with it.
-    pickup: { chance: 0.85, head: 0.4, figures: ['..x-', '..x-', 'x-x-', 'xxx-'] },
+    // eighths on 4, or a triplet on 4 turning into it. The solo's ends on the line's own
+    // approach (`approaches`): the half step below the target, or its enclosure. A swing head's
+    // phrases habitually enter on the "and" of 4 too — the way a horn player phrases a standard's
+    // downbeat entries ahead of the beat — a little less often than the solo's, since a tune's
+    // written entry on the one is kept now and then: 0.7 of a head's, keyed by the tune so it
+    // comes back with it, and walked in by the scale.
+    pickup: {
+        chance: 0.85,
+        head: 0.7,
+        figures: ['..x-', '..x-', 'x-x-', 'xxx-'],
+        approaches: true,
+    },
     // why: and it leans over the barline: a run's last eighth tied into the next bar's one, the
-    // change arriving an eighth early (#2164).
-    pushes: true,
+    // change arriving an eighth early (#2164) — on half the barlines it could, since a bebop
+    // line restrikes the one as often as it anticipates it.
+    pushes: 0.5,
 });
 
 export const jazz: Style = {
