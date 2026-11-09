@@ -2393,28 +2393,72 @@ export const METRICS = {
         return ratio(unison, both);
     },
     /**
-     * Mean span (top note less bottom note, in semitones) of the comp chords struck while a
-     * lead note sounds over them: how compact the comp plays under the line (#2025, #2057).
+     * Of the comp notes that sound while a lead note does, the share at or above the lowest lead
+     * note sounding over them: how often the comp sits on or over the soloist's line, not under
+     * it (#2025, #2057). A keyboard behind a soloist keeps its voicing under the line; a note
+     * on it is a unison (`compLeadUnison`), one above it crowds the line from over its head.
      */
-    compSpanUnderLead: (takes) => {
+    compAboveLead: (takes) => {
         let n = 0;
-        let sum = 0;
+        let hit = 0;
         for (const { events } of takes) {
             const lead = leadNotes(events);
-            for (const notes of compChords(events).values()) {
-                const { tick, dur } = notes[0];
-                if (
-                    notes.length < 2 ||
-                    !lead.some((l) => l.tick < tick + dur && l.tick + l.dur > tick)
-                ) {
+            for (const c of events) {
+                if (c.lane !== 'comp' || (c as PitchedNote).muted) {
+                    continue;
+                }
+                const { tick, dur, midi } = c as PitchedNote;
+                let low = Number.POSITIVE_INFINITY;
+                for (const l of lead) {
+                    if (l.tick < tick + dur && l.tick + l.dur > tick) {
+                        low = Math.min(low, l.midi);
+                    }
+                }
+                if (low === Number.POSITIVE_INFINITY) {
+                    continue;
+                }
+                n++;
+                hit += midi >= low ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Of consecutive keyboard strikes on seventh chords, the share whose hands change: a
+     * two-handed spread (more than an octave across) then a one-hand voicing, or the other
+     * way (#2025). Under a soloist a keyboard opens up in the line's gaps and closes up for its
+     * phrases, so its hands change at a phrase's edge, not from strike to strike. A strike
+     * belongs to the chord it plays: a push within an eighth before a change, still sounding
+     * over it, is the new chord's.
+     */
+    compHandsFlip: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const strikes = [...compChords(events).entries()].sort(([a], [b]) => a - b);
+            let before: boolean | null = null;
+            for (const [tick, notes] of strikes) {
+                const pushedTo = t.spans.find(
+                    (s) =>
+                        s.start > tick + 0.5 &&
+                        s.start - tick <= STEP * 2 + 0.5 &&
+                        notes.some((x) => x.tick + x.dur > s.start + 1),
+                );
+                const chord = pushedTo?.chord ?? chordAt(t, tick);
+                if (!chord || chord.seventh === null) {
+                    before = null;
                     continue;
                 }
                 const midi = notes.map((x) => x.midi);
-                n++;
-                sum += Math.max(...midi) - Math.min(...midi);
+                const spread = Math.max(...midi) - Math.min(...midi) > 12;
+                if (before !== null) {
+                    n++;
+                    hit += spread !== before ? 1 : 0;
+                }
+                before = spread;
             }
         }
-        return ratio(sum, n);
+        return ratio(hit, n);
     },
     /**
      * How much busier the comp is in the lead's breaths (a dotted quarter or more without it,

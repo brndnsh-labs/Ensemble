@@ -269,19 +269,35 @@ export const hiphop = defineClaims({
         {
             take: { lead: 'solo', comp: 'rhodes' },
             claims: [
+                // Measured 0 (#2025): the Rhodes keeps under the line now (`compAboveLead`);
+                // 0.107 when it was led over and across it.
                 ['compLeadUnison', 0, 0.15, "the Rhodes leaves the guitar's note to the guitar"],
-                // Measured 9.5 semitones (#2025): under a sounding line the spread closes up to
-                // the one-hand rootless voicing; 14.5 when it stays spread over the line. The
-                // ceiling sits midway.
+                // Measured 0.001 (#2025): under a live phrase the whole voicing sits a whole
+                // step or more under the guitar's lowest note over it, down to the bare 3–7
+                // shell under a line at D4. 0.109 with that rule off, 0.126 before; the ceiling
+                // sits midway. Strikes topping out at G5 or higher under the line: 6 before, 3
+                // with the rule off, 0 with it (80 on main's maj7 blues, before #2025).
+                ['compAboveLead', 0, 0.055, "the Rhodes sits under the guitar's line, not over it"],
+                // Measured 0.035 (#2025). 0.164 when the hands follow each bar's lead alone
+                // (opening up in any bar the guitar rests), 0.218 each chord's, 0.150 before;
+                // the ceiling sits midway.
                 [
-                    'compSpanUnderLead',
+                    'compTopLeapAtChange',
                     0,
-                    12,
-                    "under the guitar's line the Rhodes plays compact, out of its register",
+                    0.1,
+                    'the top line moves by step or skip at a change under the solo too',
                 ],
-                // Measured 0 (#2025). 0.089 when each strike chose its own hands, closing up
-                // under the line on one and spreading again on the next; the ceiling sits
-                // midway.
+                // Measured 0.005 (#2025): the hands follow the guitar's phrase, open in a bar of
+                // its silence, closed while it plays. 0.159 following each bar's lead alone,
+                // 0.219 each chord's, 0.245 each strike's; the ceiling sits midway.
+                [
+                    'compHandsFlip',
+                    0,
+                    0.08,
+                    "the hands change at the solo's phrase edges, not strike to strike",
+                ],
+                // Measured 0 (#2025): the hands are chosen for the whole bar. 0.097 when each
+                // strike chose its own; the ceiling sits midway.
                 [
                     'compHandsChangeInBar',
                     0,

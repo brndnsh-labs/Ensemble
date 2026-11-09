@@ -44,7 +44,8 @@ const ONE_HAND: Slot = { ...KEYS, lo: 52 };
  * `spread`: the two-handed neo-soul keyboard voicing (#2025) — a low left-hand shell (R–7, or
  * 3–7 either way up) and the colour stacked in 4ths above it in the right hand, five notes (see
  * `spreadCandidates`). Keyboards only; a seventh chord's voicing, which falls back to the
- * compact `rootless` where it has no 4ths to stack, or under a sounding lead (`keyboardKind`).
+ * compact `rootless` where it has no 4ths to stack, or while a lead phrase is live
+ * (`keyboardKind`).
  */
 export type VoicingKind = 'close' | 'rootless' | 'stab' | 'drop2' | 'shell' | 'power' | 'spread';
 
@@ -425,8 +426,10 @@ export interface LeadOver {
  * moves too much under one chord) is left out by the comp (`leaveTheLeadItsNote` in
  * idiom.ts). Sitting above the line is not weighed here: a keyboard's `yieldToLead` in
  * perform.ts drops a voice above the lead an octave only where that keeps it over the chord's
- * own bottom note, so a voicing wholly above the lead can stay there. Whether the comp should
- * keep under the lead, at the register it would cost, is an open decision (#2057).
+ * own bottom note, so a voicing wholly above the lead can stay there. A book that spreads its
+ * hands keeps its whole voicing under the line instead (`Placement.under`, #2025); for every
+ * other book, whether to keep under the lead, at the register it would cost, is an open
+ * decision (#2057).
  */
 export function leadCost(v: number[], lead: readonly LeadOver[]): number {
     // why: a unison is the worst — two instruments on one pitch read as one smeared note.
@@ -571,44 +574,101 @@ function spreadCandidates(chord: ChordFacts): number[][] {
 
 /**
  * The kind a keyboard plays a chord in: a `spread` closes up into the compact rootless voicing
- * under a sounding lead line (#2057), and where the chord has no 4ths to stack
- * (`spreadCandidates`); every other kind is itself. `lead` is what sounds over all of the
- * chord's strikes in the bar: the caller decides once per chord there (`compIdiom`), so a
- * chord struck twice in a bar never changes hands between its strikes. (A chord pushed over
- * the barline is decided again in the bar it ties into: the push hears only its own bar's
- * lead.)
+ * while a lead phrase is live (#2057), and where the chord has no 4ths to stack
+ * (`spreadCandidates`); every other kind is itself. `live`: the soloist's phrase is live over
+ * the bar the chord is struck in — the caller decides once for the bar (`compIdiom`), so a
+ * chord struck twice in a bar never changes hands between its strikes, and a chord pushed over
+ * the barline is played the way the bar that strikes it is.
  * why: a spread reaches from C3 to the high 70s, so it straddles a soloist's register — the
- * line would sound inside the chord, not over it — and its five voices leave the search fewer
- * ways to clear the lead's note. A pianist behind a singer plays small. Where the lead
- * breathes, or there is no lead, the spread plays.
+ * line would sound inside the chord, not over it — and a pianist behind a soloist plays small.
+ * The hands follow the soloist's phrase, not each strike: a pianist opens up in the soloist's
+ * gaps, not on every rest. A phrase is live from the bar its first note sounds in through the
+ * bar after its last, so the hands close as the soloist comes in (a strike before the line's
+ * first note in that bar included) and open again only after a whole bar of silence; once
+ * open they stay open until the line sounds again. A sparse line — two or three notes a bar,
+ * a rest between them — keeps them closed, where a choice made strike by strike flipped the
+ * top of the comp an octave up and down on alternate downbeats. With no lead, the spread plays.
  */
-export function keyboardKind(
-    chord: ChordFacts,
-    kind: VoicingKind,
-    lead: readonly LeadOver[],
-): VoicingKind {
-    return kind === 'spread' && (lead.length > 0 || !spreadCandidates(chord).length)
-        ? 'rootless'
-        : kind;
+export function keyboardKind(chord: ChordFacts, kind: VoicingKind, live: boolean): VoicingKind {
+    return kind === 'spread' && (live || !spreadCandidates(chord).length) ? 'rootless' : kind;
+}
+
+/** How a keyboard voicing is placed against what came before it and the lead over it. */
+export interface Placement {
+    /** The previous voicing is a spread, led from its right hand (`cost`). */
+    prevSpread?: boolean;
+    /** The lead's phrase is live over the bar (`keyboardKind`). */
+    live?: boolean;
+    /**
+     * Keep the whole voicing under the line: its top a whole step or more under the lowest
+     * lead note sounding over it (`UNDER`). A book that spreads its hands across the
+     * soloist's register sets it (`CompBook.under`).
+     */
+    under?: boolean;
 }
 
 /**
- * Place a chord's voicing near the previous one, under the lead notes sounding over it. A
- * `spread` under a lead plays rootless (`keyboardKind`). `prevSpread`: the previous voicing is
- * a spread, led from its right hand (`cost`). Deterministic.
+ * How far under the lowest lead note sounding over it a keyboard voicing that keeps under the
+ * line puts its top: a whole step. why: a half step under the line is a rub against the
+ * soloist's note, not room for it — the same whole step `yieldToLead` (perform.ts) clears.
+ */
+const UNDER = 2;
+
+/**
+ * The highest a voicing that keeps under the line may reach (`Placement.under`): a whole step
+ * under the lowest lead note sounding over it. No lead over it, no cap.
+ */
+function capUnder(lead: readonly LeadOver[], under: boolean): number {
+    return under && lead.length ? Math.min(...lead.map((l) => l.midi)) - UNDER : Infinity;
+}
+
+/**
+ * The kind a keyboard plays the held ending's chord in (`plan.ending`): a `spread` wherever one
+ * fits wholly under the line (`capUnder`), else the compact `rootless` voicing; every other
+ * kind is itself. why: the lead plays the band's final hit with it (#2178), so the ending's
+ * bar is always inside the soloist's phrase (`keyboardKind`), but the last chord is the tune's
+ * own last word, and its two-handed sound is the one to end on — a spread that stands under
+ * the lead's last note (Cmaj7 as C3-B3 | E4-A4-D5 under an E5) leaves the line its register.
+ * The hands close up only where every spread would reach the line.
+ */
+export function endingKind(
+    chord: ChordFacts,
+    kind: VoicingKind,
+    lead: readonly LeadOver[],
+    under = false,
+): VoicingKind {
+    if (kind !== 'spread') {
+        return kind;
+    }
+    const cap = capUnder(lead, under);
+    return spreadCandidates(chord).some((v) => v[v.length - 1] <= cap) ? 'spread' : 'rootless';
+}
+
+/**
+ * Place a chord's voicing near the previous one, under the lead notes sounding over it.
+ * `kind` is the kind the caller chose (`keyboardKind`). Deterministic.
  */
 export function voice(
     chord: ChordFacts,
     kind: VoicingKind,
     prev: number[] | null,
     lead: readonly LeadOver[] = [],
-    prevSpread = false,
+    { prevSpread = false, live = lead.length > 0, under = false }: Placement = {},
 ): number[] {
+    // why: under a live phrase a book that keeps under the line (`under`) puts its whole
+    // voicing a whole step or more under the lowest lead note sounding over it, a voicing
+    // struck just before the line comes in included — the soloist owns the register above.
+    // Left to the search, the voicing was led from wherever the last one stood, above or
+    // across a low line, and a voice on or over it was moved off it one note at a time
+    // (`yieldToLead`), never the chord as a whole.
+    const cap = capUnder(lead, under);
     if (kind === 'spread') {
-        if (keyboardKind(chord, kind, lead) !== 'spread') {
-            return voice(chord, 'rootless', prev, lead, prevSpread);
+        // A spread is played under a lead only on the ending's chord (`endingKind`), and then
+        // only one that fits under the line.
+        const shapes = spreadCandidates(chord).filter((v) => v[v.length - 1] <= cap);
+        if (!shapes.length) {
+            return voice(chord, 'rootless', prev, lead, { prevSpread, live, under });
         }
-        const shapes = spreadCandidates(chord);
         let best = shapes[0];
         let bestCost = Infinity;
         for (const v of shapes) {
@@ -622,24 +682,91 @@ export function voice(
     }
     const pcs = voicingTones(chord, kind).map((n) => mod12(chord.root + n));
     // why: after a spread, a one-hand voicing is led from its right hand (`cost`), so the top
-    // line keeps its place — except under a sounding lead, where the hands close up because
-    // the line is there (#2057): the right hand comes down to the left, under the line, so the
-    // voicing is led from the bottom, voice for voice, as from any other.
-    const hands = prevSpread && !lead.length ? { prev: true, v: false } : undefined;
+    // line keeps its place — except while the lead's phrase is live, where the hands close up
+    // because the line is there (#2057): the right hand comes down to the left, under the
+    // line, so the voicing is led from the bottom, voice for voice, as from any other.
+    const hands = prevSpread && !live ? { prev: true, v: false } : undefined;
+    const all = kind === 'power' ? powerCandidates(chord) : candidates(pcs, kind);
+    // why: a voice out of the register is cut below, and with it maybe a guide tone. The
+    // lead's costs can add past the register's own (two voices on the line), so under a
+    // lead an out-of-register placement isn't a candidate at all.
+    const placeable = all.filter(
+        (v) => !lead.length || v.every((m) => m >= ONE_HAND.lo && m <= ONE_HAND.hi),
+    );
+    // why: `cost` weighs a minor 2nd off a dominant against the register, and the cap takes
+    // the register's other choices away: pressed under a low line, the search stood the
+    // voicing on its 9th a half step under the minor 3rd (Em9 as F#3-G3-B3-D4, Dm7 as
+    // E3-F3-A3-C4), a cluster at the foot of the chord. Under the cap that foot doesn't fit.
+    const tense = chord.family === 'dominant';
+    const fits = (v: number[]) =>
+        v[v.length - 1] <= cap && (cap === Infinity || tense || v.length < 3 || v[1] - v[0] !== 1);
+    let shapes = placeable.filter(fits);
+    let slot = ONE_HAND;
+    if (!shapes.length && cap !== Infinity) {
+        // why: a line low enough that no whole voicing fits under it leaves the hand the
+        // shell — the chord's guide tones — with whatever of the stack fits under the line, as
+        // a pianist plays under a low guitar line: the most voices that still name the chord.
+        // A colour a half step under the next voice at the foot is left out too (F#3-G3-B3-D4
+        // plays G3-B3-D4); a guide tone stays, and the voicing doesn't fit.
+        const guides = chord.guides.map((g) => mod12(chord.root + g));
+        const cut = placeable
+            .map((v) => {
+                const kept = v.filter((m) => m <= cap);
+                return !tense &&
+                    kept.length > 2 &&
+                    kept[1] - kept[0] === 1 &&
+                    !guides.includes(mod12(kept[0]))
+                    ? kept.slice(1)
+                    : kept;
+            })
+            .filter(
+                (v) =>
+                    fits(v) && v.length >= 2 && guides.every((g) => v.some((m) => mod12(m) === g)),
+            );
+        const most = Math.max(0, ...cut.map((v) => v.length));
+        shapes = cut.filter((v) => v.length === most);
+        if (!shapes.length) {
+            // Lower still (a line at D4), the shell alone: the 3rd and 7th as the left hand
+            // holds them under a spread, its foot in the octave under middle C.
+            shapes = shellsUnder(guides, cap);
+            slot = shapes.length ? KEYS : ONE_HAND;
+        }
+    }
     let best: number[] | null = null;
     let bestCost = Infinity;
-    for (const v of kind === 'power' ? powerCandidates(chord) : candidates(pcs, kind)) {
-        // why: a voice out of the register is cut below, and with it maybe a guide tone. The
-        // lead's costs can add past the register's own (two voices on the line), so under a
-        // lead an out-of-register placement isn't a candidate at all.
-        if (lead.length && v.some((m) => m < ONE_HAND.lo || m > ONE_HAND.hi)) {
-            continue;
-        }
-        const c = cost(v, prev, chord, ONE_HAND, hands) + leadCost(v, lead);
+    // Nothing fits under a line that low (a guitar down at G3): the search places the chord
+    // as it would without the rule, and the yield settles the rest.
+    for (const v of shapes.length ? shapes : placeable) {
+        const c = cost(v, prev, chord, slot, hands) + leadCost(v, lead);
         if (c < bestCost) {
             best = v;
             bestCost = c;
         }
     }
-    return (best ?? [60, 64, 67]).filter((m) => m >= ONE_HAND.lo && m <= ONE_HAND.hi);
+    return (best ?? [60, 64, 67]).filter((m) => m >= slot.lo && m <= slot.hi);
+}
+
+/**
+ * The bare shells of a chord at or under `cap`: its two guide tones (the 3rd and the 7th or
+ * 6th, a sus chord's 4th), either way up, the foot in the left hand's octave (C3–B3,
+ * `SHELL_TOP`) — a spread's left hand without its right. A chord with one guide tone (a triad)
+ * has no shell.
+ */
+function shellsUnder(guides: readonly number[], cap: number): number[][] {
+    if (guides.length !== 2) {
+        return [];
+    }
+    const out: number[][] = [];
+    for (const [foot, partner] of [guides, [...guides].reverse()]) {
+        for (let low = KEYS.lo; low <= SHELL_TOP; low++) {
+            if (mod12(low) !== foot) {
+                continue;
+            }
+            const upper = low + 1 + mod12(partner - (low + 1));
+            if (upper <= cap) {
+                out.push([low, upper]);
+            }
+        }
+    }
+    return out;
 }

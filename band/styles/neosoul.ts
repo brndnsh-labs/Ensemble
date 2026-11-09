@@ -530,13 +530,18 @@ const KEYS_PUSH: Record<EnergyTier, number> = { low: 0.1, mid: 0.25, high: 0.35 
  * The Rhodes: one rhythm, each chord voiced with the richest colour its scale allows (see
  * `colourKind`). A seventh chord is spread across two hands (#2025): the left hand's shell
  * low, the colour stacked in 4ths over it — the neo-soul keyboard's own sound, where the
- * rootless one-hand voicing is the jazz pianist's. Under a sounding lead it closes up to that
- * rootless voicing, out of the line's way (`keyboardKind`); a triad keeps its 6/9.
+ * rootless one-hand voicing is the jazz pianist's. While the soloist's phrase is live it closes
+ * up to that rootless voicing, out of the line's way, and opens up again in the line's gaps
+ * (`keyboardKind`); a triad keeps its 6/9.
  */
 const neoKeys: PitchedIdiom = compIdiom({
     name: 'neo-soul rhodes',
     kind: (chord) =>
         colourKind(chord, chord.seventh === null ? ['rootless'] : ['spread', 'rootless']),
+    // why: under the soloist's phrase the Rhodes keeps its whole voicing under the line (the
+    // guitar solos low, around G4): a pianist behind a soloist leaves the register over its
+    // left hand's reach to the line (#2025).
+    under: true,
     push: KEYS_PUSH,
     // A lazy re-strike in the eighth before a mid-bar change is the new chord arriving early
     // and tied over the change: the drag the figures are written for (see `KEYS_FIGURES`).

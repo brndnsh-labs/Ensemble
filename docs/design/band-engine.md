@@ -113,16 +113,30 @@ physical: its range, its strum speed, whether it sustains.
   shell to the next shell, and the right hand's stack to the next voicing's top voices, so a
   one-hand voicing after a spread keeps the top line's place (`cost`'s `hands`). A chord with
   no 4ths to stack (an altered dominant, a half-diminished or diminished chord) plays the
-  rootless voicing, and so does every chord a lead note sounds over in the bar: a spread
+  rootless voicing, and so does every chord while the soloist's phrase is live: a spread
   straddles the soloist's register, so under the line the hands close up (#2057), led from
-  the bottom. The choice is made once for the chord's strikes in a bar (`keyboardKind`), so
-  it never changes hands between them. Triads keep their own kinds.
+  the bottom. The hands follow the phrase, not the strike (`keyboardKind`): a phrase is live
+  from the bar its first note sounds in through the bar after its last, so the hands open
+  only in a real gap — no lead note in the bar or the bar before — and close for the whole
+  bar the line comes back in. They are chosen for the whole bar, so a chord never changes
+  hands between its strikes. While the phrase is live these books keep the whole voicing
+  under the line (`CompBook.under`): its top a whole step or more under the lowest lead note
+  sounding over the strike, and no minor 2nd at its foot off a dominant (the cap would
+  otherwise stand Em9 on F#3-G3); a line too low for a four-note voicing gets the shell with
+  what fits of the rest under it, or the bare 3–7 shell. The held ending's chord is the
+  exception to closing up (`endingKind`): the lead plays the final hit with it (#2178), so its
+  bar is always live, but it spreads wherever a spread fits wholly under the line. Triads keep
+  their own kinds.
   - Claims: `compSharedWithJazz`, the share of seventh-chord changes where the comp strikes
     the jazz piano's exact notes, ≤30% for neo-soul and hip hop (0.99 and 1.00 before, 0.05
-    after); `compMeanLowest` for their keyboards and for the jazz piano; `compSpanUnderLead`,
-    the comp's span under a sounding lead, on their solo takes; `compTopLeapAtChange`, the
-    share of changes whose top voice leaps more than a 4th (0.16, against 0.27 led from the
-    bottom).
+    after); `compMeanLowest` for their keyboards and for the jazz piano; `compTopLeapAtChange`,
+    the share of changes whose top voice leaps more than a 4th (0.16, against 0.27 led from
+    the bottom; on the solo takes 0.04 and 0.035, against 0.15–0.16 when the hands follow each
+    bar's lead alone). On the solo takes: `compAboveLead`, the share of comp notes at or above
+    the lowest lead note over them (0.001, against 0.05 and 0.11 with the keyboard left to sit
+    over the line), and `compHandsFlip`, the share of consecutive seventh-chord strikes whose
+    hands change (0.007 and 0.005, against 0.15–0.25 decided bar by bar, chord by chord or
+    strike by strike).
 - **Guitars** play *grips found on the fretboard* (`fretboard.ts`): one note per string, on
   adjacent strings, within a four-fret reach, costed like a keyboard voicing. The invariant
   suite holds every guitar chord to `isPlayable`. An open-position book (`openPosition`, the

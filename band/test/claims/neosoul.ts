@@ -294,20 +294,41 @@ export const neosoul = defineClaims({
         {
             take: { lead: 'solo', comp: 'rhodes' },
             claims: [
+                // Measured 0.001 (#2025): the Rhodes keeps under the line now
+                // (`compAboveLead`); 0.037 when it was led over and across it.
                 ['compLeadUnison', 0, 0.15, "the Rhodes leaves the guitar's note to the guitar"],
-                // Measured 10.9 semitones (#2025): under a sounding line the spread closes up to
-                // the one-hand rootless voicing; 15.3 when it stays spread over the line. The
-                // ceiling sits midway.
+                // Measured 0.001 (#2025): under a live phrase the whole voicing sits a whole
+                // step or more under the guitar's lowest note over it. 0.050 with that rule off
+                // (the voicing led from wherever the last stood, a voice on the line moved off
+                // it alone), 0.059 before (a compact voicing led from a spread's right hand);
+                // the ceiling sits midway. Strikes topping out at G5 or higher under the line:
+                // 13 before, 10 with the rule off, 0 with it (the bossa's Dm7b5 as Ab4 C5 F5 G5
+                // over a guitar at F4, then C4 F5 G5 Ab5).
+                ['compAboveLead', 0, 0.025, "the Rhodes sits under the guitar's line, not over it"],
+                // Measured 0.039 (#2025). 0.146 when the hands follow each bar's lead alone,
+                // opening up in any bar the guitar rests (no bar of silence before it), 0.185
+                // decided against the lead over each chord's strikes, 0.134 before; the
+                // ceiling sits midway. What is left is the phrase's edge: the hands close up as
+                // the line comes in, and the top comes down under it.
                 [
-                    'compSpanUnderLead',
+                    'compTopLeapAtChange',
                     0,
-                    13,
-                    "under the guitar's line the Rhodes plays compact, out of its register",
+                    0.09,
+                    'the top line moves by step or skip at a change under the solo too',
                 ],
-                // Measured 0.004 (#2025; the base engine reads 0.003, the floor of the metric:
-                // a voice the lead's octave drops below it widens a one-hand voicing past an
-                // octave). 0.135 when each strike chose its own hands, closing up under the
-                // line on one and spreading again on the next; the ceiling sits midway.
+                // Measured 0.007 (#2025): the hands follow the guitar's phrase, open in a bar of
+                // its silence, closed while it plays. 0.148 following each bar's lead alone,
+                // 0.187 each chord's, 0.246 each strike's (the top flipping an octave on
+                // alternate downbeats under a two-note-a-bar line); the ceiling sits midway.
+                [
+                    'compHandsFlip',
+                    0,
+                    0.075,
+                    "the hands change at the solo's phrase edges, not strike to strike",
+                ],
+                // Measured 0 (#2025): the hands are chosen for the whole bar. 0.158 when each
+                // strike chose its own, closing up under the line on one and spreading again on
+                // the next; the ceiling sits midway.
                 [
                     'compHandsChangeInBar',
                     0,
