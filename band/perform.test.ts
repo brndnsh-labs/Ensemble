@@ -953,3 +953,64 @@ describe('trading with the player', () => {
         });
     });
 });
+
+/**
+ * A pass that ends (`looping: false`, `plan.ending` on its last bar) resumed at its last bar or
+ * the bar before it, and chunked with `until` at the last bar, as the host plays it: the lead
+ * note a guide-tone head ties into the ending bar is cut by the bar before and re-struck by
+ * the ending bar from the slot's memory (#2176), so each half must come out the same however
+ * the pass is split. The looping suite above never reaches `plan.ending`. Funk (a stop) and
+ * jazz (a button) are styles where the tie is cut; the pop song's seeds are ones where the
+ * head ties in.
+ */
+describe('a pass that ends resumes at its last bars exactly as the full pass (#2176)', () => {
+    it.each([
+        ['funk', 'a'],
+        ['jazz', 'f'],
+    ] as const)('%s', (style, seed) => {
+        const timeline = compileTimeline(FIXTURES.popSong);
+        const last = timeline.bars.length - 1;
+        const settings: BandSettings = {
+            ...DEFAULT_SETTINGS,
+            style,
+            seed,
+            head: 'guide-tones',
+            lanes: { ...DEFAULT_SETTINGS.lanes, lead: true },
+        };
+        const full = performPass(timeline, settings, { pass: 0, looping: false });
+        // Not vacuous: the head ties a note into the ending bar here.
+        expect(
+            full.events.some(
+                (e): e is PitchedNote =>
+                    e.lane === 'lead' &&
+                    e.bar === last - 1 &&
+                    e.tick + e.dur > timeline.bars[last].start,
+            ),
+        ).toBe(true);
+        const tail = (events: BandEvent[], from: number) =>
+            JSON.stringify(events.filter((e) => e.bar >= from));
+        for (const from of [last - 1, last]) {
+            const resumed = performPass(timeline, settings, {
+                pass: 0,
+                looping: false,
+                memory: full.snapshots[from],
+                window: { from, to: timeline.bars.length, origin: 0 },
+            });
+            expect(JSON.stringify(resumed.events), `resumed at ${from}`).toBe(
+                tail(full.events, from),
+            );
+        }
+        // Chunked: up to the last bar, then the last bar from the chunk's memory.
+        const chunk = performPass(timeline, settings, { pass: 0, looping: false, until: last });
+        expect(JSON.stringify(chunk.events), 'the chunk').toBe(
+            JSON.stringify(full.events.filter((e) => e.bar < last)),
+        );
+        const rest = performPass(timeline, settings, {
+            pass: 0,
+            looping: false,
+            memory: chunk.memory,
+            window: { from: last, to: timeline.bars.length, origin: 0 },
+        });
+        expect(JSON.stringify(rest.events), 'after the chunk').toBe(tail(full.events, last));
+    });
+});
