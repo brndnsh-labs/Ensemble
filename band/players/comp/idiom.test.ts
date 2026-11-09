@@ -13,21 +13,47 @@ import { LEAD_INSTRUMENTS } from '../lead/instruments.js';
 import { compIdiom, type Hit, tiedFromPush } from './idiom.js';
 import { COMP_INSTRUMENTS } from './instruments.js';
 
-/** The organ playing bar `index` of `bars` with a book that strikes at `steps`. */
-function organ(bars: string, index: number, steps: number[], memory?: CompMemory) {
+/**
+ * An instrument (the organ unless said) playing bar `index` of `bars` with a book that strikes
+ * at `steps`: the steps it sounds, in order.
+ */
+function struck(
+    bars: string,
+    index: number,
+    steps: (number | Hit)[],
+    options: { comp?: 'organ' | 'piano'; pushInBar?: true | 'restrike'; memory?: CompMemory } = {},
+) {
+    return sounded(bars, index, steps, options).map(([step]) => step);
+}
+
+/**
+ * The same, with each sounding's end: `[step, end]` pairs, one per onset (a chord's notes
+ * share both).
+ */
+function sounded(
+    bars: string,
+    index: number,
+    steps: (number | Hit)[],
+    {
+        comp = 'organ',
+        pushInBar = true,
+        memory,
+    }: { comp?: 'organ' | 'piano'; pushInBar?: true | 'restrike'; memory?: CompMemory } = {},
+): [number, number][] {
+    // A bare step is a sixteenth-long hit.
+    const hits = steps.map(
+        (s): Hit => (typeof s === 'number' ? { step: s, length: 1, velocity: 80 } : s),
+    );
     const book = compIdiom({
-        name: 'test organ',
+        name: `test ${comp}`,
         kind: 'close',
         // The strike an eighth before a mid-bar change plays the new chord.
-        pushInBar: true,
+        pushInBar,
         push: { low: 0, mid: 0, high: 0 },
-        rhythm: (_ctx, { from, to }) =>
-            steps
-                .filter((step) => step >= from && step < to)
-                .map((step): Hit => ({ step, length: 1, velocity: 80 })),
+        rhythm: (_ctx, { from, to }) => hits.filter((h) => h.step >= from && h.step < to),
     });
     const timeline = compileTimeline(score([{ label: 'A', bars }]));
-    const settings = { ...DEFAULT_SETTINGS, comp: 'organ' as const };
+    const settings = { ...DEFAULT_SETTINGS, comp };
     const plans = planBars(timeline, settings, {
         pass: 0,
         looping: true,
@@ -46,7 +72,7 @@ function organ(bars: string, index: number, steps: number[], memory?: CompMemory
             rng: (purpose) => rng('test', next.index, purpose),
         },
         heard: { drums: [], bass: [], lead: [] },
-        instrument: COMP_INSTRUMENTS.organ,
+        instrument: COMP_INSTRUMENTS[comp],
         lead: LEAD_INSTRUMENTS[settings.lead],
         pass: 0,
         looping: true,
@@ -55,9 +81,16 @@ function organ(bars: string, index: number, steps: number[], memory?: CompMemory
         rng: (purpose) => rng('test', index, purpose),
     };
     const { events } = book.play(ctx, memory ?? book.init());
-    const presses = [...new Set((events as PitchedNote[]).map((e) => e.tick - bar.start))];
-    return presses.map((tick) => tick / 120);
+    const byOnset = new Map<number, number>();
+    for (const e of events as PitchedNote[]) {
+        byOnset.set(e.tick - bar.start, e.tick + e.dur - bar.start);
+    }
+    return [...byOnset].map(([tick, end]) => [tick / 120, end / 120]);
 }
+
+/** The organ playing bar `index` of `bars` with a book that strikes at `steps`. */
+const organ = (bars: string, index: number, steps: number[], memory?: CompMemory) =>
+    struck(bars, index, steps, { memory });
 
 /** What the organ remembers on leaving a bar; `compIdiom` keeps the type to itself. */
 type CompMemory = ReturnType<ReturnType<typeof compIdiom>['init']>;
@@ -104,5 +137,51 @@ describe('the organ presses an anticipation once (#1510)', () => {
         // `C:1 F:1 C:1 F:1`, strikes on 3 and 11 only: each pushes an F, half a bar apart, with
         // the C between them pressed on its own beat. Both pushes are presses.
         expect(organ('C:1 F:1 C:1 F:1', 0, [0, 3, 11])).toEqual([0, 3, 8, 11]);
+    });
+});
+
+describe('a mid-bar push ties over the change (#2171)', () => {
+    // `C F`, strikes on 0, 6 and 8: the strike on 6 plays the F arriving on 8, tied over it.
+    it("the chord's own strike on the change is dropped under the tie", () => {
+        expect(struck('C F', 0, [0, 6, 8], { comp: 'piano' })).toEqual([0, 6]);
+    });
+
+    it('a strike past the tie plays', () => {
+        expect(struck('C F', 0, [0, 6, 10], { comp: 'piano' })).toEqual([0, 6, 10]);
+    });
+
+    it('a book that restrikes keeps it, and plays the push as written (the boogie pump)', () => {
+        expect(sounded('C F', 0, [0, 6, 8], { comp: 'piano', pushInBar: 'restrike' })).toEqual([
+            [0, 1],
+            [6, 7],
+            [8, 9],
+        ]);
+    });
+
+    it('a restriking book with nothing on the change ties over like any other', () => {
+        // The line's next pick is on the "e" after the change, not the beat: the pair before
+        // the change is the arrival, and rings into that pick.
+        expect(sounded('C F', 0, [0, 6, 9], { comp: 'piano', pushInBar: 'restrike' })).toEqual([
+            [0, 1],
+            [6, 9],
+            [9, 10],
+        ]);
+    });
+
+    it('the push holds for as long as the dropped strike would have', () => {
+        // The figure held the F from 8 to 14: the push, which replaces it, holds to 14.
+        const held = { step: 8, length: 6, velocity: 80 };
+        expect(sounded('C F', 0, [0, 6, held], { comp: 'piano' })).toEqual([
+            [0, 1],
+            [6, 14],
+        ]);
+    });
+
+    it('a stab stays a stab', () => {
+        // Without the drop a push an eighth before the change ties an eighth over it (to 10).
+        expect(sounded('C F', 0, [0, 6, 8], { comp: 'piano' })).toEqual([
+            [0, 1],
+            [6, 10],
+        ]);
     });
 });

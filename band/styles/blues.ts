@@ -535,7 +535,10 @@ const bluesKeysPump = compIdiom({
     name: 'blues comp (pump)',
     kind: 'close',
     push: KEYS_PUSH,
-    pushInBar: true,
+    // The pump's "and" before a mid-bar change plays the new chord, and the hand hits it again
+    // on the beat: the pump is every eighth, and a hole on the beat would break it (#2171 ties
+    // the jazz comper's push over instead; the boogie hand's double hit is the idiom).
+    pushInBar: 'restrike',
     rhythm: (ctx, span, tier) => bluesKeysRhythm(ctx, span, tier),
 });
 
