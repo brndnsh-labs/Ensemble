@@ -10,6 +10,7 @@ import {
     BASS_SLOT_HI,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     kickSteps,
     type LineMemory,
@@ -107,6 +108,7 @@ const rockBass: PitchedIdiom = {
                 (c, p) => place(bassPc(c), p),
                 last,
                 dyn(100, plan.energy),
+                memory.land ?? null,
             );
             events.push(...held.events);
             return { events, memory: { last } };
@@ -150,8 +152,12 @@ const rockBass: PitchedIdiom = {
                     to - step <= 2 &&
                     rng.chance(tier === 'low' ? 0.2 : 0.35)
                 ) {
-                    midi = approach(target, span.chord, pickApproach(rng, false));
-                    land = lead?.crossing ? target : null;
+                    // Into an ending, the low root the band ends on where the drop from the
+                    // note before stays inside an octave, else this octave, promised (#2178).
+                    const aimed =
+                        (lead?.ending ? endingAim(ctx, target, last)?.target : null) ?? target;
+                    midi = approach(aimed, span.chord, pickApproach(rng, false), lead?.ending);
+                    land = lead?.crossing || lead?.ending ? aimed : null;
                 }
                 const gap = (steps[k + 1] ?? to) - step;
                 const length = tier === 'low' ? gap * 0.95 : Math.min(gap, 2) * 0.85;

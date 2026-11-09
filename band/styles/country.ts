@@ -15,8 +15,10 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     type LineMemory,
+    lowestRoot,
     nextChord,
     place,
     sectionPlace,
@@ -255,13 +257,27 @@ type PickupNote = { step: number; midi: number; velocity: number };
  *   way up; holding it all bar sounds like the bass dropped out.
  * Null where there is no ending chord to walk into (`finalChord`) or no beat for the run:
  * outside 4/4, or a last chord struck on 4 or off the beat.
+ *
+ * The walk lands on the low root the band ends on (#2178, `lowestRoot`), the whole bar going
+ * down with it: the boom on 1 moves into the run's register (G, A-B → C, all low), the
+ * climb's 5 under the root on the E string. A low E to Ab has no 5 under it, so those keys
+ * take the octave above (B1 C#2 D#2 → E2, never E3): a country bassist never ends on the top
+ * string. A boom a lead-in from the bar before put where it is (`placed`) keeps its pitch —
+ * the lead-in's promise was the boom — and the run after it still goes down (F#2, then B1
+ * C#2 D#2 → E2); a boom more than an octave over the run's 5 walks down to the low root
+ * instead (C3 B2 A2 G2 → C2), never drops to it and climbs. A chord struck on 3 keeps its
+ * root there, in the register of the note before it, and goes down into the low root by one
+ * note (A2, G2 → C2; G2 → C2; A1, B1 → C2): a country bassist never ends on the top string
+ * (#2198).
  */
 function pickup(
     ctx: BarContext,
     chord: ChordFacts,
     root: number,
+    placed: boolean,
     from: number,
     to: number,
+    prev: number | null,
 ): { notes: PickupNote[]; target: number } | null {
     const next = ctx.next;
     const into = next?.plan.ending && next.plan.lanes.bass ? finalChord(ctx, next.bar) : null;
@@ -276,14 +292,32 @@ function pickup(
         return null;
     }
     const pc = bassPc(into);
+    // The lowest octave of the root the climb can reach: the low root, or, where the E string
+    // has no 5 under it (a low E to Ab), the octave above (B1 C#2 D#2 → E2, never E3).
+    const low = lowestRoot(pc);
+    const reach = low - 5 >= BASS.lo ? low : low + 12;
+    // A chord struck on 3 keeps its root there and goes down into the low root with one note
+    // (below); a whole-bar chord takes the run.
+    const twoBeat = from > 0;
+    const goesLow = !twoBeat;
+    // The boom: moved into the run's register, unless a lead-in from the bar before placed it
+    // (its promise was the boom; the run after it is free to go low). A chord struck on 3
+    // booms in the register of the note before it: a tenth under the chord it follows (A1
+    // under a promised C3) is a register break, not a boom.
+    const boom =
+        goesLow && !placed
+            ? nearestMidi(mod12(root), reach, BASS.lo, BASS.hi)
+            : twoBeat && !placed && prev !== null && Math.abs(root - prev) > 12
+              ? nearestMidi(mod12(root), prev, BASS.lo, BASS.hi)
+              : root;
     // The bar's own root at the boom's weight (100). why: the run after it swells into the
     // landing as the line's own walk does (96, then 102 on 4, old engine #941); the 5 is the
     // boom's fifth weight (92), where it is a new note.
-    const struck: PickupNote = { step: from, midi: root, velocity: 100 };
+    const struck: PickupNote = { step: from, midi: boom, velocity: 100 };
     const after = (run: PickupNote[]) => run.filter((n) => n.step > from);
-    if (mod12(root - pc) === 5 && root - 5 >= BASS.lo) {
+    if (mod12(boom - pc) === 5 && (goesLow ? boom - 5 === reach : boom - 5 >= BASS.lo)) {
         // `walk` always answers across a fourth: the two steps down from the IV to the I.
-        const [three, two] = walk(root, root - 5, chord)!;
+        const [three, two] = walk(boom, boom - 5, chord)!;
         return {
             notes: [
                 struck,
@@ -292,34 +326,86 @@ function pickup(
                     { step: 12, midi: two, velocity: 102 },
                 ]),
             ],
-            target: root - 5,
+            target: boom - 5,
         };
     }
-    // The 5 a fourth under the target, both inside the bass's range.
-    const five = nearestMidi(mod12(pc + 7), root, BASS.lo, BASS.hi - 5);
-    const target = five + 5;
+    // The 5 a fourth under the target: under the root's lowest reachable octave, or in the
+    // boom's own register, both inside the bass's range.
     const tones = chordPcs(chord);
-    const seven = tones.includes(mod12(target - 2)) ? target - 2 : target - 1;
     const inChord = (m: number) =>
         tones.includes(mod12(m)) || chord.scale.includes(mod12(m - chord.root));
+    if (twoBeat) {
+        // why: a country bassist never ends on the top string (#2198), so the chord struck on
+        // 3 goes down into the low root too, by the one honest note from where its boom sits:
+        // the landing's 5 over the root where the boom is above that 5 (A2, G2 → C2, the V–I
+        // in miniature), nothing where the boom is that 5 (G2 → C2, down a fifth), the scale
+        // step under the boom where it sits between the root and its 5 (E2, D2 → C2), and
+        // the 7 up into it from below (A1, B1 → C2). Never a leap over an octave.
+        const fifth = reach + 7;
+        const step =
+            boom > fifth
+                ? fifth
+                : boom === fifth
+                  ? null
+                  : boom > reach
+                    ? ([boom - 1, boom - 2].find((m) => m > reach && inChord(m)) ?? null)
+                    : tones.includes(mod12(reach - 2))
+                      ? reach - 2
+                      : reach - 1;
+        return {
+            notes: [
+                struck,
+                ...after(step === null ? [] : [{ step: 12, midi: step, velocity: 102 }]),
+            ],
+            target: reach,
+        };
+    }
+    const five = reach - 5;
+    const target = reach;
+    const seven = tones.includes(mod12(target - 2)) ? target - 2 : target - 1;
     const six = [seven - 2, seven - 1].find((m) => m > five && inChord(m)) ?? seven - 2;
+    if (goesLow && placed && boom - five > 12) {
+        // why: a bassist walks down to the low string, never drops to it and climbs. A boom a
+        // lead-in placed more than an octave above the run's 5 (C3 over G1) walks the
+        // landing's degrees down in the octave above it, the highest three under the boom
+        // that the bar's chord has (`inChord`): 7-6-5, C3 B2 A2 G2 → C2, landing a fifth down
+        // onto the low root as a V does; from a boom the 7th sits over (A2), 5-3-2, G2 E2 D2
+        // → C2, landing by step. The same `reach` as the climb, from above.
+        const down = [11, 10, 9, 8, 7, 5, 4, 3, 2]
+            .map((degree) => target + degree)
+            .filter((m) => m < boom && inChord(m))
+            .slice(0, 3);
+        if (down.length === 3) {
+            return {
+                notes: [
+                    struck,
+                    ...after([
+                        { step: 4, midi: down[0], velocity: 92 },
+                        { step: 8, midi: down[1], velocity: 96 },
+                        { step: 12, midi: down[2], velocity: 102 },
+                    ]),
+                ],
+                target,
+            };
+        }
+    }
     const run: PickupNote[] = [
         { step: 4, midi: five, velocity: 92 },
         { step: 8, midi: six, velocity: 96 },
         { step: 12, midi: seven, velocity: 102 },
     ];
-    if (five < root && root < target) {
+    if (five < boom && boom < target) {
         // A root inside the run keeps the two-beat's boom, its fifth on 3, and walks in on 4
         // with the run's note above it, or the key's leading tone where the run has none there
         // (the bVII's chromatic walk-in, Bb … B → C).
-        const above = run.find((n) => n.step === 12 && n.midi > root);
+        const above = run.find((n) => n.step === 12 && n.midi > boom);
         return {
             notes: [
                 struck,
                 ...after([
                     {
                         step: 8,
-                        midi: nearestMidi(fifthPc(chord), root, BASS.lo, BASS.hi),
+                        midi: nearestMidi(fifthPc(chord), boom, BASS.lo, BASS.hi),
                         velocity: 92,
                     },
                     above ?? { step: 12, midi: target - 1, velocity: 102 },
@@ -332,7 +418,7 @@ function pickup(
         notes: [
             struck,
             // Over the V the 5 is the root already sounding: it holds through 2.
-            ...after(run).filter((n) => n.midi !== root),
+            ...after(run).filter((n) => n.midi !== boom),
         ],
         target,
     };
@@ -371,6 +457,9 @@ const countryBass: PitchedIdiom = {
                 // why: the ending's root at the line's own weight (100), or harder where a
                 // walk-up's last note came in hotter (its 102, read at the bar before's energy).
                 Math.max(dyn(100, plan.energy), memory.walkedIn ?? 0),
+                // The walk's landing stands where its run could not be played under the low
+                // root (#2178).
+                memory.land,
             );
             events.push(...held.events);
             return { events, memory: { last, land: null, alternate: null, walkedIn: null } };
@@ -393,10 +482,8 @@ const countryBass: PitchedIdiom = {
             }
             // A walk pointed here: arrive where it pointed. Otherwise the section's register,
             // so the boom keeps its octave from bar to bar.
-            const root =
-                land !== null && mod12(land) === chord.bass
-                    ? land
-                    : sectionPlace(ctx, bassPc(chord));
+            const placed = land !== null && mod12(land) === chord.bass;
+            const root = placed ? land! : sectionPlace(ctx, bassPc(chord));
             land = null;
             if (span.fermata) {
                 events.push(bassNote(bar, from, root, (to - from) * 0.95, dyn(96, plan.energy)));
@@ -431,7 +518,8 @@ const countryBass: PitchedIdiom = {
             const rng = ctx.rng(`walk${i}`);
             // The walk-up into a country ending (#2177), at any energy: like the kit's set-up
             // fill above it, the band picks up into its end even in a ballad.
-            const walkUp = i === spans.length - 1 ? pickup(ctx, chord, root, from, to) : null;
+            const walkUp =
+                i === spans.length - 1 ? pickup(ctx, chord, root, placed, from, to, last) : null;
             if (walkUp) {
                 notes.splice(0, notes.length, ...walkUp.notes.map((n) => ({ ...n, legato: true })));
                 land = walkUp.target;
@@ -444,8 +532,12 @@ const countryBass: PitchedIdiom = {
                 following.bass !== chord.bass
             ) {
                 // Aim at the next root in this section's register when a run reaches it,
-                // else at its nearest octave.
-                const home = sectionPlace(ctx, bassPc(following));
+                // else at its nearest octave; into an ending (a bar the walk-up above could
+                // not take), the low root the band ends on where the run can get there
+                // (#2178, `endingAim`).
+                const own = sectionPlace(ctx, bassPc(following));
+                const home =
+                    (i === spans.length - 1 ? endingAim(ctx, own, root)?.target : null) ?? own;
                 const reach = Math.abs(home - root);
                 const target =
                     reach >= 2 && reach <= 6

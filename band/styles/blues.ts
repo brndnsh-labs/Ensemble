@@ -16,6 +16,7 @@ import {
     approach,
     BASS,
     bassNote,
+    endingAim,
     endingBass,
     isLeadIn,
     type LineMemory,
@@ -322,6 +323,8 @@ const shuffleBass: PitchedIdiom = {
                 (c, p) => nearestMidi(c.bass, p ?? BASS.home, BASS.lo, BASS.hi),
                 last,
                 dyn(100, plan.energy),
+                // A lead-in that aimed at the box's own octave lands there (#2178).
+                land,
             );
             events.push(...held.events);
             return { events, memory: { last } };
@@ -360,6 +363,13 @@ const shuffleBass: PitchedIdiom = {
             const root = promised ?? boxRoot(chord.bass);
             const following = spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
             const change = following && following.bass !== chord.bass ? following : null;
+            // Into an ending, the approach aims at the low root the band ends on, or at the
+            // box's own octave where the drop to the low one would be a leap (#2178,
+            // `endingAim`: the box climbing A2 C3 E3 must not jump two octaves to F#1).
+            const aim = (near: number | null) =>
+                i === spans.length - 1 && change
+                    ? endingAim(ctx, boxRoot(change.bass), near)
+                    : null;
             const rng = ctx.rng(`shuffle${i}`);
             const beats = pulses(bar)
                 .map((p) => p.step)
@@ -388,10 +398,11 @@ const shuffleBass: PitchedIdiom = {
                 const tail = notes[notes.length - 1];
                 if (change && tail && to - tail.step >= 8 && rng.chance(0.35)) {
                     // Aim at the octave the next chord will actually be played in.
-                    const target = boxRoot(change.bass);
-                    let note = approach(target, chord, pickApproach(rng, false));
+                    const into = aim(tail.midi);
+                    const target = into?.target ?? boxRoot(change.bass);
+                    let note = approach(target, chord, pickApproach(rng, false), into !== null);
                     if (note === tail.midi || note === target) {
-                        note = approach(target, chord, 'chromatic-below');
+                        note = approach(target, chord, 'chromatic-below', into !== null);
                     }
                     notes.push({ step: to - 4, midi: note, length: 0, velocity: 84 });
                     land = target;
@@ -416,16 +427,18 @@ const shuffleBass: PitchedIdiom = {
                     // where the line lands next resolves the pitch class correctly but can
                     // still leap an octave or more into the new bar.
                     if (k === beats.length - 1 && change && mod12(midi) === change.bass) {
-                        const target = boxRoot(change.bass);
-                        midi = approach(target, chord, 'chromatic-below');
+                        const into = aim(last);
+                        const target = into?.target ?? boxRoot(change.bass);
+                        midi = approach(target, chord, 'chromatic-below', into !== null);
                         land = target;
                     } else if (k === beats.length - 1 && change) {
                         // A box tone a step from the next root (V's 3rd under I) leads into
                         // it as a leading tone does, so it sounds beside the root, not an
                         // octave off: the box's high end folds down to meet it.
-                        const target = boxRoot(change.bass);
+                        const into = aim(last);
+                        const target = into?.target ?? boxRoot(change.bass);
                         if (isLeadIn(midi, target)) {
-                            midi = meetRoot(midi, target);
+                            midi = meetRoot(midi, target, into !== null);
                             land = target;
                         }
                     }

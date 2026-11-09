@@ -12,6 +12,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     type LineMemory,
     nextChord,
@@ -223,11 +224,12 @@ function chooseApproach(
     target: number,
     chord: ChordFacts,
     avoid: number | null,
+    floored = false,
     near: number = avoid ?? target,
 ): number {
     for (let tries = 0; tries < 4; tries++) {
         const kind = pickApproach(rng, true);
-        let note = approach(target, chord, kind);
+        let note = approach(target, chord, kind, floored);
         // The fifth-above approach can come from below instead (a fourth under the target):
         // take whichever octave sits nearer the line, so it never leaps an octave to get there.
         if (kind === 'dominant') {
@@ -272,10 +274,18 @@ const walkingBass: PitchedIdiom = {
             bar.meter.name === '4/4';
         if (plan.ending) {
             // The held note lasts the bar in any meter (#1503); a written `G7 C` strikes both.
-            const held = endingBass(ctx, (c, p) => place(bassPc(c), p), last, dyn(96, plan.energy));
+            const held = endingBass(
+                ctx,
+                (c, p) => place(bassPc(c), p),
+                last,
+                dyn(96, plan.energy),
+                memory.land ?? null,
+            );
             events.push(...held.events);
             return { events, memory: { last } };
         }
+        // Where an approach into the ending promised the band's last note (#2178, `endingAim`).
+        let land: number | null = null;
         spans.forEach(({ span, from, to }, i) => {
             const chord = span.chord;
             if (!chord) {
@@ -295,6 +305,10 @@ const walkingBass: PitchedIdiom = {
             const rootPc = bassPc(chord);
             const followingChord =
                 spans[i + 1]?.span.chord ?? (i === spans.length - 1 ? next : null);
+            // Into an ending, the approach aims at the low root the band ends on, or at its
+            // own octave where the drop to the low one would be a leap (#2178, `endingAim`).
+            const aim = (own: number, near: number) =>
+                i === spans.length - 1 ? endingAim(ctx, own, near) : null;
             const chordPcs = new Set(chord.intervals.map((n) => mod12(chord.root + n)));
             const scalePcs = new Set(chord.scale.map((n) => mod12(chord.root + n)));
 
@@ -340,8 +354,13 @@ const walkingBass: PitchedIdiom = {
                     .rng(`two:${ctx.pass}:${bar.barInVisit}:${i}`, 'section')
                     .chance(0.35);
                 if (followingChord && to - tail[0] >= 8 && splits) {
-                    const target = place(bassPc(followingChord), tail[1]);
-                    notes.push([to - 4, chooseApproach(rng, target, chord, tail[1])]);
+                    const into = aim(place(bassPc(followingChord), tail[1]), tail[1]);
+                    const target = into?.target ?? place(bassPc(followingChord), tail[1]);
+                    land = into?.promise ?? null;
+                    notes.push([
+                        to - 4,
+                        chooseApproach(rng, target, chord, tail[1], into !== null),
+                    ]);
                 }
                 notes.forEach(([step, midi], k) => {
                     const length = (notes[k + 1]?.[0] ?? to) - step;
@@ -366,12 +385,15 @@ const walkingBass: PitchedIdiom = {
             const lastLength = to - steps[steps.length - 1];
             let approachNote: number | null = null;
             if (followingChord && steps.length > 1 && lastLength <= 4) {
-                const target = place(bassPc(followingChord), first);
+                const into = aim(place(bassPc(followingChord), first), first);
+                const target = into?.target ?? place(bassPc(followingChord), first);
+                land = into?.promise ?? null;
                 approachNote = chooseApproach(
                     rng,
                     target,
                     chord,
                     steps.length === 2 ? first : null,
+                    into !== null,
                 );
             }
             const middleCount = steps.length - 1 - (approachNote === null ? 0 : 1);
@@ -432,7 +454,7 @@ const walkingBass: PitchedIdiom = {
             });
             last = line[Math.min(line.length, steps.length) - 1];
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

@@ -19,6 +19,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     type LineMemory,
     nextChord,
@@ -209,6 +210,7 @@ const acousticBass: PitchedIdiom = {
                 (c, p) => (land !== null && mod12(land) === c.bass ? land : place(bassPc(c), p)),
                 last,
                 dyn(96, plan.energy),
+                land,
             );
             events.push(...held.events);
             return { events, memory: { last, land: null } satisfies AcousticBassMemory };
@@ -267,9 +269,14 @@ const acousticBass: PitchedIdiom = {
                 if (ctx.rng(`pass${i}`).chance(chance)) {
                     // The target is placed the way the next bar would place it, and `land`
                     // makes the next bar arrive exactly there even across a section change.
-                    const target = sectionPlace(ctx, bassPc(following));
                     const kept = notes.filter((n) => n.step < passAt);
                     const before = kept[kept.length - 1]?.midi ?? root;
+                    // Into an ending, the low root the band ends on, or the section's own
+                    // octave where the passing tone would be a leap (#2178, `endingAim`).
+                    const own = sectionPlace(ctx, bassPc(following));
+                    const target =
+                        (i === spans.length - 1 ? endingAim(ctx, own, before)?.target : null) ??
+                        own;
                     kept.push({
                         step: passAt,
                         midi: passingInto(target, chord, before),

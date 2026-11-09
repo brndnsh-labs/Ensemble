@@ -15,6 +15,7 @@ import {
     BASS_SLOT_HI,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     isLeadIn,
     kickSteps,
@@ -213,6 +214,7 @@ const reggaeBass: PitchedIdiom = {
                 (c, p) => place(bassPc(c), p),
                 last,
                 dyn(104, plan.energy),
+                memory.land ?? null,
             );
             events.push(...held.events);
             return { events, memory: { last } };
@@ -291,14 +293,26 @@ const reggaeBass: PitchedIdiom = {
                     to - step <= 2 &&
                     rng.chance(0.35)
                 ) {
-                    midi = approach(target, chord, pickApproach(rng, false));
-                    land = lead?.crossing ? target : null;
+                    // Into an ending, the low root the band ends on where the drop from the
+                    // note before stays inside an octave, else this octave, promised (#2178).
+                    // The deep line's own octave is the low one, so where a riff tone sits
+                    // more than an octave over it (an octave pop before the end) the lead-in
+                    // is not played: a lead-in reached by that drop is a leap, and the riff
+                    // returns to its root on the One as it always does.
+                    const into = lead?.ending ? endingAim(ctx, target, last) : null;
+                    const aimed = into?.target ?? target;
+                    if (!(into && last !== null && Math.abs(aimed - last) > 12)) {
+                        midi = approach(aimed, chord, pickApproach(rng, false), lead?.ending);
+                        land = lead?.crossing || lead?.ending ? aimed : null;
+                    }
                 }
                 // A riff tone left beside the next root (the fifth of A under F) leads into it as
                 // a step; it sounds beside that root, and across a section change promises it.
                 if (isLast && target !== null && to - step <= 2 && isLeadIn(midi, target)) {
-                    midi = meetRoot(midi, target);
-                    land = lead?.crossing ? target : null;
+                    const aimed =
+                        (lead?.ending ? endingAim(ctx, target, last)?.target : null) ?? target;
+                    midi = meetRoot(midi, aimed, lead?.ending);
+                    land = lead?.crossing || lead?.ending ? aimed : null;
                 }
                 // Heavy on the drop and the arrivals; the pickups lighter.
                 const strong = step === from || step % 8 === 0;
