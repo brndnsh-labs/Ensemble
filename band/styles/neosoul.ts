@@ -584,8 +584,11 @@ const guitarBook = compIdiom({
     alone: { strings: 5, slot: { lo: 40, hi: 76, top: 67 }, rootBottom: true },
     push: { low: 0, mid: 0.1, high: 0.2 },
     // A pair picked just before a mid-bar change belongs to the new chord, tied over it,
-    // rather than the old chord's pair clipped after a sixteenth (as the Rhodes does).
-    pushInBar: true,
+    // rather than the old chord's pair clipped after a sixteenth (as the Rhodes does). The
+    // line's next pick on the beat (or its "e") still plays: a picked sixteenth line runs on
+    // through the change, the pair before it a pickup into the grip, not a chord struck twice
+    // (#2171 ties a comped chord over instead; the Rhodes' figures never strike there).
+    pushInBar: 'restrike',
     rhythm(ctx, { from, to }, tier) {
         const line = guitarLine(ctx, tier).replaceAll('d', 'x');
         // A clean grip rings for a beat; the pick is gentle — softer than the strummed

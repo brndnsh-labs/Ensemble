@@ -88,7 +88,10 @@ borrows another family's idiom. Shared machinery does everything that isn't the 
   (a book's `push`) and, where a book pushes in the bar (`pushInBar`: bossa, neo-soul, and since
   #2015 the jazz and blues keyboards), the strike in the eighth before a mid-bar change plays the
   new chord and ties over it, never a stab of the one leaving; strokes and scratches, one chord
-  at a time. The jazz comper sets its push up: before a change the figure lands on the "and" of 4.
+  at a time. Tied over means the chord's own strikes in that first eighth go, as the barline
+  push drops the next bar's (#2171); a book whose figure runs on through the change keeps them
+  (`pushInBar: 'restrike'`: the blues boogie pump, the neo-soul guitar's picked line). The jazz
+  comper sets its push up: before a change the figure lands on the "and" of 4.
 - `players/bass/line.ts`: register and approach notes.
 
 ### The comp: what the style plays, how the instrument plays it

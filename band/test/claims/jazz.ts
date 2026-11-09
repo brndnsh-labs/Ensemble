@@ -153,6 +153,20 @@ export const jazz = defineClaims({
                     0,
                     'the strike before a mid-bar change is the new chord, not a stutter',
                 ],
+                // 0.697 before #2171 (0.588 under a solo): the pushed chord was struck again on
+                // the beat by the new span's own figure (`SHORT_COMP_CELLS` opens on 0), a stab
+                // of a third of a beat then the chord. The in-bar push now drops the strikes
+                // under its tie, as the barline push does, and takes over their length: of the
+                // 33 pushes judged here, 25 stay stabs (an eighth over the change) and 8 hold the
+                // chord the figure held, to the next strike or the span's end (a mean 3.1 steps
+                // over the change, 2.0 when the push only tied its eighth and left silence).
+                // `compAnticipatesChange` is unchanged at 0.337, so the pushes themselves stayed.
+                [
+                    'compPushRestruck',
+                    0,
+                    0,
+                    'a mid-bar push ties over the change; it is not struck again on it',
+                ],
                 ['compColour', 0.6, 1, 'rootless voicings carry 9ths and 13ths'],
                 ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
             ],

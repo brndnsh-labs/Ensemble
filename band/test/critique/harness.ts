@@ -1085,7 +1085,64 @@ export const METRICS = {
                 });
             }
         }
-        return ratio(hit, n);
+        // No change the tell can read is no reading, not a clean 0 (a claim of 0 must be earned).
+        return n ? hit / n : Number.NaN;
+    },
+    /**
+     * Share of the comp's in-bar pushes that are struck again on the change (#2171): a
+     * sounding strike in the eighth before a mid-bar change that already plays the new chord
+     * (every guide tone sounds in it, `compAnticipatesChange`'s tell), followed by another
+     * sounding strike within the eighth after the change, the tie's length (`TIE_STEPS`). A
+     * push is written as one strike tied over the change; struck again, the pushed chord is cut
+     * on the beat and hit twice ("ba-DAHM"). The barline push drops the next bar's strikes under
+     * its tie; this reads whether the in-bar push does the same. Mid-bar only, with the same
+     * exclusions as `compStabsOutgoing`: a change whose guide tones the old chord already has
+     * isn't counted, and a book that strikes two notes can't show the tell.
+     */
+    compPushRestruck: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const strikes = events.filter(
+                (e): e is PitchedNote => e.lane === 'comp' && !(e as PitchedNote).muted,
+            );
+            for (const bar of t.bars) {
+                bar.spans.forEach((span, i) => {
+                    const before = bar.spans[i - 1]?.chord;
+                    if (i === 0 || !span.chord || !before || before.symbol === span.chord.symbol) {
+                        return;
+                    }
+                    const old = chordPcs(before);
+                    const root = span.chord.root;
+                    const guides = [span.chord.third, span.chord.seventh]
+                        .filter((k): k is NonNullable<typeof k> => k !== null)
+                        .map((k) => mod12(root + k));
+                    if (!guides.some((pc) => !old.includes(pc))) {
+                        return;
+                    }
+                    const early = strikes.filter(
+                        (c) => c.tick >= span.start - 2 * STEP - 0.5 && c.tick < span.start - 0.5,
+                    );
+                    const playsNew = (c: PitchedNote) =>
+                        guides.every((pc) =>
+                            strikes.some(
+                                (d) => Math.abs(d.tick - c.tick) < 1 && mod12(d.midi) === pc,
+                            ),
+                        );
+                    if (!early.some(playsNew)) {
+                        return;
+                    }
+                    n++;
+                    hit += strikes.some(
+                        (c) => c.tick >= span.start - 0.5 && c.tick < span.start + 2 * STEP - 0.5,
+                    )
+                        ? 1
+                        : 0;
+                });
+            }
+        }
+        // No in-bar push is no reading, not a clean 0: a book that never pushes can't claim it.
+        return n ? hit / n : Number.NaN;
     },
     /** Share of sounding comp onsets in 4/4 bars that fall on beat 1 or beat 3. */
     compOnOneAndThree: (takes) => {

@@ -76,8 +76,14 @@ export interface CompBook {
     ): Hit[];
     /** Chance that the last hit before a barline anticipates the next chord. */
     push: Record<EnergyTier, number>;
-    /** A hit an eighth before a mid-bar chord change plays the new chord (bossa). */
-    pushInBar?: boolean;
+    /**
+     * A hit an eighth before a mid-bar chord change plays the new chord (bossa), tied over the
+     * change: the chord's own hits under the tie (every hit, a scratch included) are dropped,
+     * as at the barline, and the push holds for as long as the longest of them would have.
+     * `'restrike'` keeps them, and the pushing hit plays at its written length when one is
+     * there to take over: the figure hammers on through the change (the boogie pump).
+     */
+    pushInBar?: boolean | 'restrike';
     /**
      * The rhythm is the part even on a sustaining instrument: the organ plays the book's hits
      * as written, short, instead of pressing once per chord and holding (the reggae bubble).
@@ -301,11 +307,42 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // Anticipate a mid-bar change: the hit an eighth before it plays the new chord.
                 // Not a held one: a fermata is struck on its beat, together.
                 if (book.pushInBar && !span.fermata) {
+                    const restrikes = book.pushInBar === 'restrike';
+                    // A restriking book's own hit on the change, when its figure has one, is
+                    // the arrival: the push is its pickup and plays as written (the pump's
+                    // "and" is a short eighth before its beat). With none there the push is the
+                    // arrival and ties over the change like any other, until the line's next
+                    // pick cuts it (a pair on the "and" rings into one on the "e").
+                    const restruck = restrikes && planned.some((h) => h.step === from);
+                    const pushes: Planned[] = [];
                     for (const hit of planned) {
                         if (!hit.muted && hit.step >= from - TIE_STEPS && hit.step < from) {
                             hit.chord = span.chord;
                             hit.early = true;
-                            hit.length = Math.max(hit.length, from - hit.step + TIE_STEPS);
+                            if (!restruck) {
+                                hit.length = Math.max(hit.length, from - hit.step + TIE_STEPS);
+                            }
+                            pushes.push(hit);
+                        }
+                    }
+                    // The pushed chord ties over the change, so the span's own hits under the
+                    // tie (its first eighth) go, as the barline push drops the next bar's
+                    // (`pushedIn`). Struck again on the beat, the push would be a stab cut short
+                    // and the chord hit twice, "ba-DAHM" (#2171). The push takes over the
+                    // dropped hit's length: a stab stays a stab, and a chord the figure held to
+                    // the span's end is held there by the push instead of ringing an eighth and
+                    // leaving silence. Unless the book restrikes: a figure that hammers every
+                    // eighth (the boogie pump) plays through the change, and a hole on the beat
+                    // would break its pump.
+                    if (pushes.length && !restrikes) {
+                        for (let k = planned.length - 1; k >= 0; k--) {
+                            const { step, length } = planned[k];
+                            if (step >= from && step < from + TIE_STEPS) {
+                                for (const push of pushes) {
+                                    push.length = Math.max(push.length, step + length - push.step);
+                                }
+                                planned.splice(k, 1);
+                            }
                         }
                     }
                 }
