@@ -1262,12 +1262,19 @@ export const METRICS = {
             const strikes = [...compChords(take.events).entries()].sort(([a], [b]) => a - b);
             const top = (notes: PitchedNote[]) => Math.max(...notes.map((x) => x.midi));
             for (const [tick, notes] of changeStrikes(take).values()) {
-                const before = strikes.findLast(([t]) => t < tick);
+                // The last strike before this one (the project's lib is ES2022: no `findLast`).
+                let before: PitchedNote[] | undefined;
+                for (const [t, struck] of strikes) {
+                    if (t >= tick) {
+                        break;
+                    }
+                    before = struck;
+                }
                 if (!before) {
                     continue;
                 }
                 n++;
-                hit += Math.abs(top(notes) - top(before[1])) > 5 ? 1 : 0;
+                hit += Math.abs(top(notes) - top(before)) > 5 ? 1 : 0;
             }
         }
         return ratio(hit, n);
