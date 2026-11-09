@@ -121,8 +121,9 @@ physical: its range, its strum speed, whether it sustains.
   bar the line comes back in. They are chosen for the whole bar, so a chord never changes
   hands between its strikes. While the phrase is live these books keep the whole voicing
   under the line (`CompBook.under`): its top a whole step or more under the lowest lead note
-  sounding over the strike, and no minor 2nd at its foot off a dominant (the cap would
-  otherwise stand Em9 on F#3-G3); a line too low for a four-note voicing gets the shell with
+  sounding over the strike, and no minor 2nd at its foot — off a dominant anywhere, on a
+  dominant below E4 (the cap would otherwise stand Em9 on F#3-G3 and G7 on E3-F3, a growl over
+  the bass; the 13 under the 7th is a dominant's colour from E4 up); a line too low for a four-note voicing gets the shell with
   what fits of the rest under it, or the bare 3–7 shell. The held ending's chord is the
   exception to closing up (`endingKind`): the lead plays the final hit with it (#2178), so its
   bar is always live, but it spreads wherever a spread fits wholly under the line. Triads keep

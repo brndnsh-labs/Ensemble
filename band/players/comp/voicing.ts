@@ -615,6 +615,14 @@ export interface Placement {
 const UNDER = 2;
 
 /**
+ * The lowest a dominant voicing that keeps under the line stands on a minor 2nd at its foot:
+ * E4. why: the 13 a half step under the 7th is a dominant's colour in the middle of the
+ * keyboard (main's G7 as E4-F4-A4-B4); an octave down, over the bass, it is a growl on a
+ * Rhodes, not a colour (`voice`).
+ */
+const DOMINANT_RUB_FLOOR = 64;
+
+/**
  * The highest a voicing that keeps under the line may reach (`Placement.under`): a whole step
  * under the lowest lead note sounding over it. No lead over it, no cap.
  */
@@ -697,9 +705,13 @@ export function voice(
     // the register's other choices away: pressed under a low line, the search stood the
     // voicing on its 9th a half step under the minor 3rd (Em9 as F#3-G3-B3-D4, Dm7 as
     // E3-F3-A3-C4), a cluster at the foot of the chord. Under the cap that foot doesn't fit.
+    // A dominant's rubs are its colour, but not at its foot down low: the 13 a half step
+    // under the 7th rings from E4 up (G7 as E4-F4-A4-B4) and growls under it, over the bass
+    // (G7 as E3-F3-A3-B3, C7 as A3-Bb3-D4-E4), so a dominant's foot is held to it below E4.
     const tense = chord.family === 'dominant';
-    const fits = (v: number[]) =>
-        v[v.length - 1] <= cap && (cap === Infinity || tense || v.length < 3 || v[1] - v[0] !== 1);
+    const rubs = (v: number[]) =>
+        v.length > 2 && v[1] - v[0] === 1 && (!tense || v[0] < DOMINANT_RUB_FLOOR);
+    const fits = (v: number[]) => v[v.length - 1] <= cap && (cap === Infinity || !rubs(v));
     let shapes = placeable.filter(fits);
     let slot = ONE_HAND;
     if (!shapes.length && cap !== Infinity) {
@@ -707,17 +719,13 @@ export function voice(
         // shell — the chord's guide tones — with whatever of the stack fits under the line, as
         // a pianist plays under a low guitar line: the most voices that still name the chord.
         // A colour a half step under the next voice at the foot is left out too (F#3-G3-B3-D4
-        // plays G3-B3-D4); a guide tone stays, and the voicing doesn't fit.
+        // plays G3-B3-D4, G7's E3-F3-A3-B3 plays F3-A3-B3); a guide tone stays, and the
+        // voicing doesn't fit.
         const guides = chord.guides.map((g) => mod12(chord.root + g));
         const cut = placeable
             .map((v) => {
                 const kept = v.filter((m) => m <= cap);
-                return !tense &&
-                    kept.length > 2 &&
-                    kept[1] - kept[0] === 1 &&
-                    !guides.includes(mod12(kept[0]))
-                    ? kept.slice(1)
-                    : kept;
+                return rubs(kept) && !guides.includes(mod12(kept[0])) ? kept.slice(1) : kept;
             })
             .filter(
                 (v) =>
