@@ -301,6 +301,11 @@ const bossaLead = leadIdiom({
             'x-----x-x-------',
             '....x-----x-----',
             '..x---x-----....',
+            // why: 3 + 3, then the next bar's note pushed on the "and" of 4 and tied over the
+            // barline, or a half and a dotted quarter before it: a long tone answered by the
+            // anticipation (`LeadBook.pushes`), the bossa melody's arrival sung ahead.
+            'x-----x-------x-',
+            'x-------x-----x-',
         ],
         // The guitar's own syncopations: the "and" of a beat pushing into a held note.
         mid: [
@@ -309,10 +314,20 @@ const bossaLead = leadIdiom({
             'x---x-x---x-x---',
             'x-----x-x-x-x---',
             '..x---x---x-x---',
+            // why: dotted quarter, an eighth onto 3, held, and the next bar's note pushed on the
+            // "and" of 4: the Ipanema line, the long tone answered by the push.
+            'x-----x-x-----x-',
         ],
         // Getz at his busiest is a legato eighth line with a sixteenth turn in it, never bebop's
         // chromatic torrent.
-        busy: ['x-x-x-x-x---x---', '..x-x-x-x-x-x---', 'x-x-x---x-x-x-x-', 'x-x-xxx-x---x---'],
+        busy: [
+            'x-x-x-x-x---x---',
+            '..x-x-x-x-x-x---',
+            'x-x-x---x-x-x-x-',
+            'x-x-xxx-x---x---',
+            // why: the legato eighths from the "and" of 1, the last pushed over the barline.
+            '..x-x-x-x-x---x-',
+        ],
     },
     // A phrase arrives on a long note: on the One, or late on the "and" of it (the bossa
     // singer's delayed arrival), or a short-long sigh.
@@ -326,6 +341,11 @@ const bossaLead = leadIdiom({
             'x-----x-x-------',
             'x---x-x-----x---',
             '....x-x-x-----x-',
+            // why: the Ipanema line — dotted quarter, an eighth onto 3, held, and the next
+            // bar's note pushed on the "and" of 4 and tied over the barline; or the one, a
+            // flick on its "and", the "and" of 2 held and the push: the samba's anticipation.
+            'x-----x-x-----x-',
+            'x-x---x-------x-',
         ],
         endings: ['x---------------', '..x-------------', 'x-----x---------'],
         form: 'period',
@@ -405,6 +425,15 @@ const bossaLead = leadIdiom({
     // Vibrato only at the tail of a note of three beats or more; everything shorter is
     // straight tone.
     vibrato: 12,
+    // why: a bossa melody comes in a little early now and then (#2164) — the "and" of 4 (twice
+    // weighted: the cool horn's soft lead-in) or two eighths on 4 stepping into the phrase, on
+    // 0.3 of the phrases that would enter on the one: the style's air is in its late entries.
+    pickup: { chance: 0.3, head: 0.3, figures: ['..x-', '..x-', 'x-x-'] },
+    // why: the bossa singer's pushed arrival: the next bar's note struck on the "and" of 4 and
+    // tied over the barline, ahead of the clave (#2164) — on 0.7 of the barlines it could, more
+    // than jazz's or the blues': the anticipation is the Brazilian melody's signature, the
+    // downbeat restruck the exception.
+    pushes: 0.7,
 });
 
 export const bossa: Style = {

@@ -2,7 +2,8 @@
  * The lead idiom: a style's lead book (its rhythm vocabulary and note palette) played through
  * one shared phrase planner. Each four-bar phrase slot of the timeline is planned whole at its
  * first bar and kept in memory, so the lead can resume at any barline; the rest of the slot's
- * bars just play what was planned.
+ * bars just play what was planned. A slot's pickup (#2164) is planned whole with it too, and
+ * played a bar early by the slot before, which plans it from the same inputs (`pickupAhead`).
  */
 import { isIntroLabel } from '../../../core/songbook/score-form.js';
 import type { LeadRole } from '../../arrange/cycle.js';
@@ -126,6 +127,32 @@ export interface LeadBook extends LinePalette {
      * that is not bent is slid into from a few frets away. Unset: never.
      */
     slide?: number;
+    /**
+     * Pickups (#2164, `pickupInto`): a phrase that enters on a downbeat after a breath may be
+     * led into from the last beat of the bar before — the `chance` a solo phrase is, `head` a
+     * head phrase (drawn once per phrase, keyed as the tune is, so it comes back with it). Each
+     * figure is that last beat in sixteenths, ending on its "and" an eighth before the barline.
+     * The pickup belongs to the phrase it leads into, and takes only the breath the phrase before
+     * it left (`PICKUP_AIR`). Unset: a phrase starts on its bar.
+     */
+    pickup?: {
+        chance: number;
+        head: number;
+        figures: readonly string[];
+        /**
+         * Whether a solo's pickup ends on the line's own approach into its target — the book's
+         * `enclosure`, else its `chromatic` half step below — rather than the scale (a head's
+         * never does: a tune steps into its phrases). Unset: the scale walked in.
+         */
+        approaches?: boolean;
+    };
+    /**
+     * Pushed arrivals (#2164, `pushArrivals`): the chance a note struck on a bar's last eighth
+     * that runs into the next bar's downbeat is tied over the barline as one note, the
+     * downbeat's — the line arrives an eighth early. Drawn once per barline a phrase crosses
+     * (`pushDraws`), keyed as the phrase is. Unset: every bar's downbeat is struck.
+     */
+    pushes?: number;
 }
 
 /** A planned note, with the bar it sounds in. */
@@ -613,7 +640,12 @@ function takeBreath(
     }
 }
 
-function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnset[] {
+function onsetsFor(
+    ctx: BarContext,
+    slotStart: number,
+    plan: SlotPlan,
+    pushes: readonly boolean[] = [],
+): SlotOnset[] {
     const { bars, spans } = ctx.timeline;
     const onsets: SlotOnset[] = [];
     plan.kinds.forEach((kind, k) => {
@@ -650,6 +682,9 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
         const limit = onsets[i + 1]?.tick ?? slotEnd;
         onsets[i].dur = Math.max(STEP / 2, Math.min(onsets[i].dur, limit - onsets[i].tick));
     }
+    if (pushes.length) {
+        pushArrivals(ctx, slotStart, plan, pushes, onsets);
+    }
     // The breath at a phrase end (`SlotPlan.breath`), out of the held note; a rest bar already is one.
     const last = plan.kinds.length - 1;
     if (plan.breath && slotStart + last === lastBar.index && plan.kinds[last] !== 'rest') {
@@ -684,6 +719,85 @@ function onsetsFor(ctx: BarContext, slotStart: number, plan: SlotPlan): SlotOnse
     }
     markChanges(onsets, spans);
     return onsets;
+}
+
+/**
+ * Which of a slot's barlines its line pushes over (#2164, `LeadBook.pushes`): one draw per bar
+ * of the slot, the crossing into it, in order whether or not a note crosses there, so what one
+ * barline draws never moves another's. Keyed as the phrase is (`phraseKey`): a head's pushes
+ * come back with its tune, a solo's are its pass's and place's. Empty where the book never
+ * pushes.
+ */
+function pushDraws(
+    ctx: BarContext,
+    book: LeadBook,
+    slotStart: number,
+    role: LeadRole,
+    count: number,
+): boolean[] {
+    if (!book.pushes) {
+        return [];
+    }
+    const rng = ctx.rng(`${phraseKey(ctx, role, slotStart)}:push`, 'song');
+    return Array.from({ length: count }, () => rng.chance(book.pushes ?? 0));
+}
+
+/**
+ * The key a phrase's own draws are seeded on: a head's by its tune (the section and the
+ * phrase, so it comes back with it), a solo's (or a trade's turn) by the pass and the slot's
+ * place in the form, as its plan is.
+ */
+function phraseKey(ctx: BarContext, role: LeadRole, slotStart: number): string {
+    const first = ctx.timeline.bars[slotStart];
+    return role.kind === 'head'
+        ? `${headKey(first)}:${first.phrase.index}`
+        : `solo:${ctx.pass}:${placeOf(ctx, slotStart)}`;
+}
+
+/**
+ * Pushed arrivals (#2164, `LeadBook.pushes`), the push-tie `guideOnsets` sings brought to every
+ * phrase: a note struck in a bar's last eighth that runs straight into the next bar's downbeat
+ * is tied over the barline into it, one note — the downbeat's, struck an eighth early — where
+ * that barline's draw says so (`pushes`, by the slot's bar the line crosses into). It takes
+ * the downbeat's chord (so a change there makes it an anticipation, voiced for the new chord)
+ * and rings for as long as the downbeat would have. why: a bebop or blues line leans over the
+ * barline on the "and" of 4 rather than restriking the one, and a bossa melody's arrival is
+ * pushed ahead of the beat; a line that restrikes every downbeat is the barline as a wall.
+ * Inside the slot only (a phrase's own bars); never into a riff bar, which plays the bar before
+ * it again attack for attack, nor into the bar a pass ends on, whose held chord the line lands
+ * on with the band. In place on `onsets` (in order, capped to one voice).
+ */
+function pushArrivals(
+    ctx: BarContext,
+    slotStart: number,
+    plan: SlotPlan,
+    pushes: readonly boolean[],
+    onsets: SlotOnset[],
+): void {
+    const { bars } = ctx.timeline;
+    // The bar a pass ends on is struck on its barline, with the band's held chord.
+    const ends = (index: number) =>
+        index === ctx.ending?.index || (!ctx.looping && index === bars.length - 1);
+    for (let i = 0; i + 1 < onsets.length; i++) {
+        const [a, b] = [onsets[i], onsets[i + 1]];
+        const bar = bars[slotStart + a.bar];
+        const barEnd = bar.start + bar.meter.barTicks;
+        if (
+            b.bar === a.bar + 1 &&
+            pushes[b.bar] &&
+            !ends(slotStart + b.bar) &&
+            b.step === 0 &&
+            !plan.riffs[b.bar] &&
+            a.tick >= barEnd - STEP * 2 &&
+            a.tick + a.dur === b.tick
+        ) {
+            a.dur += b.dur;
+            a.chord = b.chord;
+            a.key = b.key;
+            a.span = b.span;
+            onsets.splice(i + 1, 1);
+        }
+    }
 }
 
 /** A change is any different chord between a note and the phrase's previous one. */
@@ -1459,7 +1573,8 @@ function stabFigures(
 /** A head phrase, voiced — the restatement of an opening needs the opening's own notes. */
 function voiceHead(ctx: BarContext, book: LeadBook, slotStart: number): Voiced {
     const plan = headPlan(ctx, book, slotStart);
-    const onsets = onsetsFor(ctx, slotStart, plan);
+    const pushes = pushDraws(ctx, book, slotStart, { kind: 'head' }, plan.kinds.length);
+    const onsets = onsetsFor(ctx, slotStart, plan, pushes);
     // A head is a tune: it steps into its chords, and leaves the half-step approaches and
     // enclosures to the solos (0.3 of the book's chance).
     const palette = { ...book, chromatic: book.chromatic * 0.3, enclosure: 0 };
@@ -1515,7 +1630,8 @@ function voiceSolo(
     plan: SlotPlan,
     role: LeadRole,
 ): Voiced {
-    const onsets = onsetsFor(ctx, slotStart, plan);
+    const pushes = pushDraws(ctx, book, slotStart, role, plan.kinds.length);
+    const onsets = onsetsFor(ctx, slotStart, plan, pushes);
     const targets = targetsOf(onsets);
     // A looped phrase is the hook again, whole: moved by the root motion from where it was
     // first played to here (none, at the same place in the form), intervals intact.
@@ -1793,6 +1909,311 @@ function shiftNeedsNeighbour(starts: [number, number][]): [number, number][] {
     return starts.some(([from]) => Math.abs(from) <= 3) ? starts : [];
 }
 
+/**
+ * One phrase opening's pickup (#2164): its figure, whether it comes up from below, and how its
+ * last note, on the "and" of 4, approaches the arrival (`LeadBook.pickup.approaches`): by the
+ * scale (null), a half step below it, or enclosing it from the tone above.
+ */
+interface PickupDraw {
+    figure: string;
+    below: boolean;
+    approach: 'chromatic' | 'enclosure' | null;
+}
+
+/** Whether a role plays a line a pickup may lead into or out of: a solo, or an invented head. */
+function takesPickups(ctx: BarContext, role: LeadRole): boolean {
+    // A known standard's guide-tone head sings its own rhythm, turns and lead-ins (#2111); a
+    // trade's turn is the player's or the drummer's to start, so nothing crosses into or out
+    // of one.
+    return role.kind === 'solo' || (role.kind === 'head' && !ctx.guideToneHead);
+}
+
+/**
+ * A slot's pickup draws (`LeadBook.pickup`), one per bar in order, whether or not the bar opens
+ * a phrase, so what one bar draws never moves another's. A head's are keyed as its tune is (the
+ * section and the phrase), so a head phrase comes back with its pickup; a solo's by the pass and
+ * the slot's place in the form, as its phrase is.
+ */
+function pickupDraws(
+    ctx: BarContext,
+    book: LeadBook,
+    slotStart: number,
+    role: LeadRole,
+    count: number,
+): (PickupDraw | null)[] {
+    const pickup = book.pickup;
+    if (!pickup) {
+        return [];
+    }
+    const key = `${phraseKey(ctx, role, slotStart)}:pickup`;
+    const rng = ctx.rng(key, 'song');
+    // Its own stream, so a book that approaches moves none of the draws above.
+    const approachRng = ctx.rng(`${key}:approach`, 'song');
+    const approaches = Boolean(pickup.approaches) && role.kind === 'solo';
+    const chance = role.kind === 'head' ? pickup.head : pickup.chance;
+    return Array.from({ length: count }, () => {
+        const takes = rng.chance(chance);
+        const figure = rng.pick(pickup.figures);
+        // why: a pickup more often climbs into the note it leads to (the "and" of 4 stepping up
+        // onto the one) than falls onto it from above, 0.6 to 0.4.
+        const below = rng.chance(0.6);
+        // why: a bebop pickup is the line's own approach into its target — the book's
+        // enclosure (it needs a note before the "and" of 4 to come from above with) first,
+        // else its half step below, at the chances its lines take them (`fill` in `line.ts`).
+        const notes = [...figure].filter((c) => c === 'x').length;
+        const enclose = approaches && approachRng.chance(book.enclosure);
+        const chromatic = approaches && approachRng.chance(book.chromatic);
+        const approach = enclose && notes >= 2 ? 'enclosure' : chromatic ? 'chromatic' : null;
+        return takes ? { figure, below, approach } : null;
+    });
+}
+
+/**
+ * A pickup's pitches (#2164), struck at `ticks` (in order, in the last beat of a bar), leading
+ * into `arrival`, the first note of the phrase. Each is the next tone of its pool past the note
+ * after it, so the pickup runs into the arrival from one side and its last note is a step or a
+ * 3rd from it (a 4th at most between the pickup's own notes): the style's scale at the chord
+ * it sounds over (`LinePalette.pool`), or that chord's tones where it falls on a beat or a
+ * change — the beat is the harmony's. A pickup is the scale walked into the phrase, unless the
+ * draw's `approach` says otherwise (a bebop solo's): then its last note, on the "and" of 4, is
+ * the half step below the arrival, and an enclosure strikes the tone above the arrival before
+ * it (its pool's, or its chord's on beat 4), so the line closes on its target from both sides.
+ * From below (`below`) or above, the other side where the instrument runs out; null where
+ * neither fits, or where a pickup note would be held into another chord.
+ */
+function pickupPitches(
+    ctx: BarContext,
+    book: LeadBook,
+    ticks: readonly number[],
+    end: number,
+    arrival: number,
+    { below, approach }: Pick<PickupDraw, 'below' | 'approach'>,
+): number[] | null {
+    const { timeline } = ctx;
+    const [lo, hi] = ctx.lead.range;
+    // An approach that won't fit (the half step below out of range, no tone above within a
+    // 3rd) is the scale walked in instead. `dir` is the way the pickup runs into the arrival:
+    // up (+1) from the tone below it.
+    const attempts = (approach ? [approach, null] : [null]).flatMap((tries) =>
+        (below ? [1, -1] : [-1, 1]).map((dir) => [tries, dir] as const),
+    );
+    for (const [tries, dir] of attempts) {
+        const out: number[] = [];
+        let after = arrival;
+        for (let j = ticks.length - 1; j >= 0; j--) {
+            const tick = ticks[j];
+            const span = spanIndexAt(timeline, tick);
+            const chord = timeline.spans[span]?.chord;
+            const until = ticks[j + 1] ?? end;
+            if (!chord || chordAt(timeline, until - 1)?.symbol !== chord.symbol) {
+                return null;
+            }
+            const bar = timeline.bars[barOf(ctx, tick)];
+            const strong =
+                bar.meter.pulses.includes(tick - bar.start) ||
+                (timeline.spans[span].start === tick &&
+                    timeline.spans[span - 1]?.chord?.symbol !== chord.symbol);
+            const pcs = strong ? chordPcs(chord) : book.pool(chord, bar.key);
+            const last = j === ticks.length - 1;
+            let m: number;
+            if (last && tries && !strong) {
+                // The half step below, on the "and" of 4: a passing note, off the beat.
+                m = arrival - 1;
+            } else if (tries === 'enclosure' && j === ticks.length - 2) {
+                // The tone above the arrival, a 3rd at most: the enclosure's other side.
+                m = arrival + 1;
+                while (m <= hi && !pcs.includes(mod12(m))) {
+                    m++;
+                }
+            } else {
+                m = after - dir;
+                while (m >= lo && m <= hi && !pcs.includes(mod12(m))) {
+                    m -= dir;
+                }
+            }
+            if (m < lo || m > hi || Math.abs(m - after) > (last ? 4 : 5)) {
+                break;
+            }
+            out.unshift(m);
+            after = m;
+        }
+        if (out.length === ticks.length) {
+            return out;
+        }
+    }
+    return null;
+}
+
+/**
+ * The silence a pickup leaves after the line before it, at least (#2164). why: an eighth — the
+ * catch-breath a singer or a horn takes before the "and" of 4 when the phrase before held its
+ * arrival to beat 4. The breath beat is the pickup's only home, so the arrival is never cut for
+ * it; where the line before sounds into the last eighth there is no pickup.
+ */
+const PICKUP_AIR = STEP * 2;
+
+/**
+ * The pickup into bar `k` of a slot (#2164, `LeadBook.pickup`): the drawn figure in the last
+ * beat of the bar before, leading into `arrival`, the phrase's first note, on that bar's
+ * downbeat. why: a phrase need not start on its bar — a bebop line enters on the "and" of 4, a
+ * blues lick starts on 4 (a triplet there, on the shuffle), a bossa melody comes in a little
+ * early. It plays only in the breath the line before it left: its notes `PICKUP_AIR` or more
+ * after `room` (where that line falls silent), so the phrase before keeps its arrival whole —
+ * where the room is short of the whole figure, the "and" of 4 alone. A lead-in, a little under
+ * the line it leads to (6 lighter). None where the bar before is shorter than a beat at its
+ * end, or has no chord.
+ */
+function pickupInto(
+    ctx: BarContext,
+    book: LeadBook,
+    plan: SlotPlan,
+    barIndex: number,
+    draw: PickupDraw,
+    arrival: number,
+    room: number,
+): Planned[] {
+    const bar = ctx.timeline.bars[barIndex];
+    if (!bar) {
+        return [];
+    }
+    const { pulses, barTicks } = bar.meter;
+    const end = bar.start + barTicks;
+    const from = end - STEP * draw.figure.length;
+    if (from < bar.start + pulses[pulses.length - 1]) {
+        return [];
+    }
+    const ticks = [...draw.figure].flatMap((c, j) => (c === 'x' ? [from + j * STEP] : []));
+    const midis = pickupPitches(ctx, book, ticks, end, arrival, draw);
+    if (!midis) {
+        return [];
+    }
+    const home = homeOf(ctx, book);
+    return ticks.flatMap((tick, j): Planned[] =>
+        tick < room + PICKUP_AIR
+            ? []
+            : [
+                  {
+                      tick,
+                      dur: (ticks[j + 1] ?? end) - tick,
+                      midi: midis[j],
+                      velocity: dyn(
+                          Math.min(
+                              118,
+                              Math.max(40, Math.round(plan.velocity - 6 + (midis[j] - home) * 0.8)),
+                          ),
+                          ctx.plan.energy,
+                      ),
+                      bar: bar.index,
+                  },
+              ],
+    );
+}
+
+/**
+ * A slot's pickups (#2164): into each bar that opens a phrase on its downbeat — the slot's
+ * first note, or one after a breath inside it — by the bar's draw (`pickupDraws`). The one into
+ * the slot's first bar sounds in the bar before it, the last slot's: it is planned here whole,
+ * and played (in the room that slot left) only by that bar's look ahead (`pickupAhead`), so a
+ * band resuming on this slot's barline drops it rather than doubling it. None into a pass's
+ * first bar, whose bar before belongs to no pass (a looping song's wrap is not looked across),
+ * and none played across a counted chorus's seam either (`pickupAhead`).
+ */
+function slotPickups(
+    ctx: BarContext,
+    book: LeadBook,
+    slotStart: number,
+    role: LeadRole,
+    plan: SlotPlan,
+    onsets: readonly SlotOnset[],
+    sung: readonly number[],
+): Planned[][] {
+    if (!book.pickup || !takesPickups(ctx, role)) {
+        return [];
+    }
+    const { bars } = ctx.timeline;
+    const draws = pickupDraws(ctx, book, slotStart, role, plan.kinds.length);
+    return draws
+        .map((draw, k) => {
+            const i = onsets.findIndex((o) => o.bar === k);
+            if (!draw || i < 0 || onsets[i].step !== 0 || (k === 0 && slotStart === 0)) {
+                return [];
+            }
+            const before = onsets[i - 1];
+            const room =
+                k === 0
+                    ? Number.NEGATIVE_INFINITY
+                    : before
+                      ? before.tick + before.dur
+                      : bars[slotStart].start;
+            return pickupInto(ctx, book, plan, slotStart + k - 1, draw, sung[i], room);
+        })
+        .filter((figure) => figure.length > 0);
+}
+
+/**
+ * The pickup the next slot opens with (#2164), when this bar is the last of its slot: planned
+ * by that slot, from its own inputs — the next bar's context (`ctx.next`) and the memory this
+ * bar leaves, `memory` — so its plan here is the one it makes on its own barline, and played
+ * here only in the breath this slot left (`PICKUP_AIR` after its last note). Nothing here moves
+ * the memory: the next slot plans itself again on its barline, from the same memory, and a
+ * band resuming there never plays this bar.
+ */
+function pickupAhead(
+    ctx: BarContext,
+    book: LeadBook,
+    role: LeadRole,
+    memory: LeadMemory,
+): Planned[] {
+    const ahead = ctx.next;
+    const { bar } = ctx;
+    if (
+        !book.pickup ||
+        !ahead ||
+        ahead.wraps ||
+        ahead.bar.index !== bar.index + 1 ||
+        // A chorus's seam, counted or a loop's wrap: each time through the form starts on its
+        // bar, so chorus k of a counted chart plays what lap k of a loop does.
+        ahead.bar.visit.chorus !== bar.visit.chorus ||
+        ahead.bar.phrase.bar !== 0 ||
+        // A section the lead sits out (`instruments: { soloist: false }`) has no phrase to
+        // lead into: the role is the form's, the lane the chart's.
+        !ahead.plan.lanes.lead ||
+        !takesPickups(ctx, role) ||
+        !takesPickups(ctx, ahead.plan.lead)
+    ) {
+        return [];
+    }
+    // Where this slot's line falls silent. Every figure ends on the last beat's "and".
+    const last = memory.notes.reduce<Planned | null>(
+        (at, n) => (!at || n.tick > at.tick ? n : at),
+        null,
+    );
+    // why: a phrase that falls off (a horn, #2120) or lets its bend back down (a guitar) has
+    // let go — that is what the gesture says — so the next one comes in on its bar.
+    if (last?.fall || last?.release) {
+        return [];
+    }
+    const room = last ? last.tick + last.dur : Number.NEGATIVE_INFINITY;
+    if (room + PICKUP_AIR > bar.start + bar.meter.barTicks - STEP * 2) {
+        return [];
+    }
+    const nextCtx: BarContext = {
+        ...ctx,
+        bar: ahead.bar,
+        plan: ahead.plan,
+        rng: ahead.rng,
+        next: null,
+        heard: { drums: [], bass: [], lead: [] },
+    };
+    const slotStart = ahead.bar.index;
+    const nextRole = ahead.plan.lead;
+    if (!pickupDraws(nextCtx, book, slotStart, nextRole, 1)[0]) {
+        return [];
+    }
+    const planned = planSlot(nextCtx, book, slotStart, nextRole, memory);
+    return planned.notes.filter((n) => n.bar === bar.index && n.tick >= room + PICKUP_AIR);
+}
+
 function planSlot(
     ctx: BarContext,
     book: LeadBook,
@@ -1872,6 +2293,11 @@ function planSlot(
         return chord ? nearestRanked(book.settle(chord, onsets[i].key), m, ctx.lead.range) : m;
     });
     const top = Math.max(...sung);
+    // The phrase's pickups (#2164), in the bar before each phrase they lead into: the line's own
+    // notes, though nothing the next phrase remembers (its motif, its loop) is one of them. A
+    // note before one sounds into a breath that ends at it.
+    const figures = slotPickups(ctx, book, slotStart, role, plan, onsets, sung);
+    const pickups = figures.flat();
     const notes = onsets.map((onset, i): Planned => {
         const o = resolved[i] ? { ...onset, chord: resolved[i] } : onset;
         const midi = sung[i];
@@ -1937,9 +2363,12 @@ function planSlot(
         if (note.bar !== final?.index) {
             const next = onsets[i + 1];
             const end = o.tick + o.dur;
+            // The next note: the slot's next onset, or a pickup (#2164) struck before it.
+            const pickup = pickups.find((p) => p.tick >= end && (!next || p.tick < next.tick));
+            const nextTick = pickup ? pickup.tick : next ? next.tick : slotEnd;
             // A phrase end: a beat or more of silence after it before the slot's next note
             // (the head's breath, a solo's rest), or before the slot ends.
-            const ends = (next ? next.tick : slotEnd) - end >= STEP * 4;
+            const ends = nextTick - end >= STEP * 4;
             const sameChord = chordAt(ctx.timeline, end - 1)?.symbol === o.chord.symbol;
             // why: a horn player falls off the last note of a phrase — the funk and disco
             // section's drop at the end of a riff, a blues horn's sigh — never a note inside the
@@ -1959,7 +2388,7 @@ function planSlot(
                     ? fallDraw(ctx, book.fall, role, plan, o, fell, fallRng)
                     : null;
             if (shapeRng) {
-                note.fall = fallShape(shapeRng, o.dur, (next ? next.tick : slotEnd) - end);
+                note.fall = fallShape(shapeRng, o.dur, nextTick - end);
             }
             if (ends) {
                 // A phrase end that didn't fall breaks a run of falls as one that did starts it.
@@ -1987,8 +2416,9 @@ function planSlot(
             // Inside a phrase the line goes on from the let-down note: only to a note below the
             // bent pitch (3 → b3 → 2, root → b7 → 5). A line that climbs on keeps the bend held
             // rather than going up, down and up again.
-            const nextMidi = sung[i + 1];
-            const goesDown = next !== undefined && nextMidi !== undefined && nextMidi < midi;
+            const nextMidi = pickup ? pickup.midi : sung[i + 1];
+            const goesDown =
+                (pickup || next) !== undefined && nextMidi !== undefined && nextMidi < midi;
             if (
                 ctx.lead.bends &&
                 note.bendIn &&
@@ -2035,6 +2465,18 @@ function planSlot(
         return note;
     });
     landOnHeld(ctx, book, notes, plan.velocity);
+    // A phrase that fell off or let its bend down at its end (a beat of breath after it) has
+    // let go: the next comes in on its bar, as `pickupAhead` rules for the slot's first phrase.
+    // A bend let down inside the line goes on down into the pickup.
+    const kept = figures.filter((figure) => {
+        const before = notes.filter((n) => n.tick < figure[0].tick).at(-1);
+        const breath = before ? figure[0].tick - (before.tick + before.dur) : 0;
+        return !before?.fall && !(before?.release && breath >= STEP * 4);
+    });
+    if (kept.length) {
+        notes.push(...kept.flat());
+        notes.sort((a, b) => a.tick - b.tick);
+    }
     // What the next phrase may develop: this one's opening bar.
     const opening = onsets
         .map((o, i) => (o.bar === plan.developsBar ? pitches[i] : null))
@@ -2221,25 +2663,31 @@ export function leadIdiom(book: LeadBook): LeadIdiom {
                     fell: planned.fell,
                 };
             }
-            const planned: PitchedNote[] = next.notes
-                .filter((n) => n.bar === bar.index)
-                .map((n) => ({
-                    lane: 'lead',
-                    tick: n.tick,
-                    dur: n.dur,
-                    midi: n.midi,
-                    velocity: n.velocity,
-                    offsetMs: 0,
-                    bar: n.bar,
-                    ...(n.bendIn ? { bendIn: n.bendIn } : {}),
-                    ...(n.release ? { release: true } : {}),
-                    ...(n.fall ? { fall: n.fall } : {}),
-                    ...(n.slideIn ? { slideIn: n.slideIn } : {}),
-                    ...(n.vibrato ? { vibrato: true } : {}),
-                }));
-            const events = endWithTheBand(ctx, planned, book);
+            const toEvent = (n: Planned): PitchedNote => ({
+                lane: 'lead',
+                tick: n.tick,
+                dur: n.dur,
+                midi: n.midi,
+                velocity: n.velocity,
+                offsetMs: 0,
+                bar: n.bar,
+                ...(n.bendIn ? { bendIn: n.bendIn } : {}),
+                ...(n.release ? { release: true } : {}),
+                ...(n.fall ? { fall: n.fall } : {}),
+                ...(n.slideIn ? { slideIn: n.slideIn } : {}),
+                ...(n.vibrato ? { vibrato: true } : {}),
+            });
+            const events = endWithTheBand(
+                ctx,
+                next.notes.filter((n) => n.bar === bar.index).map(toEvent),
+                book,
+            );
+            // The last pitch this slot played: a pickup into the next slot (below) is that
+            // slot's, planned from this memory, so it never moves it.
             const last = events.at(-1)?.midi ?? next.last;
-            return { events, memory: { ...next, last } };
+            const after = { ...next, last };
+            const pickup = pickupAhead(ctx, book, role, after).map(toEvent);
+            return { events: pickup.length ? [...events, ...pickup] : events, memory: after };
         },
     };
 }

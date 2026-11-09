@@ -92,8 +92,16 @@ export const bossa = defineClaims({
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
                 // two after an eight-bar period. Measured 19.88 bars before (phrase into phrase),
                 // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
-                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing.
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing. 3.75 with
+                // pickups (#2164): the catch-breath before one, an eighth, is the phrase's breath.
                 ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
+                // Pickups (#2164, `LeadBook.pickup`, head 0.3): of the phrases the tune enters,
+                // the share entered on the last beat of the bar before. Measured 0.095 (0 on main,
+                // and with pickups off; 0.292 picking up every phrase it can). Pushed arrivals
+                // (`LeadBook.pushes` 0.7): 0.146 of the barlines the tune runs across are tied (0
+                // on main, and with pushes off; 0.223 pushing every one it can).
+                ['leadPhrasesStartEarly', 0.05, 0.25, 'the tune comes in early now and then'],
+                ['leadBarlineTies', 0.1, 0.2, 'an arrival pushed over the barline'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'a Jobim song form: the tune fills it'],
                 ['leadNotesPerBar', 2, 4, 'a lyrical tune: two to four notes a bar, long ones'],
@@ -120,12 +128,18 @@ export const bossa = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
-                // Measured 0.135; development off 0.040, #2012's bar fix reverted 0.079; always develops: too few openings.
-                // Floor is midway between development off (0.040) and shipped: it guards development off. The bar fix (0.079 vs 0.135) is within about 2 sd here; blues, disco and rock guard it.
+                // Pickups (#2164, `LeadBook.pickup` 0.3): measured 0.101 (0 on main, and with
+                // pickups off; 0.417 picking up every phrase it can). Pushed arrivals
+                // (`LeadBook.pushes` 0.7): 0.127 (0 on main, and with pushes off; 0.169 pushing
+                // every barline it can).
+                ['leadPhrasesStartEarly', 0.06, 0.3, 'a phrase now and then comes in early'],
+                ['leadBarlineTies', 0.1, 0.15, 'an arrival pushed over the barline'],
+                // Measured 0.099 since #2164 (0.135 before); development off 0.011 (0.040 before), #2012's bar fix reverted 0.079; always develops: too few openings.
+                // Floor is midway between development off (0.011) and shipped: it guards development off. The bar fix is not guarded here (it reads above the floor); blues, disco and rock guard it.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.088,
+                    0.055,
                     0.25,
                     "a phrase now and then says the last one's opening again",
                 ],
@@ -148,9 +162,14 @@ export const bossa = defineClaims({
                     "chord tones on the beats, the chord scale's colour between",
                 ],
                 ['leadChangeGuideTones', 0.6, 1, 'changes land on the 3rd or 7th'],
+                // Measured 0.019 (0.034 on main): a phrase's pickup (#2164) steps into its first
+                // note by the scale, as a bossa line does, and every one of those landings is one
+                // more approached without a half step, while a pushed arrival is approached from
+                // beat 4, a chord tone. The floor fails the half-step approach off (0.009; 0.014
+                // with only the enclosures off).
                 [
                     'leadChromaticApproach',
-                    0.03,
+                    0.012,
                     0.25,
                     'a half-step approach now and then, well under bebop',
                 ],

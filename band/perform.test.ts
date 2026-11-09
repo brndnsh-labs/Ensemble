@@ -64,52 +64,74 @@ it('rhodes and clav are the piano in all but their MIDI program', () => {
     }
 });
 
+/**
+ * The band as it resumes: the default (the lead off), the lead on — whose notes can ring across
+ * a barline into the bar resumed on (a pushed arrival, #2164), which the keyboard yields to —
+ * and a guide-tone head (#2027), whose pushes tie over the barline too. A guide-tone head is
+ * only the head, pass 0; the solos after it are the lead-on run's.
+ */
+const RESUME_BANDS = [
+    ['the lead off', {}, [0, 1, 2, 3]],
+    ['the lead on', { lanes: { ...DEFAULT_SETTINGS.lanes, lead: true } }, [0, 1, 2, 3]],
+    [
+        'a guide-tone head',
+        { lanes: { ...DEFAULT_SETTINGS.lanes, lead: true }, head: 'guide-tones' },
+        [0],
+    ],
+] as const satisfies readonly (readonly [string, Partial<BandSettings>, readonly number[]])[];
+
 describe.each(STYLE_IDS)('%s resume parity', (styleId) => {
     for (const [name, fixtureScore] of Object.entries(FIXTURES)) {
-        it(`${name} resumes at any barline exactly as the full pass, trading off`, () => {
-            const timeline = compileTimeline(fixtureScore);
-            const failures: string[] = [];
-            for (const [c, comp] of RESUME_COMPS.entries()) {
-                const settings: BandSettings = {
-                    ...DEFAULT_SETTINGS,
-                    style: styleId,
-                    comp,
-                    seed: 'resume',
-                };
-                // Passes 0–3: the head, then the pass-lift's first three steps (`planBars`'s
-                // `passLift` caps at pass 3) — a resumed pass can land in any of them.
-                for (const pass of [0, 1, 2, 3] as const) {
-                    const full = performPass(timeline, settings, { pass, looping: true });
-                    // A quarter of the barlines for each instrument and pass, a different quarter
-                    // each time: every barline is still resumed on every instrument and in every
-                    // pass, only not in all sixteen pairings (which were 25,000 passes). The
-                    // `from >> 2` turns the pairing every four bars, since sections open on a
-                    // multiple of four: without it every section's first bar would get the same
-                    // four pairings, and an organ would never resume at one in the head.
-                    for (let from = 1; from < timeline.bars.length; from++) {
-                        if ((from + (from >> 2) + c + pass) % 4 !== 0) {
-                            continue;
-                        }
-                        const resumed = performPass(timeline, settings, {
-                            pass,
-                            looping: true,
-                            memory: full.snapshots[from],
-                            // `origin: 0` — every pass here is a whole-song lap, which always
-                            // starts at bar 0 (`BandHost`'s own `songWindow(0)`), so a resume of
-                            // it is a continuation of pass `pass` from the top, not a fresh
-                            // start at `from` (`planBars`'s `PassWindow.origin`).
-                            window: { from, to: timeline.bars.length, origin: 0 },
-                        });
-                        const expected = JSON.stringify(full.events.filter((e) => e.bar >= from));
-                        const actual = JSON.stringify(resumed.events);
-                        if (actual !== expected) {
-                            failures.push(`${comp} pass ${pass} from ${from}`);
+        it.each(RESUME_BANDS)(
+            `${name} resumes at any barline exactly as the full pass, trading off, %s`,
+            (_, band, passes) => {
+                const timeline = compileTimeline(fixtureScore);
+                const failures: string[] = [];
+                for (const [c, comp] of RESUME_COMPS.entries()) {
+                    const settings: BandSettings = {
+                        ...DEFAULT_SETTINGS,
+                        ...band,
+                        style: styleId,
+                        comp,
+                        seed: 'resume',
+                    };
+                    // Passes 0–3: the head, then the pass-lift's first three steps (`planBars`'s
+                    // `passLift` caps at pass 3) — a resumed pass can land in any of them.
+                    for (const pass of passes) {
+                        const full = performPass(timeline, settings, { pass, looping: true });
+                        // A quarter of the barlines for each instrument and pass, a different quarter
+                        // each time: every barline is still resumed on every instrument and in every
+                        // pass, only not in all sixteen pairings (which were 25,000 passes). The
+                        // `from >> 2` turns the pairing every four bars, since sections open on a
+                        // multiple of four: without it every section's first bar would get the same
+                        // four pairings, and an organ would never resume at one in the head.
+                        for (let from = 1; from < timeline.bars.length; from++) {
+                            if ((from + (from >> 2) + c + pass) % 4 !== 0) {
+                                continue;
+                            }
+                            const resumed = performPass(timeline, settings, {
+                                pass,
+                                looping: true,
+                                memory: full.snapshots[from],
+                                // `origin: 0` — every pass here is a whole-song lap, which always
+                                // starts at bar 0 (`BandHost`'s own `songWindow(0)`), so a resume of
+                                // it is a continuation of pass `pass` from the top, not a fresh
+                                // start at `from` (`planBars`'s `PassWindow.origin`).
+                                window: { from, to: timeline.bars.length, origin: 0 },
+                            });
+                            const expected = JSON.stringify(
+                                full.events.filter((e) => e.bar >= from),
+                            );
+                            const actual = JSON.stringify(resumed.events);
+                            if (actual !== expected) {
+                                failures.push(`${comp} pass ${pass} from ${from}`);
+                            }
                         }
                     }
                 }
-            }
-            expect(failures).toEqual([]);
-        });
+                expect(failures).toEqual([]);
+            },
+        );
     }
 });
 
@@ -177,6 +199,32 @@ describe('resume from a fresh, mid-song window', () => {
             });
             expect(crashAt(events, fromBar), `play-from-here ${fromBar}`).toBe(false);
         }
+    });
+});
+
+describe('lead pickups (#2164)', () => {
+    it('never leads into a section the lead sits out', () => {
+        const chart = score([
+            { label: 'A', bars: 'Dm7 | G7 | Cmaj7 | A7 | Dm7 | G7 | Cmaj7 | / |' },
+            { label: 'B', bars: 'Fmaj7 | Bb7 | Em7 | A7 |' },
+        ]);
+        chart.sections[1].instruments = { soloist: false };
+        const timeline = compileTimeline(chart);
+        const settings: BandSettings = {
+            ...DEFAULT_SETTINGS,
+            style: 'jazz',
+            lanes: { ...DEFAULT_SETTINGS.lanes, lead: true },
+        };
+        const last = timeline.bars[7];
+        const lastBeat = last.start + (last.meter.pulses.at(-1) ?? 0);
+        const into = (seed: string, pass: number) =>
+            performPass(timeline, { ...settings, seed }, { pass, looping: true }).events.filter(
+                (e) => e.lane === 'lead' && e.bar === 7 && e.tick >= lastBeat,
+            );
+        const struck = ['a', 'b', 'c', 'd', 'e', 'f'].flatMap((seed) =>
+            [0, 1, 2].flatMap((pass) => into(seed, pass).map(() => `${seed} pass ${pass}`)),
+        );
+        expect(struck).toEqual([]);
     });
 });
 

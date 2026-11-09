@@ -731,12 +731,30 @@ const bluesLead = leadIdiom({
     name: 'blues lead',
     cells: {
         sparse: ['x-x-x-------....', '..x-x-x-----....', 'x---x-x-----....', '....x-x-x-x-----'],
-        mid: ['x-x-x-x-x-------', '..x-x-x-x-x-x---', 'x-x-x---x-x-----', 'x---x-x-x-x-----'],
+        mid: [
+            'x-x-x-x-x-------',
+            '..x-x-x-x-x-x---',
+            'x-x-x---x-x-----',
+            'x---x-x-x-x-----',
+            // why: a lick that runs on into the next bar (#2164) — swung eighths, a quarter on
+            // 3, then the long-short on 4 whose last eighth leans over the barline into the one
+            // (`LeadBook.pushes`), or the "and" of 4 alone after a held note.
+            'x-x-x---x---x-x-',
+            '..x-x-x-----..x-',
+        ],
         busy: ['x-x-x-x-x-x-x-x-', 'x-x-x-x-x-x-x---', '..x-x-x-x-x-x-x-', 'x-x-x-x-x---x-x-'],
     },
     endings: ['x-----------....', 'x-x-x-----------', 'x---------------', '..x-x-x---------'],
     head: {
-        cells: ['x-x-x-------....', '..x-x-x-----....', 'x---x-x---x-----', 'x-x---x-x-------'],
+        cells: [
+            'x-x-x-------....',
+            '..x-x-x-----....',
+            'x---x-x---x-----',
+            'x-x---x-x-------',
+            // why: a swung pair and a held note, then the "and" of 4 pushed over the barline:
+            // the next line's first word sung an eighth early, the call leaning into the IV.
+            'x-x-x-------..x-',
+        ],
         endings: ['x---------------', 'x-x-x-----------'],
         form: 'aab',
         // A known standard's guide-tone head in the blues (#2122): the guide tones sung the
@@ -804,6 +822,16 @@ const bluesLead = leadIdiom({
     // why: a blues guitarist slides into a landing as often as not when he doesn't bend it: a
     // quarter of the unbent landings (#2120).
     slide: 0.25,
+    // why: a blues lick starts on 4 (#2164) — the "and" of 4 alone, two eighths on 4 (the
+    // shuffle's long-short), or a triplet on 4 rolling into the one: 0.65 of the solo's phrases
+    // that would enter on the one, two in three, and half the head's calls, a singer's line
+    // led in by its first word as often as not (a phrase after a bend let back down comes in
+    // on its bar). The scale walked in: a blues lick runs down its box into the note.
+    pickup: { chance: 0.65, head: 0.5, figures: ['..x-', 'x-x-', 'xxx-'] },
+    // why: a lick's last eighth leans over the barline into the next bar's one (#2164) — on
+    // 0.4 of the barlines it could: a blues player restrikes the one, the shuffle's backbeat
+    // home, a little more often than he anticipates it.
+    pushes: 0.4,
 });
 
 export const blues: Style = {
