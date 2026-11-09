@@ -553,7 +553,17 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   played as written. A section merely labelled Tag or Ending is not: a jazz tag is the
   turnaround repeated before the band resolves it. An N.C. later in the last bar (`G7:2
   N.C.:2`) is a written stop: the bar still resolves, and the held ending, resolved or not,
-  sounds up to the rest and no further.
+  sounds up to the rest and no further. A fermata on the last bar holds the style's gesture,
+  not the crash and kick every fermata elsewhere shares (#2175, `holdFermatas`): the kit
+  plays its book's ending line (a bossa's crashes nowhere), and each pitched lane's last
+  strike rings to the span's end — a hold or soft ending as it was, a stop's eighth held,
+  the button as written (its eighth stretched only in time, like every note under a
+  fermata), the last of the hits ringing while the hits before it stay short — because what
+  a band holds under a fermata is the note it is playing when it reaches it; a lead note the
+  hold makes half a bar or longer sings with vibrato. A fermata on a later chord of the last bar (`|
+  G7 C(fermata) |`) is that written chord held from where it is written: `heldEnding` plays
+  the bar as it plays `| G7 C |`, the G7 struck as written and the C held from its beat. A
+  fermata anywhere else, or in a performance that loops, is held exactly as before.
 - **The key has to be the chart's.** A chart typed without setting its key reads as C major, so
   the band resolves only into a key the chart is in: one it opens on (a stable chord on the
   tonic as its first chord, which a dominant I–IV vamp like `E9 | A9` is), or one it rests on

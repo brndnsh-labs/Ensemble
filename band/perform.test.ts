@@ -271,6 +271,69 @@ describe('fermatas', () => {
         expect(rings.length).toBeGreaterThan(0);
     });
 
+    it('on a hold that ends the performance, still ties the bar before over (#2175)', () => {
+        // The ending bar's fermata holds the style's gesture, but a fermata on a hold is no
+        // new strike even there: the bar before's last bass note and comp chord ring through
+        // it, and nothing pitched is struck in the last bar. Catches the gesture path taking
+        // a tied fermata (the ending bar's re-struck chord kept, the bar before not extended).
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'C | /', fermataBars: [1] }]));
+        for (const style of ['rock', 'funk', 'bossa'] as const) {
+            const { events } = performPass(
+                timeline,
+                { ...DEFAULT_SETTINGS, style, seed: 'f' },
+                { pass: 0, looping: false },
+            );
+            const pitched = events.filter((e): e is PitchedNote => e.lane !== 'drums');
+            expect(
+                pitched.filter((e) => e.bar === 1),
+                style,
+            ).toEqual([]);
+            // The bar before's last bass note(s) and last struck comp chord.
+            const lastStruck = (lane: PitchedNote['lane'], struck = false) => {
+                const notes = pitched.filter(
+                    (e) => e.lane === lane && e.bar === 0 && !(struck && e.muted),
+                );
+                const last = Math.max(...notes.map((e) => e.tick));
+                return notes.filter((e) => e.tick === last);
+            };
+            const held = [...lastStruck('bass'), ...lastStruck('comp', true)];
+            for (const n of held) {
+                expect(n.tick + n.dur, `${style}: ${n.lane} ${n.midi}@${n.tick}`).toBe(2 * BAR);
+            }
+            expect(held.length, style).toBeGreaterThan(0);
+        }
+    });
+
+    it('mid-chart, in a performance that ends, is the shared crash and kick still (#2175)', () => {
+        // A fermata on the ending bar holds the style's gesture; one anywhere else is held as
+        // it always was. Catches the gesture reaching every fermata (the ending bar's plan
+        // read off the wrong bar, or no bar at all).
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'C | F | G7 | C', fermataBars: [1] }]),
+        );
+        for (const style of ['bossa', 'funk', 'metal'] as const) {
+            const { events } = performPass(
+                timeline,
+                { ...DEFAULT_SETTINGS, style, seed: 'f' },
+                { pass: 0, looping: false },
+            );
+            const held = events.filter((e) => e.bar === 1);
+            const drums = held.filter((e) => e.lane === 'drums');
+            expect(drums.map((e) => (e.lane === 'drums' ? e.piece : '')).sort(), style).toEqual([
+                'crash',
+                'kick',
+            ]);
+            expect(
+                held.filter((e) => e.lane === 'bass'),
+                style,
+            ).toHaveLength(1);
+            expect(
+                new Set(held.filter((e) => e.lane === 'comp').map((e) => e.tick)).size,
+                style,
+            ).toBe(1);
+        }
+    });
+
     it('hold the bass near the note just before, even after an earlier fermata', () => {
         // Bar 1's held note is appended after the bars that follow it: the second fermata
         // must still hear bar 4's last note, and a resume at any bar must hear the same.

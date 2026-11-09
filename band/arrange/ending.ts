@@ -500,8 +500,21 @@ function endingSuffix(quality: EndingQuality, key: KeyContext, family: TonicFami
  */
 export function heldEnding(timeline: Timeline, index: number, quality: EndingQuality): Bar | null {
     const bar = timeline.bars[index];
-    if (!bar?.spans[0]?.chord || bar.spans.some((span) => span.fermata)) {
+    if (!bar?.spans[0]?.chord) {
         return null;
+    }
+    const fermata = bar.spans.findIndex((span) => span.fermata);
+    if (fermata === 0) {
+        return null;
+    }
+    if (fermata > 0) {
+        // A fermata on a later chord of the last bar (`| G7 C(fermata) |`, #2175): the chart
+        // asks for that chord held from where it is written, so the band plays the bar as it
+        // plays `| G7 C |` (#1502), the chords before struck as written and the held one
+        // from its own beat; `holdFermatas` then holds the gesture's last strike on it. A
+        // fermata on a rest, or on a hold tied from the chord before, is the bar as written.
+        const held = bar.spans[fermata];
+        return held.chord && !held.tied ? heldOn(bar, held.chord, fermata) : null;
     }
     if (timeline.coda && index === timeline.bars.length - 1) {
         return null;

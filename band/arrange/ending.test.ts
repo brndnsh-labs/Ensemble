@@ -1834,3 +1834,217 @@ describe('a lead held from over the V into home (#2017)', () => {
         expect(out[1].midi).toBe(72);
     });
 });
+
+describe('a fermata on the last bar holds the gesture, not the shared crash (#2175)', () => {
+    // A written fermata on the last bar is a written ending (`heldEnding` is null), and the
+    // lanes play it in the style's gesture; `holdFermatas` once wrote the crash and kick every
+    // fermata shares over that, so a bossa ended on a crash it never plays otherwise.
+    // Straight and unhumanized, so every strike sits on the grid the players write on.
+    const timeline = compileTimeline(
+        score([{ label: 'A', bars: 'C | F | Dm7 | G7', fermataBars: [3] }]),
+    );
+    const bar = timeline.bars.at(-1)!;
+    const end = bar.start + bar.meter.barTicks;
+    const straight = (style: StyleId, seed: string): BandSettings => ({
+        ...settingsFor(style, seed),
+        swing: 0,
+        humanize: 0,
+    });
+    const step = (tick: number) => Math.round((tick - bar.start) / STEP);
+    const strikesOf = (notes: PitchedNote[]) =>
+        [
+            ...new Set(
+                notes.filter((n) => !n.muted).map((n) => `${step(n.tick)}-${step(n.tick + n.dur)}`),
+            ),
+        ]
+            .map((s) => s.split('-').map(Number))
+            .sort((a, b) => a[0] - b[0]);
+    /**
+     * The gesture's strikes in a 4/4 bar with the fermata holding the last one to the bar's
+     * end, written out by kind: a hold or soft ending as it was, a stop's eighth held, the
+     * button held, the hits short but the last.
+     */
+    const heldStrikes = (style: StyleId) => {
+        const gesture = STYLES[style].endingGesture;
+        if (gesture.kind === 'button') {
+            return [
+                [0, 14],
+                [14, 16],
+            ];
+        }
+        if (gesture.kind === 'hits') {
+            return homeSteps(style, 0).map((at, k, all) => [
+                at,
+                k === all.length - 1 ? 16 : at + 2,
+            ]);
+        }
+        return [[0, 16]];
+    };
+
+    it.each(STYLE_IDS)(
+        "%s: the kit plays its book's ending, and the last strike is held",
+        (style) => {
+            // Catches `holdFermatas` writing the shared crash and kick over the book's line, one
+            // bass note and one comp chord where the gesture strikes more (jazz's button, metal's
+            // hits), and a stop's eighth left short under a fermata.
+            const { energy } = planBars(timeline, straight(style, 'a'), {
+                pass: 0,
+                looping: false,
+                window: fullWindow(timeline),
+                endingGesture: STYLES[style].endingGesture,
+                keepsHighLine: STYLES[style].keepsHighLine,
+            })[bar.index];
+            const kit = Object.entries(ENDING_DRUMS[style])
+                .flatMap(([piece, line]) =>
+                    readLine(line).map(
+                        ([at, velocity]) =>
+                            [piece, bar.start + at * STEP, dyn(velocity, energy)] as const,
+                    ),
+                )
+                .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+            let sung = 0;
+            for (const seed of SEEDS) {
+                const where = `${style}/${seed}`;
+                const { events } = performPass(timeline, straight(style, seed), {
+                    pass: 0,
+                    looping: false,
+                });
+                const drums = events
+                    .filter((e) => e.lane === 'drums' && e.bar === bar.index)
+                    .map((e) => [e.lane === 'drums' ? e.piece : '', e.tick, e.velocity] as const)
+                    .sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0]));
+                expect(drums, where).toEqual(kit);
+                const { bass, comp, lead } = lastBar(timeline, events);
+                expect(strikesOf(bass), `${where}: the bass`).toEqual(heldStrikes(style));
+                expect(strikesOf(comp), `${where}: the comp`).toEqual(heldStrikes(style));
+                // The lead lets go with the band (`endWithTheBand`) and its last note is held
+                // with the fermata; nothing sounds past the bar.
+                for (const n of lead) {
+                    expect(
+                        n.tick + n.dur,
+                        `${where}: lead ${n.midi}@${n.tick}`,
+                    ).toBeLessThanOrEqual(end);
+                }
+                const final = lead.at(-1);
+                if (final) {
+                    expect(final.tick + final.dur, `${where}: the lead's last note`).toBe(end);
+                    sung++;
+                }
+            }
+            // Not vacuous where the hold changes the lead: the three leads the whole-band
+            // test above proves sing the last bar (a stop's note held, the button, the hits).
+            // Reggae's, the blues's and hip hop's leads rest this short chart's last bar.
+            if (style === 'funk' || style === 'metal' || style === 'jazz') {
+                expect(sung, `${style}: the lead sings the ending`).toBeGreaterThan(0);
+            }
+        },
+    );
+
+    it.each(['rock', 'funk', 'bossa'] as const)(
+        '%s: a fermata on a later chord holds that chord from where it is written',
+        (style) => {
+            // `| G7 C(fermata) |`: the C is the chart's own ending, held from beat 3 as a bar
+            // that gets home itself is (#1502), the G7 struck as written before it. Catches
+            // `heldEnding` reading any fermata as "play the first chord": the band then holds
+            // the G7 to the end and the written C never sounds.
+            const chart = compileTimeline(
+                score([{ label: 'A', bars: 'C | F | Dm7 | G7 C', fermataBars: [3] }]),
+            );
+            const last = chart.bars.at(-1)!;
+            const barEnd = last.start + last.meter.barTicks;
+            const held = heldEnding(chart, last.index, STYLES[style].ending);
+            expect(
+                held?.spans.map((s) => s.chord?.symbol),
+                style,
+            ).toEqual(['G7', 'C']);
+            const stepIn = (tick: number) => Math.round((tick - last.start) / STEP);
+            // The G7's strike keeps the gesture's shape (an eighth in funk's stop, held to
+            // the C otherwise); the C is struck on 3 and held to the bar's end.
+            const expected =
+                STYLES[style].endingGesture.kind === 'stop'
+                    ? [
+                          [0, 2],
+                          [8, 16],
+                      ]
+                    : [
+                          [0, 8],
+                          [8, 16],
+                      ];
+            for (const seed of SEEDS) {
+                const where = `${style}/${seed}`;
+                const { events } = performPass(chart, straight(style, seed), {
+                    pass: 0,
+                    looping: false,
+                });
+                const { bass, comp, lead } = lastBar(chart, events);
+                const shape = (notes: PitchedNote[]) =>
+                    [
+                        ...new Set(
+                            notes
+                                .filter((n) => !n.muted)
+                                .map((n) => `${stepIn(n.tick)}-${stepIn(n.tick + n.dur)}`),
+                        ),
+                    ]
+                        .map((s) => s.split('-').map(Number))
+                        .sort((a, b) => a[0] - b[0]);
+                expect(shape(bass), `${where}: the bass`).toEqual(expected);
+                expect(shape(comp), `${where}: the comp`).toEqual(expected);
+                expect(struckPcs(bass), `${where}: G, then C`).toEqual([7, 0]);
+                // The comp on 3 is the written C in the style's own colour (bossa's 6/9):
+                // its tones within the chord's own and its scale's, the 3rd or root among them.
+                const c = held!.spans[1].chord!;
+                const onC = pcsOf(comp.filter((n) => n.tick >= last.start + 8 * STEP));
+                expect(
+                    [...onC].every(
+                        (pc) =>
+                            chordPcs(c).includes(pc) ||
+                            c.scale.map((s) => mod12(c.root + s)).includes(pc),
+                    ),
+                    `${where}: C on 3`,
+                ).toBe(true);
+                expect(onC.has(0) || onC.has(4), `${where}: the C's root or 3rd`).toBe(true);
+                const final = lead.at(-1);
+                expect(final, `${where}: the lead lands on the C`).toBeDefined();
+                expect(final!.tick + final!.dur, where).toBe(barEnd);
+                expect([0, 4, 7], where).toContain(mod12(final!.midi));
+            }
+        },
+    );
+
+    it.each(['funk', 'skapunk'] as const)(
+        "%s: the lead's note held through a stop's fermata sings with vibrato",
+        (style) => {
+            // `endWithTheBand` cuts the lead to the band's eighth and strips its vibrato; the
+            // fermata then holds that eighth a whole bar. Catches a bar-long straight tone.
+            for (const seed of SEEDS) {
+                const { events } = performPass(timeline, straight(style, seed), {
+                    pass: 0,
+                    looping: false,
+                });
+                const final = lastBar(timeline, events).lead.at(-1);
+                expect(final, `${style}/${seed}`).toBeDefined();
+                expect(
+                    [final!.tick, final!.tick + final!.dur, final!.vibrato],
+                    `${style}/${seed}`,
+                ).toEqual([bar.start, end, true]);
+            }
+        },
+    );
+
+    it('a soft ending under a fermata crashes nowhere', () => {
+        // Catches the issue itself: bossa (and neo-soul, acoustic) with a fermata on the last
+        // bar ending on a crash none of them plays.
+        const soft = STYLE_IDS.filter((style) => STYLES[style].endingGesture.kind === 'soft');
+        expect(soft).toContain('bossa');
+        for (const style of soft) {
+            for (const seed of SEEDS) {
+                const { events } = performPass(timeline, straight(style, seed), {
+                    pass: 0,
+                    looping: false,
+                });
+                const crashes = events.filter((e) => e.lane === 'drums' && e.piece === 'crash');
+                expect(crashes, `${style}/${seed}`).toEqual([]);
+            }
+        }
+    });
+});
