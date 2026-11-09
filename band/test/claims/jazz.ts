@@ -400,10 +400,12 @@ export const jazz = defineClaims({
                 // enclosures off). A pickup's last note approaches its phrase by the book's
                 // chances (`LeadBook.pickup.approaches`; 0.149 without, the scale walked in). A
                 // pushed arrival is the change's landing (`leadLandings`), approached from beat 4,
-                // a chord tone by rule: 0.269 with pushes off, 0.177 pushing every barline.
+                // a chord tone by rule: 0.269 with pushes off, 0.177 pushing every barline. The
+                // floor is midway between shipped and the pickup approaches off (0.149), so it
+                // guards those as well as the line's.
                 [
                     'leadChromaticApproach',
-                    0.2,
+                    0.18,
                     0.6,
                     'out-of-scale half-step approaches and enclosures',
                 ],

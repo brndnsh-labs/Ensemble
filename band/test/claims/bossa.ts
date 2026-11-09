@@ -135,11 +135,11 @@ export const bossa = defineClaims({
                 ['leadPhrasesStartEarly', 0.06, 0.3, 'a phrase now and then comes in early'],
                 ['leadBarlineTies', 0.1, 0.15, 'an arrival pushed over the barline'],
                 // Measured 0.099 since #2164 (0.135 before); development off 0.011 (0.040 before), #2012's bar fix reverted 0.079; always develops: too few openings.
-                // Floor is midway between development off (0.040) and shipped: it guards development off. The bar fix (0.079 vs 0.135) is within about 2 sd here; blues, disco and rock guard it.
+                // Floor is midway between development off (0.011) and shipped: it guards development off. The bar fix is not guarded here (it reads above the floor); blues, disco and rock guard it.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
                     'leadMotifDevelopment',
-                    0.088,
+                    0.055,
                     0.25,
                     "a phrase now and then says the last one's opening again",
                 ],
