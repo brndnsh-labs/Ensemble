@@ -441,6 +441,57 @@ function motifTally(takes: Take[]): { n: number; hit: number } {
     return { n, hit };
 }
 
+/**
+ * The comp's strike that plays each chord change of a take (keyed by span index, its tick and
+ * notes): the first strike that plays the new chord — one struck on the change or after it in
+ * the span, or one struck within an eighth before it and still sounding over it (a push tied
+ * into the change). A strike before the change that lets go first is the old chord's. The same
+ * chord again in the next span is no change.
+ */
+function changeStrikes({ timeline: t, events }: Take): Map<number, [number, PitchedNote[]]> {
+    const strikes = [...compChords(events).entries()].sort(([a], [b]) => a - b);
+    const out = new Map<number, [number, PitchedNote[]]>();
+    t.spans.forEach((span, i) => {
+        if (!span.chord || t.spans[i - 1]?.chord?.symbol === span.chord.symbol) {
+            return;
+        }
+        const found = strikes.find(
+            ([tick, notes]) =>
+                (tick >= span.start - 0.5 && tick < span.end - 0.5) ||
+                (tick >= span.start - STEP * 2 - 0.5 &&
+                    tick < span.start - 0.5 &&
+                    notes.some((n) => n.tick + n.dur > span.start + 1)),
+        );
+        if (found) {
+            out.set(i, found);
+        }
+    });
+    return out;
+}
+
+/**
+ * The comp's voicing at each seventh-chord change of a take (keyed by span index), as its
+ * sorted MIDI notes (`changeStrikes`).
+ */
+function seventhChangeVoicings(take: Take): Map<number, string> {
+    const out = new Map<number, string>();
+    for (const [i, [, notes]] of changeStrikes(take)) {
+        if (take.timeline.spans[i].chord?.seventh !== null) {
+            out.set(
+                i,
+                notes
+                    .map((n) => n.midi)
+                    .sort((a, b) => a - b)
+                    .join(','),
+            );
+        }
+    }
+    return out;
+}
+
+/** The jazz piano's default takes, performed once for every style compared with it. */
+let jazzPiano: Take[] | null = null;
+
 export const METRICS = {
     // The guide-tone head's (#2111, #2122): judged in every style (`guideTonesTake`).
     ...GUIDE_METRICS,
@@ -1197,6 +1248,37 @@ export const METRICS = {
         }
         return ratio(sum, n);
     },
+    /**
+     * Of the chord changes the comp strikes (`changeStrikes`), the share where its top voice
+     * leaps more than a perfect 4th from the strike before: the top line of a comp moves by
+     * step or a small skip at a change, the way a pianist leads it (#2025). A voicing led
+     * from the wrong hand — a one-hand voicing matched against a two-handed spread's left
+     * hand — drops its top a 5th or more.
+     */
+    compTopLeapAtChange: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const take of takes) {
+            const strikes = [...compChords(take.events).entries()].sort(([a], [b]) => a - b);
+            const top = (notes: PitchedNote[]) => Math.max(...notes.map((x) => x.midi));
+            for (const [tick, notes] of changeStrikes(take).values()) {
+                // The last strike before this one (the project's lib is ES2022: no `findLast`).
+                let before: PitchedNote[] | undefined;
+                for (const [t, struck] of strikes) {
+                    if (t >= tick) {
+                        break;
+                    }
+                    before = struck;
+                }
+                if (!before) {
+                    continue;
+                }
+                n++;
+                hit += Math.abs(top(notes) - top(before)) > 5 ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
     /** Share of comp chords no longer than an eighth note. */
     compShort: (takes) => {
         let n = 0;
@@ -1328,6 +1410,83 @@ export const METRICS = {
             }
         }
         return ratio(sum, n);
+    },
+    /**
+     * Of the seventh-chord changes, the share where this comp strikes exactly the notes the
+     * jazz piano strikes on the same change (the same pitches in the same octaves) — jazz
+     * played on the same charts, seeds and passes, its default take (no lead, piano). A style
+     * whose keyboard has its own voicings shares few; one that borrowed jazz's rootless voicing
+     * shares nearly all, whatever its rhythm. Judged on takes with no lead (the default take's
+     * shape), so the two performances line up take for take.
+     */
+    compSharedWithJazz: (takes) => {
+        jazzPiano ??= perform('jazz');
+        if (jazzPiano.length !== takes.length) {
+            throw new Error('compSharedWithJazz: judge a default take (no lead), like jazz');
+        }
+        let n = 0;
+        let hit = 0;
+        takes.forEach((take, k) => {
+            const spans = (x: Take) => x.timeline.spans.map((s) => s.chord?.symbol).join(' ');
+            if (spans(jazzPiano![k]) !== spans(take)) {
+                throw new Error(`compSharedWithJazz: take ${k} is not the jazz take's chart`);
+            }
+            const jazz = seventhChangeVoicings(jazzPiano![k]);
+            for (const [i, voicing] of seventhChangeVoicings(take)) {
+                const theirs = jazz.get(i);
+                if (theirs === undefined) {
+                    continue;
+                }
+                n++;
+                hit += theirs === voicing ? 1 : 0;
+            }
+        });
+        return ratio(hit, n);
+    },
+    /**
+     * Of the seventh chords a keyboard strikes more than once in a bar, the share whose strikes
+     * change hands: a two-handed spread on one strike and a one-hand voicing on another (#2025).
+     * A strike belongs to the chord it plays — a push within an eighth before a change, still
+     * sounding over it, is the new chord's. A seventh chord's spread spans more than an
+     * octave, its rootless voicing less.
+     */
+    compHandsChangeInBar: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const strikes = [...compChords(events).entries()];
+            for (const bar of t.bars) {
+                const end = bar.start + bar.meter.barTicks;
+                for (const span of bar.spans) {
+                    if (!span.chord || span.chord.seventh === null) {
+                        continue;
+                    }
+                    const [from, to] = [Math.max(span.start, bar.start), Math.min(span.end, end)];
+                    const pushed = (tick: number, notes: PitchedNote[], edge: number) =>
+                        tick >= edge - STEP * 2 - 0.5 &&
+                        tick < edge - 0.5 &&
+                        notes.some((x) => x.tick + x.dur > edge + 1);
+                    const kinds = strikes
+                        .filter(
+                            ([tick, notes]) =>
+                                notes[0].bar === bar.index &&
+                                ((tick >= from - 0.5 &&
+                                    tick < to - 0.5 &&
+                                    !pushed(tick, notes, to)) ||
+                                    pushed(tick, notes, from)),
+                        )
+                        .map(([, notes]) => {
+                            const midi = notes.map((x) => x.midi);
+                            return Math.max(...midi) - Math.min(...midi) > 12;
+                        });
+                    if (kinds.length > 1) {
+                        n++;
+                        hit += new Set(kinds).size > 1 ? 1 : 0;
+                    }
+                }
+            }
+        }
+        return ratio(hit, n);
     },
     /** Mean length of 4/4 comp chords on beats 1 and 3 over those on 2 and 4 (long-short). */
     compLongShort: (takes) => {
@@ -2239,6 +2398,74 @@ export const METRICS = {
             }
         }
         return ratio(unison, both);
+    },
+    /**
+     * Of the comp notes that sound while a lead note does, the share at or above the lowest lead
+     * note sounding over them: how often the comp sits on or over the soloist's line, not under
+     * it (#2025, #2057). A keyboard behind a soloist keeps its voicing under the line; a note
+     * on it is a unison (`compLeadUnison`), one above it crowds the line from over its head.
+     */
+    compAboveLead: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { events } of takes) {
+            const lead = leadNotes(events);
+            for (const c of events) {
+                if (c.lane !== 'comp' || (c as PitchedNote).muted) {
+                    continue;
+                }
+                const { tick, dur, midi } = c as PitchedNote;
+                let low = Number.POSITIVE_INFINITY;
+                for (const l of lead) {
+                    if (l.tick < tick + dur && l.tick + l.dur > tick) {
+                        low = Math.min(low, l.midi);
+                    }
+                }
+                if (low === Number.POSITIVE_INFINITY) {
+                    continue;
+                }
+                n++;
+                hit += midi >= low ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Of consecutive keyboard strikes on seventh chords, the share whose hands change: a
+     * two-handed spread (more than an octave across) then a one-hand voicing, or the other
+     * way (#2025). Under a soloist a keyboard opens up in the line's gaps and closes up for its
+     * phrases, so its hands change at a phrase's edge, not from strike to strike. A strike
+     * belongs to the chord it plays: a push within an eighth before a change, still sounding
+     * over it, is the new chord's.
+     */
+    compHandsFlip: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const strikes = [...compChords(events).entries()].sort(([a], [b]) => a - b);
+            let before: boolean | null = null;
+            for (const [tick, notes] of strikes) {
+                const pushedTo = t.spans.find(
+                    (s) =>
+                        s.start > tick + 0.5 &&
+                        s.start - tick <= STEP * 2 + 0.5 &&
+                        notes.some((x) => x.tick + x.dur > s.start + 1),
+                );
+                const chord = pushedTo?.chord ?? chordAt(t, tick);
+                if (!chord || chord.seventh === null) {
+                    before = null;
+                    continue;
+                }
+                const midi = notes.map((x) => x.midi);
+                const spread = Math.max(...midi) - Math.min(...midi) > 12;
+                if (before !== null) {
+                    n++;
+                    hit += spread !== before ? 1 : 0;
+                }
+                before = spread;
+            }
+        }
+        return ratio(hit, n);
     },
     /**
      * How much busier the comp is in the lead's breaths (a dotted quarter or more without it,

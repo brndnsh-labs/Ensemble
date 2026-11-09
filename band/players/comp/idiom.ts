@@ -13,7 +13,7 @@ import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { at, BUTTON_LIFT, barSteps, dyn, endingStrikes, STEP, spanSteps } from '../grid.js';
 import { type GripShape, grip } from './fretboard.js';
-import { type LeadOver, type VoicingKind, voice } from './voicing.js';
+import { endingKind, keyboardKind, type LeadOver, type VoicingKind, voice } from './voicing.js';
 
 export interface Hit {
     step: number;
@@ -33,7 +33,10 @@ const TIE_STEPS = 2;
 
 interface CompMemory {
     voicing: number[] | null;
-    /** Where the last lead note heard ends (a tick): a note held over the barline. */
+    /**
+     * Where the last lead note heard ends (a tick): a note held over the barline, and whether
+     * the lead's phrase is still live over the next bar (`keyboardKind`).
+     */
     leadUntil?: number;
     /** The chord the hand last struck (its symbol), for an instrument that holds it. */
     chord?: string | null;
@@ -50,6 +53,9 @@ interface CompMemory {
     /** A sustaining instrument struck its last chord after that bar's downbeat: it has been
      * held for less than a bar. */
     fresh?: boolean;
+    /** The voicing the hands hold is a keyboard `spread` (two hands), led from its right
+     * hand (`cost` in voicing.ts). */
+    spread?: true;
 }
 
 export interface CompBook {
@@ -89,6 +95,13 @@ export interface CompBook {
      * as written, short, instead of pressing once per chord and holding (the reggae bubble).
      */
     percussive?: boolean;
+    /**
+     * A keyboard book that spreads its hands across the soloist's register (`spread`) keeps
+     * its whole voicing under the line while the lead's phrase is live (`Placement.under` in
+     * voicing.ts): two hands that open up in the soloist's gaps close up under the line, not
+     * around it.
+     */
+    under?: boolean;
     /**
      * A conversational comp answers the lead (see `Answer`). A book without one is a groove:
      * its figure is the part, lead or no lead.
@@ -143,18 +156,45 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             // The comp hears the lead before it plays (perform.ts), so each placement knows
             // which lead notes will sound over it, from the strike to where the hand lets go
             // (a step range in this bar), and sits under them (#2014).
+            const leadFor = (sounds: readonly (readonly [number, number])[]) =>
+                leadOver(
+                    ctx.heard.lead,
+                    sounds.map(([from, to]) => [at(bar, from), at(bar, to)] as const),
+                );
+            // Whether the keyboard voicing the hand holds is a spread: the next is led from
+            // its right hand.
+            let spread = !!memory.spread;
+            // Whether the lead's phrase is live over this bar (`keyboardKind`): a lead note
+            // sounds in it — struck here, or held into it — or sounded in the bar before. The
+            // comp hears the whole bar's lead before it plays, so a strike before the line comes
+            // in is played as the bar is; the bar before is carried in `leadUntil`.
+            const live =
+                ctx.heard.lead.length > 0 ||
+                (memory.leadUntil !== undefined && memory.leadUntil > barBeforeStart(ctx, memory));
             const place = (
                 chord: ChordFacts,
                 prev: number[] | null,
                 sounds: readonly (readonly [number, number])[] = [],
             ) => {
-                const lead = leadOver(
-                    ctx.heard.lead,
-                    sounds.map(([from, to]) => [at(bar, from), at(bar, to)] as const),
-                );
-                return shape
-                    ? grip(chord, kindOf(chord), shape, prev, lead)
-                    : voice(chord, kindOf(chord), prev, lead);
+                const lead = leadFor(sounds);
+                if (shape) {
+                    return grip(chord, kindOf(chord), shape, prev, lead);
+                }
+                // why: the hands are chosen once for the bar, by the soloist's phrase, not by
+                // each strike (`keyboardKind`): every strike in the bar — a chord struck twice,
+                // a push over the barline — is played with the same hands (#2025). The held
+                // ending's chord spreads wherever a spread fits under the line (`endingKind`).
+                const kind =
+                    plan.ending && live
+                        ? endingKind(chord, kindOf(chord), lead, book.under)
+                        : keyboardKind(chord, kindOf(chord), live);
+                const placed = voice(chord, kind, prev, lead, {
+                    prevSpread: spread,
+                    live,
+                    under: book.under,
+                });
+                spread = kind === 'spread';
+                return placed;
             };
             const tier = energyTier(plan.energy);
             const total = barSteps(bar);
@@ -238,7 +278,13 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 }
                 return {
                     events,
-                    memory: { voicing: prev, pushed: null, chord: held, bar: bar.index },
+                    memory: {
+                        voicing: prev,
+                        pushed: null,
+                        chord: held,
+                        bar: bar.index,
+                        ...(spread ? { spread: true as const } : {}),
+                    },
                 };
             }
             const legato = ctx.instrument.legato && !book.percussive;
@@ -473,11 +519,23 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                       : total - hit.step;
                 return legato ? room : Math.min(hit.length, room);
             };
+            // The strikes of one chord from planned hit `i` on, as step ranges: until a strike on
+            // another chord (a scratch is pitchless).
+            const soundsFrom = (i: number) => {
+                const sounds: [number, number][] = [];
+                for (let k = i; k < planned.length && planned[k].chord === planned[i].chord; k++) {
+                    if (!planned[k].muted) {
+                        sounds.push([planned[k].step, planned[k].step + lengthOf(k)]);
+                    }
+                }
+                return sounds;
+            };
             planned.forEach((hit, i) => {
                 const length = lengthOf(i);
                 if (!shape) {
-                    // A pianist re-voices every strike, leading from the last one. An organ
-                    // re-articulating the chord it holds keeps its shape.
+                    // A pianist re-voices every strike, leading from the last one (with the bar's
+                    // hands: `place`). An organ re-articulating the chord it holds keeps its
+                    // shape.
                     prev =
                         hit.again && prev
                             ? prev
@@ -489,13 +547,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     // that, it never jumps back to the old shape for one sixteenth.
                     // The grip sounds at each strike until one on another chord: those
                     // strikes are what the lead hears it against (a scratch is pitchless).
-                    const sounds: [number, number][] = [];
-                    for (let k = i; k < planned.length && planned[k].chord === hit.chord; k++) {
-                        if (!planned[k].muted) {
-                            sounds.push([planned[k].step, planned[k].step + lengthOf(k)]);
-                        }
-                    }
-                    prev = place(hit.chord, prev, sounds);
+                    prev = place(hit.chord, prev, soundsFrom(i));
                     held = hit.chord;
                 }
                 if (!hit.muted) {
@@ -522,6 +574,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     ...(leadUntil !== undefined ? { leadUntil } : {}),
                     bar: bar.index,
                     ...(fresh ? { fresh } : {}),
+                    ...(spread ? { spread: true as const } : {}),
                 },
             };
         },
@@ -621,6 +674,18 @@ function leadOver(
 }
 
 /**
+ * Where the bar before this one in the performance began, in this bar's ticks: the bar the
+ * comp's memory was left by (`CompMemory.bar`), its own length back from this barline — so a
+ * change of meter at the barline is measured from the bar that was played, and so is a loop's
+ * wrap, where `rebase` has moved `leadUntil` into the new lap's ticks and the lap's last bar
+ * ends at this one's start. With no bar remembered, this bar's own length back.
+ */
+function barBeforeStart(ctx: BarContext, memory: CompMemory): number {
+    const before = memory.bar === undefined ? undefined : ctx.timeline.bars[memory.bar];
+    return ctx.bar.start - (before ?? ctx.bar).meter.barTicks;
+}
+
+/**
  * Is the bar's first chord tied in from an anticipation — struck at the end of the bar before
  * and ringing over the barline — so that its downbeat is not struck again? Only when the
  * chord pushed is the chord the bar opens on (#1507): a push aimed at another chord is not
@@ -656,8 +721,7 @@ function answerLead(
     const carried = memory.leadUntil !== undefined && memory.leadUntil > bar.start;
     // A bar the lead sits out right after it played is a breath too (the classic place to
     // answer); one further on is the lead resting by form (an intro), with nothing to answer.
-    const recent =
-        memory.leadUntil !== undefined && memory.leadUntil > bar.start - bar.meter.barTicks;
+    const recent = memory.leadUntil !== undefined && memory.leadUntil > barBeforeStart(ctx, memory);
     const leadUntil = lead.length ? Math.max(...lead.map((n) => n.tick + n.dur)) : memory.leadUntil;
     // An organ holds its chords (its presses are the arrivals), and a groove keeps its figure.
     if (!book.answer || legato || (!lead.length && !recent)) {

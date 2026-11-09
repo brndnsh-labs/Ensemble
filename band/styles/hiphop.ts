@@ -409,9 +409,18 @@ const KEYS_VELOCITY: Record<EnergyTier, number> = { low: 70, mid: 80, high: 88 }
 
 const rhodesLoop = compIdiom({
     name: 'rhodes loop',
-    // Rootless: 3rd and 7th with the 9th and 13th (or the 5th) — the sampled-jazz colour,
-    // and the root left to the sub. A plain triad gets its 9th (R-3-5-9).
-    kind: 'rootless',
+    // A seventh chord is spread across two hands (#2025): a low shell, R–7 or 3–7, under its
+    // colour stacked in 4ths — the open Rhodes chord a loop is chopped from (McCoy Tyner's
+    // and Herbie Hancock's 4ths over a shell, as neo-soul inherited them), where a one-hand
+    // rootless voicing is a jazz pianist's. While the soloist's phrase is live it closes up to
+    // that rootless voicing and opens up again in the line's gaps (`keyboardKind`). Anything
+    // else stays rootless: 3rd and 7th with the 9th and 13th (or the 5th), the root left to
+    // the sub; a plain triad gets its 9th (R-3-5-9).
+    kind: (chord) => (chord.seventh === null ? 'rootless' : 'spread'),
+    // why: under the soloist's phrase the loop's Rhodes keeps its whole voicing under the
+    // line (the guitar solos low, around G4), as a keyboard behind a soloist leaves it the
+    // register above (#2025).
+    under: true,
     // The "and" of 4, when the loop plays it, always ties the next chord over the barline:
     // a chopped loop pushes into the change the same way every time round, never by chance.
     push: { low: 1, mid: 1, high: 1 },

@@ -202,7 +202,7 @@ For any weight-based picker, if you want a new bias to actually shift the chosen
 
 ### Registers
 
-Each band lane keeps to its register slot — bass 23–57, keyboard comp 52–84 (`docs/design/band-engine.md`, "Register slots") — and the invariant suite (in `band/test/`) checks every style against its lane ranges.
+Each band lane keeps to its register slot — bass 23–57, keyboard comp 48–84 (one-hand voicings from E3; only a spread's left-hand shell goes lower) (`docs/design/band-engine.md`, "Register slots") — and the invariant suite (in `band/test/`) checks every style against its lane ranges.
 
 ### Naming / Canonicalization
 

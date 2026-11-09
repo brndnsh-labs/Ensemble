@@ -26,7 +26,7 @@ For weight-based pickers, a new bias must be applied as `weight *= mult` AFTER a
 Every choice draws from `ctx.rng(purpose, scope)` (`band/core/random.ts`), so a pass is byte-identical for its inputs. Never `Math.random`, a clock or a hand-rolled hash — `band/CLAUDE.md`'s determinism law.
 
 ### The band engine
-The musical engine is `band/` (the old worker-based generator was deleted, #1404). Read `band/CLAUDE.md` and `docs/design/band-engine.md` first: register slots (bass 23–57, keyboard comp 52–84), lane order (drums → bass → lead → comp, sharing `heard`), determinism (`rng(seed, …keys)`), and the claims/invariant suite that is the Definition of Done.
+The musical engine is `band/` (the old worker-based generator was deleted, #1404). Read `band/CLAUDE.md` and `docs/design/band-engine.md` first: register slots (bass 23–57, keyboard comp 48–84 (one-hand voicings from E3; only a spread's left-hand shell goes lower)), lane order (drums → bass → lead → comp, sharing `heard`), determinism (`rng(seed, …keys)`), and the claims/invariant suite that is the Definition of Done.
 
 ### Direct mutation discipline
 State writes flow through `dispatch(ACTIONS.TYPE, payload)`. The `// @direct-mutation` exception is ONLY for the sanctioned categories in the root CLAUDE.md (real-time audio in `synth-*.ts`, init-only, detached render clones). Don't use it elsewhere — `state-discipline-reviewer` runs on the diff.

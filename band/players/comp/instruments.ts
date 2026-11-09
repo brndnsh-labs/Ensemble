@@ -21,10 +21,13 @@ export interface CompProfile {
 }
 
 export const COMP_INSTRUMENTS: Record<CompInstrument, CompProfile> = {
-    piano: { family: 'keyboard', range: [52, 84], strumMs: 0, legato: false, program: 0 },
-    rhodes: { family: 'keyboard', range: [52, 84], strumMs: 0, legato: false, program: 4 },
-    organ: { family: 'keyboard', range: [52, 84], strumMs: 0, legato: true, program: 16 },
-    clav: { family: 'keyboard', range: [52, 84], strumMs: 0, legato: false, program: 7 },
+    // Keyboards reach down to C3 (#2025): a spread voicing's left-hand shell stands in the
+    // octave under middle C. One-hand voicings still keep to E3 and up (`voicing.ts`). All four
+    // keyboards share the one keyboard slot, so all four ranges move with it.
+    piano: { family: 'keyboard', range: [48, 84], strumMs: 0, legato: false, program: 0 },
+    rhodes: { family: 'keyboard', range: [48, 84], strumMs: 0, legato: false, program: 4 },
+    organ: { family: 'keyboard', range: [48, 84], strumMs: 0, legato: true, program: 16 },
+    clav: { family: 'keyboard', range: [48, 84], strumMs: 0, legato: false, program: 7 },
     // Guitars keep their physical range: the grips themselves stay off the low strings when
     // a bass is playing (see `fretboard.ts`), and a bossa thumb may use them when it isn't.
     guitar: { family: 'guitar', range: [40, 81], strumMs: 6, legato: false, program: 27 },

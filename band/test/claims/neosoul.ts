@@ -174,6 +174,20 @@ export const neosoul = defineClaims({
                     'a half step into a root slides up from below far more than it falls',
                 ],
                 ['compColour', 0.6, 1, 'lush voicings: 9ths, 13ths, 6/9s'],
+                // Measured 0.048 (#2025): the Rhodes spreads a seventh chord across two hands,
+                // a low shell under its colour in 4ths. 0.988 before, when it borrowed the jazz
+                // piano's rootless voicing note for note; the rest are the changes it still
+                // plays compact (an altered dominant has no 4ths to stack) and lands the same.
+                [
+                    'compSharedWithJazz',
+                    0,
+                    0.3,
+                    "its own voicings: on a seventh chord it rarely plays the jazz piano's notes",
+                ],
+                // Measured 54.5 (#2025): the spread's shell stands in the octave under middle C,
+                // against 59.2 with the one-hand voicing (the ceiling sits midway). The floor:
+                // a left hand at C3–D3 on every chord would sit on the bass's register.
+                ['compMeanLowest', 50, 56.5, 'a left hand low under the chord, off the bass'],
                 [
                     'compNotesInScale',
                     0.99,
@@ -196,6 +210,17 @@ export const neosoul = defineClaims({
                     'lazily syncopated: re-strikes on the "e"s and "a"s',
                 ],
                 ['compTopVoiceMotion', 0, 3, 'smooth voice leading'],
+                // Measured 0.164 (#2025), 0.004 with the one-hand voicing. Led voice for voice
+                // from the bottom, a one-hand voicing after a spread met its left hand and the
+                // top dropped a 5th (0.271); the ceiling sits midway. What is left is the
+                // spread's own: it has few places to stand (a shell under B3, a stack within a
+                // 4th of it), so G7alt into Cm7 or F7 into Bbmaj7 still leaps a 5th on top.
+                [
+                    'compTopLeapAtChange',
+                    0,
+                    0.22,
+                    'the top line moves by step or skip at a change, led from the right hand',
+                ],
             ],
         },
         {
@@ -269,7 +294,47 @@ export const neosoul = defineClaims({
         {
             take: { lead: 'solo', comp: 'rhodes' },
             claims: [
+                // Measured 0.001 (#2025): the Rhodes keeps under the line now
+                // (`compAboveLead`); 0.037 when it was led over and across it.
                 ['compLeadUnison', 0, 0.15, "the Rhodes leaves the guitar's note to the guitar"],
+                // Measured 0.001 (#2025): under a live phrase the whole voicing sits a whole
+                // step or more under the guitar's lowest note over it. 0.050 with that rule off
+                // (the voicing led from wherever the last stood, a voice on the line moved off
+                // it alone), 0.059 before (a compact voicing led from a spread's right hand);
+                // the ceiling sits midway. Strikes topping out at G5 or higher under the line:
+                // 13 before, 10 with the rule off, 0 with it (the bossa's Dm7b5 as Ab4 C5 F5 G5
+                // over a guitar at F4, then C4 F5 G5 Ab5).
+                ['compAboveLead', 0, 0.025, "the Rhodes sits under the guitar's line, not over it"],
+                // Measured 0.039 (#2025). 0.146 when the hands follow each bar's lead alone,
+                // opening up in any bar the guitar rests (no bar of silence before it), 0.185
+                // decided against the lead over each chord's strikes, 0.134 before; the
+                // ceiling sits midway. What is left is the phrase's edge: the hands close up as
+                // the line comes in, and the top comes down under it.
+                [
+                    'compTopLeapAtChange',
+                    0,
+                    0.09,
+                    'the top line moves by step or skip at a change under the solo too',
+                ],
+                // Measured 0.007 (#2025): the hands follow the guitar's phrase, open in a bar of
+                // its silence, closed while it plays. 0.148 following each bar's lead alone,
+                // 0.187 each chord's, 0.246 each strike's (the top flipping an octave on
+                // alternate downbeats under a two-note-a-bar line); the ceiling sits midway.
+                [
+                    'compHandsFlip',
+                    0,
+                    0.075,
+                    "the hands change at the solo's phrase edges, not strike to strike",
+                ],
+                // Measured 0 (#2025): the hands are chosen for the whole bar. 0.158 when each
+                // strike chose its own, closing up under the line on one and spreading again on
+                // the next; the ceiling sits midway.
+                [
+                    'compHandsChangeInBar',
+                    0,
+                    0.07,
+                    'a chord struck twice in a bar keeps its hands: spread, or closed up',
+                ],
             ],
         },
         {

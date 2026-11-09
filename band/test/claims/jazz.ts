@@ -169,6 +169,10 @@ export const jazz = defineClaims({
                 ],
                 ['compColour', 0.6, 1, 'rootless voicings carry 9ths and 13ths'],
                 ['compTopVoiceMotion', 0, 3.5, 'smooth voice leading'],
+                // Measured 60.5: the one-hand rootless voicing, stacked up from around E4. The
+                // floor sits midway to 55.6, what the piano measures spread across two hands
+                // like the neo-soul Rhodes (#2025); the ceiling keeps the hand off the lead.
+                ['compMeanLowest', 58, 64, 'one hand, in the middle of the keyboard'],
             ],
         },
         {

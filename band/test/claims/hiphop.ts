@@ -222,6 +222,34 @@ export const hiphop = defineClaims({
                 ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its root (or slash note)'],
                 ['compColour', 0.6, 1, 'the sampled-jazz Rhodes: 9ths and 13ths'],
                 ['compStrikesPerBar', 1, 3, 'a sparse loop: a chord or two a bar, never a pulse'],
+                // Measured 0.048 (#2025), 1.000 before: the loop's Rhodes spreads a seventh
+                // chord (a low shell, its colour stacked in 4ths), where it played the jazz
+                // piano's rootless voicing note for note.
+                [
+                    'compSharedWithJazz',
+                    0,
+                    0.3,
+                    "the record's own Rhodes chord, not the jazz piano's voicing",
+                ],
+                // Measured 55.3 (#2025), 60.4 with the one-hand voicing (the ceiling sits
+                // midway). The floor: a left hand at C3–D3 on every chord would crowd the sub.
+                ['compMeanLowest', 50, 57.5, 'a left-hand shell low under the chord'],
+                // Measured 1.46 semitones (#2025), 0.65 with the one-hand voicing: a spread's
+                // stack has fewer places to stand than a rootless voicing, so its top moves
+                // more. 2.06 when a one-hand voicing after a spread was led to its left hand
+                // (`compTopLeapAtChange`); the ceiling sits midway.
+                ['compTopVoiceMotion', 0, 1.75, 'the top line led smoothly, hand by hand'],
+                // Measured 0.164 (#2025), 0.004 with the one-hand voicing; 0.270 led voice for
+                // voice from the bottom (the top dropping a 5th to a spread's left hand). The
+                // ceiling sits midway. What is left is the spread's own: few places to stand
+                // (a shell under B3, a stack within a 4th of it), so G7alt into Cm7 or F7 into
+                // Bbmaj7 still leaps a 5th on top.
+                [
+                    'compTopLeapAtChange',
+                    0,
+                    0.22,
+                    'the top line moves by step or skip at a change, led from the right hand',
+                ],
             ],
         },
         {
@@ -241,7 +269,41 @@ export const hiphop = defineClaims({
         {
             take: { lead: 'solo', comp: 'rhodes' },
             claims: [
+                // Measured 0 (#2025): the Rhodes keeps under the line now (`compAboveLead`);
+                // 0.107 when it was led over and across it.
                 ['compLeadUnison', 0, 0.15, "the Rhodes leaves the guitar's note to the guitar"],
+                // Measured 0.001 (#2025): under a live phrase the whole voicing sits a whole
+                // step or more under the guitar's lowest note over it, down to the bare 3–7
+                // shell under a line at D4. 0.109 with that rule off, 0.126 before; the ceiling
+                // sits midway. Strikes topping out at G5 or higher under the line: 6 before, 3
+                // with the rule off, 0 with it (80 on main's maj7 blues, before #2025).
+                ['compAboveLead', 0, 0.055, "the Rhodes sits under the guitar's line, not over it"],
+                // Measured 0.035 (#2025). 0.164 when the hands follow each bar's lead alone
+                // (opening up in any bar the guitar rests), 0.218 each chord's, 0.150 before;
+                // the ceiling sits midway.
+                [
+                    'compTopLeapAtChange',
+                    0,
+                    0.1,
+                    'the top line moves by step or skip at a change under the solo too',
+                ],
+                // Measured 0.005 (#2025): the hands follow the guitar's phrase, open in a bar of
+                // its silence, closed while it plays. 0.159 following each bar's lead alone,
+                // 0.219 each chord's, 0.245 each strike's; the ceiling sits midway.
+                [
+                    'compHandsFlip',
+                    0,
+                    0.08,
+                    "the hands change at the solo's phrase edges, not strike to strike",
+                ],
+                // Measured 0 (#2025): the hands are chosen for the whole bar. 0.097 when each
+                // strike chose its own; the ceiling sits midway.
+                [
+                    'compHandsChangeInBar',
+                    0,
+                    0.045,
+                    'a chord struck twice in a bar keeps its hands: spread, or closed up',
+                ],
             ],
         },
         {

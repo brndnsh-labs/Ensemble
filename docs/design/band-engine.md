@@ -65,8 +65,10 @@ from any bar reproduces the same music.
    the only tempo event, and they are written in the chart.
 3. **Motifs belong to sections, not bars.** Grooves, riffs and comping figures are chosen with
    `rng(purpose, 'section')`, so a verse keeps its groove each time and a chorus has its own.
-4. **Register slots.** Bass 23–57 (home around D2), keyboard comp 52–84 (top voice aiming for
-   C5). A guitar keeps its physical range but its grips stay at or above C3 when a bass plays:
+4. **Register slots.** Bass 23–57 (home around D2), keyboard comp 48–84 (top voice aiming for
+   C5): a one-hand voicing keeps to E3 and up, and only a spread voicing's left-hand shell
+   stands in C3–Eb3 (#2025) — the invariant suite lets a keyboard note under E3 be only a
+   chord's lowest, a perfect 4th or more under the next voice. A guitar keeps its physical range but its grips stay at or above C3 when a bass plays:
    the guitar leaves the low strings to the bassist.
 5. **One chord authority.** `theory/chord.ts` parses every quality the chart codec accepts;
    lanes read `ChordFacts` and never re-read symbol text. A parity test pins it to the codec,
@@ -102,6 +104,40 @@ bossa on nylon, funk on clav). The instrument (`players/comp/instruments.ts`) ad
 physical: its range, its strum speed, whether it sustains.
 - **Keyboards** voice for two hands (`voicing.ts`). The organ holds each chord to the next,
   unless the book is `percussive`: its figure is the part (the reggae bubble is chopped).
+- **The spread voicing** (`kind: 'spread'`, #2025) is the neo-soul and hip hop keyboard's
+  seventh chord, where the jazz piano plays a one-hand rootless voicing. The left hand holds a
+  shell in the octave under middle C — R–7, or 3–7 either way up — and the right hand stacks
+  three colours in perfect 4ths within a 4th above it: Cmaj7 as C3-B3 | E4-A4-D5, Dm7 as
+  F3-C4 | E4-A4-D5, G7 as F3-B3 | E4-A4-D5. Off a dominant, a stack note a minor 9th over the
+  shell is left out (Cmaj7 as E3-B3 | D4-G4). Shells and stacks are voice-led hand by hand: a
+  shell to the next shell, and the right hand's stack to the next voicing's top voices, so a
+  one-hand voicing after a spread keeps the top line's place (`cost`'s `hands`). A chord with
+  no 4ths to stack (an altered dominant, a half-diminished or diminished chord) plays the
+  rootless voicing, and so does every chord while the soloist's phrase is live: a spread
+  straddles the soloist's register, so under the line the hands close up (#2057), led from
+  the bottom. The hands follow the phrase, not the strike (`keyboardKind`): a phrase is live
+  from the bar its first note sounds in through the bar after its last, so the hands open
+  only in a real gap — no lead note in the bar or the bar before — and close for the whole
+  bar the line comes back in. They are chosen for the whole bar, so a chord never changes
+  hands between its strikes. While the phrase is live these books keep the whole voicing
+  under the line (`CompBook.under`): its top a whole step or more under the lowest lead note
+  sounding over the strike, and no minor 2nd at its foot — off a dominant anywhere, on a
+  dominant below E4 (the cap would otherwise stand Em9 on F#3-G3 and G7 on E3-F3, a growl over
+  the bass; the 13 under the 7th is a dominant's colour from E4 up); a line too low for a four-note voicing gets the shell with
+  what fits of the rest under it, or the bare 3–7 shell. The held ending's chord is the
+  exception to closing up (`endingKind`): the lead plays the final hit with it (#2178), so its
+  bar is always live, but it spreads wherever a spread fits wholly under the line. Triads keep
+  their own kinds.
+  - Claims: `compSharedWithJazz`, the share of seventh-chord changes where the comp strikes
+    the jazz piano's exact notes, ≤30% for neo-soul and hip hop (0.99 and 1.00 before, 0.05
+    after); `compMeanLowest` for their keyboards and for the jazz piano; `compTopLeapAtChange`,
+    the share of changes whose top voice leaps more than a 4th (0.16, against 0.27 led from
+    the bottom; on the solo takes 0.04 and 0.035, against 0.15–0.16 when the hands follow each
+    bar's lead alone). On the solo takes: `compAboveLead`, the share of comp notes at or above
+    the lowest lead note over them (0.001, against 0.05 and 0.11 with the keyboard left to sit
+    over the line), and `compHandsFlip`, the share of consecutive seventh-chord strikes whose
+    hands change (0.007 and 0.005, against 0.15–0.25 decided bar by bar, chord by chord or
+    strike by strike).
 - **Guitars** play *grips found on the fretboard* (`fretboard.ts`): one note per string, on
   adjacent strings, within a four-fret reach, costed like a keyboard voicing. The invariant
   suite holds every guitar chord to `isPlayable`. An open-position book (`openPosition`, the

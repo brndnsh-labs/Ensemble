@@ -54,6 +54,16 @@ const ringsThrough = (styleId: StyleId) =>
 const GUITAR_FLOOR_WITH_BASS = 48;
 
 /**
+ * A keyboard chord keeps to E3 and up (#2025), but for one note: the foot of a two-handed
+ * spread's open shell. Below E3 a note may only be the chord's lowest, with the next voice
+ * up a perfect 4th or more above it — stacked 2nds and 3rds down there are mud (a minor 2nd's
+ * low-interval limit is E3), and only an open shell (a 7th, a 5th, a tritone, a 4th) sounds
+ * clear that low. Stated here, not read from `voicing.ts`, so a floor moved there goes red.
+ */
+const KEYBOARD_ONE_HAND_FLOOR = 52;
+const KEYBOARD_FOOT_GAP = 5;
+
+/**
  * The chords a comp strike at `tick` may be playing: the one sounding, or — an anticipation
  * plays the next chord early — the next one in the bar, or the next bar's first (wrapping at
  * the end of the song).
@@ -847,6 +857,17 @@ function checkPass(
             !(carries(here) || carries(nextInBar) || carries(next))
         ) {
             fail(notes[0], `comp chord lacks the guide tones of ${here?.symbol}`);
+        }
+        // Below E3 a keyboard plays only an open shell's foot (`KEYBOARD_ONE_HAND_FLOOR`).
+        if (instrument.family === 'keyboard') {
+            const [foot, above] = notes.map((n) => n.midi).sort((a, b) => a - b);
+            const low = notes.filter((n) => n.midi < KEYBOARD_ONE_HAND_FLOOR);
+            if (
+                low.length > 1 ||
+                (low.length === 1 && (above === undefined || above - foot < KEYBOARD_FOOT_GAP))
+            ) {
+                fail(notes[0], `keyboard chord below E3 that isn't an open shell's foot`);
+            }
         }
         // Every guitar chord — thumb and fingers together — is one a hand can fret.
         const grip = notes.map((n) => n.midi);
