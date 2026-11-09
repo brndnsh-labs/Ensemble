@@ -584,11 +584,11 @@ function holdFermatas(
             for (let slot = from; slot < ticks.length && ticks[slot] < span.end; slot++) {
                 struck.push(...live[slot]);
             }
-            // why: a lead note the hold stretches to a bar or longer is sung, not stopped, so
-            // it gets the vibrato a long note has (`endWithTheBand` strips it from the eighth
-            // it cut). Every book's vibrato threshold is at most half a bar (4–12 sixteenths),
-            // so half the bar is the one length that says "long" for all of them from here: a
-            // chord held from beat 3 (`| G7 C |`) sings as a whole-bar one does.
+            // why: a lead note that lasts half the bar or longer under the fermata is sung, not
+            // stopped, so it gets the vibrato a long note has (`endWithTheBand` strips it from
+            // the eighth it cut), whether the hold stretched it or the gesture wrote it long
+            // (metal's last hit, a `| G7 C |` landing). Half a bar in ticks is a whole bar in
+            // time under the stretch, past every book's own threshold (4–12 sixteenths).
             const longHold = timeline.bars[barIndex].meter.barTicks / 2;
             for (const lane of ['bass', 'comp', 'lead'] as const) {
                 const notes = struck.filter((i) => {
@@ -603,9 +603,7 @@ function holdFermatas(
                         out[i] = {
                             ...e,
                             dur,
-                            ...(lane === 'lead' && dur > e.dur && dur >= longHold
-                                ? { vibrato: true }
-                                : {}),
+                            ...(lane === 'lead' && dur >= longHold ? { vibrato: true } : {}),
                         };
                     }
                 }
