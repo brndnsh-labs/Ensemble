@@ -20,7 +20,13 @@ import {
     place,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit } from '../players/comp/idiom.js';
-import { drumIdiom, type Lines } from '../players/drums/kit.js';
+import {
+    drumIdiom,
+    type FillPlace,
+    type FillShape,
+    type Lines,
+    playFill,
+} from '../players/drums/kit.js';
 import { barSteps, dyn, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bebopScale, guideTones, restingTones } from '../players/lead/palette.js';
@@ -33,7 +39,139 @@ import type { BarContext, PitchedIdiom, Style } from './types.js';
 // on 2 and 4; the kick "feathers" quarter notes under the band; the snare comps sparsely.
 // Swung-eighth offbeats and beat 3 only: the "a" sixteenths would land between triplet
 // positions once the feel pass swings them, and read as flams.
-const JAZZ_COMP_SPOTS = [2, 6, 8, 10, 14];
+
+/**
+ * The snare's comping figures (#2022), steps in the bar, in the piano's own rhythm. The kit
+ * plays before the comp in every bar (lanes play drums first), so it can't hear the pianist's
+ * strike; it reads what the pianist reads instead — the chart's harmonic rhythm — and plays
+ * where the jazz comp book strikes (`COMP_CELLS`, `PUSH_SETUP`). Measured on the critique's
+ * charts, the piano strikes: in a bar on one chord, the Charleston's "and" of 2 (0.56 of those
+ * bars), and the "and" of 4 when the chord changes over the barline (0.53; 0.13 when it doesn't,
+ * so it is only played before a change); in a bar of two chords, beat 3 with the second chord
+ * (0.51), the "and" of 4 (0.51) and the "and" of 3 (0.39). Never on 2 or 4 (the hat owns those)
+ * or on the one (the kick's). Every kind holds an empty bar: the space is the comping too.
+ */
+// why: on one chord the Charleston's "and" of 2 is the likeliest catch, weighted up, the others
+// pairing it with a quieter spot. In a bar of two chords the snare leans to the upbeats, the
+// "and" of 3 and the "and" of 4, and only now and then lands on beat 3 with the chord: a snare
+// on 3 bar after bar squares the time into a two-beat. The empty figure is weighted so a bar
+// averages one stroke at mid energy (`EMPTY_AT`).
+const SNARE_COMPS: Record<'one' | 'change' | 'two', readonly (readonly [number[], number])[]> = {
+    one: [
+        [[6], 3],
+        [[6, 10], 1],
+        [[2, 6], 1],
+        [[], 2],
+    ],
+    change: [
+        [[6], 2],
+        [[14], 2],
+        [[6, 14], 2],
+        [[], 2],
+    ],
+    two: [
+        [[10], 2],
+        [[14], 2],
+        [[10, 14], 1],
+        [[8], 1],
+        [[], 1],
+    ],
+};
+
+/**
+ * How much of the empty figure's weight a tier keeps (a final-stage multiplier on it). why: a
+ * driving band comps more: at high energy the empty bar is half as likely.
+ */
+const EMPTY_AT: Record<EnergyTier, number> = { low: 1, mid: 1, high: 0.5 };
+
+/** Whether the chart changes chord over this bar's barline (the piano's push into it). */
+function changesHere(ctx: BarContext): boolean {
+    const here = ctx.bar.spans.at(-1)?.chord?.symbol;
+    const next = ctx.next?.bar.spans[0];
+    return Boolean(next?.attack && next.chord && next.chord.symbol !== here);
+}
+
+/** Which comping figures a bar takes: by its chords, as the pianist reads it. */
+function compKind(ctx: BarContext): keyof typeof SNARE_COMPS {
+    if (ctx.bar.spans.length > 1) {
+        return 'two';
+    }
+    return changesHere(ctx) ? 'change' : 'one';
+}
+
+/** A phrase's last bar, set up into the next: the strokes on the "and" of 3 and of 4, the bomb. */
+interface Setup {
+    and3: boolean;
+    and4: boolean;
+    bomb: boolean;
+}
+const SHOT_SETUP: Setup = { and3: false, and4: true, bomb: true };
+/**
+ * The four-bar phrase's setups, drawn once per phrase position (#2022). why: Philly Joe doesn't
+ * shoot every phrase. Before a change over the barline (where the piano pushes, `PUSH_SETUP`) the
+ * shot is the likeliest, else a snare alone on the "and" of 4, the "and" of 3 into the "and" of
+ * 4, or nothing at all; with no change there is nothing to shoot into, so no bomb.
+ */
+const PHRASE_SETUPS: Record<'change' | 'still', readonly (readonly [Setup | null, number])[]> = {
+    change: [
+        [SHOT_SETUP, 3],
+        [{ and3: false, and4: true, bomb: false }, 1],
+        [{ and3: true, and4: true, bomb: false }, 1],
+        [null, 1],
+    ],
+    still: [
+        [{ and3: false, and4: true, bomb: false }, 1],
+        [{ and3: true, and4: true, bomb: false }, 1],
+        [null, 2],
+    ],
+};
+
+/**
+ * The bar's comping (#2022), keyed on the phrase, never drawn stroke by stroke: one stream per
+ * phrase position (its place in the chorus, on this pass), so the phrase's first and third bars
+ * (the statement) share a figure and its second (the answer) may take another. The phrase's last
+ * bar is its setup into the next phrase's top: at a bigger boundary (an eight-bar phrase, a
+ * section, the chorus top — the bars the plan fills) the full shot, a snare and bass-drum "bomb"
+ * on the "and" of 4, the "and" of 3 before it when the band is loud; at a four-bar phrase's end
+ * one of `PHRASE_SETUPS`.
+ */
+function snareComp(ctx: BarContext, tier: EnergyTier): { snare: string; bomb: boolean } {
+    const { bar } = ctx;
+    const snare = Array.from({ length: 16 }, () => '.');
+    if (tier === 'low') {
+        return { snare: snare.join(''), bomb: false };
+    }
+    // why: the "catch" (the figure's first stroke) is played, the rest ghosted; a driving band
+    // plays them all out.
+    const ghost = tier === 'high' ? 'o' : 'g';
+    const first = bar.index - bar.phrase.bar;
+    const place = first - chorusBars(ctx.timeline, first).first;
+    if (bar.phrase.bar === bar.phrase.length - 1 && bar.phrase.length > 1) {
+        const big = ctx.plan.fill !== 'none';
+        const setup = big
+            ? { ...SHOT_SETUP, and3: tier === 'high' }
+            : ctx
+                  .rng(`snareSetup:${ctx.pass}:${place}`, 'song')
+                  .weighted(PHRASE_SETUPS[changesHere(ctx) ? 'change' : 'still']);
+        if (setup?.and3) {
+            snare[10] = 'o';
+        }
+        if (setup?.and4) {
+            snare[14] = 'x';
+        }
+        return { snare: snare.join(''), bomb: setup?.bomb ?? false };
+    }
+    const role = bar.phrase.bar % 2 === 1 ? 'answer' : 'statement';
+    const figure = ctx
+        .rng(`snareComp:${ctx.pass}:${place}:${role}`, 'song')
+        .weighted(
+            SNARE_COMPS[compKind(ctx)].map(([f, w]) => [f, f.length ? w : w * EMPTY_AT[tier]]),
+        );
+    figure.forEach((step, i) => {
+        snare[step] = i === 0 ? 'o' : ghost;
+    });
+    return { snare: snare.join(''), bomb: false };
+}
 
 // Two beats of swung eighths, each on the beat with an offbeat in it: the statement is
 // heard as the band drops out, so it starts on the one (a displacement moves it off later).
@@ -139,6 +277,87 @@ function jazzTrade(ctx: BarContext, bar: number, length: number, tier: EnergyTie
     ) as Lines;
 }
 
+/** The ride's time: soft and spacious in a quiet chorus, "spang-spang-a-lang" above it. */
+const jazzRide = (tier: EnergyTier) => (tier === 'low' ? 'o...x.o.o...x.o.' : 'x...X.x.x...X.x.');
+/** The swing pattern on the closed hi-hat, under the light head. */
+const HEAD_HAT = 'x...X.x.x...X.x.';
+
+/*
+ * Jazz fills (#2022): setups into the next phrase on the swung eighths (never a sixteenth: it
+ * would flam once swung), written at 2, 4 and 8 sixteenths. The cymbal is added by the book.
+ */
+// The shot: snare and bass drum together on the "and" of 4.
+const SHOT: FillShape = {
+    2: { snare: 'X.', kick: 'X.' },
+    4: { snare: '..X.', kick: '..X.' },
+    8: { snare: '......X.', kick: '......X.' },
+};
+// Philly Joe's two-shot setup: the "and" of 3, then the shot on the "and" of 4.
+const TWO_SHOT: FillShape = {
+    2: { snare: 'X.', kick: 'x.' },
+    4: { snare: 'o.X.', kick: '..x.' },
+    8: { snare: '..o...X.', kick: '......X.' },
+};
+// Swung eighths on the snare into the shot.
+const EIGHTHS: FillShape = {
+    2: { snare: 'x.' },
+    4: { snare: 'o.X.', kick: '..x.' },
+    8: { snare: 'o.o.o.X.', kick: '......x.' },
+};
+// Round the kit: snare, the high tom, the floor tom on the "and" of 4.
+const ROUND_THE_TOMS: FillShape = {
+    2: { tomLow: 'X.', kick: 'x.' },
+    4: { tomHigh: 'o...', tomLow: '..X.', kick: '..x.' },
+    8: { snare: 'o.o.....', tomHigh: '....o...', tomLow: '......X.', kick: '......x.' },
+};
+// The two-shot played softly, under the light head: the bass drum feathered, the snare firm.
+const SOFT_SHOT: FillShape = {
+    2: { snare: 'x.', kick: 'o.' },
+    4: { snare: 'o.x.', kick: '..o.' },
+    8: { snare: '..o...x.', kick: '......o.' },
+};
+// The light head's setup: soft swung eighths, no shot (the melody is the event).
+const WHISPER: FillShape = { 2: { snare: 'o.' }, 4: { snare: 'g.o.' }, 8: { snare: 'g.g.o.o.' } };
+
+/**
+ * Which setups a jazz drummer plays where (#2022): a phrase's end gets the shot or the two-shot,
+ * a section's end the eighths or round the toms, the top of the chorus round the toms most. why:
+ * the drummer marks the form's hierarchy, the bigger boundary with the bigger setup.
+ */
+const JAZZ_FILLS: Record<FillPlace, readonly (readonly [FillShape, number])[]> = {
+    phrase: [
+        [SHOT, 2],
+        [TWO_SHOT, 2],
+        [EIGHTHS, 1],
+    ],
+    section: [
+        [EIGHTHS, 2],
+        [TWO_SHOT, 1],
+        [ROUND_THE_TOMS, 1],
+    ],
+    top: [
+        [ROUND_THE_TOMS, 2],
+        [EIGHTHS, 1],
+        [TWO_SHOT, 1],
+    ],
+};
+// Under the light head the drummer stays off the toms: the melody is up front. why: the bass drum
+// is otherwise silent there, so a phrase's end only whispers and a section's end takes the
+// two-shot played softly (`SOFT_SHOT`). The top is the exception: the head's last bar sets up
+// the first solo chorus with the full figure (`EIGHTHS`, which at four sixteenths is the
+// two-shot), the one place under the head the bass drum speaks.
+const HEAD_FILLS: Record<FillPlace, readonly (readonly [FillShape, number])[]> = {
+    phrase: [[WHISPER, 1]],
+    section: [
+        [WHISPER, 1],
+        [SOFT_SHOT, 1],
+    ],
+    top: [
+        [EIGHTHS, 1],
+        [SOFT_SHOT, 1],
+    ],
+};
+
 /**
  * Is this bar the light head (#2018): the head's A sections, below the high tier. The melody is
  * the event there, so the band plays it lightly — the bass in 2, the drummer on the closed
@@ -163,36 +382,30 @@ const jazzDrums = drumIdiom({
         // The light head keeps the quiet time (no feathered kick, no snare comping) whatever
         // the energy below high; the fills, the crashes and the dynamics still follow the bar.
         const tier = head ? 'low' : barTier;
-        const rng = ctx.rng('comp');
-        const snare = Array.from({ length: 16 }, () => '.');
-        // Comping density rises with energy; never on 2 or 4 (the hat owns those).
-        const hits = tier === 'low' ? 0 : tier === 'mid' ? rng.int(2) + 1 : rng.int(3) + 1;
-        for (let i = 0; i < hits; i++) {
-            snare[rng.pick(JAZZ_COMP_SPOTS)] = rng.chance(0.3) ? 'o' : 'g';
-        }
-        // An occasional "bomb" on the and-of-4 at high energy sets up the next bar.
-        const kick =
-            tier === 'high' && rng.chance(0.2)
-                ? 'g...g...g.....x.'
-                : tier === 'low'
-                  ? '................'
-                  : 'g...g...g...g...';
+        const comp = snareComp(ctx, tier);
+        // The "bomb": the bass drum drops its feathered 4 and shoots the "and" of 4 with the
+        // snare, setting up the next phrase (`snareComp`).
+        const kick = comp.bomb
+            ? 'g...g...g.....x.'
+            : tier === 'low'
+              ? '................'
+              : 'g...g...g...g...';
         if (head) {
             // why: the head on the closed hi-hat — the swing pattern played on the hat, the ride
             // silent — and the move to the ride for the bridge and the solos is the cue a
             // listener hears as the band opening up. A softer ride alone barely registers.
             return {
-                hat: 'x...X.x.x...X.x.',
+                hat: HEAD_HAT,
                 hatPedal: '....x.......x...',
                 kick,
-                snare: snare.join(''),
+                snare: comp.snare,
             };
         }
         return {
-            ride: tier === 'low' ? 'o...x.o.o...x.o.' : 'x...X.x.x...X.x.',
+            ride: jazzRide(tier),
             hatPedal: '....x.......x...',
             kick,
-            snare: snare.join(''),
+            snare: comp.snare,
         };
     },
     cells: () => ({
@@ -200,16 +413,19 @@ const jazzDrums = drumIdiom({
         back: { ride: 'X.x.', hatPedal: 'x...' },
         strong: { ride: 'x...', kick: 'g...' },
     }),
-    fill(ctx, steps, rng) {
-        // Snare on the swung eighths leading in, kick answering on the last "and".
-        const snare: string[] = Array.from({ length: steps }, (_, i) =>
-            i % 2 === 0 && rng.chance(0.75) ? 'o' : '.',
-        );
-        snare[steps - 2] = 'x';
-        const kick = `${'.'.repeat(steps - 2)}x.`;
-        // The fill's first stroke is on the cymbal keeping the time: the hat under the light head.
-        const cymbal = lightHead(ctx.plan) ? 'hat' : 'ride';
-        return { snare: snare.join(''), kick, [cymbal]: 'x'.padEnd(steps, '.') };
+    fill(ctx, steps) {
+        const head = lightHead(ctx.plan);
+        const lines = playFill(ctx, steps, head ? HEAD_FILLS : JAZZ_FILLS);
+        // The cymbal keeping the time: the hat under the light head, else the ride. why: a jazz
+        // setup is played under the time, the ride going on through it — except round the toms,
+        // where the stick hand leaves the cymbal after the fill's first stroke.
+        const cymbal = head ? 'hat' : 'ride';
+        const time = head ? HEAD_HAT : jazzRide(energyTier(ctx.plan.energy));
+        const hands = lines.tomHigh || lines.tomLow;
+        return {
+            ...lines,
+            [cymbal]: hands ? 'x'.padEnd(steps, '.') : time.padEnd(16, '.').slice(-steps),
+        };
     },
     trade: jazzTrade,
 });

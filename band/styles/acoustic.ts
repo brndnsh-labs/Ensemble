@@ -29,7 +29,16 @@ import {
 import { isPlayable } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
 import type { VoicingKind } from '../players/comp/voicing.js';
-import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
+import {
+    drumIdiom,
+    type FillPlace,
+    type FillShape,
+    type Lines,
+    pickTurn,
+    playFill,
+    strike,
+    type Turn,
+} from '../players/drums/kit.js';
 import { at, barSteps, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { guideTones, restingTones, songPentatonic } from '../players/lead/palette.js';
@@ -61,6 +70,102 @@ const KICKS: readonly (readonly [string, number])[] = [
     ['x.....o.o.......', 1],
     ['x.......o.....o.', 1],
 ];
+
+/**
+ * How an acoustic groove turns round in the second and fourth bars of a phrase (#2022), one per
+ * section, all of it soft: the kick picks up the "and" of 4 or doubles beat 3 on its "and"; where
+ * the hat keeps time, it breathes open on the "and" of 4; driving, a ghost on the snare's "a" of
+ * 4 leans into the next bar. A drummer serving a singer varies with the foot and the hat, never
+ * with a crack.
+ */
+const ACOUSTIC_TURNS: Record<'quiet' | 'loud', readonly (readonly [Turn, number])[]> = {
+    quiet: [
+        [(t) => ({ ...t, kick: strike(t.kick, 10, 'o') }), 1],
+        [(t) => ({ ...t, kick: strike(t.kick, 14, 'o') }), 1],
+    ],
+    loud: [
+        [(t) => ({ ...t, kick: strike(t.kick, 14, 'o') }), 2],
+        [(t) => ({ ...t, kick: strike(t.kick, 10, 'o') }), 1],
+        [
+            (t) =>
+                t.hat && !t.hatOpen?.includes('o')
+                    ? { ...t, hat: strike(t.hat, 14, '.'), hatOpen: strike(t.hatOpen, 14, 'o') }
+                    : t,
+            1,
+        ],
+        [(t) => (t.snare?.includes('X') ? { ...t, snare: strike(t.snare, 15, 'g') } : t), 1],
+    ],
+};
+
+/*
+ * Acoustic fills (#2022), written at 2 and 4 sixteenths: a light pickup on the snare, the
+ * cross-stick or the hat, toms only when the band drives.
+ */
+// A light snare pickup: "4-and", soft then firm.
+const SNARE_PICKUP: FillShape = { 2: { snare: 'ox' }, 4: { snare: 'o.x.' } };
+// The cross-stick picks up, never accented: no crack into a verse.
+const CROSS_PICKUP: FillShape = { 2: { rim: 'ox' }, 4: { rim: 'o.ox' } };
+// The hat breathes open on the "and" of 4 and the snare taps after it.
+const HAT_BREATH: FillShape = {
+    2: { hatOpen: 'o.', snare: '.o' },
+    4: { hat: 'x...', hatOpen: '..o.', snare: '...o' },
+};
+// Ghosted sixteenths swelling into the One, the brush's swirl.
+const SWIRL: FillShape = { 2: { snare: 'go' }, 4: { snare: 'ggoo' } };
+// The toms, soft, when the band drives: high, then the floor on the "and".
+const TOM_PICKUP: FillShape = { 2: { tomLow: 'x.' }, 4: { tomHigh: 'o...', tomLow: '..x.' } };
+
+/**
+ * Which fills an acoustic drummer plays where (#2022), by how loud the band is. why: a quiet
+ * band only picks up on the cross-stick or swirls; a mid band picks up on the snare or breathes
+ * the hat; a driving one keeps the toms for the bigger boundaries.
+ */
+const ACOUSTIC_FILLS: Record<
+    EnergyTier,
+    Record<FillPlace, readonly (readonly [FillShape, number])[]>
+> = {
+    low: {
+        phrase: [[CROSS_PICKUP, 1]],
+        section: [
+            [CROSS_PICKUP, 2],
+            [SWIRL, 1],
+        ],
+        top: [
+            [CROSS_PICKUP, 1],
+            [SWIRL, 1],
+        ],
+    },
+    mid: {
+        phrase: [
+            [SNARE_PICKUP, 2],
+            [HAT_BREATH, 1],
+        ],
+        section: [
+            [SNARE_PICKUP, 2],
+            [HAT_BREATH, 1],
+            [SWIRL, 1],
+        ],
+        top: [
+            [HAT_BREATH, 2],
+            [SNARE_PICKUP, 1],
+        ],
+    },
+    high: {
+        phrase: [
+            [SNARE_PICKUP, 2],
+            [HAT_BREATH, 1],
+        ],
+        section: [
+            [SNARE_PICKUP, 1],
+            [TOM_PICKUP, 1],
+            [HAT_BREATH, 1],
+        ],
+        top: [
+            [TOM_PICKUP, 2],
+            [SNARE_PICKUP, 1],
+        ],
+    },
+};
 
 const acousticDrums = drumIdiom({
     name: 'acoustic kit',
@@ -116,15 +221,9 @@ const acousticDrums = drumIdiom({
             strong: { kick: 'o...', ...pulse },
         };
     },
-    fill(ctx, steps, rng) {
-        const tier = energyTier(ctx.plan.energy);
-        if (tier === 'high' && steps >= 4 && rng.chance(0.5)) {
-            return tomRun(steps, rng);
-        }
-        // A quiet pickup stays on the cross-stick and never accents: no crack into a verse.
-        const figure = snareFigure(steps, rng, 2);
-        return tier === 'low' ? { rim: figure.replaceAll('X', 'x') } : { snare: figure };
-    },
+    answer: (ctx, tier, time) =>
+        pickTurn(ctx, time, ACOUSTIC_TURNS[tier === 'low' ? 'quiet' : 'loud']),
+    fill: (ctx, steps) => playFill(ctx, steps, ACOUSTIC_FILLS[energyTier(ctx.plan.energy)]),
 });
 
 // ================================================================ bass

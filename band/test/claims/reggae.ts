@@ -45,6 +45,13 @@ export const reggae = defineClaims({
                 ['bassApproachCount', 53, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['dropOnThree', 0.9, 1, 'kick and cross-stick land together on 3 in every riddim'],
+                // The answer bar (#2022): a pickup or an echo of the drop in the back half, beat
+                // 1 still a hole. Measured 0.962 (a quiet section never answers); 0 with no
+                // answer. The floor sits midway.
+                ['grooveAnswers', 0.48, 1, 'the one drop turns round at the phrase’s second bar'],
+                // The answer is the section's (#2022): one turn for all its answer bars. Measured 1.000;
+                // 0.625 with each answer bar drawing its own. The floor sits midway.
+                ['answerHolds', 0.81, 1, 'a section turns its bars round one way'],
                 ['kickOnOne', 0, 0.35, 'the One is a hole: only the high-energy riddims fill it'],
                 ['bassOnOne', 0.15, 0.75, 'the bass leaves the One open as often as it plays it'],
                 ['bassMeanPitch', 32, 42, 'a heavy line in the lowest octave'],

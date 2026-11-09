@@ -24,7 +24,15 @@ import {
     sectionPlace,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, pendulum, strums } from '../players/comp/idiom.js';
-import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
+import {
+    drumIdiom,
+    type FillPlace,
+    type FillShape,
+    pickTurn,
+    playFill,
+    strike,
+    type Turn,
+} from '../players/drums/kit.js';
 import { dyn, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bluesColour, chordScale, fifthFirst, rootFirst } from '../players/lead/palette.js';
@@ -47,6 +55,86 @@ const FUNK_GHOSTS = [
     '.g.....g..g....g',
     '.......g......gg',
 ];
+
+/**
+ * How a funk groove turns round in the second and fourth bars of a phrase (#2022), one per
+ * section — the two-bar funk beat, its second bar answering the first: a kick on the "a" of 3
+ * (the syncopated push that makes the bar lean), a kick on the "a" of 4 into the One, ghost
+ * strokes on the "e" and "a" of 4 (the left hand chattering into the turnaround), or the hat
+ * opened on the "and" of 4 in a section that keeps it closed.
+ */
+const FUNK_TURNS: Record<'quiet' | 'loud', readonly (readonly [Turn, number])[]> = {
+    // why: a quiet section has no ghosts and keeps the hat closed; only the foot answers.
+    quiet: [
+        [(t) => ({ ...t, kick: strike(t.kick, 11, 'x') }), 1],
+        [(t) => ({ ...t, kick: strike(t.kick, 15, 'x') }), 1],
+    ],
+    loud: [
+        [(t) => ({ ...t, kick: strike(t.kick, 11, 'x') }), 2],
+        [(t) => ({ ...t, kick: strike(t.kick, 15, 'x') }), 2],
+        [(t) => ({ ...t, snare: strike(strike(t.snare, 13, 'g'), 15, 'g') }), 2],
+        [
+            (t) => ({
+                ...t,
+                hat: strike(strike(t.hat, 14, '.'), 15, '.'),
+                hatOpen: strike(t.hatOpen, 14, 'x'),
+            }),
+            1,
+        ],
+    ],
+};
+
+/*
+ * Funk's fills (#2022): snare and ghost syncopations and the kick between them, never a run
+ * down the toms — the James Brown drummers fill with the left hand and the foot while the right
+ * keeps the hat going, so the groove never stops being a groove. Written at 2 and 4 sixteenths
+ * (funk fills are no longer). Only the hit and the two-handed crescendo take the hand off the hat.
+ */
+// Ghosts dragging into an accented "and-a", the hat on over them (eighths under the four-step
+// drag: the left hand's sixteenths need the room).
+const GHOST_DRAG: FillShape = {
+    2: { hat: 'xo', snare: 'gX' },
+    4: { hat: 'x.x.', snare: 'ggxX' },
+};
+// The hit: snare hard on 4, the kick on its "and", the snare again on the "a". why: the band's
+// hit is the break in the time, so the hat stops for it.
+const STAB: FillShape = { 2: { snare: '.X', kick: 'x.' }, 4: { snare: 'X..X', kick: '..x.' } };
+// Kick and snare trading sixteenths under the hat: boom-ka-boom-KA.
+const KICK_SNARE: FillShape = {
+    2: { hat: 'xo', snare: '.X', kick: 'x.' },
+    4: { hat: 'xoxo', snare: '.g.X', kick: 'x.x.' },
+};
+// The hat opens on 4 ("tss"), the foot closes it, and the snare answers on the "a".
+const HAT_CUT: FillShape = {
+    2: { hatOpen: 'x.', hatPedal: '.x', snare: '.X' },
+    4: { hatOpen: 'X...', hatPedal: '..x.', snare: '..gX' },
+};
+// A sixteenth crescendo on the snare alone.
+const SNARE_SIXTEENTHS: FillShape = { 2: { snare: 'xX' }, 4: { snare: 'oxxX' } };
+
+/**
+ * Which fills a funk drummer plays where (#2022): a phrase end is a ghost drag or the hat cut, a
+ * section end trades kick and snare or plays the hit, the top of the form plays the hit or the
+ * crescendo. why: the bigger the boundary, the louder the left hand speaks.
+ */
+const FUNK_FILLS: Record<FillPlace, readonly (readonly [FillShape, number])[]> = {
+    phrase: [
+        [GHOST_DRAG, 3],
+        [HAT_CUT, 2],
+        [KICK_SNARE, 1],
+    ],
+    section: [
+        [KICK_SNARE, 2],
+        [STAB, 2],
+        [GHOST_DRAG, 1],
+        [SNARE_SIXTEENTHS, 1],
+    ],
+    top: [
+        [STAB, 3],
+        [SNARE_SIXTEENTHS, 2],
+        [HAT_CUT, 1],
+    ],
+};
 
 const funkDrums = drumIdiom({
     name: 'funk sixteenths',
@@ -80,8 +168,14 @@ const funkDrums = drumIdiom({
         back: { snare: 'X..g', hat: tier === 'low' ? 'x.o.' : 'xoxo' },
         strong: { kick: '.x.x', hat: 'xoxo' },
     }),
-    fill: (_ctx, steps, rng) =>
-        steps <= 2 ? { snare: snareFigure(steps, rng) } : tomRun(steps, rng, 1),
+    answer: (ctx, tier, time) => pickTurn(ctx, time, FUNK_TURNS[tier === 'low' ? 'quiet' : 'loud']),
+    fill(ctx, steps) {
+        const lines = playFill(ctx, steps, FUNK_FILLS);
+        // A quiet section's hat is eighths (`groove`): a fill carrying the hat carries those.
+        return lines.hat && energyTier(ctx.plan.energy) === 'low'
+            ? { ...lines, hat: 'x.o.x.o.x.o.x.o.'.slice(-steps) }
+            : lines;
+    },
 });
 
 // ================================================================ bass

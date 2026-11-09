@@ -107,6 +107,80 @@ export const jazz = defineClaims({
         },
         /** Share of the head's last bars before a solo chorus where the bass walks into it. */
         bassSetsUpSolo: setsUpSolo,
+        /**
+         * The snare comps with the piano (#2022): of the snare strokes (ghosts too) inside a
+         * phrase — 4/4 bars on the ride, a phrase's last bar left out (its setup is
+         * `phraseEndShots`'s, its fill the fills') — the share struck where the comp strikes in
+         * the same bar.
+         */
+        snareCompsWithComp: (takes) => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events } of takes) {
+                const step = (e: BandEvent) => Math.round((e.tick - t.bars[e.bar].start) / STEP);
+                const comp = new Set(
+                    events
+                        .filter((e) => e.lane === 'comp' && !(e as PitchedNote).muted)
+                        .map((e) => `${e.bar}:${step(e)}`),
+                );
+                const ride = new Set(
+                    events
+                        .filter((e) => e.lane === 'drums' && (e as DrumHit).piece === 'ride')
+                        .map((e) => e.bar),
+                );
+                for (const e of events) {
+                    const bar = t.bars[e.bar];
+                    if (
+                        e.lane !== 'drums' ||
+                        !['snare', 'ghost'].includes((e as DrumHit).piece) ||
+                        bar.meter.name !== '4/4' ||
+                        bar.phrase.bar === bar.phrase.length - 1 ||
+                        !ride.has(e.bar)
+                    ) {
+                        continue;
+                    }
+                    n++;
+                    hit += comp.has(`${e.bar}:${step(e)}`) ? 1 : 0;
+                }
+            }
+            return ratio(hit, n);
+        },
+        /**
+         * The phrase's top is set up (#2022): of the phrase-end 4/4 bars outside the light head
+         * (which plays no snare), the share where the snare and the bass drum strike the "and"
+         * of 4 together — the shot into the next phrase, in the time or ending a fill.
+         */
+        phraseEndShots: (takes) => {
+            let n = 0;
+            let hit = 0;
+            for (const { timeline: t, events, pass = 0, trade } of takes) {
+                for (const bar of t.bars) {
+                    const role = formRole(
+                        t,
+                        bar.index,
+                        leadRole(t, bar.index, pass + bar.visit.chorus, trade ?? null),
+                    );
+                    if (
+                        bar.meter.name !== '4/4' ||
+                        bar.phrase.bar !== bar.phrase.length - 1 ||
+                        role === 'head'
+                    ) {
+                        continue;
+                    }
+                    const at = (pieces: string[]) =>
+                        events.some(
+                            (e) =>
+                                e.lane === 'drums' &&
+                                e.bar === bar.index &&
+                                pieces.includes((e as DrumHit).piece) &&
+                                Math.round((e.tick - bar.start) / STEP) === 14,
+                        );
+                    n++;
+                    hit += at(['snare', 'ghost']) && at(['kick']) ? 1 : 0;
+                }
+            }
+            return ratio(hit, n);
+        },
     },
     takes: [
         {
@@ -133,6 +207,27 @@ export const jazz = defineClaims({
                 ['hatOnBeatsHead', 0.9, 1, 'the closed hat keeps the time under the head'],
                 ['bassSetsUpSolo', 0.9, 1, "the head's last bar walks into the solo"],
                 ['hatPedal24', 0.9, 1, 'hi-hat foot on 2 and 4'],
+                // The snare comps with the piano (#2022), inside a phrase: measured 0.510 of its
+                // strokes on a piano strike; 0.396 with the chart unread (every bar comped as a bar
+                // on one chord), 0.293 before (spots drawn one by one, uniformly). The floor sits
+                // midway between the chart unread and shipped. The issue's 0.6 counted the
+                // phrase-end bars too; their setups are the next claim's.
+                [
+                    'snareCompsWithComp',
+                    0.45,
+                    1,
+                    'the snare catches the piano where it strikes, reading the same chart',
+                ],
+                // Philly Joe's setup (#2022), not every time: measured 0.533; 0.400 with no setup
+                // in the time (the fills' own shots only), 0.800 shooting every phrase end, 0.600
+                // before (a fill's shot, or a random "and" of 4 met by a one-in-five bomb). The
+                // floor and the ceiling sit midway to none and to every one.
+                [
+                    'phraseEndShots',
+                    0.46,
+                    0.67,
+                    'snare and bass drum shoot the "and" of 4 into a phrase, not every phrase',
+                ],
                 // 0.337 (0.21 at low energy, 0.39 at high): before a change the figure lands on
                 // the "and" of 4 and plays the new chord there, tied over (`PUSH_SETUP` and
                 // `push` in `styles/jazz.ts`, #2015), and a mid-bar change is pushed the same

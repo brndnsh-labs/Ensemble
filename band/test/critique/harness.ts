@@ -8,6 +8,7 @@
  */
 
 import { CYCLE, leadRole } from '../../arrange/cycle.js';
+import { fullWindow, planBars } from '../../arrange/plan.js';
 import {
     type BandEvent,
     type CompInstrument,
@@ -22,6 +23,7 @@ import { chordAt, compileTimeline, sectionKey, type Timeline } from '../../form/
 import { type PassMemory, performPass } from '../../perform.js';
 import { STEP } from '../../players/grid.js';
 import { STYLES } from '../../styles/index.js';
+import type { BarContext } from '../../styles/types.js';
 import { chordPcs, fifthOf } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
 import { COLOUR_CHART, FIXTURES } from '../scores.js';
@@ -88,6 +90,68 @@ export function perform(
         }
     }
     return takes;
+}
+
+/**
+ * A style's fill vocabulary as it plays it (#2022): every distinct fill its drummer plays in
+ * the default take's 4/4 bars (the shared charts and seeds, two passes, looping), each as the
+ * strokes from the fill's first step to the barline — piece and step from the fill's start,
+ * the kick and the hi-hat foot left out (the kit keeps the groove's own under a fill that
+ * writes none, so they are the time's, not the fill's). Where the fill starts is the kit's
+ * own arithmetic (`DrumIdiom.fillStart`), on the plan the pass plays.
+ */
+export function fillVocabulary(style: StyleId): Set<string> {
+    const shapes = new Set<string>();
+    const book = STYLES[style];
+    for (const chart of CHARTS) {
+        const timeline = compileTimeline(FIXTURES[chart]);
+        for (const seed of SEEDS) {
+            let memory: PassMemory | undefined;
+            for (let pass = 0; pass < 2; pass++) {
+                const settings = { ...DEFAULT_SETTINGS, style, seed, swing: 0, intensity: null };
+                settings.lanes = { ...DEFAULT_SETTINGS.lanes, lead: false };
+                const options = {
+                    looping: true,
+                    window: fullWindow(timeline),
+                    drumSolos: Boolean(book.drums.solos),
+                    arcShape: book.jamArc,
+                    endingGesture: book.endingGesture,
+                    keepsHighLine: book.keepsHighLine,
+                };
+                const plans = planBars(timeline, settings, { ...options, pass });
+                const wrap = planBars(timeline, settings, { ...options, pass: pass + 1 })[0];
+                const result = performPass(timeline, settings, { pass, looping: true, memory });
+                memory = result.memory;
+                for (const bar of timeline.bars) {
+                    const plan = plans[bar.index];
+                    if (bar.meter.name !== '4/4' || plan.fill === 'none' || plan.ending) {
+                        continue;
+                    }
+                    const start = book.drums.fillStart({
+                        bar,
+                        plan,
+                        next: { plan: plans[bar.index + 1] ?? wrap },
+                    } as unknown as BarContext);
+                    if (start === null) {
+                        continue;
+                    }
+                    const strokes = result.events
+                        .filter(
+                            (e): e is DrumHit =>
+                                e.lane === 'drums' &&
+                                e.bar === bar.index &&
+                                !['kick', 'hatPedal'].includes(e.piece),
+                        )
+                        .map((e) => [e.piece, stepOf(timeline, e) - start] as const)
+                        .filter(([, step]) => step >= 0)
+                        .map(([piece, step]) => `${piece}@${step}`)
+                        .sort();
+                    shapes.add(`${16 - start}: ${strokes.join(' ')}`);
+                }
+            }
+        }
+    }
+    return shapes;
 }
 
 // ---------------------------------------------------------------- lead helpers
@@ -267,6 +331,17 @@ function grooveBars(t: Timeline, events: BandEvent[]) {
         const lastPhraseBar = b.phrase.bar === b.phrase.length - 1;
         return drums.length > 0 && !hasTom && !lastPhraseBar && b.barInVisit > 0;
     });
+}
+
+/**
+ * A bar's drum hits as piece and step, the crash and the cymbal stroke it replaces on the One
+ * left out (an arrival's crash is the form's, not the groove's).
+ */
+function drumHits(t: Timeline, events: BandEvent[], bar: number) {
+    return events
+        .filter((e): e is DrumHit => e.lane === 'drums' && e.bar === bar && e.piece !== 'crash')
+        .map((e) => ({ piece: e.piece, step: stepOf(t, e) }))
+        .filter((s) => !(s.step === 0 && ['hat', 'hatOpen', 'ride'].includes(s.piece)));
 }
 
 function drumSteps(t: Timeline, events: BandEvent[], bar: number, pieces: string[]) {
@@ -759,17 +834,23 @@ export const METRICS = {
         }
         return ratio(ghosts, n);
     },
-    /** Within a section visit, how often a bar's kick matches the visit's usual kick. */
+    /**
+     * Within a section visit, how often a bar's kick matches the visit's usual kick. A phrase's
+     * answer bars (its second and fourth, #2022) are a part of the groove of their own — the
+     * two-bar figure's second bar — so each is judged against the visit's usual answer, and the
+     * statement bars against the usual statement: a turn-round is not a re-roll.
+     */
     kickConsistency: (takes) => {
         let n = 0;
         let same = 0;
         for (const { timeline: t, events } of takes) {
-            const byVisit = new Map<number, string[]>();
+            const byVisit = new Map<string, string[]>();
             for (const b of grooveBars(t, events)) {
                 const k = [...drumSteps(t, events, b.index, ['kick'])]
                     .sort((x, y) => x - y)
                     .join(',');
-                byVisit.set(b.visit.ordinal, [...(byVisit.get(b.visit.ordinal) ?? []), k]);
+                const key = `${b.visit.ordinal}:${b.phrase.bar % 2}`;
+                byVisit.set(key, [...(byVisit.get(key) ?? []), k]);
             }
             for (const kicks of byVisit.values()) {
                 const counts = new Map<string, number>();
@@ -1832,6 +1913,76 @@ export const METRICS = {
             }
         }
         return ratio(hit, n);
+    },
+    /**
+     * The groove breathes across the phrase (#2022): of the phrases whose second bar (the
+     * answer) and third bar (the statement again) are both groove bars of one section visit,
+     * the share where the answer plays the statement's front half (beats 1 and 2) exactly and
+     * varies its back half. A groove that is the same bar four times scores 0; one that re-rolls
+     * the whole bar scores 0 too (its front half moves).
+     */
+    grooveAnswers: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const half = (bar: number, back: boolean) =>
+                drumHits(t, events, bar)
+                    .filter((s) => s.step >= 8 === back)
+                    .map((s) => `${s.piece}:${s.step}`)
+                    .sort()
+                    .join(',');
+            const groove = new Set(grooveBars(t, events).map((b) => b.index));
+            for (const index of groove) {
+                const b = t.bars[index];
+                const statement = t.bars[index + 1];
+                if (b.phrase.bar !== 1 || !statement || !groove.has(statement.index)) {
+                    continue;
+                }
+                if (statement.visit.ordinal !== b.visit.ordinal) {
+                    continue;
+                }
+                n++;
+                const front = half(index, false) === half(statement.index, false);
+                hit += front && half(index, true) !== half(statement.index, true) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * The answer is the section's (#2022): within a section visit, the share of its answer bars
+     * (a phrase's second bar, a groove bar) whose back half (beats 3 and 4) is the visit's usual
+     * answer's. 1 when the drummer turns the bar round one way for the whole section; lower when
+     * each answer bar draws its own turn. Visits with a single such bar aren't judged.
+     */
+    answerHolds: (takes) => {
+        let n = 0;
+        let same = 0;
+        for (const { timeline: t, events } of takes) {
+            const byVisit = new Map<number, string[]>();
+            for (const b of grooveBars(t, events)) {
+                if (b.phrase.bar !== 1) {
+                    continue;
+                }
+                const back = drumHits(t, events, b.index)
+                    .filter((h) => h.step >= 8)
+                    .map((h) => `${h.piece}:${h.step}`)
+                    .sort()
+                    .join(',');
+                byVisit.set(b.visit.ordinal, [...(byVisit.get(b.visit.ordinal) ?? []), back]);
+            }
+            for (const backs of byVisit.values()) {
+                if (backs.length < 2) {
+                    continue;
+                }
+                const counts = new Map<string, number>();
+                for (const k of backs) {
+                    counts.set(k, (counts.get(k) ?? 0) + 1);
+                }
+                n += backs.length;
+                same += Math.max(...counts.values());
+            }
+        }
+        return ratio(same, n);
     },
     /** Mean written length of the sounding bass notes, in sixteenths. */
     bassMeanSteps: (takes) => {

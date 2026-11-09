@@ -22,7 +22,15 @@ import {
     sectionPlace,
 } from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
-import { drumIdiom, snareFigure, tomRun } from '../players/drums/kit.js';
+import {
+    drumIdiom,
+    type FillPlace,
+    type FillShape,
+    pickTurn,
+    playFill,
+    strike,
+    type Turn,
+} from '../players/drums/kit.js';
 import { dyn, isCommonTime, pulses, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { fifthFirst, pentatonicPool, rootFirst } from '../players/lead/palette.js';
@@ -39,6 +47,103 @@ const ROCK_KICKS: readonly [string, Record<EnergyTier, number>][] = [
     ['x.......x.....x.', { low: 1, mid: 2, high: 3 }],
     ['x.x.....x.x.....', { low: 0, mid: 1, high: 3 }],
 ];
+
+/**
+ * How a rock groove turns round in the second and fourth bars of a phrase (#2022), one per
+ * section: the kick pushes the "and" of 4 into the next One (the commonest, so weighted most);
+ * the kick doubles beat 3 on its "and"; the hat opens on the "and" of 4 (only where the hat
+ * keeps the time: on the ride the stick hand is busy); or the snare answers its own backbeat on
+ * the "and" of 4. The front half of the bar is never touched (`DrumBook.answer`).
+ */
+const ROCK_TURNS: Record<'quiet' | 'loud', readonly (readonly [Turn, number])[]> = {
+    // why: a quiet band varies with the foot alone, softly — no open hat, no extra crack.
+    quiet: [
+        [(t) => ({ ...t, kick: strike(t.kick, 14, 'o') }), 2],
+        [(t) => ({ ...t, kick: strike(t.kick, 10, 'o') }), 1],
+    ],
+    loud: [
+        [(t) => ({ ...t, kick: strike(t.kick, 14, 'x') }), 3],
+        [(t) => ({ ...t, kick: strike(t.kick, 10, 'x') }), 2],
+        [
+            (t) =>
+                t.hat
+                    ? { ...t, hat: strike(t.hat, 14, '.'), hatOpen: strike(t.hatOpen, 14, 'x') }
+                    : t,
+            2,
+        ],
+        [(t) => ({ ...t, snare: strike(t.snare, 14, 'o') }), 1],
+    ],
+};
+
+/*
+ * Rock's fills (#2022), written out at each length the kit plays (2, 4, 8 sixteenths). The kick
+ * holds the quarter notes under a fill that leaves the time, so the fill never floats.
+ */
+// The tom run: an eighth each down the kit, snare, high, mid, floor, the last accented.
+const TOM_RUN: FillShape = {
+    2: { tomMid: 'x.', tomLow: '.X' },
+    4: { tomHigh: 'x...', tomLow: '..X.', kick: 'x...' },
+    8: {
+        snare: 'x.......',
+        tomHigh: '..o.....',
+        tomMid: '....o...',
+        tomLow: '......X.',
+        kick: 'x...x...',
+    },
+};
+// Round the kit in sixteenths: the bigger run, for the top of the form.
+const SIXTEENTH_RUN: FillShape = {
+    2: { tomHigh: 'o.', tomLow: '.X' },
+    4: { snare: 'x...', tomHigh: '.o..', tomMid: '..o.', tomLow: '...X', kick: 'x...' },
+    8: {
+        snare: 'xooo....',
+        tomHigh: '....oo..',
+        tomMid: '......o.',
+        tomLow: '.......X',
+        kick: 'x...x...',
+    },
+};
+// The snare build: eighths, then sixteenths, crescendo into the One.
+const SNARE_BUILD: FillShape = {
+    2: { snare: 'xX' },
+    4: { snare: 'oxxX', kick: 'x...' },
+    8: { snare: 'o.o.oxxX', kick: 'x...x...' },
+};
+// Snare and floor tom together on the eighths: the heavy, Bonham-sized fill.
+const FLOOR_UNISON: FillShape = {
+    2: { snare: 'X.', tomLow: 'X.' },
+    4: { snare: 'x.X.', tomLow: 'x.X.', kick: 'x...' },
+    8: { snare: 'x.x.x.X.', tomLow: 'x.x.x.X.', kick: 'x...x...' },
+};
+// The pickup: the hat keeps going and the snare says "and-a" into the One — a phrase's nudge.
+const PICKUP: FillShape = {
+    2: { snare: 'oX' },
+    4: { hat: 'x...', snare: '..oX' },
+};
+
+/**
+ * Which fills a rock drummer plays where (#2022): a phrase end gets a nudge more often than a
+ * run, a section end the tom run or the snare build, and the top of the form or a bigger section
+ * the round-the-kit sixteenths or the floor unison. why: the size of the gesture marks the size
+ * of the boundary, and four shapes per place keep a chorus's fills from all being one run.
+ */
+const ROCK_FILLS: Record<FillPlace, readonly (readonly [FillShape, number])[]> = {
+    phrase: [
+        [PICKUP, 3],
+        [SNARE_BUILD, 2],
+        [TOM_RUN, 1],
+    ],
+    section: [
+        [TOM_RUN, 3],
+        [SNARE_BUILD, 2],
+        [FLOOR_UNISON, 2],
+    ],
+    top: [
+        [SIXTEENTH_RUN, 3],
+        [FLOOR_UNISON, 2],
+        [TOM_RUN, 1],
+    ],
+};
 
 const rockDrums = drumIdiom({
     name: 'rock backbeat',
@@ -85,8 +190,8 @@ const rockDrums = drumIdiom({
         back: { snare: tier === 'low' ? 'o...' : 'X...', hat: tier === 'low' ? 'o.o.' : 'x.o.' },
         strong: { kick: tier === 'high' ? 'x.x.' : 'x...', hat: 'x.o.' },
     }),
-    fill: (_ctx, steps, rng) =>
-        steps <= 2 ? { snare: snareFigure(steps, rng) } : tomRun(steps, rng),
+    answer: (ctx, tier, time) => pickTurn(ctx, time, ROCK_TURNS[tier === 'low' ? 'quiet' : 'loud']),
+    fill: (ctx, steps) => playFill(ctx, steps, ROCK_FILLS),
 });
 
 // ================================================================ bass

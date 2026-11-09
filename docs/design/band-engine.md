@@ -85,7 +85,28 @@ A *style* is a feel plus one idiom per lane, and each style is one file (`styles
 place, so genres can be written side by side without touching each other. Adding a genre usually means
 composing existing idioms. An influence, such as rock with a Motown bass, is a style that
 borrows another family's idiom. Shared machinery does everything that isn't the idiom itself:
-- `players/drums/kit.ts`: fills, crashes, endings, odd-meter cells.
+- `players/drums/kit.ts`: fills, crashes, endings, odd-meter cells, and the drummer's
+  phrasing (#2022). A book's `answer` turns its groove round in the second and fourth bars of
+  each phrase (`answerBar`): the kit keeps the time's front half and takes the answer's back half,
+  and a style draws its turn once per section (`pickTurn`: rock's kick pushing the "and" of 4,
+  funk's "a"-of-3 kick or ghosted "e"-and-"a" of 4, the one drop's cross-stick pickup), so a
+  section is a two-bar figure, not one bar four times. Hip hop's two-bar loop is the same answer.
+  A book's fills are written shapes (`FillShape`, at 2, 4 and 8 sixteenths), one drawn per fill
+  from the shapes its place in the form allows (`fillPlace`: a phrase's end, a section's, or the
+  top — a new chorus, a louder section, the set-up into the band's last hit), never a coin per
+  stroke: rock's tom run and snare build, funk's ghost drags and stabs with no toms (the hat
+  going on over most of them), reggae's cross-stick pickups, country's rim push, acoustic's soft
+  pickups, jazz's shots on the "and" of 4 with the ride going on through them. The kit plays
+  before the comp in every bar, so the jazz snare can't hear the piano's strike: it reads the
+  chart the way the pianist does instead, playing where the jazz comp book strikes (the
+  Charleston's "and" of 2, the "and" of 4 before a change, the upbeats of a two-chord bar), or
+  nothing, one figure per phrase position. A phrase's last bar sets the next one up: a bar the
+  plan fills (an eight-bar boundary, a section's end, the chorus top) takes the full shot (snare
+  and bass drum on the "and" of 4) whatever the chart does, since marking the form is the
+  drummer's job; a four-bar phrase's end with no fill takes one of the shot, the snare alone, the
+  "and" of 3 into the "and" of 4, or nothing, drawn once per phrase position, and there the shot
+  comes only where the chart changes over the barline, where the piano pushes.
+  Metal, disco, blues, neo-soul, bossa and ska-punk keep their fills as they were.
 - `players/comp/idiom.ts` (`compIdiom`): voice leading, anticipations tied over the barline
   (a book's `push`) and, where a book pushes in the bar (`pushInBar`: bossa, neo-soul, and since
   #2015 the jazz and blues keyboards), the strike in the eighth before a mid-bar change plays the

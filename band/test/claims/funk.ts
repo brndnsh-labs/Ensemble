@@ -28,7 +28,14 @@ export const funk = defineClaims({
                 ['snareBackbeat', 0.9, 1, 'the backbeat is hit hard'],
                 ['kickOnOne', 0.95, 1, 'on the One'],
                 ['ghostsPerBar', 1, 5, 'ghost notes around the backbeat'],
+                // Measured 1.000, statements and answers (#2022) each judged against their own;
+                // 0.637 with the kick re-rolled every bar.
                 ['kickConsistency', 0.75, 1, 'the groove repeats'],
+                // Measured 1.000; 0 with no answer bar (#2022). The floor sits midway.
+                ['grooveAnswers', 0.5, 1, 'the two-bar beat: its second bar answers the first'],
+                // The answer is the section's (#2022): one turn for all its answer bars. Measured 1.000;
+                // 0.717 with each answer bar drawing its own. The floor sits midway.
+                ['answerHolds', 0.86, 1, 'a section turns its bars round one way'],
                 ['bassSixteenthSyncopation', 0.1, 0.6, 'sixteenth-note syncopation in the bass'],
                 ['bassKickUnison', 0.35, 1, 'bass and kick lock together'],
                 ['compOffbeatShare', 0.6, 1, 'stabs live off the beat'],

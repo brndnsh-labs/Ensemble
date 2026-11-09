@@ -26,12 +26,21 @@ export const rock = defineClaims({
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['snareBackbeat', 0.9, 1, 'the backbeat is the song'],
                 ['kickOnOne', 0.95, 1, 'the kick owns the one'],
+                // Measured 1.000, statements and answers (#2022) each judged against their own;
+                // 0.625 with the kick re-rolled every bar.
                 [
                     'kickConsistency',
                     0.75,
                     1,
                     'a section keeps its groove; it does not re-roll every bar',
                 ],
+                // The second bar of a phrase answers (#2022): its front half the statement's, its
+                // back half turned round. Measured 0.990; 0 with no answer (every groove bar of a
+                // section the same bar). The floor sits midway.
+                ['grooveAnswers', 0.5, 1, 'the groove turns round at the phrase’s second bar'],
+                // The answer is the section's (#2022): one turn for all its answer bars. Measured 1.000;
+                // 0.663 with each answer bar drawing its own. The floor sits midway.
+                ['answerHolds', 0.83, 1, 'a section turns its bars round one way'],
                 [
                     'bassArrivesOnBass',
                     0.9,

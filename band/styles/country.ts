@@ -25,7 +25,16 @@ import {
 } from '../players/bass/line.js';
 import { isPlayable, pullOffs } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
-import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
+import {
+    drumIdiom,
+    type FillPlace,
+    type FillShape,
+    type Lines,
+    pickTurn,
+    playFill,
+    strike,
+    type Turn,
+} from '../players/drums/kit.js';
 import {
     at,
     barSteps,
@@ -68,6 +77,77 @@ const HEAVY_TRAIN_SNARE = 'ggggXgggggggXggg';
 // fast tempos, where sixteenths blur; the band engine doesn't regenerate on tempo, so here it
 // is a section's choice instead.
 const EIGHTH_TRAIN_SNARE = 'o.o.X.o.o.o.X.o.';
+
+/**
+ * How a country groove turns round in the second and fourth bars of a phrase (#2022), one per
+ * section: the kick picks up the "and" of 4 into the next boom; the snare doubles the chick on
+ * the "and" of 4 (the two-beat's "chick-a", an accent on a train beat's running snare); or the
+ * kick doubles the boom on the "and" of 3, the way a two-step walks.
+ */
+const COUNTRY_TURNS: Record<'quiet' | 'loud', readonly (readonly [Turn, number])[]> = {
+    // why: a ballad's answer is the foot alone, soft: the cross-stick stays on 2 and 4.
+    quiet: [[(t) => ({ ...t, kick: strike(t.kick, 14, 'o') }), 1]],
+    loud: [
+        [(t) => ({ ...t, kick: strike(t.kick, 14, 'o') }), 2],
+        [(t) => (t.snare ? { ...t, snare: strike(t.snare, 14, 'x') } : t), 2],
+        [(t) => ({ ...t, kick: strike(t.kick, 10, 'o') }), 1],
+    ],
+};
+
+/*
+ * Country's fills (#2022), written at 2 and 4 sixteenths: a pickup, rarely a run. The kit keeps
+ * the kick under them unless a fill writes its own.
+ */
+// The snare pickup: "4-and, ONE", the accent on the "and".
+const SNARE_PICKUP: FillShape = { 2: { snare: 'xX' }, 4: { snare: 'x.X.' } };
+// The rim push: a rimshot with the kick on the "and" of 4, the band pushing the One early.
+const RIM_PUSH: FillShape = {
+    2: { rim: 'X.', kick: 'x.' },
+    4: { snare: 'x...', rim: '..X.', kick: '..x.' },
+};
+// The train rolls into the next bar: its sixteenths crescendo, out of a ghost when it is one
+// beat's half (the pickup's "4-and" is the stroke-and-accent).
+const TRAIN_ROLL: FillShape = { 2: { snare: 'gX' }, 4: { snare: 'oxxX' } };
+// The snare on 4, the floor tom and the kick on its "and": a driving band's push.
+const FLOOR_PUSH: FillShape = {
+    2: { tomLow: 'X.', kick: 'x.' },
+    4: { snare: 'x...', tomLow: '..X.', kick: '..x.' },
+};
+
+/**
+ * Which fills a country drummer plays where (#2022): a phrase end is the pickup, a section end
+ * the pickup or the rim push, the top of the form (and the set-up into the band's last hit) the
+ * train roll or the floor-tom push. A quiet band only picks up. why: country drummers fill
+ * sparingly; the toms are for a band driving into the top.
+ */
+const COUNTRY_FILLS: Record<
+    'quiet' | 'loud',
+    Record<FillPlace, readonly (readonly [FillShape, number])[]>
+> = {
+    quiet: {
+        phrase: [[SNARE_PICKUP, 1]],
+        section: [
+            [SNARE_PICKUP, 2],
+            [RIM_PUSH, 1],
+        ],
+        top: [[SNARE_PICKUP, 1]],
+    },
+    loud: {
+        phrase: [
+            [SNARE_PICKUP, 3],
+            [RIM_PUSH, 1],
+        ],
+        section: [
+            [SNARE_PICKUP, 2],
+            [RIM_PUSH, 2],
+            [TRAIN_ROLL, 1],
+        ],
+        top: [
+            [TRAIN_ROLL, 2],
+            [FLOOR_PUSH, 2],
+        ],
+    },
+};
 
 const countryDrums = drumIdiom({
     name: 'country two-step',
@@ -116,13 +196,11 @@ const countryDrums = drumIdiom({
             strong: { kick: tier === 'low' ? 'o...' : 'x...', hat },
         };
     },
-    fill(ctx, steps, rng) {
-        // A snare pickup is the country fill; a tom run only when the band is driving, and
-        // then only some of the time.
-        const lines =
-            steps > 2 && energyTier(ctx.plan.energy) === 'high' && rng.chance(0.5)
-                ? tomRun(steps, rng)
-                : { snare: snareFigure(steps, rng, steps > 2 ? 2 : 1) };
+    answer: (ctx, tier, time) =>
+        pickTurn(ctx, time, COUNTRY_TURNS[tier === 'low' ? 'quiet' : 'loud']),
+    fill(ctx, steps) {
+        const quiet = energyTier(ctx.plan.energy) === 'low';
+        const lines = playFill(ctx, steps, COUNTRY_FILLS[quiet ? 'quiet' : 'loud']);
         // The chick survives the fill: a country pickup comes *off* the backbeat ("4-and,
         // ONE"), it doesn't erase it. A fill starting on a backbeat keeps its accent there.
         const start = barSteps(ctx.bar) - steps;

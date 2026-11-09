@@ -29,7 +29,17 @@ export interface DrumBook {
     groove(ctx: BarContext, tier: EnergyTier): Lines;
     /** Pulse cells by role (4-step lines) for any other meter. */
     cells(ctx: BarContext, tier: EnergyTier): Record<'down' | 'back' | 'strong', Lines>;
-    /** Fill vocabulary, written over the last `steps` sixteenths of the bar. */
+    /**
+     * The answer bar (#2022): the groove as the second and fourth bars of a phrase play it
+     * (`answerBar`), given the bar's time (`groove`'s lines). Only its back half (beats 3 and 4)
+     * is taken: the kit keeps the time's front half, so the answer is the same bar until it turns
+     * round. Absent, every groove bar of a section is the same bar.
+     */
+    answer?(ctx: BarContext, tier: EnergyTier, time: Lines): Lines;
+    /**
+     * Fill vocabulary, written over the last `steps` sixteenths of the bar. A book that keeps
+     * written shapes plays them through `playFill`; `rng` is the bar's own stream.
+     */
     fill(ctx: BarContext, steps: number, rng: Rng): Lines;
     /**
      * The style's last bar (#2017): 16-step lines for a 4/4 bar that is home on its downbeat,
@@ -88,6 +98,123 @@ export function fillStart(ctx: BarContext, book: DrumBook): number | null {
     // hierarchy, so a drummer vamping four bars doesn't play the same run each time (#2009).
     const length = plan.fillOrdinal % 2 === 1 && sized >= 4 ? sized / 2 : sized;
     return length > 0 ? total - length : null;
+}
+
+/**
+ * Whether this bar answers (#2022): the second and fourth bars of a phrase (and the sixth of a
+ * six-bar one). A phrase starts on a multiple of four bars in its section, so this is the same
+ * bar as the second of each two-bar pair in the section: hip hop's loop answers on it too.
+ */
+export const answerBar = (ctx: BarContext): boolean => ctx.bar.phrase.bar % 2 === 1;
+
+/**
+ * The time with its back half (beats 3 and 4 of a 4/4 bar) taken from the answer. The pieces
+ * keep the answer's order, which is the order their strokes are written in on a shared step.
+ */
+function answered(time: Lines, answer: Lines): Lines {
+    const out: Record<string, string> = {};
+    for (const piece of new Set([...Object.keys(answer), ...Object.keys(time)])) {
+        const front = (time[piece as DrumPiece] ?? '').padEnd(16, '.').slice(0, 8);
+        const back = (answer[piece as DrumPiece] ?? '').padEnd(16, '.').slice(8, 16);
+        out[piece] = front + back;
+    }
+    return out as Lines;
+}
+
+/** One way a groove's answer turns its bar round: the time's lines in, the answer's out. */
+export type Turn = (time: Lines) => Lines;
+
+/**
+ * The section's answer (#2022): one of the style's turns, drawn once per section so every
+ * answer bar of the section turns round the same way (the drummer's part, not a new idea each
+ * phrase). The draw is over the whole list, so it lands on the same turn in every bar of the
+ * section; only in a bar where that turn would change nothing (an added kick the groove already
+ * plays there, an open hat the bar already lifts) does it move on to the next turn in the list
+ * that is heard, so the answer is always heard and the rest of the section keeps its turn.
+ */
+export function pickTurn(
+    ctx: BarContext,
+    time: Lines,
+    turns: readonly (readonly [Turn, number])[],
+) {
+    const same = (lines: Lines) =>
+        Object.keys({ ...time, ...lines }).every(
+            (p) =>
+                (time[p as DrumPiece] ?? '').replace(/\.+$/, '') ===
+                (lines[p as DrumPiece] ?? '').replace(/\.+$/, ''),
+        );
+    const drawn = ctx.rng('answer', 'section').weighted(turns.map(([, w], i) => [i, w] as const));
+    for (let k = 0; k < turns.length; k++) {
+        const lines = turns[(drawn + k) % turns.length][0](time);
+        if (!same(lines)) {
+            return lines;
+        }
+    }
+    return time;
+}
+
+/** Write `char` at `step` of a 16-step line (a stroke the answer adds). */
+export function strike(line: string | undefined, step: number, char: string): string {
+    const padded = (line ?? '').padEnd(16, '.');
+    return `${padded.slice(0, step)}${char}${padded.slice(step + 1)}`;
+}
+
+/**
+ * Where a fill sits in the form (#2022): the end of a phrase inside a section, the end of a
+ * section, or the top. "Top" is any boundary the drummer lifts the band over, not only the top
+ * of the form: the loop's wrap or a new chorus, a lift into a louder section (a verse into its
+ * chorus), and the set-up into the band's last hit. A drummer marks the bigger boundary with the
+ * bigger idea.
+ */
+export type FillPlace = 'phrase' | 'section' | 'top';
+
+const TIER_RANK: Record<EnergyTier, number> = { low: 0, mid: 1, high: 2 };
+
+function fillPlace(ctx: BarContext): FillPlace {
+    const { plan, next, bar } = ctx;
+    if (plan.fill === 'phrase') {
+        return 'phrase';
+    }
+    if (!next) {
+        return 'section';
+    }
+    const louder = TIER_RANK[energyTier(next.plan.level)] > TIER_RANK[energyTier(plan.level)];
+    const top = next.wraps || next.bar.visit.chorus !== bar.visit.chorus || next.bar.index === 0;
+    return top || louder || next.plan.ending?.setup ? 'top' : 'section';
+}
+
+/**
+ * A written fill (#2022): its lines at each length the kit plays fills at, in sixteenths
+ * before the barline. A length it doesn't write is played as the end of the next longer one
+ * (a six-step fill in a 5/8 bar is the eight-step's last six), so its last stroke still lands
+ * on the barline's eve.
+ */
+export type FillShape = Partial<Record<2 | 4 | 8, Lines>>;
+
+function writeFill(shape: FillShape, steps: number): Lines {
+    const lengths = ([2, 4, 8] as const).filter((l) => shape[l]);
+    const length = lengths.find((l) => l >= steps) ?? lengths[lengths.length - 1];
+    const lines = shape[length] ?? {};
+    return Object.fromEntries(
+        Object.entries(lines).map(([piece, line]) => [
+            piece,
+            line.padStart(steps, '.').slice(-steps),
+        ]),
+    ) as Lines;
+}
+
+/**
+ * Play one of a style's written fills (#2022): one draw per fill, from the shapes its place in
+ * the form allows (`fillPlace`), so the choice is the fill's — never a coin per stroke, which
+ * reads as a scatter, not a figure.
+ */
+export function playFill(
+    ctx: BarContext,
+    steps: number,
+    vocabulary: Record<FillPlace, readonly (readonly [FillShape, number])[]>,
+): Lines {
+    const shape = ctx.rng('fillShape').weighted(vocabulary[fillPlace(ctx)]);
+    return writeFill(shape, steps);
 }
 
 function overlay(base: Lines, fill: Lines, from: number, total: number, keep: DrumPiece[]): Lines {
@@ -170,8 +297,13 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
             const tier = energyTier(plan.energy);
             const role = plan.lead;
             const soloing = role.kind === 'trade' && role.with === 'drums' && role.turn === 'band';
-            const time = isCommonTime(bar)
-                ? book.groove(ctx, tier)
+            const groove = isCommonTime(bar) ? book.groove(ctx, tier) : null;
+            // The answer turns a 4/4 groove round at the phrase's second and fourth bars
+            // (`DrumBook.answer`, #2022); other meters' pulse cells keep their bar.
+            const time = groove
+                ? book.answer && answerBar(ctx)
+                    ? answered(groove, book.answer(ctx, tier, groove))
+                    : groove
                 : composeFromCells(ctx, tier, book);
             // A drum solo in a chorus of fours keeps the time's own hi-hat foot, whatever the
             // meter: the form is never lost.

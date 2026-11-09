@@ -481,6 +481,18 @@ export const acoustic = defineClaims({
                 ['bassApproachCount', 80, 10000, 'it does play half-step lead-ins into changes'],
                 ['bassApproachLeap', 0, 0.05, 'a lead-in stays beside the note it leads to'],
                 ['kickOnOne', 0.95, 1, 'a soft kick states the One'],
+                // The answer bar (#2022): a soft kick pickup, the hat breathing open, a ghost
+                // leaning into the next bar. Measured 1.000; 0 with no answer. The floor sits
+                // midway.
+                [
+                    'grooveAnswers',
+                    0.5,
+                    1,
+                    'the groove turns round softly at the phrase’s second bar',
+                ],
+                // The answer is the section's (#2022): one turn for all its answer bars. Measured 1.000;
+                // 0.853 with each answer bar drawing its own. The floor sits midway.
+                ['answerHolds', 0.93, 1, 'a section turns its bars round one way'],
                 ['bassArrivesOnBass', 0.95, 1, 'every change arrives on its bass note'],
                 [
                     'bassRootFifthOnStrongBeats',
