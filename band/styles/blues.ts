@@ -4,10 +4,13 @@
  * shared machinery lives in `players/`; this file is only what makes it this genre.
  *
  * Everything here writes on the eighth-note grid and lets the feel pass swing it into the
- * shuffle. A sixteenth "e" or "a" would land between triplet positions once swung and read
- * as a flam, so no part of the blues uses them.
+ * shuffle. At the blues's swing of 100 a beat's first three sixteenths land at 0, 1/3 and 2/3
+ * of it (`swingRatio`, `band/feel/feel.ts`): a true triplet. So the "e" is the triplet's
+ * middle note, and only the fills use it (`tripletRun`, #2165); the "a" lands between
+ * triplet positions (.833 of the beat) and would read as a flam, so nothing here uses it.
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
+import type { Rng } from '../core/random.js';
 import type { DrumHit, PitchedNote } from '../core/types.js';
 import {
     approach,
@@ -22,7 +25,7 @@ import {
 } from '../players/bass/line.js';
 import { type GripShape, grip } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums, tiedFromPush } from '../players/comp/idiom.js';
-import { drumIdiom, tomRun } from '../players/drums/kit.js';
+import { drumIdiom, type Lines, tomRun } from '../players/drums/kit.js';
 import { at, dyn, isCommonTime, pulses, STEP, spanSteps } from '../players/grid.js';
 import { leadIdiom } from '../players/lead/idiom.js';
 import { bluesPool, bluesTargets, restingTones } from '../players/lead/palette.js';
@@ -53,6 +56,51 @@ function pickup(steps: number): string {
     return Array.from({ length: steps }, (_, i) =>
         i === steps - 2 ? 'X' : i % 4 === 0 ? 'x' : '.',
     ).join('');
+}
+
+/**
+ * A shuffle triplet fill over `steps` sixteenths (#2165): every beat's first three sixteenths
+ * (the triplet at swing 100), snare first then down the toms, the last note accented, leading
+ * into the downbeat. why: the shuffle drummer's fill is the triplet the ride is already implying, played
+ * out in full ("da-da-da" down the kit), not the straight eighths of a rock fill; the kick
+ * keeps the quarter notes under it, as the eighth run does (`tomRun`).
+ */
+function tripletRun(steps: number, rng: Rng): Lines {
+    const lanes: Record<'snare' | 'tomHigh' | 'tomMid' | 'tomLow', string[]> = {
+        snare: [],
+        tomHigh: [],
+        tomMid: [],
+        tomLow: [],
+    };
+    const order: [keyof typeof lanes, number][] = [
+        ['snare', 0.25],
+        ['tomHigh', 0.5],
+        ['tomMid', 0.75],
+        ['tomLow', 1],
+    ];
+    const kick: string[] = [];
+    let last: [keyof typeof lanes, number] | null = null;
+    for (let i = 0; i < steps; i++) {
+        const triplet = i % 4 !== 3;
+        const lane = order.find(([, until]) => (i + 1) / steps <= until)?.[0] ?? 'tomLow';
+        for (const name of Object.keys(lanes) as (keyof typeof lanes)[]) {
+            lanes[name].push(name === lane && triplet ? (i % 4 === 0 ? 'x' : 'o') : '.');
+        }
+        if (triplet) {
+            last = [lane, i];
+        }
+        kick.push(i % 4 === 0 && rng.chance(0.7) ? 'x' : '.');
+    }
+    if (last) {
+        lanes[last[0]][last[1]] = 'X';
+    }
+    return {
+        snare: lanes.snare.join(''),
+        tomHigh: lanes.tomHigh.join(''),
+        tomMid: lanes.tomMid.join(''),
+        tomLow: lanes.tomLow.join(''),
+        kick: kick.join(''),
+    };
 }
 
 const shuffleKit = drumIdiom({
@@ -114,10 +162,22 @@ const shuffleKit = drumIdiom({
             strong: { kick: 'x...', hat },
         };
     },
-    // Fills stay on the eighths too. A short one is a snare pickup that keeps the backbeat on
-    // 4 and accents the "and" into the one (a dropped backbeat in a two-beat fill reads as a
-    // mistake, not a fill); a longer one runs down the toms on the swung eighths.
-    fill: (_ctx, steps, rng) => (steps <= 4 ? { snare: pickup(steps) } : tomRun(steps, rng, 2)),
+    // Fills are eighths or the triplet (`tripletRun`). A short one is a snare pickup that keeps
+    // the backbeat on 4 and accents the "and" into the one (a dropped backbeat in a two-beat
+    // fill reads as a mistake, not a fill); a one-beat fill may instead be the snare's triplet
+    // into the one ("DA-da-DA": the backbeat on 4 at full weight, since it is beat 4, the
+    // middle note lighter, the last accented); a longer one runs down the toms, on the swung
+    // eighths or in triplets (`tripletRun`, #2165), each about half the time. why: both are
+    // the shuffle drummer's; the triplet is the ride's own subdivision played out, the eighth
+    // run the plainer kick into the next chorus. Drawn on its own stream so the eighth run
+    // keeps its kick.
+    fill: (ctx, steps, rng) => {
+        const triplets = ctx.rng('fillShape').chance(0.5);
+        if (steps <= 4) {
+            return { snare: steps === 4 && triplets ? 'xoX.' : pickup(steps) };
+        }
+        return triplets ? tripletRun(steps, rng) : tomRun(steps, rng, 2);
+    },
 });
 
 /**

@@ -1642,6 +1642,29 @@ export const METRICS = {
         return ratio(hit, n);
     },
     /**
+     * Share of fill bars (as `kickFourOnFloorInFills` counts them) whose snare and toms play a
+     * triplet: a beat's first three sixteenths all struck (#2165). At swing 100 those land at
+     * 0, 1/3 and 2/3 of the beat, the shuffle's own subdivision; a groove never strikes the
+     * "e", so three in a row is a fill's figure and nothing else's.
+     */
+    drumFillTriplets: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const groove = new Set(grooveBars(t, events).map((b) => b.index));
+            for (const b of t.bars) {
+                const drums = events.some((e) => e.lane === 'drums' && e.bar === b.index);
+                if (b.meter.name !== '4/4' || !drums || groove.has(b.index) || b.barInVisit === 0) {
+                    continue;
+                }
+                n++;
+                const s = drumSteps(t, events, b.index, ['snare', 'tomHigh', 'tomMid', 'tomLow']);
+                hit += [0, 4, 8, 12].some((x) => s.has(x) && s.has(x + 1) && s.has(x + 2)) ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
      * Share of fill bars (4/4 bars with toms, or a phrase's last bar) whose kick still plays
      * all four beats: `kickFourOnFloor` judges only groove bars, so this is the claim that the
      * floor keeps going *through* the fills.
