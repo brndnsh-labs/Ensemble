@@ -11,6 +11,7 @@ import {
     BASS_SLOT_HI,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     isLeadIn,
     kickSteps,
@@ -138,6 +139,7 @@ const funkBass: PitchedIdiom = {
                 (c, p) => place(bassPc(c), p),
                 last,
                 dyn(108, plan.energy),
+                memory.land ?? null,
             );
             events.push(...held.events);
             return { events, memory: { last } };
@@ -184,8 +186,12 @@ const funkBass: PitchedIdiom = {
                     to - step <= 1 &&
                     rng.chance(0.3)
                 ) {
-                    midi = approach(target, chord, 'chromatic-below');
-                    land = lead?.crossing ? target : null;
+                    // Into an ending, the low root the band ends on where the drop from the
+                    // note before stays inside an octave, else this octave, promised (#2178).
+                    const aimed =
+                        (lead?.ending ? endingAim(ctx, target, last)?.target : null) ?? target;
+                    midi = approach(aimed, chord, 'chromatic-below');
+                    land = lead?.crossing || lead?.ending ? aimed : null;
                 } else if (
                     k === steps.length - 1 &&
                     target !== null &&
@@ -196,8 +202,10 @@ const funkBass: PitchedIdiom = {
                     // root (riffs 2 and 5's 5 under a chord a half step up) leads into it as a
                     // leading tone does, beside that root and not a major seventh off: the same
                     // fold blues and reggae use.
-                    midi = meetRoot(midi, target);
-                    land = lead?.crossing ? target : null;
+                    const aimed =
+                        (lead?.ending ? endingAim(ctx, target, last)?.target : null) ?? target;
+                    midi = meetRoot(midi, aimed, lead?.ending);
+                    land = lead?.crossing || lead?.ending ? aimed : null;
                 }
                 const muted = code === 'm';
                 // Funk bass is short: notes stop before the next, ghosts are a clipped thud.

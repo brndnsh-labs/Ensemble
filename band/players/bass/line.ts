@@ -5,7 +5,7 @@ import type { Bar, BarSpan } from '../../form/timeline.js';
 import type { BarContext } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12, nearestMidi } from '../../theory/pitch.js';
-import { at, BUTTON_LIFT, endingStrikes, STEP } from '../grid.js';
+import { at, BUTTON_LIFT, endingSpans, endingStrikes, STEP } from '../grid.js';
 
 /**
  * The bass register (MIDI). Hard limits sit inside the band's slot (23–57); `home` is the
@@ -37,7 +37,12 @@ export type ApproachKind = 'chromatic-below' | 'chromatic-above' | 'dominant' | 
  * A note one beat before `target` that leads into it: a half step below or above, the
  * target's fifth (a V→I in miniature), or the scale tone of the current chord nearest it.
  */
-export function approach(target: number, chord: ChordFacts | null, kind: ApproachKind): number {
+export function approach(
+    target: number,
+    chord: ChordFacts | null,
+    kind: ApproachKind,
+    floored = false,
+): number {
     const clampIn = (m: number) => (m < BASS.lo ? m + 12 : m > BASS.hi ? m - 12 : m);
     switch (kind) {
         case 'chromatic-below':
@@ -54,7 +59,13 @@ export function approach(target: number, chord: ChordFacts | null, kind: Approac
             const candidates = [target - 2, target - 1, target + 1, target + 2].filter((m) =>
                 chord.scale.includes(mod12(m - chord.root)),
             );
-            return clampIn(candidates[0] ?? target - 2);
+            // why: at the floor (a low E, #2178) the step below is off the instrument, and
+            // folded up an octave it is a leap, not a lead-in: `floored`, the first step on
+            // the instrument is taken, from above where need be, as the chromatic cases do.
+            // Only an ending's approach into the low root asks for it: the lines' own
+            // approaches at the floor keep their fold until that is decided for them.
+            const played = floored ? candidates.find((m) => m >= BASS.lo && m <= BASS.hi) : null;
+            return clampIn(played ?? candidates[0] ?? target - 2);
         }
     }
 }
@@ -100,20 +111,75 @@ export function bassNote(
 }
 
 /**
+ * The lowest note of pitch class `pc` the bass line plays (`BASS.lo`, the E string open). `pc`
+ * is the sounding bass note's class (`bassPc`: a slash chord's slash note, `C/E`'s E), so the
+ * "root" here is what the bass stands on, not the chord's.
+ */
+export function lowestRoot(pc: number): number {
+    return BASS.lo + mod12(pc - BASS.lo);
+}
+
+/**
+ * Where a line aims its approach into an ending (#2178): the low root (`endingRoot`) when the
+ * approach to it sits within an octave of the line's note before it (`near`) — why: a
+ * chromatic approach reached by a two-octave drop (A2 C3 E3, then F#1 → G1) is a leap, not a
+ * lead-in — else the line's own placement (`own`), which the ending then lands on: `promise`
+ * is handed on as the style's `land` and to `endingBass` as `promised`. Null where this is not
+ * the bar before an ending: the line approaches as it always has, and promises nothing.
+ */
+export function endingAim(
+    ctx: BarContext,
+    own: number,
+    near: number | null,
+): { target: number; promise: number } | null {
+    const low = endingRoot(ctx);
+    if (low === null) {
+        return null;
+    }
+    const target = near === null || Math.abs(low - near) <= 12 ? low : own;
+    return { target, promise: target };
+}
+
+/**
+ * The root the bar before an ending aims at (#2178): the ending bar's bass note, low
+ * (`lowestRoot`), when that bar is the next one (`ctx.next.plan.ending`) and holds its final
+ * chord from its downbeat (a resolved turnaround, a last bar already home, a fermata's chord).
+ * why: the ending's last note goes low (`endingBass`), so an approach aimed where the line's
+ * own placement would put the root (an octave up, `place`) resolved by a leap; aimed here, a
+ * step approach lands by step. Null elsewhere: not the bar before an ending, or an ending bar
+ * that gets home itself (`| G7 C |`): the V is approached as the line places it, and the I
+ * goes low from there.
+ */
+function endingRoot(ctx: BarContext): number | null {
+    const next = ctx.next;
+    if (!next?.plan.ending) {
+        return null;
+    }
+    const chords = endingSpans({ ...ctx, bar: next.bar }).filter(({ span }) => span.chord);
+    const home = chords.at(-1);
+    return home && chords[0] === home && home.from === 0
+        ? lowestRoot(bassPc(home.span.chord!))
+        : null;
+}
+
+/**
  * The held ending's bass (`plan.ending`, `arrange/ending.ts`): one note on each strike of the
  * ending (`endingStrikes`), shaped by the style's gesture (#2017) — the resolved tonic held from
  * the downbeat, cut to an eighth, re-struck on a button or on the hits; a written `| G7 C |`'s
  * V on 1 and its I from 3 (#1502). A chord on the same bass note as the one before (`Csus4
  * Cmaj7`) is no new note in an ending that rings: the bass holds its root while the chord
  * resolves above it (a short ending strikes it again). The button is struck harder. `pitch` places a chord's bass note as
- * the style's line would (near `prev`, the note before it). Returns the notes and the last
- * pitch placed.
+ * the style's line would (near `prev`, the note before it) — every note but the last: the
+ * final note is the lowest root in the line's range (`lowestRoot`, #2178), unless a walk into
+ * the ending `promised` a pitch of that note (the style's `land`): a line that walked in by
+ * step lands by step, where it pointed. Returns the notes and the last pitch placed.
  */
 export function endingBass(
     ctx: BarContext,
     pitch: (chord: ChordFacts, prev: number | null) => number,
     prev: number | null,
     velocity: number,
+    promised: number | null = null,
 ): { events: PitchedNote[]; last: number | null } {
     const { bar } = ctx;
     const kind = ctx.plan.ending?.kind ?? 'hold';
@@ -138,6 +204,27 @@ export function endingBass(
         }
         notes.push({ from, midi, to, accent });
         last = midi;
+    }
+    // why: a bassist goes low for the last note of a tune — the root on the low string, under
+    // the whole band — where the line's voice-leading (`pitch`, near the note before) may have
+    // left it an octave up. The home chord is one note however often the gesture strikes it
+    // (a re-strike plays the note the chord already has, above), so the trailing run of
+    // strikes on that note goes low together: a button an octave below the chord it ends, or
+    // the last of the hits alone, would be a wrong note, not a low one. A chord before home
+    // (`| G7 C |`'s V) keeps the line's pitch. The bar before aims its approach at this low
+    // root (`endingAim`); where it had to aim at another octave and promised that one
+    // (`promised`: a lead-in that would have dropped two octaves to get low, country's walk),
+    // the home chord lands on the promise instead — a walk resolves where it points.
+    const final = notes.at(-1);
+    if (final) {
+        const lands =
+            promised !== null && mod12(promised) === mod12(final.midi)
+                ? promised
+                : lowestRoot(mod12(final.midi));
+        for (let i = notes.length - 1; i >= 0 && mod12(notes[i].midi) === mod12(lands); i--) {
+            notes[i].midi = lands;
+        }
+        last = lands;
     }
     return {
         events: notes.map((n) =>
@@ -189,7 +276,10 @@ export type RootPlacer = (ctx: BarContext, pc: number) => number;
  * section change (`crossing`) it is placed as the next bar places it, in the next section's
  * register, so the new section starts in its own octave rather than carrying the old one for a
  * bar (#2071); the caller still hands the target on as `land`, so the next bar plays exactly
- * the note the lead-in aimed at.
+ * the note the lead-in aimed at. Into an ending (`ending`, #2178) the caller re-aims at the
+ * band's low root where its approach, from the note before it, stays within an octave
+ * (`endingAim`, given this target as the line's own), hands the result on as `land`, and the
+ * ending lands there.
  */
 export function leadTarget(
     ctx: BarContext,
@@ -197,7 +287,7 @@ export function leadTarget(
     i: number,
     next: ChordFacts | null,
     placeRoot: RootPlacer,
-): { target: number; crossing: boolean } | null {
+): { target: number; crossing: boolean; ending: boolean } | null {
     const inBar = spans[i + 1]?.span.chord ?? null;
     const following = inBar ?? (i === spans.length - 1 ? next : null);
     if (!following) {
@@ -207,13 +297,21 @@ export function leadTarget(
         inBar === null &&
         ctx.next !== null &&
         ctx.next.bar.visit.sectionIndex !== ctx.bar.visit.sectionIndex;
-    const placed = crossing
+    const own = crossing
         ? placeRoot(
-              { ...ctx, bar: ctx.next!.bar, plan: ctx.next!.plan, next: null, rng: ctx.next!.rng },
+              {
+                  ...ctx,
+                  bar: ctx.next!.bar,
+                  plan: ctx.next!.plan,
+                  next: null,
+                  rng: ctx.next!.rng,
+              },
               bassPc(following),
           )
         : placeRoot(ctx, bassPc(following));
-    return { target: placed, crossing };
+    // `ending`: the chord approached is an ending's, so the approach is re-aimed (`endingAim`),
+    // `floored`, and promised.
+    return { target: own, crossing, ending: inBar === null && endingRoot(ctx) !== null };
 }
 
 /** A chord's root for the line: where the last bar's lead-in promised (`land`), else placed. */
@@ -238,11 +336,16 @@ export function isLeadIn(midi: number, target: number): boolean {
  * A lead-in more than a fifth from the root it leads into folds an octave to sit beside it.
  * Played where it stands it is a leading tone on paper, yet the ear hears a wrong note or a
  * leap, not a lead-in. Any other note, and the root's own octave (a pump), stays where it is.
+ * At the floor (#2178: a low E the ending goes to, `floored`), a lead-in from below has no
+ * note to fold to, so it leads in from above instead, as `approach` does there: a D# under
+ * the open E string is not on the instrument, and a leap of a seventh is not a lead-in. Only
+ * an ending's lead-in asks for it; the line's own at the floor keep their fold for now.
  */
-export function meetRoot(midi: number, target: number): number {
+export function meetRoot(midi: number, target: number, floored = false): number {
     if (!isLeadIn(midi, target) || Math.abs(midi - target) <= 7) {
         return midi;
     }
     const gap = mod12(midi - target);
-    return target + (gap <= 2 ? gap : gap - 12);
+    const folded = target + (gap <= 2 ? gap : gap - 12);
+    return floored && folded < BASS.lo ? target + (12 - gap) : folded;
 }

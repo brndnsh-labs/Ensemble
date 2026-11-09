@@ -13,14 +13,15 @@ import {
     type PitchedNote,
     type StyleId,
 } from '../core/types.js';
-import { chorusBars, compileTimeline, type Timeline } from '../form/timeline.js';
+import { chordAt, chorusBars, compileTimeline, type Timeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
+import { BASS, lowestRoot } from '../players/bass/line.js';
 import { dyn, readLine, STEP } from '../players/grid.js';
 import { endWithTheBand } from '../players/lead/idiom.js';
 import { STYLE_IDS, STYLES } from '../styles/index.js';
 import type { BarContext, EndingGesture } from '../styles/types.js';
 import { COUNTED_FIXTURES, FIXTURES, score } from '../test/scores.js';
-import { chordPcs } from '../theory/chord.js';
+import { type ChordFacts, chordPcs } from '../theory/chord.js';
 import { mod12 } from '../theory/pitch.js';
 import { heldEnding } from './ending.js';
 import { fullWindow, planBars } from './plan.js';
@@ -1677,16 +1678,18 @@ describe('the whole band ends together (#2017)', () => {
                         restrikes++;
                     }
                 } else {
-                    // Nothing crosses the button: a lead sounding there plays it, accented.
+                    // Nothing crosses the button: a lead sounding there plays it, accented; one
+                    // that let go before it plays it too (#2178), from the note it let go of.
                     const button = hits.at(-1)!;
                     for (const n of lead) {
                         expect(n.tick < button && n.tick + n.dur > button, where).toBe(false);
                     }
                     const struck = lead.find((n) => n.tick === button);
-                    if (struck) {
-                        const before = lead[lead.indexOf(struck) - 1];
+                    const before = struck ? lead[lead.indexOf(struck) - 1] : undefined;
+                    if (struck && before) {
                         expect([struck.dur, struck.midi], where).toEqual([SHORT, before.midi]);
                         expect(struck.velocity, where).toBe(Math.min(127, before.velocity + 12));
+                        // Rung up to the button where it had let go on home (#2178).
                         expect(before.tick + before.dur, where).toBe(button);
                         restrikes++;
                     }
@@ -2226,7 +2229,13 @@ describe('country ends on a walk-up and a stinger (#2177)', () => {
      */
     const walkUps: Record<
         string,
-        { chart: SemanticScore; walk: [number, number][]; seeds?: string[] }
+        {
+            chart: SemanticScore;
+            walk: [number, number][];
+            /** A second shape the bar may take, from the register the line reached it in. */
+            or?: [number, number][];
+            seeds?: string[];
+        }
     > = {
         // Over the V: "G, A-B → C", the G held through 2.
         V: {
@@ -2293,34 +2302,43 @@ describe('country ends on a walk-up and a stinger (#2177)', () => {
                 [12, -1],
             ],
         },
-        // Over the ii: D, then G A B → C.
+        // Over the ii: D, then G A B → C. The run sits under the low C the band ends on
+        // (#2178), and the D, already nearest that C, stays a step above it.
         ii: {
             chart: inC('C | F | Dm7 | Dm7 G7'),
             walk: [
-                [0, -10],
+                [0, 2],
                 [4, -5],
                 [8, -3],
                 [12, -1],
             ],
         },
-        // In E, the ii's run reaches the top of the range: F#, B C# D# → E3. The landing is
-        // where the walk pointed: placed from the D# alone it fell an octave, to E2.
+        // In E the low root has no 5 under it, so the run takes the lowest octave it fits in
+        // (#2178): F#2, then B1 C#2 D#2 → E2, never up to E3. The landing is where the walk
+        // pointed: placed from the D# alone it could fall an octave.
         'ii in E': {
             chart: score([{ label: 'A', bars: 'E | A | F#m7 | B7' }], { key: 'E' }),
             walk: [
-                [0, -10],
+                [0, 2],
                 [4, -5],
                 [8, -3],
                 [12, -1],
             ],
         },
-        // `C7 A7`: the A7 struck on 3 keeps its root there and walks with the leading tone
-        // alone (A7's 9th): A, B → C.
+        // `C7 A7`: the A7 struck on 3 keeps its root there and goes down into the low C by
+        // one note (#2178, #2198: a country bassist never ends on the top string). From a
+        // line that sat low it walks up with the leading tone (A7's 9th): A1, B1 → C2; from a
+        // C3 a lead-in had placed, the A2 boom steps to the landing's 5 and drops the fifth:
+        // A2, G2 → C2 — never the C3 the old own-register walk ended on.
         'two-beat A7': {
             chart: FIXTURES.blues,
             walk: [
                 [8, -3],
                 [12, -1],
+            ],
+            or: [
+                [8, 9],
+                [12, 7],
             ],
         },
         // In A minor, over E7: E, F#-G# → A.
@@ -2336,7 +2354,7 @@ describe('country ends on a walk-up and a stinger (#2177)', () => {
 
     it.each(Object.entries(walkUps))(
         '%s: the bass walks into the root on the one, at any energy',
-        (name, { chart, walk, seeds = SEEDS }) => {
+        (name, { chart, walk, or, seeds = SEEDS }) => {
             // Catches a walk-up left to the line's coin toss (the regular walk plays about half
             // the time, never in the ballad), one aimed at the chord the ending replaces, a
             // line that turns round under a root already inside the run, and a landing an
@@ -2360,15 +2378,15 @@ describe('country ends on a walk-up and a stinger (#2177)', () => {
                         landing.velocity,
                         `${where}: the landing's weight`,
                     ).toBeGreaterThanOrEqual(bassIn(events, before.index).at(-1)!.velocity);
-                    expect(
-                        bassIn(events, before.index)
-                            .filter((n) => n.tick >= before.start + from * STEP)
-                            .map((n) => [
-                                Math.round((n.tick - before.start) / STEP),
-                                n.midi - landing.midi,
-                            ]),
-                        `${where}: the walk-up`,
-                    ).toEqual(walk);
+                    const shape = bassIn(events, before.index)
+                        .filter((n) => n.tick >= before.start + from * STEP)
+                        .map((n) => [
+                            Math.round((n.tick - before.start) / STEP),
+                            n.midi - landing.midi,
+                        ]);
+                    expect([walk, ...(or ? [or] : [])], `${where}: the walk-up`).toContainEqual(
+                        shape,
+                    );
                 }
             }
         },
@@ -2526,4 +2544,368 @@ describe('country ends on a walk-up and a stinger (#2177)', () => {
             }
         },
     );
+});
+
+describe("the lead plays the band's final hit, and the bass's last note goes low (#2178)", () => {
+    // A head's last phrase mostly sings into the ending bar; a solo pass's sparse shapes (pass
+    // 1–3) rest the form's last bar, and some books rest it in the head too (reggae's, hip
+    // hop's, the blues's). Every case is a real chart through `performPass`, straight and
+    // unhumanized; the looping pass of the same seed, which plays no ending, shows what the
+    // phrase did on its own: a lead resting the last bar there had let go before the ending,
+    // so what it plays in the ending bar is the gesture's doing, not the phrase's.
+    const CHARTS = {
+        blues: FIXTURES.blues,
+        pop: FIXTURES.popSong,
+        roman: FIXTURES.romanNumerals,
+        gmaj: score([{ label: 'A', bars: 'G | C | Am7 | D7' }], { key: 'G' }),
+        // The low E: the root at the bass's floor, with no 5 or lead-in under it.
+        emaj: score([{ label: 'A', bars: 'E | A | F#m7 | B7' }], { key: 'E' }),
+        // And in minor, ending on its im9 over the same low E.
+        minorFunk: FIXTURES.minorFunk,
+    };
+    const PASSES = [0, 1, 2, 3];
+    const straight = (style: StyleId, seed: string): BandSettings => ({
+        ...settingsFor(style, seed),
+        lanes: { drums: true, bass: true, comp: true, lead: true },
+        swing: 0,
+        humanize: 0,
+    });
+    /** One style's cases: each chart, pass and seed, with the ending pass and the looping pass. */
+    function* cases(style: StyleId) {
+        for (const [name, chart] of Object.entries(CHARTS)) {
+            const timeline = compileTimeline(chart);
+            const bar = timeline.bars.at(-1)!;
+            const end = bar.start + bar.meter.barTicks;
+            // Every chart here is home on the ending bar's downbeat (a resolved turnaround, or
+            // a tonic already written there), so the gesture is measured from the barline.
+            const home = (heldEnding(timeline, bar.index, STYLES[style].ending) ?? bar).spans
+                .filter((span) => span.chord)
+                .at(-1)!;
+            expect(home.start, name).toBe(bar.start);
+            const hits = homeSteps(style, 0).map((at) => bar.start + at * STEP);
+            const leadIn = (events: BandEvent[]) =>
+                events.filter(
+                    (e): e is PitchedNote =>
+                        e.lane === 'lead' && e.tick < end && e.tick + e.dur > bar.start + 1,
+                );
+            for (const pass of PASSES) {
+                for (const seed of SEEDS) {
+                    const ending = performPass(timeline, straight(style, seed), {
+                        pass,
+                        looping: false,
+                    }).events;
+                    const looping = performPass(timeline, straight(style, seed), {
+                        pass,
+                        looping: true,
+                    }).events;
+                    yield {
+                        where: `${style}/${name}/pass ${pass}/${seed}`,
+                        timeline,
+                        bar,
+                        end,
+                        chord: home.chord!,
+                        hits,
+                        lead: leadIn(ending),
+                        bass: ending.filter(
+                            (e): e is PitchedNote => e.lane === 'bass' && e.bar >= bar.index - 2,
+                        ),
+                        rested: leadIn(looping).length === 0,
+                        // Where the phrase's last note in the bar ended when played on its own.
+                        loopEnd: Math.max(...leadIn(looping).map((n) => n.tick + n.dur), -1),
+                    };
+                }
+            }
+        }
+    }
+    const restingTone = (chord: ChordFacts, midi: number) =>
+        chordPcs(chord).includes(mod12(midi)) || chord.scale.includes(mod12(midi - chord.root));
+
+    it.each(STYLE_IDS)(
+        "%s: the lead ends with the band — on its final hit, or ringing to its last strike's end",
+        (style) => {
+            // Catches a lead that plays the stop's One, the last stab or the button only when
+            // its phrase was still sounding (`endWithTheBand` before #2178: reggae, hip hop and
+            // jazz missed it on the blues), a hold or soft ending whose lead stops at beat 3
+            // while the band rings to 4, and the over-reach: a lead struck into a chord the
+            // band is letting ring. The counts keep the let-go case non-vacuous: at least one
+            // case per style where the phrase had let go and the gesture put the lead on the
+            // hit (or, ringing, kept it out).
+            const gesture = STYLES[style].endingGesture;
+            const short =
+                gesture.kind === 'stop' || gesture.kind === 'button' || gesture.kind === 'hits';
+            let letGo = 0;
+            for (const { where, bar, end, chord, hits, lead, rested, loopEnd } of cases(style)) {
+                if (short) {
+                    const final = hits.at(-1)!;
+                    const onHit = lead.filter((n) => Math.abs(n.tick - final) < 1);
+                    expect(onHit, `${where}: the lead on the final hit`).toHaveLength(1);
+                    expect(onHit[0].tick + onHit[0].dur, `${where}: let go with the band`).toBe(
+                        gesture.kind === 'hits' ? end : final + SHORT,
+                    );
+                    expect(restingTone(chord, onHit[0].midi), `${where}: a resting tone`).toBe(
+                        true,
+                    );
+                    for (const n of lead) {
+                        expect(n.tick, `${where}: nothing after the last hit`).toBeLessThanOrEqual(
+                            final,
+                        );
+                    }
+                    if (rested) {
+                        letGo++;
+                        // Silent in the bar, the lead joins every one of the band's hits: the
+                        // stabs are unison, the band's (a horn in on 3 alone missed 1 and 2).
+                        // In a button it plays the button alone: the chord before it is the
+                        // band's to hold, so the lead's one note in the bar is the button.
+                        const joined = gesture.kind === 'hits' ? hits : [final];
+                        expect(
+                            lead.map((n) => n.tick),
+                            `${where}: the lead on ${joined.length} hits`,
+                        ).toEqual(joined);
+                    } else if (gesture.kind === 'button') {
+                        // Let go inside the bar, before the button (the phrase's own note ends
+                        // at beat 3 on the blues): a note on home is rung up to the button,
+                        // "baaah–bop"; the old rule left a beat and a half of silence, then
+                        // the bop from nothing.
+                        const before = lead.filter((n) => n.tick < final - 1).at(-1);
+                        if (before && before.tick >= bar.start) {
+                            expect(
+                                before.tick + before.dur,
+                                `${where}: rung up to the button`,
+                            ).toBe(final);
+                        }
+                        if (before && loopEnd < final - 1) {
+                            letGo++;
+                        }
+                    }
+                } else if (rested) {
+                    letGo++;
+                    expect(
+                        lead.filter((n) => n.bar === bar.index),
+                        `${where}: a lead that had let go stays out of a ringing chord`,
+                    ).toEqual([]);
+                } else {
+                    const last = lead.at(-1)!;
+                    expect(last.tick + last.dur, `${where}: rings to the bar's end`).toBe(end);
+                    expect(restingTone(chord, last.midi), `${where}: a resting tone`).toBe(true);
+                }
+            }
+            expect(letGo, `${style}: a case where the phrase had let go`).toBeGreaterThan(0);
+        },
+    );
+
+    /**
+     * Whether the line sat nearer the octave above the low root as it came into the bar
+     * before the ending (that bar's first note; its last is the approach, aimed low): where
+     * it did, a placement near the note before (`place`) would take the upper octave, and the
+     * low root is the rule's doing.
+     */
+    const satHigh = (bass: PitchedNote[], barIndex: number, low: number) => {
+        const first = bass.find((n) => n.bar === barIndex - 1);
+        return !!first && Math.abs(first.midi - (low + 12)) < Math.abs(first.midi - low);
+    };
+
+    it.each(STYLE_IDS)("%s: the bass's last note is the lowest root in its range", (style) => {
+        // Catches `endingBass` placing the final root where the line was (`pitch(chord, prev)`:
+        // an octave up after a line that climbed), and a home chord struck in two octaves (a
+        // button or a last hit dropped under the chord it ends). Country's walk-up (#2177) lands
+        // where it pointed, by step: on the low root where its run fits under it and nothing
+        // had placed its boom, else in its own register (a low E has no 5 under it; a boom a
+        // lead-in placed keeps its octave) — so for country the landing is the walk's, and
+        // the home chord's strikes all take it.
+        // And every line: where its approach into the ending would have dropped more than an
+        // octave from the note before it to get low, it aimed at its own octave and the
+        // ending lands there (`endingAim`'s promise); where the drop was within an octave,
+        // the ending is low.
+        for (const { where, bar, bass } of cases(style)) {
+            const inBar = bass.filter((n) => n.bar === bar.index);
+            const final = inBar.at(-1)!;
+            const low = lowestRoot(mod12(final.midi));
+            const before = bass.filter((n) => n.bar < bar.index);
+            const prev = before.at(-1);
+            // The line's note before its lead-in: the last one of another pitch (the blues
+            // lope repeats the lead-in on its swung "and").
+            const near = before
+                .slice(0, -1)
+                .reverse()
+                .find((n) => n.midi !== prev?.midi);
+            const walkedIn =
+                style === 'country' && prev !== undefined && Math.abs(prev.midi - final.midi) <= 2;
+            const promised =
+                near !== undefined && Math.abs(low - near.midi) > 12 && final.midi > low;
+            // Ska-punk's walk into a root at the floor (a low E has no lead-in under it) aims
+            // at the octave above and lands there: a walk up to E2 that then dropped a
+            // seventh to E1 was no walk.
+            const floored = style === 'skapunk' && low - 1 < BASS.lo;
+            const expected = floored ? low + 12 : walkedIn || promised ? final.midi : low;
+            expect(final.midi, `${where}: the last note`).toBe(expected);
+            expect(mod12(final.midi), `${where}: the root`).toBe(mod12(low));
+            for (const n of inBar.filter((n) => mod12(n.midi) === mod12(low))) {
+                expect(n.midi, `${where}: every strike of the home note`).toBe(expected);
+            }
+        }
+    });
+
+    it('the low root is a change for the lines that sat high, not a restatement', () => {
+        // Non-vacuous for the test above: styles whose line places near the note before
+        // (rock, jazz, funk, the blues) reach the ending bar nearer the octave above in some
+        // case, so the voice-led placement would have taken it. Metal's, hip hop's and the
+        // pumping lines already sit on the low root.
+        const changed = STYLE_IDS.filter((style) =>
+            [...cases(style)].some(({ bar, bass }) => {
+                const final = bass.filter((n) => n.bar === bar.index).at(-1)!;
+                return satHigh(bass, bar.index, lowestRoot(mod12(final.midi)));
+            }),
+        );
+        expect(changed).toEqual(expect.arrayContaining(['rock', 'jazz', 'funk', 'blues']));
+    });
+
+    it('reggae: silent before a stop under a written fermata, the lead joins the held One', () => {
+        // The fermata holds the gesture's last strike (#2175); a lead that had let go joins the
+        // stop's One (#2178), so what the hold rings on is its note too, sung with vibrato.
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'C | F | Dm7 | G7', fermataBars: [3] }]),
+        );
+        const bar = timeline.bars.at(-1)!;
+        const end = bar.start + bar.meter.barTicks;
+        const play = (looping: boolean) =>
+            performPass(timeline, straight('reggae', 'a'), { pass: 0, looping }).events.filter(
+                (e): e is PitchedNote => e.lane === 'lead' && e.tick + e.dur > bar.start + 1,
+            );
+        expect(play(true), 'the phrase rests the last bar').toEqual([]);
+        const lead = play(false);
+        expect(lead.map((n) => [n.tick, n.tick + n.dur, n.vibrato])).toEqual([
+            [bar.start, end, true],
+        ]);
+        // A fermata on the last bar is a written ending: the chord is the bar's own G7.
+        expect(restingTone(bar.spans[0].chord!, lead[0].midi)).toBe(true);
+    });
+
+    it("skapunk: a horn's fall-off in the bar before is over before the hit it joins", () => {
+        // A long fall (`fall.into`) drops into the rest after the note; with the lead now on
+        // the stop's One, the fall is cut to the room before it, or dropped (an eighth or less
+        // reads as a flat note). Catches a fall running into the hit (the invariant's "falls
+        // into the note"). Seed e of rhythm changes' second pass is one where the trumpet falls
+        // off the phrase before the last bar.
+        const timeline = compileTimeline(FIXTURES.rhythmChanges);
+        const bar = timeline.bars.at(-1)!;
+        const before = timeline.bars.at(-2)!;
+        const play = (looping: boolean) =>
+            performPass(timeline, straight('skapunk', 'e'), { pass: 1, looping }).events.filter(
+                (e): e is PitchedNote => e.lane === 'lead',
+            );
+        const planned = play(true)
+            .filter((n) => n.bar === before.index)
+            .at(-1)!;
+        expect(planned.fall?.into, 'the phrase falls off').toBe(true);
+        expect(planned.tick + planned.dur + planned.fall!.ticks).toBeGreaterThan(bar.start);
+        const lead = play(false);
+        const hit = lead.find((n) => n.bar === bar.index)!;
+        expect(hit.tick).toBe(bar.start);
+        // Long note, fall, HIT: the fall keeps its length and the note gives way to it,
+        // ending where the fall has room to finish on the hit.
+        const last = lead.filter((n) => n.bar === before.index).at(-1)!;
+        expect([last.tick, last.midi, last.fall]).toEqual([
+            planned.tick,
+            planned.midi,
+            planned.fall,
+        ]);
+        expect(last.tick + last.dur + last.fall!.ticks).toBe(hit.tick);
+        expect(last.dur).toBeGreaterThanOrEqual(2 * STEP);
+        expect(last.dur).toBeLessThan(planned.dur);
+    });
+
+    /**
+     * Whether the bass's last note before the ending is a step approach into the final root:
+     * a half step from it by class, or a whole step that is not a tone of the chord it sounds
+     * over (the V's own 5th a whole step over the tonic is the riff's note, not a lead-in).
+     */
+    const approachesByStep = (timeline: Timeline, prev: PitchedNote, final: PitchedNote) => {
+        const gap = mod12(prev.midi - final.midi);
+        if (gap === 1 || gap === 11) {
+            return true;
+        }
+        const chord = chordAt(timeline, prev.tick);
+        return (gap === 2 || gap === 10) && !!chord && !chordPcs(chord).includes(mod12(prev.midi));
+    };
+
+    it.each(STYLE_IDS)('%s: a step approach into the ending lands by step', (style) => {
+        // Catches the bar before aiming its approach at the octave the line would have placed
+        // the root in (`place`, `sectionPlace`) while the ending goes low: a half or whole step
+        // in pitch class resolving by a leap (rock's F#2 → G1). Every approach a step from the
+        // final root's class lands within a step of it.
+        for (const { where, timeline, bar, bass } of cases(style)) {
+            const final = bass.filter((n) => n.bar === bar.index)[0]!;
+            const prev = bass.filter((n) => n.bar < bar.index).at(-1);
+            if (prev && approachesByStep(timeline, prev, final)) {
+                expect(
+                    Math.abs(prev.midi - final.midi),
+                    `${where}: ${prev.midi} → ${final.midi}`,
+                ).toBeLessThanOrEqual(2);
+                // And on the instrument: a lead-in under a low E is folded up, not played
+                // under the open string (`meetRoot`).
+                expect(prev.midi, `${where}: on the E string`).toBeGreaterThanOrEqual(BASS.lo);
+            }
+        }
+    });
+
+    it.each(STYLE_IDS)("%s: no leap over an octave into the bar before's last note", (style) => {
+        // Catches an approach aimed low from a line two octaves up (the blues box climbing A2
+        // C3 E3 and jumping to F#1, bossa's anticipated root leaping a 10th): a lead-in
+        // reached by such a drop is a leap, not a lead-in, so the line aims at its own
+        // octave there and the ending lands on it (`endingAim`'s promise). A lead-in is the
+        // last note a step from the final root by class, or that root anticipated; a walk's
+        // fifth under the target (jazz's dominant approach) is the walk's own shape.
+        for (const { where, bar, bass } of cases(style)) {
+            const final = bass.filter((n) => n.bar === bar.index)[0]!;
+            const before = bass.filter((n) => n.bar < bar.index);
+            const [into, last] = before.slice(-2);
+            const gap = last ? mod12(last.midi - final.midi) : 6;
+            if (into && last && (gap <= 2 || gap >= 10)) {
+                expect(
+                    Math.abs(last.midi - into.midi),
+                    `${where}: ${into.midi} → ${last.midi} → ${final.midi}`,
+                ).toBeLessThanOrEqual(12);
+            }
+            if (style === 'country') {
+                // The walk-up is one line into the end: no note of the bar before leaps more
+                // than an octave to the next (a boom placed high walks down to the low root,
+                // never drops to its run's 5 and climbs).
+                const walk = before.filter((n) => n.bar === bar.index - 1);
+                walk.slice(1).forEach((n, k) => {
+                    expect(
+                        Math.abs(n.midi - walk[k].midi),
+                        `${where}: ${walk.map((w) => w.midi).join(',')}`,
+                    ).toBeLessThanOrEqual(12);
+                });
+            }
+        }
+    });
+
+    it("country: the final root is never above the walk's reach", () => {
+        // A country bassist never ends on the top string: the walk-up takes the lowest
+        // octave its run fits in (`reach`: the low root, or E2 over a low E), the boom a
+        // lead-in placed notwithstanding; a chord struck on 3 keeps its root and goes down into
+        // the low root by one note (#2198: the two-beat bar ended on C3 before).
+        for (const { where, bar, bass } of cases('country')) {
+            const final = bass.filter((n) => n.bar === bar.index)[0]!;
+            const low = lowestRoot(mod12(final.midi));
+            const reach = low - 5 >= BASS.lo ? low : low + 12;
+            expect(final.midi, `${where}: the landing`).toBeLessThanOrEqual(reach);
+        }
+    });
+
+    it('the lines that approach by step reach the ending that way', () => {
+        // Non-vacuous for the test above: the walking and stepping lines (jazz, the blues,
+        // ska-punk, country, bossa, rock) approach the final root by step in some case.
+        const stepping = STYLE_IDS.filter((style) =>
+            [...cases(style)].some(({ timeline, bar, bass }) => {
+                const final = bass.filter((n) => n.bar === bar.index)[0]!;
+                const prev = bass.filter((n) => n.bar < bar.index).at(-1);
+                return !!prev && approachesByStep(timeline, prev, final);
+            }),
+        );
+        expect(stepping).toEqual(
+            expect.arrayContaining(['jazz', 'blues', 'skapunk', 'country', 'bossa', 'rock']),
+        );
+    });
 });

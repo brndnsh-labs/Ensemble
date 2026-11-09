@@ -504,7 +504,39 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   counts as struck on the barline: it lets go with the band's first strike (cut in the bar
   before, `letGoBeforeTheBand`), is not struck again on the one, and from there is an
   ending-bar note — in on the hits after it, playing the button it is still sounding at — while
-  a hold or a soft ending lets it ring as planned (#2176). A style with `setup` gets a fill in the bar
+  a hold or a soft ending lets it ring as planned (#2176). The band's final hit is the lead's
+  too, every time (#2178): a working horn player plays the stop's One, the last stab and the
+  "bop" whatever the phrase did, so a lead that had let go — before the bar, or inside it
+  before the hit — is struck again with it, from its last note in the bar or from where it
+  left off before it, on home's resting tone nearest that pitch; silent in the bar, it joins
+  every one of the hits (the stabs are the band's, in unison) and in a button the button alone;
+  a note on home that had let go before the button is rung up to it, "baaah–bop", since the
+  held chord is the lead's too. A horn that fell off the phrase before is in on the hit too:
+  the fall keeps its length and the note gives way to it — long note, fall, HIT — or,
+  where even that leaves no note, the fall is not taken; so a solo pass's lead in the bar
+  before the ending changes where its last phrase falls off. In a hold or a soft ending the
+  lead's last note rings to the band's last strike's end (the written turnaround's change had
+  cut the planned whole note at beat 3), and a lead that had let go stays out: nothing is
+  struck into a chord the band is letting ring. The bass's last note is the lowest root in its
+  range (`lowestRoot`, `players/bass/line.ts`, the sounding bass note's class: a slash chord's
+  slash note): a bassist goes low for the last note where the line had left it an octave up,
+  and the home chord is one note however often the gesture strikes it, so a button or the hits
+  go low with the chord they end; a chord before home keeps the line's pitch. The bar before
+  aims its approach at that low root (`endingAim`, which each line's target placement reads
+  into an ending bar that holds its final chord from the downbeat), so a step approach resolves
+  by step, not by a leap into the octave below — but only where the approach sits within an
+  octave of the line's note before it: a lead-in reached by a two-octave drop (the blues box
+  climbing A2 C3 E3, then F#1) is a leap, not a lead-in, so the line aims at its own octave
+  there and promises it, and the ending lands on the promise (`promised`, `endingBass`). A
+  deep line whose own octave is the low one (reggae) plays no lead-in it would have to drop
+  more than an octave to reach; ska-punk's walk into a low E or F, which has no lead-in under
+  it, aims at the octave above and lands there. Country's walk-up goes down with its whole
+  bar to the lowest octave its run fits in (`reach`: the low root, or E2 over a low E — a
+  country bassist never ends on the top string, #2198), a boom a lead-in placed keeping its
+  pitch while the run after it goes down — walking down through the landing's 7-6-5 where
+  the boom sits more than an octave over the run's 5 (C3 B2 A2 G2 → C2), never dropping to
+  the 5 and climbing — and a chord struck on 3 keeping its root there and going down by one
+  note (A2, G2 → C2; a V on 3 straight down a fifth). A style with `setup` gets a fill in the bar
   before (`fillAt`), its biggest section fill whatever the bar's energy (`fillStart`), the roll
   or pickup that brings the band to its last hit; one without plays its time into the end.
   The ending bar carries no plan crash (its cymbal, or none, is the book's), so the bar before
@@ -530,7 +562,9 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
     run has no note there: the vi's A, E, B → C; the bVII's Bb, F, B → C. The 7 is the bar's b7
     of the key where its chord sounds it (C7: a blues's 5-6-b7-1), else the leading tone; a
     chord struck on 3 walks with the 7 alone (`C7 A7`: A, B → C). The ending lands where the
-    walk pointed (`land`), never an octave off.
+    walk pointed (`land`), never an octave off: on the low root the band ends on (#2178) where
+    the run fits under it and the boom is free to move with it (G, A-B → C, all on the low
+    strings; the ii's D stays a step above the C), else in the line's own register.
   - **The stinger** (`sting`), on the comp guitar, only on home (the tonic): the 6 → 5 fall of
     the pedal steel's A pedal let up. The 6th (the chord scale's step above the 5th: the b6 in
     minor) is struck with the chord and pulled off to the 5th an eighth later, a tenth softer,

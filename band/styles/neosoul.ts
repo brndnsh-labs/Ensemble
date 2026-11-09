@@ -17,6 +17,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     type LineMemory,
     nextChord,
@@ -307,11 +308,14 @@ const neoBass: PitchedIdiom = {
                 (c) => rootPlace(ctx, bassPc(c)),
                 last,
                 dyn(96, plan.energy),
+                memory.land ?? null,
             );
             events.push(...held.events);
             last = held.last;
             return { events, memory: { last } };
         }
+        // Where an approach into the ending promised the band's last note (#2178).
+        let land: number | null = null;
         const line = isCommonTime(bar)
             ? ctx.rng('riff', 'section').weighted(NEO_RIFFS.map(([r, w]) => [r, w[tier]]))
             : oddRiff(ctx);
@@ -355,6 +359,10 @@ const neoBass: PitchedIdiom = {
             const turn = phraseEnd && i === spans.length - 1;
             const change =
                 following && following.bass !== chord.bass && (leadsIn || turn) ? following : null;
+            // Into an ending, the approach aims at the low root the band ends on, or at the
+            // riff's own octave where the drop would be a leap (#2178, `endingAim`).
+            const aim = (own: number, near: number) =>
+                i === spans.length - 1 ? endingAim(ctx, own, near) : null;
             // The approach slot: the riff's last note in the span's final beat (never the
             // arrival itself), or at a phrase end a pickup on the last sixteenth.
             let approachAt: number | null = null;
@@ -379,7 +387,14 @@ const neoBass: PitchedIdiom = {
                 let midi = riffPitch(code, root, prev, chord);
                 if (step === approachAt && change) {
                     const kind = ctx.rng(`approach${i}`).weighted(NEO_APPROACHES);
-                    const lead = approachInto(kind, rootPlace(ctx, bassPc(change)), prev, chord);
+                    const into = aim(rootPlace(ctx, bassPc(change)), prev);
+                    land = into?.promise ?? null;
+                    const lead = approachInto(
+                        kind,
+                        into?.target ?? rootPlace(ctx, bassPc(change)),
+                        prev,
+                        chord,
+                    );
                     if (lead !== null) {
                         midi = lead;
                     } else if (code === 'a') {
@@ -413,7 +428,7 @@ const neoBass: PitchedIdiom = {
                 }
             });
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

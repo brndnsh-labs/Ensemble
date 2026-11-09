@@ -21,6 +21,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     nextChord,
     place,
@@ -203,6 +204,7 @@ function walk(
     targets: Target[] | null,
     rng: Rng,
     chromatic = true,
+    floored = false,
 ): { line: number[]; land: number | null } {
     const count = strong.length;
     if (count === 1) {
@@ -239,7 +241,7 @@ function walk(
                     [approach(t.midi, chord, 'chromatic-below'), APPROACH_COST.chromatic],
                     [approach(t.midi, chord, 'chromatic-above'), APPROACH_COST.chromatic],
                     [approach(t.midi, chord, 'dominant'), APPROACH_COST.dominant],
-                    [approach(t.midi, chord, 'scale'), APPROACH_COST.scale],
+                    [approach(t.midi, chord, 'scale', floored), APPROACH_COST.scale],
                 ];
                 for (const [m, weight] of candidates) {
                     if (!chromatic && weight === APPROACH_COST.chromatic) {
@@ -313,7 +315,7 @@ const skaPunkBass: PitchedIdiom = {
         const arrive = (chord: ChordFacts) =>
             land !== null && mod12(land) === bassPc(chord) ? land : songRoot(ctx, bassPc(chord));
         if (plan.ending) {
-            const held = endingBass(ctx, (c) => arrive(c), last, dyn(104, plan.energy));
+            const held = endingBass(ctx, (c) => arrive(c), last, dyn(104, plan.energy), land);
             events.push(...held.events);
             last = held.last;
             return { events, memory: { last, land: null } };
@@ -337,8 +339,16 @@ const skaPunkBass: PitchedIdiom = {
             }
             const isLast = i === spans.length - 1;
             const following = spans[i + 1]?.span.chord ?? (isLast ? next : null);
-            // Where the next chord's root sits by default: its nearest octave, drifting home.
-            const home = following ? place(bassPc(following), first) : null;
+            // Where the next chord's root sits by default: its nearest octave, drifting home;
+            // into an ending, the low root the band ends on (#2178, `endingAim`: or its own
+            // octave where the walk would have to drop more than an octave to get there), and
+            // the walk aims there alone (`targets` below). A low E or F has no lead-in under
+            // it, so the walk aims at the octave above (E2) and the ending lands there
+            // (`land`, promised): a walk up to E2 that then dropped a seventh was no walk.
+            const own = following ? place(bassPc(following), first) : null;
+            const into = isLast && own !== null ? endingAim(ctx, own, first) : null;
+            const home =
+                into === null ? own : into.target - 1 < BASS.lo ? into.target + 12 : into.target;
 
             if (mode === 'punk') {
                 // Driving root eighths (quarters when the band is quiet), picked even and
@@ -393,9 +403,11 @@ const skaPunkBass: PitchedIdiom = {
             const targets =
                 home === null
                     ? null
-                    : [home - 12, home, home + 12]
-                          .filter((t) => t > BASS.lo && t < BASS.hi)
-                          .map((t) => ({ midi: t, cost: Math.abs(t - home) * 0.25 }));
+                    : into !== null
+                      ? [{ midi: home, cost: 0 }]
+                      : [home - 12, home, home + 12]
+                            .filter((t) => t > BASS.lo && t < BASS.hi)
+                            .map((t) => ({ midi: t, cost: Math.abs(t - home) * 0.25 }));
             const { line, land: aim } = walk(
                 chord,
                 first,
@@ -403,6 +415,7 @@ const skaPunkBass: PitchedIdiom = {
                 targets,
                 ctx.rng(`walk${i}`),
                 !repeat,
+                into !== null,
             );
             line.forEach((midi, k) => {
                 const gap = (steps[k + 1] ?? to) - steps[k];

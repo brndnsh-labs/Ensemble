@@ -10,7 +10,14 @@
  */
 import { type EnergyTier, energyTier } from '../arrange/plan.js';
 import type { PitchedNote } from '../core/types.js';
-import { BASS, bassNote, endingBass, type LineMemory, nextChord } from '../players/bass/line.js';
+import {
+    BASS,
+    bassNote,
+    endingAim,
+    endingBass,
+    type LineMemory,
+    nextChord,
+} from '../players/bass/line.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, tomRun } from '../players/drums/kit.js';
 import { barSteps, dyn, isCommonTime, type Pulse, pulses, spanSteps } from '../players/grid.js';
@@ -201,11 +208,19 @@ const discoBass: PitchedIdiom = {
         const events: PitchedNote[] = [];
         let last = memory.last;
         if (plan.ending) {
-            const held = endingBass(ctx, (c) => pumpRoot(ctx, c.bass), last, dyn(106, plan.energy));
+            const held = endingBass(
+                ctx,
+                (c) => pumpRoot(ctx, c.bass),
+                last,
+                dyn(106, plan.energy),
+                memory.land ?? null,
+            );
             events.push(...held.events);
             last = held.last;
             return { events, memory: { last } };
         }
+        // Where the lead-in into the ending promised the band's last note (#2178).
+        let land: number | null = null;
         const total = barSteps(bar);
         const line = isCommonTime(bar)
             ? ctx.rng('figure', 'section').weighted(FIGURES[tier])
@@ -256,7 +271,12 @@ const discoBass: PitchedIdiom = {
                 const approaching =
                     leads && k === steps.length - 1 && step !== from && to - step <= 2;
                 if (approaching && following) {
-                    midi = leadInto(pumpRoot(ctx, following.bass));
+                    // Into an ending, the low root the band ends on, or the pump's own octave
+                    // where the drop would be a leap (#2178, `endingAim`), promised.
+                    const own = pumpRoot(ctx, following.bass);
+                    const into = inBar ? null : endingAim(ctx, own, root);
+                    land = into?.promise ?? null;
+                    midi = leadInto(into?.target ?? own);
                     velocity = 90;
                 }
                 // The pump bounces: every note stops well short of the next, so the octave pops
@@ -267,7 +287,7 @@ const discoBass: PitchedIdiom = {
                 last = midi;
             });
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

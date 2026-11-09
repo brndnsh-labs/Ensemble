@@ -14,6 +14,7 @@ import type { PitchedNote } from '../core/types.js';
 import {
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     kickSteps,
     type LineMemory,
@@ -259,11 +260,14 @@ const subBass: PitchedIdiom = {
                 (c) => subRoot(ctx, bassPc(c)),
                 last,
                 dyn(110, plan.energy),
+                memory.land ?? null,
             );
             events.push(...held.events);
             last = held.last;
             return { events, memory: { last } };
         }
+        // Where the glide into the ending promised the band's last note (#2178).
+        let land: number | null = null;
         const total = barSteps(bar);
         // The beat drops out at the end of a section (or a phrase): the bass drops with it.
         const cut = fillFrom(ctx) ?? total;
@@ -319,10 +323,14 @@ const subBass: PitchedIdiom = {
                 // of one glide, so an 808 jumps straight to the next root instead.
                 const lastSpan = i === spans.length - 1 && end === total;
                 if (lastSpan && next && nextAttack && next.bass !== chord.bass) {
-                    const target = subRoot(ctx, bassPc(next));
                     const at = total - 1;
                     const kept = notes.filter((n) => n.step < at);
                     const held = kept[kept.length - 1]?.midi ?? root;
+                    // Into an ending, the low root the band ends on, or the sub's own octave
+                    // where the glide would be a leap (#2178, `endingAim`), promised.
+                    const into = endingAim(ctx, subRoot(ctx, bassPc(next)), held);
+                    land = into?.promise ?? null;
+                    const target = into?.target ?? subRoot(ctx, bassPc(next));
                     const slide = target - Math.sign(target - held);
                     if (slide !== held && Math.abs(target - held) <= 3) {
                         notes.splice(0, notes.length, ...kept, {
@@ -348,7 +356,7 @@ const subBass: PitchedIdiom = {
                 last = n.midi;
             });
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

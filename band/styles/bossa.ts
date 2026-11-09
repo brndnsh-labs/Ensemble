@@ -12,6 +12,7 @@ import {
     BASS,
     bassNote,
     bassPc,
+    endingAim,
     endingBass,
     type LineMemory,
     nextChord,
@@ -75,10 +76,18 @@ const bossaBass: PitchedIdiom = {
         const spans = spanSteps(bar);
         const next = nextChord(ctx);
         if (plan.ending) {
-            const held = endingBass(ctx, (c, p) => place(bassPc(c), p), last, dyn(92, plan.energy));
+            const held = endingBass(
+                ctx,
+                (c, p) => place(bassPc(c), p),
+                last,
+                dyn(92, plan.energy),
+                memory.land ?? null,
+            );
             events.push(...held.events);
             return { events, memory: { last } };
         }
+        // Where the &4 pickup into the ending promised the band's last note (#2178).
+        let land: number | null = null;
         const grid =
             bar.meter.name === '4/4'
                 ? [0, 6, 8, 14]
@@ -106,15 +115,19 @@ const bossaBass: PitchedIdiom = {
                 // to the next bar's root — the chord it anticipates, or this root again.
                 let midi = isArrival ? root : fifth;
                 if (isLast && step === to - 2 && to === barSteps(bar) && !isArrival) {
+                    // Into an ending, the pickup aims at the low root the band ends on, or at
+                    // the section's own octave where the anticipated root would leap a 10th
+                    // down to get there (#2178, `endingAim`), and promises it.
+                    const own = following ? sectionPlace(ctx, bassPc(following)) : root;
+                    const into =
+                        following && i === spans.length - 1 ? endingAim(ctx, own, last) : null;
+                    land = into?.promise ?? null;
+                    const target = into?.target ?? own;
                     midi =
                         following && following.bass !== chord.bass
                             ? rng.chance(0.3)
-                                ? approach(
-                                      sectionPlace(ctx, bassPc(following)),
-                                      chord,
-                                      'chromatic-below',
-                                  )
-                                : sectionPlace(ctx, bassPc(following))
+                                ? approach(target, chord, 'chromatic-below')
+                                : target
                             : root;
                 }
                 const length = ((steps[k + 1] ?? to) - step) * 0.9;
@@ -123,7 +136,7 @@ const bossaBass: PitchedIdiom = {
                 last = midi;
             });
         });
-        return { events, memory: { last } };
+        return { events, memory: { last, land } };
     },
 };
 

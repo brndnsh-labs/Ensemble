@@ -2512,19 +2512,40 @@ function planSlot(
 }
 
 /**
+ * Where the lead left off before the ending bar: its last note's pitch and level, which the
+ * band's final hit is joined from when the lead has let go (`endWithTheBand`). Null: the lead
+ * doesn't join (no line to join from, or a caller that only cuts).
+ */
+export interface LeadLeftOff {
+    midi: number;
+    velocity: number;
+}
+
+/**
  * The lead's notes in the ending bar, let go with the band's gesture (#2017). A held or soft
- * ending is the lead's long last note as planned (`landOnHeld`). In a stop or the hits the
+ * ending is the lead's long last note as planned (`landOnHeld`), rung to the band's last
+ * strike's end (#2178: the written turnaround's change cut the planned whole note at beat 3,
+ * where the band holds one chord to 4); a lead that had let go before the bar stays out of
+ * it — nothing is struck into a chord the band is letting ring. In a stop or the hits the
  * band falls silent after each strike, and a lead holding on over that silence is the one
  * player who didn't stop: each note lets go where the band's strike it sounds under lets go
  * (`| G7:2 C:2 |`'s V too, not only home), a note struck in a silence between strikes is a
  * pickup of an eighth at most into the next, and none starts after the band's last strike. A
  * note that was held up to the band's last strike lets go with its own and is struck again
  * with the last (home's eighth in a stop, the ringing last hit). In a button, a lead still
- * sounding there plays it with the band, short and accented (`BUTTON_LIFT`); one that has
- * already let go stays out (the soloist's choice: the band's button is enough). A re-strike
- * of a note first struck before home (held from over the V) is sung on the home chord's
- * resting tone nearest it (`settle`), as the landing is: never the V's leading tone against
- * the I.
+ * sounding there plays it with the band, short and accented (`BUTTON_LIFT`). A re-strike of a
+ * note first struck before home (held from over the V) is sung on the home chord's resting
+ * tone nearest it (`settle`), as the landing is: never the V's leading tone against the I.
+ *
+ * The band's final hit is the lead's too, every time (#2178): a working horn player plays the
+ * stop's One, the last stab and the "bop" whatever the phrase did, so a lead that had let go —
+ * before the bar, or inside it before the hit — is in on it: struck again from its last note
+ * in the bar (`again`), or, silent in the bar, from where it left off before it (`from`), on
+ * home's resting tone nearest that pitch and at its level. In the hits it joins every one of
+ * home's hits after its last note, not only the last (why: unison stabs are the one place
+ * everyone hits every note; a horn that hit 1 and 3 but not 2 would be the one player who
+ * missed the arrival), and all of them when it was silent: the stabs are the band's, played
+ * in unison. In a button only the button: the chord before it is the band's to hold.
  *
  * A note struck in the bar before and tied over the barline (#2176: the guide-tone head's
  * "and" of 4 tied into the downbeat, `guideOnsets`) is the downbeat's note, struck early, so
@@ -2541,9 +2562,10 @@ export function endWithTheBand(
     ctx: BarContext,
     events: PitchedNote[],
     book: LeadBook,
+    from: LeadLeftOff | null = null,
 ): PitchedNote[] {
     const gesture = ctx.plan.ending;
-    if (!gesture || gesture.kind === 'hold' || gesture.kind === 'soft' || !events.length) {
+    if (!gesture) {
         return events;
     }
     const strikes = endingStrikes(ctx);
@@ -2552,6 +2574,12 @@ export function endWithTheBand(
         return events;
     }
     const tick = (step: number) => at(ctx.bar, step);
+    if (gesture.kind === 'hold' || gesture.kind === 'soft') {
+        return ringToTheEnd(events, tick(last.to), book);
+    }
+    if (!events.length && !from) {
+        return events;
+    }
     // Where a note counts as struck: a note tied in from the bar before, on the barline.
     const struckAt = (n: PitchedNote) => Math.max(n.tick, ctx.bar.start);
     // Where home is struck: a note from before it is the V's.
@@ -2563,17 +2591,29 @@ export function endWithTheBand(
             ? { ...rest, dur, vibrato: true }
             : { ...rest, dur };
     };
+    const settled = (midi: number) =>
+        last.span.chord
+            ? nearestRanked(book.settle(last.span.chord, ctx.bar.key), midi, ctx.lead.range)
+            : midi;
     const again = (n: PitchedNote, from: number, to: number, lift: number): PitchedNote => ({
         lane: 'lead',
         tick: from,
         dur: to - from,
-        midi:
-            struckAt(n) < home - 1 && last.span.chord
-                ? nearestRanked(book.settle(last.span.chord, ctx.bar.key), n.midi, ctx.lead.range)
-                : n.midi,
+        midi: struckAt(n) < home - 1 ? settled(n.midi) : n.midi,
         velocity: Math.min(127, n.velocity + lift),
         offsetMs: 0,
         // The re-strike is this bar's, whichever bar the note it repeats was struck in.
+        bar: ctx.bar.index,
+    });
+    // The hit a lead silent in the bar joins: from where it left off, on home's resting tone
+    // nearest that pitch (the landing's rule), at the level it was playing.
+    const join = (left: LeadLeftOff, from: number, to: number, lift: number): PitchedNote => ({
+        lane: 'lead',
+        tick: from,
+        dur: to - from,
+        midi: settled(left.midi),
+        velocity: Math.min(127, left.velocity + lift),
+        offsetMs: 0,
         bar: ctx.bar.index,
     });
     if (gesture.kind === 'button') {
@@ -2582,16 +2622,31 @@ export function endWithTheBand(
             return events;
         }
         const struck = tick(button.from);
-        const kept = events.filter((n) => n.tick < struck - 1);
+        const before = events.filter((n) => n.tick < struck - 1);
+        const to = tick(button.to);
+        // why: a note on home that let go before the button is rung up to it — "baaah–bop" —
+        // since the held chord is the lead's too, and a beat and a half of silence before the
+        // bop reads as a player who stopped early, not as a phrase's end (the written
+        // turnaround's change had cut the planned whole note at beat 3, `onsetsFor`). A note
+        // let go over the V stays as sung: home is the landing's, and the bop alone is its.
+        const last = before.at(-1);
+        const kept =
+            last && struckAt(last) >= home - 1 && last.tick + last.dur < struck - 1
+                ? ringToTheEnd(before, struck, book)
+                : before;
         const final = kept.at(-1);
-        if (!final || final.tick + final.dur < struck - 1) {
-            return kept;
+        if (final && final.tick + final.dur >= struck - 1) {
+            // Still sounding at the button: it lets go there and plays it.
+            return [
+                ...kept.slice(0, -1),
+                cut(final, struck),
+                again(final, struck, to, BUTTON_LIFT),
+            ];
         }
-        return [
-            ...kept.slice(0, -1),
-            cut(final, struck),
-            again(final, struck, tick(button.to), BUTTON_LIFT),
-        ];
+        if (final) {
+            return [...kept, again(final, struck, to, BUTTON_LIFT)];
+        }
+        return from ? [join(from, struck, to, BUTTON_LIFT)] : kept;
     }
     // stop, hits: each note lets go with the strike it sounds under; nothing after the last.
     const silence = tick(last.to);
@@ -2606,17 +2661,39 @@ export function endWithTheBand(
         return cut(n, end);
     });
     const original = sounding.at(-1);
-    // The band's strikes after the one the lead's last note sounds under.
-    const later = original ? strikes.filter((s) => tick(s.from) > struckAt(original) + 1) : [];
-    const into = later[0];
-    if (original && into && original.tick + original.dur >= tick(into.from) - 1) {
-        // Held into the band's next strike: the player is in on the hits, so the note is struck
-        // again with every one of them (short with a short one, ringing with the last), not
-        // only the last. why: unison stabs are the one place everyone hits every note; a horn
-        // that hit 1 and 3 but not 2 would be the one player who missed the arrival.
+    // Home's hits after the lead's last note (all of them when it was silent in the bar): the
+    // band's unison stabs, the lead's too. A chord before home (`| G7 C |`'s V) is the lead's
+    // only while it is singing over it.
+    const later = strikes.filter(
+        (s) => s.span === last.span && (!original || tick(s.from) > struckAt(original) + 1),
+    );
+    if (original) {
         return [...kept, ...later.map((s) => again(original, tick(s.from), tick(s.to), 0))];
     }
-    return kept;
+    return from ? [...kept, ...later.map((s) => join(from, tick(s.from), tick(s.to), 0))] : kept;
+}
+
+/**
+ * A hold or soft ending's lead (#2178): its last note in the bar rings to `end`, the band's
+ * last strike's end, where it stopped short of it. why: the band lets the one chord ring to
+ * the bar's end, and a lead that let go at beat 3 leaves the chord thinner for its last beat;
+ * the planned note was cut at the written turnaround's change (`onsetsFor`), a change the
+ * resolved ending no longer has. A note rung long enough sings with vibrato (`vibrato`, the
+ * book's threshold), and a fall-off drawn for it is dropped: a fall is letting go, and this
+ * note holds with the band. A note already reaching the end, and every note before the last,
+ * is untouched; a lead silent in the bar stays silent.
+ */
+function ringToTheEnd(events: PitchedNote[], end: number, book: LeadBook): PitchedNote[] {
+    const final = events.at(-1);
+    if (!final || final.tick + final.dur >= end - 1) {
+        return events;
+    }
+    const dur = end - final.tick;
+    const { fall: _fall, vibrato, ...rest } = final;
+    return [
+        ...events.slice(0, -1),
+        { ...rest, dur, ...(vibrato || dur >= STEP * book.vibrato ? { vibrato: true } : {}) },
+    ];
 }
 
 /**
@@ -2639,34 +2716,62 @@ function tieHeldUnderFermata(bar: Bar, gesture: EndingGesture | null): boolean {
 /**
  * The bar before the ending (#2176): a lead note struck here and tied over the barline into
  * the ending bar (`ctx.next.plan.ending`) is cut as that bar's gesture cuts it
- * (`endWithTheBand`, given the note as the ending bar sees it), so nothing rings over a stop
- * or past the first hit; the re-strikes it earns there are the ending bar's to play. A hold or
- * a soft ending leaves it ringing as planned, so does a stop under a written fermata on the
- * ending bar's downbeat (`tieHeldUnderFermata`), and a bar before anything else is untouched.
- * Both halves — this bar cutting what it played, the ending bar re-striking from the slot's
+ * (`endWithTheBand`, given the bar's notes as the ending bar sees them: the tie, then the
+ * notes the slot planned in that bar, `ahead`), so nothing rings over a stop or past the
+ * first hit; the re-strikes it earns there, and the hits the lead joins, are the ending bar's
+ * to play. A hold or a soft ending leaves it ringing as planned (rung to the bar's end where
+ * it is the lead's last note, #2178), so does a stop under a written fermata on the ending
+ * bar's downbeat (`tieHeldUnderFermata`), and a bar before anything else is untouched. Both
+ * halves — this bar cutting what it played, the ending bar re-striking from the slot's
  * memory — rely on the crossing note being the one the slot planned and this bar played: a
  * note in the plan with its `bar` before the ending bar and its end past the barline.
+ *
+ * And a horn that fell off its last phrase here still makes the hit the ending bar joins
+ * (#2178, `from` as that bar reads it): its long fall-off (`fall.into`, falling into the rest
+ * after the note) is over before the first note the ending bar strikes. The fall keeps its
+ * length and the note gives way to it — long note, fall, HIT (the fall's level sinks to
+ * nothing by the hit, which is the breath) — why: a fall cut short
+ * reads as a flat note, not a fall (`fallShape`), while a held note that lets go a beat early
+ * is just the phrase ending sooner. Only where even that leaves no note (an eighth) is the
+ * fall not taken. So the bar before an ending's lead changes in a solo pass whose last
+ * phrase falls off (a head's falls are on its own last note, inside the ending bar).
  */
-function letGoBeforeTheBand(ctx: BarContext, events: PitchedNote[], book: LeadBook): PitchedNote[] {
-    const ahead = ctx.next;
-    if (!ahead?.plan.ending || tieHeldUnderFermata(ahead.bar, ahead.plan.ending)) {
+function letGoBeforeTheBand(
+    ctx: BarContext,
+    events: PitchedNote[],
+    ahead: PitchedNote[],
+    from: LeadLeftOff | null,
+    book: LeadBook,
+): PitchedNote[] {
+    const next = ctx.next;
+    if (!next?.plan.ending || tieHeldUnderFermata(next.bar, next.plan.ending)) {
         return events;
     }
-    const barline = ahead.bar.start;
+    const barline = next.bar.start;
     const tied = events.filter((n) => n.tick + n.dur > barline + 1);
-    if (!tied.length) {
-        return events;
-    }
     const nextCtx: BarContext = {
         ...ctx,
-        bar: ahead.bar,
-        plan: ahead.plan,
-        rng: ahead.rng,
+        bar: next.bar,
+        plan: next.plan,
+        rng: next.rng,
         next: null,
         heard: { drums: [], bass: [], lead: [] },
     };
-    const cut = endWithTheBand(nextCtx, tied, book).filter((n) => n.tick < barline);
-    return [...events.filter((n) => !tied.includes(n)), ...cut].sort((a, b) => a.tick - b.tick);
+    const there = endWithTheBand(nextCtx, [...tied, ...ahead], book, from);
+    const cut = there.filter((n) => n.tick < barline);
+    const struck = there.filter((n) => n.tick >= barline).map((n) => n.tick);
+    const hit = struck.length ? Math.min(...struck) : null;
+    const fallBefore = (n: PitchedNote): PitchedNote => {
+        if (hit === null || !n.fall?.into || n.tick + n.dur + n.fall.ticks <= hit) {
+            return n;
+        }
+        const dur = hit - n.fall.ticks - n.tick;
+        const { fall: _fall, ...rest } = n;
+        return dur >= STEP * 2 ? { ...n, dur } : rest;
+    };
+    return [...events.filter((n) => !tied.includes(n)), ...cut]
+        .map(fallBefore)
+        .sort((a, b) => a.tick - b.tick);
 }
 
 /**
@@ -2744,13 +2849,26 @@ export function leadIdiom(book: LeadBook): LeadIdiom {
             // from the bar before included (#2176; that bar cut it, `letGoBeforeTheBand`): only
             // what is struck in this bar is emitted here. A stop under a fermata on the
             // downbeat holds the tie uncut, so it earns no re-strike (the bar before and this
-            // one agree, `tieHeldUnderFermata`).
+            // one agree, `tieHeldUnderFermata`), and the lead, sounding, joins no hit.
             const own = next.notes.filter((n) => n.bar === bar.index);
-            const tied =
-                ctx.plan.ending && !tieHeldUnderFermata(bar, ctx.plan.ending)
-                    ? next.notes.filter((n) => n.bar < bar.index && n.tick + n.dur > bar.start + 1)
-                    : [];
-            const events = endWithTheBand(ctx, [...tied, ...own].map(toEvent), book).filter(
+            const crossing = next.notes.filter(
+                (n) => n.bar < bar.index && n.tick + n.dur > bar.start + 1,
+            );
+            const heldTie =
+                !!ctx.plan.ending &&
+                crossing.length > 0 &&
+                tieHeldUnderFermata(bar, ctx.plan.ending);
+            const tied = ctx.plan.ending && !heldTie ? crossing : [];
+            // Where the lead left off before this bar (#2178): the slot's last note before it,
+            // which the band's final hit is joined from when nothing of the lead's sounds at
+            // it. A slot that planned nothing (the lead's rest, the player's or the drummer's
+            // turn, `planSlot`) has no line to join from, so it stays out.
+            const leftOff = (index: number): LeadLeftOff | null => {
+                const before = next.notes.filter((n) => n.bar < index).at(-1);
+                return before ? { midi: before.midi, velocity: before.velocity } : null;
+            };
+            const from = heldTie ? null : leftOff(bar.index);
+            const events = endWithTheBand(ctx, [...tied, ...own].map(toEvent), book, from).filter(
                 (n) => n.tick >= bar.start,
             );
             // The last pitch this slot played: a pickup into the next slot (below) is that
@@ -2759,7 +2877,17 @@ export function leadIdiom(book: LeadBook): LeadIdiom {
             const after = { ...next, last };
             const pickup = pickupAhead(ctx, book, role, after).map(toEvent);
             const played = pickup.length ? [...events, ...pickup] : events;
-            return { events: letGoBeforeTheBand(ctx, played, book), memory: after };
+            // What the slot planned in the bar after this one, and where the lead leaves off
+            // before it, for the cut of a note tied into an ending bar and the fall-off before
+            // its hit (`letGoBeforeTheBand` sees that bar as the ending bar will).
+            const ahead = ctx.next
+                ? next.notes.filter((n) => n.bar === ctx.next!.bar.index).map(toEvent)
+                : [];
+            const aheadFrom = ctx.next ? leftOff(ctx.next.bar.index) : null;
+            return {
+                events: letGoBeforeTheBand(ctx, played, ahead, aheadFrom, book),
+                memory: after,
+            };
         },
     };
 }
