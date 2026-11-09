@@ -804,6 +804,13 @@ const bluesLead = leadIdiom({
     // why: a blues guitarist slides into a landing as often as not when he doesn't bend it: a
     // quarter of the unbent landings (#2120).
     slide: 0.25,
+    // why: a blues lick starts on 4 (#2164) — the "and" of 4 alone, two eighths on 4 (the
+    // shuffle's long-short), or a triplet on 4 rolling into the one: 0.65 of the solo's phrases
+    // that would enter on the one, half the head's calls (about 30% of the phrases either way,
+    // the story's floor 25%; a phrase after a bend let back down comes in on its bar).
+    pickup: { chance: 0.65, head: 0.5, figures: ['..x-', 'x-x-', 'xxx-'] },
+    // why: a lick's last eighth leans over the barline into the next bar's one (#2164).
+    pushes: true,
 });
 
 export const blues: Style = {

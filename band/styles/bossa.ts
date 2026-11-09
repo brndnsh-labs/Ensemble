@@ -405,6 +405,13 @@ const bossaLead = leadIdiom({
     // Vibrato only at the tail of a note of three beats or more; everything shorter is
     // straight tone.
     vibrato: 12,
+    // why: a bossa melody comes in a little early now and then (#2164) — the "and" of 4 (twice
+    // weighted: the cool horn's soft lead-in) or two eighths on 4 stepping into the phrase, on
+    // 0.3 of the phrases that would enter on the one: the style's air is in its late entries.
+    pickup: { chance: 0.3, head: 0.3, figures: ['..x-', '..x-', 'x-x-'] },
+    // why: the bossa singer's pushed arrival: the next bar's note struck on the "and" of 4 and
+    // tied over the barline, ahead of the clave (#2164).
+    pushes: true,
 });
 
 export const bossa: Style = {

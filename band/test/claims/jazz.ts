@@ -207,8 +207,14 @@ export const jazz = defineClaims({
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
                 // two after an eight-bar period. Measured 15.63 bars before (phrase into phrase),
                 // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
-                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing.
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing. Still 3.75 with
+                // pickups (#2164): the catch-breath before one, an eighth, is the phrase's breath.
                 ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
+                // Pickups (#2164, `LeadBook.pickup`, head 0.4): of the form's phrases the head
+                // opens, the share it opens on the "and" of 4 or a beat early. Measured 0.300 (0 on
+                // main, and with pickups off); the tune's two-beat period breath is where most
+                // can go. Ceiling: a tune that picks up every phrase is a mannerism.
+                ['leadPhrasesStartEarly', 0.25, 0.45, 'a phrase now and then comes in early'],
                 ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'the head is a tune: it fills the form'],
@@ -343,7 +349,7 @@ export const jazz = defineClaims({
                 ['bassRepeatedNotes', 0, 0.02, 'the walk keeps moving: no repeated pitches'],
                 ['bassMeanLeap', 1.5, 4.5, 'mostly stepwise, not arpeggio leaps'],
                 ['compLeadUnison', 0, 0.15, 'the piano leaves the horn its note'],
-                // Measured 0.118; development off 0.026, #2012's bar fix reverted 0.106; always develops 0.32.
+                // Measured 0.115 since #2164 (0.118 before); development off 0.022 (0.026 before), #2012's bar fix reverted 0.106; always develops 0.32.
                 // Floor guards development off (0.026) only; this style barely sees the bar fix (0.106 vs 0.118), which blues, disco and rock guard.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
@@ -368,13 +374,24 @@ export const jazz = defineClaims({
                 // says the comp still leans back under the line and talks in the holes.
                 ['compLineDensity', 0.1, 0.13, 'a little thinner under the line'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
+                // Pickups (#2164, `LeadBook.pickup` 0.85 of the phrases that would enter on the
+                // one): measured 0.296 (0 on main, and with pickups off). The rest enter late, on
+                // the "and" of 1 or on 2, as the cells write.
+                ['leadPhrasesStartEarly', 0.25, 0.45, 'a bebop line enters on the "and" of 4'],
+                // Pushed arrivals (#2164, `LeadBook.pushes`): of the barlines a line runs across,
+                // the share tied over as one note. Measured 0.261 (0 on main, and with pushes off).
+                ['leadBarlineTies', 0.1, 0.45, 'a run leans over the barline into the change'],
                 ['leadRestShare', 0.2, 0.5, 'the solo breathes between phrases'],
                 ['leadShortShare', 0.6, 0.95, 'bebop: running eighth-note lines'],
                 ['leadChordToneOnBeats', 0.72, 1, 'chord tones on the beats of a run'],
                 ['leadChangeGuideTones', 0.6, 1, 'changes land on guide tones'],
+                // Measured 0.176 (0.289 before #2164; 0.059 with chromatic approaches and
+                // enclosures off). A pickup steps into its phrase by scale (0.274 with pickups
+                // off), and a pushed arrival is struck before its change, no landing here (0.225
+                // with pushes off). The floor sits midway: chromatic approaches off still fail it.
                 [
                     'leadChromaticApproach',
-                    0.2,
+                    0.12,
                     0.6,
                     'out-of-scale half-step approaches and enclosures',
                 ],

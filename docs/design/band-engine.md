@@ -306,7 +306,8 @@ expression devices take turns rather than stack; one peak note per cycle.
     is always 0 and it has no last chorus, so it plays exactly as before.
 - **Phrases, and the space between them.** Each four-bar phrase of the timeline is a slot the
   lead plays in or rests in. A phrase is planned whole at its first bar and kept in memory, so
-  any barline can resume it. Most slots leave room: a phrase plays two or three bars and
+  any barline can resume it; its pickup (below) is planned with it and played a bar early.
+  Most slots leave room: a phrase plays two or three bars and
   breathes, or plays a call and an answer with a gap between. A head breathes too (#2024,
   `phraseBreath`, `takeBreath`): the last beat of a four-bar phrase is silent, and the last two
   of an eight-bar period or a section. The breath is taken by shortening what sounds into it,
@@ -319,6 +320,31 @@ expression devices take turns rather than stack; one peak note per cycle.
   a turn strikes beat 4: a bridge hands back on one, and a last-beat note leaves the phrase an
   eighth's breath, so no shared or rock turn does), ≤ 8 for jazz's guide-tone head (its turns
   have that pickup) and the heads whose figures already left room (funk, hip hop, blues, reggae).
+- **Pickups and pushed arrivals** (#2164, 2026-11-08; `LeadBook.pickup`, `LeadBook.pushes`:
+  jazz, blues and bossa, so far). The barline is not a wall. A phrase that would enter on its
+  downbeat may be led into from the last beat of the bar before, the book's chance a phrase
+  (jazz 0.85 of a solo's and 0.4 of a head's, blues 0.65 and 0.5, bossa 0.3): the "and" of 4,
+  two eighths on 4 or a triplet there, the style's scale walked into the phrase's first note
+  (its last note a step or a 3rd away; on a beat or a change, a chord tone), a little under
+  the line. The pickup belongs to the phrase it leads into, drawn from that phrase's own seeds
+  (a head's by its section, so it comes back with the tune), and lives only in the breath the
+  phrase before left: an eighth of silence at least after that phrase's last note, whose
+  arrival is never cut for it. So it takes the four-bar breath's "and" of 4, and the period's
+  two beats whole; a phrase that fell off or let its bend down has let go, and the next comes
+  in on its bar. The bar before a slot is the last slot's, so that bar plans the next slot
+  from the same inputs the slot will plan itself with on its barline (`ctx.next`, and the
+  memory it leaves) and plays only the pickup (`pickupAhead`): the plans agree, and a band
+  resuming on the slot's barline drops the pickup rather than doubling it. None into a pass's
+  first bar or across a chorus's seam (a looping song's wrap is not looked across, so a
+  counted chorus plays what a lap does), none into or out of a trade's turn or a guide-tone
+  head (its own figures lead in). Inside a phrase, a note struck on a bar's last eighth that
+  runs into the next downbeat is tied over the barline as one note, the downbeat's chord and
+  length (the guide-tone head's push, brought to every phrase): never into a riff bar or the
+  bar a pass ends on. Claims: `leadPhrasesStartEarly` (of the form's phrases the lead opens,
+  the share opened early) 0.25–0.45 for jazz's head and solo, 0.25–0.5 for blues's;
+  `leadBarlineTies` (of the barlines a line runs across, the share tied) ≥ 0.1 in the jazz and
+  blues solos. `leadLongestRun` counts the catch-breath before a pickup at a phrase's end as
+  its breath, so a head that stops breathing still fails it.
 - **Repeated notes as riffs** (#2024, `LeadBook.repeat`: funk, ska-punk, hip hop, disco). A
   figure is stabbed or not once per solo phrase, and a head stabs up to two of its figures,
   once per section — never per note. In each bar playing a stabbed figure, a run of its notes

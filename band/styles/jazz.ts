@@ -690,6 +690,16 @@ const jazzLead = leadIdiom({
     scoop: 0.15,
     // Bebop alto is mostly straight tone: vibrato only on a half note or longer.
     vibrato: 8,
+    // why: a bebop line seldom starts on the one (#2164). Its cells already enter late, on the
+    // "and" of 1 or on 2; a phrase that would enter on the one is led in from beat 4 at 0.85
+    // (so about 30% of the solo's phrases pick up, the story's floor 25%): the eighth before the
+    // barline stepping onto its first note (the commonest pickup, so twice weighted), two
+    // eighths on 4, or a triplet on 4 turning into it. A tune picks up less: 0.4 of a head's
+    // phrases, keyed by the tune so it comes back with it.
+    pickup: { chance: 0.85, head: 0.4, figures: ['..x-', '..x-', 'x-x-', 'xxx-'] },
+    // why: and it leans over the barline: a run's last eighth tied into the next bar's one, the
+    // change arriving an eighth early (#2164).
+    pushes: true,
 });
 
 export const jazz: Style = {

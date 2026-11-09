@@ -129,6 +129,36 @@ function leadLandings(t: Timeline, events: BandEvent[]) {
     return out;
 }
 
+/**
+ * The lead's pickups (#2164): a note struck in the last beat of its bar after an eighth or more
+ * of silence, and the notes after it in that beat, where the line runs on into the next bar
+ * (less than a beat's silence before it). They open the next bar's phrase: the bar they sound
+ * in is still the breath before it.
+ */
+function leadPickups(t: Timeline, notes: PitchedNote[]): Set<PitchedNote> {
+    const out = new Set<PitchedNote>();
+    notes.forEach((note, i) => {
+        const prev = notes[i - 1];
+        const bar = t.bars[note.bar];
+        const end = bar.start + bar.meter.barTicks;
+        const lastBeat = bar.start + (bar.meter.pulses.at(-1) ?? 0);
+        if (note.tick < lastBeat || (prev && note.tick - (prev.tick + prev.dur) < STEP * 2)) {
+            return;
+        }
+        let j = i;
+        while (notes[j + 1] && notes[j + 1].tick < end) {
+            j++;
+        }
+        const on = notes[j + 1];
+        if (notes[j].tick + notes[j].dur <= end && on && on.tick - end < STEP * 4) {
+            for (let k = i; k <= j; k++) {
+                out.add(notes[k]);
+            }
+        }
+    });
+    return out;
+}
+
 /** The last note of each phrase: followed by a rest of a beat or more (or nothing). */
 function phraseEnds(events: BandEvent[]): PitchedNote[] {
     const notes = leadNotes(events);
@@ -370,13 +400,17 @@ function motifTally(takes: Take[]): { n: number; hit: number } {
             last = null;
         }
         const notes = leadNotes(events);
-        const played = new Set(notes.map((l) => l.bar));
+        // A bar holding only the pickup into the next (#2164) is still the breath before it.
+        const pickups = leadPickups(t, notes);
+        const played = new Set(notes.filter((l) => !pickups.has(l)).map((l) => l.bar));
         const recent: string[] = last?.recent ?? [];
         for (const index of [...played].sort((a, b) => a - b)) {
             if (played.has(index - 1)) {
                 continue;
             }
-            const bar = notes.filter((l) => l.bar === index).sort((a, b) => a.tick - b.tick);
+            const bar = notes
+                .filter((l) => l.bar === index && !pickups.has(l))
+                .sort((a, b) => a.tick - b.tick);
             if (bar.length < 3) {
                 continue;
             }
@@ -1786,13 +1820,24 @@ export const METRICS = {
         }
         return ratio(notes, bars);
     },
-    /** Share of bars the lead leaves empty: the space it breathes in. */
+    /**
+     * Share of bars the lead leaves empty: the space it breathes in. A bar a note is tied into
+     * sounds; one that holds only the pickup into the next phrase (#2164) is still the breath.
+     */
     leadRestShare: (takes) => {
         let empty = 0;
         let bars = 0;
         for (const { timeline: t, events } of takes) {
-            const played = new Set(leadNotes(events).map((n) => n.bar));
-            empty += t.bars.filter((b) => !played.has(b.index)).length;
+            const notes = leadNotes(events);
+            const pickups = leadPickups(t, notes);
+            const sounds = (b: Timeline['bars'][number]) =>
+                notes.some(
+                    (n) =>
+                        !pickups.has(n) &&
+                        n.tick < b.start + b.meter.barTicks &&
+                        n.tick + n.dur > b.start + 1,
+                );
+            empty += t.bars.filter((b) => !sounds(b)).length;
             bars += t.bars.length;
         }
         return ratio(empty, bars);
@@ -1918,7 +1963,9 @@ export const METRICS = {
     /**
      * The longest the lead plays without a breath — no silence of a beat or more — in bars (of
      * the bar the run starts in), the most of any take. A head is sung: a run past eight bars is
-     * a tune with nowhere to inhale (#2024).
+     * a tune with nowhere to inhale (#2024). At the end of a four-bar phrase of the form, the
+     * catch-breath before a pickup (#2164) is one too: an eighth of silence or more, then a note
+     * struck in the phrase's last beat.
      */
     leadLongestRun: (takes) => {
         let longest = 0;
@@ -1934,7 +1981,12 @@ export const METRICS = {
                 }
             };
             for (const note of leadNotes(events)) {
-                if (start < 0 || note.tick - end >= STEP * 4) {
+                const bar = t.bars[note.bar];
+                const pickup =
+                    note.tick - end >= STEP * 2 &&
+                    bar.phrase.bar === bar.phrase.length - 1 &&
+                    note.tick >= bar.start + (bar.meter.pulses.at(-1) ?? 0);
+                if (start < 0 || note.tick - end >= STEP * 4 || pickup) {
                     close();
                     start = note.tick;
                 }
@@ -1943,6 +1995,80 @@ export const METRICS = {
             close();
         }
         return longest;
+    },
+    /**
+     * Share of the form's four-bar phrases the lead opens that it opens early (#2164): a pickup.
+     * A phrase of the form (a bar that starts one, past the take's first) is opened by the
+     * first note struck from the last beat of the bar before through its own first bar after
+     * an eighth or more of silence — a phrase entering, not the line before running on. It
+     * opens early when that note is struck before the barline and the line runs on from it,
+     * with no beat's breath, into the phrase's bar. Phrases the lead enters later than its
+     * first bar, or not at all, aren't judged.
+     */
+    leadPhrasesStartEarly: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const notes = leadNotes(events);
+            for (const bar of t.bars) {
+                if (bar.index === 0 || bar.phrase.bar !== 0) {
+                    continue;
+                }
+                const before = t.bars[bar.index - 1];
+                const from = before.start + (before.meter.pulses.at(-1) ?? 0);
+                const to = bar.start + bar.meter.barTicks;
+                const i = notes.findIndex((m, j) => {
+                    const prev = notes[j - 1];
+                    return (
+                        m.tick >= from &&
+                        m.tick < to &&
+                        (!prev || m.tick - (prev.tick + prev.dur) >= STEP * 2)
+                    );
+                });
+                if (i < 0) {
+                    continue;
+                }
+                n++;
+                if (notes[i].tick >= bar.start) {
+                    continue;
+                }
+                let j = i;
+                while (
+                    notes[j + 1] &&
+                    notes[j].tick + notes[j].dur <= bar.start &&
+                    notes[j + 1].tick - (notes[j].tick + notes[j].dur) < STEP * 4
+                ) {
+                    j++;
+                }
+                hit +=
+                    notes[j].tick >= bar.start || notes[j].tick + notes[j].dur > bar.start ? 1 : 0;
+            }
+        }
+        return ratio(hit, n);
+    },
+    /**
+     * Of the barlines the lead's line crosses inside a phrase (two notes running on, less than a
+     * beat's silence between them, struck either side of the barline), the share it crosses as
+     * one note tied over it (#2164): a push into the next bar. The arrival a phrase ends on,
+     * held over a barline into its breath, is no crossing: nothing runs on from it.
+     */
+    leadBarlineTies: (takes) => {
+        let n = 0;
+        let hit = 0;
+        for (const { timeline: t, events } of takes) {
+            const notes = leadNotes(events);
+            for (let i = 1; i < notes.length; i++) {
+                const [a, b] = [notes[i - 1], notes[i]];
+                if (b.tick - (a.tick + a.dur) >= STEP * 4) {
+                    continue;
+                }
+                for (let k = a.bar + 1; k < t.bars.length && t.bars[k].start <= b.tick; k++) {
+                    n++;
+                    hit += a.tick + a.dur > t.bars[k].start + 1 ? 1 : 0;
+                }
+            }
+        }
+        return ratio(hit, n);
     },
     /**
      * Share of four-bar solo phrases that play a phrase again — the four bars before, or the

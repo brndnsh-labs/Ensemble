@@ -186,6 +186,9 @@ export const blues = defineClaims({
                 // The head breathes at every phrase end (#2024). Measured 3 bars before and after:
                 // its figures already leave room at each phrase end.
                 ['leadLongestRun', 0, 8, 'never more than eight bars without a breath'],
+                // Pickups (#2164, `LeadBook.pickup`, head 0.5): of the form's phrases the head opens,
+                // the share its call comes in on 4. Measured 0.313 (0 on main, and with pickups off).
+                ['leadPhrasesStartEarly', 0.25, 0.5, 'a call now and then starts on 4'],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0.15, 0.4, 'a call, then a bar of room for the band to answer'],
@@ -202,6 +205,12 @@ export const blues = defineClaims({
                 // releases; a phrase's arrival never releasing was too rare to hear, one in eight
                 // choruses).
                 ['leadBendReleases', 0.12, 0.45, 'a bend let back down, the blues cry'],
+                // Pickups (#2164, `LeadBook.pickup` 0.65 of the phrases that would enter on the
+                // one): measured 0.309 (0 on main, and with pickups off).
+                ['leadPhrasesStartEarly', 0.25, 0.5, 'a lick starts on 4'],
+                // Pushed arrivals (#2164, `LeadBook.pushes`): measured 0.151 (0 on main, and with
+                // pushes off).
+                ['leadBarlineTies', 0.1, 0.35, "a lick's last eighth leans into the next bar"],
                 ['leadArrivalReleaseOffRest', 0, 0, 'a phrase ends on the blue third or the b7'],
                 ['leadReleaseClimbs', 0, 0, 'the line goes on down from a let-down bend'],
                 // Slides into the landings not bent (#2120, `LeadBook.slide` 0.25). Measured 0.252
@@ -220,7 +229,7 @@ export const blues = defineClaims({
                 // slides are drawn past it: 0.820 with the chance ungated.
                 ['leadThirdsSlidFromBlue', 0.06, 0.25, 'the blue third slid up into the 3rd'],
                 ['compLeadUnison', 0, 0.15, "the piano leaves the guitar's note to the guitar"],
-                // Measured 0.134; development off 0.061, #2012's bar fix reverted 0.071; always develops 0.40.
+                // Measured 0.116 since #2164 (0.134 before); development off 0.052 (0.061 before), #2012's bar fix reverted 0.071; always develops 0.40.
                 // Floor sits between the bar fix reverted (0.071) and shipped: it guards #2012's bar fix and development off (0.061).
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [

@@ -92,8 +92,14 @@ export const bossa = defineClaims({
                 // The head breathes at every phrase end (#2024): a beat after a four-bar phrase,
                 // two after an eight-bar period. Measured 19.88 bars before (phrase into phrase),
                 // 3.75 after. The ceiling is 6, not 8: with only the period's breath the head would
-                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing.
+                // run 7.75 bars, so 6 fails if the four-bar phrase stops breathing. 4.00 with
+                // pickups (#2164): the catch-breath before one, an eighth, is the phrase's breath.
                 ['leadLongestRun', 0, 6, 'a breath at least every four bars'],
+                // Pickups (#2164, `LeadBook.pickup`, head 0.3): measured 0.325 (0 on main, and with
+                // pickups off). Pushed arrivals (`LeadBook.pushes`): 0.064 of the barlines the tune
+                // runs across are tied (0 on main, and with pushes off): its one pushed figure.
+                ['leadPhrasesStartEarly', 0.2, 0.5, 'the tune comes in early now and then'],
+                ['leadBarlineTies', 0.03, 0.15, 'an arrival pushed over the barline'],
                 ['leadLongBreath', 0, 0.02, 'the tune never drops out for two bars'],
                 ['leadRestShare', 0, 0.15, 'a Jobim song form: the tune fills it'],
                 ['leadNotesPerBar', 2, 4, 'a lyrical tune: two to four notes a bar, long ones'],
@@ -120,7 +126,11 @@ export const bossa = defineClaims({
         {
             take: { lead: 'solo' },
             claims: [
-                // Measured 0.135; development off 0.040, #2012's bar fix reverted 0.079; always develops: too few openings.
+                // Pickups (#2164, `LeadBook.pickup` 0.3): measured 0.127 (0 on main, and with
+                // pickups off). Pushed arrivals: 0.060 (0 on main, and with pushes off).
+                ['leadPhrasesStartEarly', 0.06, 0.3, 'a phrase now and then comes in early'],
+                ['leadBarlineTies', 0.03, 0.15, 'an arrival pushed over the barline'],
+                // Measured 0.151 since #2164 (0.135 before); development off 0.051 (0.040 before), #2012's bar fix reverted 0.079; always develops: too few openings.
                 // Floor is midway between development off (0.040) and shipped: it guards development off. The bar fix (0.079 vs 0.135) is within about 2 sd here; blues, disco and rock guard it.
                 // Ceiling is midway to always developing; the openings floor keeps the rate from resting on a few.
                 [
