@@ -534,10 +534,17 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   - **The stinger** (`sting`), on the comp guitar, only on home (the tonic): the 6 → 5 fall of
     the pedal steel's A pedal let up. The 6th (the chord scale's step above the 5th: the b6 in
     minor) is struck with the chord and pulled off to the 5th an eighth later, a tenth softer,
-    ringing to the end. It is always in the grip's top two voices: a 5th already there is
-    fretted two frets up (C, E, A, Bb); a grip with none adds the fall above its second voice
-    where the hand can fret it (G: E4 → D4 under the top G; D: B4 → A4 on top); else none. No
-    sting where the 6th rubs a half step under a grip note.
+    ringing to the end. It is always in the grip's top two voices, and on one string of the
+    grip as the hand holds it (`pullOffs`, `players/comp/fretboard.ts`): a string the grip
+    leaves free, or one whose note it can spare (the 5th itself, a doubled root or 5th, never
+    the only 3rd), both notes inside the hand's three-fret span. E: B2 → B0; A: e2 → e0; Bb:
+    e3 → e1; F: B3 → B1; A minor: e1 → e0; G gives it the doubled top G's string, e12 → e10
+    over the open strings. Open C's grip has no sting (its top G at e3 can't reach the A at e5
+    over B1; a one-fret pinky stretch for the grace note, `STRETCH`, is off pending #2195,
+    since the invariant suite holds every guitar chord to the span), nor has open D's (its only
+    5th is an inner voice and nothing on top reaches one), nor G's with no bassist (its picked
+    G2 at E3 puts e12 out of reach; #2191). No sting where the 6th rubs a half step under a
+    grip note.
 
   The kit keeps the blues's crash and kick; the piano, country's default comp, holds its chord
   with its own 6th (`withSixths`) and plays no stinger.

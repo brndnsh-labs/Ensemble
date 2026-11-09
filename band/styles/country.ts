@@ -21,7 +21,7 @@ import {
     place,
     sectionPlace,
 } from '../players/bass/line.js';
-import { isPlayable } from '../players/comp/fretboard.js';
+import { isPlayable, pullOffs } from '../players/comp/fretboard.js';
 import { compIdiom, type Hit, strums } from '../players/comp/idiom.js';
 import { drumIdiom, type Lines, snareFigure, tomRun } from '../players/drums/kit.js';
 import {
@@ -150,6 +150,11 @@ function finalChord(ctx: BarContext, bar: Bar): ChordFacts | null {
 interface CountryBassMemory extends LineMemory {
     /** Where a walk-up pointed: the next chord arrives exactly there, not an octave off. */
     land: number | null;
+    /**
+     * How hard the walk-up into an ending struck its last note (#2177): the ending's root is
+     * struck at least as hard, so the landing is the accent, not the note before it.
+     */
+    walkedIn: number | null;
     /**
      * A chord whose root the last one-boom bar (a waltz bar) played: if the chord holds, the
      * next bar's boom alternates to its fifth.
@@ -343,7 +348,7 @@ function pickup(
  */
 const countryBass: PitchedIdiom = {
     name: 'boom-chick',
-    init: (): CountryBassMemory => ({ last: null, land: null, alternate: null }),
+    init: (): CountryBassMemory => ({ last: null, land: null, alternate: null, walkedIn: null }),
     play(ctx, memory: CountryBassMemory) {
         const { bar, plan } = ctx;
         const tier = energyTier(plan.energy);
@@ -363,10 +368,12 @@ const countryBass: PitchedIdiom = {
                     return arrive;
                 },
                 last,
-                dyn(100, plan.energy),
+                // why: the ending's root at the line's own weight (100), or harder where a
+                // walk-up's last note came in hotter (its 102, read at the bar before's energy).
+                Math.max(dyn(100, plan.energy), memory.walkedIn ?? 0),
             );
             events.push(...held.events);
-            return { events, memory: { last, land: null, alternate: null } };
+            return { events, memory: { last, land: null, alternate: null, walkedIn: null } };
         }
         const common = isCommonTime(bar);
         const booms = pulses(bar)
@@ -377,6 +384,7 @@ const countryBass: PitchedIdiom = {
         const nextAttack = ctx.next?.bar.spans[0]?.attack ?? false;
         let land = memory.land;
         let alternate: string | null = null;
+        let walkedIn: number | null = null;
         spans.forEach(({ span, from, to }, i) => {
             const chord = span.chord;
             if (!chord) {
@@ -427,6 +435,7 @@ const countryBass: PitchedIdiom = {
             if (walkUp) {
                 notes.splice(0, notes.length, ...walkUp.notes.map((n) => ({ ...n, legato: true })));
                 land = walkUp.target;
+                walkedIn = dyn(walkUp.notes.at(-1)!.velocity, plan.energy);
             } else if (
                 tier !== 'low' &&
                 common &&
@@ -492,7 +501,7 @@ const countryBass: PitchedIdiom = {
         });
         return {
             events,
-            memory: { last, land, alternate } satisfies CountryBassMemory,
+            memory: { last, land, alternate, walkedIn } satisfies CountryBassMemory,
         };
     },
 };
@@ -681,6 +690,15 @@ const boomChick = compIdiom({
 const STING_STEPS = 2;
 const STING = STING_STEPS * STEP;
 /**
+ * How far past the hand's span the stinger's struck 6th alone may reach, in frets (`pullOffs`).
+ * why: the ending lick is the one place a Telecaster player stretches the pinky for a grace
+ * note, and it lasts an eighth, so one fret is the honest reach (open C's A at e5 over B1).
+ * Off (0) pending #2195: the invariant suite holds every guitar chord to the three-fret span,
+ * and loosening that oracle for a grace note is Brandon's call. Until then the stinger keeps
+ * the span like every other chord, and open C has none.
+ */
+const STRETCH = 0;
+/**
  * The pull-off's weight against the strum. why: a left-hand pull-off sounds a little under
  * the picked notes around it, about a tenth softer, so it reads as the hand, not a new pick.
  */
@@ -696,12 +714,17 @@ const PULL_OFF = 0.9;
  * is the chord's own scale step above the 5th: the major 6th on a major chord (the honky-tonk
  * sixth the piano adds, `withSixths`), the b6 in a minor key (A minor's F → E).
  *
- * It sings on top, or it is not played: the fall is in the grip's top two voices, never under
- * the chord. A 5th already there is fretted two frets up (C's G on the top string, 3rd fret,
- * taken at the 5th: the A); a grip with none up there (G's, D's) takes the fall as a new voice
- * above its second (G: E4 → D4 on the B string), where a hand can fret it with the grip; else
- * no stinger. Only on home, the tonic: a written V7 held under a fermata is not where the band
- * stings, and its 6th sits under the b7. Nor where the 6th rubs a half step under a grip note.
+ * It sings on top, or it is not played: the fall is in the chord's top two voices, never under
+ * it, and on one string of the chord as the hand holds it (`pullOffs`): a string sounds one
+ * note, so the fall takes a string the chord leaves free, or one whose note it can spare — the
+ * 5th it falls back to, or a doubled root or 5th, never the only 3rd — and the hand inside its
+ * reach (`STRETCH`, off pending #2195). E pulls its B string off from the C# (B2 → B0),
+ * A minor its top string from the F (e1 → e0); G, whose open shape holds its only 5th at the
+ * bottom, gives the fall its doubled top G's string (E5 → D5, e12 → e10, over the open
+ * strings). Open C's and open D's grips have no sting: C's top G (e3) can't reach the A at e5
+ * over B1 without the stretch, and D's only 5th is an inner voice. Only on home, the tonic: a
+ * written V7 held under a fermata is not where the band stings, and its 6th sits under the b7. Nor where the 6th rubs a half step under a
+ * chord note.
  */
 function sting(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
     const chord = finalChord(ctx, ctx.bar);
@@ -709,17 +732,43 @@ function sting(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
     if (chord?.fifth !== 7 || sixth === undefined || chord.root !== ctx.bar.key.tonic) {
         return events;
     }
-    const grip = events.filter((e) => e.tick === ctx.bar.start && !e.muted);
-    const pitches = grip.map((e) => e.midi).sort((a, b) => b - a);
-    const isFifth = (m: number) => mod12(m - chord.root) === 7;
+    const strum = events.filter((e) => e.tick === ctx.bar.start && !e.muted);
+    const pitches = strum.map((e) => e.midi);
+    const top = strum.reduce<PitchedNote | null>((t, e) => (t && t.midi >= e.midi ? t : e), null);
+    if (!top || top.dur <= STING) {
+        return events;
+    }
     const up = (fifth: number) => fifth + sixth - 7;
-    const free = (fifth: number) =>
-        !pitches.includes(up(fifth)) &&
-        !pitches.some((p) => p > up(fifth) && mod12(p - up(fifth)) === 1);
-    const fall = (template: PitchedNote, fifth: number): PitchedNote[] => {
+    // A note the chord can spare: one whose pitch class it sounds again elsewhere.
+    const spare = (m: number) => pitches.filter((p) => mod12(p - m) === 0).length > 1;
+    const [, hi] = ctx.instrument.range;
+    // Each 5th the fall could land on, from the top of the instrument down.
+    for (let fifth = nearestMidi(mod12(chord.root + 7), hi, 0, hi); fifth > 0; fifth -= 12) {
+        if (up(fifth) > hi || pitches.includes(up(fifth))) {
+            continue;
+        }
+        // The 6th never rubs a half step (or a ninth) under a chord note.
+        if (pitches.some((p) => p > up(fifth) && mod12(p - up(fifth)) === 1)) {
+            continue;
+        }
+        const option = pullOffs(pitches, up(fifth), fifth, STRETCH).find(
+            ({ replaces }) =>
+                (replaces === null && !pitches.includes(fifth)) ||
+                replaces === fifth ||
+                (replaces !== null && spare(replaces) && !pitches.includes(fifth)),
+        );
+        if (!option) {
+            continue;
+        }
+        const kept = strum.filter((e) => e.midi !== option.replaces);
+        // In the top two voices, or not at all: lower 5ths only sink further.
+        if (kept.filter((e) => e.midi > fifth).length > 1) {
+            return events;
+        }
+        const template = strum.find((e) => e.midi === option.replaces) ?? top;
         // The pull-off is no pick stroke: the left hand sounds it, so it rolls with no strum.
         const { stroke: _, ...pulled } = template;
-        return [
+        const fall: PitchedNote[] = [
             { ...template, midi: up(fifth), dur: STING },
             {
                 ...pulled,
@@ -729,29 +778,12 @@ function sting(ctx: BarContext, events: PitchedNote[]): PitchedNote[] {
                 velocity: Math.round(template.velocity * PULL_OFF),
             },
         ];
-    };
-    const own = grip
-        .filter((e) => isFifth(e.midi) && pitches.indexOf(e.midi) <= 1 && e.dur > STING)
-        .sort((a, b) => b.midi - a.midi)
-        .find((e) => free(e.midi) && isPlayable(grip.map((g) => (g === e ? up(e.midi) : g.midi))));
-    if (own) {
-        return events.flatMap((e) => (e === own ? fall(e, e.midi) : [e]));
+        return [
+            ...events.filter((e) => !(e.tick === top.tick && e.midi === option.replaces)),
+            ...fall,
+        ];
     }
-    const top = grip.find((e) => e.midi === pitches[0]);
-    const second = pitches[1] ?? pitches[0];
-    const fifth = second + 1 + mod12(chord.root + 7 - second - 1);
-    if (
-        !top ||
-        top.dur <= STING ||
-        pitches.includes(fifth) ||
-        up(fifth) > ctx.instrument.range[1] ||
-        !free(fifth) ||
-        !isPlayable([...pitches, up(fifth)]) ||
-        !isPlayable([...pitches, fifth])
-    ) {
-        return events;
-    }
-    return [...events, ...fall(top, fifth)];
+    return events;
 }
 
 /**
@@ -767,12 +799,13 @@ const countryGuitar: PitchedIdiom = {
     // flag `boomChick` carries (`percussive`, or one added later) survives the wrapper.
     ...boomChick,
     play(ctx, memory) {
-        const inner = boomChick.play(ctx, memory);
+        const out = boomChick.play(ctx, memory);
         const { bar, plan } = ctx;
-        // The last chord ends on the stinger (#2177), with a bassist or without.
-        const out = plan.ending ? { ...inner, events: sting(ctx, inner.events) } : inner;
+        // The last chord ends on the stinger (#2177), with a bassist or without: over the
+        // whole chord the hand holds, the picked bass note under it too.
+        const stung = (events: PitchedNote[]) => (plan.ending ? sting(ctx, events) : events);
         if (plan.lanes.bass) {
-            return out;
+            return { ...out, events: stung(out.events) };
         }
         // Where a bass note may sit: the 6th and 5th strings in first position (E2–Eb3).
         const LO = 40;
@@ -910,7 +943,7 @@ const countryGuitar: PitchedIdiom = {
             );
             return cut ? { ...e, dur: cut.tick - e.tick } : e;
         });
-        return { events, memory: out.memory };
+        return { events: stung(events), memory: out.memory };
     },
 };
 

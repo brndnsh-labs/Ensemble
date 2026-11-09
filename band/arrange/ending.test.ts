@@ -2355,6 +2355,11 @@ describe('country ends on a walk-up and a stinger (#2177)', () => {
                     const landing = bassIn(events, bar.index)[0];
                     expect(landing.tick, `${where}: the root on the one`).toBe(bar.start);
                     expect(mod12(landing.midi), `${where}: the root`).toBe(bar.key.tonic);
+                    // The landing is the accent: struck at least as hard as the note into it.
+                    expect(
+                        landing.velocity,
+                        `${where}: the landing's weight`,
+                    ).toBeGreaterThanOrEqual(bassIn(events, before.index).at(-1)!.velocity);
                     expect(
                         bassIn(events, before.index)
                             .filter((n) => n.tick >= before.start + from * STEP)
@@ -2386,71 +2391,113 @@ describe('country ends on a walk-up and a stinger (#2177)', () => {
         }
     });
 
-    it.each([
-        ['C', inC('C | F | G7 | Dm7 G7'), 9],
-        ['G', score([{ label: 'A', bars: 'G | C | D7 | D7' }], { key: 'G' }), 9],
-        ['D', score([{ label: 'A', bars: 'D | G | A7 | A7' }], { key: 'D' }), 9],
-        ['E', score([{ label: 'A', bars: 'E | A | B7 | B7' }], { key: 'E' }), 9],
-        [
-            'A minor',
-            score([{ label: 'A', bars: 'Am | Dm7 | E7 | E7' }], { key: 'A', isMinor: true }),
-            8,
-        ],
-    ] as const)(
-        '%s: the guitar stings the last chord on top, its 6th falling to its 5th',
-        (_, chart, sixth) => {
-            // Catches a stinger that never plays, one buried under the chord (G's grip has its only
-            // 5th at the bottom, D's in the middle), one struck as a chord tone it already held
-            // (two 5ths ringing), a 6th that rings on over the 5th, a pull-off as loud as the strum,
-            // and a sting on the wrong scale step (a major 6th over a minor tonic).
+    /** Open strings, low E to high E: a stung grip below is written string by string. */
+    const OPEN: Record<string, number> = { E: 40, A: 45, D: 50, G: 55, B: 59, e: 64 };
+    /** A string and fret (`e12`) as a pitch. */
+    const fretted = (at: string) => OPEN[at[0]] + Number(at.slice(1));
+    /**
+     * The stung last chord in each key, written out by hand as the hand holds it, one note per
+     * string: the chord struck on the one with the 6th in it, and the string and fret its 5th is
+     * pulled off to. Null: the grip has no sting (open C's top G at e3 can't reach the A at e5
+     * over B1 inside the hand's span, the stretch off pending #2195; open D's only 5th is an
+     * inner voice and no string on top reaches one; G without a bassist frets its picked G2 at
+     * E3, out of reach of the high fall, #2191).
+     */
+    const stung: Record<
+        string,
+        { chart: SemanticScore; bass: [string, string] | null; alone: [string, string] | null }
+    > = {
+        C: { chart: inC('C | F | G7 | Dm7 G7'), bass: null, alone: null },
+        // Open G holds its only 5th at the bottom (D0): the fall takes the doubled top G's
+        // string, high over the open strings, E5 → D5.
+        G: {
+            chart: score([{ label: 'A', bars: 'G | C | D7 | D7' }], { key: 'G' }),
+            bass: ['D0 G0 B0 e12', 'e10'],
+            alone: null,
+        },
+        D: {
+            chart: score([{ label: 'A', bars: 'D | G | A7 | A7' }], { key: 'D' }),
+            bass: null,
+            alone: null,
+        },
+        // The B string's C# pulled off to the open B, under the open top E.
+        E: {
+            chart: score([{ label: 'A', bars: 'E | A | B7 | B7' }], { key: 'E' }),
+            bass: ['D2 G1 B2 e0', 'B0'],
+            alone: ['E0 D2 G1 B2 e0', 'B0'],
+        },
+        // The b6 on the top string pulled off to the open E.
+        'A minor': {
+            chart: score([{ label: 'A', bars: 'Am | Dm7 | E7 | E7' }], { key: 'A', isMinor: true }),
+            bass: ['D2 G2 B1 e1', 'e0'],
+            alone: ['A0 D2 G2 B1 e1', 'e0'],
+        },
+    };
+
+    it.each(Object.entries(stung))(
+        '%s: the guitar stings the last chord on one string, on top',
+        (name, { chart, bass, alone }) => {
+            // Catches a stinger that never plays, one buried under the chord, one that takes a
+            // string the chord is already sounding (five notes on G's four-string grip: its B
+            // string can't ring the open B and the fretted E at once), one out of the hand's reach,
+            // a 6th that rings on over the 5th, and a pull-off as loud as the strum.
             const timeline = compileTimeline(chart);
             const bar = timeline.bars.at(-1)!;
             const end = bar.start + bar.meter.barTicks;
             const fall = bar.start + 2 * STEP;
-            for (const comp of ['guitar', 'nylon'] as const) {
-                for (const bass of [true, false]) {
+            for (const [withBass, shape] of [
+                [true, bass],
+                [false, alone],
+            ] as const) {
+                for (const comp of ['guitar', 'nylon'] as const) {
                     for (const seed of SEEDS) {
-                        const where = `${comp}/${bass ? 'bass' : 'no bass'}/${seed}`;
+                        const where = `${name}/${comp}/${withBass ? 'bass' : 'no bass'}/${seed}`;
                         const settings = {
                             ...straight(seed),
                             comp,
-                            lanes: { ...settingsFor('country', seed).lanes, bass },
+                            // No lead: a grip leaves out a voice on the lead's pitch, which would
+                            // make the written shapes depend on the solo's last note.
+                            lanes: {
+                                ...settingsFor('country', seed).lanes,
+                                bass: withBass,
+                                lead: false,
+                            },
                         };
                         const { events } = performPass(timeline, settings, {
                             pass: 0,
                             looping: false,
                         });
                         const comped = lastBar(timeline, events).comp.filter((n) => !n.muted);
-                        const fromTonic = (n: PitchedNote) => mod12(n.midi - bar.key.tonic);
-                        // The 6th, struck with the chord on the one, for an eighth.
-                        const six = comped.filter(
-                            (n) => n.tick === bar.start && fromTonic(n) === sixth,
-                        );
-                        expect(six.length, `${where}: one 6th on the hit`).toBe(1);
-                        expect(six[0].tick + six[0].dur, `${where}: the 6th lets go`).toBe(fall);
-                        // Then the 5th it falls to, alone, ringing to the end, a pull-off's weight.
-                        const five = comped.filter((n) => n.tick > bar.start);
+                        const hit = comped.filter((n) => n.tick === bar.start);
+                        const after = comped.filter((n) => n.tick > bar.start);
+                        if (!shape) {
+                            expect(after, `${where}: no stinger`).toEqual([]);
+                            continue;
+                        }
+                        const [held, to] = shape;
+                        const strings = held.split(' ');
                         expect(
-                            five.map((n) => [n.tick, n.midi, n.tick + n.dur, n.velocity]),
-                            `${where}: the 5th it falls to`,
-                        ).toEqual([
-                            [
-                                fall,
-                                six[0].midi - (sixth - 7),
-                                end,
-                                Math.round(six[0].velocity * 0.9),
-                            ],
-                        ]);
-                        // On one string: the 5th is not also struck with the chord. And on top:
-                        // at most one note of the chord sounds above it.
-                        const chord = comped.filter((n) => n.tick === bar.start && n !== six[0]);
+                            hit.map((n) => n.midi).sort((x, y) => x - y),
+                            `${where}: the chord, one note per string`,
+                        ).toEqual(strings.map(fretted).sort((x, y) => x - y));
+                        // The 6th is the note on the fall's own string, struck for an eighth.
+                        const six = hit.find(
+                            (n) => n.midi === fretted(strings.find((at) => at[0] === to[0])!),
+                        )!;
+                        expect(six.tick + six.dur, `${where}: the 6th lets go`).toBe(fall);
                         expect(
-                            chord.some((n) => n.midi === five[0].midi),
-                            `${where}: one string`,
-                        ).toBe(false);
+                            mod12(six.midi - fretted(to)) === 2 ||
+                                mod12(six.midi - fretted(to)) === 1,
+                            `${where}: a 6th over its 5th`,
+                        ).toBe(true);
                         expect(
-                            chord.filter((n) => n.midi > five[0].midi).length,
-                            `${where}: the top two voices`,
+                            after.map((n) => [n.tick, n.midi, n.tick + n.dur, n.velocity]),
+                            `${where}: pulled off to the 5th, ringing, a tenth softer`,
+                        ).toEqual([[fall, fretted(to), end, Math.round(six.velocity * 0.9)]]);
+                        expect(mod12(fretted(to) - bar.key.tonic), `${where}: the 5th`).toBe(7);
+                        expect(
+                            hit.filter((n) => n !== six && n.midi > fretted(to)).length,
+                            `${where}: in the top two voices`,
                         ).toBeLessThanOrEqual(1);
                     }
                 }

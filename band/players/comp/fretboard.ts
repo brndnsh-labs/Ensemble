@@ -476,3 +476,88 @@ export function isPlayable(notes: number[]): boolean {
     };
     return sorted.length <= STRINGS.length && place(0, [], []);
 }
+
+/** One note of a chord under the hand: its pitch, the string it sounds on (0 = low E), the fret. */
+interface Fretted {
+    midi: number;
+    string: number;
+    fret: number;
+}
+
+/** Whether the fretted notes among `frets` (open strings are free) sit inside the hand's reach. */
+const inReach = (frets: number[], reach = REACH) => {
+    const fretted = frets.filter((f) => f > 0);
+    return !fretted.length || Math.max(...fretted) - Math.min(...fretted) <= reach;
+};
+
+/**
+ * Where a hand holds a chord: each note's string and fret, one note per string in pitch order,
+ * in the lowest position that reaches it (the open-position shape a grip is played in), ties to
+ * the fewer fretted frets. Null where no hand can (`isPlayable`).
+ */
+function fingering(notes: number[]): Fretted[] | null {
+    const sorted = [...notes].sort((a, b) => a - b);
+    let best: Fretted[] | null = null;
+    let bestKey = [Infinity, Infinity];
+    const place = (i: number, chosen: Fretted[]) => {
+        if (i === sorted.length) {
+            const frets = chosen.map((n) => n.fret);
+            if (!inReach(frets)) {
+                return;
+            }
+            const key = [Math.max(...frets), frets.reduce((a, b) => a + b, 0)];
+            if (key[0] < bestKey[0] || (key[0] === bestKey[0] && key[1] < bestKey[1])) {
+                best = chosen;
+                bestKey = key;
+            }
+            return;
+        }
+        const above = chosen.at(-1)?.string ?? -1;
+        for (let s = above + 1; s < STRINGS.length; s++) {
+            const fret = sorted[i] - STRINGS[s];
+            if (fret >= 0 && fret <= MAX_FRET + REACH) {
+                place(i + 1, [...chosen, { midi: sorted[i], string: s, fret }]);
+            }
+        }
+    };
+    if (sorted.length <= STRINGS.length) {
+        place(0, []);
+    }
+    return best;
+}
+
+/**
+ * The strings a pull-off can be played on over a chord the hand already holds (#2177): `high`
+ * fretted and struck with the chord, then pulled off to `low` on the same string, every other
+ * note kept where the hand holds it (`fingering`) and the hand inside its reach for both. Each
+ * option names the chord's note that string gave up for it, or null for a string the chord
+ * leaves free. A string sounds one note: the chord's note there is gone while the pull-off
+ * plays, which is why the caller chooses which one it can spare. `stretch` lets the struck
+ * note alone reach that many frets past the hand (a pinky stretch for a grace note); the note
+ * it is pulled off to stays inside the hand's reach.
+ */
+export function pullOffs(
+    chord: number[],
+    high: number,
+    low: number,
+    stretch = 0,
+): { replaces: number | null }[] {
+    const hand = fingering(chord);
+    if (!hand) {
+        return [];
+    }
+    const out: { replaces: number | null }[] = [];
+    for (let s = STRINGS.length - 1; s >= 0; s--) {
+        const others = hand.filter((n) => n.string !== s).map((n) => n.fret);
+        const [up, down] = [high - STRINGS[s], low - STRINGS[s]];
+        if (
+            down >= 0 &&
+            up <= MAX_FRET + REACH &&
+            inReach([...others, up], REACH + stretch) &&
+            inReach([...others, down])
+        ) {
+            out.push({ replaces: hand.find((n) => n.string === s)?.midi ?? null });
+        }
+    }
+    return out;
+}
