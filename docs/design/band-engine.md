@@ -494,10 +494,11 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   (`players/grid.ts`), country's picked root with them; the kit plays its book's last bar
   (`DrumBook.ending`, a 16-step line per piece, each with its why) instead of the crash and
   kick every style shared. Blues and country end on the same kick and crash: no country-only
-  last hit was found that the book could stand behind, so the pair is left for the ear. The
-  other eleven differ. The lead lets go with the band: in a stop nothing sounds past the
-  band's eighth; in the hits a note held over the stabs lets go with its stab and is struck
-  again with the last; in a button a lead still sounding there plays it with the band
+  last hit was found that the book could stand behind; country's ending is told by its
+  walk-up and stinger instead (below). The other eleven differ. The lead lets go with the
+  band: in a stop nothing sounds past the band's eighth; in the hits a note held over the
+  stabs lets go with its stab and is struck again with the last; in a button a lead still
+  sounding there plays it with the band
   (`endWithTheBand`, `players/lead/idiom.ts`). A note tied in from the bar before (the
   guide-tone head's "and" of 4 into the downbeat) is the downbeat's note struck early, so it
   counts as struck on the barline: it lets go with the band's first strike (cut in the bar
@@ -514,6 +515,32 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   the book's own kick under the V (never louder than the I), and only the button stays on the
   last "and" (no button when the I lands there). `arrange/ending.test.ts` lists the thirteen
   drum bars and holds every lane to its gesture.
+- **Country ends on a walk-up and a stinger (#2177).** A country ending's identity is the
+  bass's walk into the last chord and the guitar's stinger over it, not the last hit, so both
+  live in `styles/country.ts`, the only style that plays them (no shared `EndingGesture` field
+  until a second style needs one). (A Nashville tag, the last line played again before the
+  end, is a different device and is not built.) They play when the ending bar is one chord
+  struck on its downbeat (`finalChord`: a resolved turnaround, a last bar already home, a
+  fermata's chord), not in a bar that gets home itself (`| G7 C |`).
+  - **The walk-up** (`pickup`), in the bar before, at any energy, into the last chord's root on
+    the one. From the IV it walks down the fourth: F, E-D → C. From anywhere else it climbs
+    5-6-7: over the V, "G, A-B → C", the root held through 2; over the I and the ii, the root on
+    1 and the 5 nearest it on 2 (C, G A B → C; D, G A B → C). A root already inside the run
+    keeps the two-beat's boom and walks in on 4 from above it, with the leading tone where the
+    run has no note there: the vi's A, E, B → C; the bVII's Bb, F, B → C. The 7 is the bar's b7
+    of the key where its chord sounds it (C7: a blues's 5-6-b7-1), else the leading tone; a
+    chord struck on 3 walks with the 7 alone (`C7 A7`: A, B → C). The ending lands where the
+    walk pointed (`land`), never an octave off.
+  - **The stinger** (`sting`), on the comp guitar, only on home (the tonic): the 6 → 5 fall of
+    the pedal steel's A pedal let up. The 6th (the chord scale's step above the 5th: the b6 in
+    minor) is struck with the chord and pulled off to the 5th an eighth later, a tenth softer,
+    ringing to the end. It is always in the grip's top two voices: a 5th already there is
+    fretted two frets up (C, E, A, Bb); a grip with none adds the fall above its second voice
+    where the hand can fret it (G: E4 → D4 under the top G; D: B4 → A4 on top); else none. No
+    sting where the 6th rubs a half step under a grip note.
+
+  The kit keeps the blues's crash and kick; the piano, country's default comp, holds its chord
+  with its own 6th (`withSixths`) and plays no stinger.
 - **The family is the chart's, the colour the style's (#1502).** The ending takes its family
   from the chart's own tonic (`tonicFamily`), so a colour never changes what the tonic is.
   Every chord on the tonic counts for its family by how long it lasts, unless it only passes
