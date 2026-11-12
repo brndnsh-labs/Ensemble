@@ -493,6 +493,124 @@ describe('the bridge lifts in every key, and on the shelf (#2123)', () => {
         expect(fell).toBeGreaterThanOrEqual(20);
     });
 
+    it('climbs back once the contrast sinks under its A, at every book’s register (#2161)', () => {
+        // Two shelf tunes whose contrast's seam lifts and whose line then sank under the A all
+        // the same, in some books (in each tune's own key): where Cherokee's A sits high (a home
+        // of Bb4 or over) its bridge falls a whole step a phrase (C#m7, Bm7, Am7, Gm7) from an A
+        // around D5, and in the books seated from G4 to Bb4 Blue Bossa's B walks Ebm7's Gb down
+        // to its ii-V's F and Eb. With them the shelf's two other bridges (`shelfRhythm`,
+        // `nightAndDay`).
+        const shelf =
+            (key: string, isMinor: boolean, sections: [label: string, bars: string][]) =>
+            (n: number) =>
+                score(
+                    sections.map(([label, bars]) => ({ label, bars: up(bars, n) })),
+                    { key: keyUp(key, n), isMinor },
+                );
+        const CHEROKEE_A =
+            'Bbmaj7 | Bbmaj7 | Fm7 | Bb7 | Ebmaj7 | Ebmaj7 | Ab7 | Ab7 | Bbmaj7 | Bbmaj7 | C7 | C7';
+        const charts = {
+            Cherokee: shelf('Bb', false, [
+                ['A', `${CHEROKEE_A} | Cm7 | G7 | Cm7 | F7+`],
+                ['A2', `${CHEROKEE_A} | Cm7 | F7 | Bbmaj7 | Bbmaj7`],
+                [
+                    'Bridge',
+                    'C#m7 | F#7 | Bmaj7 | Bmaj7 | Bm7 | E7 | Amaj7 | Amaj7 | Am7 | D7 | Gmaj7 | Gmaj7 | Gm7 | C7 | Cm7 | F7+',
+                ],
+                ['A3', `${CHEROKEE_A} | Cm7 | F7 | Bbmaj7 | Bbmaj7`],
+            ]),
+            'Blue Bossa': shelf('C', true, [
+                ['A', 'Cm7 | Cm7 | Fm7 | Fm7 | Dm7b5 | G7b9 | Cm7 | Cm7'],
+                ['B', 'Ebm7 | Ab7 | Dbmaj7 | Dbmaj7 | Dm7b5 | G7b9 | Cm7 | Dm7b5 G7b9'],
+            ]),
+            'Rhythm Changes': shelf('Bb', false, [
+                ['A', `${SHELF_A} | Bbmaj7 F7 | Bbmaj7 F7`],
+                ['A', `${SHELF_A} | Bbmaj7 F7 | Bbmaj7`],
+                ['Bridge', 'D7 | D7 | G7 | G7 | C7 | C7 | F7 | F7'],
+                ['A', `${SHELF_A} | Bbmaj7 F7 | Bbmaj7 F7`],
+            ]),
+            'Night and Day': shelf('C', false, [
+                ['A', STELLA_A],
+                ['B', `${B} | Cmaj7 | Cmaj7`],
+                ['A', STELLA_A],
+                ['B', `${B} | Cmaj7 | Bb7`],
+                ['Bridge', 'Ebmaj7 | Ebmaj7 | Cmaj7 | Cmaj7 | Ebmaj7 | Ebmaj7 | Cmaj7 | Cmaj7'],
+                ['B', `${B} | C6 | C6`],
+            ]),
+        };
+        // Every instrument at every book's register: its home and its head's top (`bookReach`).
+        const registers = new Map<string, { home: number; range: readonly [number, number] }>();
+        for (const instrument of Object.values(LEAD_INSTRUMENTS)) {
+            for (const style of Object.keys(STYLES) as StyleId[]) {
+                const book = STYLES[style].lead;
+                if (book) {
+                    const { home, top } = book.idiom.register(instrument);
+                    const range = [instrument.range[0], top] as const;
+                    registers.set(`${home}:${range}`, { home, range });
+                }
+            }
+        }
+        const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+        const worst: Record<string, number> = {};
+        for (const [name, chart] of Object.entries(charts)) {
+            worst[name] = Number.POSITIVE_INFINITY;
+            for (let n = 0; n < 12; n++) {
+                const t = compileTimeline(chart(n));
+                const { contrast } = headForm(t, 0);
+                const visit = t.visits.find((v) => v.ordinal === contrast);
+                if (!visit) {
+                    throw new Error(`${name} has a contrast`);
+                }
+                const inside = (tick: number) =>
+                    t.bars[Math.floor(tick / BAR)].visit.ordinal === contrast;
+                const from = t.bars[visit.firstBar].start;
+                const lastPhrase = t.bars[visit.firstBar + visit.barCount - 1].phrase.index;
+                for (const { home, range } of registers.values()) {
+                    const line = guideToneLine(t, t.bars[0], home, range);
+                    const a = mean(
+                        line.filter((note) => note.tick < from).map((note) => note.midi),
+                    );
+                    const lift =
+                        mean(line.filter((note) => inside(note.tick)).map((note) => note.midi)) -
+                        mean(line.filter((note) => !inside(note.tick)).map((note) => note.midi));
+                    worst[name] = Math.min(worst[name], lift);
+                    // The climb is for a line under its A, and only up: a contrast phrase top
+                    // after the seam moves more than a 4th (`SEAM`) only from under the A's
+                    // register, never by more than a 5th (`RECENTRE`). Before the contrast's
+                    // last phrase only from more than a minor 3rd under it (`SUNK_EARLY`), so
+                    // a bridge built as a sequence keeps stepping down: Cherokee's third phrase
+                    // once leapt Db5 to G5, 1.4 under its A, and broke the sequence.
+                    for (let i = 1; i < line.length; i++) {
+                        const [was, note] = [line[i - 1], line[i]];
+                        const bar = t.bars[Math.floor(note.tick / BAR)];
+                        const move = note.midi - was.midi;
+                        if (
+                            inside(note.tick) &&
+                            note.tick !== from &&
+                            bar.start === note.tick &&
+                            bar.phrase.bar === 0 &&
+                            Math.abs(move) > 5
+                        ) {
+                            const at = `${name} +${n} at ${home}, ${note.chord.symbol}`;
+                            const last = bar.phrase.index === lastPhrase;
+                            expect(was.midi, at).toBeLessThan(a - (last ? 0 : 3));
+                            expect(move, at).toBeGreaterThan(0);
+                            expect(move, at).toBeLessThanOrEqual(7);
+                        }
+                    }
+                }
+            }
+        }
+        // why: a contrast may sit a little under its A on a take, not sink: −1.5 under the
+        // rest of the head at worst, on the line itself (the sung walk reads about 1.5 over
+        // it). Every chart here holds −1.29 or over (Cherokee −0.02, Blue Bossa +1.13), the
+        // worst Night and Day's bridge at a guitar's home (A4): its B arrives at the bridge 7
+        // under home, out of any climb's reach inside it (a seam question, #2168). Before the
+        // climb (#2161) Blue Bossa's B read −1.70 and Cherokee's bridge −1.86, so −1.5 fails
+        // both; −1 would fail Night and Day.
+        expect(Object.entries(worst).filter(([, lift]) => lift < -1.5)).toEqual([]);
+    });
+
     it.each(Object.keys(STYLES) as StyleId[])(
         '%s never sings the head over the top note its solo peaks on',
         (style) => {

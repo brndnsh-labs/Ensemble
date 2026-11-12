@@ -65,10 +65,11 @@ const STANDARD = [
     // fixtures' contrasts, and it passes only because the bridges and the pop chorus sit over
     // their A: the bossa's B itself still sits under its A at the high book homes (69, 71, 73),
     // 1.1 to 2.4 under where it was 5.0 to 6.2 before #2140 climbed it back. Its first phrase
-    // is held there by #2123's falling seam; every contrast over its A on every take is #2161.
-    // With the B walking down from that seam, ska-punk read -0.21, blues -0.17 and country
-    // -0.08, so 0 fails it (a thin guard: `guide-tones.test.ts` holds the climb itself). 7 is
-    // the lift's own ceiling, a 5th.
+    // is held there by #2123's falling seam, kept by decision rather than letting the seam leap
+    // a tritone (#2161); its last phrase already climbs back (#2140). With the B walking down
+    // from that seam, ska-punk read -0.21, blues -0.17 and country -0.08, so 0 fails it (a thin
+    // guard: `guide-tones.test.ts` holds the climb itself, and the floor on the shelf's
+    // contrasts at every book's register, #2161). 7 is the lift's own ceiling, a 5th.
     ['leadContrastRegister', 0, 7, 'and the contrast sits over the A, not just its first note'],
     // 82 against 74 planned (`GUIDE_VELOCITY`), plus the lift's push: 9.7–10.7.
     ['leadBridgeLouder', 3, 20, 'and louder'],

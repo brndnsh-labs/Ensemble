@@ -209,6 +209,17 @@ const SEAM = 5;
 /** The widest move a phrase top makes re-centring anywhere else: a 5th (see `SEAM`). */
 const RECENTRE = 7;
 
+/**
+ * How far under the A's register the line inside a contrast must have sunk, in semitones,
+ * before a phrase top that is not the contrast's last climbs back (`sunk`): more than a minor
+ * 3rd. why: a bridge built as a sequence steps its line down with it, and the falling line is
+ * the tune (Cherokee's bridge, ii-V-I a whole step lower each phrase: E-Eb, D-Db, C-B, Bb-A).
+ * A horn player holds the sequence and lifts for the last phrase, the one coming back for the
+ * A; climbing at the third phrase over a shortfall of a semitone or two broke the sequence
+ * with a tritone (Db5 to G5). Only a line that has fallen well under its A climbs earlier.
+ */
+const SUNK_EARLY = 3;
+
 const LINES = new WeakMap<Timeline, Map<string, GuideNote[]>>();
 
 /**
@@ -351,12 +362,16 @@ function chorusLine(
     };
     const notes: GuideNote[] = [];
     let prev: number | null = null;
-    const { contrast } = headForm(timeline, firstBar);
+    const form = headForm(timeline, firstBar);
+    const { contrast } = form;
     // The pitch the line entered the contrast from: its lift is measured from there.
     let entry: number | null = null;
     // Whether the seam into the contrast fell: its first guide tone sits under the entry
     // (`climbsBack`).
     let seamFell = false;
+    // The A's register: the mean of the line's guide tones from the form's first bar (an intro
+    // is around the form, not in it) up to the contrast (`sunk`).
+    let register: number | null = null;
     // The chorus's first note, and its section: an A that comes back starts there again.
     let opening: { midi: number; section: string } | null = null;
     for (let i = 0; i < pieces.length; i++) {
@@ -367,17 +382,22 @@ function chorusLine(
         const lifted = bar.visit.ordinal === contrast;
         const top = tops.has(start);
         // A seam into, inside or out of the contrast moves a 4th at most (`SEAM`; inside it a
-        // 5th once the seam into it fell, `climbsBack`); elsewhere a phrase top may re-centre
-        // by a 5th (a ii-V chain falls a half step a chord, a 4th or more over a phrase, and
-        // the line has to climb back as fast as it fell).
+        // 5th once the seam into it fell, `climbsBack`, and a 5th up once the line has sunk
+        // under its A, `sunk`); elsewhere a phrase top may re-centre by a 5th (a ii-V chain
+        // falls a half step a chord, a 4th or more over a phrase, and the line has to climb
+        // back as fast as it fell).
         const seam = lifted || bars[barIndexAt(start - 1)].visit.ordinal === contrast;
         let entersContrast = false;
         if (!lifted) {
             entry = null;
             seamFell = false;
+            register = null;
         } else if (entry === null) {
             entry = prev ?? home;
             entersContrast = true;
+            const formStart = bars[form.firstBar].start;
+            const a = notes.filter((note) => note.tick >= formStart);
+            register = a.length ? a.reduce((s, note) => s + note.midi, 0) / a.length : entry;
         }
         // why: a seam into the contrast falls when no guide tone of its first chord lies at or
         // over the entry within a 4th: the A's last a half step over one and a tritone under the
@@ -389,18 +409,46 @@ function chorusLine(
         // re-centre by a 5th (`RECENTRE`), as any phrase top outside it may: at the breath the
         // line crosses to the shell's other voice (Bb7's D, its 3rd, held as Em7's 7th) and
         // climbs back toward its A. The seams into and out of the
-        // contrast, and a contrast whose seam lifted, keep the 4th.
+        // contrast keep the 4th.
         const climbsBack = lifted && !entersContrast && seamFell;
+        // The contrast's last phrase, the one coming back for the A (of two or more).
+        const phrases = bars[bar.visit.firstBar + bar.visit.barCount - 1].phrase.index + 1;
+        const lastPhrase = lifted && bar.phrase.index === phrases - 1 && phrases > 1;
+        // why: a seam that lifted is no guarantee the contrast stays up. Inside it a ii-V chain
+        // still falls a half step a chord, and the lift is aimed from the A's last note, which
+        // can sit well under an A seated high. In some books the line sank under its A (in each
+        // tune's own key): where Cherokee's A sits high (a home of Bb4 or over) its bridge's line
+        // stepped down a whole step a phrase (C#m7, Bm7, Am7, Gm7) from an A around D5, and in
+        // the books seated from G4 to Bb4 Blue Bossa's B walked Ebm7's Gb down to its ii-V's F
+        // and Eb; sung, they read up to 3.6 and 4.0 under their A (#2161). So a contrast's
+        // phrase top whose line has sunk under the A's register (`register`: the mean of the
+        // A's guide tones, as the head's contrast claims read it) may climb by a 5th
+        // (`RECENTRE`), as any phrase top outside the contrast may re-centre: at the breath the
+        // line crosses to the shell's other voice (Blue Bossa's Dm7b5 takes C, its 7th, over F,
+        // and walks C, B, Bb down the 7th-3rd chain back into the A). It climbs in the
+        // contrast's last phrase, the one that comes back for the A, at any shortfall; an
+        // earlier phrase only once the line is well under (`SUNK_EARLY`), so a bridge built as
+        // a sequence keeps stepping down. Up only: the extra reach is for climbing out from
+        // under the A, never for falling further. A line still at or over its A keeps the 4th,
+        // and the head's top (`hi`) caps the climb. (`prev` is unset only at the chorus's first
+        // note, which has nothing to climb from.)
+        const sunk =
+            lifted &&
+            !entersContrast &&
+            register !== null &&
+            prev !== null &&
+            prev < register - (lastPhrase ? 0 : SUNK_EARLY);
         // The guide tone nearest `target` within reach of the last note.
         const toward = (target: number) => {
             const from = prev ?? target;
             const reach = seam && !climbsBack ? SEAM : RECENTRE;
+            const rise = sunk ? RECENTRE : reach;
             return nearest(
                 pcs,
                 target,
                 target,
                 Math.max(lo, from - reach),
-                Math.min(hi, from + reach),
+                Math.min(hi, from + rise),
             );
         };
         const restates =
@@ -426,9 +474,7 @@ function chorusLine(
         } else if (top && lifted && entry !== null) {
             // Each of the contrast's phrases starts a 4th over where the line came in; its last
             // phrase a step over where the A starts, coming back down for it.
-            const phrases = bars[bar.visit.firstBar + bar.visit.barCount - 1].phrase.index + 1;
-            const last = bar.phrase.index === phrases - 1 && phrases > 1;
-            const target = last
+            const target = lastPhrase
                 ? (opening?.midi ?? entry) + CONTRAST_LIFT.last
                 : entry + CONTRAST_LIFT.phrase;
             midi = toward(Math.min(hi, target));
