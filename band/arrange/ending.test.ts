@@ -108,6 +108,18 @@ function homeStrokesOf(style: StyleId, arrival: number) {
         .sort();
 }
 
+/**
+ * The accent a lead's button is floored at (#2212): the comp's strike on that tick, the button's
+ * own (`ENDING_STRIKE` + `BUTTON_LIFT` through the plan's energy), as the band rendered it.
+ */
+function buttonAccent(events: BandEvent[], tick: number): number {
+    return Math.min(
+        ...events
+            .filter((e): e is PitchedNote => e.lane === 'comp' && e.tick === tick)
+            .map((e) => e.velocity),
+    );
+}
+
 /** The pitched notes the pass plays in its last bar, by lane. */
 function lastBar(timeline: Timeline, events: BandEvent[]) {
     const index = timeline.bars.length - 1;
@@ -1688,7 +1700,12 @@ describe('the whole band ends together (#2017)', () => {
                     const before = struck ? lead[lead.indexOf(struck) - 1] : undefined;
                     if (struck && before) {
                         expect([struck.dur, struck.midi], where).toEqual([SHORT, before.midi]);
-                        expect(struck.velocity, where).toBe(Math.min(127, before.velocity + 12));
+                        expect(struck.velocity, where).toBe(
+                            Math.min(
+                                127,
+                                Math.max(before.velocity + 12, buttonAccent(events, button)),
+                            ),
+                        );
                         // Rung up to the button where it had let go on home (#2178).
                         expect(before.tick + before.dur, where).toBe(button);
                         restrikes++;
@@ -2075,7 +2092,7 @@ describe('a lead note tied into the ending bar lets go with the band (#2176)', (
         const lead = events.filter((e): e is PitchedNote => e.lane === 'lead');
         const tied = lead.filter((n) => n.bar === bar.index - 1 && n.tick + n.dur > bar.start);
         expect(tied, `${style}/${seed}: the head ties into the last bar`).toHaveLength(1);
-        return { bar, tied: tied[0], inBar: lead.filter((n) => n.bar === bar.index) };
+        return { bar, events, tied: tied[0], inBar: lead.filter((n) => n.bar === bar.index) };
     };
 
     it("funk: a stop cuts it at the band's eighth, and it is not struck again on the one", () => {
@@ -2085,12 +2102,18 @@ describe('a lead note tied into the ending bar lets go with the band (#2176)', (
         expect(inBar).toEqual([]);
     });
 
-    it('jazz: held to the button, it plays the button with the band', () => {
-        const { bar, tied, inBar } = tiedIn('jazz', 'f');
+    it('jazz: held to the button, it plays the button with the band, at the accent at least (#2212)', () => {
+        const { bar, events, tied, inBar } = tiedIn('jazz', 'f');
         const button = bar.start + 14 * STEP;
         expect(tied.tick + tied.dur).toBe(button);
         expect(inBar.map((n) => [n.tick, n.dur, n.midi, n.velocity, n.bar])).toEqual([
-            [button, SHORT, tied.midi, Math.min(127, tied.velocity + 12), bar.index],
+            [
+                button,
+                SHORT,
+                tied.midi,
+                Math.min(127, Math.max(tied.velocity + 12, buttonAccent(events, button))),
+                bar.index,
+            ],
         ]);
     });
 
@@ -2156,7 +2179,7 @@ describe('a lead note tied into the ending bar lets go with the band (#2176)', (
                 button,
                 bar.start + bar.meter.barTicks,
                 tied[0].midi,
-                Math.min(127, tied[0].velocity + 12),
+                Math.min(127, Math.max(tied[0].velocity + 12, buttonAccent(events, button))),
             ],
         ]);
     });
@@ -2792,26 +2815,39 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
         },
     );
 
-    // The gestures a silent lead joins: a hold and a soft ending ring, and join nothing.
+    // The gestures whose final hit the lead plays: a hold and a soft ending ring, and play none.
     const JOINS = new Set<EndingGesture['kind']>(['stop', 'hits', 'button']);
     it.each(STYLE_IDS.filter((style) => JOINS.has(STYLES[style].endingGesture.kind)))(
-        "%s: a lead joining the band's final hit from silence is never under the comp's strike",
+        "%s: a lead striking the band's stab is never under the comp's strike",
         (style) => {
             // Catches a lead that joins the stop's One, the stabs or the button at the level its
-            // phrase died away at (72-78 under the band's 88+; #2200). Silent in the bar, every
-            // note it plays is a join; each is held to the comp's strike on the same hit as the
-            // band rendered it (the button's lift included). The count keeps it non-vacuous.
+            // phrase died away at (72-78 under the band's 88+; #2200), and one that sang into
+            // home and then struck the hits after it, or the button, at its phrase's level (#2212:
+            // metal's hits 2 and 3 at 70-95 against the comp's 83-92 where a resting lead played
+            // them at 95-104), and the phrase's own note struck with home's first hit left under
+            // the stabs after it. Every lead note struck with one of home's strikes is held to
+            // the comp's strike on the same hit as the band rendered it (the button's lift
+            // included), whether it joined from silence or the phrase was sounding. The counts
+            // keep both non-vacuous.
             let joined = 0;
-            for (const { where, lead, comp, rested } of cases(style)) {
-                if (!rested) {
-                    continue;
-                }
+            let restruck = 0;
+            const button = STYLES[style].endingGesture.kind === 'button';
+            for (const { where, lead, comp, rested, hits } of cases(style)) {
                 for (const n of lead) {
+                    // A button's landing on home (its first strike) is the phrase's note, sung
+                    // as the held chord's: the bop alone is the stab.
+                    if (button && Math.abs(n.tick - hits.at(-1)!) > 1) {
+                        continue;
+                    }
                     const band = comp.filter((c) => Math.abs(c.tick - n.tick) < 1);
                     if (!band.length) {
                         continue;
                     }
-                    joined++;
+                    if (rested) {
+                        joined++;
+                    } else {
+                        restruck++;
+                    }
                     expect(
                         n.velocity,
                         `${where}: the lead's hit at ${n.tick} under the comp's`,
@@ -2819,6 +2855,12 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
                 }
             }
             expect(joined, `${style}: a case where the lead joined the hit`).toBeGreaterThan(0);
+            if (STYLES[style].endingGesture.kind !== 'stop') {
+                expect(
+                    restruck,
+                    `${style}: a case where the lead struck the hit again`,
+                ).toBeGreaterThan(0);
+            }
         },
     );
 
@@ -3038,13 +3080,15 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
         );
     });
 
-    it('floors a joined hit at an accent and leaves a lead already sounding at its own level', () => {
-        // Catches the floor turned into a boost (every joined hit lifted, or a lead still
-        // sounding into the hit raised with it), a floor that never lifts, and one that sits
-        // at the comp's un-lifted strike, the quietest thing on the hit (#2200). Metal's hits
-        // on `| G7 C |`, driven directly: a lead left off soft joins at the accent (the comp's
-        // strike plus the button's lift, through the plan's energy), one left off louder keeps
-        // its level, and a note sounding into the hits is struck again at its own, however soft.
+    it("floors every lead note on home's strikes at an accent, never a boost, and leaves the V's alone", () => {
+        // Catches the floor turned into a boost (every hit lifted), a floor that never lifts,
+        // one that sits at the comp's un-lifted strike, the quietest thing on the hit (#2200),
+        // and the strikes it missed (#2212): a re-strike left at the phrase's level (metal's 2
+        // and 3, under the comp), the phrase's own note struck with home's first hit left soft
+        // under the two stabs after it (80/98/98 against the comp's 86), and the over-reach, the
+        // note struck with the V's own strike raised. Metal's hits on `| G7 C |`, driven
+        // directly: a lead left off soft joins at the accent (the comp's strike plus the
+        // button's lift, through the plan's energy), one left off louder keeps its level.
         const timeline = compileTimeline(score([{ label: 'A', bars: 'C | F | Dm7 | G7 C' }]));
         const bar = heldEnding(timeline, 3, STYLES.metal.ending)!;
         const plan = planBars(
@@ -3088,11 +3132,36 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
             offsetMs: 0,
             bar: 3,
         };
+        const homeTick = bar.start + 8 * STEP;
+        const onHome = (out: PitchedNote[]) => out.filter((n) => n.tick >= homeTick);
+        // Sounding over the V, struck again with each of home's hits.
         const struckAgain = endWithTheBand(ctx, [sounding], book);
+        expect(onHome(struckAgain).length, 'home is struck more than once').toBeGreaterThan(1);
         expect(
-            velocities(struckAgain),
-            'sounding into the hit: kept and struck again at its own level',
-        ).toEqual(struckAgain.map(() => strike - 20));
+            velocities(onHome(struckAgain)),
+            'every re-strike on home: the accent, not the phrase',
+        ).toEqual(onHome(struckAgain).map(() => strike));
+        expect(
+            struckAgain.find((n) => n.tick === bar.start)?.velocity,
+            "the V's own strike keeps the phrase's level",
+        ).toBe(strike - 20);
+        // The phrase's own note struck with home's first hit is the first of the stabs.
+        const onFirst = endWithTheBand(ctx, [{ ...sounding, tick: homeTick }], book);
+        expect(velocities(onHome(onFirst)), 'the note on the first hit: the accent').toEqual(
+            onHome(onFirst).map(() => strike),
+        );
+        // A floor, not a boost: a louder phrase keeps its level on every hit.
+        for (const at of [bar.start, homeTick]) {
+            const louder = endWithTheBand(
+                ctx,
+                [{ ...sounding, tick: at, velocity: strike + 15 }],
+                book,
+            );
+            expect(
+                velocities(onHome(louder)),
+                `a phrase louder than the accent keeps its own level (struck at ${at})`,
+            ).toEqual(onHome(louder).map(() => strike + 15));
+        }
     });
 });
 
