@@ -822,8 +822,8 @@ const jazzGuitar = compIdiom({
     // plays the new chord and ties over, never a stab of the one leaving (#2184).
     // why: the low tier only. A Freddie Green hand doesn't anticipate: on a change that falls
     // off a beat (a 3/4 or 5/4 bar of two chords, three chords in a 4/4 bar) the beat chunk
-    // before it sits in the push's eighth, and moving it would ring the new chord a quarter
-    // early and break the long-short chunk. The four-feel plays the new chord on its beat.
+    // before it sits in the push's eighth, and moving it would strike the new chord an eighth
+    // early and ring it a quarter, breaking the long-short chunk. The four-feel plays the new chord on its beat.
     pushInBar: ['low'],
     rhythm(ctx, span, tier, rng) {
         if (tier === 'low') {
