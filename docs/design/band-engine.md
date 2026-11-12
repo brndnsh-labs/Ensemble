@@ -566,7 +566,10 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   "bop" whatever the phrase did, so a lead that had let go — before the bar, or inside it
   before the hit — is struck again with it, from its last note in the bar or from where it
   left off before it, on home's resting tone nearest that pitch; silent in the bar, it joins
-  every one of the hits (the stabs are the band's, in unison) and in a button the button alone;
+  every one of the hits (the stabs are the band's, in unison) and in a button the button alone, at
+  the level it left off at but never under an accent (the comp's ending strike plus the
+  button's lift, `ENDING_STRIKE` + `BUTTON_LIFT`: a horn plays the last stab marcato, however
+  softly its phrase died away, #2200);
   a note on home that had let go before the button is rung up to it, "baaah–bop", since the
   held chord is the lead's too. A horn that fell off the phrase before is in on the hit too:
   the fall keeps its length and the note gives way to it — long note, fall, HIT — or,

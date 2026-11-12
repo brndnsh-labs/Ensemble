@@ -21,7 +21,16 @@ import {
 import type { BarContext, EndingGesture, PitchedIdiom } from '../../styles/types.js';
 import { type ChordFacts, chordPcs } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { at, BUTTON_LIFT, barSteps, dyn, ENDING_SHORT, endingStrikes, STEP } from '../grid.js';
+import {
+    at,
+    BUTTON_LIFT,
+    barSteps,
+    dyn,
+    ENDING_SHORT,
+    ENDING_STRIKE,
+    endingStrikes,
+    STEP,
+} from '../grid.js';
 import { type Density, soloArc, tradeArc } from './form.js';
 import { DEFAULT_GUIDE, type GuideRhythm } from './guide-figures.js';
 import { type GuideNote, guidePitchClasses, guideToneLine, headForm } from './guide-tones.js';
@@ -2606,13 +2615,26 @@ export function endWithTheBand(
         bar: ctx.bar.index,
     });
     // The hit a lead silent in the bar joins: from where it left off, on home's resting tone
-    // nearest that pitch (the landing's rule), at the level it was playing.
+    // nearest that pitch (the landing's rule), at the level it was playing but never under an
+    // accent.
+    // why: a phrase that died away ends soft (72-78), and a horn that comes in on the last
+    // stab at that level is the one player under the kick at 107-111. A horn or a lead guitar
+    // plays a unison stab marcato, over anything in its phrase, so the floor is the comp's
+    // ending strike (`ENDING_STRIKE`) plus the accent's step (`BUTTON_LIFT`), through the
+    // plan's energy as the comp's is: the level the comp plays the button at, and about the
+    // bass's ending weight in the styles that stop (104-110). The comp's own un-lifted strike
+    // was tried first and is the quietest thing on the hit: one note at a chord's velocity
+    // sits under the chord, 4-7 under the lead's own loud notes. A floor and not a boost: a
+    // lead that left off louder keeps its own level (and the button's lift on it). A lead
+    // still sounding into the hit (`again`) is untouched: it is already playing at the
+    // phrase's level.
+    const accent = dyn(ENDING_STRIKE + BUTTON_LIFT, ctx.plan.energy);
     const join = (left: LeadLeftOff, from: number, to: number, lift: number): PitchedNote => ({
         lane: 'lead',
         tick: from,
         dur: to - from,
         midi: settled(left.midi),
-        velocity: Math.min(127, left.velocity + lift),
+        velocity: Math.min(127, Math.max(left.velocity + lift, accent)),
         offsetMs: 0,
         bar: ctx.bar.index,
     });

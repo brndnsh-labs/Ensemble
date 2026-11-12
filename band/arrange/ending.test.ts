@@ -16,7 +16,7 @@ import {
 import { chordAt, chorusBars, compileTimeline, type Timeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
 import { BASS, lowestRoot } from '../players/bass/line.js';
-import { dyn, readLine, STEP } from '../players/grid.js';
+import { BUTTON_LIFT, dyn, ENDING_STRIKE, readLine, STEP } from '../players/grid.js';
 import { endWithTheBand } from '../players/lead/idiom.js';
 import { STYLE_IDS, STYLES } from '../styles/index.js';
 import type { BarContext, EndingGesture } from '../styles/types.js';
@@ -2606,6 +2606,9 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
                         chord: home.chord!,
                         hits,
                         lead: leadIn(ending),
+                        comp: ending.filter(
+                            (e): e is PitchedNote => e.lane === 'comp' && e.bar === bar.index,
+                        ),
                         bass: ending.filter(
                             (e): e is PitchedNote => e.lane === 'bass' && e.bar >= bar.index - 2,
                         ),
@@ -2690,6 +2693,36 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
                 }
             }
             expect(letGo, `${style}: a case where the phrase had let go`).toBeGreaterThan(0);
+        },
+    );
+
+    // The gestures a silent lead joins: a hold and a soft ending ring, and join nothing.
+    const JOINS = new Set<EndingGesture['kind']>(['stop', 'hits', 'button']);
+    it.each(STYLE_IDS.filter((style) => JOINS.has(STYLES[style].endingGesture.kind)))(
+        "%s: a lead joining the band's final hit from silence is never under the comp's strike",
+        (style) => {
+            // Catches a lead that joins the stop's One, the stabs or the button at the level its
+            // phrase died away at (72-78 under the band's 88+; #2200). Silent in the bar, every
+            // note it plays is a join; each is held to the comp's strike on the same hit as the
+            // band rendered it (the button's lift included). The count keeps it non-vacuous.
+            let joined = 0;
+            for (const { where, lead, comp, rested } of cases(style)) {
+                if (!rested) {
+                    continue;
+                }
+                for (const n of lead) {
+                    const band = comp.filter((c) => Math.abs(c.tick - n.tick) < 1);
+                    if (!band.length) {
+                        continue;
+                    }
+                    joined++;
+                    expect(
+                        n.velocity,
+                        `${where}: the lead's hit at ${n.tick} under the comp's`,
+                    ).toBeGreaterThanOrEqual(Math.min(...band.map((c) => c.velocity)));
+                }
+            }
+            expect(joined, `${style}: a case where the lead joined the hit`).toBeGreaterThan(0);
         },
     );
 
@@ -2907,6 +2940,63 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
         expect(stepping).toEqual(
             expect.arrayContaining(['jazz', 'blues', 'skapunk', 'country', 'bossa', 'rock']),
         );
+    });
+
+    it('floors a joined hit at an accent and leaves a lead already sounding at its own level', () => {
+        // Catches the floor turned into a boost (every joined hit lifted, or a lead still
+        // sounding into the hit raised with it), a floor that never lifts, and one that sits
+        // at the comp's un-lifted strike, the quietest thing on the hit (#2200). Metal's hits
+        // on `| G7 C |`, driven directly: a lead left off soft joins at the accent (the comp's
+        // strike plus the button's lift, through the plan's energy), one left off louder keeps
+        // its level, and a note sounding into the hits is struck again at its own, however soft.
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'C | F | Dm7 | G7 C' }]));
+        const bar = heldEnding(timeline, 3, STYLES.metal.ending)!;
+        const plan = planBars(
+            timeline,
+            { ...DEFAULT_SETTINGS, style: 'metal' },
+            {
+                pass: 0,
+                looping: false,
+                window: fullWindow(timeline),
+                endingGesture: STYLES.metal.endingGesture,
+            },
+        )[3];
+        const book = {
+            vibrato: 4,
+            settle: (chord: { root: number }) => [chord.root, mod12(chord.root + 7)],
+        } as unknown as Parameters<typeof endWithTheBand>[2];
+        const ctx = {
+            timeline,
+            bar,
+            plan,
+            ending: bar,
+            lead: { range: [55, 84] },
+        } as unknown as BarContext;
+        const strike = dyn(ENDING_STRIKE + BUTTON_LIFT, plan.energy);
+        const velocities = (out: PitchedNote[]) => out.map((n) => n.velocity);
+        const soft = endWithTheBand(ctx, [], book, { midi: 67, velocity: strike - 20 });
+        expect(velocities(soft), 'left off soft: every hit at the accent').toEqual(
+            soft.map(() => strike),
+        );
+        expect(soft.length, 'the lead joins').toBeGreaterThan(0);
+        const loud = endWithTheBand(ctx, [], book, { midi: 67, velocity: strike + 15 });
+        expect(velocities(loud), 'left off louder: its own level').toEqual(
+            loud.map(() => strike + 15),
+        );
+        const sounding: PitchedNote = {
+            lane: 'lead',
+            tick: bar.start,
+            dur: 2 * STEP,
+            midi: 67,
+            velocity: strike - 20,
+            offsetMs: 0,
+            bar: 3,
+        };
+        const struckAgain = endWithTheBand(ctx, [sounding], book);
+        expect(
+            velocities(struckAgain),
+            'sounding into the hit: kept and struck again at its own level',
+        ).toEqual(struckAgain.map(() => strike - 20));
     });
 });
 
