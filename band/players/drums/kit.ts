@@ -269,6 +269,32 @@ export function drumIdiom(book: DrumBook): DrumIdiom {
                 // Nothing is struck in a written rest after home (`G7:2 N.C.:2`).
                 const end = held ? held.to : total;
                 const lines = book.ending(ctx, plan.ending);
+                if (held?.span.tied) {
+                    // The ending bar is a tie under a fermata (`| C | /(fermata) |`, #2187):
+                    // the band strikes nothing, the chord of the bar before rings through it.
+                    // why: the drummer marks the arrival once and lets it ring. The gesture's
+                    // rhythm (metal's three hits, the jazz button) is a unison figure, and
+                    // with no band to play it the kit would play it alone, at half speed
+                    // under the hold. So the kit plays the gesture's final strokes on the
+                    // one: the last hit's (metal's crash, kick and snare), or the line's own
+                    // downbeat.
+                    const final =
+                        plan.ending.kind === 'hits'
+                            ? Math.max(0, ...(plan.ending.at ?? [])) * 4
+                            : 0;
+                    for (const [piece, line] of Object.entries(lines) as [DrumPiece, string][]) {
+                        for (const [step, velocity] of readLine(line.slice(0, 16))) {
+                            if (step === final) {
+                                hit(
+                                    piece === 'snare' && velocity < 50 ? 'ghost' : piece,
+                                    0,
+                                    velocity,
+                                );
+                            }
+                        }
+                    }
+                    return { events, memory: null };
+                }
                 if (arrival > 0) {
                     // why: the kick under the V is the book's own downbeat kick, at its level
                     // (a bossa's soft surdo, not a rock kick): never louder than the I it leads

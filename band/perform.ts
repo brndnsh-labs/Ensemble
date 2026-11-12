@@ -507,7 +507,8 @@ const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
  * On the bar a performance ends on (`plan.ending`) the band is already playing its style's
  * ending gesture (#2017), and a fermata written there holds that gesture instead (#2175): the
  * kit's line stays the book's ending, and each pitched lane's last strike in the span rings to
- * the span's end. A fermata elsewhere, or in a performance that loops, is held as above.
+ * the span's end. A tied fermata there strikes nothing new but keeps the kit's one arrival on
+ * the downbeat (#2187). A fermata elsewhere, or in a performance that loops, is held as above.
  *
  * The events are indexed by tick once, so a fermata costs a search and the events it replaces,
  * not a scan of the whole pass (#1665): a chart may write tens of thousands of them.
@@ -617,12 +618,26 @@ function holdFermatas(
         // The last slots before the span with a bass note and a struck comp chord in them.
         const bassBefore = bass.lastBefore(from);
         const compBefore = comp.lastBefore(from);
+        // why: a tie on the ending bar (`| C | /(fermata) |`) holds the chord already ringing, but
+        // the band still ends on a drum hit (#2017): the kit's one arrival on the downbeat
+        // (`drumIdiom`'s `held?.span.tied` branch writes only that in a tied bar) stays under
+        // the ringing chord, where wiping it left the band ending on no drum hit at all (#2187).
+        // The pitched lanes still strike nothing new and ring on from the bar before.
+        // `plan.ending` is set only on the last bar of a pass that actually ends, so a looping
+        // pass and a mid-chart tie are held as before; so is a tie of a rest (no chord rings,
+        // so there is no arrival to mark, and the kit's branch asks for a chord too).
+        const keepKit = plan.ending !== null && span.tied && span.chord !== null;
         for (let slot = from; slot < ticks.length && ticks[slot] < span.end; slot++) {
             if (live[slot].length) {
+                const kept: number[] = [];
                 for (const i of live[slot]) {
-                    out[i] = null;
+                    if (keepKit && out[i]!.lane === 'drums') {
+                        kept.push(i);
+                    } else {
+                        out[i] = null;
+                    }
                 }
-                live[slot] = [];
+                live[slot] = kept;
                 mark(slot);
             }
         }
