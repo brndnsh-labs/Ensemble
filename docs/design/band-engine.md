@@ -115,7 +115,9 @@ borrows another family's idiom. Shared machinery does everything that isn't the 
   Metal, disco, blues, neo-soul, bossa and ska-punk keep their fills as they were.
 - `players/comp/idiom.ts` (`compIdiom`): voice leading, anticipations tied over the barline
   (a book's `push`) and, where a book pushes in the bar (`pushInBar`: bossa, neo-soul, and since
-  #2015 the jazz and blues keyboards), the strike in the eighth before a mid-bar change plays the
+  #2015 the jazz and blues keyboards, and since #2184 the jazz guitar's sparse tier: its
+  four-to-the-bar tiers never anticipate, so the book names the tiers that push), the strike in
+  the eighth before a mid-bar change plays the
   new chord and ties over it, never a stab of the one leaving; strokes and scratches, one chord
   at a time. Tied over means the chord's own strikes in that first eighth go, as the barline
   push drops the next bar's (#2171); a book whose figure runs on through the change keeps them

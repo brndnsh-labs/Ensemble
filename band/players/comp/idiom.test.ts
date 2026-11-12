@@ -3,7 +3,7 @@
  * anticipation is one press however many strikes fall in its eighth (#1510), and only there —
  * the same chord pushed again a bar's half later is a new arrival, pressed anew.
  */
-import { fullWindow, planBars } from '../../arrange/plan.js';
+import { type EnergyTier, fullWindow, planBars } from '../../arrange/plan.js';
 import { rng } from '../../core/random.js';
 import { DEFAULT_SETTINGS, type PitchedNote } from '../../core/types.js';
 import { compileTimeline } from '../../form/timeline.js';
@@ -21,7 +21,12 @@ function struck(
     bars: string,
     index: number,
     steps: (number | Hit)[],
-    options: { comp?: 'organ' | 'piano'; pushInBar?: true | 'restrike'; memory?: CompMemory } = {},
+    options: {
+        comp?: 'organ' | 'piano';
+        pushInBar?: true | 'restrike' | readonly EnergyTier[];
+        memory?: CompMemory;
+        energy?: number;
+    } = {},
 ) {
     return sounded(bars, index, steps, options).map(([step]) => step);
 }
@@ -38,7 +43,13 @@ function sounded(
         comp = 'organ',
         pushInBar = true,
         memory,
-    }: { comp?: 'organ' | 'piano'; pushInBar?: true | 'restrike'; memory?: CompMemory } = {},
+        energy,
+    }: {
+        comp?: 'organ' | 'piano';
+        pushInBar?: true | 'restrike' | readonly EnergyTier[];
+        memory?: CompMemory;
+        energy?: number;
+    } = {},
 ): [number, number][] {
     // A bare step is a sixteenth-long hit.
     const hits = steps.map(
@@ -59,6 +70,9 @@ function sounded(
         looping: true,
         window: fullWindow(timeline),
     });
+    if (energy !== undefined) {
+        plans[index] = { ...plans[index], energy };
+    }
     const bar = timeline.bars[index];
     const next = timeline.bars[index + 1] ?? timeline.bars[0];
     const ctx: BarContext = {
@@ -144,6 +158,17 @@ describe('a mid-bar push ties over the change (#2171)', () => {
     // `C F`, strikes on 0, 6 and 8: the strike on 6 plays the F arriving on 8, tied over it.
     it("the chord's own strike on the change is dropped under the tie", () => {
         expect(struck('C F', 0, [0, 6, 8], { comp: 'piano' })).toEqual([0, 6]);
+    });
+
+    it.each([
+        ['a tier the book names pushes', 0.2, [0, 6]],
+        ['a tier it leaves out strikes the change on its beat', 0.6, [0, 6, 8]],
+    ] as const)('%s (#2184)', (_name, energy, expected) => {
+        // Catches a tier list read as `true`: the jazz guitar's four-to-the-bar tiers would
+        // anticipate a change off the beat, striking the new chord an eighth early.
+        expect(struck('C F', 0, [0, 6, 8], { comp: 'piano', pushInBar: ['low'], energy })).toEqual(
+            expected,
+        );
     });
 
     it('a strike past the tie plays', () => {
