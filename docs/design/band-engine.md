@@ -401,7 +401,8 @@ expression devices take turns rather than stack; one peak note per cycle.
   (jazz 0.85 of a solo's and 0.7 of a head's, blues 0.65 and 0.5, bossa 0.3): the "and" of 4,
   two eighths on 4 or a triplet there, the style's scale walked into the phrase's first note
   (its last note a step or a 3rd away; on a beat or a change, a chord tone), a little under
-  the line, climbing into it more often than falling (0.6). A bebop solo's pickup ends on the
+  the line, climbing into it a little more often than falling (drawn 0.6; played, a head and
+  bossa lean the same way, near even in a small take). A bebop solo's pickup ends on the
   line's own approach instead (`pickup.approaches`, at the book's `enclosure` and `chromatic`
   chances): the half step below the note on the "and" of 4, and for an enclosure the tone above
   it struck before that; beat 4's note stays a chord tone. The pickup belongs to the phrase it
