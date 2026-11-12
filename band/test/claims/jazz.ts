@@ -483,9 +483,11 @@ export const jazz = defineClaims({
                 ['compBreathDensity', 1.1, 2, "the comper talks in the soloist's breaths"],
                 ['compAnswersBreaths', 0.4, 0.7, 'a stab of its own in most of them, not all'],
                 ['compAnswerLift', 1, 12, 'an answer speaks up in the hole'],
-                // 0.123 since #2015 (0.113 before): the push into a change is one more strike
-                // (`PUSH_SETUP`), and a change under the line still gets it; breath density 1.35
-                // says the comp still leans back under the line and talks in the holes.
+                // 0.118 since #2186 (0.123 after #2015, 0.113 before it): the push into a change
+                // is one more strike (`PUSH_SETUP`), and a change under the line still gets it;
+                // since #2186 a pushed bar may thin under the line like any other. Breath
+                // density 1.34 says the comp still leans back under the line and talks in the
+                // holes.
                 ['compLineDensity', 0.1, 0.13, 'a little thinner under the line'],
                 ['leadLongBreath', 0, 0.12, 'breaths, not gaps: two empty bars are rare'],
                 // Pickups (#2164, `LeadBook.pickup` 0.85 of the phrases that would enter on the

@@ -134,8 +134,9 @@ export interface Answer {
      */
     hold?: boolean;
     /**
-     * The fewest strikes lay-out leaves in a bar: a comper who is down to the chord's
-     * arrival alone has stopped keeping time (a sparse figure thins to nothing otherwise).
+     * The fewest strikes lay-out leaves in a bar, a push counted as the strike it is: a
+     * comper who is down to the chord's arrival alone has stopped keeping time (a sparse
+     * figure thins to nothing otherwise).
      */
     keep?: number;
 }
@@ -763,7 +764,14 @@ function answerLead(
             firsts.has(hit) ||
             !sounding[hit.step] ||
             !rng.chance(book.answer.layOut) ||
-            planned.filter((h) => !h.muted && !h.early).length <= (book.answer.keep ?? 0)
+            // why: a push is a strike the comper made (the chord is struck, an eighth early),
+            // so it counts toward the floor (#2186), and it is never laid out (`hit.early`), so
+            // the strike it counts for stays. Counted out, a pushed bar sat a strike above an
+            // unpushed one: a barline push is added on top of the figure (`PUSH_SETUP`), so
+            // its bar kept one strike more; a mid-bar push takes over its tied-over on-beat hit
+            // (#2171), so its bar sat at the floor and could not thin. A chord's first strike
+            // stays whatever the count (`firsts`), so no bar empties.
+            planned.filter((h) => !h.muted).length <= (book.answer.keep ?? 0)
         ) {
             continue;
         }
