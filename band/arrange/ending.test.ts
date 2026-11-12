@@ -16,7 +16,7 @@ import {
 import { chordAt, chorusBars, compileTimeline, type Timeline } from '../form/timeline.js';
 import { type PassMemory, performPass } from '../perform.js';
 import { BASS, lowestRoot } from '../players/bass/line.js';
-import { dyn, readLine, STEP } from '../players/grid.js';
+import { BUTTON_LIFT, dyn, ENDING_STRIKE, readLine, STEP } from '../players/grid.js';
 import { endWithTheBand } from '../players/lead/idiom.js';
 import { STYLE_IDS, STYLES } from '../styles/index.js';
 import type { BarContext, EndingGesture } from '../styles/types.js';
@@ -2606,6 +2606,9 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
                         chord: home.chord!,
                         hits,
                         lead: leadIn(ending),
+                        comp: ending.filter(
+                            (e): e is PitchedNote => e.lane === 'comp' && e.bar === bar.index,
+                        ),
                         bass: ending.filter(
                             (e): e is PitchedNote => e.lane === 'bass' && e.bar >= bar.index - 2,
                         ),
@@ -2690,6 +2693,36 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
                 }
             }
             expect(letGo, `${style}: a case where the phrase had let go`).toBeGreaterThan(0);
+        },
+    );
+
+    // The gestures a silent lead joins: a hold and a soft ending ring, and join nothing.
+    const JOINS = new Set<EndingGesture['kind']>(['stop', 'hits', 'button']);
+    it.each(STYLE_IDS.filter((style) => JOINS.has(STYLES[style].endingGesture.kind)))(
+        "%s: a lead joining the band's final hit from silence is never under the comp's strike",
+        (style) => {
+            // Catches a lead that joins the stop's One, the stabs or the button at the level its
+            // phrase died away at (72-78 under the band's 88+; #2200). Silent in the bar, every
+            // note it plays is a join; each is held to the comp's strike on the same hit as the
+            // band rendered it (the button's lift included). The count keeps it non-vacuous.
+            let joined = 0;
+            for (const { where, lead, comp, rested } of cases(style)) {
+                if (!rested) {
+                    continue;
+                }
+                for (const n of lead) {
+                    const band = comp.filter((c) => Math.abs(c.tick - n.tick) < 1);
+                    if (!band.length) {
+                        continue;
+                    }
+                    joined++;
+                    expect(
+                        n.velocity,
+                        `${where}: the lead's hit at ${n.tick} under the comp's`,
+                    ).toBeGreaterThanOrEqual(Math.min(...band.map((c) => c.velocity)));
+                }
+            }
+            expect(joined, `${style}: a case where the lead joined the hit`).toBeGreaterThan(0);
         },
     );
 
@@ -2907,6 +2940,146 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
         expect(stepping).toEqual(
             expect.arrayContaining(['jazz', 'blues', 'skapunk', 'country', 'bossa', 'rock']),
         );
+    });
+
+    it('floors a joined hit at an accent and leaves a lead already sounding at its own level', () => {
+        // Catches the floor turned into a boost (every joined hit lifted, or a lead still
+        // sounding into the hit raised with it), a floor that never lifts, and one that sits
+        // at the comp's un-lifted strike, the quietest thing on the hit (#2200). Metal's hits
+        // on `| G7 C |`, driven directly: a lead left off soft joins at the accent (the comp's
+        // strike plus the button's lift, through the plan's energy), one left off louder keeps
+        // its level, and a note sounding into the hits is struck again at its own, however soft.
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'C | F | Dm7 | G7 C' }]));
+        const bar = heldEnding(timeline, 3, STYLES.metal.ending)!;
+        const plan = planBars(
+            timeline,
+            { ...DEFAULT_SETTINGS, style: 'metal' },
+            {
+                pass: 0,
+                looping: false,
+                window: fullWindow(timeline),
+                endingGesture: STYLES.metal.endingGesture,
+            },
+        )[3];
+        const book = {
+            vibrato: 4,
+            settle: (chord: { root: number }) => [chord.root, mod12(chord.root + 7)],
+        } as unknown as Parameters<typeof endWithTheBand>[2];
+        const ctx = {
+            timeline,
+            bar,
+            plan,
+            ending: bar,
+            lead: { range: [55, 84] },
+        } as unknown as BarContext;
+        const strike = dyn(ENDING_STRIKE + BUTTON_LIFT, plan.energy);
+        const velocities = (out: PitchedNote[]) => out.map((n) => n.velocity);
+        const soft = endWithTheBand(ctx, [], book, { midi: 67, velocity: strike - 20 });
+        expect(velocities(soft), 'left off soft: every hit at the accent').toEqual(
+            soft.map(() => strike),
+        );
+        expect(soft.length, 'the lead joins').toBeGreaterThan(0);
+        const loud = endWithTheBand(ctx, [], book, { midi: 67, velocity: strike + 15 });
+        expect(velocities(loud), 'left off louder: its own level').toEqual(
+            loud.map(() => strike + 15),
+        );
+        const sounding: PitchedNote = {
+            lane: 'lead',
+            tick: bar.start,
+            dur: 2 * STEP,
+            midi: 67,
+            velocity: strike - 20,
+            offsetMs: 0,
+            bar: 3,
+        };
+        const struckAgain = endWithTheBand(ctx, [sounding], book);
+        expect(
+            velocities(struckAgain),
+            'sounding into the hit: kept and struck again at its own level',
+        ).toEqual(struckAgain.map(() => strike - 20));
+    });
+});
+
+describe('a tied fermata on the ending bar keeps one drum hit on the one (#2187)', () => {
+    // `| C | /(fermata) |`: the last bar ties the bar before and holds it. Nothing pitched is
+    // struck, but the band still ends on a drum hit, once, under the ringing chord.
+    const tiedEnding = (bars: string, fermataBars: number[]) =>
+        compileTimeline(score([{ label: 'A', bars, fermataBars }]));
+    const timeline = tiedEnding('C | F | Dm7 | C | /', [4]);
+    const bar = timeline.bars.at(-1)!;
+    const before = timeline.bars.at(-2)!;
+    const end = bar.start + bar.meter.barTicks;
+    const straight = (style: StyleId): BandSettings => ({
+        ...settingsFor(style, 'a'),
+        swing: 0,
+        humanize: 0,
+    });
+    const drumsIn = (events: BandEvent[], index: number) =>
+        events.flatMap((e) => (e.lane === 'drums' && e.bar === index ? [e] : []));
+    /** The strokes a book's ending line writes on sixteenth `step`. */
+    const strokesAt = (style: StyleId, step: number) =>
+        Object.entries(ENDING_DRUMS[style])
+            .filter(([, line]) => (line[step] ?? '.') !== '.')
+            .map(([piece]) => piece)
+            .sort();
+
+    // rock: crash, kick and tom; bossa: a book with no cymbal; hiphop: a lone kick; jazz: the
+    // button's kick and snare on the "and" of 4 are not played; metal: three hits become the
+    // last one, its crash on the one.
+    it.each([
+        ['rock', 0],
+        ['bossa', 0],
+        ['hiphop', 0],
+        ['jazz', 0],
+        ['metal', 8],
+    ] as const)(
+        "%s: the kit plays its ending's final strokes on the one and nothing after, the pitched lanes ring on",
+        (style, step) => {
+            // Catches `holdFermatas`' tied path removing the kit with everything else (the band
+            // ended on no drum hit), the kit playing a unison figure alone under the hold (the
+            // jazz button, metal's hits at half speed), and a pitched note struck in the bar.
+            const { events } = performPass(timeline, straight(style), {
+                pass: 0,
+                looping: false,
+            });
+            const drums = drumsIn(events, bar.index);
+            const book = strokesAt(style, step);
+            expect(book.length, style).toBeGreaterThan(0);
+            expect(
+                drums.map((e) => e.tick - bar.start),
+                style,
+            ).toEqual(book.map(() => 0));
+            expect(drums.map((e) => e.piece).sort(), style).toEqual(book);
+            const pitched = events.filter((e): e is PitchedNote => e.lane !== 'drums');
+            expect(
+                pitched.filter((e) => e.bar === bar.index),
+                style,
+            ).toEqual([]);
+            for (const lane of ['bass', 'comp'] as const) {
+                const notes = pitched.filter((e) => e.lane === lane && e.bar === before.index);
+                const last = Math.max(...notes.map((e) => e.tick));
+                const ringing = notes.filter((e) => e.tick === last);
+                expect(ringing.length, `${style} ${lane}`).toBeGreaterThan(0);
+                for (const n of ringing) {
+                    expect(n.tick + n.dur, `${style} ${lane}`).toBe(end);
+                }
+            }
+        },
+    );
+
+    it('only the ending bar: a tie earlier in the same pass, and one in a pass that loops, keep no kit', () => {
+        // Catches the kit kept on any tied fermata of a pass that ends (not just its last bar),
+        // and on a pass that does not end: no ending gesture belongs to either.
+        const twice = tiedEnding('C | / | Dm7 | G7 | C | /', [1, 5]);
+        const ends = performPass(twice, straight('rock'), { pass: 0, looping: false }).events;
+        expect(drumsIn(ends, 1)).toEqual([]);
+        expect(drumsIn(ends, 5).length).toBeGreaterThan(0);
+        const loops = performPass(timeline, straight('rock'), { pass: 0, looping: true }).events;
+        expect(drumsIn(loops, bar.index)).toEqual([]);
+        // Nor does a tie of a rest: no chord rings, and jazz would play its button alone.
+        const rest = tiedEnding('C | F | C | N.C. | /', [4]);
+        const silent = performPass(rest, straight('jazz'), { pass: 0, looping: false }).events;
+        expect(drumsIn(silent, 4)).toEqual([]);
     });
 });
 

@@ -69,6 +69,13 @@ export const ENDING_SHORT = 2;
  * and the lead play it about a velocity step over the held chord.
  */
 export const BUTTON_LIFT = 12;
+/**
+ * The level the comp strikes an ending chord at before the plan's energy scales it (`dyn`):
+ * the held ending's weight since #1482. A lead joining the band's final hit from silence is
+ * levelled from it too (`endWithTheBand`, #2200), so the horn's accent and the keys under it
+ * move together. The bass's ending weight is each style's own number (`endingBass`).
+ */
+export const ENDING_STRIKE = 92;
 
 /** A gesture's hit beats, counted from 0, in order: home's own strike first. */
 const hitBeats = (gesture: EndingGesture) =>

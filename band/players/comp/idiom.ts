@@ -11,7 +11,16 @@ import type { Bar } from '../../form/timeline.js';
 import type { BarContext, PitchedIdiom } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
 import { mod12 } from '../../theory/pitch.js';
-import { at, BUTTON_LIFT, barSteps, dyn, endingStrikes, STEP, spanSteps } from '../grid.js';
+import {
+    at,
+    BUTTON_LIFT,
+    barSteps,
+    dyn,
+    ENDING_STRIKE,
+    endingStrikes,
+    STEP,
+    spanSteps,
+} from '../grid.js';
 import { type GripShape, grip } from './fretboard.js';
 import { endingKind, keyboardKind, type LeadOver, type VoicingKind, voice } from './voicing.js';
 
@@ -253,7 +262,7 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // strikes (`endingStrikes`, #2017): held, an eighth, a button, the hits.
                 // why: a soft ending lets the chord go at a gentle 72, every other strikes it
                 // with the band's 92 (the held ending's weight since #1482).
-                const weight = plan.ending.kind === 'soft' ? 72 : 92;
+                const weight = plan.ending.kind === 'soft' ? 72 : ENDING_STRIKE;
                 const strikes = endingStrikes(ctx);
                 let held: string | null = null;
                 for (const { span, from, to, first, accent } of strikes) {
