@@ -97,8 +97,10 @@ export interface CompBook {
      * as at the barline, and the push holds for as long as the longest of them would have.
      * `'restrike'` keeps them, and the pushing hit plays at its written length when one is
      * there to take over: the figure hammers on through the change (the boogie pump).
+     * A list of tiers pushes in those tiers only (a book whose other tiers are a different
+     * hand: the jazz guitar's four-to-the-bar never anticipates, #2184).
      */
-    pushInBar?: boolean | 'restrike';
+    pushInBar?: boolean | 'restrike' | readonly EnergyTier[];
     /**
      * The rhythm is the part even on a sustaining instrument: the organ plays the book's hits
      * as written, short, instead of pressing once per chord and holding (the reggae bubble).
@@ -356,14 +358,17 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     planned.push({ ...hit, length, chord: target, early: target !== chord });
                 }
             });
+            const pushesInBar = Array.isArray(book.pushInBar)
+                ? book.pushInBar.includes(tier)
+                : book.pushInBar;
             spans.forEach(({ span, from }, index) => {
                 if (!span.chord || index === 0) {
                     return;
                 }
                 // Anticipate a mid-bar change: the hit an eighth before it plays the new chord.
                 // Not a held one: a fermata is struck on its beat, together.
-                if (book.pushInBar && !span.fermata) {
-                    const restrikes = book.pushInBar === 'restrike';
+                if (pushesInBar && !span.fermata) {
+                    const restrikes = pushesInBar === 'restrike';
                     // A restriking book's own hit on the change, when its figure has one, is
                     // the arrival: the push is its pickup and plays as written (the pump's
                     // "and" is a short eighth before its beat). With none there the push is the

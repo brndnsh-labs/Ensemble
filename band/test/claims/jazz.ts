@@ -537,7 +537,33 @@ export const jazz = defineClaims({
         },
         {
             take: { comp: 'guitar', intensity: 0.2 },
-            claims: [['compRootLowest', 0.8, 1, 'the sparse comp keeps the root on the bottom']],
+            claims: [
+                ['compRootLowest', 0.8, 1, 'the sparse comp keeps the root on the bottom'],
+                // The sparse guitar tier comps like the piano and pushes the same way (`jazzGuitar`
+                // `pushInBar`, #2184). Over every change (the barline pushes included, which it
+                // rarely sets up): 0.045, 0.005 before. The floor sits midway to none; the
+                // ceiling keeps a sparse guitar from anticipating like the piano (0.337).
+                [
+                    'compAnticipatesChange',
+                    0.025,
+                    0.1,
+                    'a guitar hit an eighth before a change already plays the new chord',
+                ],
+                // 0.138 before #2184: the low tier's "and"-of-2 stab played the leaving chord an
+                // eighth before the change on 3, on 33 of the 240 mid-bar changes judged here.
+                [
+                    'compStabsOutgoing',
+                    0,
+                    0,
+                    'the strike before a mid-bar change is the new chord, not a stutter',
+                ],
+                [
+                    'compPushRestruck',
+                    0,
+                    0,
+                    'a mid-bar push ties over the change; it is not struck again on it',
+                ],
+            ],
         },
     ],
 });
