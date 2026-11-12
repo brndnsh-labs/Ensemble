@@ -264,8 +264,15 @@ expression devices take turns rather than stack; one peak note per cycle.
     tones the contrast can climb from (a V7's 7th resolving down into the bridge would leave it
     only a fall, #2123). Where a fall is still the only voice-led way in (the bossa's Dm6 6th
     to Gm7's 3rd), the contrast's own phrase tops may re-centre by a 5th, so it climbs back
-    toward its A rather than walking down its ii-V chain (#2140). A 12-bar chorus (a vamp
-    after it doesn't count) is a blues instead: call, call, answer. Every style sings it
+    toward its A rather than walking down its ii-V chain (#2140). However the seam went, the
+    contrast's last phrase, the one coming back for the A, may climb a 5th whenever its line has
+    sunk under the A's register (the mean of the A's guide tones), and an earlier phrase only
+    once it is more than a minor 3rd under, so a bridge built as a sequence keeps stepping down
+    (`SUNK_EARLY`): upward only, under the same top. Cherokee's bridge in the books whose A sits
+    high, and Blue Bossa's B in the books seated from G4 to Bb4, no longer sink under their A
+    (#2161; held at every book's register, no contrast more than 1.5 under its A on the line
+    itself, in `guide-tones.test.ts`). A 12-bar chorus (a vamp after it doesn't count) is a
+    blues instead: call, call, answer. Every style sings it
     (#2122): a book without its own `head.guide` takes the shared figures (`DEFAULT_GUIDE`,
     `players/lead/guide-figures.ts`, the `GuideRhythm` shape a style's override takes whole) —
     a straight-eighth pop rhythm, two to four notes a bar, a push or an attack into beat 3's
