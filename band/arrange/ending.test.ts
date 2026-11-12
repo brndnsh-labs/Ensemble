@@ -3232,6 +3232,85 @@ describe('a tied fermata on the ending bar keeps one drum hit on the one (#2187)
         },
     );
 
+    // The bar before a tied ending played as the approach into an ending, and the tie held
+    // that approach (jazz's leading tone, a G) and its last stab (a skank, one picked note).
+    // The last strike of bass and comp is played as the ending's arrival and rings (#2210).
+    const heldStrike = (events: BandEvent[], lane: 'bass' | 'comp', until: number) => {
+        const notes = events.filter(
+            (e): e is PitchedNote => e.lane === lane && !e.muted && e.tick + e.dur >= until,
+        );
+        // Of the notes ringing to the end, the ones of the last strike (the held chord).
+        const tick = Math.min(...notes.map((e) => e.tick));
+        return notes.filter((e) => e.tick === tick);
+    };
+    it.each(STYLE_IDS)(
+        "%s: the bass holds the chord's root (or its written bass) and the comp a chord",
+        (style) => {
+            // Catches the tie extending the bar before's last notes as they were: the walk's
+            // approach under the final chord, a skank or one picked string as the held comp.
+            for (const [bars, bassPc] of [
+                ['C | F | Dm7 | C | /', 0],
+                ['C | F | Dm7 | C/E | /', 4],
+                ['C | F | Dm7 | Cm | /', 0],
+            ] as const) {
+                const tied = compileTimeline(score([{ label: 'A', bars, fermataBars: [4] }]));
+                const finish = tied.bars.at(-1)!.start + tied.bars.at(-1)!.meter.barTicks;
+                for (const seed of ['a', 'b', 'c', 'd', 'e']) {
+                    const { events } = performPass(
+                        tied,
+                        { ...straight(style), seed },
+                        { pass: 0, looping: false },
+                    );
+                    const note = `${style} ${bars} ${seed}`;
+                    const bass = heldStrike(events, 'bass', finish);
+                    expect(
+                        bass.map((e) => mod12(e.midi)),
+                        note,
+                    ).toEqual([bassPc]);
+                    // Low, as an ending's last note is (`lowestRoot`, or the octave a walk promised).
+                    expect(bass[0].midi - lowestRoot(bassPc), note).toBeLessThanOrEqual(12);
+                    const comp = heldStrike(events, 'comp', finish);
+                    // A chord, not a stab: metal's power chord is its full chord (root and fifth).
+                    expect(
+                        new Set(comp.map((e) => mod12(e.midi))).size,
+                        note,
+                    ).toBeGreaterThanOrEqual(style === 'metal' ? 2 : 3);
+                    // Struck in the bar before, at its last strike: nothing new on the downbeat.
+                    const last = tied.bars.at(-1)!;
+                    for (const n of [...bass, ...comp]) {
+                        expect(n.tick, note).toBeLessThan(last.start);
+                    }
+                }
+            }
+        },
+    );
+
+    it("a tie mid-chart still rings the bar before's last notes as they were", () => {
+        // Catches the arrival replacing the last strike of a tie that is not the ending's: the
+        // notes held through it are the ones the same bar plays without the fermata.
+        const midTied = compileTimeline(
+            score([{ label: 'A', bars: 'C | / | Dm7 | G7 | C | /', fermataBars: [1, 5] }]),
+        );
+        const plain = compileTimeline(
+            score([{ label: 'A', bars: 'C | / | Dm7 | G7 | C | /', fermataBars: [5] }]),
+        );
+        for (const style of ['jazz', 'funk', 'acoustic'] as const) {
+            const settings = straight(style);
+            const held = performPass(midTied, settings, { pass: 0, looping: false }).events;
+            const free = performPass(plain, settings, { pass: 0, looping: false }).events;
+            for (const lane of ['bass', 'comp'] as const) {
+                const before = (events: BandEvent[]) =>
+                    events.filter((e): e is PitchedNote => e.lane === lane && e.bar === 0);
+                const strikes = (events: BandEvent[]) => {
+                    const notes = before(events).filter((e) => !e.muted);
+                    const tick = Math.max(...notes.map((e) => e.tick));
+                    return notes.filter((e) => e.tick === tick).map((e) => e.midi);
+                };
+                expect(strikes(held), `${style} ${lane}`).toEqual(strikes(free));
+            }
+        }
+    });
+
     it('only the ending bar: a tie earlier in the same pass, and one in a pass that loops, keep no kit', () => {
         // Catches the kit kept on any tied fermata of a pass that ends (not just its last bar),
         // and on a pass that does not end: no ending gesture belongs to either.

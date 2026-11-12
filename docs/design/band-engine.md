@@ -722,8 +722,13 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   hold makes half a bar or longer sings with vibrato. A fermata on a later chord of the last bar (`|
   G7 C(fermata) |`) is that written chord held from where it is written: `heldEnding` plays
   the bar as it plays `| G7 C |`, the G7 struck as written and the C held from its beat. A
-  fermata on a tie (`| C | /(fermata) |`) as the last bar strikes nothing new, the bar
-  before's last bass note and comp chord ringing through it, and the kit marks the arrival
+  fermata on a tie (`| C | /(fermata) |`) as the last bar strikes nothing new on the one: the
+  bar before's last bass note and comp strike ring through it, but played as the ending's
+  arrival (#2210), not as they were. That bar was played as the approach into an ending
+  (`endingAim`), and held as it stood the tie kept the approach itself (jazz's leading tone
+  under the root) and the last stab (a skank, one picked string). So the ending bar's own
+  bass note (low, the chord's root or written bass) and chord struck to ring replace them at
+  that last strike's tick, and the bar's earlier beats keep the groove. The kit marks the arrival
   once on the one (#2187): its ending line's downbeat strokes, or for the hits the last hit's
   (metal's crash, kick and snare). The gesture's own rhythm, the hits and the jazz button, is
   a unison figure and is not played by the kit alone. A fermata anywhere else, or in a

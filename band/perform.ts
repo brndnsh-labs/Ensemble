@@ -508,7 +508,9 @@ const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
  * ending gesture (#2017), and a fermata written there holds that gesture instead (#2175): the
  * kit's line stays the book's ending, and each pitched lane's last strike in the span rings to
  * the span's end. A tied fermata there strikes nothing new but keeps the kit's one arrival on
- * the downbeat (#2187). A fermata elsewhere, or in a performance that loops, is held as above.
+ * the downbeat (#2187), and the bar before's last bass note and comp chord become the ending's
+ * own arrival, the root and a full chord, rung to the span's end (#2210). A fermata elsewhere,
+ * or in a performance that loops, is held as above.
  *
  * The events are indexed by tick once, so a fermata costs a search and the events it replaces,
  * not a scan of the whole pass (#1665): a chart may write tens of thousands of them.
@@ -622,16 +624,17 @@ function holdFermatas(
         // the band still ends on a drum hit (#2017): the kit's one arrival on the downbeat
         // (`drumIdiom`'s `held?.span.tied` branch writes only that in a tied bar) stays under
         // the ringing chord, where wiping it left the band ending on no drum hit at all (#2187).
-        // The pitched lanes still strike nothing new and ring on from the bar before.
+        // The pitched lanes strike nothing new on the downbeat; what rings is the bar before's
+        // last strike, played as the ending's arrival (below, #2210).
         // `plan.ending` is set only on the last bar of a pass that actually ends, so a looping
         // pass and a mid-chart tie are held as before; so is a tie of a rest (no chord rings,
         // so there is no arrival to mark, and the kit's branch asks for a chord too).
-        const keepKit = plan.ending !== null && span.tied && span.chord !== null;
+        const tiedEnding = plan.ending !== null && span.tied && span.chord !== null;
         for (let slot = from; slot < ticks.length && ticks[slot] < span.end; slot++) {
             if (live[slot].length) {
                 const kept: number[] = [];
                 for (const i of live[slot]) {
-                    if (keepKit && out[i]!.lane === 'drums') {
+                    if (tiedEnding && out[i]!.lane === 'drums') {
                         kept.push(i);
                     } else {
                         out[i] = null;
@@ -651,8 +654,49 @@ function holdFermatas(
                     }
                 }
             };
-            extend(bassBefore, isBass);
-            extend(compBefore, isStruckComp);
+            // why: the bar before a tied ending was played as the approach into an ending
+            // (`endingAim`, #2178), and the arrival it aims at, the ending bar's own bass note
+            // (low, the chord's root or written bass) and chord struck to ring (`endingBass`,
+            // `endingStrikes`), is the one thing the tie wipes. Held as they stood, the bar
+            // before's last notes are the approach itself (jazz's leading tone under the
+            // root, a G, an A) and its last stab (a skank, one picked string): the band holds
+            // a note that was leading somewhere. So the last strike of each lane is played as
+            // the arrival, at its own tick and no earlier: the bar's groove stays, its last
+            // strike lands home and rings. Nothing is struck on the downbeat; a lane with no
+            // arrival (off in the ending bar) extends what it had.
+            const arrival = (wanted: (e: BandEvent) => e is PitchedNote) =>
+                tiedEnding ? atStart.filter(wanted) : [];
+            const land = (
+                slot: number,
+                wanted: (e: BandEvent) => e is PitchedNote,
+                arrives: PitchedNote[],
+            ) => {
+                const last = (live[slot] ?? []).map((i) => out[i]!).filter(wanted);
+                if (!arrives.length || !last.length) {
+                    extend(slot, wanted);
+                    return;
+                }
+                for (const i of live[slot]) {
+                    if (wanted(out[i]!)) {
+                        out[i] = null;
+                    }
+                }
+                live[slot] = live[slot].filter((i) => out[i] !== null);
+                for (const note of arrives) {
+                    // The arrival's pitch and weight at the last strike's tick, ringing to the end.
+                    live[slot].push(out.length);
+                    out.push({
+                        ...note,
+                        tick: last[0].tick,
+                        dur: span.end - last[0].tick,
+                        offsetMs: last[0].offsetMs,
+                        bar: last[0].bar,
+                    });
+                }
+                mark(slot);
+            };
+            land(bassBefore, isBass, arrival(isBass));
+            land(compBefore, isStruckComp, arrival(isStruckComp));
             continue;
         }
         const length = span.end - span.start;
