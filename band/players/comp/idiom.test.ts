@@ -10,7 +10,7 @@ import { compileTimeline } from '../../form/timeline.js';
 import type { BarContext } from '../../styles/types.js';
 import { score } from '../../test/scores.js';
 import { LEAD_INSTRUMENTS } from '../lead/instruments.js';
-import { compIdiom, type Hit, tiedFromPush } from './idiom.js';
+import { type Answer, compIdiom, type Hit, tiedFromPush } from './idiom.js';
 import { COMP_INSTRUMENTS } from './instruments.js';
 
 /**
@@ -25,6 +25,8 @@ function struck(
         comp?: 'organ' | 'piano';
         pushInBar?: true | 'restrike' | readonly EnergyTier[];
         memory?: CompMemory;
+        answer?: Answer;
+        push?: number;
         energy?: number;
     } = {},
 ) {
@@ -43,11 +45,15 @@ function sounded(
         comp = 'organ',
         pushInBar = true,
         memory,
+        answer,
+        push = 0,
         energy,
     }: {
         comp?: 'organ' | 'piano';
         pushInBar?: true | 'restrike' | readonly EnergyTier[];
         memory?: CompMemory;
+        answer?: Answer;
+        push?: number;
         energy?: number;
     } = {},
 ): [number, number][] {
@@ -60,7 +66,8 @@ function sounded(
         kind: 'close',
         // The strike an eighth before a mid-bar change plays the new chord.
         pushInBar,
-        push: { low: 0, mid: 0, high: 0 },
+        push: { low: push, mid: push, high: push },
+        answer,
         rhythm: (_ctx, { from, to }) => hits.filter((h) => h.step >= from && h.step < to),
     });
     const timeline = compileTimeline(score([{ label: 'A', bars }]));
@@ -85,7 +92,24 @@ function sounded(
             wraps: next.index !== index + 1,
             rng: (purpose) => rng('test', next.index, purpose),
         },
-        heard: { drums: [], bass: [], lead: [] },
+        // A soloist who plays through the whole bar: the comp is under the line throughout.
+        heard: {
+            drums: [],
+            bass: [],
+            lead: answer
+                ? [
+                      {
+                          lane: 'lead',
+                          tick: bar.start,
+                          dur: bar.meter.barTicks,
+                          midi: 72,
+                          velocity: 80,
+                          offsetMs: 0,
+                          bar: index,
+                      },
+                  ]
+                : [],
+        },
         instrument: COMP_INSTRUMENTS[comp],
         lead: LEAD_INSTRUMENTS[settings.lead],
         pass: 0,
@@ -208,5 +232,45 @@ describe('a mid-bar push ties over the change (#2171)', () => {
             [0, 1],
             [6, 10],
         ]);
+    });
+});
+
+describe('a push is a strike toward the answer floor (#2186)', () => {
+    // A soloist sounds through the bar and every strike but a chord's first may lay out
+    // (`layOut` 1), so what is left is the floor: `keep` strikes, pushes counted.
+    const under = (keep: number): Answer => ({ layOut: 1, fill: 0, keep });
+    // `C F` strikes on 0, 4, 6, 10 and 12: the strike on 6 pushes the F in (tied over the change,
+    // so the F's own on 8, if there were one, is gone); the 10 and 12 are the F's.
+    const steps = [0, 4, 6, 10, 12];
+
+    it('a pushed two-chord bar thins to the floor as a one-chord bar does', () => {
+        // Faults: counting the push as nothing left this bar at three strikes (the floor of 2
+        // plus the push the count ignored), thicker than the one-chord bar beside it.
+        const pushed = struck('C F', 0, steps, { comp: 'piano', answer: under(2) });
+        const plain = struck('C', 0, [0, 4, 10, 12], { comp: 'piano', answer: under(2) });
+        expect(pushed).toEqual([0, 6]);
+        expect(plain.length).toBe(pushed.length);
+    });
+
+    it('the floor holds: one strike over it thins, at it nothing does', () => {
+        // Fault: a floor that stopped counting (or counted the push twice) thins below `keep`.
+        expect(struck('C F', 0, steps, { comp: 'piano', answer: under(3) })).toEqual([0, 4, 6]);
+        expect(struck('C F', 0, steps, { comp: 'piano', answer: under(4) })).toEqual([0, 4, 6, 10]);
+        expect(struck('C F', 0, steps, { comp: 'piano', answer: under(5) })).toEqual(steps);
+    });
+
+    it('a bar that pushes over the barline thins to the floor too', () => {
+        // Fault: the barline push counted as nothing. It is added on top of the figure, so
+        // the bar kept one strike more than a bar that doesn't push (1, the "and" of 2 and the
+        // push on the "and" of 4, under the soloist): it thins to 1 and the push.
+        expect(
+            struck('C | F', 0, [0, 6, 14], { comp: 'piano', answer: under(2), push: 1 }),
+        ).toEqual([0, 14]);
+    });
+
+    it('a chord is never left unstruck, whatever the floor', () => {
+        // Fault: a chord's first strike laid out (`firsts`): with no floor at all, both
+        // chords still sound.
+        expect(struck('C F', 0, steps, { comp: 'piano', answer: under(0) })).toEqual([0, 6]);
     });
 });
