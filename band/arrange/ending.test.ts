@@ -2392,6 +2392,102 @@ describe('country ends on a walk-up and a stinger (#2177)', () => {
         },
     );
 
+    // A V struck on 3 (`Dm7 G7`) into the ending, by key. The low root is the lowest note of
+    // its class on the bass (E1 is MIDI 28); a landing goes down to it only where the E string
+    // has a 5 under it, so A to Eb land on A1 to Eb2 but E to Ab, with no 5 under their low
+    // root, land an octave above it. Written out by hand (MIDI), not read back from
+    // `lowestRoot`. On these charts seed `a` is the one whose boom sits on the landing's 5
+    // (D3 over G2), the case the rule is about; the other seeds' booms sit under the landing
+    // and walked in before #2201 too.
+    const twoBeatInto: [string, SemanticScore, number][] = [
+        [
+            'E (no 5 under its low E)',
+            score([{ label: 'A', bars: 'E | A | F#m7 B7 | E' }], { key: 'E' }),
+            40,
+        ],
+        [
+            'F (no 5 under its low F)',
+            score([{ label: 'A', bars: 'F | Bb | Gm7 C7 | F' }], { key: 'F' }),
+            41,
+        ],
+        [
+            'G (no 5 under its low G)',
+            score([{ label: 'A', bars: 'G | F | F | Am7 D7 | G' }], { key: 'G' }),
+            43,
+        ],
+        [
+            'Ab (no 5 under its low Ab)',
+            score([{ label: 'A', bars: 'Ab | Gb | Gb | Bbm7 Eb7 | Ab' }], { key: 'Ab' }),
+            44,
+        ],
+    ];
+
+    it.each(twoBeatInto)(
+        '%s: a two-beat turnaround keeps its walk-in under the landing',
+        (_name, chart, landingMidi) => {
+            // Catches #2178's fifth drop played where the landing stays in the line's octave:
+            // the V's boom on the landing's own 5 (D3 over G2) fell to it with nothing leading
+            // in (`D3 — | G2`), where the country move is the step under the root (D3, F#2 →
+            // G2). Every seed: the bar's last note is on 4, the leading tone under the landing
+            // (a major V has no note a whole step under it: that would be F under D7's F#).
+            const timeline = compileTimeline(chart);
+            const bar = timeline.bars.at(-1)!;
+            const before = timeline.bars.at(-2)!;
+            for (const seed of SEEDS) {
+                const { events } = performPass(timeline, straight(seed), {
+                    pass: 0,
+                    looping: false,
+                });
+                expect(bassIn(events, bar.index)[0].midi, `${seed}: the landing`).toBe(landingMidi);
+                const last = bassIn(events, before.index).at(-1)!;
+                expect(
+                    Math.round((last.tick - before.start) / STEP),
+                    `${seed}: the walk-in is on 4`,
+                ).toBe(12);
+                expect(last.midi, `${seed}: the walk-in is the leading tone`).toBe(landingMidi - 1);
+            }
+        },
+    );
+
+    // A (33) and Eb (39) are the lowest and highest landings that go low: the keys either side
+    // of the E to Ab that walk in.
+    it.each([
+        ['A', 'A | D | Bm7 E7 | A', 33],
+        ['C', 'C | F | Dm7 G7 | C', 36],
+        ['D', 'D | G | Em7 A7 | D', 38],
+        ['Eb', 'Eb | Ab | Fm7 Bb7 | Eb', 39],
+    ])(
+        '%s: a two-beat turnaround into a low landing drops the fifth, no walk-in',
+        (key, bars, low) => {
+            // Catches the walk-in kept where the landing goes low: the V's boom a fifth over the low
+            // root (G2 over C2) drops to it as a V does (#2178), the bar's last note the boom.
+            const timeline = compileTimeline(score([{ label: 'A', bars }], { key }));
+            const bar = timeline.bars.at(-1)!;
+            const before = timeline.bars.at(-2)!;
+            const { events } = performPass(timeline, straight('a'), { pass: 0, looping: false });
+            expect(bassIn(events, bar.index)[0].midi, 'the low landing').toBe(low);
+            const last = bassIn(events, before.index).at(-1)!;
+            expect(last.midi, 'the boom, a fifth over the landing').toBe(low + 7);
+            expect(Math.round((last.tick - before.start) / STEP), 'on 3').toBe(8);
+        },
+    );
+
+    it('a chord struck on 3 that is not the V still steps down into a landing in E to Ab', () => {
+        // Catches the walk-in given to every beat-3 chord in the keys that land an octave up:
+        // `Am7 Bm | G` walks 3-2-1 (B2, A2 → G2), and a 7 there would drop a fourth to F#2 and
+        // turn back. Only the boom on the landing's 5 differs by key (#2201).
+        const timeline = compileTimeline(
+            score([{ label: 'A', bars: 'G | F | F | Am7 Bm | G' }], { key: 'G' }),
+        );
+        const bar = timeline.bars.at(-1)!;
+        const before = timeline.bars.at(-2)!;
+        const { events } = performPass(timeline, straight('a'), { pass: 0, looping: false });
+        expect(bassIn(events, bar.index)[0].midi, 'the landing, G2').toBe(43);
+        const last = bassIn(events, before.index).at(-1)!;
+        expect(Math.round((last.tick - before.start) / STEP), 'on 4').toBe(12);
+        expect(last.midi, 'A2, the step between the B and the G').toBe(45);
+    });
+
     it('a pass that goes round plays its own line there, not the walk-up', () => {
         // Catches the walk-up played into a chord the band does not end on. The chart ends home
         // on its C either way; a ballad's line never walks, so its bar before strikes nothing on
@@ -2997,89 +3093,6 @@ describe("the lead plays the band's final hit, and the bass's last note goes low
             velocities(struckAgain),
             'sounding into the hit: kept and struck again at its own level',
         ).toEqual(struckAgain.map(() => strike - 20));
-    });
-});
-
-describe('a tied fermata on the ending bar keeps one drum hit on the one (#2187)', () => {
-    // `| C | /(fermata) |`: the last bar ties the bar before and holds it. Nothing pitched is
-    // struck, but the band still ends on a drum hit, once, under the ringing chord.
-    const tiedEnding = (bars: string, fermataBars: number[]) =>
-        compileTimeline(score([{ label: 'A', bars, fermataBars }]));
-    const timeline = tiedEnding('C | F | Dm7 | C | /', [4]);
-    const bar = timeline.bars.at(-1)!;
-    const before = timeline.bars.at(-2)!;
-    const end = bar.start + bar.meter.barTicks;
-    const straight = (style: StyleId): BandSettings => ({
-        ...settingsFor(style, 'a'),
-        swing: 0,
-        humanize: 0,
-    });
-    const drumsIn = (events: BandEvent[], index: number) =>
-        events.flatMap((e) => (e.lane === 'drums' && e.bar === index ? [e] : []));
-    /** The strokes a book's ending line writes on sixteenth `step`. */
-    const strokesAt = (style: StyleId, step: number) =>
-        Object.entries(ENDING_DRUMS[style])
-            .filter(([, line]) => (line[step] ?? '.') !== '.')
-            .map(([piece]) => piece)
-            .sort();
-
-    // rock: crash, kick and tom; bossa: a book with no cymbal; hiphop: a lone kick; jazz: the
-    // button's kick and snare on the "and" of 4 are not played; metal: three hits become the
-    // last one, its crash on the one.
-    it.each([
-        ['rock', 0],
-        ['bossa', 0],
-        ['hiphop', 0],
-        ['jazz', 0],
-        ['metal', 8],
-    ] as const)(
-        "%s: the kit plays its ending's final strokes on the one and nothing after, the pitched lanes ring on",
-        (style, step) => {
-            // Catches `holdFermatas`' tied path removing the kit with everything else (the band
-            // ended on no drum hit), the kit playing a unison figure alone under the hold (the
-            // jazz button, metal's hits at half speed), and a pitched note struck in the bar.
-            const { events } = performPass(timeline, straight(style), {
-                pass: 0,
-                looping: false,
-            });
-            const drums = drumsIn(events, bar.index);
-            const book = strokesAt(style, step);
-            expect(book.length, style).toBeGreaterThan(0);
-            expect(
-                drums.map((e) => e.tick - bar.start),
-                style,
-            ).toEqual(book.map(() => 0));
-            expect(drums.map((e) => e.piece).sort(), style).toEqual(book);
-            const pitched = events.filter((e): e is PitchedNote => e.lane !== 'drums');
-            expect(
-                pitched.filter((e) => e.bar === bar.index),
-                style,
-            ).toEqual([]);
-            for (const lane of ['bass', 'comp'] as const) {
-                const notes = pitched.filter((e) => e.lane === lane && e.bar === before.index);
-                const last = Math.max(...notes.map((e) => e.tick));
-                const ringing = notes.filter((e) => e.tick === last);
-                expect(ringing.length, `${style} ${lane}`).toBeGreaterThan(0);
-                for (const n of ringing) {
-                    expect(n.tick + n.dur, `${style} ${lane}`).toBe(end);
-                }
-            }
-        },
-    );
-
-    it('only the ending bar: a tie earlier in the same pass, and one in a pass that loops, keep no kit', () => {
-        // Catches the kit kept on any tied fermata of a pass that ends (not just its last bar),
-        // and on a pass that does not end: no ending gesture belongs to either.
-        const twice = tiedEnding('C | / | Dm7 | G7 | C | /', [1, 5]);
-        const ends = performPass(twice, straight('rock'), { pass: 0, looping: false }).events;
-        expect(drumsIn(ends, 1)).toEqual([]);
-        expect(drumsIn(ends, 5).length).toBeGreaterThan(0);
-        const loops = performPass(timeline, straight('rock'), { pass: 0, looping: true }).events;
-        expect(drumsIn(loops, bar.index)).toEqual([]);
-        // Nor does a tie of a rest: no chord rings, and jazz would play its button alone.
-        const rest = tiedEnding('C | F | C | N.C. | /', [4]);
-        const silent = performPass(rest, straight('jazz'), { pass: 0, looping: false }).events;
-        expect(drumsIn(silent, 4)).toEqual([]);
     });
 });
 

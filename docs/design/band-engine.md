@@ -70,6 +70,12 @@ from any bar reproduces the same music.
    stands in C3–Eb3 (#2025) — the invariant suite lets a keyboard note under E3 be only a
    chord's lowest, a perfect 4th or more under the next voice. A guitar keeps its physical range but its grips stay at or above C3 when a bass plays:
    the guitar leaves the low strings to the bassist.
+   The bass's own floor is E1 (`BASS.lo`, 28), the open E string: a lead-in into the low E or F
+   comes down onto it by a step from above, a half or whole step by the chord's own scale
+   (`approach`'s scale case, `meetRoot`; #2197, mid-song as in an ending), never from a
+   note under the string and never from an octave up (Eb2 into E1). Jazz keeps its own mid-song way (it places the next root beside the note
+   before it, so a floor approach aims at the octave above: `floorsBelow`), and neo-soul takes
+   the half step above.
 5. **One chord authority.** `theory/chord.ts` parses every quality the chart codec accepts;
    lanes read `ChordFacts` and never re-read symbol text. A parity test pins it to the codec,
    and the chord-symbol oracle (`tests/oracle/`, #1579) pins it to an outside dictionary: every
@@ -626,7 +632,11 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
     chord struck on 3 walks with the 7 alone (`C7 A7`: A, B → C). The ending lands where the
     walk pointed (`land`), never an octave off: on the low root the band ends on (#2178) where
     the run fits under it and the boom is free to move with it (G, A-B → C, all on the low
-    strings; the ii's D stays a step above the C), else in the line's own register.
+    strings; the ii's D stays a step above the C), else in the line's own register. A V struck
+    on 3 (`Dm7 G7`) whose boom is the landing's 5 drops the fifth with nothing after it only
+    onto the low root (G2 → C2); E to Ab land an octave above their lowest root, and there the
+    V walks in by the 7 a step under the root (D3, F#2 → G2; C3, E2 → F2; #2201). Every other
+    chord struck on 3 steps down into the landing the same way in every key.
   - **The stinger** (`sting`), on the comp guitar, only on home (the tonic): the 6 → 5 fall of
     the pedal steel's A pedal let up. The 6th (the chord scale's step above the 5th: the b6 in
     minor) is struck with the chord and pulled off to the 5th an eighth later, a tenth softer,

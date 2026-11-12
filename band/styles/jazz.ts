@@ -14,6 +14,7 @@ import {
     bassPc,
     endingAim,
     endingBass,
+    floorsBelow,
     type LineMemory,
     nextChord,
     pickApproach,
@@ -440,12 +441,22 @@ function chooseApproach(
     target: number,
     chord: ChordFacts,
     avoid: number | null,
-    floored = false,
-    near: number = avoid ?? target,
+    ending: boolean,
 ): number {
+    const near = avoid ?? target;
+    // why: a scale approach into a floor target (E1, F1: its scale step under it is off the
+    // instrument, `floorsBelow`) mid-song aims at the target's upper octave. Jazz places the
+    // next bar's root beside the note before it, so the line goes on from the octave above
+    // (Eb2 up into F2);
+    // aimed at the floor, the walk sat on the open string and pendulumed (F1 A1 F1 G1 | F1).
+    // An ending's aim is the low root itself (`endingAim`), approached from above.
+    const aimsUp = !ending && floorsBelow(target, chord);
     for (let tries = 0; tries < 4; tries++) {
         const kind = pickApproach(rng, true);
-        let note = approach(target, chord, kind, floored);
+        let note =
+            kind === 'scale' && aimsUp
+                ? approach(target + 12, chord, kind)
+                : approach(target, chord, kind);
         // The fifth-above approach can come from below instead (a fourth under the target):
         // take whichever octave sits nearer the line, so it never leaps an octave to get there.
         if (kind === 'dominant') {

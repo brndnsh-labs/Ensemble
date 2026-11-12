@@ -370,7 +370,7 @@ const reggaeBass: PitchedIdiom = {
                     const into = lead?.ending ? endingAim(ctx, target, last) : null;
                     const aimed = into?.target ?? target;
                     if (!(into && last !== null && Math.abs(aimed - last) > 12)) {
-                        midi = approach(aimed, chord, pickApproach(rng, false), lead?.ending);
+                        midi = approach(aimed, chord, pickApproach(rng, false));
                         land = lead?.crossing || lead?.ending ? aimed : null;
                     }
                 }
@@ -379,7 +379,7 @@ const reggaeBass: PitchedIdiom = {
                 if (isLast && target !== null && to - step <= 2 && isLeadIn(midi, target)) {
                     const aimed =
                         (lead?.ending ? endingAim(ctx, target, last)?.target : null) ?? target;
-                    midi = meetRoot(midi, aimed, lead?.ending);
+                    midi = meetRoot(midi, aimed);
                     land = lead?.crossing || lead?.ending ? aimed : null;
                 }
                 // Heavy on the drop and the arrivals; the pickups lighter.
