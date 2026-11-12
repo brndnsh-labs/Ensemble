@@ -215,9 +215,11 @@ export const blues = defineClaims({
                 // every phrase it can, which the ceiling fails).
                 ['leadPhrasesStartEarly', 0.25, 0.4, 'a lick starts on 4'],
                 // Of the pickups into the form's phrases, the share whose last note is below the
-                // note it leads into (`pickupDraws` 0.6). Measured 0.712: 0.288 with the direction
-                // inverted, 1 always from below.
-                ['leadPickupsClimb', 0.55, 0.9, 'a pickup climbs into its lick'],
+                // note it leads into (`pickupDraws` 0.6). Measured 0.712 (47:19): 0.545 with the
+                // direction inverted (the draw's own sample, 66 pickups, runs well above 0.4),
+                // 1 always from below. The floor sits between the two, so inverting the draw
+                // fails it: it was 0.55 and the inverted draw read 0.545, a miss by 0.005.
+                ['leadPickupsClimb', 0.62, 0.9, 'a pickup climbs into its lick'],
                 // Pushed arrivals (#2164, `LeadBook.pushes` 0.4 a barline): measured 0.057 (0 on
                 // main, and with pushes off). Most of the line's crossings run on from a note held
                 // to the barline, which can't be pushed: pushing every barline it can reads only
