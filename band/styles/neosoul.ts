@@ -19,6 +19,7 @@ import {
     bassPc,
     endingAim,
     endingBass,
+    floorsBelow,
     type LineMemory,
     nextChord,
 } from '../players/bass/line.js';
@@ -257,8 +258,10 @@ const NEO_APPROACHES: readonly [ApproachKind, number][] = [
  * not just in pitch class. Only when the line is within a fifth of the target: a bassist leads
  * in from where the hand is, and an approach reached by an octave leap is a jump, not a
  * lead-in. A half step that would leave the register, or repeat the note before, comes from
- * the other side; a scale step that folds out of reach is played as the half step below; the
- * fifth is taken in the octave nearest the hand. Null when the line is too far away.
+ * the other side; a scale step into a floor target (E1, F1), which has no step under it on the
+ * instrument, is the half step above (`halfStep(true)`); any other scale step that is not within
+ * two semitones (a short scale) is played as the half step below; the fifth is taken in the
+ * octave nearest the hand. Null when the line is too far away.
  */
 function approachInto(
     kind: ApproachKind,
@@ -282,6 +285,12 @@ function approachInto(
         case 'chromatic-above':
             return halfStep(false);
         case 'scale': {
+            // why: at a floor target (its scale step under it is off the instrument,
+            // `floorsBelow`) the line comes from the half step above, as `halfStep(true)` does
+            // when the one below is off the string: not a repeated or a folded note.
+            if (floorsBelow(target, chord)) {
+                return halfStep(true);
+            }
             const step = approach(target, chord, 'scale');
             return Math.abs(step - target) <= 2 ? step : halfStep(true);
         }

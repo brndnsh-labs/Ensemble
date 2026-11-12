@@ -261,7 +261,7 @@ const rockBass: PitchedIdiom = {
                     // note before stays inside an octave, else this octave, promised (#2178).
                     const aimed =
                         (lead?.ending ? endingAim(ctx, target, last)?.target : null) ?? target;
-                    midi = approach(aimed, span.chord, pickApproach(rng, false), lead?.ending);
+                    midi = approach(aimed, span.chord, pickApproach(rng, false));
                     land = lead?.crossing || lead?.ending ? aimed : null;
                 }
                 const gap = (steps[k + 1] ?? to) - step;

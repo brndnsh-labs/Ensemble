@@ -21,6 +21,7 @@ import {
 import { MAX_CHARACTER_MS } from '../../feel/feel.js';
 import { chordAt, compileTimeline, type Timeline } from '../../form/timeline.js';
 import { type PassMemory, performPass } from '../../perform.js';
+import { BASS } from '../../players/bass/line.js';
 import { isPlayable } from '../../players/comp/fretboard.js';
 import { COMP_INSTRUMENTS } from '../../players/comp/instruments.js';
 import { STEP } from '../../players/grid.js';
@@ -32,7 +33,9 @@ import { type KeyContext, mod12 } from '../../theory/pitch.js';
 import { COUNTED_FIXTURES, FIXTURES, METER_ENDINGS, VAMP_FIXTURES } from '../scores.js';
 
 const SEEDS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-const BASS_REGISTER = [23, 57] as const;
+// why: the bass's floor is the open E string (`BASS.lo`), not the slot's 23: a lead-in under it
+// is a note the instrument doesn't have (#2197). The ceiling stays the slot's 57 (octave pops).
+const BASS_REGISTER = [BASS.lo, 57] as const;
 /**
  * The comp instruments that play differently (a keyboard, a sustaining organ, a picked and
  * a finger-plucked guitar). Rhodes and clav play the keyboard book exactly as the piano does.

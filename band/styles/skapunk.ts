@@ -204,7 +204,6 @@ function walk(
     targets: Target[] | null,
     rng: Rng,
     chromatic = true,
-    floored = false,
 ): { line: number[]; land: number | null } {
     const count = strong.length;
     if (count === 1) {
@@ -241,7 +240,7 @@ function walk(
                     [approach(t.midi, chord, 'chromatic-below'), APPROACH_COST.chromatic],
                     [approach(t.midi, chord, 'chromatic-above'), APPROACH_COST.chromatic],
                     [approach(t.midi, chord, 'dominant'), APPROACH_COST.dominant],
-                    [approach(t.midi, chord, 'scale', floored), APPROACH_COST.scale],
+                    [approach(t.midi, chord, 'scale'), APPROACH_COST.scale],
                 ];
                 for (const [m, weight] of candidates) {
                     if (!chromatic && weight === APPROACH_COST.chromatic) {
@@ -415,7 +414,6 @@ const skaPunkBass: PitchedIdiom = {
                 targets,
                 ctx.rng(`walk${i}`),
                 !repeat,
-                into !== null,
             );
             line.forEach((midi, k) => {
                 const gap = (steps[k + 1] ?? to) - steps[k];
