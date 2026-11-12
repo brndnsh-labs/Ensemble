@@ -37,7 +37,8 @@ jobs:
   # edge rule has to be provable on the PR that writes it, not only after it has been published
   # under a tag.
   v2-root-image:
-    runs-on: ubuntu-latest
+    # Pinned with ci.yml (see its RUNNER note): the same image the required checks run on.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
