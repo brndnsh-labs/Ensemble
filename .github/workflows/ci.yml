@@ -1,7 +1,14 @@
 # CI + continuous deployment. Moved here from `.forgejo/workflows/` at the
 # 2026-08-04 GitHub flip.
 #
-# RUNNER: `ubuntu-latest`, NOT the org's self-hosted runner on ghrunner01. That is
+# RUNNER: GitHub-hosted `ubuntu-24.04`, pinned, NOT `ubuntu-latest`: `ubuntu-latest`
+# moved to 26.04 around 2026-11-10, and Playwright's WebKit build needs libicu 74 and
+# libxml2.so.2, which 26.04 doesn't carry ("Host system is missing dependencies to run
+# browsers"), so every WebKit leg failed to launch. The browser cache key is
+# `runner.os` (Linux), which doesn't tell the two images apart. Move the pin when
+# Playwright supports 26.04 (see #1953's Playwright bump).
+#
+# Hosted, NOT the org's self-hosted runner on ghrunner01. That is
 # deliberate and not negotiable while this repo is public — the org runner group
 # refuses public repos, and for good reason: a fork PR carries its own workflow YAML,
 # so a self-hosted LAN box would execute an outside contributor's code. Being
@@ -48,7 +55,7 @@ jobs:
   # job's checks == that script; don't add gate steps here that aren't in the
   # script (or vice versa).
   checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
@@ -88,7 +95,7 @@ jobs:
   # No `needs: checks`: this is a required context in its own right, and the edge
   # only put it (and v2-checks) behind checks' ~3 minutes on the critical path (#1223).
   e2e-tests:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
@@ -218,7 +225,7 @@ jobs:
   # `changes` decides, from a short list of paths that provably cannot reach either. Anything
   # not on the list runs the suite, and so does every push to `main`: a merge is a release.
   changes:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       pull-requests: read
@@ -268,7 +275,7 @@ jobs:
     name: v2-suite (${{ matrix.shard }}, ${{ matrix.project }})
     needs: changes
     if: needs.changes.outputs.app == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     strategy:
       # Every leg always runs: a red leg must not hide another.
@@ -439,7 +446,7 @@ jobs:
   v2-checks:
     needs: [changes, v2-suite]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Require every v2 shard to have passed
@@ -464,7 +471,7 @@ jobs:
   # never reach it: it runs on the main push only, and the package is public so
   # docker04 pulls without a credential.
   api-image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: checks
     # `!inputs.hosting_probe` (#1357 patch P3-2): a read-only probe dispatched from `main`
     # must not build and PUSH `:sha-<commit>` and `:main` for a commit nobody asked to
@@ -570,7 +577,7 @@ jobs:
   #
   # `ensemble-web` is a public package, like `ensemble-api`: docker04 pulls anonymously.
   web-image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: v2-checks
     # `!inputs.hosting_probe` (#1357 patch P3-2): a read-only probe dispatched from `main`
     # must not build and PUSH `:sha-<commit>` and `:main` for a commit nobody asked to
@@ -732,7 +739,7 @@ jobs:
   # this job doesn't run on `pull_request` at all. An explicitly dispatched probe
   # may run on a reviewed branch, but cannot execute the release step.
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     needs: [checks, e2e-tests, v2-checks, api-image, web-image]
     # A skipped `needs` would skip this job too, so each image job's acceptable results are
     # spelled out. `skipped` is acceptable IFF this run is the hosting probe — which since
