@@ -2560,7 +2560,11 @@ export interface LeadLeftOff {
  * stop's One, the last stab and the "bop" whatever the phrase did, so a lead that had let go —
  * before the bar, or inside it before the hit — is in on it: struck again from its last note
  * in the bar (`again`), or, silent in the bar, from where it left off before it (`from`), on
- * home's resting tone nearest that pitch and at its level. In the hits it joins every one of
+ * home's resting tone nearest that pitch and at its level. In a stop or the hits every lead
+ * note on one of home's strikes, and in a button the button, is the band's stab, a join, a
+ * re-strike or the phrase's own note, and is never under an accent (#2200, #2212); a
+ * button's landing is the held chord and keeps the phrase's level, and the V's strike in
+ * `| G7 C |` is not home's and keeps the phrase's level. In the hits it joins every one of
  * home's hits after its last note, not only the last (why: unison stabs are the one place
  * everyone hits every note; a horn that hit 1 and 3 but not 2 would be the one player who
  * missed the arrival), and all of them when it was silent: the stabs are the band's, played
@@ -2614,12 +2618,14 @@ export function endWithTheBand(
         last.span.chord
             ? nearestRanked(book.settle(last.span.chord, ctx.bar.key), midi, ctx.lead.range)
             : midi;
+    // The accent every stab is floored at (see `join`).
+    const accent = dyn(ENDING_STRIKE + BUTTON_LIFT, ctx.plan.energy);
     const again = (n: PitchedNote, from: number, to: number, lift: number): PitchedNote => ({
         lane: 'lead',
         tick: from,
         dur: to - from,
         midi: struckAt(n) < home - 1 ? settled(n.midi) : n.midi,
-        velocity: Math.min(127, n.velocity + lift),
+        velocity: Math.min(127, Math.max(n.velocity + lift, accent)),
         offsetMs: 0,
         // The re-strike is this bar's, whichever bar the note it repeats was struck in.
         bar: ctx.bar.index,
@@ -2635,10 +2641,14 @@ export function endWithTheBand(
     // bass's ending weight in the styles that stop (104-110). The comp's own un-lifted strike
     // was tried first and is the quietest thing on the hit: one note at a chord's velocity
     // sits under the chord, 4-7 under the lead's own loud notes. A floor and not a boost: a
-    // lead that left off louder keeps its own level (and the button's lift on it). A lead
-    // still sounding into the hit (`again`) is untouched: it is already playing at the
-    // phrase's level.
-    const accent = dyn(ENDING_STRIKE + BUTTON_LIFT, ctx.plan.energy);
+    // lead that left off louder keeps its own level (and the button's lift on it). Every lead
+    // note on one of home's strikes in a short ending is that stab, whether it joins from
+    // silence, re-strikes the phrase's note (`again`) or is the phrase's own note struck with
+    // the band (#2212): a note struck on the hits' first beat is the first of the band's
+    // unison stabs, not a phrase note to be left under the two after it (metal's 80/98/98
+    // against the comp's 86), and the same stab is not played at two levels by whether the
+    // lead happened to rest (metal's hits 2 and 3 were 70-95 against the comp's 83-92).
+    // The V's own strike in `| G7 C |` is the V's and keeps the phrase's level.
     const join = (left: LeadLeftOff, from: number, to: number, lift: number): PitchedNote => ({
         lane: 'lead',
         tick: from,
@@ -2690,7 +2700,11 @@ export function endWithTheBand(
             under && n.tick < tick(under.to) - 1
                 ? tick(under.to)
                 : Math.min(n.tick + ENDING_SHORT * STEP, next ? tick(next.from) : silence);
-        return cut(n, end);
+        const stabbed = cut(n, end);
+        // why: a note struck with one of home's strikes is the band's stab (see `join`).
+        return strikes.some((s) => s.span === last.span && Math.abs(tick(s.from) - n.tick) < 2)
+            ? { ...stabbed, velocity: Math.min(127, Math.max(n.velocity, accent)) }
+            : stabbed;
     });
     const original = sounding.at(-1);
     // Home's hits after the lead's last note (all of them when it was silent in the bar): the

@@ -586,7 +586,12 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   every one of the hits (the stabs are the band's, in unison) and in a button the button alone, at
   the level it left off at but never under an accent (the comp's ending strike plus the
   button's lift, `ENDING_STRIKE` + `BUTTON_LIFT`: a horn plays the last stab marcato, however
-  softly its phrase died away, #2200);
+  softly its phrase died away, #2200); in a stop or the hits every lead note on one of
+  home's strikes, and in a button the button, is the band's stab and takes the same floor,
+  joined, re-struck or the phrase's own note (#2212: the same stab is not played at two
+  levels by whether the lead happened to rest, nor the hits' first beat left under the two
+  after it); a button's landing is the held chord and keeps the phrase's level, and so does
+  the V's own strike in `| G7 C |`;
   a note on home that had let go before the button is rung up to it, "baaah–bop", since the
   held chord is the lead's too. A horn that fell off the phrase before is in on the hit too:
   the fall keeps its length and the note gives way to it — long note, fall, HIT — or,
