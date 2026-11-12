@@ -624,7 +624,11 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
     chord struck on 3 walks with the 7 alone (`C7 A7`: A, B → C). The ending lands where the
     walk pointed (`land`), never an octave off: on the low root the band ends on (#2178) where
     the run fits under it and the boom is free to move with it (G, A-B → C, all on the low
-    strings; the ii's D stays a step above the C), else in the line's own register.
+    strings; the ii's D stays a step above the C), else in the line's own register. A V struck
+    on 3 (`Dm7 G7`) whose boom is the landing's 5 drops the fifth with nothing after it only
+    onto the low root (G2 → C2); E to Ab land an octave above their lowest root, and there the
+    V walks in by the 7 a step under the root (D3, F#2 → G2; C3, E2 → F2; #2201). Every other
+    chord struck on 3 steps down into the landing the same way in every key.
   - **The stinger** (`sting`), on the comp guitar, only on home (the tonic): the 6 → 5 fall of
     the pedal steel's A pedal let up. The 6th (the chord scale's step above the 5th: the b6 in
     minor) is struck with the chord and pulled off to the 5th an eighth later, a tenth softer,

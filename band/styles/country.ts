@@ -346,7 +346,10 @@ type PickupNote = { step: number; midi: number; velocity: number };
  * instead (C3 B2 A2 G2 → C2), never drops to it and climbs. A chord struck on 3 keeps its
  * root there, in the register of the note before it, and goes down into the low root by one
  * note (A2, G2 → C2; G2 → C2; A1, B1 → C2): a country bassist never ends on the top string
- * (#2198).
+ * (#2198). A V struck on 3 whose boom is the landing's own 5 drops the fifth with nothing
+ * after it only where the landing is the low root (G2 → C2). E to Ab land an octave above
+ * their lowest root (it has no 5 under it on the E string), so there the V walks in by the 7
+ * a step under the root (D3, F#2 → G2; #2201).
  */
 function pickup(
     ctx: BarContext,
@@ -412,6 +415,10 @@ function pickup(
     const tones = chordPcs(chord);
     const inChord = (m: number) =>
         tones.includes(mod12(m)) || chord.scale.includes(mod12(m - chord.root));
+    // The 7 that leads into the landing from below: the chord's own note a whole step under
+    // it (a V7's b7 is the landing's 4, so a major V has none and takes the leading tone; a
+    // minor v's b3 is the landing's b7).
+    const seven = tones.includes(mod12(reach - 2)) ? reach - 2 : reach - 1;
     if (twoBeat) {
         // why: a country bassist never ends on the top string (#2198), so the chord struck on
         // 3 goes down into the low root too, by the one honest note from where its boom sits:
@@ -419,17 +426,23 @@ function pickup(
         // in miniature), nothing where the boom is that 5 (G2 → C2, down a fifth), the scale
         // step under the boom where it sits between the root and its 5 (E2, D2 → C2), and
         // the 7 up into it from below (A1, B1 → C2). Never a leap over an octave.
+        // The boom on the landing's 5 drops with nothing after it only onto the low root
+        // (`reach === low`): that fifth down to the bottom of the bass is the ending. E to Ab
+        // land an octave above their lowest root, where a bare fifth down is just a V–I with
+        // its pickup missing, so the V walks in by the 7 as it does in a full bar (D3, F#2 →
+        // G2; C3, E2 → F2: the open D, then F#–G on the E string; #2201). Only this arm
+        // differs by key; the other beat-3 chords step down into the landing in every key.
         const fifth = reach + 7;
         const step =
             boom > fifth
                 ? fifth
                 : boom === fifth
-                  ? null
+                  ? reach === low
+                      ? null
+                      : seven
                   : boom > reach
                     ? ([boom - 1, boom - 2].find((m) => m > reach && inChord(m)) ?? null)
-                    : tones.includes(mod12(reach - 2))
-                      ? reach - 2
-                      : reach - 1;
+                    : seven;
         return {
             notes: [
                 struck,
@@ -440,7 +453,6 @@ function pickup(
     }
     const five = reach - 5;
     const target = reach;
-    const seven = tones.includes(mod12(target - 2)) ? target - 2 : target - 1;
     const six = [seven - 2, seven - 1].find((m) => m > five && inChord(m)) ?? seven - 2;
     if (goesLow && placed && boom - five > 12) {
         // why: a bassist walks down to the low string, never drops to it and climbs. A boom a
