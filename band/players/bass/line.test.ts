@@ -114,6 +114,65 @@ describe('a lead-in at the floor of the range comes from above', () => {
         expect(meetRoot(midi, target)).toBeGreaterThanOrEqual(BASS.lo);
     });
 
+    const setting = (symbol: string, into: string | null, tonic: number, minor = false) => ({
+        chord: chordOn(symbol),
+        into: into ? chordOn(into) : null,
+        key: { tonic, minor },
+    });
+
+    it.each([
+        // chord, into, key tonic, target, midi (the lead-in before folding), expected
+        ['B7', 'E', 4, BASS.lo, BASS.lo - 1 + 12, BASS.lo + 2], // F natural: in neither chord nor E's key: F#1
+        ['Cdim', null, 0, BASS.lo, BASS.lo - 2 + 12, BASS.lo + 2], // F# is Cdim's own, as F is: kept
+        ['D5', 'E5', 4, BASS.lo, BASS.lo - 2 + 12, BASS.lo + 2], // a power chord's pentatonic lacks F#: the key's 2nd keeps it
+        ['B7', 'Dm', 4, BASS.lo, BASS.lo - 1 + 12, BASS.lo + 1], // F is the target chord's tone: kept
+        ['B7', 'E', 4, BASS.lo + 2, BASS.lo + 2 - 1 + 12, BASS.lo + 1], // above the floor: unchanged
+    ] as const)(
+        'meetRoot in %s into %s (key %i), target %i: mirror of %i is %i',
+        (symbol, into, tonic, target, midi, expected) => {
+            // Catches (#2215): the mirror's half step taken whatever the chord (F1 | E1 over B7),
+            // a note in neither chord nor key where the scale path plays F#1; and the step
+            // overriding a mirror that is a tone of its chord, of the chord it leads into or of
+            // the key (funk D5 | E5's F#1).
+            expect(meetRoot(midi, target, setting(symbol, into, tonic))).toBe(expected);
+        },
+    );
+
+    it.each([
+        // chord, target, avoid, expected
+        // No scale step on the instrument (Dsus4's only step by the open E is the D under it):
+        // the whole step above, F#1, the target's 2nd; the fold up an octave was D2, a
+        // ten-semitone leap, and the half step an F, a b3 against the sus4.
+        ['Dsus4', BASS.lo, null, BASS.lo + 2],
+        // One above the floor the scale's E is on the string: unchanged.
+        ['Dsus4', BASS.lo + 1, null, BASS.lo],
+    ] as const)(
+        'approach: a short scale at the floor, %s into %i (avoid %s) is %i',
+        (symbol, target, avoid, expected) => {
+            // Catches (#2215): the octave fold of the first candidate (D2 into E1), and the
+            // half step above in its place.
+            expect(approach(target, chordOn(symbol), 'scale', avoid)).toBe(expected);
+        },
+    );
+
+    it.each([
+        // chord, target, the note before, expected
+        ['C', 40, null, 38], // D2 under E2, as ever
+        ['C', 40, 38, 41], // the note before is D2: F2, the scale step on the other side
+        ['C', 38, 36, 40], // C2 before D2: E2 (a scale step) before any half or whole step above
+        ['Dsus4', 40, 38, 42], // no other scale step: the whole step above, F#2
+        // The chord's own half step above is the note before (F | C/E written, F1 into E1): stands.
+        ['F', BASS.lo, BASS.lo + 1, BASS.lo + 1],
+    ] as const)(
+        'approach: scale into %s %i after %s never repeats it: %i',
+        (symbol, target, avoid, expected) => {
+            // Catches (#2215): a scale lead-in equal to the note before it (a repeat, not a
+            // lead-in), a half or whole step taken ahead of the scale's other side, and a
+            // chord's own step above moved off the written walk-down.
+            expect(approach(target, chordOn(symbol), 'scale', avoid)).toBe(expected);
+        },
+    );
+
     it('meetRoot never returns a note under the floor for any lead-in above a floor target', () => {
         for (let target = BASS.lo; target <= BASS.lo + 12; target++) {
             for (let midi = target + 9; midi <= BASS.hi + 12; midi++) {

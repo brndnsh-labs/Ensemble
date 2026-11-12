@@ -298,7 +298,11 @@ const funkBass: PitchedIdiom = {
                     // fold blues and reggae use.
                     const aimed =
                         (lead?.ending ? endingAim(ctx, target, last)?.target : null) ?? target;
-                    midi = meetRoot(midi, aimed);
+                    midi = meetRoot(midi, aimed, {
+                        chord,
+                        into: lead?.chord ?? null,
+                        key: ctx.bar.key,
+                    });
                     land = lead?.crossing || lead?.ending ? aimed : null;
                 }
                 const muted = code === 'm';

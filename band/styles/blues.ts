@@ -438,7 +438,11 @@ const shuffleBass: PitchedIdiom = {
                         const into = aim(last);
                         const target = into?.target ?? boxRoot(change.bass);
                         if (isLeadIn(midi, target)) {
-                            midi = meetRoot(midi, target);
+                            midi = meetRoot(midi, target, {
+                                chord,
+                                into: change,
+                                key: ctx.bar.key,
+                            });
                             land = target;
                         }
                     }

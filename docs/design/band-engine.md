@@ -75,7 +75,13 @@ from any bar reproduces the same music.
    (`approach`'s scale case, `meetRoot`; #2197, mid-song as in an ending), never from a
    note under the string and never from an octave up (Eb2 into E1). Jazz keeps its own mid-song way (it places the next root beside the note
    before it, so a floor approach aims at the octave above: `floorsBelow`), and neo-soul takes
-   the half step above.
+   the half step above. A mirrored lead-in that is no tone of its chord, of the chord it leads into or of the key
+   takes the chord's step above (`meetRoot`: F#1 into E1 over B7, not F; #2215); a short scale
+   with no step on the string there (sus, `Dsus4` into E1) takes the whole step above, the
+   target's 2nd (F#1, not the fold up to D2); and a scale approach is never the note before it,
+   taking the other side or the whole step above (`approach`'s `avoid`, for the lines that
+   pass it: reggae, not rock's pump), unless the chord's own half step above is that note
+   (`F | C/E`'s F1 into E1).
 5. **One chord authority.** `theory/chord.ts` parses every quality the chart codec accepts;
    lanes read `ChordFacts` and never re-read symbol text. A parity test pins it to the codec,
    and the chord-symbol oracle (`tests/oracle/`, #1579) pins it to an outside dictionary: every

@@ -4,7 +4,7 @@ import type { PitchedNote } from '../../core/types.js';
 import type { Bar, BarSpan } from '../../form/timeline.js';
 import type { BarContext } from '../../styles/types.js';
 import type { ChordFacts } from '../../theory/chord.js';
-import { mod12, nearestMidi } from '../../theory/pitch.js';
+import { type KeyContext, mod12, nearestMidi } from '../../theory/pitch.js';
 import { at, BUTTON_LIFT, endingSpans, endingStrikes, STEP } from '../grid.js';
 
 /**
@@ -37,7 +37,12 @@ export type ApproachKind = 'chromatic-below' | 'chromatic-above' | 'dominant' | 
  * A note one beat before `target` that leads into it: a half step below or above, the
  * target's fifth (a V→I in miniature), or the scale tone of the current chord nearest it.
  */
-export function approach(target: number, chord: ChordFacts | null, kind: ApproachKind): number {
+export function approach(
+    target: number,
+    chord: ChordFacts | null,
+    kind: ApproachKind,
+    avoid: number | null = null,
+): number {
     const clampIn = (m: number) => (m < BASS.lo ? m + 12 : m > BASS.hi ? m - 12 : m);
     switch (kind) {
         case 'chromatic-below':
@@ -60,8 +65,31 @@ export function approach(target: number, chord: ChordFacts | null, kind: Approac
             // half or whole step, the chord's own), as the chromatic cases do, mid-song as in
             // an ending: a bassist leading into the open string comes down onto it. A style
             // that places its next root by ear may aim elsewhere first (jazz, `floorsBelow`).
-            const played = candidates.find((m) => m >= BASS.lo && m <= BASS.hi);
-            return clampIn(played ?? candidates[0] ?? target - 2);
+            const onString = candidates.filter((m) => m >= BASS.lo && m <= BASS.hi);
+            // why: a lead-in that is the note before it is no lead-in, only a repeat (a pumped D2
+            // under reggae's Dm | E7, #2215): the scale step on the other side comes first, then
+            // the whole step above, the target's 2nd in every mode (major, minor, dorian,
+            // mixolydian, sus), then the half step. Where the chord's own half step above is the
+            // note before (`F | C/E`'s F into E1, written), it stands: it is the chord's step and
+            // there is no other way onto the string.
+            const played = onString.find((m) => m !== avoid);
+            if (played !== undefined) {
+                return played;
+            }
+            if (onString.length > 0) {
+                if (onString.includes(target + 1)) {
+                    return target + 1;
+                }
+                const above = [target + 2, target + 1].find((m) => m !== avoid && m <= BASS.hi);
+                return above ?? onString[0];
+            }
+            // why: no scale step on the string at the floor (a short scale, sus or power: Dsus4's
+            // only step by the open E is the D under it, #2215): the whole step above, the
+            // target's 2nd, as the mirror in `meetRoot` plays it (Dsus4 | Em: F#1 | E1). Folded
+            // up an octave the first candidate is a ten-semitone leap (D2 into E1), not a
+            // lead-in; the half step would be an F, a b3 against the sus4.
+            const fallback = candidates[0] ?? target - 2;
+            return fallback < BASS.lo && target + 2 <= BASS.hi ? target + 2 : clampIn(fallback);
         }
     }
 }
@@ -294,7 +322,7 @@ export function leadTarget(
     i: number,
     next: ChordFacts | null,
     placeRoot: RootPlacer,
-): { target: number; crossing: boolean; ending: boolean } | null {
+): { target: number; crossing: boolean; ending: boolean; chord: ChordFacts } | null {
     const inBar = spans[i + 1]?.span.chord ?? null;
     const following = inBar ?? (i === spans.length - 1 ? next : null);
     if (!following) {
@@ -318,7 +346,12 @@ export function leadTarget(
         : placeRoot(ctx, bassPc(following));
     // `ending`: the chord approached is an ending's, so the approach is re-aimed (`endingAim`)
     // and promised.
-    return { target: own, crossing, ending: inBar === null && endingRoot(ctx) !== null };
+    return {
+        target: own,
+        crossing,
+        ending: inBar === null && endingRoot(ctx) !== null,
+        chord: following,
+    };
 }
 
 /** A chord's root for the line: where the last bar's lead-in promised (`land`), else placed. */
@@ -348,11 +381,50 @@ export function isLeadIn(midi: number, target: number): boolean {
  * not on the instrument, and a leap of a seventh is not a lead-in. In an ending and mid-song
  * alike.
  */
-export function meetRoot(midi: number, target: number): number {
+export function meetRoot(
+    midi: number,
+    target: number,
+    setting: LeadInSetting | null = null,
+): number {
     if (!isLeadIn(midi, target) || Math.abs(midi - target) <= 7) {
         return midi;
     }
     const gap = mod12(midi - target);
     const folded = target + (gap <= 2 ? gap : gap - 12);
-    return folded < BASS.lo ? target + (12 - gap) : folded;
+    if (folded >= BASS.lo) {
+        return folded;
+    }
+    const mirror = target + (12 - gap);
+    // why: the mirror is arithmetic, not a step of the chord: over B7 | E the F1 into E1 is an F
+    // natural in neither chord nor the key, where the chord's own step above the target is F#1
+    // (#2215), the step `approach`'s scale case takes. A mirror that is a tone of the chord, of
+    // the chord it leads into or of the key stays: a power chord's scale is a minor pentatonic
+    // (D5 | E5's F#1 is the key's 2nd). With no scale step above, the mirror stays.
+    if (setting && !inSetting(setting, mirror)) {
+        const step = [target + 1, target + 2].find((m) =>
+            setting.chord.scale.includes(mod12(m - setting.chord.root)),
+        );
+        return step ?? mirror;
+    }
+    return mirror;
+}
+
+/** What a lead-in sits in: its own chord, the chord it leads into (if known) and the key. */
+export interface LeadInSetting {
+    chord: ChordFacts;
+    into: ChordFacts | null;
+    key: KeyContext;
+}
+
+const KEY_PCS = { major: [0, 2, 4, 5, 7, 9, 11], minor: [0, 2, 3, 5, 7, 8, 10, 11] } as const;
+
+function inSetting(setting: LeadInSetting, midi: number): boolean {
+    const tone = (c: ChordFacts) => c.scale.includes(mod12(midi - c.root));
+    return (
+        tone(setting.chord) ||
+        (setting.into !== null && tone(setting.into)) ||
+        (KEY_PCS[setting.key.minor ? 'minor' : 'major'] as readonly number[]).includes(
+            mod12(midi - setting.key.tonic),
+        )
+    );
 }
