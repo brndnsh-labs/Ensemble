@@ -400,9 +400,9 @@ const shuffleBass: PitchedIdiom = {
                     // Aim at the octave the next chord will actually be played in.
                     const into = aim(tail.midi);
                     const target = into?.target ?? boxRoot(change.bass);
-                    let note = approach(target, chord, pickApproach(rng, false), into !== null);
+                    let note = approach(target, chord, pickApproach(rng, false));
                     if (note === tail.midi || note === target) {
-                        note = approach(target, chord, 'chromatic-below', into !== null);
+                        note = approach(target, chord, 'chromatic-below');
                     }
                     notes.push({ step: to - 4, midi: note, length: 0, velocity: 84 });
                     land = target;
@@ -429,7 +429,7 @@ const shuffleBass: PitchedIdiom = {
                     if (k === beats.length - 1 && change && mod12(midi) === change.bass) {
                         const into = aim(last);
                         const target = into?.target ?? boxRoot(change.bass);
-                        midi = approach(target, chord, 'chromatic-below', into !== null);
+                        midi = approach(target, chord, 'chromatic-below');
                         land = target;
                     } else if (k === beats.length - 1 && change) {
                         // A box tone a step from the next root (V's 3rd under I) leads into
@@ -438,7 +438,7 @@ const shuffleBass: PitchedIdiom = {
                         const into = aim(last);
                         const target = into?.target ?? boxRoot(change.bass);
                         if (isLeadIn(midi, target)) {
-                            midi = meetRoot(midi, target, into !== null);
+                            midi = meetRoot(midi, target);
                             land = target;
                         }
                     }

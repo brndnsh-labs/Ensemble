@@ -37,12 +37,7 @@ export type ApproachKind = 'chromatic-below' | 'chromatic-above' | 'dominant' | 
  * A note one beat before `target` that leads into it: a half step below or above, the
  * target's fifth (a V→I in miniature), or the scale tone of the current chord nearest it.
  */
-export function approach(
-    target: number,
-    chord: ChordFacts | null,
-    kind: ApproachKind,
-    floored = false,
-): number {
+export function approach(target: number, chord: ChordFacts | null, kind: ApproachKind): number {
     const clampIn = (m: number) => (m < BASS.lo ? m + 12 : m > BASS.hi ? m - 12 : m);
     switch (kind) {
         case 'chromatic-below':
@@ -59,15 +54,27 @@ export function approach(
             const candidates = [target - 2, target - 1, target + 1, target + 2].filter((m) =>
                 chord.scale.includes(mod12(m - chord.root)),
             );
-            // why: at the floor (a low E, #2178) the step below is off the instrument, and
-            // folded up an octave it is a leap, not a lead-in: `floored`, the first step on
-            // the instrument is taken, from above where need be, as the chromatic cases do.
-            // Only an ending's approach into the low root asks for it: the lines' own
-            // approaches at the floor keep their fold until that is decided for them.
-            const played = floored ? candidates.find((m) => m >= BASS.lo && m <= BASS.hi) : null;
+            // why: at the floor (a low E or F, #2178, #2197) the step below is off the
+            // instrument, and folded up an octave it is a leap (Eb2 into E1), not a lead-in:
+            // the first scale step on the instrument is taken, from above where need be (a
+            // half or whole step, the chord's own), as the chromatic cases do, mid-song as in
+            // an ending: a bassist leading into the open string comes down onto it. A style
+            // that places its next root by ear may aim elsewhere first (jazz, `floorsBelow`).
+            const played = candidates.find((m) => m >= BASS.lo && m <= BASS.hi);
             return clampIn(played ?? candidates[0] ?? target - 2);
         }
     }
+}
+
+/**
+ * Whether the scale step into `target` that a line would reach for first (the nearest scale
+ * tone under it) is off the instrument: a target at the floor (E1, F1) whose step below falls
+ * under the open E. A style that places its next root beside the note before it reads this to
+ * choose its own way onto the string; `approach` itself already takes the step from above.
+ */
+export function floorsBelow(target: number, chord: ChordFacts): boolean {
+    const under = [target - 2, target - 1].find((m) => chord.scale.includes(mod12(m - chord.root)));
+    return under !== undefined && under < BASS.lo;
 }
 
 export function pickApproach(rng: Rng, jazz: boolean): ApproachKind {
@@ -309,8 +316,8 @@ export function leadTarget(
               bassPc(following),
           )
         : placeRoot(ctx, bassPc(following));
-    // `ending`: the chord approached is an ending's, so the approach is re-aimed (`endingAim`),
-    // `floored`, and promised.
+    // `ending`: the chord approached is an ending's, so the approach is re-aimed (`endingAim`)
+    // and promised.
     return { target: own, crossing, ending: inBar === null && endingRoot(ctx) !== null };
 }
 
@@ -336,16 +343,16 @@ export function isLeadIn(midi: number, target: number): boolean {
  * A lead-in more than a fifth from the root it leads into folds an octave to sit beside it.
  * Played where it stands it is a leading tone on paper, yet the ear hears a wrong note or a
  * leap, not a lead-in. Any other note, and the root's own octave (a pump), stays where it is.
- * At the floor (#2178: a low E the ending goes to, `floored`), a lead-in from below has no
- * note to fold to, so it leads in from above instead, as `approach` does there: a D# under
- * the open E string is not on the instrument, and a leap of a seventh is not a lead-in. Only
- * an ending's lead-in asks for it; the line's own at the floor keep their fold for now.
+ * At the floor (#2178, #2197: a low E or F), a lead-in from below has no note to fold to, so
+ * it leads in from above instead, as `approach` does there: a D# under the open E string is
+ * not on the instrument, and a leap of a seventh is not a lead-in. In an ending and mid-song
+ * alike.
  */
-export function meetRoot(midi: number, target: number, floored = false): number {
+export function meetRoot(midi: number, target: number): number {
     if (!isLeadIn(midi, target) || Math.abs(midi - target) <= 7) {
         return midi;
     }
     const gap = mod12(midi - target);
     const folded = target + (gap <= 2 ? gap : gap - 12);
-    return floored && folded < BASS.lo ? target + (12 - gap) : folded;
+    return folded < BASS.lo ? target + (12 - gap) : folded;
 }

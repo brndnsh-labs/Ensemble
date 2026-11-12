@@ -70,6 +70,12 @@ from any bar reproduces the same music.
    stands in C3–Eb3 (#2025) — the invariant suite lets a keyboard note under E3 be only a
    chord's lowest, a perfect 4th or more under the next voice. A guitar keeps its physical range but its grips stay at or above C3 when a bass plays:
    the guitar leaves the low strings to the bassist.
+   The bass's own floor is E1 (`BASS.lo`, 28), the open E string: a lead-in into the low E or F
+   comes down onto it by a step from above, a half or whole step by the chord's own scale
+   (`approach`'s scale case, `meetRoot`; #2197, mid-song as in an ending), never from a
+   note under the string and never from an octave up (Eb2 into E1). Jazz keeps its own mid-song way (it places the next root beside the note
+   before it, so a floor approach aims at the octave above: `floorsBelow`), and neo-soul takes
+   the half step above.
 5. **One chord authority.** `theory/chord.ts` parses every quality the chart codec accepts;
    lanes read `ChordFacts` and never re-read symbol text. A parity test pins it to the codec,
    and the chord-symbol oracle (`tests/oracle/`, #1579) pins it to an outside dictionary: every
