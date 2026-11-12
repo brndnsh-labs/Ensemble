@@ -292,6 +292,12 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             const wraps = !!ctx.next?.wraps;
             const nextFirst = ctx.next?.bar.spans[0];
             let pushed: string | null = null;
+            // How far into the next bar the figure's own downbeat strikes would have rung
+            // (`heldUnderPush`), asked once, on the first push.
+            let carried: number | undefined;
+            // And, in a bar a push lands in, how far it rings (a step; the tie's end when the
+            // figure wrote no hold, or when this book doesn't lengthen its pushes).
+            let ringsTo = TIE_STEPS;
             // The bar before struck this bar's first chord early: it rings in, tied.
             const pushedIn = tiedFromPush(memory, bar);
             const planned: Planned[] = [];
@@ -309,6 +315,8 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                 // The previous bar already played this chord early and tied it over its
                 // first eighth.
                 if (pushedIn && index === 0) {
+                    // The push rings as long as the dropped strikes would have (`heldUnder`).
+                    ringsTo = heldUnder(hits, to);
                     hits = hits.filter((h) => h.step >= TIE_STEPS);
                 }
                 const isLastSpan = to >= total;
@@ -341,6 +349,16 @@ export function compIdiom(book: CompBook): PitchedIdiom {
                     if (anticipates && nextFirst?.chord) {
                         target = nextFirst.chord;
                         length = total - hit.step + TIE_STEPS;
+                        // why: the next bar drops its downbeat strikes under this tie
+                        // (`pushedIn`), so the push takes over the length the figure wrote
+                        // for them: a chord laid down and held stays held (#2183), as the
+                        // mid-bar push does (#2171). Not on a sustaining instrument (it holds
+                        // to its next press anyway), nor in a restriking book (its figure
+                        // hammers on through the change).
+                        if (!legato && book.pushInBar !== 'restrike') {
+                            carried ??= heldUnderPush(ctx, book);
+                            length = Math.max(length, total - hit.step + carried);
+                        }
                         pushed = nextFirst.chord.symbol;
                     }
                     planned.push({ ...hit, length, chord: target, early: target !== chord });
@@ -422,7 +440,15 @@ export function compIdiom(book: CompBook): PitchedIdiom {
             });
             planned.sort((a, b) => a.step - b.step);
             let fresh = false;
-            const leadUntil = answerLead(ctx, book, planned, spans, memory, legato);
+            const leadUntil = answerLead(
+                ctx,
+                book,
+                planned,
+                spans,
+                memory,
+                legato,
+                !legato && book.pushInBar !== 'restrike' ? ringsTo : TIE_STEPS,
+            );
             if (legato) {
                 // An organist holds a chord and presses again only when it changes: the comping
                 // rhythm is for a struck instrument, and re-pressing a held organ chord on every
@@ -696,6 +722,64 @@ export function tiedFromPush(memory: { pushed?: string | null }, bar: Bar): bool
 }
 
 /**
+ * Where, in the next bar's steps, a chord pushed over the barline rings to: the end of the
+ * longest of the strikes the next bar's figure writes inside the tie (`TIE_STEPS`) and then
+ * drops, never less than the tie itself. Asked of the book with the next bar's own plan and
+ * seeded streams (`BarContext.next.rng`), so it is the figure that bar will draw.
+ * why: the push stands in for those strikes (`pushedIn`), so a downbeat chord the figure held
+ * (jazz's "lay it down and let it breathe") is held by the push; a stab stays the eighth the
+ * tie gives it. It stops at the next strike the figure plays (one hand, one chord at a time,
+ * as `lengthOf` cuts a chord inside a bar) and at the chord's own span end.
+ */
+function heldUnderPush(ctx: BarContext, book: CompBook): number {
+    const next = ctx.next;
+    const first = next && spanSteps(next.bar)[0];
+    if (!next || !first) {
+        return TIE_STEPS;
+    }
+    // The bar after that, as far as the figure can read it (jazz sets a push up from it): the
+    // plan is the next bar's own, which only a section's edge makes differ.
+    const index = next.bar.index + 1;
+    const beyond = ctx.timeline.bars[index] ?? (ctx.looping ? ctx.timeline.bars[0] : undefined);
+    const hits = book.rhythm(
+        {
+            ...ctx,
+            bar: next.bar,
+            plan: next.plan,
+            next: beyond
+                ? { bar: beyond, plan: next.plan, wraps: !ctx.timeline.bars[index], rng: next.rng }
+                : null,
+            heard: { drums: [], bass: [], lead: [] },
+            ending: null,
+            pass: ctx.pass + (next.wraps ? 1 : 0),
+            rng: next.rng,
+        },
+        { from: first.from, to: first.to, attack: first.span.attack, index: 0 },
+        energyTier(next.plan.energy),
+        next.rng('comp0'),
+    );
+    return heldUnder(hits, first.to);
+}
+
+/**
+ * How far a chord tied over the barline rings in the bar it arrives in (its steps), given the
+ * hits the figure writes for that chord's span (to `to`): to the end of the longest of those
+ * inside the tie, never less than the tie, and cut at the first strike past it (one hand, one
+ * chord at a time) and at the span's end. The bar the push lands in reads it too, to keep its
+ * own answers off the held chord (`answerLead`).
+ */
+function heldUnder(hits: readonly Hit[], to: number): number {
+    const reach = Math.min(to, ...hits.filter((h) => h.step >= TIE_STEPS).map((h) => h.step));
+    let end = TIE_STEPS;
+    for (const h of hits) {
+        if (h.step < TIE_STEPS) {
+            end = Math.max(end, Math.min(h.step + h.length, reach));
+        }
+    }
+    return end;
+}
+
+/**
  * A planned hit: `early` plays the next chord ahead of its arrival (an anticipation); `again`
  * presses the chord the organ already holds once more, in its shape (a phrase's re-press).
  */
@@ -715,6 +799,7 @@ function answerLead(
     spans: ReturnType<typeof spanSteps>,
     memory: CompMemory,
     legato: boolean,
+    ringsTo: number,
 ): number | undefined {
     const lead = ctx.heard.lead;
     const { bar } = ctx;
@@ -807,6 +892,9 @@ function answerLead(
                 const step = Array.from({ length: end - s }, (_, k) => s + k).find(
                     (x) =>
                         x % 4 === 2 &&
+                        // why: nor inside a chord the last bar's push still holds: a stab
+                        // there would strike it again over its own ring (#2183).
+                        x >= ringsTo &&
                         (s === 0 || x >= s + 2) &&
                         !pushZone(x) &&
                         !planned.some((h) => Math.abs(h.step - x) < 4),

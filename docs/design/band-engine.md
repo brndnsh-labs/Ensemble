@@ -113,7 +113,12 @@ borrows another family's idiom. Shared machinery does everything that isn't the 
   new chord and ties over it, never a stab of the one leaving; strokes and scratches, one chord
   at a time. Tied over means the chord's own strikes in that first eighth go, as the barline
   push drops the next bar's (#2171); a book whose figure runs on through the change keeps them
-  (`pushInBar: 'restrike'`: the blues boogie pump, the neo-soul guitar's picked line). The jazz
+  (`pushInBar: 'restrike'`: the blues boogie pump, the neo-soul guitar's picked line). The
+  pushed chord takes over the length of the strikes it drops, over the barline as in the bar
+  (#2183, `heldUnderPush`): a downbeat chord the figure held is held by the push, to the end of
+  the longest dropped strike, cut at the next strike the figure plays and at the chord's span
+  end; a stab keeps the eighth the tie gives it. Not a `'restrike'` book, not a sustaining
+  instrument, and the bar the push lands in keeps its answers to the lead off the held chord. The jazz
   comper sets its push up: before a change the figure lands on the "and" of 4.
 - `players/bass/line.ts`: register and approach notes.
 

@@ -21,7 +21,12 @@ function struck(
     bars: string,
     index: number,
     steps: (number | Hit)[],
-    options: { comp?: 'organ' | 'piano'; pushInBar?: true | 'restrike'; memory?: CompMemory } = {},
+    options: {
+        comp?: 'organ' | 'piano';
+        pushInBar?: true | 'restrike';
+        push?: boolean;
+        memory?: CompMemory;
+    } = {},
 ) {
     return sounded(bars, index, steps, options).map(([step]) => step);
 }
@@ -37,8 +42,14 @@ function sounded(
     {
         comp = 'organ',
         pushInBar = true,
+        push = false,
         memory,
-    }: { comp?: 'organ' | 'piano'; pushInBar?: true | 'restrike'; memory?: CompMemory } = {},
+    }: {
+        comp?: 'organ' | 'piano';
+        pushInBar?: true | 'restrike';
+        push?: boolean;
+        memory?: CompMemory;
+    } = {},
 ): [number, number][] {
     // A bare step is a sixteenth-long hit.
     const hits = steps.map(
@@ -49,7 +60,8 @@ function sounded(
         kind: 'close',
         // The strike an eighth before a mid-bar change plays the new chord.
         pushInBar,
-        push: { low: 0, mid: 0, high: 0 },
+        // The barline push: the last strike before a change plays the next chord, when asked.
+        push: push ? { low: 1, mid: 1, high: 1 } : { low: 0, mid: 0, high: 0 },
         rhythm: (_ctx, { from, to }) => hits.filter((h) => h.step >= from && h.step < to),
     });
     const timeline = compileTimeline(score([{ label: 'A', bars }]));
@@ -183,5 +195,52 @@ describe('a mid-bar push ties over the change (#2171)', () => {
             [0, 1],
             [6, 10],
         ]);
+    });
+});
+
+describe('a barline push holds as long as the downbeat strike it replaces (#2183)', () => {
+    // `C | F`, strikes on 14 (the push into F) and on 0 of each bar: the bar after the push
+    // drops its downbeat strike under the tie, and the push rings for that strike's length. The
+    // figure is the same in both bars, so the strike on 14 is also the next played strike there.
+    const pushOf = (
+        bars: string,
+        downbeat: Hit,
+        extra: Hit[] = [],
+        options: { pushInBar?: true | 'restrike' } = {},
+    ) =>
+        sounded(bars, 0, [downbeat, { step: 14, length: 1, velocity: 80 }, ...extra], {
+            comp: 'piano',
+            push: true,
+            ...options,
+        }).find(([step]) => step === 14);
+
+    it('a held downbeat chord is held by the push, to where it was written', () => {
+        // Held to step 12 of the next bar: the push rings from 14 to 16 + 12. Where it stops
+        // is what the listener hears of "lay it down and let it breathe".
+        expect(pushOf('C | F', { step: 0, length: 12, velocity: 80 })).toEqual([14, 28]);
+    });
+
+    it('a short stab stays the eighth the tie gives it (never shorter)', () => {
+        expect(pushOf('C | F', { step: 0, length: 1.5, velocity: 80 })).toEqual([14, 18]);
+    });
+
+    it('a book that restrikes plays the push as before', () => {
+        expect(
+            pushOf('C | F', { step: 0, length: 12, velocity: 80 }, [], { pushInBar: 'restrike' }),
+        ).toEqual([14, 18]);
+    });
+
+    it('stops at the next strike the next bar plays: one hand, one chord at a time', () => {
+        // A strike on step 8 of the next bar cuts the held chord there.
+        expect(
+            pushOf('C | F', { step: 0, length: 14, velocity: 80 }, [
+                { step: 8, length: 2, velocity: 80 },
+            ]),
+        ).toEqual([14, 24]);
+    });
+
+    it("stops at the chord's own span end: a hold written past a change is the change's", () => {
+        // `F:2 C:2`: the F's first half lasts to step 8, the figure's hold of 16 is cut there.
+        expect(pushOf('C | F:2 C:2', { step: 0, length: 16, velocity: 80 })).toEqual([14, 24]);
     });
 });
