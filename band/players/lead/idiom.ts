@@ -1963,8 +1963,18 @@ function pickupDraws(
     return Array.from({ length: count }, () => {
         const takes = rng.chance(chance);
         const figure = rng.pick(pickup.figures);
-        // why: a pickup more often climbs into the note it leads to (the "and" of 4 stepping up
-        // onto the one) than falls onto it from above, 0.6 to 0.4.
+        // why: a lean, not a rule: a pickup climbs into the note it leads to (the "and" of 4
+        // stepping up onto the one) a little more often than it falls onto it, 0.6 to 0.4 — a
+        // tune steps down into a phrase nearly as often as up, so a near-even split is the right
+        // sound for a head and for bossa. The draw is what plays: the from-below attempt gives up
+        // only where the pickup would be held into another chord (no pickup, from either side)
+        // and the from-above one only at the floor of the range (a few in a hundred, climbing
+        // instead). So the split in the lines is the draw's, not 2:1, except in a bebop solo,
+        // whose chromatic and enclosure approaches always close from below whatever drew (~0.8).
+        // Measured (the critique's takes, climb:fall of the pickups that sound): jazz head 20:19,
+        // jazz solo 54:13, blues head 20:7, blues solo 47:19, bossa head 4:9, bossa solo 16:8 —
+        // 13 to 67 pickups a take, too few for a 0.6 draw to read as 0.6 (and a head's draws
+        // repeat with its sections).
         const below = rng.chance(0.6);
         // why: a bebop pickup is the line's own approach into its target — the book's
         // enclosure (it needs a note before the "and" of 4 to come from above with) first,

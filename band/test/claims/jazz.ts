@@ -500,8 +500,8 @@ export const jazz = defineClaims({
                 ['leadPhrasesStartEarly', 0.2, 0.26, 'a bebop line enters on the "and" of 4'],
                 // Of the pickups into the form's phrases, the share whose last note is below the
                 // note it leads into (`pickupDraws` 0.6, and the approaches all from below).
-                // Measured 0.806: 0.716 with the direction inverted, 0.567 with the approaches
-                // off, 1 always from below.
+                // Measured 0.806 (54:13): 0.687 with the direction inverted (the approaches
+                // still close from below), 0.567 with the approaches off, 1 always from below.
                 ['leadPickupsClimb', 0.75, 0.95, 'a pickup climbs into its phrase'],
                 // Pushed arrivals (#2164, `LeadBook.pushes` 0.5 a barline): of the barlines a line
                 // runs across, the share tied over as one note. Measured 0.143 (0 on main, and with
