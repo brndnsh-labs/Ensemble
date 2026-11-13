@@ -733,12 +733,26 @@ in a minor key the minor equivalents (im6 for jazz and bossa, im9, im7, the mino
   arrival (#2210), not as they were. That bar was played as the approach into an ending
   (`endingAim`), and held as it stood the tie kept the approach itself (jazz's leading tone
   under the root) and the last stab (a skank, one picked string). So the ending bar's own
-  bass note (low, the chord's root or written bass) and chord struck to ring replace them at
-  that last strike's tick, and the bar's earlier beats keep the groove. The kit marks the arrival
-  once on the one (#2187): its ending line's downbeat strokes, or for the hits the last hit's
-  (metal's crash, kick and snare). The gesture's own rhythm, the hits and the jazz button, is
-  a unison figure and is not played by the kit alone. A fermata anywhere else, or in a
-  performance that loops, is held exactly as before.
+  bass note (low, the chord's root or written bass) and chord struck to ring replace them,
+  and the bar's earlier beats keep the groove. Bass and comp land together, on one tick
+  (#2223): a tick both lanes already share on an eighth stays; otherwise the "and" of the
+  last beat when either lane's last strike is there or after it (a push into the one, rung
+  over the barline), else the beat the later of the two last strikes sits in (a lane that
+  ended on 3 joins the other on 4; a sixteenth offbeat or a skank's upbeat is never the
+  arrival). The arrival is the lane's last word: its own strikes from that tick on, and any
+  closer than an eighth before it, give way, and an earlier note lets go where it is struck.
+  A lane that struck nothing in the bar before still gets its arrival at the band's tick.
+  Nothing is struck on the fermata bar's downbeat but the kit's arrival. The kit marks the
+  arrival once (#2187): its ending line's downbeat strokes, or for the hits the last hit's
+  (metal's crash, kick and snare). When the band pushes the kit hits the push with it and its
+  own strokes from there to the one give way (the fill ends on the push); when the band lands
+  on a beat the kit's arrival stays on the one. The gesture's own rhythm, the hits and the
+  jazz button, is a unison figure and is not played by the kit alone. A tie that runs on over
+  the last barline (`| C | /(fermata) | / |`) is the ending's own: its plan is the last
+  bar's, the kit's arrival is at the span's start, where the held chord begins, and the held
+  root and chord come from the bar before the tie. A fermata elsewhere, or in a performance
+  that loops, is held as before, except that a tie of a rest (`| C | N.C. | /(fermata) |`)
+  holds the rest, in any pass: nothing rings across an N.C. (#2223).
 - **The key has to be the chart's.** A chart typed without setting its key reads as C major, so
   the band resolves only into a key the chart is in: one it opens on (a stable chord on the
   tonic as its first chord, which a dominant I–IV vamp like `E9 | A9` is), or one it rests on

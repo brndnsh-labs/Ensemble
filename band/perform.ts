@@ -9,7 +9,14 @@
 import { heldEnding } from './arrange/ending.js';
 import { type BarPlan, fullWindow, type PassWindow, planBars } from './arrange/plan.js';
 import { rng } from './core/random.js';
-import type { BandEvent, BandSettings, DrumHit, Lane, PitchedNote } from './core/types.js';
+import {
+    type BandEvent,
+    type BandSettings,
+    type DrumHit,
+    type Lane,
+    type PitchedNote,
+    PPQ,
+} from './core/types.js';
 import { applyFeel } from './feel/feel.js';
 import {
     type Bar,
@@ -502,14 +509,16 @@ const laneOrder = (e: BandEvent) => LANE_ORDER[e.lane];
  * A fermata is a held chord, not a slow groove: whatever the idioms played inside a fermata
  * span is replaced by one crash-and-kick, one held bass note, the comp's first chord and the
  * lead's note if it struck one there, all ringing to the end of the (stretched) span. A fermata on a hold ties over: nothing new is
- * struck, and the notes already sounding are extended through it.
+ * struck, and the notes already sounding are extended through it, except a tie of a rest, which
+ * holds the rest and nothing rings across it (#2223).
  *
  * On the bar a performance ends on (`plan.ending`) the band is already playing its style's
  * ending gesture (#2017), and a fermata written there holds that gesture instead (#2175): the
  * kit's line stays the book's ending, and each pitched lane's last strike in the span rings to
- * the span's end. A tied fermata there strikes nothing new but keeps the kit's one arrival on
- * the downbeat (#2187), and the bar before's last bass note and comp chord become the ending's
- * own arrival, the root and a full chord, rung to the span's end (#2210). A fermata elsewhere,
+ * the span's end. A tied fermata there strikes nothing new but keeps the kit's one arrival, on
+ * the downbeat or on the push with the band (#2187, #2223), and the bar before's last bass note and comp chord become the ending's
+ * own arrival, the root and a full chord, rung to the span's end (#2210), both on one tick (#2223).
+ * A tie that runs on over the last barline is the ending's too. A fermata elsewhere,
  * or in a performance that loops, is held as above.
  *
  * The events are indexed by tick once, so a fermata costs a search and the events it replaces,
@@ -521,7 +530,15 @@ function holdFermatas(
     plans: { lanes: Record<Lane, boolean>; ending: EndingGesture | null }[],
     lastBassBefore: number | undefined,
 ): BandEvent[] {
-    const held: { span: ChordSpan; barIndex: number; plan: (typeof plans)[number] }[] = [];
+    const held: {
+        span: ChordSpan;
+        barIndex: number;
+        plan: (typeof plans)[number];
+        /** The ending the span's hold ends the performance on, if it does. */
+        ending: EndingGesture | null;
+        /** The bar the span ends in: its own bar, or the last one a tie runs on over. */
+        endIndex: number;
+    }[] = [];
     for (const span of timeline.spans) {
         // A fermata whose span rounds to no ticks holds nothing for no time: skip it. Holding
         // one copied the comp chord and removed nothing, so a few on one tick doubled the
@@ -531,7 +548,16 @@ function holdFermatas(
             const plan = plans[barIndex];
             // No plan: the fermata is outside this pass's window.
             if (plan) {
-                held.push({ span, barIndex, plan });
+                // why: a fermata tie that runs on over the last barline (`| C | /(fermata) | / |`)
+                // is the ending's own hold: the span starts in the bar before the ending bar,
+                // but what it holds is the ending, so its ending is the last bar's plan (#2223).
+                // Only a tie takes it: a held chord that a plain hold extends is the span's own
+                // first bar's gesture, as before.
+                const endIndex = span.tied
+                    ? (barAtTick(timeline, span.end - 1)?.index ?? barIndex)
+                    : barIndex;
+                const ending = span.tied ? (plans[endIndex] ?? plan).ending : plan.ending;
+                held.push({ span, barIndex, plan, ending, endIndex });
             }
         }
     }
@@ -571,7 +597,7 @@ function holdFermatas(
         mark(slot);
     });
 
-    for (const { span, barIndex, plan } of held) {
+    for (const { span, barIndex, plan, ending, endIndex } of held) {
         const from = slots.get(span.start)!;
         if (plan.ending && !span.tied) {
             // The ending bar's fermata holds the style's gesture (#2175), not the crash and
@@ -626,16 +652,27 @@ function holdFermatas(
         // the ringing chord, where wiping it left the band ending on no drum hit at all (#2187).
         // The pitched lanes strike nothing new on the downbeat; what rings is the bar before's
         // last strike, played as the ending's arrival (below, #2210).
-        // `plan.ending` is set only on the last bar of a pass that actually ends, so a looping
-        // pass and a mid-chart tie are held as before; so is a tie of a rest (no chord rings,
-        // so there is no arrival to mark, and the kit's branch asks for a chord too).
-        const tiedEnding = plan.ending !== null && span.tied && span.chord !== null;
+        // `ending` is set only on the last bar of a pass that actually ends, so a looping
+        // pass and a mid-chart tie with a chord are held as before. A tie of a rest has no
+        // chord to ring, so it has no arrival to mark (the kit's branch asks for a chord too)
+        // and holds nothing, below.
+        const tiedEnding = ending !== null && span.tied && span.chord !== null;
+        // The ending bar's own downbeat strikes: the arrival the bar before's last strikes
+        // become. When the tie runs on over the last barline the span starts earlier, so these
+        // are read from the ending bar's tick, before the span's slots are wiped.
+        const endSlot = slots.get(timeline.bars[endIndex].start);
+        const arrivalAt =
+            tiedEnding && endSlot !== undefined ? live[endSlot].map((i) => out[i]!) : [];
+        const keptKit: number[] = [];
         for (let slot = from; slot < ticks.length && ticks[slot] < span.end; slot++) {
             if (live[slot].length) {
                 const kept: number[] = [];
                 for (const i of live[slot]) {
-                    if (tiedEnding && out[i]!.lane === 'drums') {
+                    // The kit's one arrival is the ending bar's own, never the groove of a bar
+                    // the tie runs on through before it.
+                    if (tiedEnding && out[i]!.lane === 'drums' && out[i]!.bar === endIndex) {
                         kept.push(i);
+                        keptKit.push(i);
                     } else {
                         out[i] = null;
                     }
@@ -645,6 +682,12 @@ function holdFermatas(
             }
         }
         if (span.tied) {
+            // why: a tie of a rest (`| C | N.C. | /(fermata) |`) holds the rest: the written
+            // silence is what the fermata lengthens, and no chord is sounding to ring across it.
+            // Extending the last notes before it rang the C through the N.C. (#2223).
+            if (!span.chord) {
+                continue;
+            }
             // Extend the last bass note and the last comp chord through the fermata.
             const extend = (slot: number, wanted: (e: BandEvent) => e is PitchedNote) => {
                 for (const i of live[slot] ?? []) {
@@ -654,6 +697,11 @@ function holdFermatas(
                     }
                 }
             };
+            if (!tiedEnding) {
+                extend(bassBefore, isBass);
+                extend(compBefore, isStruckComp);
+                continue;
+            }
             // why: the bar before a tied ending was played as the approach into an ending
             // (`endingAim`, #2178), and the arrival it aims at, the ending bar's own bass note
             // (low, the chord's root or written bass) and chord struck to ring (`endingBass`,
@@ -661,42 +709,127 @@ function holdFermatas(
             // before's last notes are the approach itself (jazz's leading tone under the
             // root, a G, an A) and its last stab (a skank, one picked string): the band holds
             // a note that was leading somewhere. So the last strike of each lane is played as
-            // the arrival, at its own tick and no earlier: the bar's groove stays, its last
-            // strike lands home and rings. Nothing is struck on the downbeat; a lane with no
-            // arrival (off in the ending bar) extends what it had.
-            const arrival = (wanted: (e: BandEvent) => e is PitchedNote) =>
-                tiedEnding ? atStart.filter(wanted) : [];
-            const land = (
-                slot: number,
-                wanted: (e: BandEvent) => e is PitchedNote,
-                arrives: PitchedNote[],
-            ) => {
-                const last = (live[slot] ?? []).map((i) => out[i]!).filter(wanted);
+            // the arrival and the bar's groove stays. Nothing is struck on the downbeat; a lane
+            // with no arrival (off in the ending bar) extends what it had.
+            const lanes = [
+                { wanted: isBass, slot: bassBefore },
+                { wanted: isStruckComp, slot: compBefore },
+            ].map(({ wanted, slot }) => ({
+                wanted,
+                slot,
+                arrives: arrivalAt.filter(wanted),
+                last: (live[slot] ?? []).map((i) => out[i]!).filter(wanted),
+            }));
+            const before = barAtTick(timeline, span.start - 1);
+            // why: bass and comp are one band landing on one chord, so they land on one tick
+            // (#2223). Each kept its own last strike's tick before, and a band whose bass hit
+            // the "and" of 4, comp the "e" of 4 and kit the downbeat arrived three times for
+            // one chord. The "and" of the last beat is a push into the downbeat: if either
+            // lane's last strike is there (or the "a" after it) both push there, ringing over
+            // the barline, and the kit's one arrival moves to the push with them, its strokes
+            // after the push giving way (the fill ends on the push; nothing on the tied one).
+            // Any other strike falls back to the beat it sits in, the "e" of 4 to 4,
+            // the "and" of 3 to 3, so a sixteenth offbeat or a skank's upbeat is never an
+            // arrival; the later of the two lanes' beats is the band's (a lane that ended on 3
+            // while the other reached 4 joins it on 4). A lane's strike never moves after the
+            // downbeat the tie sits on: nothing is struck there (the tie reading #2175/#2187).
+            const pulseStarts = before ? before.meter.pulses.map((p) => before.start + p) : [];
+            const push =
+                before?.meter.quarterPulse && span.start === before.start + before.meter.barTicks
+                    ? span.start - PPQ / 2
+                    : -1;
+            const landing = (tick: number) =>
+                push >= 0 && tick >= push
+                    ? push
+                    : (pulseStarts.filter((p) => p <= tick).at(-1) ?? tick);
+            const strikes = lanes
+                .filter(({ arrives, last }) => arrives.length && last.length)
+                .map(({ last }) => last[0].tick)
+                .filter((tick) => !!before && tick >= before.start);
+            // why: a tick both lanes already share on an eighth (hip hop's "and" of 3, where the
+            // kick plays too) is already one landing and stays: flooring it would move a band
+            // that was together. Anything off the eighths still snaps as above.
+            const shared =
+                strikes.length === 2 && strikes[0] === strikes[1] && strikes[0] % (PPQ / 2) === 0;
+            const together = shared
+                ? strikes[0]
+                : strikes.length
+                  ? Math.max(...strikes.map(landing))
+                  : null;
+            for (const { wanted, slot, arrives, last } of lanes) {
                 if (!arrives.length || !last.length) {
                     extend(slot, wanted);
-                    return;
+                    continue;
                 }
-                for (const i of live[slot]) {
-                    if (wanted(out[i]!)) {
+                const own = last[0].tick;
+                const at = together ?? own;
+                // why: the arrival is the lane's last word, so what the lane played from its
+                // tick on in the bar before (the strike it replaces, and a push's sixteenth
+                // after an eighth) gives way to it. A note before it stays as the groove played
+                // it and lets go where the arrival is struck: a lane whose last strike was on 3
+                // plays that note and then lands on 4 (an approach, then the root), and a bass
+                // quarter on 4 does not sound under a root struck on the "and". A lane that
+                // struck nothing in the bar before keeps its earlier bar's note as played, and
+                // still gets its arrival at the band's tick.
+                const from = Math.min(before?.start ?? at, at);
+                for (const [i, e] of out.entries()) {
+                    if (!e || !wanted(e) || e.tick < from || e.tick >= span.start) {
+                        continue;
+                    }
+                    // A strike closer to the arrival than an eighth is a flam under it (the
+                    // funk comp's "e" of 4 before a push on the "and"), not a note of the
+                    // groove: it is the arrival's, and goes with it.
+                    if (e.tick > at - PPQ / 2) {
+                        out[i] = null;
+                        const where = slots.get(e.tick);
+                        if (where !== undefined) {
+                            live[where] = live[where].filter((j) => j !== i);
+                        }
+                    } else if (e.tick + e.dur > at) {
+                        out[i] = { ...e, dur: at - e.tick };
+                    }
+                }
+                for (const note of arrives) {
+                    // The arrival's pitch and weight at the common tick, ringing to the end.
+                    const index = out.length;
+                    out.push({
+                        ...note,
+                        tick: at,
+                        dur: span.end - at,
+                        offsetMs: last[0].offsetMs,
+                        bar: barAtTick(timeline, at)?.index ?? last[0].bar,
+                    });
+                    const landed = slots.get(at);
+                    if (landed !== undefined) {
+                        live[landed].push(index);
+                        mark(landed);
+                    }
+                }
+                mark(slot);
+            }
+            // why: the kit's one arrival (#2187) goes with the band. When the band pushes into
+            // the one (the "and" of the last beat) the drummer hits the push with it, and the
+            // kit's own strokes from there to the downbeat, the fill's tail, give way as the
+            // pitched lanes' do: the fill ends on the push, and nothing is struck on the one
+            // the tie sits on. When the band lands on a beat the kit's arrival stays on the
+            // one, a beat later, its own gesture. A tie that runs on over the last barline
+            // has the arrival at the span's start, where the held chord begins, not a bar or
+            // two into it.
+            const kitAt = together !== null && together === push ? push : span.start;
+            if (kitAt === push && push >= 0) {
+                for (const [i, e] of out.entries()) {
+                    if (e?.lane === 'drums' && e.tick >= push && e.tick < span.start) {
                         out[i] = null;
                     }
                 }
-                live[slot] = live[slot].filter((i) => out[i] !== null);
-                for (const note of arrives) {
-                    // The arrival's pitch and weight at the last strike's tick, ringing to the end.
-                    live[slot].push(out.length);
-                    out.push({
-                        ...note,
-                        tick: last[0].tick,
-                        dur: span.end - last[0].tick,
-                        offsetMs: last[0].offsetMs,
-                        bar: last[0].bar,
-                    });
-                }
-                mark(slot);
-            };
-            land(bassBefore, isBass, arrival(isBass));
-            land(compBefore, isStruckComp, arrival(isStruckComp));
+            }
+            for (const i of keptKit) {
+                out[i] = {
+                    ...out[i]!,
+                    tick: kitAt,
+                    bar: barAtTick(timeline, kitAt)?.index ?? out[i]!.bar,
+                };
+            }
             continue;
         }
         const length = span.end - span.start;

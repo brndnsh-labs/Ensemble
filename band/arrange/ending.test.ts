@@ -11,6 +11,7 @@ import {
     type BandSettings,
     DEFAULT_SETTINGS,
     type PitchedNote,
+    PPQ,
     type StyleId,
 } from '../core/types.js';
 import { chordAt, chorusBars, compileTimeline, type Timeline } from '../form/timeline.js';
@@ -3198,7 +3199,7 @@ describe('a tied fermata on the ending bar keeps one drum hit on the one (#2187)
         ['jazz', 0],
         ['metal', 8],
     ] as const)(
-        "%s: the kit plays its ending's final strokes on the one and nothing after, the pitched lanes ring on",
+        "%s: the kit plays its ending's final strokes once, with the band's push or on the one, the pitched lanes ring on",
         (style, step) => {
             // Catches `holdFermatas`' tied path removing the kit with everything else (the band
             // ended on no drum hit), the kit playing a unison figure alone under the hold (the
@@ -3207,14 +3208,17 @@ describe('a tied fermata on the ending bar keeps one drum hit on the one (#2187)
                 pass: 0,
                 looping: false,
             });
-            const drums = drumsIn(events, bar.index);
+            // The one arrival: with the band's push when it pushes, else on the one.
+            const band = heldStrike(events, 'bass', end)[0].tick;
+            const kitTick = bar.start - band === PPQ / 2 ? band : bar.start;
+            const drums = events.filter((e) => e.lane === 'drums' && e.tick >= kitTick);
             const book = strokesAt(style, step);
             expect(book.length, style).toBeGreaterThan(0);
             expect(
-                drums.map((e) => e.tick - bar.start),
+                drums.map((e) => e.tick),
                 style,
-            ).toEqual(book.map(() => 0));
-            expect(drums.map((e) => e.piece).sort(), style).toEqual(book);
+            ).toEqual(book.map(() => kitTick));
+            expect(drums.map((e) => (e as { piece: string }).piece).sort(), style).toEqual(book);
             const pitched = events.filter((e): e is PitchedNote => e.lane !== 'drums');
             expect(
                 pitched.filter((e) => e.bar === bar.index),
@@ -3285,6 +3289,177 @@ describe('a tied fermata on the ending bar keeps one drum hit on the one (#2187)
         },
     );
 
+    // The tied-ending shapes the held notes are measured on: the plain tie with a V-I-ish
+    // approach, its minor and slash-bass variants, and the tie that runs on over the last barline.
+    const heldShapes: [string, number][] = [
+        ['C | F | Dm7 | C | /', 4],
+        ['C | F | Dm7 | Cm | /', 4],
+        ['C | F | Dm7 | C/E | /', 4],
+        ['C | / | /', 1],
+        ['C | F | / | /', 2],
+    ];
+    it.each(STYLE_IDS)(
+        '%s: bass and comp land the held chord on one tick, a beat or the "and" of 4 (#2223)',
+        (style) => {
+            // Catches each lane keeping its own last strike's tick (the bass on the "and" of 4,
+            // the comp on the "e", the kit on the one: three attacks for one arrival), a
+            // sixteenth or a skank's upbeat as the arrival, and a strike on the fermata bar.
+            for (const [bars, fermata] of heldShapes) {
+                const tied = compileTimeline(score([{ label: 'A', bars, fermataBars: [fermata] }]));
+                const span = tied.spans.find((s) => s.fermata)!;
+                const finish = tied.bars.at(-1)!.start + tied.bars.at(-1)!.meter.barTicks;
+                for (const seed of ['a', 'b', 'c', 'd', 'e']) {
+                    const { events } = performPass(
+                        tied,
+                        { ...straight(style), seed },
+                        { pass: 0, looping: false },
+                    );
+                    const note = `${style} ${bars} ${seed}`;
+                    const bass = heldStrike(events, 'bass', finish);
+                    const comp = heldStrike(events, 'comp', finish);
+                    const tick = bass[0].tick;
+                    expect(tick, note).toBe(comp[0].tick);
+                    const early = span.start - tick;
+                    // Before the downbeat the tie sits on, on the eighths and no earlier than
+                    // the "and" of 3 (a shared tick stays, a beat or the push otherwise).
+                    expect(early, note).toBeGreaterThan(0);
+                    expect(
+                        early <= (PPQ * 5) / 2 && early % (PPQ / 2) === 0,
+                        `${note}: ${early}`,
+                    ).toBe(true);
+                    const bassComp = events.filter(
+                        (e): e is PitchedNote =>
+                            (e.lane === 'bass' || e.lane === 'comp') && !e.muted,
+                    );
+                    // The flam goes: no strike of either lane within an eighth before the
+                    // arrival (a funk comp's "e" under a push).
+                    expect(
+                        bassComp.filter((e) => e.tick > tick - PPQ / 2 && e.tick < tick),
+                        note,
+                    ).toEqual([]);
+                    // The clip: nothing of either lane sounds across the arrival's tick but
+                    // the arrival itself (a bass quarter on 4 under a root on the "and").
+                    expect(
+                        bassComp.filter((e) => e.tick < tick && e.tick + e.dur > tick),
+                        note,
+                    ).toEqual([]);
+                    // The kit-bar filter: in the tied span the kit strikes only its arrival,
+                    // on the span's start, never the groove of a bar the tie runs through.
+                    expect(
+                        events
+                            .filter(
+                                (e) =>
+                                    e.lane === 'drums' && e.tick >= span.start && e.tick < span.end,
+                            )
+                            .filter((e) => e.tick !== span.start),
+                        note,
+                    ).toEqual([]);
+                    expect(
+                        events.filter(
+                            (e) =>
+                                e.lane !== 'drums' &&
+                                e.tick === span.start &&
+                                !(e as PitchedNote).muted,
+                        ),
+                        note,
+                    ).toEqual([]);
+                }
+            }
+        },
+    );
+
+    it.each([
+        // rock: the bass's last root is on the "and" of 4 and the comp's chord on 4, so the
+        // chord is pushed; country: nothing after 4 in either lane, so it lands on 4.
+        ['rock', PPQ / 2],
+        ['funk', PPQ / 2],
+        ['country', PPQ],
+    ] as const)(
+        '%s: lands %i ticks before the fermata bar (a push, or the last beat)',
+        (style, back) => {
+            // Catches the push lost (both lanes pulled back to 4 under a bass that hit the "and")
+            // and a push invented for lines that never played one, and the kit's arrival left
+            // on the one under a push (or pulled off the one for a landing on a beat): the kit
+            // strikes once, with the band, and its fill's tail from the push on is gone.
+            const { events } = performPass(timeline, straight(style), { pass: 0, looping: false });
+            expect(bar.start - heldStrike(events, 'comp', end)[0].tick, style).toBe(back);
+            expect(bar.start - heldStrike(events, 'bass', end)[0].tick, style).toBe(back);
+            const push = back === PPQ / 2;
+            const kitTick = push ? bar.start - PPQ / 2 : bar.start;
+            const kit = events.filter((e) => e.lane === 'drums' && e.tick >= kitTick);
+            expect(kit.length, style).toBeGreaterThan(0);
+            expect(
+                kit.filter((e) => e.tick !== kitTick),
+                `${style}: the kit strikes once, with the band`,
+            ).toEqual([]);
+        },
+    );
+
+    it('hiphop: a landing both lanes already share on an eighth stays (the "and" of 3)', () => {
+        // Catches a shared tick floored to the beat under it: both lanes were together on
+        // the "and" of 3 (with the kick), and snapping moved a band that was already one.
+        const over = tiedEnding('C | / | /', [1]);
+        const span = over.spans.find((s) => s.fermata)!;
+        const { events } = performPass(over, straight('hiphop'), { pass: 0, looping: false });
+        const finish = over.bars.at(-1)!.start + over.bars.at(-1)!.meter.barTicks;
+        expect(span.start - heldStrike(events, 'bass', finish)[0].tick).toBe((PPQ * 3) / 2);
+        expect(span.start - heldStrike(events, 'comp', finish)[0].tick).toBe((PPQ * 3) / 2);
+    });
+
+    it.each(STYLE_IDS)(
+        '%s: a tie that runs on over the last barline ends on the kit and the held chord (#2223)',
+        (style) => {
+            // Catches the span's plan being the bar it starts in, which has no ending: both
+            // bars were wiped and the band ended on no drum hit and no pitched note.
+            const over = tiedEnding('C | / | /', [1]);
+            const last = over.bars.at(-1)!;
+            const { events } = performPass(over, straight(style), { pass: 0, looping: false });
+            // The kit's arrival is at the start of the span, where the held chord begins, or
+            // with the band's push before it: never on the last bar, a bar or more into it.
+            const span = over.spans.find((s) => s.fermata)!;
+            const band = heldStrike(events, 'bass', last.start + last.meter.barTicks)[0].tick;
+            const kitTick = span.start - band === PPQ / 2 ? band : span.start;
+            const drums = events.filter((e) => e.lane === 'drums' && e.tick >= kitTick);
+            expect(drums.length, style).toBeGreaterThan(0);
+            expect(
+                drums.every((e) => e.tick === kitTick),
+                style,
+            ).toBe(true);
+            // One arrival, not the groove of the bar the tie runs through on top of it: no
+            // piece is struck twice on the tick (the kit-bar filter).
+            const pieces = drums.map((e) => (e as { piece: string }).piece);
+            expect(new Set(pieces).size, style).toBe(pieces.length);
+            const finish = last.start + last.meter.barTicks;
+            expect(
+                heldStrike(events, 'bass', finish).map((e) => mod12(e.midi)),
+                style,
+            ).toEqual([0]);
+            expect(
+                new Set(heldStrike(events, 'comp', finish).map((e) => mod12(e.midi))).size,
+                style,
+            ).toBeGreaterThanOrEqual(style === 'metal' ? 2 : 3);
+        },
+    );
+
+    it.each(STYLE_IDS)('%s: a tie of a rest holds nothing across it (#2223)', (style) => {
+        // Catches the tie extending the last notes before an N.C. through it: the C rang
+        // across the written rest. Nothing pitched sounds from the rest's start to the end.
+        for (const bars of ['C | N.C. | /', 'C | F | C | N.C. | /']) {
+            const rested = tiedEnding(bars, [bars.split('|').length - 1]);
+            const rest = rested.spans.find((s) => !s.chord)!;
+            for (const looping of [false, true]) {
+                const { events } = performPass(rested, straight(style), { pass: 0, looping });
+                const sounding = events.filter(
+                    (e) =>
+                        e.lane !== 'drums' &&
+                        !(e as PitchedNote).muted &&
+                        e.tick + (e as PitchedNote).dur > rest.start + 1,
+                );
+                expect(sounding, `${style} ${bars} ${looping}`).toEqual([]);
+            }
+        }
+    });
+
     it("a tie mid-chart still rings the bar before's last notes as they were", () => {
         // Catches the arrival replacing the last strike of a tie that is not the ending's: the
         // notes held through it are the ones the same bar plays without the fermata.
@@ -3317,7 +3492,10 @@ describe('a tied fermata on the ending bar keeps one drum hit on the one (#2187)
         const twice = tiedEnding('C | / | Dm7 | G7 | C | /', [1, 5]);
         const ends = performPass(twice, straight('rock'), { pass: 0, looping: false }).events;
         expect(drumsIn(ends, 1)).toEqual([]);
-        expect(drumsIn(ends, 5).length).toBeGreaterThan(0);
+        const lastBar = twice.bars.at(-1)!;
+        expect(
+            ends.filter((e) => e.lane === 'drums' && e.tick >= lastBar.start - PPQ / 2).length,
+        ).toBeGreaterThan(0);
         const loops = performPass(timeline, straight('rock'), { pass: 0, looping: true }).events;
         expect(drumsIn(loops, bar.index)).toEqual([]);
         // Nor does a tie of a rest: no chord rings, and jazz would play its button alone.
