@@ -1,6 +1,6 @@
 import { DEFAULT_SETTINGS, type PitchedNote } from '../../core/types.js';
 import { compileTimeline } from '../../form/timeline.js';
-import { performPass } from '../../perform.js';
+import { type PassMemory, performPass } from '../../perform.js';
 import { score } from '../../test/scores.js';
 import { parseChord } from '../../theory/chord.js';
 import { type ApproachKind, approach, BASS, floorsBelow, meetRoot } from './line.js';
@@ -181,5 +181,78 @@ describe('a lead-in at the floor of the range comes from above', () => {
                 );
             }
         }
+    });
+});
+
+/**
+ * #2225 (from #2197, #2215): jazz's mid-song scale approach into a floor target (E1, F1) aims
+ * at the octave above, and the next bar's root keeps that octave because the approach promised
+ * it (`land`), not because `place` happens to anchor near the note before.
+ */
+describe('a jazz floor approach promises the octave above to the next bar', () => {
+    // Four in the bar (high intensity), the walk that approaches by the beat before the change.
+    const jazz = { ...DEFAULT_SETTINGS, style: 'jazz' as const, intensity: 0.8 };
+    const bassOf = (events: { lane: string }[], bar: number) =>
+        (events as PitchedNote[])
+            .filter((e) => e.lane === 'bass' && e.bar === bar)
+            .sort((a, b) => a.tick - b.tick);
+    const land = (memory: unknown) => (memory as { land?: number | null } | undefined)?.land;
+    // The other lanes start fresh; only the bass remembers where it was.
+    const resume = (bass: unknown): PassMemory => ({
+        ...performPass(compileTimeline(score([{ label: 'A', bars: 'C' }])), jazz, {
+            pass: 0,
+            looping: true,
+        }).snapshots[0],
+        bass,
+    });
+
+    it('the next bar plays the promised octave where place would choose the floor', () => {
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'E | E | E | E' }]));
+        // `place` puts E beside a line sitting on G1 (31) on the floor: E1 is nearer than E2.
+        const arrival = (bass: unknown) =>
+            bassOf(
+                performPass(
+                    timeline,
+                    { ...jazz, seed: 'a' },
+                    { pass: 0, looping: true, memory: resume(bass) },
+                ).events,
+                0,
+            )[0].midi;
+        expect(arrival({ last: 31, land: null })).toBe(BASS.lo);
+        expect(arrival({ last: 31, land: BASS.lo + 12 })).toBe(BASS.lo + 12);
+        // A promise for another pitch class is not this chord's: it places as before.
+        expect(arrival({ last: 31, land: BASS.lo + 1 + 12 })).toBe(BASS.lo);
+    });
+
+    it('a mid-song scale approach into a floor target writes the promise, and only then', () => {
+        // F1 then E: the line sits low, so E's place is the floor (and F's scale has the D
+        // under it that is off the instrument) and the approach goes to the octave above.
+        const timeline = compileTimeline(score([{ label: 'A', bars: 'F | E | E | E' }]));
+        let promised = 0;
+        for (let s = 0; s < 80; s++) {
+            const { events, snapshots } = performPass(
+                timeline,
+                { ...jazz, seed: `s${s}` },
+                {
+                    pass: 0,
+                    looping: true,
+                    memory: resume({ last: 30, land: null }),
+                },
+            );
+            const promise = land(snapshots[1].bass);
+            const [arrival] = bassOf(events, 1);
+            const into = bassOf(events, 0).at(-1);
+            if (promise === null || promise === undefined) {
+                continue;
+            }
+            promised++;
+            expect(promise).toBe(BASS.lo + 12);
+            expect(arrival.midi).toBe(promise);
+            // The note before it is the scale step under the octave (D2 or D#2), not a leap.
+            expect(Math.abs((into?.midi ?? 0) - promise)).toBeLessThanOrEqual(2);
+            // The promise is consumed by one bar: the bar after the arrival carries none.
+            expect(land(snapshots[2].bass) ?? null).toBe(null);
+        }
+        expect(promised).toBeGreaterThan(0);
     });
 });
