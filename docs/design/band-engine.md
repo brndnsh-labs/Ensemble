@@ -73,8 +73,10 @@ from any bar reproduces the same music.
    The bass's own floor is E1 (`BASS.lo`, 28), the open E string: a lead-in into the low E or F
    comes down onto it by a step from above, a half or whole step by the chord's own scale
    (`approach`'s scale case, `meetRoot`; #2197, mid-song as in an ending), never from a
-   note under the string and never from an octave up (Eb2 into E1). Jazz keeps its own mid-song way (it places the next root beside the note
-   before it, so a floor approach aims at the octave above: `floorsBelow`), and neo-soul takes
+   note under the string and never from an octave up (Eb2 into E1). Jazz keeps its own mid-song way (a floor approach aims at the octave above:
+   `floorsBelow`), and promises it: the approach hands the octave on as `land`, and the next
+   bar's root is that note (`landingRoot`), not wherever `place` anchors beside the note
+   before it (#2225); an ending's own aim wins. Neo-soul takes
    the half step above. A mirrored lead-in that is no tone of its chord, of the chord it leads into or of the key
    takes the chord's step above (`meetRoot`: F#1 into E1 over B7, not F; #2215); a short scale
    with no step on the string there (sus, `Dsus4` into E1) takes the whole step above, the

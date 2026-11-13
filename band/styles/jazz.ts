@@ -16,6 +16,7 @@ import {
     endingBass,
     floorsBelow,
     type LineMemory,
+    landingRoot,
     nextChord,
     pickApproach,
     place,
@@ -434,7 +435,9 @@ const jazzDrums = drumIdiom({
 // ================================================================ bass
 /**
  * An approach into `target` that neither repeats `avoid` (the note before it) nor is the
- * target itself — so an approach always moves, and always resolves.
+ * target itself — so an approach always moves, and always resolves. `up` is the octave the
+ * line was aimed at, instead of `target`, where a floor target's scale approach went to the
+ * octave above (the line's promise for the next bar's root, `walkingBass`), else null.
  */
 function chooseApproach(
     rng: Rng,
@@ -442,7 +445,7 @@ function chooseApproach(
     chord: ChordFacts,
     avoid: number | null,
     ending: boolean,
-): number {
+): { note: number; up: number | null } {
     const near = avoid ?? target;
     // why: a scale approach into a floor target (E1, F1: its scale step under it is off the
     // instrument, `floorsBelow`) mid-song aims at the target's upper octave. Jazz places the
@@ -453,10 +456,8 @@ function chooseApproach(
     const aimsUp = !ending && floorsBelow(target, chord);
     for (let tries = 0; tries < 4; tries++) {
         const kind = pickApproach(rng, true);
-        let note =
-            kind === 'scale' && aimsUp
-                ? approach(target + 12, chord, kind)
-                : approach(target, chord, kind);
+        const up = kind === 'scale' && aimsUp;
+        let note = up ? approach(target + 12, chord, kind) : approach(target, chord, kind);
         // The fifth-above approach can come from below instead (a fourth under the target):
         // take whichever octave sits nearer the line, so it never leaps an octave to get there.
         if (kind === 'dominant') {
@@ -466,11 +467,25 @@ function chooseApproach(
             }
         }
         if (note !== avoid && note !== target) {
-            return note;
+            return { note, up: up ? target + 12 : null };
         }
     }
     const below = approach(target, chord, 'chromatic-below');
-    return below !== avoid ? below : approach(target, chord, 'chromatic-above');
+    return { note: below !== avoid ? below : approach(target, chord, 'chromatic-above'), up: null };
+}
+
+/**
+ * The promise a mid-song floor approach makes (#2225): the octave above the floor target it
+ * aimed at (`up`), kept by the next bar's arrival. why: that bar's root sits there today only
+ * because `place` anchors near the note before it; if `place` moved, the approach would leap
+ * ten semitones down onto the open string again. Only the bar's last span promises, since
+ * `land` is read by the next bar's first; and never into an ending, whose own `land`
+ * (`endingAim`) and `endingBass` are not to be fed a mid-song octave. That guard is defensive:
+ * an ending with a home root already turns `aimsUp` off, and no rendered chart reaches the
+ * case it covers (an ending bar whose first chord is not home, approached from the floor).
+ */
+function promiseUp(ctx: BarContext, i: number, spans: number, up: number | null): number | null {
+    return i === spans - 1 && !ctx.next?.plan.ending ? up : null;
 }
 
 // ---------------------------------------------------------------- walking
@@ -511,7 +526,9 @@ const walkingBass: PitchedIdiom = {
             events.push(...held.events);
             return { events, memory: { last } };
         }
-        // Where an approach into the ending promised the band's last note (#2178, `endingAim`).
+        // Where an approach promised the next bar's root: into the ending, the band's last
+        // note (#2178, `endingAim`); mid-song, the octave a floor target's scale approach
+        // aimed at (#2225, `chooseApproach`'s `up`). The bar's last span decides it.
         let land: number | null = null;
         spans.forEach(({ span, from, to }, i) => {
             const chord = span.chord;
@@ -544,7 +561,10 @@ const walkingBass: PitchedIdiom = {
             //    top of a section, and never under a slash chord (its bass note is the point).
             let first: number;
             if (span.attack || last === null) {
-                const arrival = place(rootPc, last);
+                // why: after a floor approach that aimed at the octave above (#2197), the root
+                // is that octave, kept by the promise (`landingRoot`) rather than left to
+                // `place`'s anchor on the note before it (#2225).
+                const arrival = landingRoot(ctx, memory, i, rootPc, () => place(rootPc, last));
                 const approached = last !== null && Math.abs(last - arrival) <= 2;
                 const third = chord.third;
                 const useThird =
@@ -583,11 +603,9 @@ const walkingBass: PitchedIdiom = {
                 if (followingChord && to - tail[0] >= 8 && splits) {
                     const into = aim(place(bassPc(followingChord), tail[1]), tail[1]);
                     const target = into?.target ?? place(bassPc(followingChord), tail[1]);
-                    land = into?.promise ?? null;
-                    notes.push([
-                        to - 4,
-                        chooseApproach(rng, target, chord, tail[1], into !== null),
-                    ]);
+                    const lead = chooseApproach(rng, target, chord, tail[1], into !== null);
+                    land = into?.promise ?? promiseUp(ctx, i, spans.length, lead.up);
+                    notes.push([to - 4, lead.note]);
                 }
                 notes.forEach(([step, midi], k) => {
                     const length = (notes[k + 1]?.[0] ?? to) - step;
@@ -614,14 +632,15 @@ const walkingBass: PitchedIdiom = {
             if (followingChord && steps.length > 1 && lastLength <= 4) {
                 const into = aim(place(bassPc(followingChord), first), first);
                 const target = into?.target ?? place(bassPc(followingChord), first);
-                land = into?.promise ?? null;
-                approachNote = chooseApproach(
+                const lead = chooseApproach(
                     rng,
                     target,
                     chord,
                     steps.length === 2 ? first : null,
                     into !== null,
                 );
+                approachNote = lead.note;
+                land = into?.promise ?? promiseUp(ctx, i, spans.length, lead.up);
             }
             const middleCount = steps.length - 1 - (approachNote === null ? 0 : 1);
             for (let k = 0; k < middleCount; k++) {
