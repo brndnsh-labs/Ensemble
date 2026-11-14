@@ -9,7 +9,7 @@ import { SEATS, TIER_HIGH, TIER_MID, tierOf } from "../style/types.ts";
 import { chordFamily, chordToString, makeQuality } from "../theory/chord.ts";
 import type { Key } from "../theory/pitch.ts";
 import { pitchClass } from "../theory/pitch.ts";
-import { arcOffset } from "./arc.ts";
+import { arcOffset, defaultClimax } from "./arc.ts";
 import type { EndingMark, FillMark, Plan, PlanBar, PlanOptions, SoloMark } from "./types.ts";
 
 /** A timed jam with no stated length. */
@@ -46,6 +46,8 @@ export function planBars(
   const without = new Set<Seat>(options.without ?? []);
   const bodyBarsPerPass = Math.max(1, options.mode === "jam" ? bodyOf(expanded).length : 1);
 
+  const climax = soloClimax(options, passes, open);
+
   // First the music, bar by bar, without marks that depend on a neighbour.
   const drafts: Draft[] = [];
   let occurrence = 0;
@@ -74,6 +76,7 @@ export function planBars(
               part: run.part,
               phraseStart: phraseStart / bodyBarsPerPass,
               phraseEnd: Math.min(1, (phraseStart + phraseLength) / bodyBarsPerPass),
+              ...(climax === undefined ? {} : { climax }),
             })
           : 0;
       drafts.push({
@@ -442,16 +445,39 @@ function soloMarks(
   if (options.mode === "song") {
     return drafts.map((draft) => (body(draft) ? { chorus: 0, of: 1 } : null));
   }
-  // The band alone first, unless one pass is all there is.
+  return drafts.map((draft) => (body(draft) ? soloTurn(draft.run.pass, passes, open) : null));
+}
+
+/**
+ * Whether a pass of a jam is the soloist's, and where in its solo: the band
+ * alone first (unless one pass is all there is), then solos of three choruses
+ * with a chorus of rest between them.
+ */
+function soloTurn(pass: number, passes: number, open: boolean): SoloMark | null {
   const lead = open || passes > 1 ? 1 : 0;
   const cycle = SOLO_CHORUSES + 1;
-  return drafts.map((draft) => {
-    const turn = draft.run.pass - lead;
-    if (!body(draft) || turn < 0 || turn % cycle === SOLO_CHORUSES) return null;
-    const chorus = turn % cycle;
-    const first = draft.run.pass - chorus;
-    return { chorus, of: open ? SOLO_CHORUSES : Math.min(SOLO_CHORUSES, passes - first) };
-  });
+  const turn = pass - lead;
+  if (turn < 0 || turn % cycle === SOLO_CHORUSES) return null;
+  const chorus = turn % cycle;
+  return { chorus, of: open ? SOLO_CHORUSES : Math.min(SOLO_CHORUSES, passes - (pass - chorus)) };
+}
+
+/**
+ * The pass a jam with a soloist peaks on: the last chorus of a solo, the one
+ * nearest to where the jam would have peaked anyway. A solo starts low and
+ * peaks in its last chorus (SO-05), and the band under it does the same, or the
+ * band would be at its loudest while the soloist is still finding its idea.
+ */
+function soloClimax(options: PlanOptions, passes: number, open: boolean): number | undefined {
+  if (options.solo !== true || options.mode !== "jam" || open || passes < 3) return undefined;
+  const wanted = defaultClimax(passes);
+  let best: number | undefined;
+  for (let pass = 1; pass < passes; pass++) {
+    const turn = soloTurn(pass, passes, open);
+    if (!turn || turn.of === 1 || turn.chorus !== turn.of - 1) continue;
+    if (best === undefined || Math.abs(pass - wanted) <= Math.abs(best - wanted)) best = pass;
+  }
+  return best;
 }
 
 /** Add a lift without leaving the tier the bar is in. */

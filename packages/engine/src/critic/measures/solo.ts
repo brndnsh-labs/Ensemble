@@ -1,0 +1,522 @@
+// What a soloist would say about a solo, read from the notes played. The
+// old band measured notes, bars and changes, and the complaints lived where
+// nothing was measured: whether a phrase follows from the one before, whether
+// a chorus goes anywhere (ME-29). So these are taken at the phrase, the
+// breath and the chorus as well as at the note.
+//
+// A phrase here is the notes of one slot of the form (a pickup counted with
+// the phrase it leads into); a breath is a silence of a beat or more.
+
+import { PPQ } from "../../chart/types.ts";
+import { score } from "../../critic/choose.ts";
+import type { Arrival } from "../../perform/harmony.ts";
+import type { Heard, SoloCandidate, Sounding } from "../../players/solo/critique.ts";
+import {
+  bassStruck,
+  body,
+  closest,
+  likeness,
+  lineBars,
+  phrasesOf,
+  RELATED,
+  SAME,
+  SOLO_FEATURES,
+} from "../../players/solo/critique.ts";
+import type { World } from "../../players/solo/slots.ts";
+import { worldOf } from "../../players/solo/slots.ts";
+import type { StylePack } from "../../style/types.ts";
+import type { Take } from "../../take.ts";
+import { chordTones } from "../../theory/chord.ts";
+import { mod12, pitchClass } from "../../theory/pitch.ts";
+import { mean, notesOf, share } from "../read.ts";
+import type { Measure, Measurement } from "../types.ts";
+
+/** Slack, in ticks, for "still sounding": the pocket moves a note's end a little. */
+const POCKET = 10;
+
+interface Reading {
+  readonly world: World;
+  readonly notes: readonly Sounding[];
+  /** Every phrase slot with its notes, in order. */
+  readonly phrases: readonly Heard[];
+  /** The phrases of each solo. */
+  readonly solos: readonly (readonly Heard[])[];
+  /** Each phrase as the critic's candidate, and its cost under the style's weights. */
+  readonly costs: readonly number[];
+}
+
+const readings = new WeakMap<Take, Reading | null>();
+
+function read(take: Take, style: StylePack): Reading | null {
+  if (readings.has(take)) return readings.get(take) ?? null;
+  const events = notesOf(take, "solo");
+  let reading: Reading | null = null;
+  if (events.length > 0) {
+    const bass = bassStruck(notesOf(take, "bass"));
+    const world = worldOf(take.plan, style, bass, events[0]!.voice);
+    let at = 0;
+    const bars = take.plan.bars;
+    const notes = [...events]
+      .sort((a, b) => a.tick - b.tick)
+      .map((event): Sounding => {
+        while (bars[at + 1] && bars[at + 1]!.start <= event.tick) at++;
+        return {
+          bar: bars[at]!,
+          tick: event.tick,
+          ends: event.tick + event.duration,
+          pitch: event.pitch,
+        };
+      });
+    const phrases = phrasesOf(world, notes);
+    const solos: Heard[][] = [];
+    for (const phrase of phrases) {
+      solos[phrase.slot.solo] = [...(solos[phrase.slot.solo] ?? []), phrase];
+    }
+    const candidates = phrases.map((phrase): SoloCandidate => {
+      const before = solos[phrase.slot.solo]!;
+      return { ...phrase, kind: "", earlier: before.slice(0, before.indexOf(phrase)), world };
+    });
+    const costs = score(candidates, SOLO_FEATURES, style.critic.weights.solo ?? {}).map(
+      (scored) => scored.cost,
+    );
+    reading = { world, notes, phrases, solos: solos.filter(Boolean), costs };
+  }
+  readings.set(take, reading);
+  return reading;
+}
+
+const isTone = (arrival: Arrival | undefined, pitch: number): boolean => {
+  const chord = arrival?.chord;
+  if (!chord) return false;
+  const root = pitchClass(chord.root);
+  return chordTones(chord.quality).some((tone) => mod12(root + tone.interval) === mod12(pitch));
+};
+
+/** The chord a note answers to: the one it is struck over, or the one it leans into. */
+function chordFor(world: World, note: Sounding): Arrival | undefined {
+  const here = world.arrivalAt(note.tick);
+  const next = here && world.harmony[here.index + 1];
+  const leans = next?.changed && next.tick - note.tick <= PPQ / 2 && note.ends > next.tick + POCKET;
+  return leans ? next : here;
+}
+
+/** Each note with the note after it, where no breath comes between: the moves of a line. */
+function moves(reading: Reading): (readonly [Sounding, Sounding])[] {
+  const pairs: (readonly [Sounding, Sounding])[] = [];
+  reading.notes.forEach((note, i) => {
+    const next = reading.notes[i + 1];
+    if (next && next.tick - note.ends < PPQ - POCKET) pairs.push([note, next]);
+  });
+  return pairs;
+}
+
+/** The silences of a beat or more between one note and the next inside a solo, in ticks. */
+function breaths(reading: Reading): number[] {
+  const lengths: number[] = [];
+  for (const solo of reading.solos) {
+    const notes = solo.flatMap((phrase) => phrase.notes);
+    notes.forEach((note, i) => {
+      const next = notes[i + 1];
+      if (next && next.tick - note.ends >= PPQ - POCKET) lengths.push(next.tick - note.ends);
+    });
+  }
+  return lengths;
+}
+
+/** The solos that ran their whole length, as choruses of notes: for anything about the arc. */
+function wholeSolos(reading: Reading): Sounding[][][] {
+  const result: Sounding[][][] = [];
+  for (const solo of reading.solos) {
+    const of = solo[0]!.slot.of;
+    const choruses: Sounding[][] = Array.from({ length: of }, () => []);
+    const seen = new Set<number>();
+    for (const phrase of solo) {
+      seen.add(phrase.slot.chorus);
+      choruses[phrase.slot.chorus]?.push(...phrase.notes);
+    }
+    if (seen.size === of) result.push(choruses);
+  }
+  return result;
+}
+
+const seconds = (reading: Reading, ticks: number) => ticks / reading.world.ticksPerSecond;
+const chorusSeconds = (reading: Reading, solo: readonly Heard[], chorus: number) =>
+  seconds(
+    reading,
+    solo
+      .filter((phrase) => phrase.slot.chorus === chorus)
+      .flatMap((phrase) => phrase.slot.bars)
+      .reduce((sum, bar) => sum + bar.ticks, 0),
+  );
+
+/** Notes a second in one chorus of each whole solo of three choruses. */
+function pace(reading: Reading, which: "first" | "last"): number[] {
+  return reading.solos.flatMap((solo) => {
+    const of = solo[0]!.slot.of;
+    const chorus = which === "first" ? 0 : of - 1;
+    const notes = solo.filter((phrase) => phrase.slot.chorus === chorus);
+    const whole = new Set(solo.map((phrase) => phrase.slot.chorus)).size === of;
+    if (of < 2 || !whole || notes.length === 0) return [];
+    const count = notes.reduce((sum, phrase) => sum + phrase.notes.length, 0);
+    return [count / chorusSeconds(reading, solo, chorus)];
+  });
+}
+
+const measure = (
+  id: string,
+  unit: Measure["unit"],
+  says: string,
+  of: (reading: Reading) => Measurement | null,
+): Measure => ({
+  id: `solo.${id}`,
+  seat: "solo",
+  says,
+  unit,
+  of: (take, style) => {
+    const reading = read(take, style);
+    return reading ? of(reading) : null;
+  },
+});
+
+export const soloMeasures: readonly Measure[] = [
+  measure(
+    "changes-on-chord-tones",
+    "share",
+    "A note struck on a chord change, or held across one, is a tone of the new chord. Always.",
+    (reading) => {
+      const { world, notes } = reading;
+      let cases = 0;
+      let good = 0;
+      for (const note of notes) {
+        const here = world.arrivalAt(note.tick);
+        const struck = here?.tick === note.tick && here.changed && here.chord !== null;
+        const next = here && world.harmony[here.index + 1];
+        const across = next?.changed && next.chord !== null && note.ends > next.tick + POCKET;
+        if (!struck && !across) continue;
+        cases++;
+        if ((!struck || isTone(here, note.pitch)) && (!across || isTone(next, note.pitch))) good++;
+      }
+      return share(good, cases);
+    },
+  ),
+  measure(
+    "thirds-and-sevenths-on-changes",
+    "share",
+    "Around half the changes are landed on the new chord's 3rd or 7th, the notes that say the chord moved; the rest on its root or 5th.",
+    (reading) => {
+      const landings = reading.notes.filter((note) => {
+        const here = reading.world.arrivalAt(note.tick);
+        return here?.tick === note.tick && here.changed && here.chord !== null;
+      });
+      const guide = landings.filter((note) => {
+        const chord = reading.world.arrivalAt(note.tick)!.chord!;
+        const root = pitchClass(chord.root);
+        return chordTones(chord.quality).some(
+          (tone) =>
+            ["third", "seventh", "sixth", "sus"].includes(tone.role) &&
+            mod12(root + tone.interval) === mod12(note.pitch),
+        );
+      });
+      return share(guide.length, landings.length);
+    },
+  ),
+  measure(
+    "beats-on-chord-tones",
+    "share",
+    "Most notes on a beat are chord tones (a note picked blind from this pool would be one about half the time).",
+    (reading) => {
+      const on = reading.notes.filter((note) => (note.tick - note.bar.start) % PPQ === 0);
+      const tones = on.filter((note) => isTone(reading.world.arrivalAt(note.tick), note.pitch));
+      return share(tones.length, on.length);
+    },
+  ),
+  measure(
+    "phrase-ends-on-chord-tones",
+    "share",
+    "The last note before a breath is a tone of its chord: a phrase lands somewhere.",
+    (reading) => {
+      const ends = reading.notes.filter((note, i) => {
+        const next = reading.notes[i + 1];
+        return !next || next.tick - note.ends >= PPQ - POCKET;
+      });
+      const tones = ends.filter((note) => isTone(chordFor(reading.world, note), note.pitch));
+      return share(tones.length, ends.length);
+    },
+  ),
+  measure(
+    "phrases-related",
+    "share",
+    "Most phrases are made of something already played in the solo: the same rhythm with the line going the same way, or most of it.",
+    (reading) => {
+      const scores = reading.solos.flatMap((solo) =>
+        solo.flatMap((phrase, i) =>
+          i === 0 || phrase.notes.length === 0 ? [] : [closest(phrase, solo.slice(0, i))!],
+        ),
+      );
+      return share(scores.filter((value) => value >= RELATED).length, scores.length);
+    },
+  ),
+  measure(
+    "phrase-likeness",
+    "ratio",
+    "How alike a phrase is to the earlier phrase most like it, from 0 (nothing shared) to 1 (the same phrase): around the middle is an idea coming back changed.",
+    (reading) =>
+      mean(
+        reading.solos.flatMap((solo) =>
+          solo.flatMap((phrase, i) =>
+            i === 0 || phrase.notes.length === 0 ? [] : [closest(phrase, solo.slice(0, i))!],
+          ),
+        ),
+      ),
+  ),
+  measure(
+    "phrase-same-as-last",
+    "share",
+    "Sometimes a phrase is the phrase before it again, note for note in rhythm and shape; mostly it has changed.",
+    (reading) => {
+      const scores = reading.solos.flatMap((solo) =>
+        solo.flatMap((phrase, i) =>
+          i === 0 || phrase.notes.length === 0 ? [] : [likeness(phrase, solo[i - 1]!)],
+        ),
+      );
+      return share(scores.filter((value) => value >= SAME).length, scores.length);
+    },
+  ),
+  measure(
+    "bars-that-rhyme",
+    "share",
+    "Inside a phrase the rhythm of a bar comes back: of the bars that carry a line, the share whose rhythm another bar of the phrase also plays (Q-43).",
+    (reading) => {
+      let bars = 0;
+      let rhyming = 0;
+      for (const phrase of reading.phrases) {
+        const lines = lineBars(phrase);
+        if (lines.length < 2) continue;
+        bars += lines.length;
+        rhyming += lines.filter((bar, i) =>
+          lines.some((other, j) => j !== i && other === bar),
+        ).length;
+      }
+      return share(rhyming, bars);
+    },
+  ),
+  measure(
+    "empty-bars",
+    "share",
+    "Some of a solo is air: bars with no note struck in them (a pickup in the last beat is the next bar's).",
+    (reading) => {
+      const bars = reading.phrases.flatMap((phrase) => phrase.slot.bars);
+      const struck = new Set(
+        reading.notes
+          .filter((note) => note.tick - note.bar.start < note.bar.ticks - PPQ)
+          .map((note) => note.bar.index),
+      );
+      return share(bars.filter((bar) => !struck.has(bar.index)).length, bars.length);
+    },
+  ),
+  measure(
+    "long-breaths",
+    "share",
+    "Few breaths are two bars or longer: that is dropping out, not phrasing.",
+    (reading) => {
+      const all = breaths(reading);
+      const bar = reading.phrases[0]?.slot.bars[0]?.ticks ?? PPQ * 4;
+      return share(all.filter((ticks) => ticks >= 2 * bar - POCKET).length, all.length);
+    },
+  ),
+  measure(
+    "breath",
+    "seconds",
+    "The usual breath, in seconds: long enough to be one at a fast tempo, short enough not to be a hole at a slow one.",
+    (reading) => {
+      const all = breaths(reading).sort((a, b) => a - b);
+      const middle = all[Math.floor(all.length / 2)];
+      return middle === undefined ? null : { value: seconds(reading, middle), cases: all.length };
+    },
+  ),
+  measure(
+    "longest-silence",
+    "seconds",
+    "The longest the soloist goes without a note inside a solo, in seconds.",
+    (reading) => {
+      const all = breaths(reading);
+      return all.length === 0
+        ? null
+        : { value: seconds(reading, Math.max(...all)), cases: all.length };
+    },
+  ),
+  measure(
+    "notes-per-second-first",
+    "per second",
+    "The first chorus of a solo is sparse: a note or two a second.",
+    (reading) => mean(pace(reading, "first")),
+  ),
+  measure(
+    "notes-per-second-last",
+    "per second",
+    "The last chorus is where the playing is.",
+    (reading) => mean(pace(reading, "last")),
+  ),
+  measure(
+    "builds",
+    "ratio",
+    "The last chorus of a solo has one and a half to four times the notes of the first (SO-02).",
+    (reading) => {
+      const [first, last] = [pace(reading, "first"), pace(reading, "last")];
+      return mean(first.flatMap((value, i) => (last[i] === undefined ? [] : [last[i]! / value])));
+    },
+  ),
+  measure(
+    "rises",
+    "semitones",
+    "The last chorus of a solo sits higher than the first: the middle of its notes is some semitones up.",
+    (reading) =>
+      mean(
+        wholeSolos(reading)
+          .filter((choruses) => choruses.length >= 2 && choruses[0]!.length > 0)
+          .map((choruses) => {
+            const middle = (notes: readonly Sounding[]) =>
+              notes.reduce((sum, note) => sum + note.pitch, 0) / Math.max(1, notes.length);
+            return middle(choruses.at(-1)!) - middle(choruses[0]!);
+          }),
+      ),
+  ),
+  measure(
+    "top-in-last-chorus",
+    "share",
+    "The highest note of a solo is in its last chorus.",
+    (reading) => {
+      const solos = wholeSolos(reading).filter((choruses) => choruses.length >= 2);
+      const high = (notes: readonly Sounding[]) => Math.max(0, ...notes.map((note) => note.pitch));
+      const late = solos.filter(
+        (choruses) => high(choruses.at(-1)!) > Math.max(...choruses.slice(0, -1).map(high)),
+      );
+      return share(late.length, solos.length);
+    },
+  ),
+  measure(
+    "top-falls",
+    "ratio",
+    "Where the highest note of a solo falls, from 0 at its first note to 1 at its last: near the end, not at it.",
+    (reading) =>
+      mean(
+        wholeSolos(reading).flatMap((choruses) => {
+          const notes = choruses.flat();
+          if (notes.length < 2) return [];
+          const top = notes.reduce((high, note) => (note.pitch > high.pitch ? note : high));
+          const [first, last] = [notes[0]!, notes.at(-1)!];
+          return [(top.tick - first.tick) / Math.max(1, last.tick - first.tick)];
+        }),
+      ),
+  ),
+  measure(
+    "high-points-deserved",
+    "share",
+    "A phrase's highest note is one a listener can hear as its high point: on a beat, or held (Q-45).",
+    (reading) => {
+      const phrases = reading.phrases.filter((phrase) => body(phrase).length >= 3);
+      const deserved = phrases.filter((phrase) => {
+        const notes = body(phrase);
+        const top = notes.reduce((high, note) => (note.pitch > high.pitch ? note : high));
+        return (top.tick - top.bar.start) % PPQ === 0 || top.ends - top.tick >= PPQ * 0.75;
+      });
+      return share(deserved.length, phrases.length);
+    },
+  ),
+  measure(
+    "range",
+    "semitones",
+    "A chorus covers an octave or so: more than a box, less than the whole instrument.",
+    (reading) =>
+      mean(
+        wholeSolos(reading).flatMap((choruses) =>
+          choruses
+            .filter((notes) => notes.length > 1)
+            .map((notes) => {
+              const pitches = notes.map((note) => note.pitch);
+              return Math.max(...pitches) - Math.min(...pitches);
+            }),
+        ),
+      ),
+  ),
+  measure(
+    "steps",
+    "share",
+    "Most moves inside a line are a step of the blues scale: a minor third or less.",
+    (reading) => {
+      const all = moves(reading);
+      return share(all.filter(([a, b]) => Math.abs(b.pitch - a.pitch) <= 3).length, all.length);
+    },
+  ),
+  measure("wide-leaps", "share", "Leaps wider than a fifth are rare inside a line.", (reading) => {
+    const all = moves(reading);
+    return share(all.filter(([a, b]) => Math.abs(b.pitch - a.pitch) > 7).length, all.length);
+  }),
+  measure(
+    "leaps-resolved",
+    "share",
+    "A wide leap is followed by a step or a third back the other way.",
+    (reading) => {
+      const { notes } = reading;
+      let leaps = 0;
+      let resolved = 0;
+      notes.forEach((note, i) => {
+        const [next, after] = [notes[i + 1], notes[i + 2]];
+        if (!next || next.tick - note.ends >= PPQ - POCKET) return;
+        const leap = next.pitch - note.pitch;
+        if (Math.abs(leap) <= 7) return;
+        leaps++;
+        const back = after && after.tick - next.ends < PPQ - POCKET ? after.pitch - next.pitch : 0;
+        if (back !== 0 && Math.sign(back) !== Math.sign(leap) && Math.abs(back) <= 4) resolved++;
+      });
+      return share(resolved, leaps);
+    },
+  ),
+  measure(
+    "trills",
+    "share",
+    "Almost no run of four notes rocks between two pitches (a-b-a-b).",
+    (reading) => {
+      const pitches = reading.notes.map((note) => note.pitch);
+      let runs = 0;
+      let trills = 0;
+      for (let i = 3; i < pitches.length; i++) {
+        runs++;
+        const [a, b, c, d] = [pitches[i - 3]!, pitches[i - 2]!, pitches[i - 1]!, pitches[i]!];
+        if (a === c && b === d && a !== b) trills++;
+      }
+      return share(trills, runs);
+    },
+  ),
+  measure(
+    "repeated-notes",
+    "share",
+    "A line moves: few of its moves strike the same note again.",
+    (reading) => {
+      const all = moves(reading);
+      return share(all.filter(([a, b]) => a.pitch === b.pitch).length, all.length);
+    },
+  ),
+  measure(
+    "entered-early",
+    "share",
+    "Some phrases are led into from the beat before the barline, and some start on the one: neither every time.",
+    (reading) => {
+      const phrases = reading.phrases.filter(
+        (phrase) => !phrase.slot.first && phrase.notes.length > 0,
+      );
+      const early = phrases.filter((phrase) => phrase.notes[0]!.tick < phrase.slot.bars[0]!.start);
+      return share(early.length, phrases.length);
+    },
+  ),
+  measure(
+    "cost",
+    "cost",
+    "How the solo went by the critic's own lights: the mean cost of its phrases under the style's weights. Lower is better; it is for finding the worst takes, not a target.",
+    (reading) => mean(reading.costs.filter((_, i) => reading.phrases[i]!.notes.length > 0)),
+  ),
+  measure("worst-phrase", "cost", "The cost of the solo's worst phrase.", (reading) => {
+    const costs = reading.costs.filter((_, i) => reading.phrases[i]!.notes.length > 0);
+    return costs.length === 0 ? null : { value: Math.max(...costs), cases: costs.length };
+  }),
+];

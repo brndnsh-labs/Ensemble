@@ -18,6 +18,11 @@ export interface TakeOptions extends PlanOptions {
   readonly seed: number | string;
   /** Play the chart in another key. */
   readonly key?: Key;
+  /**
+   * The soloist's instrument, by its name in the instrument list, in place of
+   * the style's default. The instrument is the player's choice (BRIEF 5.3).
+   */
+  readonly soloInstrument?: string;
 }
 
 export interface Take {
@@ -37,10 +42,14 @@ export function render(text: string, style: StylePack, options: TakeOptions): Ta
   const parsed = parse(text);
   const chart = options.key ? transpose(parsed.chart, options.key) : parsed.chart;
   const roadmap = plan(chart, style, options);
+  const played =
+    options.soloInstrument === undefined
+      ? style
+      : { ...style, solo: { ...style.solo, instrument: options.soloInstrument } };
   return {
     chart,
     diagnostics: parsed.diagnostics,
     plan: roadmap,
-    events: perform(roadmap, style, options.seed),
+    events: perform(roadmap, played, options.seed),
   };
 }

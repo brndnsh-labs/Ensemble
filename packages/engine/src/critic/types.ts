@@ -23,8 +23,21 @@ export interface Measure {
    * - `share`: a fraction of cases, 0 to 1
    * - `semitones`, `per bar`, `per beat`, `velocity`: a mean in those units
    * - `pitch`: a mean MIDI note number
+   * - `seconds`, `per second`: time as a listener feels it, whatever the tempo
+   * - `ratio`: one count over another
+   * - `cost`: what a player's choices cost under the style's own weights
    */
-  readonly unit: "share" | "semitones" | "per bar" | "per beat" | "velocity" | "pitch";
+  readonly unit:
+    | "share"
+    | "semitones"
+    | "per bar"
+    | "per beat"
+    | "velocity"
+    | "pitch"
+    | "seconds"
+    | "per second"
+    | "ratio"
+    | "cost";
   /**
    * The value for one take and how many cases it was measured over. A rate
    * measured on nothing passes any ceiling, so the count travels with the value.

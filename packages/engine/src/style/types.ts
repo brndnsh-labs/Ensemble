@@ -5,6 +5,7 @@ import type { CriticStyle } from "../critic/types.ts";
 import type { BassStyle } from "../players/bass/style.ts";
 import type { ChordStyle } from "../players/chords/style.ts";
 import type { DrumStyle } from "../players/drums/style.ts";
+import type { SoloStyle } from "../players/solo/style.ts";
 import type { BaseQuality } from "../theory/chord.ts";
 
 /** The seats in the band. Drums are the clock; the other three are pitched. */
@@ -132,10 +133,14 @@ export interface StylePack {
   readonly drums: DrumStyle;
   readonly bass: BassStyle;
   readonly chords: ChordStyle;
+  readonly solo: SoloStyle;
   /** What the critic expects of this style, and what its players' choices cost. */
   readonly critic: CriticStyle;
-  /** General MIDI program numbers (0 to 127) for export. Drums need none. */
-  readonly instruments: Readonly<Record<PitchedSeat, number>>;
+  /**
+   * General MIDI program numbers (0 to 127) for export. Drums need none, and
+   * the soloist's comes from its instrument, which is the player's choice.
+   */
+  readonly instruments: Readonly<Record<Exclude<PitchedSeat, "solo">, number>>;
 }
 
 /** The arc the old band settled on by ear. Styles spread this and change what differs. */

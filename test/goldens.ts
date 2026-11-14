@@ -30,6 +30,13 @@ export const GOLDENS: readonly Golden[] = [
     style: "blues",
     options: { mode: "song", seed: 2 },
   },
+  // The band, then a three-chorus solo that runs into the ending.
+  {
+    file: "blues-12-bar-a-solo.mid",
+    chart: "blues-12-bar-a.chart",
+    style: "blues",
+    options: { mode: "jam", passes: 4, seed: 3, solo: true },
+  },
 ];
 
 export const goldenUrl = (golden: Golden): URL =>

@@ -4,6 +4,7 @@
 import { PPQ } from "../chart/types.ts";
 import type { PerformanceEvent } from "../perform/notes.ts";
 import type { Plan } from "../plan/types.ts";
+import { SOLO_INSTRUMENTS } from "../players/solo/instruments.ts";
 import type { Seat, StylePack } from "../style/types.ts";
 import { SEATS } from "../style/types.ts";
 import type { SmfMeta, SmfNote, SmfTrack } from "./smf.ts";
@@ -39,6 +40,7 @@ export function toMidi(
   }
 
   const notes: Record<Seat, SmfNote[]> = { drums: [], bass: [], chords: [], solo: [] };
+  let soloProgram: number | undefined;
   for (const event of events) {
     if (event.kind === "marker") {
       // Sections and landmarks are markers a DAW can show; chords and pass counts are text.
@@ -46,6 +48,7 @@ export function toMidi(
       const text = event.marker === "pass" ? `Pass ${event.text}` : event.text;
       conductor.push({ tick: event.tick, type: isLandmark ? "marker" : "text", text });
     } else {
+      if (event.seat === "solo") soloProgram ??= SOLO_INSTRUMENTS[event.voice ?? ""]?.program;
       notes[event.seat].push({
         tick: event.tick + event.offset,
         duration: event.duration,
@@ -59,7 +62,10 @@ export function toMidi(
   for (const seat of SEATS) {
     if (notes[seat].length === 0) continue;
     const track = { name: TRACK_NAMES[seat], channel: CHANNELS[seat], notes: notes[seat] };
-    tracks.push(seat === "drums" ? track : { ...track, program: style.instruments[seat] });
+    if (seat === "drums") tracks.push(track);
+    // The soloist's notes name the instrument that played them.
+    else if (seat === "solo") tracks.push({ ...track, program: soloProgram ?? 0 });
+    else tracks.push({ ...track, program: style.instruments[seat] });
   }
   return writeSmf({ ppq: PPQ, conductor, tracks });
 }

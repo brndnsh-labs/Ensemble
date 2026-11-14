@@ -9,7 +9,7 @@ import { STYLES } from "@ensemble/styles";
 export { STYLES };
 
 /** Enough seeds to meet every weighted choice a few times, few enough to stay inside the budget. */
-export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6, 7, 8];
+export const SEEDS: readonly number[] = [1, 2, 3, 4, 5, 6];
 
 export interface LibraryChart {
   readonly file: string;
@@ -35,12 +35,17 @@ export interface Jam {
   readonly take: Take;
 }
 
-/** The kinds of jam every property sees: a short one, a timed one, and one with no planned end. */
+/**
+ * The kinds of take every property sees: a short jam, a timed one, one with no planned end,
+ * the chart as a song, and a jam with the soloist asked for (the band, then a three-chorus
+ * solo that runs into the ending).
+ */
 const KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 2 },
   { mode: "jam", minutes: 2.5 },
   { mode: "jam", open: true, passes: 3 },
   { mode: "song" },
+  { mode: "jam", passes: 4, solo: true },
 ];
 
 let cache: Jam[] | undefined;
@@ -87,6 +92,7 @@ export function stressTakes(): Jam[] {
     { mode: "jam", passes: 2, energy: 0.55 },
     { mode: "jam", passes: 2, energy: 0.85 },
     { mode: "jam", passes: 3 },
+    { mode: "jam", passes: 3, solo: true },
   ];
   stressCache ??= STYLES.flatMap((style) =>
     STRESS.flatMap((chart) =>

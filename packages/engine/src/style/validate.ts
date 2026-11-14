@@ -4,6 +4,7 @@
 import { validateBassStyle } from "../players/bass/validate.ts";
 import { validateChordStyle } from "../players/chords/validate.ts";
 import { validateDrumStyle } from "../players/drums/validate.ts";
+import { validateSoloStyle } from "../players/solo/validate.ts";
 import { BASE_QUALITIES } from "../theory/chord.ts";
 import type { StylePack } from "./types.ts";
 
@@ -54,5 +55,6 @@ export function validateStyle(style: StylePack): string[] {
   problems.push(...validateDrumStyle(style.drums).map((problem) => `drums: ${problem}`));
   problems.push(...validateBassStyle(style.bass).map((problem) => `bass: ${problem}`));
   problems.push(...validateChordStyle(style.chords).map((problem) => `chords: ${problem}`));
+  problems.push(...validateSoloStyle(style.solo).map((problem) => `solo: ${problem}`));
   return problems;
 }

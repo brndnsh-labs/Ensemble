@@ -6,6 +6,7 @@ import { bluesBass } from "./bass.ts";
 import { bluesChords } from "./chords.ts";
 import { bluesCritic } from "./critic.ts";
 import { bluesDrums } from "./drums.ts";
+import { bluesSolo } from "./solo.ts";
 
 export const blues: StylePack = {
   id: "blues",
@@ -30,6 +31,7 @@ export const blues: StylePack = {
   drums: bluesDrums,
   bass: bluesBass,
   chords: bluesChords,
-  // Acoustic bass, acoustic grand piano, clean electric guitar.
-  instruments: { bass: 32, chords: 0, solo: 27 },
+  solo: bluesSolo,
+  // Acoustic bass and acoustic grand piano. The soloist's sound is its instrument's.
+  instruments: { bass: 32, chords: 0 },
 };

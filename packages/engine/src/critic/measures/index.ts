@@ -4,6 +4,7 @@ import { bassMeasures } from "./bass.ts";
 import { chordMeasures } from "./chords.ts";
 import { compingMeasures } from "./comping.ts";
 import { drumMeasures } from "./drums.ts";
+import { soloMeasures } from "./solo.ts";
 
 /** Every measure the scorecard reports, in the order it reports them. */
 export const MEASURES: readonly Measure[] = [
@@ -11,5 +12,6 @@ export const MEASURES: readonly Measure[] = [
   ...bassMeasures,
   ...chordMeasures,
   ...compingMeasures,
+  ...soloMeasures,
   ...bandMeasures,
 ];

@@ -12,6 +12,17 @@ export interface ArcPosition {
   /** Where the current phrase starts and ends, as fractions of one pass through the body. */
   readonly phraseStart: number;
   readonly phraseEnd: number;
+  /**
+   * The pass the band peaks on, when someone's solo says where: a band builds
+   * with its soloist. Left out, the jam peaks about two thirds of the way through.
+   */
+  readonly climax?: number;
+}
+
+/** Where a jam of `passes` peaks when nothing else says: its climax pass ends about two thirds in. */
+export function defaultClimax(passes: number): number {
+  if (passes <= 3) return 1;
+  return Math.min(passes - 3, Math.max(1, Math.round((2 * passes) / 3) - 1));
 }
 
 export function arcOffset(arc: ArcStyle, at: ArcPosition): number {
@@ -35,10 +46,7 @@ export function arcOffset(arc: ArcStyle, at: ArcPosition): number {
     if (n === 3 && at.phraseStart === 0) return shape.breath;
     return lift(shape.lastFrom);
   }
-  if (n === 3) return leaning(shape.climax);
-
-  // The climax pass ends about two thirds of the way through.
-  const climax = Math.min(n - 3, Math.max(1, Math.round((2 * n) / 3) - 1));
+  const climax = at.climax ?? defaultClimax(n);
   if (at.pass < climax) {
     return leaning(shape.first + ((shape.climax - shape.first) * at.pass) / climax);
   }

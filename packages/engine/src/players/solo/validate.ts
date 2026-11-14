@@ -1,0 +1,151 @@
+// Checks a solo style's meaning. The compiler has already checked its shape;
+// this reads it the way the soloist will and says what it could not play.
+
+import { cells } from "../../perform/grid.ts";
+import { SOLO_INSTRUMENTS } from "./instruments.ts";
+import type { Cell, SoloStyle } from "./style.ts";
+import { CONTOURS } from "./style.ts";
+
+const STEPS = 16;
+
+/** Every problem in a solo style, in words. An empty list means the data is sound. */
+export function validateSoloStyle(solo: SoloStyle): string[] {
+  const problems: string[] = [];
+  const say = (ok: boolean, message: string) => {
+    if (!ok) problems.push(message);
+  };
+  const chance = (value: number, where: string) =>
+    say(value >= 0 && value <= 1, `${where}: ${value} is not a chance from 0 to 1.`);
+  const rhythm = (cell: Cell, where: string, steps = STEPS) => {
+    const symbols = cells(cell);
+    say(symbols.length === steps, `${where}: "${cell}" is not ${steps} sixteenths long.`);
+    say(
+      symbols.every((symbol) => "x-.".includes(symbol)),
+      `${where}: "${cell}" has a symbol that is not x, - or a dot.`,
+    );
+    say(symbols.includes("x"), `${where}: "${cell}" strikes no note.`);
+    say(symbols[0] !== "-", `${where}: "${cell}" opens by holding a note nobody struck.`);
+    return symbols;
+  };
+
+  say(
+    solo.instrument in SOLO_INSTRUMENTS,
+    `instrument: "${solo.instrument}" is not an instrument the soloist knows.`,
+  );
+  for (const [name, instrument] of Object.entries(SOLO_INSTRUMENTS)) {
+    const [low, high] = instrument.range;
+    say(
+      low < instrument.home && instrument.home < high,
+      `instrument "${name}": its home is outside its range.`,
+    );
+  }
+
+  const names = solo.levels.map((level) => level.name);
+  const known = (name: string, where: string) =>
+    say(
+      names.includes(name),
+      `${where}: "${name}" is not one of the levels (${names.join(", ")}).`,
+    );
+  say(solo.levels.length > 0, "levels: there are none.");
+  for (const level of solo.levels) {
+    const where = `level "${level.name}"`;
+    say(level.notesPerBar > 0, `${where}: notes a bar must be more than none.`);
+    say(level.span >= 3 && level.span <= 24, `${where}: a span of ${level.span} semitones.`);
+    say(level.cells.length > 0, `${where}: has no rhythms.`);
+    for (const cell of level.cells) rhythm(cell, where);
+    say(
+      level.shapes.some((shape) => shape.weight > 0),
+      `${where}: has no shape with a weight.`,
+    );
+    for (const shape of level.shapes) {
+      const letters = cells(shape.bars);
+      say(letters.length === 4, `${where}: shape "${shape.bars}" is not four bars.`);
+      say(
+        letters.every((letter) => "LER".includes(letter)),
+        `${where}: shape "${shape.bars}" has a letter that is not L, E or R.`,
+      );
+      say(letters.includes("E"), `${where}: shape "${shape.bars}" never lands (no E).`);
+      say(shape.weight >= 0, `${where}: shape "${shape.bars}" has a negative weight.`);
+    }
+  }
+
+  say(solo.endings.length > 0, "endings: there are none.");
+  for (const cell of [...solo.endings, solo.arc.peak.ending]) {
+    const symbols = rhythm(cell, "endings");
+    // A phrase leaves its last beat unstruck: a note there is the next phrase's pickup.
+    say(
+      !symbols.slice(STEPS - 4).includes("x"),
+      `endings: "${cell}" strikes a note in the last beat, which belongs to the next phrase.`,
+    );
+    const last = symbols.lastIndexOf("x");
+    const held = symbols.slice(last + 1).filter((symbol) => symbol === "-").length + 1;
+    say(held >= 4, `endings: "${cell}" does not finish on a long note.`);
+  }
+
+  say(
+    solo.forms.some((form) => form.weight > 0 && cells(form.phrases)[0] === "s"),
+    "forms: none opens on a statement (s), so a solo has nowhere to start.",
+  );
+  for (const form of solo.forms) {
+    const letters = cells(form.phrases);
+    say(letters.length > 0, "forms: an empty form.");
+    say(
+      letters.every((letter) => "srva".includes(letter)),
+      `forms: "${form.phrases}" has a letter that is not s, r, v or a.`,
+    );
+    say(form.weight >= 0, `forms: "${form.phrases}" has a negative weight.`);
+  }
+
+  say(
+    CONTOURS.some((kind) => solo.contours[kind] > 0),
+    "contours: none has a weight.",
+  );
+  for (const [list, tones] of [
+    ["arrive", solo.arrive],
+    ["settle", solo.settle],
+    ["hang", solo.hang],
+  ] as const) {
+    say(tones.length > 0, `${list}: names no tone.`);
+  }
+  const degrees = [...solo.notes.key.major, ...solo.notes.key.minor];
+  say(
+    degrees.every((degree) => Number.isInteger(degree) && degree >= 0 && degree < 12),
+    "notes: a key note is a whole number of semitones from 0 to 11.",
+  );
+  for (const blue of solo.notes.blue) {
+    say(
+      degrees.includes(blue.degree),
+      `notes: blue note ${blue.degree} is not one of the key's notes.`,
+    );
+  }
+
+  const { stages, peak, windDown } = solo.arc;
+  say(stages.length > 0, "arc: has no stages.");
+  for (const [i, stage] of stages.entries()) known(stage.density, `arc, stage ${i + 1}`);
+  known(peak.density, "arc, the peak");
+  known(windDown.density, "arc, the wind-down");
+  say(peak.above > 0 && peak.clear >= 0, "arc: the peak is above home, and clear of the rest.");
+
+  say(
+    solo.tempo.slowBar > solo.tempo.fastBar && solo.tempo.fastBar > 0,
+    "tempo: a slow bar is longer than a fast one.",
+  );
+  say(solo.space.breath > 0, "space: a breath takes time.");
+  say(solo.space.patience > 0, "space: patience is a number of seconds.");
+  say(solo.space.emptyBars >= 0, "space: empty bars cannot be negative.");
+  chance(solo.space.roomier, "space, roomier");
+  chance(solo.habits.riff, "habits, riff");
+  chance(solo.habits.chromatic, "habits, chromatic");
+  chance(solo.habits.enclosure, "habits, enclosure");
+  chance(solo.habits.pickup.chance, "habits, pickup");
+  chance(solo.habits.pickup.rising, "habits, pickup rising");
+  for (const figure of solo.habits.pickup.figures) rhythm(figure.beat, "habits, pickup", 4);
+
+  const touch = solo.touch;
+  for (const level of [touch.level, touch.peak, touch.floor, touch.ceiling]) {
+    say(level >= 1 && level <= 127, `touch: ${level} is not a level from 1 to 127.`);
+  }
+  say(touch.floor <= touch.ceiling, "touch: the floor is above the ceiling.");
+  say(touch.legato > 0 && touch.legato <= 1, "touch: legato is a share of a note's space.");
+  return problems;
+}

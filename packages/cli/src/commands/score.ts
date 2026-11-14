@@ -22,6 +22,10 @@ const KINDS: readonly { name: string; options: Omit<TakeOptions, "seed"> }[] = [
   { name: "jam 4 passes", options: { mode: "jam", passes: 4 } },
   { name: "quiet", options: { mode: "jam", passes: 3, energy: 0.3 } },
   { name: "loud", options: { mode: "jam", passes: 3, energy: 0.85 } },
+  // The same two jams with the soloist asked for: a three-chorus solo, a chorus of rest and
+  // a one-chorus solo into the ending; and a three-chorus solo that runs to the ending.
+  { name: "jam 3 min, solo", options: { mode: "jam", minutes: 3, solo: true } },
+  { name: "jam 4 passes, solo", options: { mode: "jam", passes: 4, solo: true } },
 ];
 
 /** How far the share of takes in a target band may fall before --check fails. */

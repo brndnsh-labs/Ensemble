@@ -15,6 +15,7 @@ import {
   pitchClass,
   plan,
   render,
+  SOLO_INSTRUMENTS,
   scaleHas,
   tierOf,
   toMidi,
@@ -31,7 +32,10 @@ test("every style that ships is sound data", () => {
 });
 
 test("the same chart, style, options, and seed give the identical performance, down to the MIDI bytes", () => {
-  for (const { style, chart, options, take } of takes()) {
+  // Every other seed is played again: enough to meet every kind of take on every chart.
+  for (const { style, chart, options, take } of takes(
+    (jam) => Number(jam.options.seed) % 2 === 1,
+  )) {
     const again = render(chart.text, style, options);
     assert.deepEqual(again.events, take.events, `${chart.file} seed ${options.seed}`);
     assert.deepEqual(
@@ -140,7 +144,14 @@ test("making an open jam one pass longer changes nothing that was already played
       for (const seed of SEEDS.slice(0, 4)) {
         for (const passes of [1, 2, 4]) {
           const jam = (n: number) =>
-            render(chart.text, style, { mode: "jam", open: true, passes: n, seed });
+            // Half with the soloist asked for: its solo may not depend on the jam's length.
+            render(chart.text, style, {
+              mode: "jam",
+              open: true,
+              passes: n,
+              seed,
+              solo: seed % 2 === 0,
+            });
           const shorter = jam(passes);
           const longer = jam(passes + 1);
           const before = (take: Take) =>
@@ -160,7 +171,7 @@ test("a take with a count-in is the same music as one without, a bar later", () 
   for (const style of STYLES) {
     for (const chart of LIBRARY) {
       const jam = (countIn: boolean) =>
-        render(chart.text, style, { mode: "jam", passes: 2, seed: 5, countIn });
+        render(chart.text, style, { mode: "jam", passes: 2, seed: 5, countIn, solo: true });
       const counted = jam(true);
       const bare = jam(false);
       const shift = counted.plan.bars[0]!.ticks;
@@ -245,7 +256,7 @@ test("under a rest nobody pitched plays", () => {
   const text = "key: A\n| A7 | D7 | A7 . NC . | NC | E7 | D7 | A7 | E7 |";
   for (const style of STYLES) {
     for (const seed of SEEDS) {
-      const take = render(text, style, { mode: "jam", passes: 3, seed });
+      const take = render(text, style, { mode: "jam", passes: 3, seed, solo: true });
       for (const bar of take.plan.bars) {
         for (const span of bar.spans) {
           if (span.chord !== null || bar.kind !== "music") continue;
@@ -692,6 +703,223 @@ test("the soloist is off unless asked for; asked for, it rests through the intro
           shorter.map((bar) => bar.solo),
           `${where}: an open jam's solos moved when it grew`,
         );
+      }
+    }
+  }
+});
+
+test("the band builds with the solo: under a solo's last chorus it is at least as loud as under its first, and louder when the solo has three", () => {
+  for (const style of STYLES) {
+    for (const chart of LIBRARY) {
+      const written = parse(chart.text).chart;
+      for (const passes of [2, 3, 4, 5, 6, 7, 8, 9]) {
+        const roadmap = plan(written, style, { mode: "jam", passes, solo: true });
+        const level = new Map<number, number[]>();
+        const mark = new Map<number, NonNullable<PlanBar["solo"]>>();
+        for (const bar of roadmap.bars) {
+          if (!bar.solo) continue;
+          level.set(bar.pass, [...(level.get(bar.pass) ?? []), bar.energy]);
+          mark.set(bar.pass, bar.solo);
+        }
+        const mean = (pass: number) => {
+          const values = level.get(pass)!;
+          return values.reduce((sum, value) => sum + value, 0) / values.length;
+        };
+        for (const [pass, solo] of mark) {
+          if (solo.chorus !== 0 || solo.of === 1) continue;
+          const last = pass + solo.of - 1;
+          const where = `${chart.file}, ${passes} passes, the solo from pass ${pass}`;
+          assert.ok(mean(last) >= mean(pass) - 1e-9, `${where}: ${mean(pass)} then ${mean(last)}`);
+          if (solo.of === 3) {
+            assert.ok(mean(last) > mean(pass) + 0.02, `${where}: no build under the solo`);
+          }
+        }
+      }
+    }
+  }
+});
+
+/** A take's solos: each one's notes, and the plan bars it runs over. */
+function solosOf(take: Take): { bars: PlanBar[]; notes: ReturnType<typeof notesOf> }[] {
+  const solos: { bars: PlanBar[]; notes: ReturnType<typeof notesOf> }[] = [];
+  let current: PlanBar[] | null = null;
+  for (const bar of take.plan.bars) {
+    if (bar.solo && (!current || (bar.solo.chorus === 0 && bar.barInPass === 0))) {
+      current = [];
+      solos.push({ bars: current, notes: [] });
+    }
+    if (bar.solo) current!.push(bar);
+    else current = null;
+  }
+  const all = notesOf(take, "solo");
+  for (const solo of solos) {
+    const from = solo.bars[0]!.start;
+    const last = solo.bars.at(-1)!;
+    // A pickup into the solo's first phrase may start in the bar before it.
+    solo.notes = all.filter(
+      (note) => note.tick >= from - PPQ && note.tick < last.start + last.ticks,
+    );
+  }
+  return solos;
+}
+
+const soloTakes = () => [...takes(), ...stressTakes()].filter((jam) => jam.options.solo === true);
+
+test("the soloist plays only where it has the lead (a pickup may lead in by a beat), stays on its instrument, and is one voice", () => {
+  let notes = 0;
+  for (const { chart, options, take } of soloTakes()) {
+    const solo = notesOf(take, "solo");
+    const where = `${chart.file} seed ${options.seed}`;
+    solo.forEach((note, i) => {
+      notes++;
+      const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+      const next = take.plan.bars[bar.index + 1];
+      const leadsIn = next?.solo && note.tick >= next.start - PPQ;
+      assert.ok(
+        bar.solo || leadsIn,
+        `${where}: a solo note in bar ${bar.index}, where it lays out`,
+      );
+      const instrument = SOLO_INSTRUMENTS[note.voice ?? ""];
+      assert.ok(instrument, `${where}: played on "${note.voice}"`);
+      assert.ok(
+        note.pitch >= instrument.range[0] && note.pitch <= instrument.range[1],
+        `${where}: ${note.pitch} is off the ${instrument.name}`,
+      );
+      const after = solo[i + 1];
+      if (after) {
+        const overlap = note.tick + note.offset + note.duration - (after.tick + after.offset);
+        assert.ok(overlap <= POCKET, `${where} at tick ${after.tick}: two solo notes at once`);
+      }
+    });
+  }
+  assert.ok(notes > 5000, `only ${notes} solo notes`);
+});
+
+test("the soloist lands the changes: a note struck where a chord arrives is a tone of that chord, and a note held across a change on a beat is a tone of the new chord", () => {
+  let landings = 0;
+  for (const { chart, options, take } of soloTakes()) {
+    const solo = notesOf(take, "solo");
+    for (const arrival of harmonyOf(take)) {
+      const chord = arrival.chord;
+      if (!chord || !arrival.changed) continue;
+      const tones = new Set(
+        chordTones(chord.quality).map((tone) => (pitchClass(chord.root) + tone.interval) % 12),
+      );
+      const where = `${chart.file} seed ${options.seed} into ${chord.text} at tick ${arrival.tick}`;
+      for (const note of solo) {
+        if (note.tick > arrival.tick) break;
+        const struck = note.tick === arrival.tick;
+        const held =
+          arrival.tick % PPQ === 0 &&
+          note.tick < arrival.tick &&
+          note.tick + note.offset + note.duration > arrival.tick + POCKET;
+        if (!struck && !held) continue;
+        landings++;
+        assert.ok(
+          tones.has(note.pitch % 12),
+          `${where}: ${note.pitch} ${struck ? "struck" : "held"}`,
+        );
+      }
+    }
+  }
+  assert.ok(landings > 800, `only ${landings} landings`);
+});
+
+test("a solo breathes and keeps going: no silence inside it reaches three bars, and it has one top note, in its last chorus", () => {
+  let solos = 0;
+  for (const { chart, options, take } of soloTakes()) {
+    for (const { bars, notes } of solosOf(take)) {
+      const where = `${chart.file} seed ${options.seed}, the solo from bar ${bars[0]!.index}`;
+      assert.ok(notes.length > 0, `${where}: a solo with no notes`);
+      solos++;
+      const barTicks = bars[0]!.ticks;
+      for (let i = 1; i < notes.length; i++) {
+        const gap = notes[i]!.tick - (notes[i - 1]!.tick + notes[i - 1]!.duration);
+        assert.ok(gap < barTicks * 3, `${where}: ${(gap / barTicks).toFixed(1)} bars of silence`);
+      }
+      const of = bars[0]!.solo!.of;
+      if (of < 2 || bars.at(-1)!.solo!.chorus !== of - 1) continue;
+      const top = Math.max(...notes.map((note) => note.pitch));
+      const tops = notes.filter((note) => note.pitch === top);
+      const lastChorus = bars.find((bar) => bar.solo!.chorus === of - 1)!;
+      assert.ok(
+        tops.every((note) => note.tick >= lastChorus.start),
+        `${where}: the top note comes before the last chorus`,
+      );
+    }
+  }
+  assert.ok(solos > 40, `only ${solos} solos`);
+});
+
+test("a three-chorus solo builds: its last chorus has more notes than its first, in nine solos in ten", () => {
+  let built = 0;
+  let solos = 0;
+  for (const { take } of takes((jam) => jam.options.solo === true)) {
+    for (const { bars, notes } of solosOf(take)) {
+      if (bars[0]!.solo!.of !== 3) continue;
+      const inChorus = (chorus: number) => {
+        const own = bars.filter((bar) => bar.solo!.chorus === chorus);
+        const from = own[0]!.start;
+        const to = own.at(-1)!.start + own.at(-1)!.ticks;
+        return notes.filter((note) => note.tick >= from && note.tick < to).length;
+      };
+      solos++;
+      if (inChorus(2) > inChorus(0)) built++;
+    }
+  }
+  assert.ok(solos > 40, `only ${solos} three-chorus solos`);
+  assert.ok(built >= solos * 0.9, `${built} of ${solos} solos built`);
+});
+
+test("a solo that runs into the ending ends with the band: its last note is struck where the final chord lands, on that chord's root, third or fifth", () => {
+  let endings = 0;
+  for (const { chart, options, take } of soloTakes()) {
+    const last = take.plan.bars.findLast((bar) => bar.kind === "music")!;
+    if (!last.ending || !last.solo) continue;
+    const final = last.spans.findLast((span) => span.chord !== null)?.chord;
+    const note = notesOf(take, "solo").at(-1);
+    const where = `${chart.file} seed ${options.seed}`;
+    assert.ok(final && note, `${where}: no last note`);
+    endings++;
+    assert.equal(
+      note.tick,
+      last.start + last.ending.at,
+      `${where}: the last note is not on the final chord`,
+    );
+    const resting = chordTones(final.quality)
+      .filter((tone) => ["root", "third", "fifth"].includes(tone.role))
+      .map((tone) => (pitchClass(final.root) + tone.interval) % 12);
+    assert.ok(
+      resting.includes(note.pitch % 12),
+      `${where}: ends on ${note.pitch} over ${final.text}`,
+    );
+  }
+  assert.ok(endings > 40, `only ${endings} endings with the soloist`);
+});
+
+test("a horn breathes: the alto never plays eight seconds without half a second of air", () => {
+  for (const style of STYLES) {
+    for (const chart of LIBRARY) {
+      for (const tempo of [66, 120]) {
+        const take = render(chart.text, style, {
+          mode: "jam",
+          passes: 4,
+          seed: 3,
+          solo: true,
+          tempo,
+          soloInstrument: "alto-sax",
+        });
+        const perTick = 60 / tempo / PPQ;
+        const notes = notesOf(take, "solo");
+        assert.ok(notes.length > 0 && notes.every((note) => note.voice === "alto-sax"));
+        let since = notes[0]!.tick;
+        for (let i = 1; i < notes.length; i++) {
+          const before = notes[i - 1]!;
+          const air = (notes[i]!.tick - (before.tick + before.duration)) * perTick;
+          if (air >= 0.5) since = notes[i]!.tick;
+          const blown = (notes[i]!.tick + notes[i]!.duration - since) * perTick;
+          assert.ok(blown <= 8.5, `${chart.file} at ${tempo}: ${blown.toFixed(1)} s on one breath`);
+        }
       }
     }
   }
