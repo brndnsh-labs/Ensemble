@@ -1,25 +1,27 @@
-// ensemble render <chart> --style S --seed N [--minutes M | --passes P] --out take.mid
+// ensemble render <chart> --style S --seed N [--minutes M | --passes P] --out take.mid [--save take.json]
 
-import { writeFileSync } from "node:fs";
+import { basename } from "node:path";
 import { parseArgs } from "node:util";
 import type { Seat, TakeOptions } from "@ensemble/engine";
-import { parseKey, render, seconds, toMidi } from "@ensemble/engine";
-import { STYLES, styleById } from "@ensemble/styles";
+import { parseKey } from "@ensemble/engine";
+import { STYLES } from "@ensemble/styles";
 import type { Command } from "../command.ts";
-import { readChart, reportDiagnostics, UsageError } from "../command.ts";
+import { readChart, UsageError } from "../command.ts";
+import { findStyle, playTake, RECIPE_VERSION, writeRecipe } from "../take-output.ts";
 
 const SEAT_NAMES: readonly Seat[] = ["drums", "bass", "chords", "solo"];
 
 export const renderCommand: Command = {
   summary: "play the chart and write the performance as a MIDI file",
   usage:
-    "<chart> --out take.mid [--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
+    "<chart> [--out take.mid] [--save take.json] [--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
   run(args) {
     const { positionals, values } = parseArgs({
       args,
       allowPositionals: true,
       options: {
         out: { type: "string", short: "o" },
+        save: { type: "string" },
         style: { type: "string", short: "s" },
         seed: { type: "string", default: "1" },
         minutes: { type: "string", short: "m" },
@@ -35,7 +37,8 @@ export const renderCommand: Command = {
     });
     const path = positionals[0];
     const text = readChart(path);
-    if (values.out === undefined) throw new UsageError("where to? Give --out take.mid");
+    if (values.out === undefined && values.save === undefined)
+      throw new UsageError("where to? Give --out take.mid, --save take.json, or both");
 
     const number = (name: string, value: string | undefined): number | undefined => {
       if (value === undefined) return undefined;
@@ -79,21 +82,20 @@ export const renderCommand: Command = {
 
     // The style named on the command line, else the chart's own, else the first that ships.
     const fromChart = /^style:\s*(\S+)/m.exec(text)?.[1];
-    const styleId = values.style ?? fromChart ?? STYLES[0]!.id;
-    const style = styleById(styleId);
-    if (!style) {
-      throw new UsageError(`no style "${styleId}" (styles: ${STYLES.map((s) => s.id).join(", ")})`);
-    }
+    const style = findStyle(values.style ?? fromChart ?? STYLES[0]!.id);
 
-    const take = render(text, style, options);
-    reportDiagnostics(path ?? "", take.diagnostics);
-    writeFileSync(values.out, toMidi(take.plan, take.events, style));
-    const notes = take.events.filter((event) => event.kind === "note").length;
-    const length = Math.round(seconds(take.plan));
-    console.log(
-      `${values.out}: ${style.name}, ${take.plan.tempo} bpm, ${take.plan.passes} ${take.plan.passes === 1 ? "pass" : "passes"}, ` +
-        `${take.plan.bars.length} bars, ${Math.floor(length / 60)}:${String(length % 60).padStart(2, "0")}, ${notes} notes, seed ${values.seed}`,
-    );
+    const chartName = path ? basename(path) : "";
+    if (values.save !== undefined) {
+      writeRecipe(values.save, {
+        version: RECIPE_VERSION,
+        chartName,
+        chartText: text,
+        style: style.id,
+        options,
+      });
+      console.log(`${values.save}: recipe saved`);
+    }
+    playTake(chartName, text, style, options, values.out);
     return 0;
   },
 };

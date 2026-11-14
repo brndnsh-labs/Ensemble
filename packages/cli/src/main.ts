@@ -6,12 +6,14 @@ import { UsageError } from "./command.ts";
 import { fmtCommand } from "./commands/fmt.ts";
 import { parseCommand } from "./commands/parse.ts";
 import { renderCommand } from "./commands/render.ts";
+import { replayCommand } from "./commands/replay.ts";
 import { scoreCommand } from "./commands/score.ts";
 
 const commands: Readonly<Record<string, Command>> = {
   parse: parseCommand,
   fmt: fmtCommand,
   render: renderCommand,
+  replay: replayCommand,
   score: scoreCommand,
 };
 
