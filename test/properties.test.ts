@@ -19,7 +19,7 @@ import {
   validateStyle,
 } from "@ensemble/engine";
 import { corpus } from "./corpus.ts";
-import { type Jam, LIBRARY, notesOf, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
+import { colourTakes, type Jam, LIBRARY, notesOf, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
 
 /** Ticks of slack for where a note sounds: the largest lean plus human placement. */
 const POCKET = 40;
@@ -625,6 +625,163 @@ test("in a jam on a one-section form, the biggest fill is kept for where the ban
     }
   }
   assert.ok(tops > 0 && plain > 0, `${tops} tops and ${plain} ordinary chorus ends`);
+});
+
+// ── the piano ───────────────────────────────────────────────────────────────
+
+interface Strike {
+  readonly tick: number;
+  readonly pitches: number[];
+  readonly sounds: number;
+  readonly ends: number;
+}
+
+/** The comp's notes grouped into the times the hand comes down. */
+function strikesOf(take: Take): Strike[] {
+  const strikes: Strike[] = [];
+  for (const note of notesOf(take, "chords")) {
+    const last = strikes.at(-1);
+    if (last && last.tick === note.tick) {
+      last.pitches.push(note.pitch);
+    } else {
+      strikes.push({
+        tick: note.tick,
+        pitches: [note.pitch],
+        sounds: note.tick + note.offset,
+        ends: note.tick + note.offset + note.duration,
+      });
+    }
+  }
+  for (const strike of strikes) strike.pitches.sort((a, b) => a - b);
+  return strikes;
+}
+
+/**
+ * The chords a strike may be playing: the one written under it, and, when it is struck within
+ * an eighth before a change and rings into it, the one coming (X-B-07).
+ */
+function chordsUnder(take: Take, strike: Strike) {
+  const harmony = arrivals(take.plan);
+  const at = harmony.findLastIndex((arrival) => arrival.tick <= strike.tick);
+  const under = [harmony[at]];
+  const next = harmony[at + 1];
+  if (next && next.tick - strike.tick <= PPQ / 2 && strike.ends > next.tick) under.push(next);
+  return under.flatMap((arrival) =>
+    arrival?.chord
+      ? [{ chord: arrival.chord, scale: chordScale(arrival.chord, contextOf(harmony, arrival)) }]
+      : [],
+  );
+}
+
+test("the piano stays in its register: nothing under the style's floor, nothing above E6, in every take", () => {
+  let strikes = 0;
+  for (const { style, chart, options, take } of [...takes(), ...colourTakes()]) {
+    for (const strike of strikesOf(take)) {
+      strikes++;
+      const where = `${chart.file} seed ${options.seed} at tick ${strike.tick}`;
+      assert.ok(strike.pitches[0]! >= style.chords.register.floor, `${where}: under the floor`);
+      assert.ok(strike.pitches.at(-1)! <= 88, `${where}: above E6`);
+    }
+  }
+  assert.ok(strikes > 5000, `only ${strikes} strikes across the library`);
+});
+
+test("a chord keeps its identity: every strike of two or more notes has the chord's third (or suspension) and its seventh (or sixth), and every alteration the chart writes", () => {
+  for (const { chart, options, take } of [...takes(), ...colourTakes()]) {
+    for (const strike of strikesOf(take)) {
+      if (strike.pitches.length < 2) continue;
+      const classes = new Set(strike.pitches.map((pitch) => pitch % 12));
+      const whole = chordsUnder(take, strike).some(({ chord }) => {
+        const tones = chordTones(chord.quality);
+        const sounds = (interval: number) => classes.has((pitchClass(chord.root) + interval) % 12);
+        const one = (...roles: string[]) => {
+          const tone = tones.find((candidate) => roles.includes(candidate.role));
+          return tone === undefined || sounds(tone.interval);
+        };
+        const altered = { b5: 6, "#5": 8, b9: 1, "#9": 3, "#11": 6, b13: 8 } as const;
+        return (
+          one("third", "sus") &&
+          one("seventh", "sixth") &&
+          chord.quality.alterations.every((alteration) => sounds(altered[alteration]))
+        );
+      });
+      assert.ok(
+        whole,
+        `${chart.file} seed ${options.seed} at tick ${strike.tick}: ${strike.pitches}`,
+      );
+    }
+  }
+});
+
+test("the piano plays nothing the harmony rules out: every note is a tone of its chord or of that chord's scale", () => {
+  for (const { chart, options, take } of [...takes(), ...colourTakes()]) {
+    for (const strike of strikesOf(take)) {
+      const fits = chordsUnder(take, strike).some(({ chord, scale }) =>
+        strike.pitches.every((pitch) => {
+          const interval = (pitch - pitchClass(chord.root) + 120) % 12;
+          return (
+            scaleHas(scale, interval) ||
+            chordTones(chord.quality).some((tone) => tone.interval % 12 === interval)
+          );
+        }),
+      );
+      assert.ok(
+        fits,
+        `${chart.file} seed ${options.seed} at tick ${strike.tick}: ${strike.pitches}`,
+      );
+    }
+  }
+});
+
+test("every chord the chart writes is struck: the piano plays each one within an eighth of where it arrives, or while it sounds", () => {
+  for (const { chart, options, take } of [...takes(), ...colourTakes()]) {
+    const strikes = strikesOf(take);
+    for (const arrival of arrivals(take.plan)) {
+      const bar = take.plan.bars.find((candidate) => candidate.index === arrival.bar);
+      if (!arrival.chord || !bar || bar.kind !== "music" || bar.seats.chords === null) continue;
+      const struck = strikes.some(
+        (strike) =>
+          strike.tick >= arrival.tick - PPQ / 2 && strike.tick < arrival.tick + arrival.duration,
+      );
+      assert.ok(
+        struck,
+        `${chart.file} seed ${options.seed}: ${arrival.chord.text} in bar ${bar.index} never struck`,
+      );
+    }
+  }
+});
+
+test("one hand, one chord: a strike has stopped sounding before the next one starts", () => {
+  for (const { chart, options, take } of [...takes(), ...colourTakes()]) {
+    const strikes = strikesOf(take);
+    for (let i = 1; i < strikes.length; i++) {
+      const overlap = strikes[i - 1]!.ends - strikes[i]!.sounds;
+      assert.ok(
+        overlap <= POCKET,
+        `${chart.file} seed ${options.seed} at tick ${strikes[i]!.tick}: two chords at once`,
+      );
+    }
+  }
+});
+
+test("the piano's last chord is the final chord, struck once where it lands and never early", () => {
+  for (const { chart, options, take } of takes((jam) => !jam.options.open)) {
+    const last = take.plan.bars.findLast((bar) => bar.kind === "music")!;
+    if (!last.ending) continue;
+    const landing = last.start + last.ending.at;
+    const strikes = strikesOf(take);
+    const where = `${chart.file} seed ${options.seed}`;
+    assert.equal(
+      strikes.at(-1)?.tick,
+      landing,
+      `${where}: the last strike is not on the final chord`,
+    );
+    assert.ok(strikes.at(-1)!.pitches.length >= 3, `${where}: a thin final chord`);
+    const early = strikes.filter(
+      (strike) => strike.tick < landing && strike.ends > landing + POCKET,
+    );
+    assert.equal(early.length, 0, `${where}: a chord ringing into the final hit`);
+  }
 });
 
 function musicSeconds(take: Take): number {

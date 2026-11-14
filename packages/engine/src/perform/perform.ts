@@ -3,6 +3,7 @@
 
 import type { Plan } from "../plan/types.ts";
 import { playBass } from "../players/bass/play.ts";
+import { playChords } from "../players/chords/play.ts";
 import { playDrums } from "../players/drums/play.ts";
 import { createRng } from "../rng.ts";
 import type { Seat, StylePack } from "../style/types.ts";
@@ -16,6 +17,7 @@ import { byBar } from "./notes.ts";
 const PLAYERS: Readonly<Partial<Record<Seat, Player>>> = {
   drums: playDrums,
   bass: playBass,
+  chords: playChords,
 };
 
 export function perform(plan: Plan, style: StylePack, seed: number | string): PerformanceEvent[] {

@@ -59,6 +59,38 @@ export function takes(only: (jam: Jam) => boolean = () => true): Jam[] {
   return cache.filter(only);
 }
 
+/**
+ * Not a tune: every kind of chord the format can write, with tensions, alterations, and a
+ * slash chord, for the rules about which notes a chord may be voiced with. The library is
+ * nearly all plain sevenths, which cannot break those rules.
+ */
+const everyColour: LibraryChart = {
+  file: "every-colour.chart",
+  text: readFileSync(new URL("./charts/every-colour.chart", import.meta.url), "utf8"),
+  meter: "4/4",
+};
+
+let colourCache: Jam[] | undefined;
+
+/** The every-colour chart at each level, and once as a jam with an arc and an ending. */
+export function colourTakes(): Jam[] {
+  const kinds: readonly TakeOptions[] = [
+    { mode: "jam", passes: 1, energy: 0.3, seed: 1 },
+    { mode: "jam", passes: 1, energy: 0.55, seed: 2 },
+    { mode: "jam", passes: 1, energy: 0.85, seed: 3 },
+    { mode: "jam", passes: 3, seed: 4 },
+  ];
+  colourCache ??= STYLES.flatMap((style) =>
+    kinds.map((options) => ({
+      style,
+      chart: everyColour,
+      options,
+      take: render(everyColour.text, style, options),
+    })),
+  );
+  return colourCache;
+}
+
 /** A take's notes in the order they sound, for one seat or for all. */
 export function notesOf(take: Take, seat?: Seat): NoteEvent[] {
   return take.events.filter(

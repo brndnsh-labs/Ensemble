@@ -91,14 +91,13 @@ State on 2026-11-14, after the review fixes. Everything is committed.
 
 - The review's findings are fixed except the ones that wait for a listening verdict: the wide bass drops (they follow from the register) and the two one-note phrase fills at mid level. Both are in `out/gate-1/GATE_REPORT.md` under "Not yet acted on". The review did not reach 3/4, 6/8, long arcs, or whether the property tests are weaker than their names.
 - Gate 1 feedback so far: loudness (done: 15% trim, hat under the backbeat, three measures) and "a little plain" (to be judged again with chords in). Further feedback becomes a property or a measure first, then a fix.
-- Owed once the voicing agent lands, because it shares the files: targets for `band.backbeat-level` (about 85 to 108 outside quiet takes), `band.notes-near-the-top` (at most 2%) and `drums.cymbal-under-backbeat` (at least 95%) in `packages/styles/src/blues/critic.ts`; then `pnpm goldens` and `score --update`. Until then the golden test fails on purpose.
 
 **Models** (agreed with Brandon to stretch quota): Sonnet for small fixes with a property written first and for mechanical work; Opus for the voicing engine and for adversarial reviews; Fable for comping rhythm, the soloist, and the main thread. The chord seat is built in two parts, in sequence: voicing (Opus), then rhythm (Fable). See "Built in two parts" in `prompts/seat-chords.md`.
 
 **Stage 2, in the order to pick up**
 
 1. The critic framework, `ensemble score`, and the drum, bass, and band measures are done (`packages/engine/src/critic/`, baseline in `scorecard/blues.json`).
-2. **Chord seat**: the brief is `prompts/seat-chords.md`, built in two parts (see its last section).
+2. **Chord seat**: the brief is `prompts/seat-chords.md`, built in two parts (see its last section). Part 1 (voicing, with a plain held-chord rhythm) is done and committed, with six piano properties. Part 2 (rhythm) is next, then one independent review of the whole seat.
 3. When it lands: read rendered takes bar by bar; turn its list of "properties that always hold" into tests in `test/properties.test.ts` (register floor, chord identity, every chord struck, voice leading); have a second agent review it against part B of the notes; then `pnpm goldens`, `score --update`, each with a line in `DECISIONS.md`.
 4. Gate 2 files and report: a script like `scripts/gate-1.sh`, with takes that isolate each level, and the scorecard's comping lines in the report.
 

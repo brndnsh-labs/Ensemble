@@ -29,6 +29,12 @@
     "p90": 0,
     "inTarget": 1
   },
+  "drums.cymbal-under-backbeat": {
+    "mean": 1,
+    "p10": 1,
+    "p90": 1,
+    "inTarget": 1
+  },
   "bass.changes-stated": {
     "mean": 1,
     "p10": 1,
@@ -65,10 +71,94 @@
     "p90": 4.7,
     "inTarget": null
   },
-  "band.backbeat-swell": {
-    "mean": 9.8837,
-    "p10": 9.7857,
+  "chords.top-holds": {
+    "mean": 0.1418,
+    "p10": 0.0286,
+    "p90": 0.4348,
+    "inTarget": 1
+  },
+  "chords.top-steps": {
+    "mean": 0.8057,
+    "p10": 0.3913,
+    "p90": 0.9733,
+    "inTarget": 1
+  },
+  "chords.top-small-leaps": {
+    "mean": 0.0525,
+    "p10": 0,
+    "p90": 0.2264,
+    "inTarget": 1
+  },
+  "chords.top-leaps": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "chords.top-movement": {
+    "mean": 1.1809,
+    "p10": 1,
+    "p90": 1.7692,
+    "inTarget": 1
+  },
+  "chords.floor-clearance": {
+    "mean": 8.375,
+    "p10": 4,
     "p90": 10,
+    "inTarget": 1
+  },
+  "chords.crowds-the-bass": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "chords.closest-to-bass": {
+    "mean": 11.945,
+    "p10": 6,
+    "p90": 21,
+    "inTarget": 1
+  },
+  "chords.lowest-note": {
+    "mean": 64.1112,
+    "p10": 58.8511,
+    "p90": 67.1455,
+    "inTarget": 1
+  },
+  "chords.colour": {
+    "mean": 0.9841,
+    "p10": 0.8741,
+    "p90": 1,
+    "inTarget": 1
+  },
+  "chords.voicing-faults": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "chords.width-jumps": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "band.backbeat-swell": {
+    "mean": 8.6886,
+    "p10": 8.55,
+    "p90": 8.8,
     "inTarget": null
+  },
+  "band.backbeat-level": {
+    "mean": 92.3946,
+    "p10": 68.2241,
+    "p90": 106.025,
+    "inTarget": 1
+  },
+  "band.notes-near-the-top": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
   }
 }

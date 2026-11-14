@@ -22,8 +22,9 @@ export interface Measure {
   /**
    * - `share`: a fraction of cases, 0 to 1
    * - `semitones`, `per bar`, `per beat`, `velocity`: a mean in those units
+   * - `pitch`: a mean MIDI note number
    */
-  readonly unit: "share" | "semitones" | "per bar" | "per beat" | "velocity";
+  readonly unit: "share" | "semitones" | "per bar" | "per beat" | "velocity" | "pitch";
   /**
    * The value for one take and how many cases it was measured over. A rate
    * measured on nothing passes any ceiling, so the count travels with the value.
