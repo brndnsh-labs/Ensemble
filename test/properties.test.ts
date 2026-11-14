@@ -1252,7 +1252,7 @@ test("blues: the piano comps on beats and their offbeats only, and a quiet band'
   );
 });
 
-test("a section keeps its figure: every phrase opens on the same rhythm each time the section comes round at the same level", () => {
+test("a section keeps its figure: away from a solo, every phrase opens on the same rhythm each time the section comes round at the same level", () => {
   let compared = 0;
   for (const { chart, options, take } of takes((jam) => jam.chart.meter === "4/4")) {
     const byBar = strikesByBar(take);
@@ -1260,6 +1260,9 @@ test("a section keeps its figure: every phrase opens on the same rhythm each tim
     for (const bar of take.plan.bars) {
       if (bar.kind !== "music" || bar.ending || bar.seats.chords === null) continue;
       if (bar.phrase.bar !== 0) continue;
+      // Where the soloist has the lead the hand lays out under the line and answers its
+      // breaths: the figure is still the section's, with strikes left out and put in.
+      if (bar.solo !== null) continue;
       // A bar with one chord: where a chord changes inside the bar, the hand owes it a strike.
       if (bar.spans.filter((span) => !span.tied).length !== 1 || bar.spans[0]!.chord === null)
         continue;
