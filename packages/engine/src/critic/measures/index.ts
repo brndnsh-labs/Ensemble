@@ -1,0 +1,7 @@
+import type { Measure } from "../types.ts";
+import { bandMeasures } from "./band.ts";
+import { bassMeasures } from "./bass.ts";
+import { drumMeasures } from "./drums.ts";
+
+/** Every measure the scorecard reports, in the order it reports them. */
+export const MEASURES: readonly Measure[] = [...drumMeasures, ...bassMeasures, ...bandMeasures];

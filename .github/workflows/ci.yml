@@ -22,5 +22,6 @@ jobs:
       - run: pnpm lint
       # Corpus, properties, goldens: 10 seconds, enforced by scripts/budget.ts.
       - run: pnpm test
-      # The scorecard job (2 minutes, report only except for tolerance failures) joins at stage 2.
+      # The scorecard: 2 minutes. It reports movement and fails only on a drop past the tolerance.
+      - run: pnpm score
       # Browser smoke journeys (60 seconds, on merge to main only) join at stage 6.

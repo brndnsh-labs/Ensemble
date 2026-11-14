@@ -1,0 +1,74 @@
+{
+  "drums.kick-on-one": {
+    "mean": 1,
+    "p10": 1,
+    "p90": 1,
+    "inTarget": 1
+  },
+  "drums.backbeat": {
+    "mean": 1,
+    "p10": 1,
+    "p90": 1,
+    "inTarget": 1
+  },
+  "drums.same-groove": {
+    "mean": 1,
+    "p10": 1,
+    "p90": 1,
+    "inTarget": 1
+  },
+  "drums.triplet-fills": {
+    "mean": 0.3951,
+    "p10": 0.25,
+    "p90": 0.5,
+    "inTarget": 0.8909
+  },
+  "drums.fills-that-repeat": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "bass.changes-stated": {
+    "mean": 1,
+    "p10": 1,
+    "p90": 1,
+    "inTarget": 1
+  },
+  "bass.half-step-approaches": {
+    "mean": 0.2694,
+    "p10": 0.1053,
+    "p90": 0.4,
+    "inTarget": 0.755
+  },
+  "bass.lead-ins-that-leap": {
+    "mean": 0,
+    "p10": 0,
+    "p90": 0,
+    "inTarget": 1
+  },
+  "bass.sixths-on-dominants": {
+    "mean": 0.2004,
+    "p10": 0.1,
+    "p90": 0.2688,
+    "inTarget": 0.7763
+  },
+  "bass.notes-per-beat-when-quiet": {
+    "mean": 0.5639,
+    "p10": 0.5214,
+    "p90": 0.6214,
+    "inTarget": 1
+  },
+  "bass.semitones-per-move": {
+    "mean": 3.7103,
+    "p10": 3.2286,
+    "p90": 4.7,
+    "inTarget": null
+  },
+  "band.backbeat-swell": {
+    "mean": 10.2181,
+    "p10": 10.1,
+    "p90": 10.35,
+    "inTarget": null
+  }
+}

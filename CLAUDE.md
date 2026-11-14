@@ -29,7 +29,21 @@ pnpm check              # typecheck, lint, tests (10-second budget)
 pnpm typecheck          # tsc --build across packages
 pnpm lint               # biome check; `pnpm format` to fix
 pnpm test               # engine suite under the budget
+pnpm score              # the critic's scorecard against the accepted baseline (2-minute budget)
+pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)
+pnpm gate:1             # write the gate 1 audition files to out/gate-1/
 pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
 ```
 
-`render` and `score` do not exist yet; add them here when they do.
+The CLI:
+
+```sh
+pnpm -s ensemble parse  library/blues-12-bar-a.chart
+pnpm -s ensemble fmt    library/blues-12-bar-a.chart [--write]
+pnpm -s ensemble render library/blues-12-bar-a.chart --out take.mid \
+    [--style blues] [--seed 1] [--minutes 3 | --passes 4] [--song] \
+    [--tempo 96] [--energy 0.3] [--key Bb] [--without bass] [--no-count-in]
+pnpm -s ensemble score  [chart...] [--style blues] [--seeds 200] [--update | --check]
+```
+
+A take is its chart, style, options, and seed: the same four always give the same MIDI file. `score --update` accepts the current scorecard as the baseline in `scorecard/<style>.json`.

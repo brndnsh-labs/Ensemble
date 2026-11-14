@@ -3,6 +3,7 @@
 
 import { DEFAULT_ARC, type StylePack } from "@ensemble/engine";
 import { bluesBass } from "./bass.ts";
+import { bluesCritic } from "./critic.ts";
 import { bluesDrums } from "./drums.ts";
 
 export const blues: StylePack = {
@@ -24,6 +25,7 @@ export const blues: StylePack = {
     setupFill: true,
     tailBars: 1,
   },
+  critic: bluesCritic,
   drums: bluesDrums,
   bass: bluesBass,
   // Acoustic bass, acoustic grand piano, clean electric guitar.

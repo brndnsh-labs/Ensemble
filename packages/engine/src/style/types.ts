@@ -1,6 +1,7 @@
 // A style pack: how a band plays a genre, as plain data. No functions live
 // here, so a pack could be JSON. Adding or tuning a style changes data only.
 
+import type { CriticStyle } from "../critic/types.ts";
 import type { BassStyle } from "../players/bass/style.ts";
 import type { DrumStyle } from "../players/drums/style.ts";
 import type { BaseQuality } from "../theory/chord.ts";
@@ -129,6 +130,8 @@ export interface StylePack {
   readonly ending: EndingStyle;
   readonly drums: DrumStyle;
   readonly bass: BassStyle;
+  /** What the critic expects of this style, and what its players' choices cost. */
+  readonly critic: CriticStyle;
   /** General MIDI program numbers (0 to 127) for export. Drums need none. */
   readonly instruments: Readonly<Record<PitchedSeat, number>>;
 }
