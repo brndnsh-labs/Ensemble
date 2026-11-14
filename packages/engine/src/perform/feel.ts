@@ -67,12 +67,15 @@ export function applyFeel(
     const velocityShift = (touch.next() * 2 - 1) * HUMAN_VELOCITY * human;
 
     const energy = bar.seats[note.seat] ?? bar.energy;
+    const offset = Math.round(start - tickInBar + lean + placement + (note.nudge ?? 0));
+    // Nothing rings past the end of a performance that ends, however the pocket moved the note.
+    const room = plan.open ? Number.POSITIVE_INFINITY : plan.ticks - (note.tick + offset);
     const event: NoteEvent = {
       kind: "note",
       seat: note.seat,
       tick: note.tick,
-      offset: Math.round(start - tickInBar + lean + placement + (note.nudge ?? 0)),
-      duration: Math.max(1, Math.round(end - start)),
+      offset,
+      duration: Math.max(1, Math.min(Math.round(end - start), room)),
       pitch: note.pitch,
       velocity: clampVelocity(note.velocity * energyGain(energy) + velocityShift),
     };

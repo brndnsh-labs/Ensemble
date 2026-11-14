@@ -1,0 +1,383 @@
+// Musical properties: rules a musician would care about, checked across
+// charts, seeds, and styles. See docs/TESTING.md, kind 2. Each test names its
+// rule; none of them knows how the engine is built.
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import type { PlanBar, Take } from "@ensemble/engine";
+import { PPQ, pitchClass, render, toMidi, validateStyle } from "@ensemble/engine";
+import { corpus } from "./corpus.ts";
+import { type Jam, LIBRARY, notesOf, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
+
+/** Ticks of slack for where a note sounds: the largest lean plus human placement. */
+const POCKET = 40;
+
+test("every style that ships is sound data", () => {
+  for (const style of STYLES) assert.deepEqual(validateStyle(style), [], style.id);
+});
+
+test("the same chart, style, options, and seed give the identical performance, down to the MIDI bytes", () => {
+  for (const { style, chart, options, take } of takes()) {
+    const again = render(chart.text, style, options);
+    assert.deepEqual(again.events, take.events, `${chart.file} seed ${options.seed}`);
+    assert.deepEqual(
+      toMidi(again.plan, again.events, style),
+      toMidi(take.plan, take.events, style),
+    );
+  }
+});
+
+test("a different seed is a different take", () => {
+  for (const style of STYLES) {
+    for (const chart of LIBRARY) {
+      const performances = SEEDS.map((seed) =>
+        JSON.stringify(render(chart.text, style, { mode: "jam", passes: 3, seed }).events),
+      );
+      assert.equal(new Set(performances).size, SEEDS.length, chart.file);
+    }
+  }
+});
+
+test("a timed jam is a whole number of passes, the number that lands closest to the time asked for, and at least one", () => {
+  for (const style of STYLES) {
+    for (const chart of LIBRARY) {
+      for (const minutes of [0.2, 1, 3, 7]) {
+        const lengthWith = (passes: number) =>
+          musicSeconds(render(chart.text, style, { mode: "jam", passes, seed: 1 }));
+        const take = render(chart.text, style, { mode: "jam", minutes, seed: 1 });
+        const passes = take.plan.passes;
+        assert.ok(Number.isInteger(passes) && passes >= 1, `${chart.file}: ${passes} passes`);
+        const miss = (n: number) => Math.abs(lengthWith(n) - minutes * 60);
+        assert.ok(
+          miss(passes) <= miss(passes + 1) + 1e-6,
+          `${chart.file} ${minutes} min: one more`,
+        );
+        if (passes > 1) {
+          assert.ok(
+            miss(passes) <= miss(passes - 1) + 1e-6,
+            `${chart.file} ${minutes} min: one fewer`,
+          );
+        }
+        // Never cut mid-form: every pass is the whole body.
+        const body = take.plan.bars.filter(
+          (bar) => bar.kind === "music" && bar.section.role === "body",
+        );
+        const perPass = body.filter((bar) => bar.pass === 0).length;
+        assert.equal(body.length, perPass * passes, `${chart.file}: whole passes`);
+      }
+    }
+  }
+});
+
+test("a jam that ends lands on the tonic: the last chord is rooted on the key, and the bass's last note is that root", () => {
+  for (const { chart, options, take } of takes((jam) => !jam.options.open)) {
+    const last = take.plan.bars.findLast((bar) => bar.kind === "music")!;
+    assert.ok(last.ending, `${chart.file}: the last bar is an ending`);
+    const final = last.spans.findLast((span) => span.chord !== null)?.chord;
+    assert.ok(final, `${chart.file}: the ending has a chord`);
+    assert.equal(pitchClass(final.root), pitchClass(last.key.tonic), `${chart.file}: ends at home`);
+    assert.equal(final.bass, null, `${chart.file}: the tonic is in the bass`);
+    const bass = notesOf(take, "bass").at(-1);
+    if (bass) {
+      assert.equal(
+        bass.pitch % 12,
+        pitchClass(last.key.tonic),
+        `${chart.file} seed ${options.seed}`,
+      );
+    }
+  }
+});
+
+test("every note starts inside the performance and nothing rings past its end", () => {
+  for (const { chart, options, take } of takes()) {
+    for (const note of notesOf(take)) {
+      const sounds = note.tick + note.offset;
+      assert.ok(
+        note.tick >= 0 && note.tick < take.plan.ticks,
+        `${chart.file}: a note outside the plan`,
+      );
+      assert.ok(sounds >= -POCKET, `${chart.file}: a note before the start`);
+      assert.ok(note.duration >= 1, `${chart.file}: a note with no length`);
+      if (!options.open) {
+        assert.ok(sounds + note.duration <= take.plan.ticks, `${chart.file}: rings past the end`);
+      }
+    }
+  }
+});
+
+test("making an open jam one pass longer changes nothing that was already played", () => {
+  for (const style of STYLES) {
+    for (const chart of LIBRARY) {
+      for (const seed of SEEDS) {
+        for (const passes of [1, 2, 4]) {
+          const jam = (n: number) =>
+            render(chart.text, style, { mode: "jam", open: true, passes: n, seed });
+          const shorter = jam(passes);
+          const longer = jam(passes + 1);
+          const before = (take: Take) =>
+            take.events.filter((event) => event.tick < shorter.plan.ticks);
+          assert.deepEqual(
+            before(longer),
+            shorter.events,
+            `${chart.file} seed ${seed} at ${passes}`,
+          );
+        }
+      }
+    }
+  }
+});
+
+test("a take with a count-in is the same music as one without, a bar later", () => {
+  for (const style of STYLES) {
+    for (const chart of LIBRARY) {
+      const jam = (countIn: boolean) =>
+        render(chart.text, style, { mode: "jam", passes: 2, seed: 5, countIn });
+      const counted = jam(true);
+      const bare = jam(false);
+      const shift = counted.plan.bars[0]!.ticks;
+      const music = notesOf(counted)
+        .filter((note) => note.tick >= shift)
+        .map((note) => ({ ...note, tick: note.tick - shift }));
+      assert.deepEqual(music, notesOf(bare), chart.file);
+      const sticks = notesOf(counted).filter((note) => note.tick < shift);
+      assert.ok(
+        sticks.length > 0 && sticks.every((note) => note.seat === "drums"),
+        "the count is sticks alone",
+      );
+    }
+  }
+});
+
+test("a chart with mistakes in it still plays", () => {
+  for (const style of STYLES) {
+    const broken = [
+      ...corpus.map((row) => row.text),
+      "",
+      "\n\n",
+      "| | |",
+      "|: C | G",
+      "key: H\n| Zzz | % | . |",
+      "[A]\n[B]\n[A]",
+      "title: only a header",
+      "| C | G |\n--- arrangement\nnonsense",
+      "\u0000\u{1F3B8} | C",
+    ];
+    for (const text of broken) {
+      const take = render(text, style, { mode: "jam", passes: 2, seed: 1 });
+      const hasChords = take.plan.bars.some((bar) => bar.spans.some((span) => span.chord !== null));
+      if (hasChords) {
+        assert.ok(notesOf(take, "bass").length > 0, `the bass plays: ${JSON.stringify(text)}`);
+        assert.ok(notesOf(take, "drums").length > 0, `the drums play: ${JSON.stringify(text)}`);
+      }
+      readSmf(toMidi(take.plan, take.events, style));
+    }
+  }
+});
+
+test("every take is a valid MIDI file: one track per playing seat after the tempo track, drums on channel 10", () => {
+  for (const { style, chart, take } of takes()) {
+    const file = readSmf(toMidi(take.plan, take.events, style));
+    assert.equal(file.format, 1, chart.file);
+    assert.equal(file.ppq, PPQ);
+    const names = file.tracks.map((track) => track.name);
+    assert.deepEqual(names.slice(0, 3), ["Ensemble", "Drums", "Bass"], chart.file);
+    assert.equal(file.tracks[0]!.tempos.length, 1, "one tempo: the band is metronomic");
+    assert.equal(file.tracks[0]!.tempos[0], take.plan.tempo);
+    const drums = file.tracks[1]!;
+    assert.ok(drums.channels.size === 1 && drums.channels.has(9), "drums on channel 10");
+    for (const track of file.tracks.slice(1)) {
+      assert.equal(track.noteOns, track.noteOffs, `${track.name}: every note ends`);
+      assert.ok(track.noteOns > 0);
+    }
+  }
+});
+
+test("a seat that is left out plays nothing, and the band still counts in", () => {
+  for (const style of STYLES) {
+    const chart = LIBRARY[0]!;
+    const take = render(chart.text, style, {
+      mode: "jam",
+      passes: 2,
+      seed: 2,
+      without: ["drums"],
+    });
+    const drums = notesOf(take, "drums");
+    const countIn = take.plan.bars[0]!;
+    assert.ok(drums.length > 0, "the count-in is there");
+    assert.ok(
+      drums.every((note) => note.tick < countIn.ticks),
+      "and nothing after it",
+    );
+    assert.ok(notesOf(take, "bass").length > 0);
+  }
+});
+
+test("under a rest nobody pitched plays", () => {
+  const text = "key: A\n| A7 | D7 | A7 . NC . | NC | E7 | D7 | A7 | E7 |";
+  for (const style of STYLES) {
+    for (const seed of SEEDS) {
+      const take = render(text, style, { mode: "jam", passes: 3, seed });
+      for (const bar of take.plan.bars) {
+        for (const span of bar.spans) {
+          if (span.chord !== null || bar.kind !== "music") continue;
+          const from = bar.start + span.start;
+          const struck = notesOf(take).filter(
+            (note) =>
+              note.seat !== "drums" && note.tick >= from && note.tick < from + span.duration,
+          );
+          assert.equal(
+            struck.length,
+            0,
+            `seed ${seed}: a pitched note under N.C. in bar ${bar.index}`,
+          );
+        }
+      }
+    }
+  }
+});
+
+test("the bass stays on the instrument: nothing below the open E, nothing above A3, and one note at a time", () => {
+  for (const { chart, options, take } of takes()) {
+    const bass = notesOf(take, "bass");
+    for (const note of bass) {
+      assert.ok(
+        note.pitch >= 28 && note.pitch <= 57,
+        `${chart.file} seed ${options.seed}: ${note.pitch}`,
+      );
+    }
+    for (let i = 1; i < bass.length; i++) {
+      const previous = bass[i - 1]!;
+      const overlap =
+        previous.tick + previous.offset + previous.duration - (bass[i]!.tick + bass[i]!.offset);
+      assert.ok(overlap <= POCKET, `${chart.file} seed ${options.seed}: two bass notes at once`);
+    }
+  }
+});
+
+test("where a chord is written the bass plays a tone of that chord, and at a change of chord it is the chord's bass note", () => {
+  for (const { chart, options, take } of takes()) {
+    const bass = notesOf(take, "bass");
+    let previous = "";
+    for (const bar of take.plan.bars) {
+      if (bar.kind !== "music") continue;
+      for (const span of bar.spans) {
+        const chord = span.chord;
+        if (!chord || span.tied) {
+          if (!span.tied) previous = "";
+          continue;
+        }
+        const at = bar.start + span.start;
+        const struck = bass.find((note) => note.tick === at);
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        assert.ok(struck, `${where}: no bass note on the arrival`);
+        const name = `${pitchClass(chord.root)}:${chord.quality.base}:${chord.bass ? pitchClass(chord.bass) : ""}`;
+        const root = pitchClass(chord.bass ?? chord.root);
+        if (name !== previous || bar.ending) {
+          assert.equal(struck.pitch % 12, root, `${where}: the change is not stated`);
+        }
+        previous = name;
+      }
+    }
+  }
+});
+
+test("a timed jam has a shape: it does not start at its peak, and it ends above where it started", () => {
+  for (const style of STYLES) {
+    for (const passes of [3, 4, 6, 9, 14]) {
+      const take = render(LIBRARY[0]!.text, style, { mode: "jam", passes, seed: 1 });
+      const body = take.plan.bars.filter(
+        (bar) => bar.kind === "music" && bar.section.role === "body",
+      );
+      const mean = (bars: readonly PlanBar[]) =>
+        bars.reduce((sum, bar) => sum + bar.energy, 0) / bars.length;
+      const byPass = Array.from({ length: passes }, (_, pass) =>
+        mean(body.filter((bar) => bar.pass === pass)),
+      );
+      const peak = byPass.indexOf(Math.max(...byPass));
+      assert.ok(peak > 0, `${passes} passes: peaks on pass ${peak + 1}`);
+      assert.ok(
+        body.at(-1)!.energy > byPass[0]!,
+        `${passes} passes: the last bar is above the first pass`,
+      );
+      // With room for it, there is a breath between the peak and the last pass.
+      const between = byPass.slice(peak + 1, -1);
+      if (passes >= 4) {
+        assert.ok(
+          between.some((energy) => energy < byPass[peak]!),
+          `${passes} passes: no breath after the peak`,
+        );
+      }
+    }
+  }
+});
+
+// ── blues ───────────────────────────────────────────────────────────────────
+
+const blues = (jam: Jam) => jam.style.id === "blues" && jam.chart.meter === "4/4";
+
+test("blues: the offbeat eighth is the last note of a triplet, for everyone", () => {
+  for (const { chart, take } of takes(blues)) {
+    for (const note of notesOf(take)) {
+      const inBeat = note.tick % PPQ;
+      if (inBeat !== PPQ / 2) continue;
+      // Written on the "and", it sounds two thirds of the way through the beat.
+      const lands = inBeat + note.offset;
+      assert.ok(Math.abs(lands - (PPQ * 2) / 3) <= POCKET, `${chart.file}: an "and" at ${lands}`);
+    }
+  }
+});
+
+test("blues: the time is kick on 1 and 3 and a backbeat on 2 and 4, in every bar the drummer plays time", () => {
+  for (const { chart, options, take } of takes(blues)) {
+    const drums = notesOf(take, "drums");
+    for (const bar of take.plan.bars) {
+      if (bar.kind !== "music" || bar.ending) continue;
+      const at = (beat: number, ...voices: string[]) =>
+        drums.some(
+          (note) => note.tick === bar.start + beat * PPQ && voices.includes(note.voice ?? ""),
+        );
+      const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+      assert.ok(at(0, "kick"), `${where}: no kick on 1`);
+      assert.ok(at(2, "kick"), `${where}: no kick on 3`);
+      assert.ok(at(1, "snare", "crossStick"), `${where}: no backbeat on 2`);
+      // A long fill takes the hands off the backbeat on 4; a short one never does.
+      if (!bar.fill) assert.ok(at(3, "snare", "crossStick"), `${where}: no backbeat on 4`);
+    }
+  }
+});
+
+test("blues: nothing is ever played on the last sixteenth of a beat, which would flam against the triplet", () => {
+  for (const { chart, take } of takes(blues)) {
+    for (const note of notesOf(take)) {
+      assert.notEqual(note.tick % PPQ, (PPQ * 3) / 4, `${chart.file}: ${note.seat} on an "a"`);
+    }
+  }
+});
+
+test("an arrival is one crash with a kick under it, and the cymbal that keeps time gives way to it", () => {
+  for (const { chart, options, take } of takes()) {
+    const drums = notesOf(take, "drums");
+    for (const bar of take.plan.bars) {
+      if (bar.kind !== "music" || bar.ending) continue;
+      const onOne = drums.filter((note) => note.tick === bar.start);
+      const voices = onOne.map((note) => note.voice);
+      const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+      const crashes = voices.filter((voice) => voice === "crash").length;
+      assert.equal(crashes, bar.crash ? 1 : 0, `${where}: crashes on 1`);
+      if (bar.crash) {
+        assert.ok(voices.includes("kick"), `${where}: a crash with no kick`);
+        assert.ok(
+          !voices.includes("closedHat") && !voices.includes("ride"),
+          `${where}: two cymbals in one hand`,
+        );
+      }
+    }
+  }
+});
+
+function musicSeconds(take: Take): number {
+  const ticks = take.plan.bars
+    .filter((bar) => bar.kind === "music")
+    .reduce((sum, bar) => sum + bar.ticks, 0);
+  return (ticks / PPQ) * (60 / take.plan.tempo);
+}
