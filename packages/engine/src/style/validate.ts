@@ -1,6 +1,7 @@
 // Checks a style pack for mistakes the type system cannot see. The compiler
 // guarantees the shape; this guarantees the data means something.
 
+import { validateBassStyle } from "../players/bass/validate.ts";
 import { validateDrumStyle } from "../players/drums/validate.ts";
 import { BASE_QUALITIES } from "../theory/chord.ts";
 import type { StylePack } from "./types.ts";
@@ -50,5 +51,6 @@ export function validateStyle(style: StylePack): string[] {
   }
 
   problems.push(...validateDrumStyle(style.drums).map((problem) => `drums: ${problem}`));
+  problems.push(...validateBassStyle(style.bass).map((problem) => `bass: ${problem}`));
   return problems;
 }

@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
-import { PPQ, pitchClass, render, toMidi, validateStyle } from "@ensemble/engine";
+import { chordTones, PPQ, pitchClass, render, toMidi, validateStyle } from "@ensemble/engine";
 import { corpus } from "./corpus.ts";
 import { type Jam, LIBRARY, notesOf, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
 
@@ -372,6 +372,97 @@ test("an arrival is one crash with a kick under it, and the cymbal that keeps ti
         );
       }
     }
+  }
+});
+
+// ── the bass line ───────────────────────────────────────────────────────────
+
+/** Every place the bass note of the harmony changes: where, and to which pitch class. */
+function bassChanges(take: Take): { tick: number; root: number }[] {
+  const changes: { tick: number; root: number }[] = [];
+  let sounding = -1;
+  for (const bar of take.plan.bars) {
+    if (bar.kind !== "music") continue;
+    for (const span of bar.spans) {
+      if (span.tied) continue;
+      const root = span.chord ? pitchClass(span.chord.bass ?? span.chord.root) : -1;
+      if (root >= 0 && sounding >= 0 && root !== sounding) {
+        changes.push({ tick: bar.start + span.start, root });
+      }
+      sounding = root;
+    }
+  }
+  return changes;
+}
+
+test("a lead-in resolves by step in actual pitch: a note a step from the next root by name is a step from the note the bass plays next", () => {
+  let leadIns = 0;
+  for (const { chart, options, take } of takes()) {
+    const bass = notesOf(take, "bass");
+    const arrivalTicks = new Set(bassChanges(take).map((change) => change.tick));
+    for (const change of bassChanges(take)) {
+      const landing = bass.find((note) => note.tick === change.tick);
+      const before = bass.findLast((note) => note.tick < change.tick);
+      if (!landing || !before || change.tick - before.tick > PPQ) continue;
+      const where = `${chart.file} seed ${options.seed} at tick ${change.tick}`;
+      // The arrival is never sounded a beat early.
+      if (!arrivalTicks.has(before.tick)) {
+        assert.notEqual(before.pitch % 12, change.root, `${where}: the new root, a beat early`);
+      }
+      const byName = Math.min(
+        (before.pitch - change.root + 120) % 12,
+        (change.root - before.pitch + 120) % 12,
+      );
+      if (byName === 1 || byName === 2) {
+        leadIns++;
+        const leap = Math.abs(before.pitch - landing.pitch);
+        assert.ok(leap <= 2, `${where}: a leading tone ${leap} semitones from where it leads`);
+      }
+    }
+  }
+  // A ceiling on bad lead-ins passes trivially when there are none: make sure there are some.
+  assert.ok(leadIns > 500, `only ${leadIns} stepwise lead-ins across the library`);
+});
+
+test("the bass line never leaps more than an octave", () => {
+  for (const { chart, options, take } of takes((jam) => jam.chart.meter === "4/4")) {
+    const bass = notesOf(take, "bass");
+    for (let i = 1; i < bass.length; i++) {
+      const leap = Math.abs(bass[i]!.pitch - bass[i - 1]!.pitch);
+      assert.ok(leap <= 12, `${chart.file} seed ${options.seed}: a leap of ${leap} semitones`);
+    }
+  }
+});
+
+test("a bass note held for a half note or more is a tone of its chord", () => {
+  for (const { chart, options, take } of takes()) {
+    for (const note of notesOf(take, "bass")) {
+      if (note.duration < PPQ * 2 - POCKET) continue;
+      const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+      const span = bar.spans.findLast((candidate) => bar.start + candidate.start <= note.tick);
+      const chord = span?.chord;
+      if (!chord) continue;
+      const tones = chordTones(chord.quality).map(
+        (tone) => (pitchClass(chord.root) + tone.interval) % 12,
+      );
+      if (chord.bass) tones.push(pitchClass(chord.bass));
+      assert.ok(
+        tones.includes(note.pitch % 12),
+        `${chart.file} seed ${options.seed}: a long passing tone in bar ${bar.index}`,
+      );
+    }
+  }
+});
+
+test("the last bass note of a jam that ends is the lowest root on the instrument", () => {
+  for (const { chart, options, take } of takes(
+    (jam) => !jam.options.open && jam.chart.meter === "4/4",
+  )) {
+    const last = notesOf(take, "bass").at(-1)!;
+    assert.ok(
+      last.pitch >= 28 && last.pitch < 40,
+      `${chart.file} seed ${options.seed}: ends on ${last.pitch}`,
+    );
   }
 });
 

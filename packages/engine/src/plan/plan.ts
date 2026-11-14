@@ -421,7 +421,12 @@ function resolveEnding(last: FlatBar, expanded: ExpandedChart, style: StylePack)
   }
   // The gesture starts where the final chord begins. A bar that is all rest has no final chord:
   // the chart wrote its own silence, and the band keeps it.
-  const finalSpan = spans.findLast((span) => span.chord !== null) ?? spans[0]!;
+  const lastChorded = spans.findLastIndex((span) => span.chord !== null);
+  // Home written twice in the bar (or held with a dot) has sounded since its first span:
+  // the band's hit is where the final chord first lands.
+  let landing = Math.max(0, lastChorded);
+  while (landing > 0 && sameHarmony(spans[landing - 1]!, spans[landing]!)) landing--;
+  const finalSpan = spans[landing]!;
   const gesture = style.ending.gesture;
   const rings = gesture.kind !== "stop" && rest.length === 0 && finalSpan.chord !== null;
   const tailBars = rings ? Math.max(0, Math.floor(style.ending.tailBars)) : 0;
@@ -437,6 +442,11 @@ function resolveEnding(last: FlatBar, expanded: ExpandedChart, style: StylePack)
         : Math.min(gesture.kind === "stop" ? PPQ / 2 : barTicks, restStart - finalSpan.start),
     }),
   };
+}
+
+function sameHarmony(a: ChordSpan, b: ChordSpan): boolean {
+  if (b.tied) return true;
+  return a.chord !== null && b.chord !== null && chordToString(a.chord) === chordToString(b.chord);
 }
 
 /** Home: rooted on the tonic, with the tonic in the bass, in a family that can rest. */

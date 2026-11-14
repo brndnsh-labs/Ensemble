@@ -2,7 +2,8 @@
 // choice made (which kick, which cymbal), fitted to the bar's meter.
 
 import type { Meter } from "../../chart/types.ts";
-import { cells, LEVELS } from "../../perform/grid.ts";
+import { cells, LEVELS, STEP } from "../../perform/grid.ts";
+import { pulseTicks } from "../../perform/meter.ts";
 import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
@@ -44,19 +45,9 @@ export function overlay(part: BarPart, lines: Lines, from: number, steps: number
   }
 }
 
-/**
- * A bar's pulses, each a length in sixteenths. Quarter notes wherever the
- * meter counts them; in eighth-note meters dotted quarters when the eighths
- * group in threes (6/8, 12/8), otherwise quarters with the odd eighth joining
- * the last one (7/8 is 2+2+3).
- */
+/** A bar's pulses, each a length in sixteenths. */
 export function pulses(meter: Meter): number[] {
-  if (meter.unit !== 8) return new Array<number>((meter.beats * 4) / meter.unit).fill(BEAT);
-  if (meter.beats % 3 === 0) return new Array<number>(meter.beats / 3).fill(6);
-  if (meter.beats < 2) return [2];
-  const result = new Array<number>(Math.floor(meter.beats / 2)).fill(BEAT);
-  if (meter.beats % 2 === 1) result[result.length - 1]! += 2;
-  return result;
+  return pulseTicks(meter).map((ticks) => ticks / STEP);
 }
 
 /** The bar of time the drummer plays under this bar, before any fill or crash. */
