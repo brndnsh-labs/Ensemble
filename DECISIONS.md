@@ -82,3 +82,7 @@ A second agent reviewed the parser against the spec and found the corpus had gap
 - The alternate spellings for sevenths and ninths apply to elevenths and thirteenths.
 - With no `key:`, a first chord with a minor third makes the fallback key minor.
 - A hold at the top of a looped form is struck when the bar played before it ends on another chord. The planner does this, since only it knows played order.
+
+## 2026-11-14: goldens
+
+- First golden takes written: a two-minute blues jam (the whole arc and the ending) and a song-mode take with an intro, mid-bar changes, and a written ending.
