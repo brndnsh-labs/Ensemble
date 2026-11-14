@@ -6,7 +6,8 @@ A browser-based generative backing band. Read these before doing anything:
 2. `docs/CHART_FORMAT.md` (the song text format; a spec)
 3. `docs/TESTING.md` (what may be tested; binding)
 4. `docs/MILESTONES.md` (stages and gates)
-5. `docs/MUSIC_NOTES.md` (musical knowledge carried over from the previous version, if present)
+5. `docs/MUSIC_NOTES.md` (musical knowledge carried over from the previous version: an index, plus four parts under `docs/music-notes/` to read when the work touches them)
+6. `PLAN.md` (the map, and "Resume here" for current state) and `DECISIONS.md`
 
 ## Standing rules
 
@@ -22,4 +23,13 @@ A browser-based generative backing band. Read these before doing anything:
 
 ## Commands
 
-Fill this section in as the repo takes shape (install, test, render, score).
+```sh
+pnpm install            # once
+pnpm check              # typecheck, lint, tests (10-second budget)
+pnpm typecheck          # tsc --build across packages
+pnpm lint               # biome check; `pnpm format` to fix
+pnpm test               # engine suite under the budget
+pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
+```
+
+`render` and `score` do not exist yet; add them here when they do.

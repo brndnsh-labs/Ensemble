@@ -81,6 +81,31 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 14. Comping regenerated around the soloist; featured-seat control so the soloist lays out and returns.
 15. Takes saved and replayed by seed from the CLI; gate 3 files.
 
+## Resume here
+
+State at the pause on 2026-11-14 (session quota). Everything below is committed unless it says otherwise.
+
+**Done**
+
+- Workspace scaffold, lint boundaries, test budget script.
+- Theory: pitch, chord, chord scales. Seeded generator. MIDI file writer and performance export.
+- Style pack types, plan types, planner (`plan/plan.ts`, `plan/arc.ts`), the shared dynamics and feel pass, the harmony timeline, the `perform` orchestrator.
+- Blues pack shell (`packages/styles/src/blues/index.ts`): feel, arc, ending, instruments.
+- Eight blues charts in `library/`. They have not been through a parser yet.
+- Music notes: four parts under `docs/music-notes/`, index at `docs/MUSIC_NOTES.md`.
+
+**Not done, in the order to pick up**
+
+1. **Chart parser, printer, expander, corpus.** Delegated once and paused; see `prompts/chart-parser.md` and whatever that agent left in `packages/engine/src/chart/`. Until this exists nothing can be rendered from text.
+2. **Drum seat** (`players/drums/`, `packages/styles/src/blues/drums.ts`): placeholders. Brief ready at `prompts/seat-drums.md`.
+3. **Bass seat** (`players/bass/`, `packages/styles/src/blues/bass.ts`): placeholders. Write a sibling brief: the same house rules, reading part A "Bass" (shared craft, the blues boogie box, known weaknesses, failures) and part C blues bass. Design notes already settled: a bass line is a tone sequence (root, 3, 5, 6, b7, octave, fitted to the chord by conditions on its family and scale) laid over a rhythm figure chosen per section; a register policy per style (blues: nearest the previous note, pulled 30% toward a per-section anchor between C2 and E2, roots at or under A2); lead-ins that aim at the exact pitch the next arrival will play; the ending's low root. Use `perform/harmony.ts` for arrivals and `theory/scale.ts` for chord scales.
+4. `render(text, style, options)` in the engine; `validateStyle`; CLI `render`.
+5. Move the suite to a top-level `test/` package (see `DECISIONS.md`); properties for determinism, timed jams, plan extension, ranges, "a chart with errors still plays"; goldens.
+6. Dormant CI workflow; fill in the Commands section of `CLAUDE.md` for `render`.
+7. Gate 1 audition files and `out/gate-1/GATE_REPORT.md`. Then stages 2 and 3.
+
+**Unverified so far.** The planner, arc, feel pass, and MIDI export typecheck and lint clean but have not run against a real chart, because the parser does not exist yet. Expect to find bugs there first.
+
 ## Open questions from the brief, resolved
 
 See `DECISIONS.md` for the reasoning.
