@@ -10,7 +10,6 @@ import { contextOf } from "../../perform/harmony.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 import { chordFamily } from "../../theory/chord.ts";
 import { pitchClass } from "../../theory/pitch.ts";
-import type { ChordScale } from "../../theory/scale.ts";
 import { chordScale } from "../../theory/scale.ts";
 import type { InstrumentIdiom } from "./idiom.ts";
 import type { Strike, VoicedStrike, Voicing } from "./strike.ts";
@@ -89,6 +88,15 @@ export const VOICING_FEATURES: readonly Feature<VoicingCandidate>[] = [
     of: ({ voicing, register }) => Math.abs(top(voicing) - register.target),
   },
   {
+    id: "top-out-of-reach",
+    says: "How far the top voice has crept past the style's reach from its target, in semitones.",
+    // Voice leading is greedy: each smooth step is cheap, and a hand led a step at a time can
+    // climb an octave over a few choruses and never come back (CH-77). This is the pull that
+    // turns it round.
+    of: ({ voicing, register }) =>
+      Math.max(0, Math.abs(top(voicing) - register.target) - register.reach),
+  },
+  {
     id: "hand-movement",
     says: "How far the hand moves from the chord before, in semitones summed over the voices.",
     // Voices are paired from the top down, so a chord with one voice fewer is judged by the
@@ -153,6 +161,12 @@ export const VOICING_FEATURES: readonly Feature<VoicingCandidate>[] = [
 /**
  * Voice every strike in order, each led from the one before. The same
  * strikes always get the same voicings.
+ *
+ * A comping figure strikes one chord many times, and a blues plays the same
+ * three chords all night, so two things are remembered instead of worked out
+ * again: the ways a chord can be played (by its kind, root, quality and scale),
+ * and where the hand is led from a given voicing to that chord. Both are what
+ * would have been computed; nothing is chosen differently.
  */
 export function voiceStrikes(
   strikes: readonly Strike[],
@@ -161,27 +175,56 @@ export function voiceStrikes(
   idiom: InstrumentIdiom,
   weights: Readonly<Record<string, number>>,
 ): VoicedStrike[] {
-  const scales = new Map<number, ChordScale>();
+  const ways = new Map<string, Way>();
+  const wayAt = new Map<string, Way>();
   const voiced: VoicedStrike[] = [];
   let previous: Voicing | null = null;
   for (const strike of strikes) {
     const chord = strike.arrival.chord;
     const kind = chords.kinds[strike.kind];
     if (!chord || !kind) continue;
-    let scale = scales.get(strike.arrival.index);
-    if (!scale) {
-      scale = chordScale(chord, contextOf(harmony, strike.arrival));
-      scales.set(strike.arrival.index, scale);
+    const at = `${strike.kind} ${strike.arrival.index}`;
+    let way = wayAt.get(at);
+    if (!way) {
+      const scale = chordScale(chord, contextOf(harmony, strike.arrival));
+      const root = pitchClass(chord.root);
+      const colour = `${JSON.stringify(chord.quality)} ${scale.name} ${scale.intervals.join(" ")}`;
+      const name = `${strike.kind} ${root} ${colour}`;
+      way = ways.get(name);
+      if (!way) {
+        const tones = fitTones(kind, chord, scale);
+        way = {
+          family: chordFamily(chord.quality),
+          voicings: idiom.candidates(tones, root, chords.register),
+          led: new Map(),
+        };
+        ways.set(name, way);
+      }
+      wayAt.set(at, way);
     }
-    const tones = fitTones(kind, chord, scale);
-    const family = chordFamily(chord.quality);
-    const candidates = idiom
-      .candidates(tones, pitchClass(chord.root), chords.register)
-      .map((voicing) => ({ voicing, previous, register: chords.register, family }));
-    const best = choose(candidates, VOICING_FEATURES, weights);
-    if (!best) continue;
-    previous = best.candidate.voicing;
-    voiced.push({ strike, voicing: previous });
+    let next = way.led.get(previous);
+    if (next === undefined) {
+      const { family } = way;
+      const candidates = way.voicings.map((voicing) => ({
+        voicing,
+        previous,
+        register: chords.register,
+        family,
+      }));
+      next = choose(candidates, VOICING_FEATURES, weights)?.candidate.voicing ?? null;
+      way.led.set(previous, next);
+    }
+    if (next === null) continue;
+    previous = next;
+    voiced.push({ strike, voicing: next });
   }
   return voiced;
+}
+
+/** One chord in one kind: every way to play it, and where each hand position is led to. */
+interface Way {
+  readonly family: ChordFamily;
+  readonly voicings: readonly Voicing[];
+  /** From the voicing in hand (null: the first strike) to the one chosen; null when there is none. */
+  readonly led: Map<Voicing | null, Voicing | null>;
 }

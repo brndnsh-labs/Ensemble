@@ -58,6 +58,44 @@ export const bluesCritic: CriticStyle = {
     "chords.voicing-faults": { max: 0.02, kind: "intent", minCases: 8 },
     // Hand width stays consistent across neighbours (Q-06, KF-B-28).
     "chords.width-jumps": { max: 0.01, kind: "intent", minCases: 8 },
+
+    // How busy the piano is at each level: a pad, chops, then four stabs or the pump's
+    // eight (ST-blues-31, ST-blues-56). Delivers 1.4, 2.2 and 3.1 to 8 by take.
+    "chords.strikes-per-bar-quiet": { min: 1, max: 2, kind: "intent", minCases: 8 },
+    "chords.strikes-per-bar-mid": { min: 1.5, max: 3.2, kind: "intent", minCases: 8 },
+    "chords.strikes-per-bar-loud": { min: 3, max: 8, kind: "intent", minCases: 8 },
+    // With the drums: 65% of strikes land with a kick or a backbeat, where a hand placed at
+    // random on the eighths would score 59% and the first plan drawn, unchosen, 62%. The
+    // target is on the difference, by take. It is not met by every take, and should not be:
+    // a section whose own figure is the "and"s sits between the backbeats by design.
+    "chords.with-the-drums-over-chance": { min: 0, kind: "intent", minCases: 20 },
+    // 30% to 80% of strikes off the beat over everything (CH-52; delivers 48%). By take a
+    // section that chops 2 and 4 is nearly all on the beat, so the band by take is wider.
+    "chords.off-the-beat": { min: 0.1, max: 0.8, kind: "measured", minCases: 20 },
+    // 35% to 60% of changes anticipated over everything, about 25% when quiet and more when
+    // hot (ST-blues-51; delivers 44%, 29% quiet, 55% hot). Never pushing is stiff and
+    // always pushing is a mannerism (Q-13), so each take is held inside 15% to 80%.
+    "chords.changes-anticipated": { min: 0.15, max: 0.8, kind: "intent", minCases: 10 },
+
+    // Does it sound like a loop? Asked of the bars that are a conversation (the pump is
+    // meant to be one bar). Three players to compare with, on the same takes: the old
+    // band's loop (the section's figure in every bar), a scatter (each bar any of the
+    // phrase's three figures), and the first plan drawn with no critic.
+    //
+    // A bar is the bar before it again 41% of the time. Loop 97%, scatter 43%, first plan 51%.
+    "chords.bar-same-as-last": { min: 0.15, max: 0.75, kind: "measured", minCases: 12 },
+    // A phrase is the phrase before it again 4% of the time. Loop 85%, scatter 5%, first 10%.
+    "chords.phrase-same-as-last": { max: 0.35, kind: "measured", minCases: 6 },
+    // A phrase is the one played at this place last chorus 4% of the time. Loop 100%,
+    // scatter 4%, first plan 9%.
+    "chords.phrase-same-as-last-chorus": { max: 0.4, kind: "measured", minCases: 4 },
+    // The opening bar comes back and some bar differs in 99.7% of phrases. Loop 3%,
+    // scatter 65%, first plan 86%. The floor sits between the scatter and the first plan.
+    "chords.phrases-shaped": { min: 0.8, kind: "measured", minCases: 6 },
+    // One bar four times: 0.3% of phrases. Loop 97%, scatter 10%, first plan 14%.
+    "chords.phrases-one-bar": { max: 0.15, kind: "measured", minCases: 6 },
+    // The opening bar never comes back: none. Loop 0%, scatter 24%, first plan 0.1%.
+    "chords.phrases-unrelated": { max: 0.1, kind: "measured", minCases: 6 },
   },
   weights: {
     // What a voicing costs (CH-16), in comparable units: a note out of the slot is
@@ -67,6 +105,9 @@ export const bluesCritic: CriticStyle = {
     voicing: {
       "outside-register": 40,
       "top-from-target": 0.35,
+      // More than a smooth move saves (0.5 a voice and 0.6 for the top is 2.6 a semitone
+      // for four voices), so past the reach the hand comes back.
+      "top-out-of-reach": 4,
       "hand-movement": 0.5,
       "top-movement": 0.6,
       "minor-ninths": 12,
@@ -74,6 +115,29 @@ export const bluesCritic: CriticStyle = {
       "minor-seconds-thin": 24,
       "sharp-nine-under-third": 20,
       "low-intervals": 10,
+    },
+    // What a phrase of comping costs. The first three are in comparable units, a share of
+    // the phrase's strikes or strikes a bar; the rest are yes or no. Each was set to zero in
+    // turn over 200 takes to see what it moves (ME-10).
+    comping: {
+      // Land with the kick and the backbeat the drummer actually played. Weaker settings
+      // that lean reliably were what sounded right in the old band (ME-23): this moves
+      // one strike in twenty, not the figure.
+      "off-the-drums": 2,
+      // Stay out from under the soloist. Nothing to hear until there is a soloist (stage 3).
+      "under-the-soloist": 3,
+      // As busy as the energy asks: within a tier, a higher bar takes the busier answer.
+      "off-the-energy": 1,
+      // Not one bar four times, unless everything else about it is better by this much.
+      "one-bar": 0.5,
+      // The opening bar comes back. The forms see to that on a plain 12-bar; this is for
+      // bars of two chords and more, which reshape a figure: on the jazz blues it keeps 2%
+      // of phrases from wandering off, on a chart of busy changes one in ten.
+      "no-return": 1,
+      // Not the last phrase again, and not last chorus's phrase at this place: mild, so that
+      // it sometimes is.
+      "same-as-last": 0.25,
+      "same-as-last-time": 0.3,
     },
   },
 };

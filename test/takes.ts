@@ -59,36 +59,46 @@ export function takes(only: (jam: Jam) => boolean = () => true): Jam[] {
   return cache.filter(only);
 }
 
-/**
- * Not a tune: every kind of chord the format can write, with tensions, alterations, and a
- * slash chord, for the rules about which notes a chord may be voiced with. The library is
- * nearly all plain sevenths, which cannot break those rules.
- */
-const everyColour: LibraryChart = {
-  file: "every-colour.chart",
-  text: readFileSync(new URL("./charts/every-colour.chart", import.meta.url), "utf8"),
+const chartsDir = new URL("./charts/", import.meta.url);
+const testChart = (file: string): LibraryChart => ({
+  file,
+  text: readFileSync(new URL(file, chartsDir), "utf8"),
   meter: "4/4",
-};
+});
 
-let colourCache: Jam[] | undefined;
+/**
+ * Not tunes: charts written to reach what the library cannot.
+ *
+ * - every-colour: every kind of chord the format can write, with tensions, alterations, and
+ *   a slash chord. The library is nearly all plain sevenths.
+ * - awkward: chords an eighth long, rests inside bars, two and four and eight chords a bar.
+ */
+const STRESS: readonly LibraryChart[] = [
+  testChart("every-colour.chart"),
+  testChart("awkward.chart"),
+];
 
-/** The every-colour chart at each level, and once as a jam with an arc and an ending. */
-export function colourTakes(): Jam[] {
-  const kinds: readonly TakeOptions[] = [
-    { mode: "jam", passes: 1, energy: 0.3, seed: 1 },
-    { mode: "jam", passes: 1, energy: 0.55, seed: 2 },
-    { mode: "jam", passes: 1, energy: 0.85, seed: 3 },
-    { mode: "jam", passes: 3, seed: 4 },
+let stressCache: Jam[] | undefined;
+
+/** The stress charts at each level and as a jam with an arc and an ending, over a few seeds. */
+export function stressTakes(): Jam[] {
+  const kinds: readonly Omit<TakeOptions, "seed">[] = [
+    { mode: "jam", passes: 2, energy: 0.3 },
+    { mode: "jam", passes: 2, energy: 0.55 },
+    { mode: "jam", passes: 2, energy: 0.85 },
+    { mode: "jam", passes: 3 },
   ];
-  colourCache ??= STYLES.flatMap((style) =>
-    kinds.map((options) => ({
-      style,
-      chart: everyColour,
-      options,
-      take: render(everyColour.text, style, options),
-    })),
+  stressCache ??= STYLES.flatMap((style) =>
+    STRESS.flatMap((chart) =>
+      [1, 2, 3, 4].flatMap((seed) =>
+        kinds.map((kind) => {
+          const options = { ...kind, seed };
+          return { style, chart, options, take: render(chart.text, style, options) };
+        }),
+      ),
+    ),
   );
-  return colourCache;
+  return stressCache;
 }
 
 /** A take's notes in the order they sound, for one seat or for all. */

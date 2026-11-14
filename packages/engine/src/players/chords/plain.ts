@@ -1,6 +1,7 @@
 // The plain rhythm: a pad. One strike where each chord arrives, held most of
 // the way to the next strike, so what is heard is the voicing and how it
-// moves, with no rhythm in the way. It is also what any meter but 4/4 plays.
+// moves, with no rhythm in the way. It is what any meter but 4/4 plays
+// (CH-54), and what a style with no rhythm book plays everywhere.
 
 import type { ChartChord } from "../../chart/types.ts";
 import type { Arrival } from "../../perform/harmony.ts";
@@ -46,8 +47,9 @@ export function stretches(bar: PlanBar, harmony: readonly Arrival[], from: numbe
 }
 
 /**
- * Strikes for every bar the seat plays, except the ending bar, which has its
- * own gesture. A chord carried over a barline is struck again softly at the
+ * Strikes for every bar the seat plays that is not comped (`comped` says
+ * which are) and is not the ending bar, which has its own gesture. A chord
+ * carried over a barline is struck again softly at the
  * barline, the way a pianist keeps a pad alive on an instrument that dies away
  * (CH-48), since nothing rings past a barline (CH-35). Nothing under N.C.
  * (X-B-18), in the count-in or the tail, or in a bar the seat sits out.
@@ -56,6 +58,7 @@ export function plainStrikes(
   plan: Plan,
   harmony: readonly Arrival[],
   chords: ChordStyle,
+  comped: (bar: PlanBar) => boolean,
 ): Strike[] {
   const strikes: Strike[] = [];
   const { length, velocity } = chords.plain;
@@ -64,7 +67,7 @@ export function plainStrikes(
   let at = -1;
   for (const bar of plan.bars) {
     const energy = bar.seats.chords;
-    if (bar.kind !== "music" || energy === null || bar.ending) {
+    if (bar.kind !== "music" || energy === null || bar.ending || comped(bar)) {
       holding = null;
       continue;
     }

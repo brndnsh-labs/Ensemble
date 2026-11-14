@@ -15,6 +15,7 @@
     "ensemble": "node packages/cli/src/main.ts",
     "goldens": "node scripts/goldens.ts",
     "gate:1": "sh scripts/gate-1.sh",
+    "gate:2": "sh scripts/gate-2.sh",
     "score": "node scripts/budget.ts 120 node packages/cli/src/main.ts score --check"
   },
   "devDependencies": {

@@ -83,6 +83,13 @@ export interface ChordRegister {
   readonly ceiling: number;
   /** Where the top voice is aimed (MIDI). */
   readonly target: number;
+  /**
+   * How far, in semitones, the top voice may be led from its target before the
+   * hand is pulled back. Inside the reach voice leading decides; outside it each
+   * semitone costs more than a smooth move saves, so a hand that has crept up or
+   * down a chorus at a time turns round instead of leaving its part of the keyboard.
+   */
+  readonly reach: number;
 }
 
 /**
@@ -116,6 +123,128 @@ export interface PlainRhythm {
   };
 }
 
+/**
+ * How the hand plays one written symbol of a figure: how hard, and for how
+ * long when the grid does not hold it on.
+ */
+export interface Attack {
+  /** Written level, before the bar's energy scales it. */
+  readonly level: number;
+  /** Length in sixteenths of a strike the grid does not hold: a stab. */
+  readonly steps: number;
+}
+
+/** The symbols a figure may be written in, and how each is played. */
+export type Articulation = Readonly<Record<string, Attack>>;
+
+/**
+ * One bar of comping rhythm, written whole (X-A-31). A character per
+ * sixteenth of a 4/4 bar, spaces ignored:
+ *
+ * - a symbol of the articulation (`x`, `X`, `o`): the hand comes down
+ * - `-` the chord before is still held
+ * - `.` silence
+ *
+ * `x--- --X- ---- ----` is the Charleston as a pad; `.... X... .... X...` is
+ * chops on 2 and 4. The grid is straight: the style's swing bends it afterwards.
+ */
+export interface CompFigure {
+  /** What a musician would call it. Reports and scorecards name figures by this. */
+  readonly name: string;
+  /** Relative weight in the draw. Zero never wins. */
+  readonly weight: number;
+  readonly grid: string;
+  /** Its own articulation, where it is not played like the rest of the tier (the pump's long-short). */
+  readonly articulation?: Articulation;
+  /** The voicing kind it asks for, where that is not the tier's (the pump's close position). */
+  readonly voicing?: string;
+  /**
+   * A groove, not a conversation: it is played in every bar of the phrase,
+   * never as an answer, and nothing takes a stroke out of it. Where it does
+   * not lean into a change it stays on the old chord; where it does, it plays
+   * the new chord early and strikes it again on the beat, because a hole would
+   * break it (CH-41).
+   */
+  readonly groove?: boolean;
+}
+
+/** The comping vocabulary at one level of energy. */
+export interface RhythmTier {
+  /**
+   * Names the section's draw of its figure. Tiers that share a name share the
+   * draw: with their figures listed in the same order and weights, a section's
+   * riff when quiet is the same riff, thinned, that it plays when loud. Tiers
+   * with different names choose independently.
+   */
+  readonly draw: string;
+  readonly articulation: Articulation;
+  /**
+   * The figures a section may take as its own. One is drawn per section and
+   * played every time the section returns (X-B-14); the others can answer it.
+   */
+  readonly figures: readonly CompFigure[];
+  /** Figures that are only ever answers: a bar that turns the section's figure. */
+  readonly answers: readonly CompFigure[];
+  /** Strikes a bar the hand aims for, from the bottom of the tier's energy to its top. */
+  readonly busy: { readonly from: number; readonly to: number };
+  /**
+   * The strike a chord gets where it arrives when the figure would pass it
+   * by (CH-34): its level, and its length in sixteenths or to the chord's end.
+   */
+  readonly arrival: Attack;
+}
+
+/**
+ * The shape of a four-bar phrase, a letter per bar: `a` is the section's own
+ * figure, `b` and `c` the two figures answering it this time through. Every
+ * form opens on `a`: the top of a phrase states the figure. A longer phrase
+ * plays `a` again at the front; a shorter one keeps its first bar and its end.
+ */
+export interface PhraseForm {
+  readonly weight: number;
+  /** Four letters, spaces ignored: `a a b a`. */
+  readonly bars: string;
+}
+
+/**
+ * The rhythm book: written figures, how they are articulated, and how a phrase
+ * is built from them. A phrase is chosen whole: several plans are drawn from the
+ * forms and the critic picks one (`critic.weights.comping`).
+ */
+export interface RhythmBook {
+  readonly tiers: PerTier<RhythmTier>;
+  /** How much of a held chord's written length sounds: a pad that breathes (ST-blues-31). */
+  readonly hold: number;
+  readonly forms: readonly PhraseForm[];
+  /** How many plans the comper weighs for each phrase. One is no choice at all. */
+  readonly candidates: number;
+}
+
+/** Playing a chord before the chart writes it (CH-36, CH-40). */
+export interface Anticipation {
+  /**
+   * The chance, at a barline where the chord changes, that the hand leans in:
+   * the new chord on the last eighth, tied over, whether or not the figure has
+   * a strike there (a figure that passes the last eighth by would otherwise
+   * never lean in, KF-B-36). When it does not, the change lands on the beat.
+   */
+  readonly barline: PerTier<number>;
+  /**
+   * A change inside the bar. `tie`: a strike in the eighth before it plays the
+   * new chord and ties over (CH-40). `wait`: the change waits for the beat.
+   */
+  readonly midBar: "tie" | "wait";
+  /**
+   * What becomes of a strike in the eighth before a change when the hand does
+   * not lean in. `rest`: it is left out, because a stab of the outgoing chord
+   * just before the new one was heard as a wrong chord (jazz, blues; KF-B-27).
+   * `stay`: it plays the old chord, because the figure is the figure (funk, rock).
+   */
+  readonly otherwise: "rest" | "stay";
+  /** The symbol of the tier's articulation a push is played as when the figure has no strike there. */
+  readonly stroke: string;
+}
+
 export interface ChordStyle {
   readonly idiom: Idiom;
   /** The ways of voicing a chord, by name. A strike asks for one of them by name. */
@@ -124,6 +253,12 @@ export interface ChordStyle {
   readonly voicing: PerTier<string>;
   readonly register: ChordRegister;
   readonly plain: PlainRhythm;
+  /**
+   * The comping rhythm in 4/4. Null plays the plain rhythm everywhere: a pad,
+   * or a voicing audition with no rhythm in the way.
+   */
+  readonly rhythm: RhythmBook | null;
+  readonly anticipation: Anticipation;
   /** The final chord (CH-74, EN-14 to EN-19). */
   readonly ending: {
     /** The written level of the final chord. */
@@ -133,6 +268,4 @@ export interface ChordStyle {
     /** How much harder a short final hit (the button) is than the held chord. */
     readonly accent: number;
   };
-  // Part 2, the comping rhythm, adds its fields here: the rhythm book (figures with
-  // weights, their articulation, how a phrase is built from them) and anticipation.
 }

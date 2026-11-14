@@ -83,23 +83,21 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-14, after the review fixes. Everything is committed.
+State on 2026-11-14, after stage 2. Everything is committed.
 
-**Stage 1 is built and its gate files are written** (`out/gate-1/`, with `GATE_REPORT.md`). Waiting on Brandon's ears. `pnpm check` passes (413 tests, about 4.5 s); `pnpm score` matches its baseline.
+**Stages 1 and 2 are built and their gate files are written** (`out/gate-1/`, `out/gate-2/`, each with a `GATE_REPORT.md`; `pnpm gate:1`, `pnpm gate:2`). `pnpm check` passes (423 tests, about 6.5 s of 10); `pnpm score` matches its baseline.
 
-**Open from stage 1**
+**Feedback so far (gate 1, in Logic)**: sounds good so far, "a little plain"; velocities were slamming. Loudness is done (15% trim, hat under the backbeat, three measures). "Plain" is to be judged again with the piano in. Gate 2 has not been heard yet.
 
-- The review's findings are fixed except the ones that wait for a listening verdict: the wide bass drops (they follow from the register) and the two one-note phrase fills at mid level. Both are in `out/gate-1/GATE_REPORT.md` under "Not yet acted on". The review did not reach 3/4, 6/8, long arcs, or whether the property tests are weaker than their names.
-- Gate 1 feedback so far: loudness (done: 15% trim, hat under the backbeat, three measures) and "a little plain" (to be judged again with chords in). Further feedback becomes a property or a measure first, then a fix.
+**Open, waiting on Brandon's ear**
 
-**Models** (agreed with Brandon to stretch quota): Sonnet for small fixes with a property written first and for mechanical work; Opus for the voicing engine and for adversarial reviews; Fable for comping rhythm, the soloist, and the main thread. The chord seat is built in two parts, in sequence: voicing (Opus), then rhythm (Fable). See "Built in two parts" in `prompts/seat-chords.md`.
+- Gate 1: the wide bass drops (they follow from the register) and the two one-note phrase fills at mid level. See `out/gate-1/GATE_REPORT.md`, "Not yet acted on".
+- Gate 2: the questions under "What to listen for" in `out/gate-2/GATE_REPORT.md`. The ones most likely to need a change: the piano's level under the drums, the modest lock with the drums, the pump with no variation, the rub in rootless dominants.
+- Further feedback becomes a property or a measure first, then a fix.
 
-**Stage 2, in the order to pick up**
+**Models** (agreed with Brandon to stretch quota): Sonnet for small fixes with a property written first and for mechanical work; Opus for well-specified builds and for adversarial reviews; Fable for the open design problems (comping rhythm, the soloist) and the main thread. What this cost in stage 2, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, review (Opus) 240k. The review found two audible bugs and four weak properties; keep doing one per seat.
 
-1. The critic framework, `ensemble score`, and the drum, bass, and band measures are done (`packages/engine/src/critic/`, baseline in `scorecard/blues.json`).
-2. **Chord seat**: the brief is `prompts/seat-chords.md`, built in two parts (see its last section). Part 1 (voicing, with a plain held-chord rhythm) is done and committed, with six piano properties. Part 2 (rhythm) is next, then one independent review of the whole seat.
-3. When it lands: read rendered takes bar by bar; turn its list of "properties that always hold" into tests in `test/properties.test.ts` (register floor, chord identity, every chord struck, voice leading); have a second agent review it against part B of the notes; then `pnpm goldens`, `score --update`, each with a line in `DECISIONS.md`.
-4. Gate 2 files and report: a script like `scripts/gate-1.sh`, with takes that isolate each level, and the scorecard's comping lines in the report.
+**Stage 2 is done**: critic, scorecard, chord seat (`prompts/seat-chords.md`, built in two parts), 10 piano properties, gate 2 files and report.
 
 **Stage 3** follows `PLAN.md` above: soloist by phrase with candidates and critic selection (report selection against first-candidate on the same seeds), comping regenerated around it, a featured-seat control, takes saved and replayed by seed. Read part B's soloist sections and Q-43 to Q-50, and ME-22 to ME-29 in part D, before designing it.
 

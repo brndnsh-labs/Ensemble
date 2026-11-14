@@ -3,6 +3,7 @@
 // carries. Measured strike by strike, and at the changes for the line on top.
 
 import type { ChartChord } from "../../chart/types.ts";
+import { arrivals } from "../../perform/harmony.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { LOW_LIMITS, RUB_FLOOR } from "../../players/chords/voicing.ts";
@@ -12,6 +13,7 @@ import { chordFamily, chordTones, chordToString } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import { barAt, chordAt, mean, notesOf, share } from "../read.ts";
 import type { Measure } from "../types.ts";
+import { EIGHTH, POCKET, pumping } from "./comping.ts";
 
 /** One time the hand comes down: its pitches low to high, and the chord written under it. */
 interface Struck {
@@ -21,17 +23,28 @@ interface Struck {
   readonly bar: PlanBar;
 }
 
-/** The comp's strikes in order. Notes struck together are one chord. */
+/**
+ * The comp's strikes in order. Notes struck together are one chord, and the
+ * chord a strike plays is the one written under it, unless it is struck in
+ * the eighth before a change and is still sounding there: then it is the
+ * chord coming, played early (X-B-07).
+ */
 function strikes(take: Take): Struck[] {
-  const byTick = new Map<number, number[]>();
+  const byTick = new Map<number, { pitches: number[]; ends: number }>();
   for (const note of notesOf(take, "chords")) {
-    const list = byTick.get(note.tick) ?? [];
-    list.push(note.pitch);
-    byTick.set(note.tick, list);
+    const hit = byTick.get(note.tick) ?? { pitches: [], ends: 0 };
+    hit.pitches.push(note.pitch);
+    hit.ends = Math.max(hit.ends, note.tick + note.offset + note.duration);
+    byTick.set(note.tick, hit);
   }
+  const harmony = arrivals(take.plan);
+  let at = 0;
   const result: Struck[] = [];
-  for (const [tick, pitches] of [...byTick].sort((a, b) => a[0] - b[0])) {
-    const chord = chordAt(take, tick);
+  for (const [tick, { pitches, ends }] of [...byTick].sort((a, b) => a[0] - b[0])) {
+    while ((harmony[at + 1]?.tick ?? Infinity) <= tick) at++;
+    const next = harmony[at + 1];
+    const early = next?.chord && next.tick - tick <= EIGHTH && ends >= next.tick - POCKET;
+    const chord = early ? next.chord : chordAt(take, tick);
     const bar = barAt(take, tick);
     if (chord && bar) result.push({ tick, pitches: pitches.sort((a, b) => a - b), chord, bar });
   }
@@ -205,10 +218,13 @@ export const chordMeasures: readonly Measure[] = [
   {
     id: "chords.colour",
     seat: "chords",
-    says: "Most chords carry a 9th or a 13th: the sound of a blues or jazz piano, not a rock one.",
+    says: "Most chords carry a 9th or a 13th: the sound of a blues or jazz piano, not a rock one. Bars of the pump are left out: there the hand plays plain chords on purpose.",
     unit: "share",
     of(take) {
-      const list = strikes(take).filter((s) => s.pitches.length >= 2);
+      // The pump hammers triads, 6ths and 7ths (ST-blues-32), eight to the bar: counted in, it
+      // would swamp every other bar of a loud take.
+      const pumped = pumping(take);
+      const list = strikes(take).filter((s) => s.pitches.length >= 2 && !pumped.has(s.bar.index));
       const coloured = list.filter((s) => {
         const own = new Set(
           chordTones(s.chord.quality)

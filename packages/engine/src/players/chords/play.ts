@@ -4,20 +4,31 @@
 // it (the idiom). This file only runs them in order.
 
 import { arrivals } from "../../perform/harmony.ts";
-import type { Player } from "../../perform/notes.ts";
+import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
+import type { Pick } from "./critique.ts";
+import { byCritic } from "./critique.ts";
 import { endingStrikes } from "./ending.ts";
 import { IDIOM_PLAYERS } from "./idiom.ts";
+import { compStrikes, comps } from "./phrase.ts";
 import { plainStrikes } from "./plain.ts";
 import { voiceStrikes } from "./voicing.ts";
 
-export const playChords: Player = ({ plan, style }) => {
+/**
+ * The seat's part, with the comper's choice of phrase left open: the player
+ * asks the critic, and a gate report can ask for the first plan drawn, or any
+ * plan, to show on the same seeds what the critic's choice is worth.
+ */
+export function chordPart(context: PlayerContext, pick?: Pick): WrittenNote[] {
+  const { plan, style } = context;
   const chords = style.chords;
   const harmony = arrivals(plan);
   const idiom = IDIOM_PLAYERS[chords.idiom];
 
-  // 1. Rhythm. The ending bar has its own gesture; every other bar plays the pad.
+  // 1. Rhythm. Bars of 4/4 are comped phrase by phrase from the style's book; any other
+  // meter plays the pad; the ending bar has its own gesture.
   const strikes = [
-    ...plainStrikes(plan, harmony, chords),
+    ...compStrikes(context, harmony, pick ?? byCritic(style.critic.weights.comping ?? {})),
+    ...plainStrikes(plan, harmony, chords, (bar) => comps(bar, chords)),
     ...plan.bars.flatMap((bar) => endingStrikes(bar, harmony, chords)),
   ].sort((a, b) => a.tick - b.tick);
 
@@ -26,4 +37,6 @@ export const playChords: Player = ({ plan, style }) => {
 
   // 3. Idiom.
   return idiom.write(voiced);
-};
+}
+
+export const playChords: Player = (context) => chordPart(context);
