@@ -1,3 +1,3 @@
-import { hello } from "@ensemble/engine";
+import { createRng } from "@ensemble/engine";
 
-console.log(hello(41));
+console.log(createRng(1).next());
