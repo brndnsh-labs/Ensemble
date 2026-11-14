@@ -86,3 +86,7 @@ A second agent reviewed the parser against the spec and found the corpus had gap
 ## 2026-11-14: goldens
 
 - First golden takes written: a two-minute blues jam (the whole arc and the ending) and a song-mode take with an intro, mid-bar changes, and a written ending.
+
+## 2026-11-14: a level the player sets
+
+- `energy` is a plan option (CLI `--energy`): a fixed level in place of the arc, held on every pass, with the form breathing around it at half depth (CO-05, CO-06). Added at gate 1 so each tier of a style can be auditioned alone; the app will need it anyway.

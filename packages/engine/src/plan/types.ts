@@ -19,6 +19,11 @@ export interface PlanOptions {
    * (default 1) and the plan can be made again with more, leaving these unchanged.
    */
   readonly open?: boolean;
+  /**
+   * A level the player sets, 0 to 1, in place of the arc. It holds on every
+   * pass (no lift, no arc), and the form still breathes around it at half depth.
+   */
+  readonly energy?: number;
   /** A bar of sticks before the first bar. Default true. */
   readonly countIn?: boolean;
   /** Seats to leave out entirely. Default: none. */

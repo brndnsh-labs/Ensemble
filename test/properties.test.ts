@@ -311,6 +311,26 @@ test("a timed jam has a shape: it does not start at its peak, and it ends above 
   }
 });
 
+test("a level the player sets is held: every pass plays at that level, with no arc and no lift", () => {
+  for (const style of STYLES) {
+    for (const energy of [0.2, 0.5, 0.9]) {
+      const take = render(LIBRARY[0]!.text, style, { mode: "jam", passes: 5, seed: 1, energy });
+      const body = take.plan.bars.filter(
+        (bar) => bar.kind === "music" && bar.section.role === "body",
+      );
+      const firstPass = body.filter((bar) => bar.pass === 0).map((bar) => bar.energy);
+      for (let pass = 1; pass < 5; pass++) {
+        const energies = body.filter((bar) => bar.pass === pass).map((bar) => bar.energy);
+        assert.deepEqual(energies, firstPass, `pass ${pass + 1} at ${energy}`);
+      }
+      assert.ok(
+        firstPass.every((e) => Math.abs(e - energy) < 0.15),
+        `the level stays near ${energy}`,
+      );
+    }
+  }
+});
+
 // ── blues ───────────────────────────────────────────────────────────────────
 
 const blues = (jam: Jam) => jam.style.id === "blues" && jam.chart.meter === "4/4";

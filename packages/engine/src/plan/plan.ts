@@ -80,7 +80,11 @@ export function planBars(
         run,
         occurrence,
         level,
-        energy: level + offset * style.arc.depth,
+        // A level the player set is held: the band must not drift away from it (CO-05, CO-06).
+        energy:
+          options.energy === undefined
+            ? level + offset * style.arc.depth
+            : options.energy + (level - style.arc.defaultLevel) / 2,
         barInSection: i,
         barInPass,
         phrase: { index: phraseIndex, bar: barInPhrase, length: phraseLength },

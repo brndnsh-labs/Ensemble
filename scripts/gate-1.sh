@@ -25,6 +25,13 @@ for seed in 1 2 3; do
   render library/blues-quick-change-e.chart --minutes 3 --seed "$seed" --out "$out/timed-3min-quick-change-e-seed${seed}.mid"
 done
 
+echo "One level held throughout, to hear each part of the band's vocabulary on its own:"
+render library/blues-12-bar-a.chart --energy 0.25 --passes 2 --seed 1 --out "$out/level-quiet-0.25-seed1.mid"
+render library/blues-12-bar-a.chart --energy 0.38 --passes 2 --seed 1 --out "$out/level-low-0.38-seed1.mid"
+render library/blues-12-bar-a.chart --energy 0.55 --passes 2 --seed 1 --out "$out/level-mid-0.55-seed1.mid"
+render library/blues-12-bar-a.chart --energy 0.85 --passes 2 --seed 1 --out "$out/level-high-0.85-seed1.mid"
+render library/blues-12-bar-a.chart --energy 0.85 --passes 2 --seed 2 --out "$out/level-high-0.85-seed2.mid"
+
 echo "Mid-bar changes, and an intro with a written ending:"
 render library/blues-jazz-f.chart --passes 3 --seed 1 --out "$out/jazz-blues-f-seed1.mid"
 render library/blues-intro-outro-d.chart --passes 2 --seed 1 --out "$out/intro-and-tag-d-seed1.mid"

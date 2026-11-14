@@ -13,7 +13,7 @@ const SEAT_NAMES: readonly Seat[] = ["drums", "bass", "chords", "solo"];
 export const renderCommand: Command = {
   summary: "play the chart and write the performance as a MIDI file",
   usage:
-    "<chart> --out take.mid [--style S] [--seed N] [--minutes M | --passes P] [--song] [--tempo BPM] [--key K] [--without seat,seat] [--no-count-in]",
+    "<chart> --out take.mid [--style S] [--seed N] [--minutes M | --passes P] [--song] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
   run(args) {
     const { positionals, values } = parseArgs({
       args,
@@ -26,6 +26,7 @@ export const renderCommand: Command = {
         passes: { type: "string", short: "p" },
         song: { type: "boolean", default: false },
         tempo: { type: "string", short: "t" },
+        energy: { type: "string", short: "e" },
         key: { type: "string", short: "k" },
         without: { type: "string" },
         "no-count-in": { type: "boolean", default: false },
@@ -58,6 +59,10 @@ export const renderCommand: Command = {
     const minutes = number("minutes", values.minutes);
     const passes = number("passes", values.passes);
     const tempo = number("tempo", values.tempo);
+    const energy = values.energy === undefined ? undefined : Number(values.energy);
+    if (energy !== undefined && !(energy >= 0 && energy <= 1)) {
+      throw new UsageError("--energy is a level from 0 (quiet) to 1 (loud)");
+    }
     const options: TakeOptions = {
       mode: values.song ? "song" : "jam",
       seed: values.seed,
@@ -66,6 +71,7 @@ export const renderCommand: Command = {
       ...(minutes === undefined ? {} : { minutes }),
       ...(passes === undefined ? {} : { passes }),
       ...(tempo === undefined ? {} : { tempo }),
+      ...(energy === undefined ? {} : { energy }),
       ...(key ? { key } : {}),
     };
 
