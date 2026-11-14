@@ -61,7 +61,7 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 1. Scaffold, lint boundaries, test budget. (done)
 2. Theory: note names, keys, degrees, chord qualities and tones. (done) Chord scales by function.
-3. Chart: parser, printer, expander, transposition, corpus. (in progress, delegated)
+3. Chart: parser, printer, expander, transposition, corpus. (done)
 4. Seeded generator, MIDI file writer. (done)
 5. Style pack types; plan types; planner: song mode, jam mode, timed jams, energy arc, phrases, fills and crashes, ending resolution.
 6. Perform skeleton: grid notation, dynamics pass, feel pass, markers.
@@ -83,28 +83,29 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State at the pause on 2026-11-14 (session quota). Everything below is committed unless it says otherwise.
+State at the second pause on 2026-11-14 (session quota). Everything is committed.
 
-**Done**
+**Stage 1 is built and its gate files are written** (`out/gate-1/`, with `GATE_REPORT.md`). Waiting on Brandon's ears. `pnpm check` passes (407 tests, about 4 s); `pnpm score` matches its baseline.
 
-- Workspace scaffold, lint boundaries, test budget script.
-- Theory: pitch, chord, chord scales. Seeded generator. MIDI file writer and performance export.
-- Style pack types, plan types, planner (`plan/plan.ts`, `plan/arc.ts`), the shared dynamics and feel pass, the harmony timeline, the `perform` orchestrator.
-- Blues pack shell (`packages/styles/src/blues/index.ts`): feel, arc, ending, instruments.
-- Eight blues charts in `library/`. They have not been through a parser yet.
-- Music notes: four parts under `docs/music-notes/`, index at `docs/MUSIC_NOTES.md`.
+**Open from stage 1**
 
-**Not done, in the order to pick up**
+- The adversarial review of drums, bass, and planner was cut short. Whatever it reported is at the end of `out/gate-1/GATE_REPORT.md` under "Review findings not yet acted on". Triage those first: verify each by rendering, fix the real ones (property or measure first), regenerate the gate files with `pnpm gate:1`, and update the goldens with a line in `DECISIONS.md`. If that section is empty, rerun the review (the brief is in the session history; the parser's reviewer brief is the model: "what to read, how to probe, what to look for in priority order, what was decided on purpose").
+- Gate 1 feedback, when it arrives, becomes a property or a measure first, then a fix.
 
-1. **Chart parser, printer, expander, corpus.** Delegated once and paused; see `prompts/chart-parser.md` and whatever that agent left in `packages/engine/src/chart/`. Until this exists nothing can be rendered from text.
-2. **Drum seat** (`players/drums/`, `packages/styles/src/blues/drums.ts`): placeholders. Brief ready at `prompts/seat-drums.md`.
-3. **Bass seat** (`players/bass/`, `packages/styles/src/blues/bass.ts`): placeholders. Write a sibling brief: the same house rules, reading part A "Bass" (shared craft, the blues boogie box, known weaknesses, failures) and part C blues bass. Design notes already settled: a bass line is a tone sequence (root, 3, 5, 6, b7, octave, fitted to the chord by conditions on its family and scale) laid over a rhythm figure chosen per section; a register policy per style (blues: nearest the previous note, pulled 30% toward a per-section anchor between C2 and E2, roots at or under A2); lead-ins that aim at the exact pitch the next arrival will play; the ending's low root. Use `perform/harmony.ts` for arrivals and `theory/scale.ts` for chord scales.
-4. `render(text, style, options)` in the engine; `validateStyle`; CLI `render`.
-5. Move the suite to a top-level `test/` package (see `DECISIONS.md`); properties for determinism, timed jams, plan extension, ranges, "a chart with errors still plays"; goldens.
-6. Dormant CI workflow; fill in the Commands section of `CLAUDE.md` for `render`.
-7. Gate 1 audition files and `out/gate-1/GATE_REPORT.md`. Then stages 2 and 3.
+**Stage 2, in the order to pick up**
 
-**Unverified so far.** The planner, arc, feel pass, and MIDI export typecheck and lint clean but have not run against a real chart, because the parser does not exist yet. Expect to find bugs there first.
+1. The critic framework, `ensemble score`, and the drum, bass, and band measures are done (`packages/engine/src/critic/`, baseline in `scorecard/blues.json`).
+2. **Chord seat**: not started. The brief is ready at `prompts/seat-chords.md`; launch it as the drum and bass seats were launched (one Fable agent, told which other agents are running and where its scratch folder is).
+3. When it lands: read rendered takes bar by bar; turn its list of "properties that always hold" into tests in `test/properties.test.ts` (register floor, chord identity, every chord struck, voice leading); have a second agent review it against part B of the notes; then `pnpm goldens`, `score --update`, each with a line in `DECISIONS.md`.
+4. Gate 2 files and report: a script like `scripts/gate-1.sh`, with takes that isolate each level, and the scorecard's comping lines in the report.
+
+**Stage 3** follows `PLAN.md` above: soloist by phrase with candidates and critic selection (report selection against first-candidate on the same seeds), comping regenerated around it, a featured-seat control, takes saved and replayed by seed. Read part B's soloist sections and Q-43 to Q-50, and ME-22 to ME-29 in part D, before designing it.
+
+**Things learned in this session that the next one should not relearn**
+
+- Seats are delegated whole (style type, player, data, validation) with a written brief in `prompts/`; the main session owns the planner, feel, critic framework, tests, docs, and commits. Agents report "properties I believe always hold", which become the property tests.
+- An independent reviewer found real bugs the author's own 341-row corpus missed. Review each seat before its gate.
+- Check `git status` after committing: a hidden error from `git add` once left a commit with the wrong contents.
 
 ## Open questions from the brief, resolved
 
