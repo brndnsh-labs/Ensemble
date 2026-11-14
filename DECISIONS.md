@@ -52,3 +52,33 @@ Date, decision, one line of why. Newest at the bottom. Departures from the docs 
 - Choices held per bar are keyed by the bar's place in the form, not its position in the plan, so a take with a count-in and one without are the same music.
 - The count-in plays even when the drum seat is left out: the count belongs to the band.
 - The lint rule against `../../` imports is gone; it also rejected imports inside the engine. The compiler's `rootDir` check already stops an import from leaving the package (verified with a probe).
+
+## 2026-11-14: bass seat
+
+- A bass line is a tone sequence (R 3 4 5 6 b7 8, fitted to each chord, with variants chosen by conditions on the chord) laid over a rhythm figure. The blues box, a two-feel, an eighth-note pump and a riff are all that shape; a walking line will need one more way to produce tones, and a kick-following riff will read the drummer's notes the seat already receives.
+- The bass decides every arrival's pitch first, in order, then writes the notes between, so a lead-in always resolves into the note actually played (BA-05). The previous note is carried forward as a bassist carries it; every random draw is still keyed by position.
+- Lead-in kinds are weighted by how the root is about to move (down a fifth, up a fifth, by step, by third), as style data. The brief asks for this; the old band's bass knew a chord's function only through its scale (BA-82). **(new)**
+- Blues lead-in rates above the quiet tier (0.3 inside a section at mid, 0.5 at high; more into a section top; always into the ending) are chosen here. The notes give only the quiet tier's 0.35. A gate 1 listening question.
+- Lead-ins are drawn per pass, so each chorus has its own; the rhythm figure is what the section keeps.
+- No lead-in is reached by a leap of more than an octave, and a leap of more than an octave onto an arrival is bridged by a lead-in. Generalises the old band's rule for the ending (EN-28, EN-29).
+- The "fifth" kind of lead-in is always a perfect fifth of the target; a diminished chord's own flat fifth made a tritone approach.
+- When the two-feel's held fifth is the next chord's root, it is traded for the third (or split by an approach), so the arrival is never heard a beat early (BA-34, extended).
+- The blues register is carried over as the old band had it (roots E1 to A2, home between C2 and E2, 30% pull). In A and E this lets the box climb to G3. Kept for now because it is what was approved by ear; it is one line of data and a gate 1 listening question.
+- The ending's hit is where the final chord first sounds in the bar, not where it is last written.
+- Not built yet: kick lock (BA-13), the jazz floor rule (BA-26), button and hits endings for drums. They arrive with the styles that need them.
+
+## 2026-11-14: chart format, after an independent review
+
+A second agent reviewed the parser against the spec and found the corpus had gaps. The spec is amended where these go beyond it.
+
+- A line in the header that is neither `name: value` nor chords is one error on that line and the header continues. Before, `tempo 120` (no colon) was read as a bar and the whole chart went silent.
+- Bars before the first section label form an unlabeled section. The implicit label `A` is only for a chart with no labels at all. Before, a typed `[A]` after unlabeled bars was discarded as a duplicate.
+- Spelling: a chromatic degree is spelled by letter unless that needs a double accidental or gives Cb, Fb, E# or B# outside the key's own scale, in which case it takes the plain enharmonic. Reading a name back into a degree is the inverse, so transposing through text and back returns the original. A section key moved by transposition takes the conventional spelling (Db, not C#).
+- An empty stretch between spaced bar lines still makes no bar, but now warns. `||` stays silent.
+- `%` after a repeat repeats the bar played last, not the bar written last.
+- Only intro sections before the first body section are the intro; a later one is part of the body.
+- A misplaced `xN` occupies no bar.
+- `//` directly after a bar line is a comment (the spec said whitespace was required).
+- The alternate spellings for sevenths and ninths apply to elevenths and thirteenths.
+- With no `key:`, a first chord with a minor third makes the fallback key minor.
+- A hold at the top of a looped form is struck when the bar played before it ends on another chord. The planner does this, since only it knows played order.
