@@ -1,0 +1,12 @@
+or {
+  `Math.random` as $hit,
+  `Date.now` as $hit,
+  `new Date($...)` as $hit,
+  `performance.now` as $hit
+} where {
+  register_diagnostic(
+    span = $hit,
+    message = "The engine is pure: no ambient randomness or clock. Take a seeded Rng or a time value as an argument.",
+    severity = "error"
+  )
+}

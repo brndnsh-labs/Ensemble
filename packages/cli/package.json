@@ -1,0 +1,12 @@
+{
+  "name": "@ensemble/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "ensemble": "./src/main.ts"
+  },
+  "dependencies": {
+    "@ensemble/engine": "workspace:*"
+  }
+}

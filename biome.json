@@ -1,0 +1,37 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": {
+    "includes": ["**", "!out", "!**/dist", "!**/dist-test", "!**/*.md", "!**/*.grit", "!**/*.chart"]
+  },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "style": { "noNonNullAssertion": "off" }
+    }
+  },
+  "plugins": [{ "path": "./tools/no-ambient-inputs.grit", "includes": ["packages/engine/src/**"] }],
+  "overrides": [
+    {
+      "includes": ["packages/engine/src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["node:*", "@ensemble/*", "../../*"],
+                    "message": "The engine imports nothing outside itself: no Node, no other packages."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
