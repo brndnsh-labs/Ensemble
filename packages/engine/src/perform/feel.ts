@@ -18,6 +18,21 @@ export function energyGain(energy: number): number {
   return 0.72 + 0.4 * energy;
 }
 
+/** Above this level a stroke keeps a quarter of its excess. */
+const KNEE = 120;
+
+/**
+ * The velocity a written level is played at. A hard ceiling would flatten the
+ * loudest strokes into one level at full energy. Squeezing above the knee keeps
+ * an accent an accent, and puts the hardest written stroke at full energy just
+ * under the top of the range. The knee sits above where a backbeat lands until
+ * the band is well into its high tier, so the swell of a jam's arc is untouched.
+ */
+export function loudness(written: number, energy: number): number {
+  const level = written * energyGain(energy);
+  return level <= KNEE ? level : KNEE + (level - KNEE) / 4;
+}
+
 /**
  * Where a straight-grid position lands once swung. Each pair of the swung unit
  * is bent so its offbeat sits later; beats never move, and the bend is linear
@@ -77,7 +92,7 @@ export function applyFeel(
       offset,
       duration: Math.max(1, Math.min(Math.round(end - start), room)),
       pitch: note.pitch,
-      velocity: clampVelocity(note.velocity * energyGain(energy) + velocityShift),
+      velocity: clampVelocity(loudness(note.velocity, energy) + velocityShift),
     };
     return note.voice === undefined ? event : { ...event, voice: note.voice };
   });

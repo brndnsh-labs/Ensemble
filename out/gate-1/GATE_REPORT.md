@@ -64,7 +64,7 @@ I could not test this. Please check: separate tracks; the right tempo; drums map
 `pnpm check`: typecheck and lint clean; 407 tests pass in 4.2 s of the 10 s budget.
 
 - **Chart format**: a 380-row corpus covering every example in the spec, a round trip over the corpus and library (including each library chart through all twelve keys and back), and a fuzz property.
-- **Musical properties** (24), over all eight library charts, 8 seeds, four kinds of take: identical output for identical input, down to the MIDI bytes; a timed jam is a whole number of passes, the closest to the time asked; a jam that ends lands on the tonic with the bass on its lowest root; extending an open jam changes nothing already played; a broken chart still plays (all 380 corpus rows are rendered); nothing rings past the end; nothing pitched under a rest; the bass stays between E1 and A3, one note at a time, never leaps more than an octave, states every change, and resolves every stepwise lead-in by step in real pitch; blues offbeats land on the triplet; kick on 1 and 3 and backbeat on 2 and 4 in every bar of time; nothing ever on the last sixteenth of a beat; an arrival is one crash with a kick under it and no second cymbal.
+- **Musical properties** (30), over all eight library charts, 8 seeds, four kinds of take: identical output for identical input, down to the MIDI bytes; a timed jam is a whole number of passes, the closest to the time asked; a jam that ends lands on the tonic with the bass on its lowest root; extending an open jam changes nothing already played; a broken chart still plays (all 380 corpus rows are rendered); nothing rings past the end; nothing pitched under a rest; the bass stays between E1 and A3, one note at a time, never leaps more than an octave, states every change, and resolves every stepwise lead-in by step in real pitch; blues offbeats land on the triplet; kick on 1 and 3 and backbeat on 2 and 4 in every bar of time; nothing ever on the last sixteenth of a beat; an arrival is one crash with a kick under it and no second cymbal.
 - **Golden takes**: two, both blues.
 
 `pnpm score` (200 takes over the 8 charts; the critic arrived early, from stage 2):
@@ -72,10 +72,10 @@ I could not test this. Please check: separate tracks; the right tempo; drums map
 | Measure | Target | Result |
 |---|---|---|
 | Kick on 1; backbeat on 2 and 4; a section keeps its groove | 95%, 95%, 75% or more | 100% of takes in target |
-| Fills that are triplets | 15% to 50% | 34% of all fills; 89% of takes in target |
+| Fills that are triplets | 15% to 50% | 32% of all fills; 96% of takes in target |
 | Two fills in a row the same | 10% or less | never |
 | Changes stated by the bass | 80% or more | every change, every take |
-| Changes approached by a half step | 15% to 40% | 29% overall; 76% of takes in target (the lowest are quiet takes, which approach less) |
+| Changes approached by a half step | 15% to 40% | 29% overall; 74% of takes in target (the lowest are quiet takes, which approach less) |
 | Stepwise lead-ins that land a leap away | 5% or less | never |
 | Sixths over dominant chords, above the quiet level | 15% to 35% | 22% overall; 78% of takes in target (the lowest are minor blues, where the rule against the sixth applies) |
 | Notes per beat when quiet | 0.45 to 0.75 | 0.56; all in target |
@@ -139,18 +139,19 @@ All of them are in `DECISIONS.md`. The ones that change what you hear, or depart
 
 An independent agent reviewed drums, bass, and planner against the notes by rendering and reading takes (2,280 takes swept; its own charts in other keys, with slash chords, rests, vamps, and written endings). It was cut short by quota: 3/4, 6/8, the long arcs, and the property tests themselves were not reached.
 
-**Fixed after the review**
+**Fixed after the review** (each with a property written first; the gate files were rewritten after these)
 
-- A written `Outro` ending on a chord that is not home was overridden with the tonic. It is now played as written, with a property that pins it. No gate file was affected (the library's written ending stops on home).
+- A written `Outro` ending on a chord that is not home was overridden with the tonic. It is now played as written.
+- **A lead-in could clash with the chord being left** (E natural over F7 into Am7, and C over Bdim7, both in the jazz blues). A lead-in is now either in the scale of the chord it is played over or a half step from where it lands. 35 of 7,375 lead-ins in the test takes changed, all to half-step approaches.
+- **A last bar that is all rest got a crash and kick**, after a set-up fill. It is now silent for everyone, and nobody rolls into it.
+- **Accents flattened above about 0.9 energy**: the loudest strokes all hit the top of the MIDI range. Levels above 120 now keep a quarter of their excess, so the hardest stroke at full energy sits just under the top. The knee is above where a backbeat lands in a jam on a plain form, so the arc's swell is as it was (9.9 against 10.2).
+- **On a 4-bar vamp the cymbal changed every lap** at high energy. A choice held "per pass" is now held for 16 bars on a short vamp, the same line its section fills count to.
+- **Every chorus end got the biggest fill.** On a one-section form the biggest fill is now kept for where the band steps up a tier; an ordinary turnaround gets the section fills (the tom and snare runs), which a 12-bar jam never played before. This changes most of the gate files at their chorus ends.
 
 **Not yet acted on**
 
 - **Wide drops in the bass, several per chorus.** About 3 bars in each 12-bar chorus have a drop of a sixth to an octave onto beat 4, and 9% to 25% of changes (by key; worst in E and Eb) are entered by a major-sixth drop with no lead-in. The octave-drop-then-step figure (`E3 E2 | D2`) recurs often enough to be a tic, and was the approach to the last note in 4 of 6 endings in A. These follow from the old band's rule that moves a leading tone beside its root, combined with roots allowed up to A2. This is the cost of the register flagged above, and the first thing to listen for.
-- **A lead-in from the next chord's fifth can clash with the chord being left** (E natural over F7 into Am7, in the jazz blues at high energy). Only on root moves outside I, IV, V.
-- **A last bar that is all rest still gets a crash and kick**, after a set-up fill. The band should keep the chart's silence.
-- **Accents flatten above about 0.9 energy**: the loudest strokes all reach the top of the MIDI range, so an accented hat equals the backbeat. A jam on a plain form tops out at 0.77 and is not affected; `--energy 0.85` slightly is; a section named "Chorus" in a jam would be.
-- **On a 4-bar vamp the cymbal can change every lap** at high energy, because hat or ride is chosen per pass and a pass is 4 bars.
-- **Sameness in a one-section jam**, as listed under known weaknesses, with two specifics: the mid-level fill at bar 8 is always one of two one-note pickups, and because every chorus end counts as a "top", the tom and snare runs written for ordinary section ends are never played in a 12-bar jam.
+- **The mid-level fill at bar 8 is always one of two one-note pickups.** More phrase fills are style data; waiting to hear whether it reads as sameness.
 - Suspected, not confirmed: with 6 passes, one phrase sits exactly on the line between mid and high.
 
 **Held up under the review**: every bass arrival, range, note length and overlap; no leap over an octave; the lope; sixths and half-step shares in their bands; nothing on an "a"; never two cymbals at once; kick and backbeat in every bar; every fill ending on the "and" of 4; endings that are already home, reach home partway, or rest after home; vamp fills on the 8- and 16-bar lines; song-mode contrast between named sections.

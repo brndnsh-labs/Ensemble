@@ -5,7 +5,19 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
-import { chordTones, PPQ, pitchClass, render, toMidi, validateStyle } from "@ensemble/engine";
+import {
+  arrivals,
+  chordScale,
+  chordTones,
+  contextOf,
+  PPQ,
+  pitchClass,
+  render,
+  scaleHas,
+  tierOf,
+  toMidi,
+  validateStyle,
+} from "@ensemble/engine";
 import { corpus } from "./corpus.ts";
 import { type Jam, LIBRARY, notesOf, readSmf, SEEDS, STYLES, takes } from "./takes.ts";
 
@@ -497,6 +509,122 @@ test("the last bass note of a jam that ends is the lowest root on the instrument
       `${chart.file} seed ${options.seed}: ends on ${last.pitch}`,
     );
   }
+});
+
+test("a bass note that leads into a change belongs to the scale of the chord it is played over, unless it is a half step from where it lands", () => {
+  let leadIns = 0;
+  for (const { chart, options, take } of takes()) {
+    const bass = notesOf(take, "bass");
+    const harmony = arrivals(take.plan);
+    const arrivalTicks = new Set(harmony.map((arrival) => arrival.tick));
+    for (const change of bassChanges(take)) {
+      const landing = bass.find((note) => note.tick === change.tick);
+      const before = bass.findLast((note) => note.tick < change.tick);
+      if (!landing || !before || change.tick - before.tick > PPQ) continue;
+      if (arrivalTicks.has(before.tick)) continue;
+      const over = harmony.findLast((arrival) => arrival.tick <= before.tick);
+      if (!over?.chord) continue;
+      leadIns++;
+      if (Math.abs(before.pitch - landing.pitch) === 1) continue;
+      const scale = chordScale(over.chord, contextOf(harmony, over));
+      assert.ok(
+        scaleHas(scale, before.pitch - pitchClass(over.chord.root)),
+        `${chart.file} seed ${options.seed} at tick ${change.tick}: ${before.pitch} over ${over.chord.text} (${scale.name})`,
+      );
+    }
+  }
+  assert.ok(leadIns > 500, `only ${leadIns} lead-ins across the library`);
+});
+
+// ── the planner and the drummer, on charts the library does not have ────────
+
+test("a last bar that is all rest is silence: nobody plays in it, and the drummer does not roll into it", () => {
+  const charts = [
+    "key: A\n| A7 | D7 | E7 | NC |",
+    "key: A\n| A7 | D7 | A7 | A7 | D7 | D7 | E7 | NC |",
+  ];
+  for (const style of STYLES) {
+    for (const text of charts) {
+      for (const seed of SEEDS) {
+        const take = render(text, style, { mode: "jam", passes: 2, seed });
+        const music = take.plan.bars.filter((bar) => bar.kind === "music");
+        const last = music.at(-1)!;
+        const before = music.at(-2)!;
+        const played = notesOf(take).filter((note) => note.tick >= last.start);
+        assert.equal(played.length, 0, `seed ${seed}: ${played.length} notes in the silent bar`);
+        assert.equal(before.fill, null, `seed ${seed}: a fill into silence`);
+      }
+    }
+  }
+});
+
+test("at full energy the band still has accents: almost nothing is pinned to the top of the range", () => {
+  for (const style of STYLES) {
+    for (const chart of LIBRARY) {
+      const take = render(chart.text, style, { mode: "jam", passes: 2, energy: 1, seed: 1 });
+      const notes = notesOf(take);
+      const pinned = notes.filter((note) => note.velocity >= 127).length;
+      assert.ok(
+        pinned <= notes.length * 0.02,
+        `${chart.file}: ${pinned} of ${notes.length} notes at 127`,
+      );
+    }
+  }
+});
+
+test("on a short vamp the drummer does not change cymbal every lap: the cymbal that keeps time holds for 16 bars", () => {
+  const text = "key: A\n| A7 | D7 | A7 | E7 |";
+  for (const style of STYLES) {
+    const perSeed = new Set<string>();
+    for (const seed of SEEDS) {
+      const take = render(text, style, { mode: "jam", passes: 16, energy: 0.85, seed });
+      const music = take.plan.bars.filter((bar) => bar.kind === "music");
+      const drums = notesOf(take, "drums");
+      for (let from = 0; from < music.length; from += 16) {
+        const stretch = music.slice(from, from + 16);
+        const start = stretch[0]!.start;
+        const end = stretch.at(-1)!.start + stretch.at(-1)!.ticks;
+        const cymbals = new Set(
+          drums
+            .filter((note) => note.tick >= start && note.tick < end)
+            .map((note) => note.voice)
+            .filter((voice) => voice === "closedHat" || voice === "ride"),
+        );
+        assert.ok(
+          cymbals.size <= 1,
+          `seed ${seed}: hat and ride both within bars ${from + 1} to ${from + 16}`,
+        );
+        for (const cymbal of cymbals) perSeed.add(cymbal!);
+      }
+    }
+    // Guard against passing because one cymbal was dropped altogether.
+    if (style.id === "blues")
+      assert.equal(perSeed.size, 2, "both hat and ride are heard somewhere");
+  }
+});
+
+test("in a jam on a one-section form, the biggest fill is kept for where the band steps up a level", () => {
+  const rank = (energy: number) => ["low", "mid", "high"].indexOf(tierOf(energy));
+  let tops = 0;
+  let plain = 0;
+  for (const { chart, take } of takes((jam) => jam.options.mode === "jam")) {
+    const body = take.plan.bars.filter(
+      (bar) => bar.kind === "music" && bar.section.role === "body",
+    );
+    if (new Set(body.map((bar) => bar.section.identity)).size !== 1) continue;
+    if (body[0]!.section.bars < 8) continue; // a short vamp counts its own lines
+    for (let i = 0; i + 1 < body.length; i++) {
+      const bar = body[i]!;
+      const next = body[i + 1]!;
+      if (next.pass === bar.pass || next.ending) continue;
+      assert.ok(bar.fill, `${chart.file}: a chorus ends without a fill`);
+      const stepsUp = rank(next.energy) > rank(bar.energy);
+      assert.equal(bar.fill.top, stepsUp, `${chart.file} bar ${bar.index}: top fill`);
+      if (stepsUp) tops++;
+      else plain++;
+    }
+  }
+  assert.ok(tops > 0 && plain > 0, `${tops} tops and ${plain} ordinary chorus ends`);
 });
 
 function musicSeconds(take: Take): number {

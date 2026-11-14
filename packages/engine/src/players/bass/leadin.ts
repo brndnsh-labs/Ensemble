@@ -221,8 +221,12 @@ function approach(
           : [kind === "below" ? target - 1 : target + 1];
   // The kind asked for first, then the scale steps, then the fifth: a lead-in the line would
   // have to leap more than an octave to reach is no lead-in, so one it can reach is played.
+  // Every kind answers to the scale of the chord being left: a passing or approach tone comes
+  // from it, the one exception being the chromatic half step onto the landing note (X-A-26).
+  // So the fifth of the chord coming, say E over F7 into Am7, is not a candidate there.
+  const eligible = (pitch: number) => inScale(pitch) || Math.abs(pitch - target) === 1;
   const playable = [...wanted, ...scaleSteps(), ...fifths()].filter(
-    (pitch) => pitch >= LOW_E && pitch <= TOP && pitch !== target,
+    (pitch) => pitch >= LOW_E && pitch <= TOP && pitch !== target && eligible(pitch),
   );
   let candidates = playable.filter(
     (pitch) => previous === null || Math.abs(pitch - previous) <= OCTAVE,

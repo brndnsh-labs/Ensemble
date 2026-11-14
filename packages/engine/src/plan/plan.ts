@@ -42,6 +42,7 @@ export function planBars(
   }
 
   const vamp = isVamp(expanded, options);
+  const oneSection = runs.filter((run) => run.part === "body" && run.pass === 0).length === 1;
   const without = new Set<Seat>(options.without ?? []);
   const bodyBarsPerPass = Math.max(1, options.mode === "jam" ? bodyOf(expanded).length : 1);
 
@@ -154,18 +155,22 @@ export function planBars(
         }
       } else if (draft.lastOfRun) {
         const newPass = next !== undefined && next.run.pass !== draft.run.pass;
-        // "Is the next section bigger" is asked of the sections themselves, before the one-bar
-        // build, or the build would hide the very step it leads into.
-        const bigger = next !== undefined && tierRank(next.energy) > tierRank(draft.energy);
-        fill = { boundary: "section", top: newPass || bigger, tier, half: false };
+        // "Is the next section bigger" is asked of the levels the band will actually play.
+        // The one-bar build stays inside its tier, so it cannot hide the step it leads into.
+        const bigger = next !== undefined && tierRank(nextEnergy) > tierRank(energy);
+        // On a one-section form every turnaround is the top of the form. The biggest fill is
+        // kept for where the band steps up, or it is the only fill the turnaround ever gets.
+        fill = { boundary: "section", top: bigger || (newPass && !oneSection), tier, half: false };
       } else if (lastOfPhrase && draft.phrase.index % 2 === 1) {
         fill = { boundary: "phrase", top: false, tier, half: false };
       }
       if (isSetup) {
         // A quiet tune still rolls into its last hit; a style that ends softly plays time into it.
-        fill = style.ending.setupFill
-          ? { boundary: "section", top: true, tier: "high", half: false }
-          : null;
+        // Nobody rolls into a bar of written silence.
+        fill =
+          style.ending.setupFill && !ending?.silent
+            ? { boundary: "section", top: true, tier: "high", half: false }
+            : null;
       }
     }
     if (previous && !isEnding) {
@@ -181,7 +186,9 @@ export function planBars(
     }
 
     const flat = draft.flat;
-    const endingMark = isEnding && ending ? ending.mark(flat.ticks, style) : null;
+    // A last bar that is all rest is the chart's own silence: no final hit, and everyone is out.
+    const silent = isEnding && ending?.silent === true;
+    const endingMark = isEnding && ending && !silent ? ending.mark(flat.ticks, style) : null;
     bars.push({
       index: i + offsetIndex,
       start: tick,
@@ -203,7 +210,13 @@ export function planBars(
       phrase: draft.phrase,
       energy,
       level: draft.level,
-      seats: seatEnergies(energy, without),
+      seats: silent ? seatEnergies(energy, new Set(SEATS)) : seatEnergies(energy, without),
+      // What a choice held "per pass" is held for. A lap of a short vamp is too short to be a
+      // pass: there it is the 16 bars between the vamp's own section lines.
+      stretch:
+        vamp && draft.run.part === "body"
+          ? Math.floor((draft.lapBarsBefore + draft.barInSection) / 16)
+          : draft.occurrence,
       fill,
       crash,
       lastPass: !open && options.mode === "jam" && draft.run.pass === passes - 1,
@@ -404,6 +417,8 @@ const clampTempo = (bpm: number): number =>
 interface Ending {
   readonly spans: readonly ChordSpan[];
   readonly finalSpan: ChordSpan;
+  /** The last bar is all rest: there is no final chord to play. */
+  readonly silent: boolean;
   readonly tailBars: number;
   mark(barTicks: number, style: StylePack): EndingMark;
 }
@@ -440,6 +455,7 @@ function resolveEnding(
   // The gesture starts where the final chord begins. A bar that is all rest has no final chord:
   // the chart wrote its own silence, and the band keeps it.
   const lastChorded = spans.findLastIndex((span) => span.chord !== null);
+  const silent = lastChorded < 0;
   // Home written twice in the bar (or held with a dot) has sounded since its first span:
   // the band's hit is where the final chord first lands.
   let landing = Math.max(0, lastChorded);
@@ -451,6 +467,7 @@ function resolveEnding(
   return {
     spans,
     finalSpan,
+    silent,
     tailBars,
     mark: (barTicks) => ({
       gesture,

@@ -18,10 +18,10 @@
     "inTarget": 1
   },
   "drums.triplet-fills": {
-    "mean": 0.3951,
+    "mean": 0.3654,
     "p10": 0.25,
     "p90": 0.5,
-    "inTarget": 0.8909
+    "inTarget": 0.9636
   },
   "drums.fills-that-repeat": {
     "mean": 0,
@@ -36,10 +36,10 @@
     "inTarget": 1
   },
   "bass.half-step-approaches": {
-    "mean": 0.2694,
+    "mean": 0.2727,
     "p10": 0.1053,
-    "p90": 0.4,
-    "inTarget": 0.755
+    "p90": 0.4118,
+    "inTarget": 0.74
   },
   "bass.lead-ins-that-leap": {
     "mean": 0,
@@ -60,15 +60,15 @@
     "inTarget": 1
   },
   "bass.semitones-per-move": {
-    "mean": 3.7103,
+    "mean": 3.7016,
     "p10": 3.2286,
     "p90": 4.7,
     "inTarget": null
   },
   "band.backbeat-swell": {
-    "mean": 10.2181,
-    "p10": 10.1,
-    "p90": 10.35,
+    "mean": 9.8837,
+    "p10": 9.7857,
+    "p90": 10,
     "inTarget": null
   }
 }

@@ -83,19 +83,21 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State at the second pause on 2026-11-14 (session quota). Everything is committed.
+State on 2026-11-14, after the review fixes. Everything is committed.
 
-**Stage 1 is built and its gate files are written** (`out/gate-1/`, with `GATE_REPORT.md`). Waiting on Brandon's ears. `pnpm check` passes (407 tests, about 4 s); `pnpm score` matches its baseline.
+**Stage 1 is built and its gate files are written** (`out/gate-1/`, with `GATE_REPORT.md`). Waiting on Brandon's ears. `pnpm check` passes (413 tests, about 4.5 s); `pnpm score` matches its baseline.
 
 **Open from stage 1**
 
-- The adversarial review of drums, bass, and planner reported before the pause, cut short. One bug is fixed (a written ending overridden). The rest is in `out/gate-1/GATE_REPORT.md` under "Review findings", "Not yet acted on". Take them in this order: the lead-in fifth that clashes with the chord being left (check a lead-in against that chord's scale, X-A-26); the all-rest last bar that still gets a crash; accents clipping above 0.9 energy; hat or ride changing every lap of a short vamp; the section fill list never heard in a one-section jam. The wide bass drops wait for Brandon's ear on the register, since they follow from it. Each fix: property or measure first, then `pnpm gate:1` and the goldens with a line in `DECISIONS.md`. The review did not reach 3/4, 6/8, long arcs, or whether the property tests are weaker than their names.
+- The review's findings are fixed except the ones that wait for a listening verdict: the wide bass drops (they follow from the register) and the two one-note phrase fills at mid level. Both are in `out/gate-1/GATE_REPORT.md` under "Not yet acted on". The review did not reach 3/4, 6/8, long arcs, or whether the property tests are weaker than their names.
 - Gate 1 feedback, when it arrives, becomes a property or a measure first, then a fix.
+
+**Models** (agreed with Brandon to stretch quota): Sonnet for small fixes with a property written first and for mechanical work; Opus for the voicing engine and for adversarial reviews; Fable for comping rhythm, the soloist, and the main thread. The chord seat is built in two parts, in sequence: voicing (Opus), then rhythm (Fable). See "Built in two parts" in `prompts/seat-chords.md`.
 
 **Stage 2, in the order to pick up**
 
 1. The critic framework, `ensemble score`, and the drum, bass, and band measures are done (`packages/engine/src/critic/`, baseline in `scorecard/blues.json`).
-2. **Chord seat**: not started. The brief is ready at `prompts/seat-chords.md`; launch it as the drum and bass seats were launched (one Fable agent, told which other agents are running and where its scratch folder is).
+2. **Chord seat**: the brief is `prompts/seat-chords.md`, built in two parts (see its last section).
 3. When it lands: read rendered takes bar by bar; turn its list of "properties that always hold" into tests in `test/properties.test.ts` (register floor, chord identity, every chord struck, voice leading); have a second agent review it against part B of the notes; then `pnpm goldens`, `score --update`, each with a line in `DECISIONS.md`.
 4. Gate 2 files and report: a script like `scripts/gate-1.sh`, with takes that isolate each level, and the scorecard's comping lines in the report.
 

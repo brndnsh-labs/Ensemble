@@ -82,6 +82,11 @@ export interface PlanBar {
     readonly occurrence: number;
     readonly bars: number;
   };
+  /**
+   * Counts the stretches a choice held "per pass" lasts, from 0: each time
+   * through a section, except on a short vamp, where it is every 16 bars.
+   */
+  readonly stretch: number;
   /** Which time through the form, from 0. The intro belongs to pass 0. */
   readonly pass: number;
   readonly barInSection: number;
