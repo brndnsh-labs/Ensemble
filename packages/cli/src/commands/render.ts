@@ -13,7 +13,7 @@ const SEAT_NAMES: readonly Seat[] = ["drums", "bass", "chords", "solo"];
 export const renderCommand: Command = {
   summary: "play the chart and write the performance as a MIDI file",
   usage:
-    "<chart> --out take.mid [--style S] [--seed N] [--minutes M | --passes P] [--song] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
+    "<chart> --out take.mid [--style S] [--seed N] [--minutes M | --passes P] [--song] [--solo] [--tempo BPM] [--energy 0..1] [--key K] [--without seat,seat] [--no-count-in]",
   run(args) {
     const { positionals, values } = parseArgs({
       args,
@@ -25,6 +25,7 @@ export const renderCommand: Command = {
         minutes: { type: "string", short: "m" },
         passes: { type: "string", short: "p" },
         song: { type: "boolean", default: false },
+        solo: { type: "boolean", default: false },
         tempo: { type: "string", short: "t" },
         energy: { type: "string", short: "e" },
         key: { type: "string", short: "k" },
@@ -67,6 +68,7 @@ export const renderCommand: Command = {
       mode: values.song ? "song" : "jam",
       seed: values.seed,
       countIn: !values["no-count-in"],
+      ...(values.solo ? { solo: true } : {}),
       without: without as Seat[],
       ...(minutes === undefined ? {} : { minutes }),
       ...(passes === undefined ? {} : { passes }),

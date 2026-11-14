@@ -10,7 +10,7 @@ import { chordFamily, chordToString, makeQuality } from "../theory/chord.ts";
 import type { Key } from "../theory/pitch.ts";
 import { pitchClass } from "../theory/pitch.ts";
 import { arcOffset } from "./arc.ts";
-import type { EndingMark, FillMark, Plan, PlanBar, PlanOptions } from "./types.ts";
+import type { EndingMark, FillMark, Plan, PlanBar, PlanOptions, SoloMark } from "./types.ts";
 
 /** A timed jam with no stated length. */
 const DEFAULT_MINUTES = 3;
@@ -101,6 +101,8 @@ export function planBars(
     });
     occurrence++;
   }
+
+  const solos = soloMarks(drafts, options, passes, open);
 
   // The one-bar build into a bigger section, then the rule about the high-tier line.
   const energies = drafts.map((draft, i) => {
@@ -210,7 +212,10 @@ export function planBars(
       phrase: draft.phrase,
       energy,
       level: draft.level,
-      seats: silent ? seatEnergies(energy, new Set(SEATS)) : seatEnergies(energy, without),
+      seats: silent
+        ? seatEnergies(energy, new Set(SEATS))
+        : seatEnergies(energy, solos[i] ? without : new Set([...without, "solo" as const])),
+      solo: silent || without.has("solo") ? null : solos[i]!,
       // What a choice held "per pass" is held for. A lap of a short vamp is too short to be a
       // pass: there it is the 16 bars between the vamp's own section lines.
       stretch:
@@ -401,6 +406,54 @@ function seatEnergies(energy: number, without: ReadonlySet<Seat>): Record<Seat, 
   return seats;
 }
 
+/** A solo is one arc of at most this many choruses, then the soloist lays out for one (SO-04, SO-05). */
+const SOLO_CHORUSES = 3;
+
+/**
+ * Where the soloist has the lead, bar by bar. It rests through an intro and a
+ * written ending. A section labelled "Solo" is a solo whenever it comes round.
+ * Otherwise, in a jam, the band states the form once, then the soloist plays
+ * solos of three choruses with a chorus of rest between them; a solo cut short
+ * by the end of the jam knows it is shorter, so it still peaks in its last
+ * chorus. In a song with no "Solo" section it plays the body through as one
+ * chorus. An open jam's solos never depend on how long the jam turns out to be.
+ */
+function soloMarks(
+  drafts: readonly Draft[],
+  options: PlanOptions,
+  passes: number,
+  open: boolean,
+): (SoloMark | null)[] {
+  if (options.solo !== true) return drafts.map(() => null);
+  const body = (draft: Draft) => draft.run.part === "body" && draft.flat.role === "body";
+  const arc = (index: number, count: number): SoloMark => {
+    const chorus = index % SOLO_CHORUSES;
+    const of = open ? SOLO_CHORUSES : Math.min(SOLO_CHORUSES, count - (index - chorus));
+    return { chorus, of };
+  };
+
+  const named = (draft: Draft) => sectionIdentity(draft.flat.sectionLabel).startsWith("solo");
+  if (drafts.some(named)) {
+    const times = [...new Set(drafts.filter(named).map((draft) => draft.occurrence))];
+    return drafts.map((draft) =>
+      named(draft) ? arc(times.indexOf(draft.occurrence), times.length) : null,
+    );
+  }
+  if (options.mode === "song") {
+    return drafts.map((draft) => (body(draft) ? { chorus: 0, of: 1 } : null));
+  }
+  // The band alone first, unless one pass is all there is.
+  const lead = open || passes > 1 ? 1 : 0;
+  const cycle = SOLO_CHORUSES + 1;
+  return drafts.map((draft) => {
+    const turn = draft.run.pass - lead;
+    if (!body(draft) || turn < 0 || turn % cycle === SOLO_CHORUSES) return null;
+    const chorus = turn % cycle;
+    const first = draft.run.pass - chorus;
+    return { chorus, of: open ? SOLO_CHORUSES : Math.min(SOLO_CHORUSES, passes - first) };
+  });
+}
+
 /** Add a lift without leaving the tier the bar is in. */
 function withinTier(energy: number, lift: number): number {
   const ceiling = energy < TIER_MID ? TIER_MID : energy < TIER_HIGH ? TIER_HIGH : 1;
@@ -553,6 +606,7 @@ function countInBar(first: PlanBar): PlanBar {
     phrase: { index: 0, bar: 0, length: 1 },
     // The count belongs to the band even when its drummer is the person playing along.
     seats: { drums: first.energy, bass: null, chords: null, solo: null },
+    solo: null,
     fill: null,
     crash: false,
     ending: null,
@@ -570,6 +624,7 @@ function tailBar(last: PlanBar, index: number, start: number, finalSpan: ChordSp
     barInSection: last.barInSection + (index - last.index),
     barInPass: last.barInPass + (index - last.index),
     seats: { drums: null, bass: null, chords: null, solo: null },
+    solo: null,
     fill: null,
     crash: false,
     ending: null,

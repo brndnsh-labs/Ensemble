@@ -631,6 +631,72 @@ test("in a jam on a one-section form, the biggest fill is kept for where the ban
   assert.ok(tops > 0 && plain > 0, `${tops} tops and ${plain} ordinary chorus ends`);
 });
 
+// ── the soloist ─────────────────────────────────────────────────────────────
+
+test("the soloist is off unless asked for; asked for, it rests through the intro and a written ending, lays out and returns, and never solos more than three choruses in a row", () => {
+  for (const style of STYLES) {
+    for (const chart of LIBRARY) {
+      const written = parse(chart.text).chart;
+      for (const passes of [1, 2, 3, 4, 6, 9]) {
+        const without = plan(written, style, { mode: "jam", passes });
+        assert.ok(
+          without.bars.every((bar) => bar.solo === null && bar.seats.solo === null),
+          `${chart.file}: a soloist nobody asked for`,
+        );
+
+        const roadmap = plan(written, style, { mode: "jam", passes, solo: true });
+        const where = `${chart.file}, ${passes} passes`;
+        const byPass = new Map<number, PlanBar[]>();
+        for (const bar of roadmap.bars) {
+          assert.equal(bar.solo !== null, bar.seats.solo !== null, `${where}: bar ${bar.index}`);
+          if (bar.kind !== "music" || bar.section.role !== "body") {
+            assert.equal(bar.solo, null, `${where}: a solo outside the form, bar ${bar.index}`);
+          } else {
+            byPass.set(bar.pass, [...(byPass.get(bar.pass) ?? []), bar]);
+          }
+        }
+        // A pass is all solo or all rest, and one chorus of the solo throughout.
+        const turns = [...byPass.values()].map((bars) => {
+          const marks = new Set(bars.map((bar) => JSON.stringify(bar.solo)));
+          assert.equal(marks.size, 1, `${where}: a pass that changes its mind`);
+          return bars[0]!.solo;
+        });
+        assert.ok(
+          turns.some((turn) => turn !== null),
+          `${where}: the soloist never plays`,
+        );
+        if (passes >= 2) assert.equal(turns[0], null, `${where}: the band states the form first`);
+        let run = 0;
+        turns.forEach((turn, pass) => {
+          run = turn ? run + 1 : 0;
+          assert.ok(run <= 3, `${where}: more than three choruses in a row`);
+          if (!turn) return;
+          // The solo counts its choruses in order and knows how many it has.
+          assert.equal(turn.chorus, run - 1, `${where}: pass ${pass} is chorus ${turn.chorus}`);
+          const left = turns.slice(pass).indexOf(null);
+          const remaining = left < 0 ? turns.length - pass : left;
+          assert.equal(turn.of, turn.chorus + remaining, `${where}: pass ${pass} of ${turn.of}`);
+        });
+        if (passes >= 6) {
+          assert.ok(turns.slice(1).includes(null), `${where}: the soloist never lays out`);
+        }
+
+        // An open jam's solo does not depend on how long the jam turns out to be.
+        const open = (n: number) =>
+          plan(written, style, { mode: "jam", open: true, passes: n, solo: true }).bars;
+        const shorter = open(passes);
+        assert.deepEqual(
+          open(passes + 1)
+            .slice(0, shorter.length)
+            .map((bar) => bar.solo),
+          shorter.map((bar) => bar.solo),
+          `${where}: an open jam's solos moved when it grew`,
+        );
+      }
+    }
+  }
+});
+
 // ── the piano ───────────────────────────────────────────────────────────────
 
 interface Strike {

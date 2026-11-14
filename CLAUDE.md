@@ -41,7 +41,7 @@ The CLI:
 pnpm -s ensemble parse  library/blues-12-bar-a.chart
 pnpm -s ensemble fmt    library/blues-12-bar-a.chart [--write]
 pnpm -s ensemble render library/blues-12-bar-a.chart --out take.mid \
-    [--style blues] [--seed 1] [--minutes 3 | --passes 4] [--song] \
+    [--style blues] [--seed 1] [--minutes 3 | --passes 4] [--song] [--solo] \
     [--tempo 96] [--energy 0.3] [--key Bb] [--without bass] [--no-count-in]
 pnpm -s ensemble score  [chart...] [--style blues] [--seeds 200] [--update | --check]
 ```

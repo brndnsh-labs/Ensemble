@@ -24,6 +24,11 @@ export interface PlanOptions {
    * pass (no lift, no arc), and the form still breathes around it at half depth.
    */
   readonly energy?: number;
+  /**
+   * The band's soloist plays. Default false: someone practising wants the band,
+   * not a soloist (SO-04). Where it plays and lays out is the plan's to say.
+   */
+  readonly solo?: boolean;
   /** A bar of sticks before the first bar. Default true. */
   readonly countIn?: boolean;
   /** Seats to leave out entirely. Default: none. */
@@ -42,6 +47,18 @@ export interface FillMark {
   readonly tier: Tier;
   /** Half length, so consecutive laps of a short vamp differ. */
   readonly half: boolean;
+}
+
+/**
+ * The soloist's place in its solo. A solo is one arc of up to three choruses:
+ * it starts low and sparse and peaks in its last chorus (SO-05), so the soloist
+ * needs to know which chorus this is and how many the solo has.
+ */
+export interface SoloMark {
+  /** Which chorus of this solo, from 0. */
+  readonly chorus: number;
+  /** How many choruses this solo has: 1 to 3. */
+  readonly of: number;
 }
 
 /** The final chord and how the band plays it. Present on the ending bar only. */
@@ -108,6 +125,9 @@ export interface PlanBar {
   readonly level: number;
   /** Each seat's energy for this bar, or null when it lays out. */
   readonly seats: Readonly<Record<Seat, number | null>>;
+
+  /** Present where the soloist has the lead. Null where it lays out. */
+  readonly solo: SoloMark | null;
 
   readonly fill: FillMark | null;
   /** An arrival: crash on beat 1. */
