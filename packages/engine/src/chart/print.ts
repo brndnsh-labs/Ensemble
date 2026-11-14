@@ -2,7 +2,7 @@
 // Printing a chart and parsing the result gives the same chart.
 
 import { chordText } from "./display.ts";
-import type { Cell, Row } from "./layout.ts";
+import type { Cell, Row, TextLine } from "./layout.ts";
 import { flow } from "./layout.ts";
 import { repeatCount, validRepeatCount } from "./lex.ts";
 import type { Bar, BarToken, Chart, ChartComment, ChartField, Section } from "./model.ts";
@@ -29,11 +29,13 @@ function fieldText(field: ChartField): string {
     : `${field.name}: ${field.value}`;
 }
 
-const lineText = (item: ChartField | ChartComment): string =>
-  item.kind === "field" ? fieldText(item) : commentText(item);
+function lineText(item: TextLine): string {
+  if (item.kind === "field") return fieldText(item);
+  return item.kind === "comment" ? commentText(item) : item.text;
+}
 
-/** Fields and comments, one to a line. A trailing comment joins the line before it. */
-function linesOf(items: readonly (ChartField | ChartComment)[]): string[] {
+/** Fields, comments, and unread lines, one to a line. A trailing comment joins the line before it. */
+function linesOf(items: readonly TextLine[]): string[] {
   const lines: string[] = [];
   for (const item of items) {
     const last = lines.length - 1;
@@ -56,6 +58,7 @@ function tokenText(token: BarToken): string {
     case "annotation":
       return `!${token.word}`;
     case "unknown":
+    case "misplaced":
       return token.text;
   }
 }
@@ -94,7 +97,7 @@ interface BarLine {
 /** A bar that would be read as the repeat count if it came straight after `:|`. */
 const looksLikeCount = (cell: Cell | undefined): boolean => {
   const first = cell?.bar.tokens[0];
-  const times = first?.kind === "unknown" ? repeatCount(first.text) : null;
+  const times = first?.kind === "misplaced" ? repeatCount(first.text) : null;
   return times !== null && validRepeatCount(times);
 };
 

@@ -31,7 +31,7 @@ style: blues
 A chart is a header followed by one or more sections.
 
 - Blank lines are ignored everywhere.
-- `//` starts a comment that runs to the end of the line. It must be at the start of a line or preceded by whitespace.
+- `//` starts a comment that runs to the end of the line. It must be at the start of a line, preceded by whitespace, or directly after a bar line.
 - Column alignment and extra spaces are cosmetic.
 
 ### 3.1 Header
@@ -47,7 +47,8 @@ A chart is a header followed by one or more sections.
 | `style` | a style pack id | chosen in the app |
 
 - Unknown fields are preserved and ignored, with an info diagnostic.
-- **Key.** Required if the chart uses numerals (an error on each numeral otherwise). If absent in a chart of absolute chords, the parser warns and uses the root of the first chord as the tonic, major unless that chord is minor. Endings and numeral display depend on the key, so charts should state it.
+- A line in the header that is neither `name: value` nor chords (a title typed without `title:`, `tempo 120` without its colon) is an error on that line. The header continues after it.
+- **Key.** Required if the chart uses numerals (an error on each numeral otherwise). If absent in a chart of absolute chords, the parser warns and uses the root of the first chord as the tonic, major unless that chord has a minor third. Endings and numeral display depend on the key, so charts should state it.
 - Only major and minor keys in version 1. No modes.
 
 ### 3.2 Sections
@@ -60,7 +61,7 @@ A section starts with a label in square brackets on its own line, followed by it
 ```
 
 - Labels are free text: `[A]`, `[Verse 1]`, `[Bridge]`.
-- A chart with bars and no section header has one implicit section labeled `A`.
+- A chart with bars and no section header has one implicit section labeled `A`. In a chart that does have headers, bars before the first one form a section with no label.
 - **Overrides.** Header-style lines directly after a section label apply to that section only. Allowed: `key`, `meter`.
 
   ```
@@ -80,12 +81,13 @@ A section starts with a label in square brackets on its own line, followed by it
   [A]
   ```
 
-  A reference to a label that has not been defined is an error. Defining bars under a label that already has bars is an error; use a distinct label (`Verse 2`).
+  A reference to a label that has not been defined is an error. Defining bars under a label that already has bars is an error, and the section plays its first definition; use a distinct label (`Verse 2`). Labels match without regard to case. A reference may carry its own `key:` (it plays transposed) but not its own `meter:`.
 
 - **Reserved labels** (case-insensitive) have roles in jam mode:
-  - `Intro`: played once at the start, not looped.
+  - `Intro`: played once at the start, not looped. Only intro sections before the first body section count; a later one is part of the body.
   - `Outro`, `Ending`, `Coda`, `Tag`: played once at the end, replacing the style's generated ending.
   - Everything else is the body, which loops.
+  - A reserved word followed by a number (`Intro 2`, `Tag 2`) keeps its role. Anything longer (`Intro vamp`) is body.
 
   In song mode, all sections play once in file order.
 
@@ -94,7 +96,7 @@ A section starts with a label in square brackets on its own line, followed by it
 Bars are separated by `|`.
 
 - Leading and trailing `|` on a line are optional.
-- A run of `|` characters (`||`) counts as one bar line.
+- A run of `|` characters (`||`) counts as one bar line. Bar lines with only spaces between them (`| |`) also make no bar, with a warning: use `%` or `.` for a bar that repeats or holds.
 - A line break also ends a bar.
 - Four bars per line is conventional and not required.
 
@@ -122,13 +124,13 @@ One rule: **the tokens in a bar divide it into equal slots.**
 | 12/8 | 1, 2, 3, 4, 6, 12, 24 |
 | 5/4 | 1, 5, 10 |
 
-Any other count is an error on that bar. Two chords in 3/4 must say how they split: `| C . G |`.
+The rule is the definition; the table shows the common counts. Any other count is an error on that bar. Two chords in 3/4 must say how they split: `| C . G |`.
 
 ### 4.2 Other bar tokens
 
 | Token | Meaning |
 |---|---|
-| `%` | Repeat the previous bar. Must be alone in its bar. |
+| `%` | Repeat the bar played before it, in the same section. Must be alone in its bar. After a repeat, that is the last bar the repeat played; at the start of an ending, the last bar before the endings. |
 | `NC` | No chord. Also accepted: `N.C.`, `nc`. Occupies a slot like a chord. |
 | `!word` | Reserved for hits and stops (`!stop`, `!hit`). Version 1 parses and ignores these with an info diagnostic. They do not occupy a slot. |
 
@@ -156,10 +158,11 @@ Borrowed from common notation and kept to one level.
 |: Dm7 | G7 |1 Cmaj7 | A7 :|2 Cmaj7 | % |
 ```
 
-- `|:` opens a repeat and `:|` closes it. Default is two times. `xN` after `:|` sets the total count.
+- `|:` opens a repeat and `:|` closes it. Default is two times. `xN` after `:|` sets the total count (1 to 99). A repeat with numbered endings takes its count from them, and `xN` there is an error.
 - `|1` begins a first ending. `:|2` closes the repeat and begins the second ending, which runs to the end of the line or the next section. More endings (`:|3`) follow the same pattern.
 - The ending number must touch the bar line with no space.
 - Repeats do not nest and do not cross section boundaries.
+- Because the last ending runs to the end of its line, line breaks carry meaning there. The formatter keeps an ending's bars on one line.
 
 ## 6. Chords
 
@@ -223,8 +226,8 @@ Input is lenient. Display is canonical. Matching is case-sensitive (`M` is major
 | `dim7` | `o7`, `°7` |
 | `7sus4` | `7sus` |
 | `9`, `maj9`, `m9` | same alternates as the sevenths |
-| `11`, `m11` | |
-| `13`, `maj13`, `m13` | |
+| `11`, `m11` | same alternates as the sevenths |
+| `13`, `maj13`, `m13` | same alternates as the sevenths |
 | `9sus4`, `13sus4` | `9sus`, `13sus` |
 | `7alt` | `alt` |
 | `7#5` | `+7`, `aug7` |
@@ -254,6 +257,12 @@ The parser never throws on user input. It returns a chart and a list of diagnost
 | Unknown or duplicate section label | Error on the header line. The section is skipped (unknown) or kept as first defined (duplicate). |
 | Unclosed repeat | Error. The repeat closes at the end of the section. |
 | Missing key | Warning. Fallback as described in 3.1. |
+| A stray line in the header | Error on the line. The header continues. |
+| Nothing between two spaced bar lines | Warning. No bar is made. |
+| `xN` away from `:|`, or on a repeat with numbered endings | Error. It occupies no bar. |
+| A header-style line among the bars | Error. Ignored when playing. |
+
+The formatter never deletes a chord, a comment, or a field line, including the ones the parser ignores.
 
 A chart with errors still plays.
 
@@ -262,7 +271,8 @@ A chart with errors still plays.
 The exact types are the implementer's call. Requirements:
 
 - Every chord keeps three things: the text as typed, its absolute spelling in the section's key, and its degree and quality relative to the key. Display as names, numerals, or both is derived from these.
-- Transposition is a change of key, after which absolute spellings are recomputed. Chords typed as absolute names are re-spelled; the stored text can be rewritten only by an explicit "transpose and rewrite" action.
+- Spelling. A note at a degree of the key is spelled by letter (bIII in C is Eb), unless that needs a double accidental or gives Cb, Fb, E#, or B# where the key's own scale has no such note; then it takes the plain enharmonic (bVI in Db is A). Reading a typed name back into a degree is the inverse of this, so a chart survives transposition through text and back.
+- Transposition is a change of key, after which absolute spellings are recomputed. A section's own key moves by the same interval and takes its conventional spelling (Db, not C#). Chords typed as absolute names are re-spelled; the stored text can be rewritten only by an explicit "transpose and rewrite" action.
 - Repeats, endings, `%`, and section references are preserved in the model for display, and a separate function expands them into a flat list of bars for the planner.
 - Every node keeps its source range, for diagnostics and for linking the playhead to the text.
 
@@ -346,7 +356,7 @@ solo     .      .  .  3  .  .
 - Values are 1 to 4. `.` means the player is out. `-` means inherit the section's energy.
 - A chart without this block uses the style's default arrangement.
 
-Until then, a line beginning with `---` ends the chart, and the parser ignores what follows with an info diagnostic.
+Until then, a line beginning with `---` ends the chart, and the parser ignores what follows with an info diagnostic. The text is kept, so formatting does not delete it.
 
 ## 12. Reserved for later
 

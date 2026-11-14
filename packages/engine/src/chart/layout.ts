@@ -2,7 +2,7 @@
 // rules to find the line width the author used, so that printing a chart and
 // parsing it again arrive at the same width.
 
-import type { Bar, ChartComment, ChartField, Repeat, SectionItem } from "./model.ts";
+import type { Bar, ChartComment, ChartField, Repeat, SectionItem, UnreadLine } from "./model.ts";
 
 /** One bar on a printed line, with the marks on the bar lines around it. */
 export interface Cell {
@@ -20,13 +20,16 @@ export interface Cell {
   readonly breakAfter: boolean;
 }
 
-type Piece = Cell | ChartComment | ChartField;
+/** A line that is not bars. */
+export type TextLine = ChartComment | ChartField | UnreadLine;
+
+type Piece = Cell | TextLine;
 
 export type Row =
   | { readonly kind: "bars"; readonly cells: Cell[]; comment: ChartComment | null }
   | {
       readonly kind: "line";
-      readonly item: ChartComment | ChartField;
+      readonly item: TextLine;
       comment: ChartComment | null;
     };
 
@@ -50,7 +53,8 @@ function repeatPieces(repeat: Repeat): Piece[] {
       const first = item === bars[0];
       const last = item === bars.at(-1);
       let open = first && number > 0 ? `|${number}` : "|";
-      if (!opened) open = open === "|" ? "|:" : `|: ${open}`;
+      // A repeat that goes straight into its first ending: `|:|1`, with no space to read as an empty bar.
+      if (!opened) open = open === "|" ? "|:" : `|:${open}`;
       opened = true;
       out.push({
         kind: "cell",

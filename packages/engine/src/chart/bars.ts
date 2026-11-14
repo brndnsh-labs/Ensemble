@@ -207,7 +207,7 @@ export function createBarBuilder(
       say(
         "error",
         range,
-        `\`${text}\` sets how many times a repeat plays, so it goes right after \`:|\`. Here it is read as an unrecognized chord.`,
+        `\`${text}\` sets how many times a repeat plays, so it goes right after \`:|\`. Here it is ignored.`,
       );
       return false;
     }
@@ -215,7 +215,7 @@ export function createBarBuilder(
       say(
         "error",
         range,
-        `Numbered endings already say how many times this repeat plays, so \`${text}\` cannot be used with them.`,
+        `Numbered endings already say how many times this repeat plays, so \`${text}\` cannot be used with them. It is ignored.`,
       );
       return false;
     }
@@ -223,7 +223,7 @@ export function createBarBuilder(
       say(
         "error",
         range,
-        `A repeat plays from 1 to ${MAX_REPEATS} times, so \`${text}\` is not a count. It is read as an unrecognized chord.`,
+        `A repeat plays from 1 to ${MAX_REPEATS} times, so \`${text}\` is not a count. It is ignored.`,
       );
       return false;
     }
@@ -239,7 +239,16 @@ export function createBarBuilder(
       if (times !== null) {
         const node = tokens.length === 0 ? countFor : null;
         countFor = null;
-        if (!setCount(node, times, text, range)) addToken({ kind: "unknown", text, range });
+        // A count that cannot apply stays in the text and out of the music.
+        if (!setCount(node, times, text, range)) addToken({ kind: "misplaced", text, range });
+      } else if (open && tokens.length === 0 && /^\d+$/.test(text)) {
+        // `| 1 G :|`: inside a repeat, a bare number that opens a bar was meant as an ending.
+        say(
+          "error",
+          range,
+          `An ending number must touch its bar line, with no space: \`|${text}\`. As typed, \`${text}\` is read as an unrecognized chord.`,
+        );
+        addToken({ kind: "unknown", text, range });
       } else {
         addToken(readToken(text, range));
       }

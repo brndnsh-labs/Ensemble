@@ -112,3 +112,22 @@ export const repeatCount = (word: string): number | null =>
   /^[xX]\d+$/.test(word) ? Number(word.slice(1)) : null;
 
 export const validRepeatCount = (times: number): boolean => times >= 1 && times <= MAX_REPEATS;
+
+/**
+ * Stretches of a line where bar lines have only spaces between them
+ * (`| C | | | G |`). Each is one bar line to the parser, and likely a bar the
+ * author left out. Bar lines that touch (`||`) are not counted.
+ */
+export function emptyStretches(lexemes: readonly Lexeme[]): { from: number; to: number }[] {
+  const stretches: { from: number; to: number }[] = [];
+  let growing = false;
+  lexemes.forEach((lexeme, index) => {
+    const before = lexemes[index - 1];
+    const gap = lexeme.kind === "barline" && before?.kind === "barline" && before.to < lexeme.from;
+    const last = stretches.at(-1);
+    if (gap && growing && last) last.to = lexeme.to;
+    else if (gap) stretches.push({ from: before.from, to: lexeme.to });
+    growing = gap;
+  });
+  return stretches;
+}

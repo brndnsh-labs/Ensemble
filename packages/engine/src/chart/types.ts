@@ -92,7 +92,7 @@ export interface FlatBar {
 export interface ExpandedChart {
   /** Song mode: every section once, in file order. */
   readonly song: readonly FlatBar[];
-  /** `Intro` sections: played once at the start. */
+  /** `Intro` sections that come before the body: played once at the start. */
   readonly intro: readonly FlatBar[];
   /** Everything else: the form that loops. */
   readonly body: readonly FlatBar[];

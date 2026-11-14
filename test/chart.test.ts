@@ -43,22 +43,27 @@ function checkRow(row: Row): void {
   const { chart, diagnostics } = parse(row.text);
   const expanded = expand(chart);
 
-  const got = diagnostics.map((d) => `${d.severity} on line ${d.range.line}: ${d.message}`);
+  // A row gives a line, or "line:column" when the column matters.
   const wanted = row.diagnostics ?? [];
+  const where = (d: (typeof diagnostics)[number], pinned: number | string): string =>
+    typeof pinned === "number" ? `${d.range.line}` : `${d.range.line}:${d.range.column}`;
+  const got = diagnostics.map(
+    (d, i) => `${d.severity} at ${where(d, wanted[i]?.[1] ?? 0)}: ${d.message}`,
+  );
   const matches =
     got.length === wanted.length &&
-    wanted.every(([severity, line, fragment], i) => {
+    wanted.every(([severity, place, fragment], i) => {
       const actual = diagnostics[i];
       return (
         actual?.severity === severity &&
-        actual.range.line === line &&
+        where(actual, place) === `${place}` &&
         actual.message.includes(fragment)
       );
     });
   if (!matches)
     assert.deepEqual(
       got,
-      wanted.map(([severity, line, fragment]) => `${severity} on line ${line}: ...${fragment}...`),
+      wanted.map(([severity, place, fragment]) => `${severity} at ${place}: ...${fragment}...`),
       "diagnostics",
     );
 
@@ -75,6 +80,15 @@ function checkRow(row: Row): void {
     };
     assert.deepEqual({ ...actual, ...row.header }, actual, "header");
   }
+  if (row.places)
+    assert.deepEqual(
+      expanded.song.map(
+        (bar) =>
+          `${bar.sectionLabel} in ${keyToString(bar.key)} ${bar.meter.beats}/${bar.meter.unit}`,
+      ),
+      row.places,
+      "where each bar is played",
+    );
   if (row.sections)
     assert.deepEqual(
       chart.sections.map(
@@ -102,6 +116,22 @@ function checkRow(row: Row): void {
     assert.ok(key, `${row.transposed.to} is a key`);
     assert.equal(print(transpose(chart, key)), row.transposed.print, "printed in the new key");
   }
+  if (row.thereAndBack) {
+    const home = print(chart);
+    const back = throughKeys(home, [...row.thereAndBack, keyToString(chart.key)]);
+    assert.equal(back, home, "home again from other keys");
+  }
+}
+
+/** Transpose to each key in turn, by way of the printed text each time. */
+function throughKeys(text: string, keys: readonly string[]): string {
+  let current = text;
+  for (const name of keys) {
+    const key = parseKey(name);
+    assert.ok(key, `${name} is a key`);
+    current = print(transpose(parse(current).chart, key));
+  }
+  return current;
 }
 
 /**
@@ -147,13 +177,37 @@ const library = readdirSync(libraryDir)
   .filter((file) => file.endsWith(".chart"))
   .map((file) => ({ file, text: readFileSync(new URL(file, libraryDir), "utf8") }));
 
-test("formatting a chart never changes it: parse, print, parse again gives the same chart (whole corpus and library), and every library chart is free of errors and warnings", () => {
+const TWELVE_KEYS = ["C", "Db", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+const TWELVE_MINOR_KEYS = [
+  "Cm",
+  "C#m",
+  "Dm",
+  "Ebm",
+  "Em",
+  "Fm",
+  "F#m",
+  "Gm",
+  "G#m",
+  "Am",
+  "Bbm",
+  "Bm",
+];
+
+test("formatting a chart never changes it: parse, print, parse again gives the same chart (whole corpus and library); every library chart is free of errors and warnings, and comes home unchanged from each of the twelve keys", () => {
   for (const row of corpus) assertRoundTrip(row.text, row.name);
   assert.ok(library.length > 0, "the library has charts");
   for (const { file, text } of library) {
     assertRoundTrip(text, file);
-    const problems = parse(text).diagnostics.filter((d) => d.severity !== "info");
+    const { chart, diagnostics } = parse(text);
+    const problems = diagnostics.filter((d) => d.severity !== "info");
     assert.deepEqual(problems, [], `${file} has no errors or warnings`);
+    const home = print(chart);
+    for (const away of chart.key.mode === "minor" ? TWELVE_MINOR_KEYS : TWELVE_KEYS)
+      assert.equal(
+        throughKeys(home, [away, keyToString(chart.key)]),
+        home,
+        `${file}: to ${away} and back by way of the text`,
+      );
   }
 });
 
@@ -193,7 +247,10 @@ test("one bad token never breaks the rest of the chart: a chord replaced by nons
     const original = parse(row.text).chart;
 
     // A chord becomes nonsense: the mistake is reported where it is, and no bar is lost.
-    const chords = chordRanges(original);
+    // On a line with no bar line at all, before any bars, a word that is not a
+    // chord makes the line a header mistake, so this is about lines that have one.
+    const lines = row.text.split("\n");
+    const chords = chordRanges(original).filter((at) => lines[at.line - 1]?.includes("|"));
     if (chords.length > 0) {
       const at = pick.pick(chords);
       const text = row.text.slice(0, at.start) + pick.pick(NOT_CHORDS) + row.text.slice(at.end);

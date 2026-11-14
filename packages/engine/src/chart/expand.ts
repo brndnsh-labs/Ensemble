@@ -37,10 +37,16 @@ interface Played {
   readonly previous: Bar | null;
 }
 
+/** A bar that holds nothing but a misplaced repeat count is text, not music. */
+const isPlayed = (item: RepeatItem | SectionItem): item is Bar =>
+  item.kind === "bar" && item.tokens.some((token) => token.kind !== "misplaced");
+
 /**
- * A section's bars in the order they are played. `%` repeats the bar written
- * before it in its section; at the start of an ending that is the last bar
- * before the endings, which is what was just played.
+ * A section's bars in the order they are played. Each comes with the bar that
+ * `%` would repeat: the one played just before it the first time it is
+ * reached. That is the bar written before it, except around endings: an
+ * ending follows the last bar before the endings, and the bars after a repeat
+ * follow whatever its last time through ended on.
  */
 function playOrder(items: readonly SectionItem[]): Played[] {
   const out: Played[] = [];
@@ -48,7 +54,7 @@ function playOrder(items: readonly SectionItem[]): Played[] {
     const run: Played[] = [];
     let previous = from;
     for (const item of list) {
-      if (item.kind !== "bar") continue;
+      if (!isPlayed(item)) continue;
       run.push({ bar: item, previous });
       previous = item;
     }
@@ -56,7 +62,7 @@ function playOrder(items: readonly SectionItem[]): Played[] {
   };
   let before: Bar | null = null;
   for (const item of items) {
-    if (item.kind === "bar") {
+    if (isPlayed(item)) {
       out.push({ bar: item, previous: before });
       before = item;
     } else if (item.kind === "repeat") {
@@ -66,7 +72,7 @@ function playOrder(items: readonly SectionItem[]): Played[] {
       for (let pass = 0; pass < item.times; pass++) {
         out.push(...body, ...(endings[pass] ?? []));
       }
-      before = endings.at(-1)?.at(-1)?.bar ?? lastOfBody;
+      before = endings[item.times - 1]?.at(-1)?.bar ?? lastOfBody;
     }
   }
   return out;
@@ -77,7 +83,7 @@ const sameKey = (a: Key, b: Key): boolean => keyToString(a) === keyToString(b);
 const sameHarmony = (a: ChartChord | null, b: ChartChord | null): boolean =>
   a === null || b === null ? a === b : chordToString(a) === chordToString(b);
 
-type Slot = Exclude<BarToken, { kind: "annotation" }>;
+type Slot = Exclude<BarToken, { kind: "annotation" | "misplaced" }>;
 
 export function expandReporting(chart: Chart, report: Report): ExpandedChart {
   const song: FlatBar[] = [];
@@ -105,7 +111,9 @@ export function expandReporting(chart: Chart, report: Report): ExpandedChart {
     const held = (): ChordSpan[] => (sounding === undefined ? whole(null) : whole(sounding, true));
 
     function spansOf(bar: Bar, previous: Bar | null): readonly ChordSpan[] {
-      const slots = bar.tokens.filter((token): token is Slot => token.kind !== "annotation");
+      const slots = bar.tokens.filter(
+        (token): token is Slot => token.kind !== "annotation" && token.kind !== "misplaced",
+      );
       if (slots.some((slot) => slot.kind === "simile")) {
         if (slots.length > 1) {
           report(
@@ -187,8 +195,9 @@ export function expandReporting(chart: Chart, report: Report): ExpandedChart {
 function slotCountMessage(slots: number, meter: Meter): string {
   if (slots === 0)
     return "This bar has no chord in it. Write a chord, `.` to hold the one before, or `NC`.";
+  // Every count this meter takes: the divisors of its beats, then the beats doubled and doubled again.
   const valid: number[] = [];
-  for (let n = 1; n <= meter.beats * 4; n++) if (validSlotCount(n, meter)) valid.push(n);
+  for (let n = 1; n <= barTicks(meter); n++) if (validSlotCount(n, meter)) valid.push(n);
   const choices = `${valid.slice(0, -1).join(", ")} or ${valid.at(-1)}`;
-  return `This bar has ${slots} slots, but a bar of ${meterToString(meter)} divides into ${choices}. Use \`.\` to hold a chord for another slot, as in \`| C . G |\`. Until then this bar plays its first chord throughout.`;
+  return `This bar has ${slots} slots, but a bar of ${meterToString(meter)} takes ${choices}. Use \`.\` to hold a chord for another slot, as in \`| C . G |\`. Until then this bar plays its first chord throughout.`;
 }

@@ -29,7 +29,18 @@ export interface ChartField {
   readonly range: SourceRange;
 }
 
-/** One token of a bar. Every kind but `annotation` occupies a slot. */
+/**
+ * A line in the header, or under a label before its bars, that is neither a
+ * `name: value` line nor chords (`tempo 120`, a title with no `title:`). An
+ * error; kept as typed so that printing does not lose it.
+ */
+export interface UnreadLine {
+  readonly kind: "unread";
+  readonly text: string;
+  readonly range: SourceRange;
+}
+
+/** One token of a bar. Every kind but `annotation` and `misplaced` occupies a slot. */
 export type BarToken =
   | { readonly kind: "chord"; readonly chord: ChartChord; readonly range: SourceRange }
   /** `.`: extends the chord before it by one slot. */
@@ -41,7 +52,12 @@ export type BarToken =
   /** `!word`: reserved, parsed and ignored. */
   | { readonly kind: "annotation"; readonly word: string; readonly range: SourceRange }
   /** A token that is not a chord. Kept as typed; it plays as a hold. */
-  | { readonly kind: "unknown"; readonly text: string; readonly range: SourceRange };
+  | { readonly kind: "unknown"; readonly text: string; readonly range: SourceRange }
+  /**
+   * A repeat count (`x4`) where none can apply. Kept as typed. It takes no
+   * slot, and a bar holding nothing else is not played.
+   */
+  | { readonly kind: "misplaced"; readonly text: string; readonly range: SourceRange };
 
 export interface Bar {
   readonly kind: "bar";
@@ -76,13 +92,21 @@ export interface Repeat {
   readonly range: SourceRange;
 }
 
-export type SectionItem = RepeatItem | Repeat;
+export type SectionItem = RepeatItem | Repeat | UnreadLine;
 
 export interface Section {
+  /**
+   * As typed between the brackets. Bars with no label above them are a section
+   * too: labeled `A` when the chart has no labels at all, and unlabeled (the
+   * empty string) when they come before the first label.
+   */
   readonly label: string;
-  /** True for the section of a chart that has bars and no `[Label]` line. */
+  /** True for bars with no `[Label]` line above them. */
   readonly implicit: boolean;
-  /** What jam mode does with it, from the label. */
+  /**
+   * What jam mode does with it, from the label and its place: an `Intro` is
+   * the intro only before the body begins, and part of the body after that.
+   */
   readonly role: SectionRole;
   /** Resolved: the section's own `key:` line, else the key of the section it repeats, else the chart's. */
   readonly key: Key;
@@ -123,7 +147,7 @@ export interface Chart {
   readonly meter: Meter;
   readonly styleId: string | null;
   /** The header as typed, in order, including fields this version does not know. */
-  readonly header: readonly (ChartField | ChartComment)[];
+  readonly header: readonly (ChartField | ChartComment | UnreadLine)[];
   readonly sections: readonly Section[];
   readonly arrangement: ArrangementBlock | null;
   readonly range: SourceRange;

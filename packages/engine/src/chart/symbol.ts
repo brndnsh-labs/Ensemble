@@ -25,7 +25,10 @@ const LOOKALIKES: Readonly<Record<string, string>> = {
 export const plainSigns = (text: string): string =>
   text.replace(/[♯♭∆º˚Ø]/g, (ch) => LOOKALIKES[ch] ?? ch);
 
-/** The "also accepted" column of the quality table. Matching is case-sensitive. */
+/**
+ * The "also accepted" column of the quality table. Matching is case-sensitive.
+ * The alternates for sevenths and ninths apply to elevenths and thirteenths too.
+ */
 const ALSO_ACCEPTED: Readonly<Record<BaseQuality, readonly string[]>> = {
   "": ["M", "maj"],
   m: ["min", "mi", "-"],
@@ -51,10 +54,10 @@ const ALSO_ACCEPTED: Readonly<Record<BaseQuality, readonly string[]>> = {
   maj9: ["M9", "ma9", "^9", "Δ9"],
   m9: ["min9", "mi9", "-9"],
   "11": [],
-  m11: [],
+  m11: ["min11", "mi11", "-11"],
   "13": [],
-  maj13: [],
-  m13: [],
+  maj13: ["M13", "ma13", "^13", "Δ13"],
+  m13: ["min13", "mi13", "-13"],
   "9sus4": ["9sus"],
   "13sus4": ["13sus"],
   "7alt": ["alt"],
@@ -210,9 +213,14 @@ export function parseChordSymbol(text: string): ChordSymbol | null {
   return { written: "numeral", numeral: degree, quality, bassDegree, of: null };
 }
 
-/** The key assumed when a chart of absolute chords has no `key:` line: its first chord. */
+/**
+ * The key assumed when a chart of absolute chords has no `key:` line: the root
+ * of its first chord, minor when that chord has a minor third.
+ */
 export function keyFromFirstChord(symbol: ChordSymbol & { written: "name" }): Key {
-  return { tonic: symbol.root, mode: chordFamily(symbol.quality) === "minor" ? "minor" : "major" };
+  const family = chordFamily(symbol.quality);
+  const minor = family === "minor" || family === "half-diminished" || family === "diminished";
+  return { tonic: symbol.root, mode: minor ? "minor" : "major" };
 }
 
 /** Place a symbol in a key: spell numerals, and find the degree of names. */

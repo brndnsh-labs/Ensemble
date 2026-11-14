@@ -15,8 +15,15 @@ export interface Row {
   readonly text: string;
   /** The song as played. An array is joined with bar lines, to keep long charts readable. */
   readonly bars: string | readonly string[];
-  /** Exactly these, in order of position. Each is severity, line, and a fragment of the message. */
-  readonly diagnostics?: readonly (readonly ["error" | "warning" | "info", number, string])[];
+  /**
+   * Exactly these, in order of position. Each is severity, where, and a
+   * fragment of the message. Where is a line, or `"line:column"` to pin the column too.
+   */
+  readonly diagnostics?: readonly (readonly [
+    "error" | "warning" | "info",
+    number | `${number}:${number}`,
+    string,
+  ])[];
   /** The canonical printing (`fmt`). */
   readonly print?: string;
   /** The bars shown as numerals, without durations. */
@@ -29,12 +36,20 @@ export interface Row {
     readonly meter?: string;
     readonly style?: string | null;
   };
+  /** For each bar played, the section it is played under and that section's key and meter: `A in C 4/4`. */
+  readonly places?: readonly string[];
   /** Each section as `label: role, key, meter`. */
   readonly sections?: readonly string[];
   /** What jam mode gets: the intro, the looping body, and the written ending. */
   readonly jam?: { readonly intro: string; readonly body: string; readonly ending: string };
   /** The canonical printing after a change of key. */
   readonly transposed?: { readonly to: string; readonly print: string };
+  /**
+   * Keys to visit in turn, each time by transposing, printing, and parsing the
+   * printed text. Brought back to its own key the same way, the chart must
+   * print exactly as it did before it left.
+   */
+  readonly thereAndBack?: readonly string[];
 }
 
 /** A chart written as an indented block. The common indent is removed. */
@@ -302,6 +317,80 @@ const fileStructure: Row[] = [
       ["error", 1, "numerals need a key"],
     ],
   },
+  {
+    name: "key: without a key line, a first chord with a minor third of any kind makes the key minor: half-diminished",
+    text: "| Bm7b5 | E7 | Am |\n",
+    bars: "Bm7b5:1920 | E7:1920 | Am:1920",
+    header: { key: "Bm" },
+    diagnostics: [["warning", "1:3", "read in B minor"]],
+  },
+  {
+    name: "key: without a key line, a diminished first chord makes the key minor too",
+    text: "| Bdim7 | C |\n",
+    bars: "Bdim7:1920 | C:1920",
+    header: { key: "Bm" },
+    diagnostics: [["warning", 1, "read in B minor"]],
+  },
+
+  // Slips in the header. Before any bars, a line is bars only if it has a bar
+  // line or every word on it could stand in a bar.
+  {
+    name: "a header line missing its colon is one error on that line, kept in the text, and the header goes on",
+    text: chart`
+      title: X
+      tempo 120
+      key: G
+
+      [A]
+      | I | IV | V | I |
+    `,
+    bars: "G:1920 | C:1920 | D:1920 | G:1920",
+    header: { title: "X", key: "G", tempo: null },
+    sections: ["A: body, G, 4/4"],
+    diagnostics: [["error", "2:1", "Did you mean `tempo: 120`?"]],
+    print: chart`
+      title: X
+      tempo 120
+      key: G
+
+      [A]
+      | I | IV | V | I |
+    `,
+  },
+  {
+    name: "a title typed without title: is a header mistake, not the start of the bars",
+    text: chart`
+      Blues in F
+      key: F
+
+      [A]
+      | I7 | IV7 | I7 | % |
+    `,
+    bars: "F7:1920 | Bb7:1920 | F7:1920 | F7:1920",
+    header: { title: "Untitled", key: "F" },
+    diagnostics: [["error", "1:1", "neither a `name: value` line nor chords"]],
+    print: chart`
+      Blues in F
+      key: F
+
+      [A]
+      | I7 | IV7 | I7 | % |
+    `,
+  },
+  {
+    name: "a field name of two words is a header mistake, and the lines after it still count",
+    text: "title: Foo\ncomposer name: Bob // who?\nkey: C\n| I | IV | V | I |\n",
+    bars: "C:1920 | F:1920 | G:1920 | C:1920",
+    header: { title: "Foo", key: "C" },
+    diagnostics: [["error", 2, "neither a `name: value` line nor chords"]],
+    print: "title: Foo\ncomposer name: Bob // who?\nkey: C\n\n| I | IV | V | I |\n",
+  },
+  {
+    name: "a first line of chords with no bar line is still bars, when every word on it is a chord",
+    text: "key: C\nC . Am F\n| G |\n",
+    bars: "C:960 Am:480 F:480 | G:1920",
+    print: "key: C\n\n| C . Am F |\n| G        |\n",
+  },
 ];
 
 // ── 3.2 Sections ────────────────────────────────────────────────────────────
@@ -328,6 +417,21 @@ const sections: Row[] = [
     print: "key: C\n\n| C | F |\n",
   },
   {
+    name: "bars before the first label are a section of their own with no label, which a label below cannot collide with",
+    text: "key: C\n| C | G |\n[A]\n| F | G |\n",
+    bars: "C:1920 | G:1920 | F:1920 | G:1920",
+    sections: [": body, C, 4/4", "A: body, C, 4/4"],
+    places: [" in C 4/4", " in C 4/4", "A in C 4/4", "A in C 4/4"],
+    print: "key: C\n\n| C | G |\n\n[A]\n| F | G |\n",
+  },
+  {
+    name: "unlabeled bars, then labeled sections, with no key line: every bar plays, in the key of the first chord",
+    text: "| C | G |\n[A]\n| F | G |\n[B]\n| Am | % |\n",
+    bars: "C:1920 | G:1920 | F:1920 | G:1920 | Am:1920 | Am:1920",
+    header: { key: "C" },
+    diagnostics: [["warning", "1:3", "read in C major"]],
+  },
+  {
     name: "a key line directly under a label applies to that section only (spec 3.2)",
     text: chart`
       [Bridge]
@@ -349,6 +453,15 @@ const sections: Row[] = [
     text: "key: C\n[A]\n| C G |\n[Waltz]\nmeter: 3/4\n| C . G |\n",
     bars: "C:960 G:960 | C:960 G:480",
     sections: ["A: body, C, 4/4", "Waltz: body, C, 3/4"],
+    places: ["A in C 4/4", "Waltz in C 3/4"],
+  },
+  {
+    name: "a section's field line missing its colon is an error on that line, and does not become a bar",
+    text: "key: C\n[Bridge]\nkey Ab\n| ii7 | V7 |\n",
+    bars: "Dm7:1920 | G7:1920",
+    sections: ["Bridge: body, C, 4/4"],
+    diagnostics: [["error", "3:1", "Did you mean `key: Ab`?"]],
+    print: "key: C\n\n[Bridge]\nkey Ab\n| ii7 | V7 |\n",
   },
   {
     name: "only key and meter can be set for one section; any other field there is an error, kept and ignored",
@@ -389,6 +502,16 @@ const sections: Row[] = [
     text: "key: C\n[A]\n| I | V7 | Am | F/A |\n[A]\nkey: D\n",
     bars: "C:1920 | G7:1920 | Am:1920 | F/A:1920 | D:1920 | A7:1920 | Bm:1920 | G/B:1920",
     sections: ["A: body, C, 4/4", "A: body, D, 4/4"],
+    places: [
+      "A in C 4/4",
+      "A in C 4/4",
+      "A in C 4/4",
+      "A in C 4/4",
+      "A in D 4/4",
+      "A in D 4/4",
+      "A in D 4/4",
+      "A in D 4/4",
+    ],
     print: "key: C\n\n[A]\n| I | V7 | Am | F/A |\n\n[A]\nkey: D\n",
   },
   {
@@ -402,7 +525,7 @@ const sections: Row[] = [
     name: "a reference to a label that has not been defined is an error on the header line, and the section is skipped",
     text: "key: C\n[A]\n| C |\n[B]\n[C]\n| G |\n",
     bars: "C:1920 | G:1920",
-    diagnostics: [["error", 4, "no section above is labeled `B`"]],
+    diagnostics: [["error", "4:1", "no section above is labeled `B`"]],
     print: "key: C\n\n[A]\n| C |\n\n[B]\n\n[C]\n| G |\n",
   },
   {
@@ -446,9 +569,25 @@ const sections: Row[] = [
   },
   {
     name: "in song mode all sections play once in file order, wherever the reserved ones are written",
-    text: "key: C\n[Outro]\n| G |\n[A]\n| C |\n[Intro]\n| F |\n",
-    bars: "G:1920 | C:1920 | F:1920",
+    text: "key: C\n[Outro]\n| G |\n[Intro]\n| F |\n[A]\n| C |\n",
+    bars: "G:1920 | F:1920 | C:1920",
     jam: { intro: "F:1920", body: "C:1920", ending: "G:1920" },
+  },
+  {
+    name: "an Intro is the intro only before the body begins: one that returns after it is part of the body",
+    text: "key: C\n[Intro]\n| C | G |\n[A]\n| F | G |\n[Intro]\n[Outro]\n| C |\n",
+    bars: "C:1920 | G:1920 | F:1920 | G:1920 | C:1920 | G:1920 | C:1920",
+    sections: [
+      "Intro: intro, C, 4/4",
+      "A: body, C, 4/4",
+      "Intro: body, C, 4/4",
+      "Outro: ending, C, 4/4",
+    ],
+    jam: {
+      intro: "C:1920 | G:1920",
+      body: "F:1920 | G:1920 | C:1920 | G:1920",
+      ending: "C:1920",
+    },
   },
   {
     name: "bars on the same line as a label are read, with a warning, and print on their own line",
@@ -477,6 +616,15 @@ const sections: Row[] = [
 
 const dots = (n: number): string => " .".repeat(n);
 
+/** Chords with their lengths, as one row of bars: `timed("C F | G", [960, 960, 1920])`. */
+const timed = (chords: string, ticks: readonly number[]): string => {
+  let next = 0;
+  return chords
+    .split(" ")
+    .map((word) => (word === "|" ? word : `${word}:${ticks[next++]}`))
+    .join(" ");
+};
+
 const bars: Row[] = [
   {
     name: "bars are separated by |, and the leading and trailing | on a line are optional",
@@ -491,10 +639,11 @@ const bars: Row[] = [
     print: "key: C\n\n| C | F |\n",
   },
   {
-    name: "bar lines with only spaces between them are one bar line too: there are no empty bars",
-    text: inC("| C |   | F |"),
-    bars: "C:1920 | F:1920",
-    print: "key: C\n\n| C | F |\n",
+    name: "bar lines with only spaces between them are one bar line too, with a warning that a bar may be missing",
+    text: inC("| C | | | G |"),
+    bars: "C:1920 | G:1920",
+    diagnostics: [["warning", "2:5", "nothing between these bar lines"]],
+    print: "key: C\n\n| C | G |\n",
   },
   {
     name: "a line break also ends a bar",
@@ -605,13 +754,15 @@ const bars: Row[] = [
     name: "any other slot count is an error on the bar, which plays its first chord for the whole bar",
     text: inC("| C F G | Am |"),
     bars: "C:1920 | Am:1920",
-    diagnostics: [["error", 2, "3 slots, but a bar of 4/4 divides into 1, 2, 4, 8 or 16"]],
+    diagnostics: [
+      ["error", "2:3", "3 slots, but a bar of 4/4 takes 1, 2, 4, 8, 16, 32, 64 or 128."],
+    ],
   },
   {
     name: "two chords in 3/4 are an error: they must say how they split",
     text: "key: C\nmeter: 3/4\n| C G |\n",
     bars: "C:1440",
-    diagnostics: [["error", 3, "2 slots, but a bar of 3/4 divides into 1, 3, 6 or 12"]],
+    diagnostics: [["error", 3, "2 slots, but a bar of 3/4 takes 1, 3, 6, 12, 24, 48 or 96."]],
   },
   {
     name: "two chords in 3/4, split with a dot: | C . G | (spec 4.1)",
@@ -782,7 +933,9 @@ const repeats: Row[] = [
     name: "the ending number must touch the bar line: with a space it is not an ending",
     text: inC("|: C | 1 F :|"),
     bars: "C:1920 | ~C:960 F:960 | C:1920 | ~C:960 F:960",
-    diagnostics: [["error", 2, "Number chords are not supported"]],
+    diagnostics: [
+      ["error", "2:8", "An ending number must touch its bar line, with no space: `|1`"],
+    ],
   },
   {
     name: "repeats do not nest: a second |: is an error and reads as a plain bar line",
@@ -833,24 +986,25 @@ const repeats: Row[] = [
     print: "key: C\n\n|: C | F :| x1\n",
   },
   {
-    name: "a count of zero is an error: the repeat plays twice, and the token is kept as an unrecognized chord",
+    name: "a count of zero is an error: the repeat plays twice, and the token stays in the text without adding a bar",
     text: inC("|: C | F :| x0"),
-    bars: "C:1920 | F:1920 | C:1920 | F:1920 | ~F:1920",
+    bars: "C:1920 | F:1920 | C:1920 | F:1920",
     diagnostics: [["error", 2, "from 1 to 99 times"]],
     print: "key: C\n\n|: C | F :| x0 |\n",
   },
   {
-    name: "a count anywhere but after :| is an error, kept as an unrecognized chord",
+    name: "a count anywhere but after :| is an error: it stays in the text and takes no slot",
     text: inC("| C x4 | F |"),
     bars: "C:1920 | F:1920",
     diagnostics: [["error", 2, "goes right after `:|`"]],
     print: "key: C\n\n| C x4 | F |\n",
   },
   {
-    name: "a count cannot be combined with numbered endings",
-    text: inC("|: C |1 F :| x3"),
-    bars: "C:1920 | F:1920 | C:1920 | ~C:1920",
+    name: "a count cannot be combined with numbered endings: it is an error, stays in the text, and adds no bar",
+    text: inC("|: C |1 F :| x3\n| G |"),
+    bars: "C:1920 | F:1920 | C:1920 | G:1920",
     diagnostics: [["error", 2, "Numbered endings already say"]],
+    print: "key: C\n\n|: C |1 F :| x3 |\n|  G |\n",
   },
   {
     name: ":| with no |: before it is an error and reads as a plain bar line",
@@ -912,6 +1066,7 @@ const repeats: Row[] = [
     bars: "C:1920 | C:1920 | F:1920",
     diagnostics: [
       ["error", 2, "Ending 1 has no bars"],
+      ["warning", 2, "nothing between these bar lines"],
       ["error", 2, "needs a first ending"],
     ],
   },
@@ -919,12 +1074,30 @@ const repeats: Row[] = [
     name: "a repeat with no bars is an error",
     text: inC("| C |: :| F |"),
     bars: "C:1920 | F:1920",
-    diagnostics: [["error", 2, "no bars in it"]],
+    diagnostics: [
+      ["error", 2, "no bars in it"],
+      ["warning", 2, "nothing between these bar lines"],
+    ],
   },
   {
     name: "% at the start of a second ending repeats the last bar before the endings, which is what was just played",
     text: inC("|: C | Am |1 F :|2 % | G |"),
     bars: "C:1920 | Am:1920 | F:1920 | C:1920 | Am:1920 | Am:1920 | G:1920",
+  },
+  {
+    name: "% after a repeat repeats the bar played last, not the bar written last: here the first ending is skipped the second time",
+    text: inC("|: C | D |1 E :|\n| % |"),
+    bars: "C:1920 | D:1920 | E:1920 | C:1920 | D:1920 | D:1920",
+  },
+  {
+    name: "% after a repeat whose last time through takes no ending repeats the last bar before the endings",
+    text: inC("|: C |1 F :|2 G :|\n| % |"),
+    bars: "C:1920 | F:1920 | C:1920 | G:1920 | C:1920 | C:1920",
+  },
+  {
+    name: "% after a repeat that ends on its last ending repeats that ending's last bar",
+    text: inC("|: C |1 F :|2 G |\n| % |"),
+    bars: "C:1920 | F:1920 | C:1920 | G:1920 | G:1920",
   },
   {
     name: "a dot at the top of a repeat holds whatever was sounding: the bar before the first time, the end of the repeat the second",
@@ -1019,6 +1192,43 @@ const numerals: Row[] = [
     text: "key: F\n| IV | V7 |\n[B]\nkey: E\n| IV | V7 |\n",
     bars: "Bb:1920 | C7:1920 | A:1920 | B7:1920",
   },
+  // Spelling. A numeral is spelled by letter; a double accidental, or a Cb,
+  // Fb, E#, or B# that the key's own scale does not have, becomes the plain note.
+  ...(
+    [
+      ["F#", "F# G#m A#m B | C# D#m E#dim", "G A Cdim7 | D E F#"],
+      ["Gb", "Gb Abm Bbm Cb | Db Ebm Fdim", "G A Cdim7 | D E Gb"],
+      ["Db", "Db Ebm Fm Gb | Ab Bbm Cdim", "D E Gdim7 | A B Db"],
+      ["Ab", "Ab Bbm Cm Db | Eb Fm Gdim", "A B Ddim7 | E Gb Ab"],
+      ["Eb", "Eb Fm Gm Ab | Bb Cm Ddim", "E Gb Adim7 | B Db Eb"],
+      ["B", "B C#m D#m E | F# G#m A#dim", "C D Fdim7 | G A B"],
+    ] as const
+  ).map(
+    ([key, diatonic, chromatic]): Row => ({
+      name: `numerals in ${key}: the scale chords, then bII bIII #ivo7 bVI bVII, spelled as a player in ${key} reads them`,
+      text: `key: ${key}\n| I ii iii IV | V vi viio . |\n| bII bIII #ivo7 . | bVI bVII I . |\n`,
+      bars: [
+        timed(diatonic, [480, 480, 480, 480, 480, 480, 960]),
+        timed(chromatic, [480, 480, 960, 480, 480, 960]),
+      ],
+    }),
+  ),
+  {
+    name: "numerals in C# minor: the raised seventh is B#, the leading tone; III, which the key's scale does not have as E#, is F",
+    text: "key: C#m\n| i iv V7 viio7 | bIII bVI bVII III |\n",
+    bars: "C#m:480 F#m:480 G#7:480 B#dim7:480 | E:480 A:480 B:480 F:480",
+  },
+  {
+    name: "numerals in Eb minor: bVI is Cb, which the key's own scale has",
+    text: "key: Ebm\n| i iv V7 viio7 | bIII bVI bVII bII |\n",
+    bars: "Ebm:480 Abm:480 Bb7:480 Ddim7:480 | Gb:480 Cb:480 Db:480 E:480",
+  },
+  {
+    name: "a note name is read as the degree that spells it in the key: A in Db is bVI, G# in C is #V, and Ab in C# minor is V",
+    text: "key: Db\n| A | B |\n[B]\nkey: C\n| G# | Ab |\n[C]\nkey: C#m\n| Ab7 | G#7 |\n",
+    bars: "A:1920 | B:1920 | G#:1920 | Ab:1920 | Ab7:1920 | G#7:1920",
+    numerals: "bVI | bVII | #V | bVI | V7 | V7",
+  },
   // The table in 6.2: case sets the third, and the suffix is applied on top.
   reads("numeral table: I is a major triad", "I", "C"),
   reads("numeral table: ii is a minor triad", "ii", "Dm"),
@@ -1072,6 +1282,12 @@ const numerals: Row[] = [
     print: inC("\n| I/b7 |"),
   }),
   {
+    name: "bass degree: one a half step from the chord's own third gets a warning that offers the third (i/3 in A minor is Am over C sharp)",
+    text: "key: Am\n| i/3 | i/b3 | I/3 |\n",
+    bars: "Am/C#:1920 | Am/C:1920 | A/C#:1920",
+    diagnostics: [["warning", "2:3", "for the third, write `i/b3`"]],
+  },
+  {
     name: "a chord typed as a name can be shown as a numeral, and one typed as a numeral is shown by name here",
     text: inC("| Dm7 G7/B | ii7 V7/7 |"),
     bars: "Dm7:960 G7/B:960 | Dm7:960 G7/B:960",
@@ -1108,10 +1324,10 @@ const QUALITY_TABLE: readonly (readonly [canonical: string, accepted: string, nu
     ["maj9", "M9 ma9 ^9 Δ9", "Imaj9"],
     ["m9", "min9 mi9 -9", "i9"],
     ["11", "", "I11"],
-    ["m11", "", "i11"],
+    ["m11", "min11 mi11 -11", "i11"],
     ["13", "", "I13"],
-    ["maj13", "", "Imaj13"],
-    ["m13", "", "i13"],
+    ["maj13", "M13 ma13 ^13 Δ13", "Imaj13"],
+    ["m13", "min13 mi13 -13", "i13"],
     ["9sus4", "9sus", "I9sus4"],
     ["13sus4", "13sus", "I13sus4"],
     ["7alt", "alt", "I7alt"],
@@ -1286,7 +1502,7 @@ const diagnosticsTable: Row[] = [
     name: "an unrecognized chord is an error on the token, and its slot holds the previous chord",
     text: inC("| C Xyz | F |"),
     bars: "C:1920 | F:1920",
-    diagnostics: [["error", 2, "Unrecognized chord `Xyz`"]],
+    diagnostics: [["error", "2:5", "Unrecognized chord `Xyz`"]],
     print: "key: C\n\n| C Xyz | F |\n",
   },
   {
@@ -1305,7 +1521,7 @@ const diagnosticsTable: Row[] = [
     name: "% with other tokens in its bar is an error on the bar, which plays as no chord",
     text: inC("| C | % G | F |"),
     bars: "C:1920 | NC:1920 | F:1920",
-    diagnostics: [["error", 2, "must be alone in its bar"]],
+    diagnostics: [["error", "2:7", "must be alone in its bar"]],
     print: "key: C\n\n| C | % G | F |\n",
   },
   {
@@ -1318,7 +1534,7 @@ const diagnosticsTable: Row[] = [
     name: "diagnostics say where: one bad token is reported at its own line",
     text: "key: C\n\n[A]\n| C | F |\n| G | Hm7 |\n",
     bars: "C:1920 | F:1920 | G:1920 | ~G:1920",
-    diagnostics: [["error", 5, "Unrecognized chord `Hm7`"]],
+    diagnostics: [["error", "5:7", "Unrecognized chord `Hm7`"]],
   },
   {
     name: "a bar played many times reports its mistake once",
@@ -1399,6 +1615,57 @@ const transposition: Row[] = [
     text: "key: Am\n| Am | F | E7 |\n",
     bars: "Am:1920 | F:1920 | E7:1920",
     transposed: { to: "Dm", print: "key: Dm\n\n| Dm | Bb | A7 |\n" },
+  },
+  {
+    name: "transposing spells for the new key: Cm7 B7 in Bb becomes F#m7 F7 in E, and comes back as it was",
+    text: "key: Bb\n| Cm7 B7 | Bbmaj7 |\n",
+    bars: "Cm7:960 B7:960 | Bbmaj7:1920",
+    numerals: "ii7 bII7 | Imaj7",
+    transposed: { to: "E", print: "key: E\n\n| F#m7 F7 | Emaj7 |\n" },
+    thereAndBack: ["E"],
+  },
+  {
+    name: "there and back: C to Db and back to C through the printed text changes nothing",
+    text: inC("| C | Ab | Bb | C |"),
+    bars: "C:1920 | Ab:1920 | Bb:1920 | C:1920",
+    transposed: { to: "Db", print: "key: Db\n\n| Db | A | B | Db |\n" },
+    thereAndBack: ["Db"],
+  },
+  {
+    name: "there and back: a section's own key is written as a conventional key on the way (Ab becomes A, not Bbb) and returns",
+    text: "key: C\n[A]\n| C | G |\n[B]\nkey: Ab\n| Imaj7 | Dbmaj7 |\n",
+    bars: "C:1920 | G:1920 | Abmaj7:1920 | Dbmaj7:1920",
+    transposed: {
+      to: "Db",
+      print: "key: Db\n\n[A]\n| Db | Ab |\n\n[B]\nkey: A\n| Imaj7 | Dmaj7 |\n",
+    },
+    thereAndBack: ["Db"],
+  },
+  {
+    name: "a moved section key takes the spelling with fewer accidentals, and on a tie the side the new chart key leans: Gb under Db",
+    text: "key: C\n[A]\n| C |\n[B]\nkey: F\n| I |\n[C]\nkey: Am\n| i |\n",
+    bars: "C:1920 | F:1920 | Am:1920",
+    transposed: {
+      to: "Db",
+      print: "key: Db\n\n[A]\n| Db |\n\n[B]\nkey: Gb\n| I |\n\n[C]\nkey: Bbm\n| i |\n",
+    },
+    thereAndBack: ["Db"],
+  },
+  {
+    name: "a moved section key on a tie goes sharp under a sharp chart key: F# under G",
+    text: "key: C\n[A]\n| C |\n[B]\nkey: B\n| I |\n",
+    bars: "C:1920 | B:1920",
+    transposed: { to: "G", print: "key: G\n\n[A]\n| G |\n\n[B]\nkey: F#\n| I |\n" },
+    thereAndBack: ["G"],
+  },
+  {
+    name: "there and back: through all twelve keys in turn and home again, by way of the text each time",
+    text: inC("| C | Ab | Bb | Dm7 G7 |\n| F#dim7 | Eb | Db | C/E |"),
+    bars: [
+      "C:1920 | Ab:1920 | Bb:1920 | Dm7:960 G7:960",
+      "F#dim7:1920 | Eb:1920 | Db:1920 | C/E:1920",
+    ],
+    thereAndBack: ["Db", "D", "Eb", "E", "F", "F#", "Gb", "G", "Ab", "A", "Bb", "B"],
   },
 ];
 
@@ -1515,7 +1782,7 @@ const printing: Row[] = [
     text: inC("| C | F |\ntempo: 90 // slower here\n| G | C |"),
     bars: "C:1920 | F:1920 | G:1920 | C:1920",
     header: { tempo: null },
-    diagnostics: [["error", 3, "Here among the bars it is ignored"]],
+    diagnostics: [["error", "3:1", "Here among the bars it is ignored"]],
     print: "key: C\n\n| C | F |\ntempo: 90 // slower here\n| G | C |\n",
   },
   {

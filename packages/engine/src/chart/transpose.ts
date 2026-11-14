@@ -3,17 +3,17 @@
 // alone; printing the result is the "transpose and rewrite".
 
 import type { Key } from "../theory/pitch.ts";
-import { degreeOf, keyToString, noteAtDegree } from "../theory/pitch.ts";
+import { conventionalKey, keyLeansFlat, keyToString, pitchClass } from "../theory/pitch.ts";
 import { parseKey } from "./fields.ts";
-import type { Bar, Chart, ChartComment, ChartField, RepeatItem, Section } from "./model.ts";
+import type { Bar, Chart, ChartField, RepeatItem, Section, UnreadLine } from "./model.ts";
 import { respellChord } from "./symbol.ts";
 
 export function transpose(chart: Chart, toKey: Key): Chart {
-  /** A section's own key moves by the same interval as the chart's. */
-  const moved = (key: Key): Key => ({
-    tonic: noteAtDegree(degreeOf(key.tonic, chart.key), toKey),
-    mode: key.mode,
-  });
+  // A section's own key moves by the same interval as the chart's, and is then
+  // written the conventional way: a bridge in Ab, moved up a half step, is in A.
+  const shift = pitchClass(toKey.tonic) - pitchClass(chart.key.tonic);
+  const moved = (key: Key): Key =>
+    conventionalKey(pitchClass(key.tonic) + shift, key.mode, keyLeansFlat(toKey));
 
   const sections: Section[] = [];
   for (const section of chart.sections) {
@@ -27,7 +27,7 @@ export function transpose(chart: Chart, toKey: Key): Chart {
         token.kind === "chord" ? { ...token, chord: respellChord(token.chord, key) } : token,
       ),
     });
-    const each = <T extends RepeatItem>(item: T): T | Bar | ChartField => {
+    const each = <T extends RepeatItem | UnreadLine>(item: T): T | Bar | ChartField => {
       if (item.kind === "bar") return bar(item);
       return item === ownKeyLine ? { ...ownKeyLine, value: keyToString(key) } : item;
     };
@@ -58,7 +58,7 @@ function keyLine(section: Section): ChartField | null {
 }
 
 /** The header with its key line rewritten, or with one added after the title if it had none. */
-function headerIn(chart: Chart, key: Key): (ChartField | ChartComment)[] {
+function headerIn(chart: Chart, key: Key): Chart["header"] {
   const value = keyToString(key);
   const existing = chart.header.find((item) => item.kind === "field" && item.name === "key");
   if (existing)

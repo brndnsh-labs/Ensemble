@@ -2,15 +2,17 @@
 // becomes something, and what cannot be read is kept as typed and reported.
 // See docs/CHART_FORMAT.md.
 
+import { toneInterval } from "../theory/chord.ts";
 import type { Key } from "../theory/pitch.ts";
-import { keyToString } from "../theory/pitch.ts";
+import { keyToString, mod12, noteNameToString, pitchClass } from "../theory/pitch.ts";
 import type { BarBuilder } from "./bars.ts";
 import { createBarBuilder } from "./bars.ts";
+import { chordText } from "./display.ts";
 import { expandReporting } from "./expand.ts";
 import { labelId, meterToString, parseKey, parseMeter, parseTempo, roleOfLabel } from "./fields.ts";
 import { chooseWidth } from "./layout.ts";
 import type { Line } from "./lex.ts";
-import { commentStart, lexBars, rangeIn, splitLines } from "./lex.ts";
+import { commentStart, emptyStretches, lexBars, rangeIn, splitLines } from "./lex.ts";
 import type {
   ArrangementBlock,
   BarToken,
@@ -19,6 +21,7 @@ import type {
   ChartField,
   Section,
   SectionItem,
+  UnreadLine,
 } from "./model.ts";
 import type { ChordSymbol } from "./symbol.ts";
 import {
@@ -28,7 +31,7 @@ import {
   resolveChord,
   unreadableChord,
 } from "./symbol.ts";
-import type { Diagnostic, Meter, SourceRange } from "./types.ts";
+import type { ChartChord, Diagnostic, Meter, SourceRange } from "./types.ts";
 
 const C_MAJOR: Key = { tonic: { letter: "C", accidental: 0 }, mode: "major" };
 const COMMON_TIME: Meter = { beats: 4, unit: 4 };
@@ -58,7 +61,7 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
     diagnostics.push({ severity, message, range });
   };
 
-  const header: (ChartField | ChartComment)[] = [];
+  const header: (ChartField | ChartComment | UnreadLine)[] = [];
   const headerSeen = new Set<string>();
   let title: string | null = null;
   let statedKey: Key | null = null;
@@ -108,7 +111,15 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
       return { kind: "unknown", text: raw, range };
     }
     const key = sectionKey ?? (firstNamed ? keyFromFirstChord(firstNamed) : C_MAJOR);
-    return { kind: "chord", chord: resolveChord(symbol, key, raw, range), range };
+    const chord = resolveChord(symbol, key, raw, range);
+    const meant = thirdInTheBass(chord);
+    if (meant && chord.bass)
+      say(
+        "warning",
+        range,
+        `\`${raw}\` puts ${noteNameToString(chord.bass)} in the bass, a half step from this chord's own third. Bass degrees are counted in the major scale, in minor keys too; for the third, write \`${meant}\`.`,
+      );
+    return { kind: "chord", chord, range };
   }
 
   // ── lines ─────────────────────────────────────────────────────────────────
@@ -160,7 +171,7 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
     const lexemes = lexBars(line.text, from);
     const hasWords = lexemes.some((lexeme) => lexeme.kind === "word");
     // Bar lines with nothing between them, before any section, begin nothing.
-    const draft = section ?? (hasWords ? startSection("A", true, rangeIn(line, from, from)) : null);
+    const draft = section ?? (hasWords ? startSection("", true, rangeIn(line, from, from)) : null);
     let trailing: ChartComment | null = null;
     for (const lexeme of lexemes) {
       if (lexeme.kind === "comment") trailing = comment(line, lexeme.from, true);
@@ -168,8 +179,45 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
         draft?.bars.word(lexeme.text, rangeIn(line, lexeme.from, lexeme.to));
       else draft?.bars.barLine(lexeme, rangeIn(line, lexeme.from, lexeme.to));
     }
+    for (const { from: start, to } of emptyStretches(lexemes))
+      say(
+        "warning",
+        rangeIn(line, start, to),
+        "There is nothing between these bar lines, so no bar is played here. Use `%` to repeat the bar before, or `.` to hold its chord.",
+      );
     // A comment after a line with no bars on it is a comment line like any other.
     if (!draft?.bars.endLine(trailing) && trailing) pending.push({ ...trailing, trailing: false });
+  }
+
+  /**
+   * Where no bars have been written yet (the header, or under a label), a line
+   * is bars only if it has a bar line or every word on it could stand in a bar.
+   * Anything else there is a slip in a header line, and must not start the bars.
+   */
+  function looksLikeBars(line: Line): boolean {
+    const lexemes = lexBars(line.text, 0);
+    if (lexemes.some((lexeme) => lexeme.kind === "barline")) return true;
+    return lexemes.every((lexeme) => lexeme.kind !== "word" || isBarToken(lexeme.text));
+  }
+
+  /** Whether bars have been written where we are: in this section, or at all while in the header. */
+  const hasBarsHere = (): boolean => section !== null && section.bars.barCount > 0;
+
+  function readUnread(line: Line, content: string, cut: number): void {
+    settlePending();
+    const text = content.trim();
+    const from = content.indexOf(text);
+    const range = rangeIn(line, from, from + text.length);
+    const [first = "", ...rest] = text.split(/\s+/);
+    const name = first.toLowerCase();
+    const hint =
+      HEADER_FIELDS.includes(name) && rest.length > 0
+        ? `Did you mean \`${name}: ${rest.join(" ")}\`?`
+        : "A header line is written like `title: My Song`, and bars are chords between bar lines, like `| C | G |`.";
+    say("error", range, `This line is neither a \`name: value\` line nor chords. ${hint}`);
+    const list: { push(item: UnreadLine | ChartComment): unknown } = section?.items ?? header;
+    list.push({ kind: "unread", text, range });
+    if (cut >= 0) list.push(comment(line, cut, true));
   }
 
   function readLabel(line: Line, content: string, cut: number): void {
@@ -345,8 +393,9 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
     if (content.trim() === "") pending.push(comment(line, cut, false));
     else if (content.trimStart().startsWith("[")) readLabel(line, content, cut);
     else if (field) readField(line, content, cut, field[1]!, field[2]!);
+    else if (!hasBarsHere() && !looksLikeBars(line)) readUnread(line, content, cut);
     else {
-      // Comments directly above the first bars of a chart with no labels lead its one section.
+      // Comments directly above bars that have no label lead that unlabeled section.
       if (section) settlePending();
       readBars(line, 0);
     }
@@ -363,14 +412,19 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
 
   const defined = new Map<string, number>();
   const sections: Section[] = [];
+  const hasLabels = drafts.some((draft) => !draft.implicit);
+  let bodyBegun = false;
   drafts.forEach((draft, index) => {
-    const id = labelId(draft.label);
-    const first = defined.get(id);
+    // Bars above the first label are a section with no label, which no typed
+    // label can collide with. A chart with no labels at all is one section, `A`.
+    const label = draft.implicit ? (hasLabels ? "" : "A") : draft.label;
+    const id = labelId(label);
+    const first = draft.implicit ? undefined : defined.get(id);
     const hasBars = draft.bars.barCount > 0;
-    const name = `\`${draft.label}\``;
+    const name = `\`${label}\``;
     let barsFrom: number | null = first ?? null;
     if (first === undefined && hasBars) {
-      defined.set(id, index);
+      if (!draft.implicit) defined.set(id, index);
       barsFrom = index;
     } else if (first === undefined) {
       say(
@@ -382,9 +436,14 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
       say(
         "error",
         draft.range,
-        `Section ${name} already has bars above (line ${drafts[first]?.range.line}). That first one is played here, and the bars under this label are ignored. Give this section its own label, like \`${draft.label} 2\`.`,
+        `Section ${name} already has bars above (line ${drafts[first]?.range.line}). That first one is played here, and the bars under this label are ignored. Give this section its own label, like \`${label} 2\`.`,
       );
     }
+    // An intro is what comes before the body. Once the body has begun, a
+    // section called Intro (or a return to one) is part of the form that loops.
+    let role = roleOfLabel(label);
+    if (role === "intro" && bodyBegun) role = "body";
+    if (role === "body" && barsFrom !== null) bodyBegun = true;
     // A section that repeats another keeps its meter, and its key unless it sets one.
     const source = barsFrom === null || barsFrom === index ? undefined : sections[barsFrom];
     if (source && draft.meterLine)
@@ -394,9 +453,9 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
         "A repeated section keeps the meter it was written in. This line is ignored.",
       );
     sections.push({
-      label: draft.label,
+      label,
       implicit: draft.implicit,
-      role: roleOfLabel(draft.label),
+      role,
       key: draft.key ?? source?.key ?? chartKey,
       meter: source ? source.meter : (draft.meter ?? chartMeter),
       barsFrom,
@@ -442,3 +501,25 @@ export function parse(text: string): { chart: Chart; diagnostics: Diagnostic[] }
 }
 
 const describeKey = (key: Key): string => `${keyToString({ ...key, mode: "major" })} ${key.mode}`;
+
+/** Whether a word could stand in a bar: a chord in either form, `.`, `%`, `NC`, or `!word`. */
+function isBarToken(word: string): boolean {
+  if (word === "." || word === "%" || NO_CHORD.test(word)) return true;
+  return (word.startsWith("!") && word.length > 1) || parseChordSymbol(plainSigns(word)) !== null;
+}
+
+/**
+ * `i/3` in a minor key asks for the major third under a minor chord, because
+ * bass degrees are counted in the major scale. When a numeral's bass sits a
+ * half step from the chord's own third, this is the chord with its third in
+ * the bass instead (`i/b3`); otherwise null.
+ */
+function thirdInTheBass(chord: ChartChord): string | null {
+  const third = toneInterval(chord.quality, "third");
+  if (chord.written !== "numeral" || !chord.bass || !chord.bassDegree || third === null)
+    return null;
+  const off = mod12(pitchClass(chord.bass) - pitchClass(chord.root) - third);
+  if (off !== 1 && off !== 11) return null;
+  const accidental = chord.bassDegree.accidental + (off === 1 ? -1 : 1);
+  return chordText({ ...chord, bassDegree: { ...chord.bassDegree, accidental } }, "numeral");
+}
