@@ -134,3 +134,7 @@ All of them are in `DECISIONS.md`. The ones that change what you hear, or depart
 - X-A-32: a swing dial the player can turn. Swing is the style's.
 - CO-07: reading a section named "B" as a bridge. Not carried over; it was marked unclear.
 - X-A-05: the stale bass floor of 23.
+
+## Review findings not yet acted on
+
+The independent review of drums, bass, and planner had not reported when this was written. If this section still says so, the review needs to be run again before stage 2 builds on these parts.
