@@ -90,3 +90,7 @@ A second agent reviewed the parser against the spec and found the corpus had gap
 ## 2026-11-14: a level the player sets
 
 - `energy` is a plan option (CLI `--energy`): a fixed level in place of the arc, held on every pass, with the form breathing around it at half depth (CO-05, CO-06). Added at gate 1 so each tier of a style can be auditioned alone; the app will need it anyway.
+
+## 2026-11-14: after the rhythm section review
+
+- A written ending (Outro, Tag) is played as written even when its last chord is not home (EN-05). The planner had been resolving it to the tonic, against the decision above; a property now pins it. Goldens unchanged.

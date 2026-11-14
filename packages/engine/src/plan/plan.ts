@@ -113,7 +113,14 @@ export function planBars(
 
   const endingIndex = open ? -1 : playedBars - 1;
   const ending =
-    endingIndex >= 0 ? resolveEnding(drafts[endingIndex]!.flat, expanded, style) : null;
+    endingIndex >= 0
+      ? resolveEnding(
+          drafts[endingIndex]!.flat,
+          expanded,
+          style,
+          drafts[endingIndex]!.run.part === "ending",
+        )
+      : null;
 
   const countIn = options.countIn !== false;
   const firstMeterTicks = drafts[0]!.flat.ticks;
@@ -407,16 +414,23 @@ interface Ending {
  * does not (a turnaround, written to send the form round again), the band does
  * not play it: the whole bar becomes the tonic in the style's colour.
  */
-function resolveEnding(last: FlatBar, expanded: ExpandedChart, style: StylePack): Ending {
+function resolveEnding(
+  last: FlatBar,
+  expanded: ExpandedChart,
+  style: StylePack,
+  written: boolean,
+): Ending {
   // The final chord is the last chord written, not the last span: a rest written after it is
   // honoured, and the chord sounds only up to the rest.
   const finalIndex = last.spans.findLastIndex((span) => span.chord !== null);
-  const written = last.spans[finalIndex];
+  const finalWritten = last.spans[finalIndex];
   const rest = last.spans.slice(finalIndex + 1);
   const restStart = rest[0]?.start ?? last.ticks;
 
   let spans: readonly ChordSpan[];
-  if (!written?.chord || isHome(written.chord, last.key)) {
+  // A written ending (an Outro, a Tag) is the chart's own: it is played as written, wherever
+  // it stops (EN-05). Only the form's own last bar is resolved for it.
+  if (written || !finalWritten?.chord || isHome(finalWritten.chord, last.key)) {
     spans = last.spans;
   } else {
     const family = tonicFamily(expanded, last.key);

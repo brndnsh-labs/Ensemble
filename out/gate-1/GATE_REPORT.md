@@ -135,6 +135,22 @@ All of them are in `DECISIONS.md`. The ones that change what you hear, or depart
 - CO-07: reading a section named "B" as a bridge. Not carried over; it was marked unclear.
 - X-A-05: the stale bass floor of 23.
 
-## Review findings not yet acted on
+## Review findings
 
-The independent review of drums, bass, and planner had not reported when this was written. If this section still says so, the review needs to be run again before stage 2 builds on these parts.
+An independent agent reviewed drums, bass, and planner against the notes by rendering and reading takes (2,280 takes swept; its own charts in other keys, with slash chords, rests, vamps, and written endings). It was cut short by quota: 3/4, 6/8, the long arcs, and the property tests themselves were not reached.
+
+**Fixed after the review**
+
+- A written `Outro` ending on a chord that is not home was overridden with the tonic. It is now played as written, with a property that pins it. No gate file was affected (the library's written ending stops on home).
+
+**Not yet acted on**
+
+- **Wide drops in the bass, several per chorus.** About 3 bars in each 12-bar chorus have a drop of a sixth to an octave onto beat 4, and 9% to 25% of changes (by key; worst in E and Eb) are entered by a major-sixth drop with no lead-in. The octave-drop-then-step figure (`E3 E2 | D2`) recurs often enough to be a tic, and was the approach to the last note in 4 of 6 endings in A. These follow from the old band's rule that moves a leading tone beside its root, combined with roots allowed up to A2. This is the cost of the register flagged above, and the first thing to listen for.
+- **A lead-in from the next chord's fifth can clash with the chord being left** (E natural over F7 into Am7, in the jazz blues at high energy). Only on root moves outside I, IV, V.
+- **A last bar that is all rest still gets a crash and kick**, after a set-up fill. The band should keep the chart's silence.
+- **Accents flatten above about 0.9 energy**: the loudest strokes all reach the top of the MIDI range, so an accented hat equals the backbeat. A jam on a plain form tops out at 0.77 and is not affected; `--energy 0.85` slightly is; a section named "Chorus" in a jam would be.
+- **On a 4-bar vamp the cymbal can change every lap** at high energy, because hat or ride is chosen per pass and a pass is 4 bars.
+- **Sameness in a one-section jam**, as listed under known weaknesses, with two specifics: the mid-level fill at bar 8 is always one of two one-note pickups, and because every chorus end counts as a "top", the tom and snare runs written for ordinary section ends are never played in a 12-bar jam.
+- Suspected, not confirmed: with 6 passes, one phrase sits exactly on the line between mid and high.
+
+**Held up under the review**: every bass arrival, range, note length and overlap; no leap over an octave; the lope; sixths and half-step shares in their bands; nothing on an "a"; never two cymbals at once; kick and backbeat in every bar; every fill ending on the "and" of 4; endings that are already home, reach home partway, or rest after home; vamp fills on the 8- and 16-bar lines; song-mode contrast between named sections.

@@ -89,7 +89,7 @@ State at the second pause on 2026-11-14 (session quota). Everything is committed
 
 **Open from stage 1**
 
-- The adversarial review of drums, bass, and planner was cut short. Whatever it reported is at the end of `out/gate-1/GATE_REPORT.md` under "Review findings not yet acted on". Triage those first: verify each by rendering, fix the real ones (property or measure first), regenerate the gate files with `pnpm gate:1`, and update the goldens with a line in `DECISIONS.md`. If that section is empty, rerun the review (the brief is in the session history; the parser's reviewer brief is the model: "what to read, how to probe, what to look for in priority order, what was decided on purpose").
+- The adversarial review of drums, bass, and planner reported before the pause, cut short. One bug is fixed (a written ending overridden). The rest is in `out/gate-1/GATE_REPORT.md` under "Review findings", "Not yet acted on". Take them in this order: the lead-in fifth that clashes with the chord being left (check a lead-in against that chord's scale, X-A-26); the all-rest last bar that still gets a crash; accents clipping above 0.9 energy; hat or ride changing every lap of a short vamp; the section fill list never heard in a one-section jam. The wide bass drops wait for Brandon's ear on the register, since they follow from it. Each fix: property or measure first, then `pnpm gate:1` and the goldens with a line in `DECISIONS.md`. The review did not reach 3/4, 6/8, long arcs, or whether the property tests are weaker than their names.
 - Gate 1 feedback, when it arrives, becomes a property or a measure first, then a fix.
 
 **Stage 2, in the order to pick up**

@@ -88,6 +88,19 @@ test("a jam that ends lands on the tonic: the last chord is rooted on the key, a
   }
 });
 
+test("a written ending is played as written: the band stops on the chart's last chord, even when it is not home", () => {
+  const text = "key: A\n[A]\n| A7 | D7 | A7 | E7 |\n[Outro]\n| A7 | D7 | A7 | E7#9 |";
+  for (const style of STYLES) {
+    for (const seed of SEEDS) {
+      const take = render(text, style, { mode: "jam", passes: 2, seed });
+      const last = take.plan.bars.findLast((bar) => bar.kind === "music")!;
+      const final = last.spans.findLast((span) => span.chord !== null)?.chord;
+      assert.equal(final?.text, "E7#9", `seed ${seed}: the plan ends on the written chord`);
+      assert.equal(notesOf(take, "bass").at(-1)!.pitch % 12, 4, `seed ${seed}: the bass ends on E`);
+    }
+  }
+});
+
 test("every note starts inside the performance and nothing rings past its end", () => {
   for (const { chart, options, take } of takes()) {
     for (const note of notesOf(take)) {
