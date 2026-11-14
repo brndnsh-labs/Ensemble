@@ -83,9 +83,9 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-14, after stage 2. Everything is committed.
+State at the third pause on 2026-11-14 (session quota). Everything is committed; no agent is running.
 
-**Stages 1 and 2 are built and their gate files are written** (`out/gate-1/`, `out/gate-2/`, each with a `GATE_REPORT.md`; `pnpm gate:1`, `pnpm gate:2`). `pnpm check` passes (423 tests, about 6.5 s of 10); `pnpm score` matches its baseline.
+**Stages 1 and 2 are built and their gate files are written** (`out/gate-1/`, `out/gate-2/`, each with a `GATE_REPORT.md`; `pnpm gate:1`, `pnpm gate:2`). **Stage 3 is partly built.** `pnpm check` passes (431 tests, about 6.7 s of 10); `pnpm score` matches its baseline.
 
 **Feedback so far (gate 1, in Logic)**: sounds good so far, "a little plain"; velocities were slamming. Loudness is done (15% trim, hat under the backbeat, three measures). "Plain" is to be judged again with the piano in. Gate 2 has not been heard yet.
 
@@ -95,11 +95,24 @@ State on 2026-11-14, after stage 2. Everything is committed.
 - Gate 2: the questions under "What to listen for" in `out/gate-2/GATE_REPORT.md`. The ones most likely to need a change: the piano's level under the drums, the modest lock with the drums, the pump with no variation, the rub in rootless dominants.
 - Further feedback becomes a property or a measure first, then a fix.
 
-**Models** (agreed with Brandon to stretch quota): Sonnet for small fixes with a property written first and for mechanical work; Opus for well-specified builds and for adversarial reviews; Fable for the open design problems (comping rhythm, the soloist) and the main thread. What this cost in stage 2, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, review (Opus) 240k. The review found two audible bugs and four weak properties; keep doing one per seat.
+**Models** (agreed with Brandon to stretch quota): Sonnet for small fixes with a property written first and for mechanical work; Opus for well-specified builds and for adversarial reviews; Fable for the open design problems and the main thread. What things cost, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, chord review (Opus) 240k, soloist build (Fable) 630k, CLI save and replay (Sonnet) 50k. Each review so far found audible bugs the builder's own checks missed; keep doing one per seat.
 
-**Stage 2 is done**: critic, scorecard, chord seat (`prompts/seat-chords.md`, built in two parts), 10 piano properties, gate 2 files and report.
+**Stage 3: done so far**
 
-**Stage 3** follows `PLAN.md` above: soloist by phrase with candidates and critic selection (report selection against first-candidate on the same seeds), comping regenerated around it, a featured-seat control, takes saved and replayed by seed. Read part B's soloist sections and Q-43 to Q-50, and ME-22 to ME-29 in part D, before designing it.
+- The plan control: `solo` option (`--solo`), `PlanBar.solo`, the solo schedule, and the band's arc peaking with the solo (`plan/plan.ts`: `soloMarks`, `soloTurn`, `soloClimax`).
+- The soloist (`players/solo/`, `packages/styles/src/blues/solo.ts`, `critic/measures/solo.ts`), from `prompts/seat-solo.md`. Its builder's report is summarised in `DECISIONS.md`, "the soloist". Selection against first candidate on the same seeds: mean phrase cost 1.52 against 2.13; worst tenth of takes from 1.77 against 2.53.
+- Six soloist properties, a golden take with a solo, and the soloist on in one kind of take across the suite.
+- CLI `render --save take.json` and `replay take.json --out take.mid`.
+
+**Stage 3: still to do, in order**
+
+1. **The piano around the soloist** (CH-59 to CH-72, ST-blues-33): keep off the soloist's note and under its register when voicing (CH-59, CH-60, CH-63), lay out under the line and answer its breaths. The vibraphone's home (C5) is the piano's top-voice target, so this matters. Do it by candidates and the critic, not by a coin per strike: add laid-out and answering variants to the phrase plans in `players/chords/phrase.ts` and features to `critique.ts` (`under-the-soloist` is already there). The soloist's report says what the comper can rely on: a breath is a beat or more of silence; `phrasesOf` in `players/solo/critique.ts` sorts solo notes into phrases (not yet exported). Planned as an Opus build with a written brief (`prompts/comp-with-soloist.md`, not yet written), then properties from its report. The stage's "done when" asks for the comping's overlap with the soloist's rhythm to be lower with the soloist present than a naive baseline: report both numbers.
+2. **An independent Opus review of the soloist** (read-only, its own charts, as for the chord seat). It can run alongside step 1. Not yet read by anyone but the builder: the alto sax, tempo 60 and 160, quiet and loud levels, song mode, open jams, the test charts. The stop, button and hits endings have never run for the soloist.
+3. **Gate 3 files and report** (`scripts/gate-3.sh`, `out/gate-3/`): ten seeds on a blues including the three lowest-scoring by `solo.cost` (the scorecard's worst list names them), each saved with `--save` so a take can be replayed. Report selection against first-candidate, and the comping overlap against its baseline.
+4. **The kickoff's closing summary**: where each gate report is, the blues scorecard, the exact render and score commands, and the five things I am least sure of. Do not start stage 4.
+
+Small things noticed and not done: the scorecard's worst-takes list has no lower-is-better flag, so `solo.cost` carries a ceiling target to make its list point the right way; `test/properties.test.ts` is over 1,300 lines and could be split by seat.
+
 
 **Things learned in this session that the next one should not relearn**
 
