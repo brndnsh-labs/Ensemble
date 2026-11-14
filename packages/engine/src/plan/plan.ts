@@ -178,7 +178,7 @@ export function planBars(
       meter: flat.meter,
       key: flat.key,
       kind: "music",
-      spans: isEnding && ending ? ending.spans : flat.spans,
+      spans: isEnding && ending ? ending.spans : seamSpans(flat, previous?.flat),
       section: {
         label: flat.sectionLabel,
         identity: sectionIdentity(flat.sectionLabel),
@@ -325,6 +325,25 @@ export function phraseLengths(bars: number): number[] {
   if (leftover === 3) phrases.push(3);
   else if (leftover > 0) phrases[phrases.length - 1]! += leftover;
   return phrases;
+}
+
+/**
+ * A bar that opens by holding "the chord from the bar before" was written with
+ * the file's order in mind. Played order can differ (the top of the form comes
+ * after its own last bar on every pass but the first), so the hold stands only
+ * when the bar actually played before it ends on that chord; otherwise the
+ * chord is struck.
+ */
+function seamSpans(bar: FlatBar, previous: FlatBar | undefined): readonly ChordSpan[] {
+  const first = bar.spans[0];
+  if (!first?.tied) return bar.spans;
+  const sounding = previous?.spans[previous.spans.length - 1]?.chord ?? null;
+  const same =
+    previous !== undefined &&
+    (first.chord === null || sounding === null
+      ? first.chord === sounding
+      : chordToString(first.chord) === chordToString(sounding));
+  return same ? bar.spans : [{ ...first, tied: false }, ...bar.spans.slice(1)];
 }
 
 // ── energy ──────────────────────────────────────────────────────────────────
