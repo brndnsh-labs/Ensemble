@@ -8,10 +8,10 @@
       "path": "packages/styles"
     },
     {
-      "path": "packages/engine/test"
+      "path": "packages/cli"
     },
     {
-      "path": "packages/cli"
+      "path": "test"
     }
   ]
 }

@@ -181,6 +181,9 @@ importers:
       '@ensemble/engine':
         specifier: workspace:*
         version: link:../engine
+      '@ensemble/styles':
+        specifier: workspace:*
+        version: link:../styles
 
   packages/engine: {}
 
@@ -189,6 +192,15 @@ importers:
       '@ensemble/engine':
         specifier: workspace:*
         version: link:../engine
+
+  test:
+    dependencies:
+      '@ensemble/engine':
+        specifier: workspace:*
+        version: link:../packages/engine
+      '@ensemble/styles':
+        specifier: workspace:*
+        version: link:../packages/styles
 
 packages:
 

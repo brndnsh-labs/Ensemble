@@ -1,0 +1,10 @@
+{
+  "name": "@ensemble/test",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ensemble/engine": "workspace:*",
+    "@ensemble/styles": "workspace:*"
+  }
+}

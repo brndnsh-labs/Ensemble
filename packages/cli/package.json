@@ -7,6 +7,7 @@
     "ensemble": "./src/main.ts"
   },
   "dependencies": {
-    "@ensemble/engine": "workspace:*"
+    "@ensemble/engine": "workspace:*",
+    "@ensemble/styles": "workspace:*"
   }
 }

@@ -1,0 +1,130 @@
+// The parsed chart: the text's structure kept for display and printing.
+// Repeats, endings, `%`, references, comments, and unknown fields all survive
+// here; `expand` flattens them into bars for the planner.
+// See docs/CHART_FORMAT.md section 8.
+
+import type { Key } from "../theory/pitch.ts";
+import type { ChartChord, Meter, SectionRole, SourceRange } from "./types.ts";
+
+/** A `//` comment. `trailing` comments sit at the end of the line of the node before them. */
+export interface ChartComment {
+  readonly kind: "comment";
+  /** The text after `//`, without the first space. */
+  readonly text: string;
+  readonly trailing: boolean;
+  readonly range: SourceRange;
+}
+
+/**
+ * A `name: value` line as typed. What the line achieved is on the chart and
+ * the section (`key`, `meter`, ...); the node itself is kept so that printing
+ * never loses a line, including ones the parser ignored: unknown fields,
+ * duplicates, and a field stranded among the bars (an error).
+ * Known names are lowercase and valid values are in canonical form.
+ */
+export interface ChartField {
+  readonly kind: "field";
+  readonly name: string;
+  readonly value: string;
+  readonly range: SourceRange;
+}
+
+/** One token of a bar. Every kind but `annotation` occupies a slot. */
+export type BarToken =
+  | { readonly kind: "chord"; readonly chord: ChartChord; readonly range: SourceRange }
+  /** `.`: extends the chord before it by one slot. */
+  | { readonly kind: "hold"; readonly range: SourceRange }
+  /** `NC`. */
+  | { readonly kind: "noChord"; readonly range: SourceRange }
+  /** `%`: repeat the previous bar. Valid only when alone in its bar. */
+  | { readonly kind: "simile"; readonly range: SourceRange }
+  /** `!word`: reserved, parsed and ignored. */
+  | { readonly kind: "annotation"; readonly word: string; readonly range: SourceRange }
+  /** A token that is not a chord. Kept as typed; it plays as a hold. */
+  | { readonly kind: "unknown"; readonly text: string; readonly range: SourceRange };
+
+export interface Bar {
+  readonly kind: "bar";
+  readonly tokens: readonly BarToken[];
+  readonly range: SourceRange;
+}
+
+/**
+ * What can sit between the marks of a repeat: bars, and lines that are not
+ * bars. A comment always goes in the same list as the bar before it, so one
+ * written just after a repeat is the last item inside it.
+ */
+export type RepeatItem = Bar | ChartComment | ChartField;
+
+/** A numbered ending. Its number is its position in `Repeat.endings`, plus one. */
+export interface Ending {
+  readonly items: readonly RepeatItem[];
+  readonly range: SourceRange;
+}
+
+/**
+ * `|: ... :|`. Pass n plays `body`, then `endings[n - 1]` if there is one.
+ * With endings, `times` is their count, plus one when the last ending is
+ * itself closed with `:|` (so `|: A |1 B :|` plays A B, then A, and goes on).
+ */
+export interface Repeat {
+  readonly kind: "repeat";
+  readonly body: readonly RepeatItem[];
+  readonly endings: readonly Ending[];
+  /** Total passes. */
+  readonly times: number;
+  readonly range: SourceRange;
+}
+
+export type SectionItem = RepeatItem | Repeat;
+
+export interface Section {
+  readonly label: string;
+  /** True for the section of a chart that has bars and no `[Label]` line. */
+  readonly implicit: boolean;
+  /** What jam mode does with it, from the label. */
+  readonly role: SectionRole;
+  /** Resolved: the section's own `key:` line, else the key of the section it repeats, else the chart's. */
+  readonly key: Key;
+  readonly meter: Meter;
+  /**
+   * Index into `Chart.sections` of the section whose bars are played here:
+   * this one, an earlier one for a reference (or a duplicate label), or null
+   * when the label was never defined and the section is skipped.
+   */
+  readonly barsFrom: number | null;
+  /** Comment lines directly above the label. */
+  readonly leading: readonly ChartComment[];
+  /**
+   * Everything under the label, in order. `key:` and `meter:` lines before the
+   * first bar are the section's overrides; a field after a bar is a mistake
+   * kept in place.
+   */
+  readonly items: readonly SectionItem[];
+  /** Bars per printed line: 4 unless the source used another consistent width. */
+  readonly barsPerLine: number;
+  /** The `[Label]` in the text (empty, at the first bar, for an implicit section). */
+  readonly range: SourceRange;
+}
+
+/** Text from a `---` line to the end of the file: kept verbatim, never read. */
+export interface ArrangementBlock {
+  readonly text: string;
+  readonly range: SourceRange;
+}
+
+export interface Chart {
+  /** `Untitled` when the chart has no title. */
+  readonly title: string;
+  /** Resolved: stated, or taken from the first chord when the chart has no `key:` line. */
+  readonly key: Key;
+  /** Null when absent: the default tempo comes from the style. */
+  readonly tempo: number | null;
+  readonly meter: Meter;
+  readonly styleId: string | null;
+  /** The header as typed, in order, including fields this version does not know. */
+  readonly header: readonly (ChartField | ChartComment)[];
+  readonly sections: readonly Section[];
+  readonly arrangement: ArrangementBlock | null;
+  readonly range: SourceRange;
+}
