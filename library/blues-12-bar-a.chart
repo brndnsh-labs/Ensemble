@@ -1,0 +1,9 @@
+title: 12-Bar Blues in A
+key: A
+tempo: 100
+style: blues
+
+[A]
+| A7 | %  | %  | %  |
+| D7 | %  | A7 | %  |
+| E7 | D7 | A7 | E7 |

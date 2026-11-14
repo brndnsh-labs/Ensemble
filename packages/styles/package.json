@@ -1,0 +1,12 @@
+{
+  "name": "@ensemble/styles",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ensemble/engine": "workspace:*"
+  }
+}

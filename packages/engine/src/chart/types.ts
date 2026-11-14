@@ -90,6 +90,8 @@ export interface FlatBar {
 
 /** A chart flattened for the planner, split by what jam mode does with each part. */
 export interface ExpandedChart {
+  /** Song mode: every section once, in file order. */
+  readonly song: readonly FlatBar[];
   /** `Intro` sections: played once at the start. */
   readonly intro: readonly FlatBar[];
   /** Everything else: the form that loops. */

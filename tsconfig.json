@@ -1,8 +1,17 @@
 {
   "files": [],
   "references": [
-    { "path": "packages/engine" },
-    { "path": "packages/engine/test" },
-    { "path": "packages/cli" }
+    {
+      "path": "packages/engine"
+    },
+    {
+      "path": "packages/styles"
+    },
+    {
+      "path": "packages/engine/test"
+    },
+    {
+      "path": "packages/cli"
+    }
   ]
 }

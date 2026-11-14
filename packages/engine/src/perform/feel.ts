@@ -1,0 +1,88 @@
+// Dynamics and feel, applied to every seat's written notes in one place.
+// Players write on a straight grid at written levels; this is the only code
+// that moves a note in time or scales it by the band's energy.
+
+import { PPQ } from "../chart/types.ts";
+import type { Plan, PlanBar } from "../plan/types.ts";
+import type { Rng } from "../rng.ts";
+import type { FeelStyle, StylePack } from "../style/types.ts";
+import type { NoteEvent, WrittenNote } from "./notes.ts";
+
+/** The largest human placement, in milliseconds, at humanize 100. */
+const HUMAN_MS = 9;
+/** The largest human change of velocity at humanize 100. */
+const HUMAN_VELOCITY = 10;
+
+/** How loud a written level is played at an energy: 72% at 0, 100% at 0.7, 112% at 1. */
+export function energyGain(energy: number): number {
+  return 0.72 + 0.4 * energy;
+}
+
+/**
+ * Where a straight-grid position lands once swung. Each pair of the swung unit
+ * is bent so its offbeat sits later; beats never move, and the bend is linear
+ * inside each half so a note between grid lines keeps its place in line.
+ */
+export function swing(tickInBar: number, feel: FeelStyle): number {
+  const amount = Math.min(100, Math.max(0, feel.swing.amount));
+  if (amount === 0) return tickInBar;
+  const pair = feel.swing.unit === "eighth" ? PPQ : PPQ / 2;
+  const half = pair / 2;
+  const offbeat = pair * (0.5 + amount / 600);
+  const base = Math.floor(tickInBar / pair) * pair;
+  const within = tickInBar - base;
+  const bent =
+    within < half
+      ? (within / half) * offbeat
+      : offbeat + ((within - half) / half) * (pair - offbeat);
+  return base + bent;
+}
+
+export function applyFeel(
+  notes: readonly WrittenNote[],
+  plan: Plan,
+  style: StylePack,
+  rng: Rng,
+): NoteEvent[] {
+  const ticksPerMs = (plan.tempo * PPQ) / 60_000;
+  const human = Math.min(100, Math.max(0, style.feel.humanize)) / 100;
+
+  return notes.map((note) => {
+    const bar = plan.bars[note.bar]!;
+    const tickInBar = note.tick - bar.start;
+    // Swing is geometry on a quarter-note pulse; bars in 6/8 and the like play straight.
+    const swings = bar.meter.unit === 4;
+    const bend = (t: number) => (swings ? swing(t, style.feel) : t);
+    const start = bend(tickInBar);
+    // A swung note's end is swung too, so it still ends where its written end lands.
+    const end = bend(tickInBar + note.duration);
+
+    const lean = note.seat === "drums" ? 0 : style.feel.lean[note.seat] * ticksPerMs;
+    // Human placement belongs to a position in the bar, so the same sixteenth leans the same
+    // way every bar and reads as a pocket. Touch belongs to a position in the pass.
+    const voice = note.voice ?? "";
+    const place = rng.fork("place", note.seat, voice, tickInBar);
+    const touch = rng.fork("touch", note.seat, voice, note.pitch, barInPass(bar), tickInBar);
+    const placement = (place.next() * 2 - 1) * HUMAN_MS * human * ticksPerMs;
+    const velocityShift = (touch.next() * 2 - 1) * HUMAN_VELOCITY * human;
+
+    const energy = bar.seats[note.seat] ?? bar.energy;
+    const event: NoteEvent = {
+      kind: "note",
+      seat: note.seat,
+      tick: note.tick,
+      offset: Math.round(start - tickInBar + lean + placement + (note.nudge ?? 0)),
+      duration: Math.max(1, Math.round(end - start)),
+      pitch: note.pitch,
+      velocity: clampVelocity(note.velocity * energyGain(energy) + velocityShift),
+    };
+    return note.voice === undefined ? event : { ...event, voice: note.voice };
+  });
+}
+
+/** A position that repeats every pass, so every chorus has the same touch at the same place. */
+function barInPass(bar: PlanBar): string {
+  return `${bar.section.identity}:${bar.barInSection}`;
+}
+
+const clampVelocity = (v: number): number => Math.min(127, Math.max(1, Math.round(v)));

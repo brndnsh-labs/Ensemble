@@ -1,0 +1,17 @@
+title: Shuffle in D with Intro and Tag
+key: D
+tempo: 116
+style: blues
+
+// The intro comes in "from the five". The outro is a written ending,
+// so the band plays it in place of the style's own.
+[Intro]
+| A7 | G7 | D7 | A7 |
+
+[A]
+| D7 | G7 | D7 | %  |
+| G7 | %  | D7 | %  |
+| A7 | G7 | D7 | A7 |
+
+[Outro]
+| D7 | G7 | D7 A7 | D9 |
