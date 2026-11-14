@@ -171,7 +171,8 @@ export const bluesDrums: DrumStyle = {
       },
     ],
 
-    // Hot: the beats accented, the kick always pushed, and the left hand and the foot fill in.
+    // Hot: the kick always pushed, and the left hand and the foot fill in. The hat stays at its
+    // working level: accented as hard as the backbeat it slammed (heard at gate 1).
     high: [
       // Hat or ride, chosen for one time through the section, so a hot chorus commits to its
       // cymbal and some hot choruses ride (DR-45, DR-109). On the ride the foot closes the hat
@@ -180,7 +181,7 @@ export const bluesDrums: DrumStyle = {
         id: "time",
         hold: "pass",
         options: [
-          { weight: 1, lines: { closedHat: "X.o. X.o. X.o. X.o." } },
+          { weight: 1, lines: { closedHat: "x.o. x.o. x.o. x.o." } },
           { weight: 1, lines: { ride: "x.o. x.o. x.o. x.o.", pedalHat: ".... x... .... x..." } },
         ],
       },

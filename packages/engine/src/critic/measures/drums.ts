@@ -115,4 +115,26 @@ export const drumMeasures: readonly Measure[] = [
       return share(repeats, fills.length - 1);
     },
   },
+  {
+    id: "drums.cymbal-under-backbeat",
+    seat: "drums",
+    says: "The cymbal that keeps time sits under the backbeat, however loud the band is.",
+    unit: "share",
+    of(take) {
+      const drums = notesOf(take, "drums");
+      let bars = 0;
+      let under = 0;
+      for (const bar of musicBars(take)) {
+        if (bar.ending || bar.fill) continue;
+        const played = notesIn(drums, bar);
+        const backbeat = played.filter((note) => note.voice === "snare" && note.tick % PPQ === 0);
+        const cymbal = played.filter((note) => note.voice === "closedHat" || note.voice === "ride");
+        if (backbeat.length === 0 || cymbal.length === 0) continue;
+        bars++;
+        const hardest = Math.max(...cymbal.map((note) => note.velocity));
+        if (hardest < Math.min(...backbeat.map((note) => note.velocity))) under++;
+      }
+      return share(under, bars);
+    },
+  },
 ];

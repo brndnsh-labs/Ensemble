@@ -135,6 +135,15 @@ All of them are in `DECISIONS.md`. The ones that change what you hear, or depart
 - CO-07: reading a section named "B" as a bridge. Not carried over; it was marked unclear.
 - X-A-05: the stale bass floor of 23.
 
+## Feedback from listening (2026-11-14)
+
+Brandon, in Logic: the import works and it sounds good so far, if a little plain; the velocities were slamming.
+
+- **Loudness.** Measured first: the backbeat averaged 108 (114 in the middle take, 120 at high level), 8% of all notes were at 115 or above, and at high level the hat was accented as hard as the snare. Brandon compared three settings by ear and chose 15% quieter, with the hat under the backbeat. Now: every written level is played at 61% to 95% (it was 72% to 112%), the backbeat averages 92 (97 in the middle take, about 105 at high level), nothing is at 115 or above, and the cymbal is under the backbeat in every bar. The files in this folder were rewritten with it. The two quiet-level files are 15% quieter too, which he has not heard yet.
+- **Plain.** Not acted on yet: drums and bass alone on a one-section form are the plainest the band will be. To be judged again with the chord seat in.
+
+The scorecard table above was taken before this change; the bass and drum lines in it are about notes, not levels, and did not move.
+
 ## Review findings
 
 An independent agent reviewed drums, bass, and planner against the notes by rendering and reading takes (2,280 takes swept; its own charts in other keys, with slash chords, rests, vamps, and written endings). It was cut short by quota: 3/4, 6/8, the long arcs, and the property tests themselves were not reached.

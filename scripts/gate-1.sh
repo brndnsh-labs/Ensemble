@@ -5,7 +5,8 @@ set -eu
 cd "$(dirname "$0")/.."
 out=out/gate-1
 mkdir -p "$out"
-render() { node packages/cli/src/main.ts render "$@" | sed 's/^/  /'; }
+# Gate 1 is the rhythm section alone, whatever seats have been built since.
+render() { node packages/cli/src/main.ts render "$@" --without chords,solo | sed 's/^/  /'; }
 
 echo "A 12-bar blues at three tempos, three seeds each (3 choruses):"
 for tempo in 72 100 132; do

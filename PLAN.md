@@ -90,7 +90,8 @@ State on 2026-11-14, after the review fixes. Everything is committed.
 **Open from stage 1**
 
 - The review's findings are fixed except the ones that wait for a listening verdict: the wide bass drops (they follow from the register) and the two one-note phrase fills at mid level. Both are in `out/gate-1/GATE_REPORT.md` under "Not yet acted on". The review did not reach 3/4, 6/8, long arcs, or whether the property tests are weaker than their names.
-- Gate 1 feedback, when it arrives, becomes a property or a measure first, then a fix.
+- Gate 1 feedback so far: loudness (done: 15% trim, hat under the backbeat, three measures) and "a little plain" (to be judged again with chords in). Further feedback becomes a property or a measure first, then a fix.
+- Owed once the voicing agent lands, because it shares the files: targets for `band.backbeat-level` (about 85 to 108 outside quiet takes), `band.notes-near-the-top` (at most 2%) and `drums.cymbal-under-backbeat` (at least 95%) in `packages/styles/src/blues/critic.ts`; then `pnpm goldens` and `score --update`. Until then the golden test fails on purpose.
 
 **Models** (agreed with Brandon to stretch quota): Sonnet for small fixes with a property written first and for mechanical work; Opus for the voicing engine and for adversarial reviews; Fable for comping rhythm, the soloist, and the main thread. The chord seat is built in two parts, in sequence: voicing (Opus), then rhythm (Fable). See "Built in two parts" in `prompts/seat-chords.md`.
 

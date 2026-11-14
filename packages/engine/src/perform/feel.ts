@@ -13,24 +13,16 @@ const HUMAN_MS = 9;
 /** The largest human change of velocity at humanize 100. */
 const HUMAN_VELOCITY = 10;
 
-/** How loud a written level is played at an energy: 72% at 0, 100% at 0.7, 112% at 1. */
-export function energyGain(energy: number): number {
-  return 0.72 + 0.4 * energy;
-}
-
-/** Above this level a stroke keeps a quarter of its excess. */
-const KNEE = 120;
-
 /**
- * The velocity a written level is played at. A hard ceiling would flatten the
- * loudest strokes into one level at full energy. Squeezing above the knee keeps
- * an accent an accent, and puts the hardest written stroke at full energy just
- * under the top of the range. The knee sits above where a backbeat lands until
- * the band is well into its high tier, so the swell of a jam's arc is untouched.
+ * How loud a written level is played at an energy: 61% at 0, 85% at 0.7, 95% at 1.
+ *
+ * The old band played its levels at 72% to 112% (X-B-16), set against its own
+ * sampler. Through a sampled kit that slammed: Brandon chose 15% under it by ear
+ * at gate 1. Nothing written reaches the top of the range even at full energy,
+ * so an accent stays an accent and there is headroom above the loudest chorus.
  */
-export function loudness(written: number, energy: number): number {
-  const level = written * energyGain(energy);
-  return level <= KNEE ? level : KNEE + (level - KNEE) / 4;
+export function energyGain(energy: number): number {
+  return 0.61 + 0.34 * energy;
 }
 
 /**
@@ -92,7 +84,7 @@ export function applyFeel(
       offset,
       duration: Math.max(1, Math.min(Math.round(end - start), room)),
       pitch: note.pitch,
-      velocity: clampVelocity(loudness(note.velocity, energy) + velocityShift),
+      velocity: clampVelocity(note.velocity * energyGain(energy) + velocityShift),
     };
     return note.voice === undefined ? event : { ...event, voice: note.voice };
   });
