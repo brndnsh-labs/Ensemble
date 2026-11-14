@@ -94,7 +94,9 @@ export function heldRng(rng: Rng, purpose: string, hold: Hold, bar: PlanBar): Rn
     case "phrase":
       return rng.fork(purpose, "phrase", bar.section.occurrence, bar.phrase.index);
     case "bar":
-      return rng.fork(purpose, "bar", bar.index);
+      // Keyed by place in the form, not by position in the plan, so a take with a count-in
+      // and one without draw the same bars.
+      return rng.fork(purpose, "bar", bar.section.occurrence, bar.barInSection);
   }
 }
 

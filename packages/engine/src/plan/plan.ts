@@ -5,7 +5,7 @@
 import type { ChartChord, ChordSpan, ExpandedChart, FlatBar, SourceRange } from "../chart/types.ts";
 import { PPQ } from "../chart/types.ts";
 import type { Seat, StylePack } from "../style/types.ts";
-import { SEATS, TIER_HIGH, tierOf } from "../style/types.ts";
+import { SEATS, TIER_HIGH, TIER_MID, tierOf } from "../style/types.ts";
 import { chordFamily, chordToString, makeQuality } from "../theory/chord.ts";
 import type { Key } from "../theory/pitch.ts";
 import { pitchClass } from "../theory/pitch.ts";
@@ -101,7 +101,9 @@ export function planBars(
   const energies = drafts.map((draft, i) => {
     const next = drafts[i + 1];
     const builds = draft.lastOfRun && next !== undefined && next.level > draft.level + 0.05;
-    const lifted = draft.energy + (builds ? style.arc.build : 0);
+    // The build is a swell, not a new part: it never carries its one bar across a tier line,
+    // or the groove would change for a single bar before the fill.
+    const lifted = builds ? withinTier(draft.energy, style.arc.build) : draft.energy;
     return clamp01(holdTierLine(lifted, draft.level, style));
   });
 
@@ -141,7 +143,9 @@ export function planBars(
         }
       } else if (draft.lastOfRun) {
         const newPass = next !== undefined && next.run.pass !== draft.run.pass;
-        const bigger = next !== undefined && tierRank(energies[i + 1]!) > tierRank(energy);
+        // "Is the next section bigger" is asked of the sections themselves, before the one-bar
+        // build, or the build would hide the very step it leads into.
+        const bigger = next !== undefined && tierRank(next.energy) > tierRank(draft.energy);
         fill = { boundary: "section", top: newPass || bigger, tier, half: false };
       } else if (lastOfPhrase && draft.phrase.index % 2 === 1) {
         fill = { boundary: "phrase", top: false, tier, half: false };
@@ -354,6 +358,12 @@ function seatEnergies(energy: number, without: ReadonlySet<Seat>): Record<Seat, 
   return seats;
 }
 
+/** Add a lift without leaving the tier the bar is in. */
+function withinTier(energy: number, lift: number): number {
+  const ceiling = energy < TIER_MID ? TIER_MID : energy < TIER_HIGH ? TIER_HIGH : 1;
+  return Math.max(energy, Math.min(energy + lift, ceiling - 0.01));
+}
+
 const tierRank = (energy: number): number => ["low", "mid", "high"].indexOf(tierOf(energy));
 const clamp01 = (n: number): number => Math.min(1, Math.max(0, n));
 const clampTempo = (bpm: number): number =>
@@ -375,21 +385,26 @@ interface Ending {
  * not play it: the whole bar becomes the tonic in the style's colour.
  */
 function resolveEnding(last: FlatBar, expanded: ExpandedChart, style: StylePack): Ending {
-  const written = last.spans[last.spans.length - 1];
-  const restsAtHome =
-    written !== undefined && (written.chord === null || isHome(written.chord, last.key));
+  // The final chord is the last chord written, not the last span: a rest written after it is
+  // honoured, and the chord sounds only up to the rest.
+  const finalIndex = last.spans.findLastIndex((span) => span.chord !== null);
+  const written = last.spans[finalIndex];
+  const rest = last.spans.slice(finalIndex + 1);
+  const restStart = rest[0]?.start ?? last.ticks;
+
   let spans: readonly ChordSpan[];
-  if (restsAtHome) {
+  if (!written?.chord || isHome(written.chord, last.key)) {
     spans = last.spans;
   } else {
     const family = tonicFamily(expanded, last.key);
     const chord = tonicChord(last.key, style.ending.finalChord[family], last.source);
-    spans = [{ chord, start: 0, duration: last.ticks, tied: false }];
+    spans = [{ chord, start: 0, duration: restStart, tied: false }, ...rest];
   }
-  // The gesture starts where the final chord begins; a chord held from the bar before starts at 0.
-  const finalSpan = spans[spans.length - 1]!;
+  // The gesture starts where the final chord begins. A bar that is all rest has no final chord:
+  // the chart wrote its own silence, and the band keeps it.
+  const finalSpan = spans.findLast((span) => span.chord !== null) ?? spans[0]!;
   const gesture = style.ending.gesture;
-  const rings = gesture.kind !== "stop";
+  const rings = gesture.kind !== "stop" && rest.length === 0 && finalSpan.chord !== null;
   const tailBars = rings ? Math.max(0, Math.floor(style.ending.tailBars)) : 0;
   return {
     spans,
@@ -398,7 +413,9 @@ function resolveEnding(last: FlatBar, expanded: ExpandedChart, style: StylePack)
     mark: (barTicks) => ({
       gesture,
       at: finalSpan.start,
-      ring: rings ? barTicks - finalSpan.start + tailBars * barTicks : PPQ / 2,
+      ring: rings
+        ? barTicks - finalSpan.start + tailBars * barTicks
+        : Math.min(gesture.kind === "stop" ? PPQ / 2 : barTicks, restStart - finalSpan.start),
     }),
   };
 }
@@ -470,7 +487,8 @@ function countInBar(first: PlanBar): PlanBar {
     barInSection: 0,
     barInPass: -1,
     phrase: { index: 0, bar: 0, length: 1 },
-    seats: { drums: first.seats.drums, bass: null, chords: null, solo: null },
+    // The count belongs to the band even when its drummer is the person playing along.
+    seats: { drums: first.energy, bass: null, chords: null, solo: null },
     fill: null,
     crash: false,
     ending: null,

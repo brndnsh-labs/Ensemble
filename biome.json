@@ -23,7 +23,7 @@
               "options": {
                 "patterns": [
                   {
-                    "group": ["node:*", "@ensemble/*", "../../*"],
+                    "group": ["node:*", "@ensemble/*"],
                     "message": "The engine imports nothing outside itself: no Node, no other packages."
                   }
                 ]
