@@ -99,14 +99,21 @@ test("a bass note held for a half note or more is a tone of its chord", () => {
   }
 });
 
-test("the last bass note of a jam that ends is the lowest root on the instrument", () => {
+test("the last bass note of a jam that ends is the lowest root on the instrument, or the root an octave over it where the fall from the note before would be more than an octave", () => {
   for (const { chart, options, take } of takes(
     (jam) => !jam.options.open && jam.chart.meter === "4/4",
   )) {
-    const last = notesOf(take, "bass").at(-1)!;
+    const bass = notesOf(take, "bass");
+    const last = bass.at(-1)!;
+    const ending = take.plan.bars.findLast((bar) => bar.kind === "music")!;
+    const before = bass.findLast((note) => note.tick < ending.start);
+    const lowest = 28 + ((last.pitch - 28) % 12);
+    // A line on a low tonic lives an octave over the open string, and its last note can be
+    // a seventh over that: it comes home there, not two octaves down by a leap (EN-28).
+    const leap = before !== undefined && before.pitch - lowest > 12;
     assert.ok(
-      last.pitch >= 28 && last.pitch < 40,
-      `${chart.file} seed ${options.seed}: ends on ${last.pitch}`,
+      last.pitch === lowest || (leap && last.pitch === lowest + 12),
+      `${chart.file} seed ${options.seed}: ends on ${last.pitch} from ${before?.pitch}`,
     );
   }
 });
@@ -324,7 +331,10 @@ test(
         for (const note of own) {
           const i = bass.indexOf(note);
           const before = bass[i - 1];
-          if (!before || !walking(take.plan.bars.findLast((b) => b.start <= before.tick))) continue;
+          // The note before is the one it follows: in this bar or the last. A bass that has
+          // laid out for a section comes back on whatever the chord asks.
+          const from = before && take.plan.bars.findLast((b) => b.start <= before.tick);
+          if (!before || !from || from.index < bar.index - 1 || !walking(from)) continue;
           assert.notEqual(note.pitch, before.pitch, `${where}: ${note.pitch} twice running`);
           if (changes.get(note.tick) !== note.pitch % 12) continue;
           approaches++;

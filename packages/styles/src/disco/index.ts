@@ -43,8 +43,9 @@ export const disco: StylePack = {
   sound: {
     packs: { drums: "drum-kit", bass: "electric-bass", chords: "clean-guitar" },
     // Measured (`pnpm levels`), no ear yet. The guitar comes up 3 dB, as funk's does: short
-    // chops measure quiet. At these levels the band read -16.9 LUFS with the soloist 2.3 to
-    // 2.7 dB under it; the master comes down half a decibel and the soloist up one and a half.
+    // chops measure quiet, and the soloist up to sit a decibel under the band. With everyone
+    // playing that read -16.1 LUFS, a decibel over funk and rock, so the master comes down to
+    // bring it level with them.
     mix: {
       ...DEFAULT_MIX,
       seats: {
@@ -52,7 +53,7 @@ export const disco: StylePack = {
         chords: { ...DEFAULT_MIX.seats.chords, level: -3 },
         solo: { ...DEFAULT_MIX.seats.solo, level: 4.5 },
       },
-      master: DEFAULT_MIX.master - 0.5,
+      master: DEFAULT_MIX.master - 1.5,
     },
   },
 };

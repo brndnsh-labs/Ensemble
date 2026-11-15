@@ -690,16 +690,17 @@ test("with nobody soloing, a piano that listens plays exactly what a deaf one pl
 
 test("under a solo the piano leaves the soloist its note: a voice held on the soloist's own pitch for more than a beat is the bottom of the hand or a tone the chord is heard by", () => {
   let under = 0;
-  // A comp that does not listen plays as if nobody were soloing, by design: the organ, a
-  // strummed groove (CH-60, CH-68). Its held last chord may sit on the soloist's last note.
-  const listening = soloTakes().filter(({ style }) => style.chords.listening !== null);
-  for (const { chart, options, take } of listening) {
+  for (const { style, chart, options, take } of soloTakes()) {
     const solo = notesOf(take, "solo");
     const strikes = strikesOf(take);
     const bars = take.plan.bars;
     strikes.forEach((strike, i) => {
       const bar = bars.findLast((candidate) => candidate.start <= strike.tick);
       if (!bar?.solo || strike.pitches.length <= 2) return;
+      // A comp that does not listen plays as if nobody were soloing, by design (a strummed
+      // groove, CH-60, CH-68): its strokes are short, so it holds nothing under the line
+      // until the last chord, and there its grip may have the note the soloist ends on.
+      if (style.chords.listening === null && bar.ending) return;
       // One hand: a strike sounds until the next one, and is judged inside its own bar.
       const ends = Math.min(strike.ends, strikes[i + 1]?.sounds ?? Infinity, bar.start + bar.ticks);
       under++;
@@ -731,10 +732,7 @@ test("under a solo the piano leaves the soloist its note: a voice held on the so
       }
     });
   }
-  assert.ok(
-    STYLES.every((style) => style.chords.listening === null) || under > enough(3000),
-    `only ${under} strikes under a solo`,
-  );
+  assert.ok(under > enough(3000), `only ${under} strikes under a solo`);
 });
 
 test("under a solo the hand does not growl: its two lowest notes are a half step apart only on a dominant from E4 up", () => {

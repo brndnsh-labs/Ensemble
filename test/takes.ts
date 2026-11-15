@@ -110,8 +110,8 @@ const BORROWED = 12;
 
 /**
  * A style's own charts: the ones written for it, named for it. Any band can be handed any
- * tune, so a style is held to its own in every kind of take on every seed, and to a dozen
- * of the others in one take each (a kind and a seed by turns). The dozen are spread evenly
+ * tune, so a style is held to its own in every kind of take on every seed, and to up to a
+ * dozen of the others in one take each (a kind and a seed by turns). They are spread evenly
  * through the rest of the library, starting at a different chart for each style, so that
  * between them the styles play all of it, and a new style's charts do not make every
  * other style's run longer.

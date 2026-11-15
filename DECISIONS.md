@@ -924,3 +924,16 @@ Built from `prompts/style-disco.md` in its own clone: `packages/styles/src/disco
 **Found, not fixed:**
 
 - `otherCharts` (`test/takes.ts`) hands a style every n-th chart with n rounded up, so as the library grows a style gets fewer than the dozen meant: nine for funk now. Handing exactly twelve was tried, and on the full run the blues bass ended an octave up (E2, not E1) on `funk-one-chord-e` seed 5, failing "the last bass note of a jam that ends is the lowest root". That is the blues bass's, and fixing it would move the blues; left for the main session.
+
+## disco, checked and merged (stage 6, part 5)
+
+Read on the main thread: the whole engine and test diff, the drum data against ST-disco-05 to 09, the six charts. `pnpm check` 11.7 s of 14 with five styles, `pnpm test:full` 28.5 s, `pnpm score` no movement in any style, the other four styles' goldens untouched. Changed before merging:
+
+- **"Under a solo the piano leaves the soloist its note" excuses less than the build had it.** The build left out every take of a comp that does not listen, which took funk out of a rule it passes. Now only the last chord of such a comp is excused: its strokes are short everywhere else, and where the band holds the final chord its grip may have the soloist's last note. Funk and disco are both read again.
+- **The mix a decibel further down** (master 1.5 under the default): with everyone playing disco read -16.1 LUFS where funk and rock read -17; now -17.0, the alto 1.1 dB under the band.
+- **"The same note twice running" is asked only of notes that follow one another** (the jazz walk, `test/bass.test.ts`). Found by handing every style every other style's chart once: in the disco song the jazz bass lays out for four bars and comes back on the root it left on. Not a walk repeating itself; the test had been comparing across the silence.
+- **"The last bass note is the lowest root" now says what the engine has done since stage 2** (EN-28): or the root an octave over it, where the fall from the note before would be more than an octave. The build reported the blues bass ending on E2 on a one-chord tune in E as a bug. It is the rule: a line on a low tonic lives an octave over the open string, its last note can be a seventh over that, and it comes home in its own octave. 10 endings in 2,970 (every style on every 4/4 chart, six seeds, three kinds) end an octave up, every one with that leap; none breaks the rule as now written. The old wording held only because no borrowed chart happened to sit on E to the end.
+- **Each style borrows up to a dozen charts, not a dozen** (`otherCharts` rounds its stride up: nine each with 33 charts). Left: the spread through the library is the point, not the count, and the probe above (every style on every chart) passes every property.
+
+Not done, as the build said: the keyboard book (ST-disco-18 to 20), a horn's scoops and falls, "this section walks" as one decision for a section (a coin for each change, held by section, stands in), and the bass's lead-in a whole step under where the engine keeps a note already a step away (BA-07).
+
