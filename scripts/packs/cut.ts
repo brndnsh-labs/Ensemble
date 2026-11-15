@@ -13,9 +13,11 @@ import {
   type PackLevel,
   type PackVoice,
 } from "../../packages/audio/src/pack.ts";
+import { throughAmp } from "./amp.ts";
 import type { Recipe, Take } from "./recipe.ts";
 import { altoSax } from "./recipes/alto-sax.ts";
 import { cleanGuitar } from "./recipes/clean-guitar.ts";
+import { drivenGuitar, drivenGuitarGrit } from "./recipes/driven-guitar.ts";
 import { drumKit } from "./recipes/drum-kit.ts";
 import { electricBass } from "./recipes/electric-bass.ts";
 import { grandPiano } from "./recipes/grand-piano.ts";
@@ -50,6 +52,8 @@ const RECIPES: readonly Recipe[] = [
   vibraphone,
   electricBass,
   cleanGuitar,
+  drivenGuitar,
+  drivenGuitarGrit,
 ];
 
 const ROOT = join(import.meta.dirname, "..", "..");
@@ -103,8 +107,10 @@ function cutTake(recipe: Recipe, level: PackLevel, take: Take, measureRoots: boo
   const rest = x.length - start;
   const length = Math.min(cap, decay, rest);
   const endedBy = length === cap ? "cap" : length === decay ? "decay" : "file";
-  const seg = x.slice(start, start + length);
+  let seg = x.slice(start, start + length);
   if (pre > 0) fadeIn(seg, pre);
+  // Through the amp while the note still has its own shape: the clip then eases as the note dies away.
+  if (recipe.amp) seg = throughAmp(seg, recipe.amp, take.push);
   const fadeLength = Math.min(length, Math.max(Math.round(0.08 * RATE), Math.round(0.1 * length)));
   fadeOut(seg, fadeLength);
 

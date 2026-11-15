@@ -8,7 +8,7 @@
 // The FSBS files are folded to mono; `monoCheck` prints what the fold loses.
 
 import { join } from "node:path";
-import { byVelocity, capByNote, pickLayers, type Recipe } from "../recipe.ts";
+import { byVelocity, capByNote, pickLayers, type Recipe, type Voice } from "../recipe.ts";
 import { alternate, keys, readSfz, soundsByDefault } from "../sfz.ts";
 
 const FSBS = "EGuitarFSBS-clean SFZ+FLAC-20260807";
@@ -52,6 +52,42 @@ const MUTED_RELEASE = 0.03;
  */
 const MUTED_LEVEL = { measure: "peak", reference: -11.1 } as const;
 
+/** The plain notes: every recorded pitch at both dynamics. The overdriven guitar is cut from these too. */
+export function plainVoice(dir: string): Voice {
+  const regions = readSfz(join(dir, FSBS, "EGuitarFSBS-clean bridge 20260807.sfz")).filter(
+    soundsByDefault,
+  );
+  const notes = [...new Set(regions.map((r) => keys(r).center))].sort((a, b) => a - b);
+  const byNote = notes.map((note) => {
+    const own = regions
+      .filter((r) => keys(r).center === note)
+      .sort((a, b) => alternate(a) - alternate(b));
+    const groups = byVelocity(own);
+    // A note the mapping plays at every velocity: its alternates in turn, two to a layer.
+    if (groups.length === 1) {
+      return TOPS.map((top, i) => ({
+        top,
+        regions: own.slice(i * ALTERNATES, (i + 1) * ALTERNATES),
+      }));
+    }
+    return pickLayers(groups, TOPS, ALTERNATES);
+  });
+  return {
+    name: "",
+    release: RELEASE,
+    layers: TOPS.map((top, i) => ({
+      top,
+      zones: byNote.map((layers, n) => ({
+        takes: layers[i]!.regions.map((r) => ({
+          parts: [{ file: r.sample, db: 0 }],
+          mapped: notes[n]!,
+          cap: capByNote(notes[n]!, CAP_LOW, CAP_HIGH),
+        })),
+      })),
+    })),
+  };
+}
+
 export const cleanGuitar: Recipe = {
   id: "clean-guitar",
   name: "Clean electric guitar",
@@ -77,25 +113,6 @@ export const cleanGuitar: Recipe = {
     },
   ],
   voices(dir, dirOf) {
-    const regions = readSfz(join(dir, FSBS, "EGuitarFSBS-clean bridge 20260807.sfz")).filter(
-      soundsByDefault,
-    );
-    const notes = [...new Set(regions.map((r) => keys(r).center))].sort((a, b) => a - b);
-    const byNote = notes.map((note) => {
-      const own = regions
-        .filter((r) => keys(r).center === note)
-        .sort((a, b) => alternate(a) - alternate(b));
-      const groups = byVelocity(own);
-      // A note the mapping plays at every velocity: its alternates in turn, two to a layer.
-      if (groups.length === 1) {
-        return TOPS.map((top, i) => ({
-          top,
-          regions: own.slice(i * ALTERNATES, (i + 1) * ALTERNATES),
-        }));
-      }
-      return pickLayers(groups, TOPS, ALTERNATES);
-    });
-
     const emily = readSfz(join(dirOf("emilyguitar"), "emily_basic.sfz"));
     const strokes = MUTED.map(({ stroke, root }) => {
       const takes = emily
@@ -112,20 +129,7 @@ export const cleanGuitar: Recipe = {
     });
 
     return [
-      {
-        name: "",
-        release: RELEASE,
-        layers: TOPS.map((top, i) => ({
-          top,
-          zones: byNote.map((layers, n) => ({
-            takes: layers[i]!.regions.map((r) => ({
-              parts: [{ file: r.sample, db: 0 }],
-              mapped: notes[n]!,
-              cap: capByNote(notes[n]!, CAP_LOW, CAP_HIGH),
-            })),
-          })),
-        })),
-      },
+      plainVoice(dir),
       {
         name: "muted",
         release: MUTED_RELEASE,

@@ -24,6 +24,8 @@ export interface Take {
   readonly cap: number;
   /** Semitones to move the pitch by resampling when it is cut (the mid tom). */
   readonly shift?: number;
+  /** In a pack with an amp: how hard this take drives it, as a multiple of the amp's drive. Default 1. */
+  readonly push?: number;
 }
 
 export interface Zone {
@@ -65,9 +67,26 @@ export interface Credit {
   readonly changes: string;
 }
 
+/** An amplifier the takes are played through before they are levelled (`amp.ts`). */
+export interface Amp {
+  /** Hz. The guitar is thinned below this before the clip, or the low strings turn to mud. */
+  readonly lowCut: number;
+  /** A take at full scale is multiplied by this before the soft clip: the main knob. */
+  readonly drive: number;
+  /** Added before the clip and taken out after: an uneven clip, for warmth. */
+  readonly bias: number;
+  /** The speaker: where it rolls off, in Hz, and its peaks as frequency, dB and sharpness. */
+  readonly speaker: {
+    readonly rollOff: number;
+    readonly peaks: readonly (readonly [hz: number, db: number, q: number])[];
+  };
+}
+
 export interface Recipe {
   readonly id: string;
   readonly name: string;
+  /** Every take goes through this amplifier. Mono packs only. */
+  readonly amp?: Amp;
   /** The libraries the pack draws on, the one most of it is cut from first. */
   readonly credits: readonly Credit[];
   /**

@@ -16,6 +16,23 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     home: 67,
     breath: { lungs: 8, takes: 0.5 },
   },
+  // A lead guitar's working register, from the open D string's octave up to the top of the
+  // neck, at home around the twelfth fret. Its notes are plain for now: no bends, no vibrato.
+  "driven-guitar": {
+    name: "Overdriven guitar",
+    program: 29,
+    range: [52, 85],
+    home: 69,
+    breath: null,
+  },
+  // The same guitar driven harder, kept beside the first until an ear has chosen between them.
+  "driven-guitar-grit": {
+    name: "Overdriven guitar, more grit",
+    program: 29,
+    range: [52, 85],
+    home: 69,
+    breath: null,
+  },
 };
 
 /** The name an instrument is listed under, for a note's `voice`. */

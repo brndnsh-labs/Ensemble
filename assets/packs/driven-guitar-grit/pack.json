@@ -1,0 +1,538 @@
+{
+  "format": 1,
+  "id": "driven-guitar-grit",
+  "name": "Overdriven guitar, more grit",
+  "credits": [
+    {
+      "title": "Electric Guitar FSBS (clean)",
+      "author": "FreePats",
+      "url": "https://github.com/freepats/electric-guitar-FSBS-clean",
+      "version": "2026-08-07",
+      "licence": "CC0-1.0",
+      "changes": "Every recorded note, C2 to C-sharp 6, at both dynamics, two alternates each, the stereo files folded to mono; trimmed to the onset, cut at a length cap and faded; played through a simulated amplifier (six times drive: thinned below 90 Hz, a soft uneven clip, and a speaker rolling off at 4 kHz); each levelled to one loudness; roots measured; encoded as Opus."
+    }
+  ],
+  "audio": {
+    "container": "webm",
+    "codec": "opus",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bytes": 2053239,
+    "decodedBytes": 28901088
+  },
+  "level": {
+    "measure": "loudness",
+    "reference": -20
+  },
+  "voices": {
+    "": {
+      "layers": [
+        {
+          "top": 70,
+          "zones": [
+            {
+              "root": 36.02,
+              "takes": [
+                {
+                  "file": "n36-v1-1.webm",
+                  "seconds": 2.45
+                },
+                {
+                  "file": "n36-v1-2.webm",
+                  "seconds": 2.45
+                }
+              ]
+            },
+            {
+              "root": 39.935,
+              "takes": [
+                {
+                  "file": "n40-v1-1.webm",
+                  "seconds": 2.374896
+                },
+                {
+                  "file": "n40-v1-2.webm",
+                  "seconds": 2.374896
+                }
+              ]
+            },
+            {
+              "root": 40.983,
+              "takes": [
+                {
+                  "file": "n41-v1-1.webm",
+                  "seconds": 2.356125
+                },
+                {
+                  "file": "n41-v1-2.webm",
+                  "seconds": 2.356125
+                }
+              ]
+            },
+            {
+              "root": 44.822,
+              "takes": [
+                {
+                  "file": "n45-v1-1.webm",
+                  "seconds": 2.281021
+                },
+                {
+                  "file": "n45-v1-2.webm",
+                  "seconds": 2.281021
+                }
+              ]
+            },
+            {
+              "root": 47.984,
+              "takes": [
+                {
+                  "file": "n48-v1-1.webm",
+                  "seconds": 2.224687
+                },
+                {
+                  "file": "n48-v1-2.webm",
+                  "seconds": 2.224687
+                }
+              ]
+            },
+            {
+              "root": 49.971,
+              "takes": [
+                {
+                  "file": "n50-v1-1.webm",
+                  "seconds": 2.187146
+                },
+                {
+                  "file": "n50-v1-2.webm",
+                  "seconds": 2.187146
+                }
+              ]
+            },
+            {
+              "root": 51.996,
+              "takes": [
+                {
+                  "file": "n52-v1-1.webm",
+                  "seconds": 2.149583
+                },
+                {
+                  "file": "n52-v1-2.webm",
+                  "seconds": 2.149583
+                }
+              ]
+            },
+            {
+              "root": 54.97,
+              "takes": [
+                {
+                  "file": "n55-v1-1.webm",
+                  "seconds": 2.093271
+                },
+                {
+                  "file": "n55-v1-2.webm",
+                  "seconds": 2.093271
+                }
+              ]
+            },
+            {
+              "root": 59.043,
+              "takes": [
+                {
+                  "file": "n59-v1-1.webm",
+                  "seconds": 2.018167
+                },
+                {
+                  "file": "n59-v1-2.webm",
+                  "seconds": 2.018167
+                }
+              ]
+            },
+            {
+              "root": 61.01,
+              "takes": [
+                {
+                  "file": "n61-v1-1.webm",
+                  "seconds": 1.980604
+                },
+                {
+                  "file": "n61-v1-2.webm",
+                  "seconds": 1.980604
+                }
+              ]
+            },
+            {
+              "root": 63.986,
+              "takes": [
+                {
+                  "file": "n64-v1-1.webm",
+                  "seconds": 1.924292
+                },
+                {
+                  "file": "n64-v1-2.webm",
+                  "seconds": 1.924292
+                }
+              ]
+            },
+            {
+              "root": 66.994,
+              "takes": [
+                {
+                  "file": "n67-v1-1.webm",
+                  "seconds": 1.867958
+                },
+                {
+                  "file": "n67-v1-2.webm",
+                  "seconds": 1.867958
+                }
+              ]
+            },
+            {
+              "root": 70.994,
+              "takes": [
+                {
+                  "file": "n71-v1-1.webm",
+                  "seconds": 1.792854
+                },
+                {
+                  "file": "n71-v1-2.webm",
+                  "seconds": 1.792854
+                }
+              ]
+            },
+            {
+              "root": 71.992,
+              "takes": [
+                {
+                  "file": "n72-v1-1.webm",
+                  "seconds": 1.774083
+                },
+                {
+                  "file": "n72-v1-2.webm",
+                  "seconds": 1.774083
+                }
+              ]
+            },
+            {
+              "root": 74.034,
+              "takes": [
+                {
+                  "file": "n74-v1-1.webm",
+                  "seconds": 1.736521
+                },
+                {
+                  "file": "n74-v1-2.webm",
+                  "seconds": 1.736521
+                }
+              ]
+            },
+            {
+              "root": 77.015,
+              "takes": [
+                {
+                  "file": "n77-v1-1.webm",
+                  "seconds": 1.680208
+                },
+                {
+                  "file": "n77-v1-2.webm",
+                  "seconds": 1.680208
+                }
+              ]
+            },
+            {
+              "root": 80.021,
+              "takes": [
+                {
+                  "file": "n80-v1-1.webm",
+                  "seconds": 1.623875
+                },
+                {
+                  "file": "n80-v1-2.webm",
+                  "seconds": 1.623875
+                }
+              ]
+            },
+            {
+              "root": 82.018,
+              "takes": [
+                {
+                  "file": "n82-v1-1.webm",
+                  "seconds": 1.586333
+                },
+                {
+                  "file": "n82-v1-2.webm",
+                  "seconds": 1.586333
+                }
+              ]
+            },
+            {
+              "root": 84.974,
+              "takes": [
+                {
+                  "file": "n85-v1-1.webm",
+                  "seconds": 1.53
+                },
+                {
+                  "file": "n85-v1-2.webm",
+                  "seconds": 1.53
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "root": 35.92,
+              "takes": [
+                {
+                  "file": "n36-v2-1.webm",
+                  "seconds": 2.45
+                },
+                {
+                  "file": "n36-v2-2.webm",
+                  "seconds": 2.45
+                }
+              ]
+            },
+            {
+              "root": 40.009,
+              "takes": [
+                {
+                  "file": "n40-v2-1.webm",
+                  "seconds": 2.374896
+                },
+                {
+                  "file": "n40-v2-2.webm",
+                  "seconds": 2.374896
+                }
+              ]
+            },
+            {
+              "root": 40.98,
+              "takes": [
+                {
+                  "file": "n41-v2-1.webm",
+                  "seconds": 2.356125
+                },
+                {
+                  "file": "n41-v2-2.webm",
+                  "seconds": 2.356125
+                }
+              ]
+            },
+            {
+              "root": 45.023,
+              "takes": [
+                {
+                  "file": "n45-v2-1.webm",
+                  "seconds": 2.281021
+                },
+                {
+                  "file": "n45-v2-2.webm",
+                  "seconds": 2.281021
+                }
+              ]
+            },
+            {
+              "root": 47.951,
+              "takes": [
+                {
+                  "file": "n48-v2-1.webm",
+                  "seconds": 2.224687
+                },
+                {
+                  "file": "n48-v2-2.webm",
+                  "seconds": 2.224687
+                }
+              ]
+            },
+            {
+              "root": 50.005,
+              "takes": [
+                {
+                  "file": "n50-v2-1.webm",
+                  "seconds": 2.187146
+                },
+                {
+                  "file": "n50-v2-2.webm",
+                  "seconds": 2.187146
+                }
+              ]
+            },
+            {
+              "root": 52.022,
+              "takes": [
+                {
+                  "file": "n52-v2-1.webm",
+                  "seconds": 2.149583
+                },
+                {
+                  "file": "n52-v2-2.webm",
+                  "seconds": 2.149583
+                }
+              ]
+            },
+            {
+              "root": 54.96,
+              "takes": [
+                {
+                  "file": "n55-v2-1.webm",
+                  "seconds": 2.093271
+                },
+                {
+                  "file": "n55-v2-2.webm",
+                  "seconds": 2.093271
+                }
+              ]
+            },
+            {
+              "root": 59.004,
+              "takes": [
+                {
+                  "file": "n59-v2-1.webm",
+                  "seconds": 2.018167
+                },
+                {
+                  "file": "n59-v2-2.webm",
+                  "seconds": 2.018167
+                }
+              ]
+            },
+            {
+              "root": 61.005,
+              "takes": [
+                {
+                  "file": "n61-v2-1.webm",
+                  "seconds": 1.980604
+                },
+                {
+                  "file": "n61-v2-2.webm",
+                  "seconds": 1.980604
+                }
+              ]
+            },
+            {
+              "root": 63.984,
+              "takes": [
+                {
+                  "file": "n64-v2-1.webm",
+                  "seconds": 1.924292
+                },
+                {
+                  "file": "n64-v2-2.webm",
+                  "seconds": 1.924292
+                }
+              ]
+            },
+            {
+              "root": 67.014,
+              "takes": [
+                {
+                  "file": "n67-v2-1.webm",
+                  "seconds": 1.867958
+                },
+                {
+                  "file": "n67-v2-2.webm",
+                  "seconds": 1.867958
+                }
+              ]
+            },
+            {
+              "root": 71.012,
+              "takes": [
+                {
+                  "file": "n71-v2-1.webm",
+                  "seconds": 1.792854
+                },
+                {
+                  "file": "n71-v2-2.webm",
+                  "seconds": 1.792854
+                }
+              ]
+            },
+            {
+              "root": 72.001,
+              "takes": [
+                {
+                  "file": "n72-v2-1.webm",
+                  "seconds": 1.774083
+                },
+                {
+                  "file": "n72-v2-2.webm",
+                  "seconds": 1.774083
+                }
+              ]
+            },
+            {
+              "root": 74.046,
+              "takes": [
+                {
+                  "file": "n74-v2-1.webm",
+                  "seconds": 1.736521
+                },
+                {
+                  "file": "n74-v2-2.webm",
+                  "seconds": 1.736521
+                }
+              ]
+            },
+            {
+              "root": 77.02,
+              "takes": [
+                {
+                  "file": "n77-v2-1.webm",
+                  "seconds": 1.680208
+                },
+                {
+                  "file": "n77-v2-2.webm",
+                  "seconds": 1.680208
+                }
+              ]
+            },
+            {
+              "root": 79.992,
+              "takes": [
+                {
+                  "file": "n80-v2-1.webm",
+                  "seconds": 1.623875
+                },
+                {
+                  "file": "n80-v2-2.webm",
+                  "seconds": 1.623875
+                }
+              ]
+            },
+            {
+              "root": 82.015,
+              "takes": [
+                {
+                  "file": "n82-v2-1.webm",
+                  "seconds": 1.586333
+                },
+                {
+                  "file": "n82-v2-2.webm",
+                  "seconds": 1.586333
+                }
+              ]
+            },
+            {
+              "root": 84.991,
+              "takes": [
+                {
+                  "file": "n85-v2-1.webm",
+                  "seconds": 1.53
+                },
+                {
+                  "file": "n85-v2-2.webm",
+                  "seconds": 1.53
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "release": 0.06
+    }
+  }
+}
