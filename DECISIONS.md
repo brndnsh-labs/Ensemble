@@ -937,3 +937,11 @@ Read on the main thread: the whole engine and test diff, the drum data against S
 
 Not done, as the build said: the keyboard book (ST-disco-18 to 20), a horn's scoops and falls, "this section walks" as one decision for a section (a coin for each change, held by section, stands in), and the bass's lead-in a whole step under where the engine keeps a note already a step away (BA-07).
 
+## the electric piano is the Rhodes (stage 6, part 5)
+
+Brandon, 2026-11-15, asked whether to use the old band's Rhodes or a CC0 FM piano: "it'll stay non-commercial, let's use the rhodes".
+
+- **`jrhodes3c`** (Jeff Learman, a 1977 Mark I Stage 73) is pinned in `scripts/packs/sources.ts` at the commit of 2025-11-25. Its `LICENSE` lets the samples be distributed in an application under CC BY-NC-SA 4.0 (it names that licence, links the BY-NC deed and lists only BY and NC; the stricter reading is followed, as the old band did), and offers a commercial licence on request.
+- **What that binds**: Ensemble is not sold or put behind payment while this pack ships in it; the pack carries the source's licence file and its credit says the licence by name; anyone who takes the pack takes it on the same terms. Every other pack is CC0 or CC BY and is not touched by this. If Ensemble were ever to be commercial, this pack is the one to replace or to ask the author about.
+- The CC0 alternative found and not used: `Electrophones/TX81Z/FM Piano` in VCSL, already a pinned source.
+
