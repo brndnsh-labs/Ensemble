@@ -1,0 +1,691 @@
+@import "@fontsource-variable/archivo/wdth.css";
+
+/* Ink on paper, and a highlighter for the bar being played. The ink is the
+   blue-violet of a duplicated band chart; the paper is cool, not cream. */
+:root {
+  color-scheme: light dark;
+  --paper: #eef0f4;
+  --ink: #1e1a4f;
+  --faint: #6f6d93;
+  --rule: #c5c6d6;
+  --marker: #ffe53b;
+  --on-marker: #1e1a4f;
+  --pencil: #cf3d35;
+  --gutter: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #15132b;
+    --ink: #eceaff;
+    --faint: #9b99c2;
+    --rule: #3a3760;
+    --marker: #ffd83b;
+    --pencil: #ff8176;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: "Archivo Variable", system-ui, sans-serif;
+  font-weight: 450;
+  line-height: 1.35;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* ── The library ─────────────────────────────────────────────────────────── */
+
+.library {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: calc(28px + env(safe-area-inset-top)) var(--gutter) 64px;
+}
+
+.masthead h1 {
+  margin: 0;
+  font-size: clamp(3.6rem, 17vw, 6.5rem);
+  font-stretch: 62%;
+  font-weight: 800;
+  line-height: 0.86;
+  letter-spacing: -0.01em;
+}
+
+.masthead p {
+  margin: 10px 0 0;
+  color: var(--faint);
+}
+
+.shelf h2 {
+  margin: 34px 0 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid var(--ink);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.shelf ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shelf li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.tune {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.tune-title {
+  display: block;
+  font-size: 1.3rem;
+  font-stretch: 80%;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.tune-facts {
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+.tune-play {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  padding: 0;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: none;
+}
+
+.tune-play svg {
+  width: 20px;
+  height: 20px;
+  fill: currentColor;
+  vertical-align: middle;
+}
+
+.tune-play:hover,
+.tune-play:active {
+  background: var(--marker);
+  color: var(--on-marker);
+  border-color: var(--on-marker);
+}
+
+/* ── The play screen ─────────────────────────────────────────────────────── */
+
+.play {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  overflow: hidden;
+}
+
+.bar-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px var(--gutter) 4px;
+}
+
+.back {
+  flex: none;
+  padding: 6px 0;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.back span {
+  margin-left: 0.3em;
+}
+
+.bar-top h1 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: 1.25rem;
+  font-stretch: 75%;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reading {
+  display: flex;
+  flex: none;
+}
+
+.reading button,
+.focus-toggle,
+.seats button {
+  padding: 5px 9px;
+  border: 1.5px solid var(--ink);
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.reading :where(button + button) {
+  border-left: 0;
+}
+
+.reading button:first-child,
+.seats button:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.reading button:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.focus-toggle {
+  flex: none;
+  border-radius: 6px;
+}
+
+button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.summary {
+  margin: 0;
+  padding: 0 var(--gutter) 6px;
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+.setup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  padding: 2px var(--gutter) 10px;
+}
+
+.setup label,
+.setup .field {
+  display: grid;
+  gap: 2px;
+}
+
+.setup label > span,
+.setup .field > span {
+  color: var(--faint);
+  font-size: 0.75rem;
+}
+
+.setup select,
+.stepper {
+  height: 36px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: none;
+  font-weight: 600;
+}
+
+.setup select {
+  padding: 0 8px;
+}
+
+.stepper {
+  display: flex;
+  align-items: stretch;
+}
+
+.stepper button {
+  width: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.stepper output {
+  min-width: 2.4em;
+  align-self: center;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.seats {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.seats button {
+  height: 36px;
+}
+
+.seats :where(button + button) {
+  border-left: 0;
+}
+
+.seats button:last-of-type {
+  border-radius: 0 6px 6px 0;
+}
+
+.seats select {
+  margin-left: 8px;
+}
+
+.problem {
+  margin: 0;
+  padding: 8px var(--gutter);
+  color: var(--pencil);
+  font-weight: 600;
+}
+
+/* ── The chart ───────────────────────────────────────────────────────────── */
+
+.chart-frame {
+  flex: 1;
+  min-height: 0;
+  margin: 0 var(--gutter);
+  overflow: hidden;
+}
+
+/* One em here is the size of a chord's root: everything on the page is cut from it. */
+.chart {
+  font-size: var(--size);
+  line-height: 1;
+}
+
+.section + .section {
+  margin-top: 0.35em;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  height: 0.95em;
+}
+
+.mark {
+  padding: 0.12em 0.42em;
+  border: max(1.5px, 0.045em) solid currentColor;
+  font-size: 0.5em;
+  font-stretch: 80%;
+  font-weight: 750;
+}
+
+.aside {
+  color: var(--faint);
+  font-size: 0.42em;
+}
+
+.line {
+  display: flex;
+  height: calc(var(--line) * 1em);
+}
+
+.bar {
+  position: relative;
+  display: flex;
+  flex: 0 0 calc(100% / var(--columns));
+  align-items: center;
+  min-width: 0;
+  padding: 0 0.14em;
+  border-left: max(1px, 0.03em) solid var(--rule);
+  isolation: isolate;
+}
+
+.bar:last-child {
+  border-right: max(1px, 0.03em) solid var(--rule);
+}
+
+/* The highlighter: a stroke of marker, not a tidy box. */
+.bar.now {
+  color: var(--on-marker);
+}
+
+.bar.now::before {
+  content: "";
+  position: absolute;
+  inset: 7% 1.5%;
+  z-index: -1;
+  border-radius: 0.5em 0.2em 0.6em 0.25em / 0.3em 0.6em 0.25em 0.5em;
+  background: var(--marker);
+  transform: rotate(-0.6deg);
+}
+
+.slot {
+  display: flex;
+  flex: 0 1 0;
+  align-items: center;
+  min-width: 0;
+  padding-right: 0.14em;
+  white-space: nowrap;
+}
+
+.slot.again {
+  justify-content: center;
+}
+
+/* A pencil line under the change that is coming. */
+.slot.next > * {
+  box-shadow: 0 0.11em 0 0 currentColor;
+}
+
+.chord {
+  display: inline-flex;
+  align-items: baseline;
+  font-stretch: 88%;
+}
+
+.root {
+  font-weight: 720;
+}
+
+.quality {
+  position: relative;
+  top: -0.52em;
+  margin-left: 0.05em;
+  font-size: 0.56em;
+  font-weight: 620;
+}
+
+.under {
+  position: relative;
+  top: 0.22em;
+  font-size: 0.6em;
+  font-weight: 620;
+}
+
+.chord.rest {
+  color: var(--faint);
+  font-size: 0.6em;
+  font-weight: 620;
+}
+
+.chord.stacked {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.over,
+.below {
+  display: inline-flex;
+  align-items: baseline;
+}
+
+.below {
+  margin-top: 0.22em;
+  font-size: 0.55em;
+  opacity: 0.72;
+}
+
+.sign {
+  height: 0.86em;
+  margin: 0 0.01em 0 -0.02em;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2.1;
+  vertical-align: -0.08em;
+}
+
+.simile {
+  width: 0.95em;
+  height: 0.95em;
+  fill: currentColor;
+  opacity: 0.7;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.9;
+}
+
+.repeat {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.3em;
+  align-self: stretch;
+  width: 0.5em;
+  margin-block: 0.38em;
+}
+
+.repeat i {
+  width: 0.15em;
+  height: 0.15em;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.repeat::before,
+.repeat::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.repeat.opens {
+  align-items: flex-end;
+  margin-left: -0.14em;
+}
+
+.repeat.opens::before {
+  left: 0;
+  border-left: 0.11em solid currentColor;
+}
+
+.repeat.opens::after {
+  left: 0.19em;
+  border-left: 0.035em solid currentColor;
+}
+
+.repeat.closes {
+  align-items: flex-start;
+  margin-right: -0.14em;
+}
+
+.repeat.closes::before {
+  right: 0;
+  border-right: 0.11em solid currentColor;
+}
+
+.repeat.closes::after {
+  right: 0.19em;
+  border-right: 0.035em solid currentColor;
+}
+
+.ending {
+  position: absolute;
+  top: 0.1em;
+  right: 0.2em;
+  left: 0;
+  height: 0.5em;
+  padding: 0.06em 0 0 0.12em;
+  border-top: max(1.5px, 0.04em) solid currentColor;
+  border-left: max(1.5px, 0.04em) solid currentColor;
+  font-size: 0.36em;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.ending {
+  height: 1.3em;
+  padding: 0.15em 0 0 0.3em;
+}
+
+.times {
+  position: absolute;
+  top: 0.25em;
+  right: 0.7em;
+  font-size: 0.36em;
+  font-weight: 650;
+}
+
+/* ── Under the chart ─────────────────────────────────────────────────────── */
+
+.bar-bottom {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px var(--gutter) 10px;
+}
+
+.strip {
+  display: grid;
+  flex: 1;
+  grid-template-columns: auto 1fr auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.strip-where {
+  font-stretch: 80%;
+  font-weight: 750;
+}
+
+.strip.last .strip-where {
+  color: var(--pencil);
+}
+
+.strip-solo {
+  grid-column: 2;
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 0.875rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.strip-solo.on {
+  color: inherit;
+  font-weight: 600;
+}
+
+.strip-time {
+  grid-column: 3;
+  font-size: 0.875rem;
+}
+
+.arc {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  width: 100%;
+  height: 22px;
+}
+
+.arc-fill {
+  fill: var(--faint);
+  opacity: 0.45;
+}
+
+.arc-last {
+  fill: var(--pencil);
+  opacity: 0.16;
+}
+
+.arc-top {
+  stroke: var(--paper);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.arc-solo {
+  stroke: var(--ink);
+  stroke-width: 2.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.arc-now {
+  fill: var(--marker);
+  stroke: var(--on-marker);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.go {
+  flex: none;
+  min-width: 104px;
+  height: 58px;
+  border: 2px solid var(--ink);
+  border-radius: 29px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 1.25rem;
+  font-stretch: 75%;
+  font-weight: 750;
+}
+
+.go.stop {
+  background: none;
+  color: var(--ink);
+}
+
+/* ── A phone held upright ────────────────────────────────────────────────── */
+
+@media (max-width: 480px) {
+  .back span {
+    display: none;
+  }
+
+  .back {
+    padding-right: 4px;
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+
+  .bar-top h1 {
+    font-size: 1.1rem;
+  }
+}

@@ -9,3 +9,4 @@ out/audio/
 .cut-tmp/
 .work/
 out/gate-5/*.m4a
+dist-types/

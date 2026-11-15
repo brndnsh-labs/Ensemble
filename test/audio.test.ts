@@ -157,3 +157,45 @@ test("starting part-way through plays nothing from before that point, and stoppi
     );
   }
 });
+
+test("when what is to come is changed, everything before the change is played as it was and everything after as it now is, once each and in time", () => {
+  for (let seed = 1; seed <= 20; seed++) {
+    const rng = createRng(seed);
+    const sounds = someSounds(rng.fork("sounds"));
+    const instead = someSounds(rng.fork("instead"));
+    const changeAt = 100.1 + rng.between(5, 30);
+    let scheduler: Scheduler | undefined;
+    let cut: number | undefined;
+    const { handed, origin } = run(
+      sounds,
+      (now) => {
+        if (cut === undefined && now >= changeAt) {
+          // The band is told now; the change takes hold just past what is already handed over.
+          cut = now - 100.1 + horizon + 0.001;
+          scheduler?.replace(cut, instead);
+        }
+        return 0.025;
+      },
+      (s) => {
+        scheduler = s;
+        s.append(sounds.slice(sounds.length / 2));
+        s.start(100.1);
+        return 100.1;
+      },
+    );
+    assert.ok(cut !== undefined);
+    const expected = [
+      ...sounds.filter((s) => s.at < cut!),
+      ...instead.filter((s) => s.at >= cut! && s.at < sounds.at(-1)!.at),
+    ];
+    assert.deepEqual(
+      handed.map((h) => h.sound).filter((s) => s.at < sounds.at(-1)!.at),
+      expected,
+      "the old before the change, the new after, each once and in order",
+    );
+    for (const { sound, when, now } of handed) {
+      assert.ok(Math.abs(when - (origin + sound.at)) < 1e-9, "at its own time on the clock");
+      assert.ok(when >= now, "handed over before it is due");
+    }
+  }
+});

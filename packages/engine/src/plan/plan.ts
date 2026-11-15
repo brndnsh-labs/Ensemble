@@ -200,6 +200,7 @@ export function planBars(
       kind: "music",
       spans: isEnding && ending ? ending.spans : seamSpans(flat, previous?.flat),
       section: {
+        index: flat.sectionIndex,
         label: flat.sectionLabel,
         identity: sectionIdentity(flat.sectionLabel),
         role: flat.role,

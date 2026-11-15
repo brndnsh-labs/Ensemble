@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>Ensemble</title>
+  <rect width="64" height="64" fill="#1e1a4f"/>
+  <path d="M9 18l44-3 2 30-45 4z" fill="#ffe53b"/>
+  <path d="M22 44V20h20v5H28v4.5h12v5H28V39h14v5z" fill="#1e1a4f"/>
+</svg>

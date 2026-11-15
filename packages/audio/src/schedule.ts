@@ -105,6 +105,19 @@ export class Scheduler {
     this.#sounds.push(...sounds);
   }
 
+  /**
+   * Change what is to come: from second `from` of the performance on, these
+   * sounds are played in place of the ones that were there. Give a `from`
+   * further off than the horizon. A sound already handed over cannot be taken
+   * back, so a nearer one would have it and its replacement both sound.
+   */
+  replace(from: number, sounds: readonly Sound[]): void {
+    const kept = firstAtOrAfter(this.#sounds, from);
+    this.#sounds.length = kept;
+    this.#sounds.push(...sounds.slice(firstAtOrAfter(sounds, from)));
+    this.#next = Math.min(this.#next, kept);
+  }
+
   /** Hand over everything that starts inside the horizon. Call it on any timer, however uneven. */
   tick(now: number): void {
     if (this.#origin === undefined) return;

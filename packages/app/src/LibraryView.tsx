@@ -1,0 +1,65 @@
+// The library: every chart, a tap away from playing.
+
+import { keyToString } from "@ensemble/engine";
+import { STYLES, styleById } from "@ensemble/styles";
+import type { LibraryChart } from "./library.ts";
+import { LIBRARY } from "./library.ts";
+
+interface Props {
+  /** Open a chart and start the band, from the tap that asked. */
+  readonly play: (entry: LibraryChart) => void;
+}
+
+export function LibraryView({ play }: Props) {
+  const shelves = [
+    ...STYLES.map((style) => ({
+      name: style.name,
+      charts: LIBRARY.filter((entry) => entry.chart.styleId === style.id),
+    })),
+    {
+      name: "Other",
+      charts: LIBRARY.filter((entry) => !styleById(entry.chart.styleId ?? "")),
+    },
+  ].filter((shelf) => shelf.charts.length > 0);
+
+  return (
+    <main className="library">
+      <header className="masthead">
+        <h1>Ensemble</h1>
+        <p>Pick a chart and the band plays it.</p>
+      </header>
+      {shelves.map((shelf) => (
+        <section key={shelf.name} className="shelf">
+          <h2>{shelf.name}</h2>
+          <ul>
+            {shelf.charts.map((entry) => {
+              const tempo =
+                entry.chart.tempo ?? styleById(entry.chart.styleId ?? "")?.tempo.default;
+              return (
+                <li key={entry.id}>
+                  <a className="tune" href={`#/chart/${entry.id}`}>
+                    <span className="tune-title">{entry.chart.title}</span>
+                    <span className="tune-facts">
+                      {keyToString(entry.chart.key)}, {entry.bars} bars
+                      {tempo ? `, ${tempo} bpm` : ""}
+                    </span>
+                  </a>
+                  <button
+                    type="button"
+                    className="tune-play"
+                    aria-label={`Play ${entry.chart.title}`}
+                    onClick={() => play(entry)}
+                  >
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M6 3.5v13l11-6.5z" />
+                    </svg>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))}
+    </main>
+  );
+}

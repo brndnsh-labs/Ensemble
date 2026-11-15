@@ -21,6 +21,12 @@
     },
     {
       "path": "scripts/packs"
+    },
+    {
+      "path": "packages/app"
+    },
+    {
+      "path": "packages/app/tsconfig.node.json"
     }
   ]
 }

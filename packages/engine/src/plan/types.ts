@@ -89,6 +89,8 @@ export interface PlanBar {
   readonly spans: readonly ChordSpan[];
 
   readonly section: {
+    /** Index into `Chart.sections` of the header this bar is played under: with `source`, its place on the page. */
+    readonly index: number;
     readonly label: string;
     /**
      * What the section is for every held choice: the label lower-cased with

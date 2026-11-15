@@ -98,6 +98,14 @@ export class Player {
   append(sounds: readonly Sound[]): void {
     this.#scheduler.append(sounds);
   }
+
+  /**
+   * Change what is to come, from a second of the performance on: a jam going
+   * round again, or told to end. `from` must be more than the look-ahead away.
+   */
+  replace(from: number, sounds: readonly Sound[]): void {
+    this.#scheduler.replace(from, sounds);
+  }
 }
 
 /** How often a render pauses to hand over more sounds, in seconds, and how far ahead it hands them. */
