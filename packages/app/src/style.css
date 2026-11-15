@@ -12,6 +12,8 @@
   --on-marker: #1e1a4f;
   --pencil: #cf3d35;
   --gutter: 14px;
+  /* The chart's text is set in the system's own monospace, so bars typed in columns stay in them. */
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -49,7 +51,8 @@ body {
 }
 
 button,
-select {
+select,
+textarea {
   font: inherit;
   color: inherit;
 }
@@ -90,6 +93,45 @@ fieldset {
 .masthead p {
   margin: 10px 0 0;
   color: var(--faint);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.actions button,
+.actions label {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: none;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.actions button {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* The file picker is the label; the browser's own control stays out of sight. */
+.actions input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.actions label:focus-within {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 .shelf h2 {
@@ -241,6 +283,8 @@ fieldset {
 
 .reading button,
 .focus-toggle,
+.edit-link,
+.tools button,
 .seats button {
   padding: 5px 9px;
   border: 1.5px solid var(--ink);
@@ -262,9 +306,17 @@ fieldset {
   border-radius: 0 6px 6px 0;
 }
 
-.focus-toggle {
+.focus-toggle,
+.edit-link {
   flex: none;
   border-radius: 6px;
+}
+
+.edit-link,
+.to-play {
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
 button[aria-pressed="true"] {
@@ -711,10 +763,341 @@ button[aria-pressed="true"] {
   color: var(--ink);
 }
 
+/* ── The editor ──────────────────────────────────────────────────────────── */
+
+/* Pinned to the screen, so that while a phone's keyboard is up it can be fitted to what is left. */
+.edit {
+  position: fixed;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  overflow: hidden;
+}
+
+.to-play {
+  flex: none;
+  padding: 6px 16px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 700;
+}
+
+/* A phone held upright: the page above, about two fifths of the height, and the text under it. */
+.panes {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.pane-chart {
+  position: relative;
+  display: flex;
+  flex: 0 0 40%;
+  flex-direction: column;
+  min-height: 0;
+  padding: 4px 0 8px;
+}
+
+.empty-page {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--faint);
+}
+
+.pane-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 var(--gutter) 8px;
+}
+
+.tools {
+  display: flex;
+  gap: 8px;
+  padding-bottom: 6px;
+}
+
+.tools button {
+  border-radius: 6px;
+}
+
+.tools button:last-child {
+  margin-left: auto;
+  border-color: var(--pencil);
+  color: var(--pencil);
+}
+
+.pane-text .problem {
+  padding: 0 0 6px;
+  font-size: 0.875rem;
+}
+
+/* The text box and the marked copy behind it: every measure that places a letter is the same in both. */
+.source {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  border: 1.5px solid var(--rule);
+  border-radius: 6px;
+}
+
+.source:focus-within {
+  border-color: var(--ink);
+}
+
+.source textarea,
+.source-copy > div {
+  margin: 0;
+  padding: 10px 12px;
+  font-family: var(--mono);
+  /* Sixteen pixels or more, or a phone zooms the page in when the box is touched. */
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  letter-spacing: 0;
+  tab-size: 4;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+
+.source textarea {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  overflow: auto;
+  resize: none;
+  caret-color: var(--ink);
+}
+
+.source textarea:focus-visible {
+  outline: none;
+}
+
+.source-copy {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  color: transparent;
+  pointer-events: none;
+}
+
+.source-copy > div {
+  position: relative;
+  width: max-content;
+  min-width: 100%;
+}
+
+.source-copy mark {
+  --mark: var(--faint);
+  position: relative;
+  background: none;
+  color: transparent;
+  text-decoration: underline wavy var(--mark);
+  text-decoration-skip-ink: none;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 3px;
+}
+
+.source-copy mark.error {
+  --mark: var(--pencil);
+  background: color-mix(in srgb, var(--pencil) 12%, transparent);
+}
+
+.source-copy mark.info {
+  text-decoration-style: dotted;
+}
+
+/* A problem at a place with no letter to mark, such as the end of a line. */
+.source-copy mark.empty::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0.6em;
+  border-bottom: 2px solid var(--mark);
+}
+
+/* What is wrong, in words: the worst first. */
+.problems {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-height: 30%;
+  padding-top: 6px;
+  overflow-y: auto;
+  font-size: 0.875rem;
+}
+
+.problems ol {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.problems li button {
+  display: block;
+  width: 100%;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+}
+
+.problems li button:hover .what {
+  text-decoration: underline;
+}
+
+.where {
+  margin-right: 0.5em;
+  color: var(--faint);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.where.error {
+  color: var(--pencil);
+}
+
+.problems code {
+  font-family: var(--mono);
+  font-size: 0.95em;
+}
+
+.clean {
+  margin: 3px 0;
+  color: var(--faint);
+}
+
+.more {
+  position: sticky;
+  top: 0;
+  display: none;
+  flex: none;
+  padding: 3px 0;
+  border: 0;
+  background: none;
+  font-size: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+/* A small screen has room for one problem: the one on the caret's line, and a count of the rest. */
+@media (max-width: 699px), (max-height: 500px) {
+  .problems li:not(.current) {
+    display: none;
+  }
+
+  .problems.open li {
+    display: list-item;
+  }
+
+  .problems:not(.open) .what {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .more {
+    display: block;
+  }
+
+  .problems .said {
+    display: none;
+  }
+}
+
+/* The format's characters, on top of a phone's keyboard while the text is being typed. */
+.keys {
+  display: none;
+}
+
+@media (pointer: coarse) {
+  .edit.typing .keys {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    display: flex;
+    gap: 4px;
+    padding: 4px max(4px, env(safe-area-inset-right)) 4px max(4px, env(safe-area-inset-left));
+    background: var(--rule);
+  }
+
+  .edit.typing .panes {
+    padding-bottom: 52px;
+  }
+
+  .keys button {
+    flex: 1;
+    min-width: 0;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: var(--paper);
+    font-family: var(--mono);
+    font-size: 1.25rem;
+    font-weight: 600;
+    touch-action: manipulation;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .keys button:active {
+    background: var(--marker);
+    color: var(--on-marker);
+  }
+
+  /* While typing on a phone the tools wait; the keyboard has taken their room. */
+  .edit.typing .tools {
+    display: none;
+  }
+}
+
+/* A wide screen: the text on the left, the page beside it. */
+@media (min-width: 700px) {
+  .panes {
+    flex-direction: row;
+  }
+
+  .pane-text {
+    flex: 0 0 min(46%, 38rem);
+    order: -1;
+    padding: 4px 0 12px var(--gutter);
+  }
+
+  .pane-chart {
+    flex: 1;
+    padding: 4px 0 12px;
+  }
+}
+
 /* ── A phone held upright ────────────────────────────────────────────────── */
 
 @media (max-width: 480px) {
-  .back span {
+  .back span,
+  .roomy {
     display: none;
   }
 

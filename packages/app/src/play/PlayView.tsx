@@ -12,6 +12,7 @@ import {
 } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import { useEffect, useMemo, useState } from "react";
+import { addChart } from "../charts.ts";
 import type { LibraryChart } from "../library.ts";
 import type { ChartChoices, Settings } from "../settings.ts";
 import type { Playhead } from "./ChartView.tsx";
@@ -150,6 +151,24 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
           ‹<span>Charts</span>
         </a>
         <h1>{shown.title}</h1>
+        {entry.own ? (
+          <a className="edit-link" href={`#/edit/${entry.id}`}>
+            Edit
+          </a>
+        ) : (
+          // A built-in stays as it ships; the player changes a copy of their own.
+          <button
+            type="button"
+            className="edit-link"
+            aria-label="Edit a copy"
+            onClick={() => {
+              location.hash = `#/edit/${addChart(entry.text)}`;
+            }}
+          >
+            {/* A phone's header has no room for the whole of it. */}
+            Edit<span className="roomy"> a copy</span>
+          </button>
+        )}
         <fieldset className="reading" aria-label="Show chords as">
           {READINGS.map((reading) => (
             <button
