@@ -83,7 +83,7 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1, 2 and 3 are built and their gates passed. Stage 4 (jazz and funk as data) is built and waiting on Brandon's listen: gate 4.** The files and the report are in `out/gate-4/`.
+State on 2026-11-15: **stages 1 to 4 are built and their gates passed** (gate 4: "everything is sounding incredible so far"). **Stage 5 (audio) is next and has not started**: it needs the instrument packs from Brandon in `assets/packs/`, each with its license file.
 
 - Gate reports: `out/gate-1/GATE_REPORT.md` to `out/gate-4/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1` to `gate:4`.
 - `pnpm check` passes with three styles in about 8.8 s of 10. `pnpm score` matches its baselines (`scorecard/blues.json`, `funk.json`, `jazz.json`).
@@ -113,10 +113,12 @@ Done since (`DECISIONS.md`, "funk and jazz ship"): funk and jazz are in `STYLES`
 
 Gate 4 is written: 35 takes from `pnpm gate:4` and `out/gate-4/GATE_REPORT.md` (the two questions, what to listen for in each band, every engine change of the stage and why it was a missing concept, the sixteen tests added). `pnpm check` 8.8 s of 10 with 78 properties, `pnpm test:full` 19 s, `pnpm score` no movement in any style, `out/gate-3` byte for byte unchanged.
 
-**Next: Brandon listens.** His feedback becomes a property or a measure first, then a change. Also queued:
+Left open by gate 4 (none blocks stage 5; each wants a property or a measure first when taken up):
 
-- **A decision for after the gate**: a section's held choices (its beat, riff, strum, figure) are drawn from the seed and the section's label, not the chart, so at one seed every chart with an `[A]` plays the same groove. Fixing it changes every take in every style. Brandon left the timing to me (2026-11-15): **it is the first change of stage 5**, after his gate 4 verdict, so the files he is listening to stay the files the repo writes. It goes in as its own commit with every golden and gate file rewritten and the scorecards shown not to move; widening the funk pool (three kicks, six riffs, four strums) follows it as data (`DECISIONS.md`, "the funk band read as a band").
-- If he hears the band guessing at a change (jazz drums against the piano's push; the funk guitar's push against the bass): the concept is a push marked in the plan that every seat reads.
+- The listening questions in `out/gate-4/GATE_REPORT.md` that Brandon has not spoken to: his verdict was short and positive, which closes the gate, not each question.
+- **The funk pool is small** (three kicks, about six riffs, four strums at the working level): widen it as data, with a measure first (distinct grooves in 100 seeds: 57 today).
+- **The app picks a fresh seed for each jam** (stage 6). At one seed, every chart with an `[A]` draws the same held choices; that is by design, since draws are keyed by position so an edit stays local. An engine change for it was considered and withdrawn (`DECISIONS.md`, "the groove does not follow the chart after all").
+- If the band is heard guessing at a change (jazz drums against the piano's push; the funk guitar's push against the bass): the concept is a push marked in the plan that every seat reads.
 
 Known and not yet handled in stage 4: the head out is not played light; in compound meters the soloist's "beat" is still a quarter note; funk's chord seat is the guitar only (the clavinet book is data for later).
 
