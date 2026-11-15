@@ -92,7 +92,33 @@ export function serve(options: ServeOptions): Promise<Server> {
       if (extname(file) === ".ts") {
         return send(200, stripTypeScriptTypes(readFileSync(file, "utf8")), type);
       }
-      return send(200, readFileSync(file), type);
+      const body = readFileSync(file);
+      // Safari will not play audio from a server that cannot send part of a file.
+      const range = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range ?? "");
+      if (range && (range[1] || range[2])) {
+        const from = range[1] ? Number(range[1]) : Math.max(0, body.length - Number(range[2]));
+        const to =
+          range[1] && range[2] ? Math.min(Number(range[2]), body.length - 1) : body.length - 1;
+        if (from > to) {
+          response.writeHead(416, { "content-range": `bytes */${body.length}` });
+          return response.end();
+        }
+        response.writeHead(206, {
+          "content-type": type,
+          "cache-control": "no-store",
+          "accept-ranges": "bytes",
+          "content-range": `bytes ${from}-${to}/${body.length}`,
+          "content-length": to - from + 1,
+        });
+        return response.end(body.subarray(from, to + 1));
+      }
+      response.writeHead(200, {
+        "content-type": type,
+        "cache-control": "no-store",
+        "accept-ranges": "bytes",
+        "content-length": body.length,
+      });
+      return response.end(body);
     } catch {
       return send(404, "not found");
     }

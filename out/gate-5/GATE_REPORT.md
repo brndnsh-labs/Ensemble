@@ -15,9 +15,26 @@ Nothing here has been heard by me. Every claim below is a measurement or a state
 
 ## The files
 
-TABLE
+| File | Band | What | Loudness |
+|---|---|---|---|
+| `1-jazz-rhythm-changes-bb-alto.m4a` | Jazz | Rhythm changes in Bb, 4 choruses, alto | -18.4 LUFS, peak -0.9 dBFS |
+| `1-jazz-two-five-one-c-vibes.m4a` | Jazz | ii-V-I in C, 4 choruses, vibraphone | -19.4 LUFS, peak -0.8 dBFS |
+| `1-jazz-ballad-eb-alto.m4a` | Jazz | Ballad in Eb, 2 choruses, alto | -20.8 LUFS, peak -0.8 dBFS |
+| `1-jazz-waltz-f-no-solo.m4a` | Jazz | Waltz in F, 3 choruses, no soloist | -19.9 LUFS, peak -0.9 dBFS |
+| `2-blues-12-bar-a-alto.m4a` | Blues | 12-bar in A, 5 choruses, alto | -19.0 LUFS, peak -1.8 dBFS |
+| `2-blues-slow-g-vibes.m4a` | Blues | Slow blues in G, 3 choruses, vibraphone | -20.2 LUFS, peak -3.0 dBFS |
+| `2-blues-quick-change-e-no-solo.m4a` | Blues | Quick-change blues in E, 4 choruses, no soloist | -19.5 LUFS, peak -2.4 dBFS |
+| `3-funk-vamp-a-alto.m4a` | Funk | Vamp in A, alto | -17.7 LUFS, peak -1.6 dBFS |
+| `3-funk-two-chord-dm-no-solo.m4a` | Funk | Two-chord vamp in Dm, no soloist | -18.0 LUFS, peak -2.7 dBFS |
+| `3-funk-verse-bridge-e-vibes.m4a` | Funk | Verse and bridge in E, vibraphone | -16.7 LUFS, peak -1.2 dBFS |
+| `4-soloist-alto.m4a` | Jazz | A jazz blues in F, 4 choruses, alto | -19.6 LUFS, peak -2.5 dBFS |
+| `4-soloist-vibes.m4a` | Jazz | The same take, vibraphone | -19.3 LUFS, peak -2.5 dBFS |
+| `5-layers-all.m4a` | Jazz | Rhythm changes, 2 choruses, every dynamic layer | -19.0 LUFS, peak -0.9 dBFS |
+| `5-layers-one.m4a` | Jazz | The same take, one layer | -18.9 LUFS, peak -0.9 dBFS |
+| `5-funk-layers-all.m4a` | Funk | One-chord vamp in E, every layer | -17.7 LUFS, peak -2.2 dBFS |
+| `5-funk-layers-one.m4a` | Funk | The same take, one layer | -17.6 LUFS, peak -1.8 dBFS |
 
-Every file is a jam with a count-in. Loudness is the whole file's, measured after rendering.
+Every file is a jam with a count-in. Loudness is the whole file's, measured after rendering. They sit between -17 and -21 LUFS with peaks within 1 to 3 dB of full scale; the last version aimed at -16. Is it loud enough on the phone?
 
 ## What to listen for
 
@@ -65,7 +82,8 @@ Every file is a jam with a count-in. Loudness is the whole file's, measured afte
 - **Your iPhone 17 and your laptop both played it** (your first listen), so Safari decodes the packs and a tap unlocks the sound.
 - **Stop is clean by measurement**: a render with stop pressed at 20 seconds and no reverb reads -72 dBFS from 0.2 seconds after the stop and silence after 1.7. Before the fix it read -17 dBFS (the pop you heard).
 - **Every pack file was measured independently of the agent that cut it**: all listed files present and no others, lengths exact to the sample, levels on reference, each licence identical to its source's.
-- `pnpm check` passes in about 9 seconds of 10. Engine output is unchanged: the goldens and all three scorecards are as they were at gate 4.
+- `pnpm check` passes in about 9 seconds of 10. Engine output is unchanged: the goldens match and `pnpm score` shows no movement in any of the three scorecards.
+- **The rendered files match live playing to within rounding**: a render made the slow way (every note queued at once) and the way the files were made (a second at a time, by the scheduler that plays live) differ by at most one step of 16-bit in 0.6% of samples.
 
 ## The packs
 
