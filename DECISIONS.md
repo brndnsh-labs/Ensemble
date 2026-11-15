@@ -403,3 +403,12 @@ What the engine was missing, each a concept and not a jazz case:
 - A written 7b9 with a natural 5th on its way to a minor chord is read as the altered scale fitted to that 5th, which has no 13th of either kind; X-B-11 says it keeps the b13 (Phrygian dominant). The voicing falls back to the 5th and stays four notes; nothing wrong is played. Changing the scale changes what the soloist plays on those chords in every style, so it waits for a property and a look at the blues.
 - The comp has no idea of tempo: at 66 the ballad is about two strikes a bar and leans on held chords; at 176 rhythm changes is two clean strikes a bar. Listening questions for the gate.
 - CH-72's "40% to 70% of breaths answered" is not reachable with figures that strike every two beats; jazz sets a floor only.
+
+## 2026-11-15: funk and jazz ship (stage 4)
+
+Every seat of both styles is its own, so both are in `STYLES` and `UNFINISHED` is gone: `pnpm check` holds all three styles to every property.
+
+- **Golden takes**, two a style as `docs/TESTING.md` allows. Funk: `funk-two-chord-dm` with a solo, and `funk-intro-outro-c` in song mode. Jazz: `jazz-rhythm-changes-bb` with a solo (the head, the walk, two chords to the bar, the ending), and `jazz-waltz-f` (the meter the 4/4 books are not written in). The three blues goldens are byte for byte what they were.
+- **Scorecard baselines** `scorecard/funk.json` and `scorecard/jazz.json` accept what the two styles deliver today, including the targets they miss (listed in the gate 4 report). `ensemble score` with no style named now scores every shipping style against its own baseline, so `pnpm score` guards all three. The blues baseline is unchanged.
+- **Neither style borrows the blues critic weights any more.** Each seat build replaced its group; the spread of `bluesCritic.weights` under them was dead and is removed. Both scorecards are identical before and after.
+- **Suite time**: 9.4 to 9.7 s with the goldens and the jazz piano in. Two properties that render their own long takes ("making an open jam one pass longer", "the piano stays in its part of the keyboard") now play one seed per chart on a push, the charts taking the seeds by turns, and all of them on `pnpm test:full`. Push 8.8 s, full 19.5 s. The limit stays at 10 s.

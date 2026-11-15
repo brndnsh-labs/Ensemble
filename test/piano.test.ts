@@ -14,7 +14,17 @@ import {
   tierOf,
 } from "@ensemble/engine";
 import { blues, chordsUnder, harmonyOf, POCKET, type Strike, strikesOf } from "./reading.ts";
-import { enough, notesOf, only, ownCharts, SEEDS, STYLES, stressTakes, takes } from "./takes.ts";
+import {
+  enough,
+  FULL,
+  notesOf,
+  only,
+  ownCharts,
+  SEEDS,
+  STYLES,
+  stressTakes,
+  takes,
+} from "./takes.ts";
 
 test("the piano stays in its register: nothing under the style's floor, nothing above E6, in every take", () => {
   let strikes = 0;
@@ -251,8 +261,9 @@ test("the eighth before a change belongs to the chord coming: a strike there tha
 
 test("the piano stays in its part of the keyboard: the top of its chords never wanders more than a sixth from where the style aims it", () => {
   for (const style of STYLES) {
-    for (const chart of ownCharts(style)) {
-      for (const seed of SEEDS.slice(0, 4)) {
+    for (const [c, chart] of ownCharts(style).entries()) {
+      // On a push a chart is played on one seed, the charts taking the seeds by turns.
+      for (const seed of SEEDS.slice(0, 4).filter((s) => FULL || (s + c) % 2 === 0)) {
         // Long enough for a hand that drifts a step a chorus to get somewhere.
         const take = render(chart.text, style, { mode: "jam", minutes: 4, seed });
         for (const strike of strikesOf(take)) {

@@ -37,6 +37,34 @@ export const GOLDENS: readonly Golden[] = [
     style: "blues",
     options: { mode: "jam", passes: 4, seed: 3, solo: true },
   },
+  // Funk: a vamp with a solo over it (the riff, the guitar, the sixteenths).
+  {
+    file: "funk-two-chord-dm-solo.mid",
+    chart: "funk-two-chord-dm.chart",
+    style: "funk",
+    options: { mode: "jam", passes: 4, seed: 1, solo: true },
+  },
+  // Funk: sections, an intro and a written ending, in song mode.
+  {
+    file: "funk-intro-outro-c.mid",
+    chart: "funk-intro-outro-c.chart",
+    style: "funk",
+    options: { mode: "song", seed: 2 },
+  },
+  // Jazz: the head, the walk, a solo, and the ending, on a tune with two chords to the bar.
+  {
+    file: "jazz-rhythm-changes-bb-solo.mid",
+    chart: "jazz-rhythm-changes-bb.chart",
+    style: "jazz",
+    options: { mode: "jam", passes: 4, seed: 1, solo: true },
+  },
+  // Jazz: a timed jam in three, where the piano and the bass leave their 4/4 books.
+  {
+    file: "jazz-waltz-f.mid",
+    chart: "jazz-waltz-f.chart",
+    style: "jazz",
+    options: { mode: "jam", minutes: 2, seed: 2 },
+  },
 ];
 
 export const goldenUrl = (golden: Golden): URL =>

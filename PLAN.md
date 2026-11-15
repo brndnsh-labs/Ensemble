@@ -86,14 +86,14 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 State on 2026-11-14: **stages 1, 2 and 3 are built and their gates passed. Stage 4 (jazz and funk as data) is under way.** Brandon said "go ahead" after answering the open questions below.
 
 - Gate reports: `out/gate-1/GATE_REPORT.md`, `out/gate-2/GATE_REPORT.md`, `out/gate-3/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1`, `gate:2`, `gate:3`.
-- `pnpm check` passes: 442 tests in about 8.8 s of 10. `pnpm score` matches its baseline (`scorecard/blues.json`).
+- `pnpm check` passes with three styles in about 8.8 s of 10. `pnpm score` matches its baselines (`scorecard/blues.json`, `funk.json`, `jazz.json`).
 
 ### Stage 4: how it is being built
 
 Done on the main thread (`DECISIONS.md`, "stage 4 begins" and "a library for three styles"):
 
 - A short vamp is a chorus of several laps (planner); the head is an offset in the arc (`ArcStyle.head`).
-- `packages/styles/src/funk/` and `jazz/` exist with their own feel, tempo, arc and ending, and **placeholder seats** (the blues seat under another name) that each seat build replaces. They are in `UNFINISHED`, not `STYLES`; `ENSEMBLE_STYLES=funk,jazz node --test test/` holds them to the properties.
+- `packages/styles/src/funk/` and `jazz/` exist with their own feel, tempo, arc and ending, and **placeholder seats** (the blues seat under another name) that each seat build replaces. They began in `UNFINISHED` and joined `STYLES` when every seat was their own.
 - Thirteen new library charts. Each style is held to its own charts in full and to the others in one take.
 
 Seat builds, each from a brief in `prompts/`, each in its own clone under the session's scratch folder, committed there on a branch and merged here after the main thread has read the diff and the printed takes:
@@ -109,7 +109,9 @@ Seat builds, each from a brief in `prompts/`, each in its own clone under the se
 
 **One subagent at a time** (Brandon, 2026-11-15, after the usage limit was hit twice). Round 2 starts when round 1 is merged (the funk bass follows the kick; the jazz piano hears the soloist and the snare). After each merge: turn the builder's "properties that always hold" into tests, break each on purpose once, and keep the blues goldens and scorecard unmoved.
 
-Then, on the main thread: move funk and jazz into `STYLES` (the suite's time is settled: `DECISIONS.md`, "three styles inside ten seconds". With all three styles the push run takes 9.4 s and `pnpm test:full` 19 s; measure again when the jazz piano is in); golden takes for both; `scorecard/funk.json` and `jazz.json`; `scripts/gate-4.sh` (written, not yet run: the same chart in three styles, each style on its own charts, and the blues again for "did the blues get worse"; also run `pnpm gate:3` and check `git status out/gate-3` is clean, which says the blues takes he passed are byte for byte what they were); `out/gate-4/GATE_REPORT.md`, which must list every engine change made in this stage and why each was a missing concept.
+Done since (`DECISIONS.md`, "funk and jazz ship"): funk and jazz are in `STYLES`; two golden takes each; `scorecard/funk.json` and `jazz.json`; `pnpm score` checks all three. `pnpm check` 8.8 s of 10 with three styles, `pnpm test:full` 19.5 s.
+
+Still to do, in order: the independent review of jazz, then of funk (`prompts/review-style.md`, Opus, one at a time, each in its own clone); act on what they find, property first; `pnpm gate:4` (`scripts/gate-4.sh`, written, not yet run: the same chart in three styles, each style on its own charts, and the blues again for "did the blues get worse"); `pnpm gate:3` and check `git status out/gate-3` is clean; `out/gate-4/GATE_REPORT.md`, which must list every engine change made in this stage and why each was a missing concept, the thirteen properties added, and the listening questions; serve the files on the LAN.
 
 Known and not yet handled in stage 4: the head out is not played light; in compound meters the soloist's "beat" is still a quarter note; funk's chord seat is the guitar only (the clavinet book is data for later).
 

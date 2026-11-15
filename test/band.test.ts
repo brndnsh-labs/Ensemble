@@ -134,9 +134,10 @@ test("every note starts inside the performance and nothing rings past its end", 
 test("making an open jam one pass longer changes nothing that was already played", () => {
   for (const style of STYLES) {
     for (const [c, chart] of ownCharts(style).entries()) {
-      for (const seed of SEEDS.slice(0, 4)) {
+      // On a push a chart is played on one seed, the charts taking the seeds by turns.
+      for (const seed of SEEDS.slice(0, 4).filter((s) => FULL || (s + c) % 2 === 0)) {
         // Each chart at each length, on two seeds or one by turns.
-        for (const passes of [1, 2, 4].filter((_, i) => (i + seed + c) % 2 === 0)) {
+        for (const passes of [1, 2, 4].filter((_, i) => (i + seed + (c >> 1)) % 2 === 0)) {
           const jam = (n: number) =>
             // Half with the soloist asked for: its solo may not depend on the jam's length.
             render(chart.text, style, {

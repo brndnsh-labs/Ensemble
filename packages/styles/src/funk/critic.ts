@@ -1,13 +1,8 @@
 // What the critic expects of a funk band, and what its players' choices cost.
 // An `intent` bound is true whatever the band currently plays; a `measured` bound
 // sits a margin from what it delivers today.
-//
-// PLACEHOLDER weights: each seat's weights are the blues seat's until that seat is
-// written. Replace a seat's weights with its own, and add its targets under its heading.
-// The soloist's weights and targets are its own.
 
 import type { CriticStyle } from "@ensemble/engine";
-import { bluesCritic } from "../blues/critic.ts";
 
 export const funkCritic: CriticStyle = {
   targets: {
@@ -157,7 +152,6 @@ export const funkCritic: CriticStyle = {
     // ── band ──
   },
   weights: {
-    ...bluesCritic.weights,
     // What a phrase of the solo costs. Each was set to zero in turn over 120 takes (ME-10);
     // what it moved is beside it. "stuck" has no weight here: it counts a repeated note as
     // going nowhere, and a stabbed figure repeats its note on purpose; "rocks" is the half

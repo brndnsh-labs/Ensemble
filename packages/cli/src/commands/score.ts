@@ -47,14 +47,35 @@ export const scoreCommand: Command = {
         json: { type: "boolean", default: false },
       },
     });
-    const styleId = values.style ?? STYLES[0]!.id;
-    const style = styleById(styleId);
-    if (!style) {
-      throw new UsageError(`no style "${styleId}" (styles: ${styleIds().join(", ")})`);
-    }
     const seeds = Number(values.seeds);
     if (!Number.isInteger(seeds) || seeds < 1) throw new UsageError("--seeds is a whole number");
+    if (values.style && !styleById(values.style)) {
+      throw new UsageError(`no style "${values.style}" (styles: ${styleIds().join(", ")})`);
+    }
+    // No style named: every style that ships, each on its own charts and against its own
+    // baseline. Charts named without a style are scored as the first style plays them.
+    const ids = values.style
+      ? [values.style]
+      : positionals.length > 0 || values.baseline
+        ? [STYLES[0]!.id]
+        : STYLES.map((style) => style.id);
+    let worst = 0;
+    for (const id of ids) {
+      if (id !== ids[0]) console.log("");
+      worst = Math.max(worst, scoreStyle(id, positionals, seeds, values));
+    }
+    return worst;
+  },
+};
 
+function scoreStyle(
+  styleId: string,
+  positionals: readonly string[],
+  seeds: number,
+  values: { baseline?: string; check: boolean; update: boolean; json: boolean },
+): number {
+  const style = styleById(styleId)!;
+  {
     // No charts named: every library chart written for this style.
     const charts = positionals.length > 0 ? positionals : libraryChartsFor(styleId);
     if (charts.length === 0) throw new UsageError(`no charts for style "${styleId}"`);
@@ -94,8 +115,8 @@ export const scoreCommand: Command = {
       throw new UsageError(`no baseline at ${baselinePath}; write one with --update`);
     }
     return 0;
-  },
-};
+  }
+}
 
 function libraryChartsFor(styleId: string): string[] {
   const dir = "library";

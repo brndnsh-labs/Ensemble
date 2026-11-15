@@ -8,9 +8,8 @@ import { parse, render } from "@ensemble/engine";
 import { STYLES as SHIPPING, styleById } from "@ensemble/styles";
 
 /**
- * The styles the properties are checked in: every style that ships. While a style
- * is being written, `ENSEMBLE_STYLES=funk,jazz node --test test/` holds it to the
- * same properties before it joins them.
+ * The styles the properties are checked in: every style that ships, or the ones
+ * `ENSEMBLE_STYLES=funk,jazz` names (`scripts/test.ts` runs one style to a process).
  */
 export const STYLES: readonly StylePack[] = process.env.ENSEMBLE_STYLES
   ? process.env.ENSEMBLE_STYLES.split(",").map((id) => {

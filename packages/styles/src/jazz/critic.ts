@@ -1,13 +1,8 @@
 // What the critic expects of a jazz band, and what its players' choices cost.
 // An `intent` bound is true whatever the band currently plays; a `measured` bound
 // sits a margin from what it delivers today.
-//
-// PLACEHOLDER weights: each seat's weights are the blues seat's until that seat is
-// written. Replace a seat's weights with its own, and add its targets under its heading.
-// The soloist's weights and targets are its own.
 
 import type { CriticStyle } from "@ensemble/engine";
-import { bluesCritic } from "../blues/critic.ts";
 
 export const jazzCritic: CriticStyle = {
   targets: {
@@ -212,7 +207,6 @@ export const jazzCritic: CriticStyle = {
     // ── band ──
   },
   weights: {
-    ...bluesCritic.weights,
     // What a voicing costs (CH-16): the blues piano's numbers, which already lead a ii-V-I
     // with almost no motion (Dm9 C E F A, G13 B E F A, Cmaj9 B D E G: one voice moves a half
     // step, then three move a step), except the soloist's note. The alto lives in the piano's
