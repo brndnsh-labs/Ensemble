@@ -1,0 +1,1100 @@
+{
+  "format": 1,
+  "id": "drum-kit",
+  "name": "Drum kit",
+  "credit": {
+    "title": "Virtuosity Drums",
+    "author": "Versilian Studios and Karoryfer Samples",
+    "url": "https://github.com/sfzinstruments/virtuosity_drums",
+    "version": "9f04cf9a734527edfbb0a4eee1f674e45bbf71bc",
+    "licence": "CC0-1.0",
+    "changes": "Each hit's kick, snare and overhead microphones mixed to one mono file at the basic kit program's balance; a selection of velocity layers and alternates; trimmed to the onset, cut at its decay or a length cap and faded; levelled to one peak; the mid tom made from the high tom tuned down two semitones; encoded as Opus."
+  },
+  "audio": {
+    "container": "webm",
+    "codec": "opus",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bytes": 1908516,
+    "decodedBytes": 39098208
+  },
+  "level": {
+    "measure": "peak",
+    "reference": -6
+  },
+  "voices": {
+    "kick": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "kick-v1-1.webm",
+                  "seconds": 1.2
+                },
+                {
+                  "file": "kick-v1-2.webm",
+                  "seconds": 1.2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "kick-v2-1.webm",
+                  "seconds": 1.2
+                },
+                {
+                  "file": "kick-v2-2.webm",
+                  "seconds": 1.2
+                },
+                {
+                  "file": "kick-v2-3.webm",
+                  "seconds": 1.2
+                },
+                {
+                  "file": "kick-v2-4.webm",
+                  "seconds": 1.2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "kick-v3-1.webm",
+                  "seconds": 1.2
+                },
+                {
+                  "file": "kick-v3-2.webm",
+                  "seconds": 1.2
+                },
+                {
+                  "file": "kick-v3-3.webm",
+                  "seconds": 1.2
+                },
+                {
+                  "file": "kick-v3-4.webm",
+                  "seconds": 1.2
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "kick-v4-1.webm",
+                  "seconds": 1.2
+                },
+                {
+                  "file": "kick-v4-2.webm",
+                  "seconds": 1.2
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "oneShot": true
+    },
+    "snare": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "snare-v1-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "snare-v1-2.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "snare-v2-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "snare-v2-2.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "snare-v2-3.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "snare-v2-4.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "snare-v3-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "snare-v3-2.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "snare-v3-3.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "snare-v3-4.webm",
+                  "seconds": 0.933937
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "snare-v4-1.webm",
+                  "seconds": 0.869896
+                },
+                {
+                  "file": "snare-v4-2.webm",
+                  "seconds": 0.945854
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "oneShot": true
+    },
+    "ghostSnare": {
+      "layers": [
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "ghostSnare-v1-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "ghostSnare-v1-2.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "ghostSnare-v1-3.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "ghostSnare-v1-4.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "oneShot": true
+    },
+    "crossStick": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "crossStick-v1-1.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "crossStick-v1-2.webm",
+                  "seconds": 0.6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "crossStick-v2-1.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "crossStick-v2-2.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "crossStick-v2-3.webm",
+                  "seconds": 0.6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "crossStick-v3-1.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "crossStick-v3-2.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "crossStick-v3-3.webm",
+                  "seconds": 0.6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "crossStick-v4-1.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "crossStick-v4-2.webm",
+                  "seconds": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -6,
+      "oneShot": true
+    },
+    "closedHat": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "closedHat-v1-1.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "closedHat-v1-2.webm",
+                  "seconds": 0.518708
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "closedHat-v2-1.webm",
+                  "seconds": 0.575812
+                },
+                {
+                  "file": "closedHat-v2-2.webm",
+                  "seconds": 0.503958
+                },
+                {
+                  "file": "closedHat-v2-3.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "closedHat-v2-4.webm",
+                  "seconds": 0.588333
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "closedHat-v3-1.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "closedHat-v3-2.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "closedHat-v3-3.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "closedHat-v3-4.webm",
+                  "seconds": 0.6
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "closedHat-v4-1.webm",
+                  "seconds": 0.6
+                },
+                {
+                  "file": "closedHat-v4-2.webm",
+                  "seconds": 0.6
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -8,
+      "pan": 0.3,
+      "oneShot": true,
+      "chokes": [
+        "openHat"
+      ]
+    },
+    "pedalHat": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "pedalHat-v1-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "pedalHat-v1-2.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "pedalHat-v2-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "pedalHat-v2-2.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "pedalHat-v2-3.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "pedalHat-v2-4.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "pedalHat-v3-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "pedalHat-v3-2.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -12,
+      "pan": 0.3,
+      "oneShot": true,
+      "chokes": [
+        "openHat"
+      ]
+    },
+    "openHat": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "openHat-v1-1.webm",
+                  "seconds": 2.5
+                },
+                {
+                  "file": "openHat-v1-2.webm",
+                  "seconds": 2.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "openHat-v2-1.webm",
+                  "seconds": 2.5
+                },
+                {
+                  "file": "openHat-v2-2.webm",
+                  "seconds": 2.5
+                },
+                {
+                  "file": "openHat-v2-3.webm",
+                  "seconds": 2.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "openHat-v3-1.webm",
+                  "seconds": 2.5
+                },
+                {
+                  "file": "openHat-v3-2.webm",
+                  "seconds": 2.5
+                },
+                {
+                  "file": "openHat-v3-3.webm",
+                  "seconds": 2.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "openHat-v4-1.webm",
+                  "seconds": 2.5
+                },
+                {
+                  "file": "openHat-v4-2.webm",
+                  "seconds": 2.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -8,
+      "pan": 0.3,
+      "oneShot": true
+    },
+    "ride": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "ride-v1-1.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "ride-v1-2.webm",
+                  "seconds": 3.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "ride-v2-1.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "ride-v2-2.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "ride-v2-3.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "ride-v2-4.webm",
+                  "seconds": 3.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "ride-v3-1.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "ride-v3-2.webm",
+                  "seconds": 3.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -6,
+      "pan": -0.35,
+      "oneShot": true
+    },
+    "rideBell": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "rideBell-v1-1.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "rideBell-v1-2.webm",
+                  "seconds": 3.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "rideBell-v2-1.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "rideBell-v2-2.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "rideBell-v2-3.webm",
+                  "seconds": 3.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "rideBell-v3-1.webm",
+                  "seconds": 3.5
+                },
+                {
+                  "file": "rideBell-v3-2.webm",
+                  "seconds": 3.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -4,
+      "pan": -0.35,
+      "oneShot": true
+    },
+    "crash": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "crash-v1-1.webm",
+                  "seconds": 5
+                },
+                {
+                  "file": "crash-v1-2.webm",
+                  "seconds": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "crash-v2-1.webm",
+                  "seconds": 5
+                },
+                {
+                  "file": "crash-v2-2.webm",
+                  "seconds": 5
+                },
+                {
+                  "file": "crash-v2-3.webm",
+                  "seconds": 5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "crash-v3-1.webm",
+                  "seconds": 5
+                },
+                {
+                  "file": "crash-v3-2.webm",
+                  "seconds": 5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -5,
+      "pan": 0.2,
+      "oneShot": true
+    },
+    "highTom": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "highTom-v1-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "highTom-v1-2.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "highTom-v2-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "highTom-v2-2.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "highTom-v2-3.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "highTom-v3-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "highTom-v3-2.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "highTom-v3-3.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "highTom-v4-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "highTom-v4-2.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -1,
+      "pan": 0.15,
+      "oneShot": true
+    },
+    "midTom": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "midTom-v1-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "midTom-v1-2.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "midTom-v2-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "midTom-v2-2.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "midTom-v2-3.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "midTom-v3-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "midTom-v3-2.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "midTom-v3-3.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "midTom-v4-1.webm",
+                  "seconds": 1
+                },
+                {
+                  "file": "midTom-v4-2.webm",
+                  "seconds": 1
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -1,
+      "pan": -0.05,
+      "oneShot": true
+    },
+    "lowTom": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "lowTom-v1-1.webm",
+                  "seconds": 1.5
+                },
+                {
+                  "file": "lowTom-v1-2.webm",
+                  "seconds": 1.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "lowTom-v2-1.webm",
+                  "seconds": 1.5
+                },
+                {
+                  "file": "lowTom-v2-2.webm",
+                  "seconds": 1.5
+                },
+                {
+                  "file": "lowTom-v2-3.webm",
+                  "seconds": 1.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "lowTom-v3-1.webm",
+                  "seconds": 1.5
+                },
+                {
+                  "file": "lowTom-v3-2.webm",
+                  "seconds": 1.5
+                },
+                {
+                  "file": "lowTom-v3-3.webm",
+                  "seconds": 1.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "lowTom-v4-1.webm",
+                  "seconds": 1.5
+                },
+                {
+                  "file": "lowTom-v4-2.webm",
+                  "seconds": 1.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -1,
+      "pan": -0.3,
+      "oneShot": true
+    },
+    "shaker": {
+      "layers": [
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "shaker-v1-1.webm",
+                  "seconds": 0.5
+                },
+                {
+                  "file": "shaker-v1-2.webm",
+                  "seconds": 0.5
+                },
+                {
+                  "file": "shaker-v1-3.webm",
+                  "seconds": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -11,
+      "pan": 0.4,
+      "oneShot": true
+    },
+    "sticks": {
+      "layers": [
+        {
+          "top": 40,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "sticks-v1-1.webm",
+                  "seconds": 0.5
+                },
+                {
+                  "file": "sticks-v1-2.webm",
+                  "seconds": 0.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 64,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "sticks-v2-1.webm",
+                  "seconds": 0.5
+                },
+                {
+                  "file": "sticks-v2-2.webm",
+                  "seconds": 0.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 88,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "sticks-v3-1.webm",
+                  "seconds": 0.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "takes": [
+                {
+                  "file": "sticks-v4-1.webm",
+                  "seconds": 0.5
+                },
+                {
+                  "file": "sticks-v4-2.webm",
+                  "seconds": 0.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "trim": -6,
+      "oneShot": true
+    }
+  }
+}
