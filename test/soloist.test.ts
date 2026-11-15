@@ -418,7 +418,7 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
   }
 });
 
-test("a guitar bends only into a note a phrase lands on (one struck where the chord changes, or the last before a breath), of an eighth or longer and never in the bar the band ends on: a half step up into a major third, or a whole step up into a root or a fifth of a quarter or longer, in a tenth of a second; it shakes only a note held as long as the style asks; a style that does not bend does not; and a horn and a vibraphone do neither", () => {
+test("a guitar bends only into a note a phrase lands on (one struck where the chord changes, or the last before a breath), of an eighth or longer and never in the bar the band ends on: a half step up into a major third, or a whole step up into a root or a fifth of a quarter or longer (the solo's top note from the scale note under it, whatever tone it is, in two solos in three at least), in a tenth of a second; it shakes only a note held as long as the style asks; a style that does not bend does not; and a horn and a vibraphone do neither", () => {
   // Every instrument whose hand can move a pitch, in a style where it is not the soloist
   // already: the takes the other properties read are on each style's own soloist and the
   // horn. On a push, each chart on one seed where the style bends, and every other chart
@@ -442,6 +442,8 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
   );
   const PLAIN = ["alto-sax", "vibraphone"];
   let [bent, shaken, plain] = [0, 0, 0];
+  // Solos on a hand that bends in a style that does, and how many push up into their top note.
+  let [solos, topped] = [0, 0];
   for (const { style, chart, options, take } of [...soloTakes(), ...handed]) {
     const harmony = harmonyOf(take);
     const notes = notesOf(take, "solo");
@@ -449,6 +451,11 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
     const perSecond = (take.plan.tempo * PPQ) / 60;
     const { habits, space, touch } = style.solo;
     let [at, b] = [0, 0];
+    const top = Math.max(...notes.map((note) => note.pitch));
+    if (bendsIn(style) && notes.some((note) => SOLO_INSTRUMENTS[note.voice ?? ""]?.bend)) {
+      solos++;
+      if (notes.some((note) => note.pitch === top && note.move?.glide)) topped++;
+    }
     notes.forEach((note, i) => {
       const hand = SOLO_INSTRUMENTS[note.voice ?? ""]!;
       const where = `${chart.file} ${JSON.stringify(options)} at tick ${note.tick}: ${note.pitch}`;
@@ -497,10 +504,12 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
               .filter((tone) => (pitchClass(chord.root) + tone.interval) % 12 === note.pitch % 12)
               .map((tone) => `${tone.role} ${tone.interval % 12}`),
           );
+        // The solo's top note is pushed up from the scale note under it, whatever tone it is.
         assert.ok(
-          up === 1
-            ? roles.includes("third 4")
-            : roles.includes("root 0") || roles.includes("fifth 7"),
+          note.pitch === top ||
+            (up === 1
+              ? roles.includes("third 4")
+              : roles.includes("root 0") || roles.includes("fifth 7")),
           `${where}: bent up ${up} into ${roles.join(", ") || "no chord tone"}`,
         );
 
@@ -539,6 +548,9 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
   // Where the style's hand bends, both are heard often enough to have been judged.
   assert.ok(!bends || bent > enough(60), `only ${bent} bent notes`);
   assert.ok(!bends || shaken > enough(300), `only ${shaken} shaken notes`);
+  // The top note is always pushed up into where the hand can (SO-53): not in a song's one
+  // short solo, which has no climb, nor over a chord that leaves no note under it to start on.
+  assert.ok(topped * 3 >= solos * 2, `only ${topped} of ${solos} solos bend into their top note`);
   assert.ok(plain > enough(2000), `only ${plain} notes on the horn and the vibraphone`);
 });
 

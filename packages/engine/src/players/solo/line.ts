@@ -473,16 +473,39 @@ function bendFrom(spot: Spot, pitch: number): number {
       : role === "root" || (role === "fifth" && interval === 7)
         ? 2
         : 0;
-  if (by === 0 || spot.hold < (by === 1 ? EIGHTH : PPQ)) return 0;
+  return by > 0 && inHand(spot, pitch, by) ? by : 0;
+}
+
+/**
+ * Whether the hand could start a bend `by` semitones under a note: the note is
+ * long enough (an eighth for a half step, a quarter for a whole), and the one
+ * under it is a tone of the scale in play there, not one that says another
+ * chord, and not the flat 7th under a major 7th.
+ */
+function inHand(spot: Spot, pitch: number, by: number): boolean {
+  const { pool } = spot;
+  if (spot.hold < (by === 1 ? EIGHTH : PPQ)) return false;
   const from = pitch - by;
   const [low, high] = [pool.ladder[0]!, pool.ladder.at(-1)!];
-  const inHand =
+  return (
     from >= low &&
     from <= high &&
     (pool.ladder.includes(from) || pool.scale.has(mod12(from))) &&
     !onlyPasses(pool, from) &&
-    !(by === 2 && isChordTone(pool, from + 1));
-  return inHand ? by : 0;
+    !(by === 2 && isChordTone(pool, from + 1))
+  );
+}
+
+/**
+ * The solo's top note is always bent into (SO-53), whatever tone of the chord
+ * it is: as any landing is where it can be, and otherwise from the scale note
+ * under it, the whole step before the half. (The 6th of a major key pushed up
+ * from the 5th, over the IV, is the top of a three-chord rocker.)
+ */
+function topBendFrom(spot: Spot, pitch: number): number {
+  const by = bendFrom(spot, pitch);
+  if (by > 0 || !spot.pool.arrival.chord || spot.bar.ending !== null) return by;
+  return [2, 1].find((under) => inHand(spot, pitch, under)) ?? 0;
 }
 
 /**
@@ -506,9 +529,10 @@ export function writeBends(
   if (world.instrument.bend === null || (habit.third <= 0 && habit.rootOrFifth <= 0)) return bends;
   const { barOf, saidBefore } = layout(bars);
   spots.forEach((spot, i) => {
-    const by = bendFrom(spot, pitches[i]!);
-    if (by === 0) return;
     const next = spots[i + 1];
+    const top = ask.top && !next;
+    const by = (top ? topBendFrom : bendFrom)(spot, pitches[i]!);
+    if (by === 0) return;
     const ends = !next || next.tick - (spot.tick + spot.hold) >= PPQ;
     const arrival = spot.pool.arrival;
     const changes = arrival.changed && arrival.tick >= spot.tick;
@@ -522,7 +546,7 @@ export function writeBends(
       pitches[i - 1] === pitches[i]! - 1;
     if (by === 2 && leanedInto) return;
     // The solo's top note is bent into whenever it can be.
-    if (ask.top && !next) {
+    if (top) {
       bends[i] = by;
       return;
     }
