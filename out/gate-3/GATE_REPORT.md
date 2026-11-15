@@ -109,6 +109,8 @@ Brandon, in Logic, after a few seeds: "sounding pretty good, definitely intentio
 - In C and F the line now lives on the two low strings and averages B1. Too deep?
 - There are still wide drops: about 6% of changes are reached by a fall of a sixth or more into the note that leads in. With each root in one place, a line that has climbed its box has to fall to get home.
 
+**Second listen (2026-11-14), to the rewritten files, a few more seeds:** "seems pretty good from what i can tell. nice job!" Nothing asked to change. The questions above were not answered one by one, so they stay open as settings to revisit, not as work owed.
+
 The tables under "What the checks say" were taken before these changes. After them: strikes under a sounding solo note 63%, over chance +1 point (it was +3), busier in the breaths than under the line by 1.17 (it was 1.03).
 
 ## Known weaknesses

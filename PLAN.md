@@ -93,13 +93,14 @@ State on 2026-11-14: **stages 1, 2 and 3 are built, each with gate files and a r
 
 - Gate 1 (in Logic): sounds good so far, "a little plain"; velocities were slamming. Loudness is done (15% trim, by ear). "Plain" was to be judged again with the piano in.
 - Gate 2: "so far so good". Nothing asked to change.
-- Gate 3, first listen: the solos are "sounding pretty good, definitely intentional melodies that work well"; the piano got busy as the intensity ramped up; the bass was an octave high and could be more creative. All three were measured, changed, and the gate files rewritten (`DECISIONS.md`, "gate 3 feedback" and "a bass that varies its line"). The rewritten files have not been heard yet.
+- Gate 3, first listen: the solos are "sounding pretty good, definitely intentional melodies that work well"; the piano got busy as the intensity ramped up; the bass was an octave high and could be more creative. All three were measured, changed, and the gate files rewritten (`DECISIONS.md`, "gate 3 feedback" and "a bass that varies its line"). 
+- Gate 3, second listen (the rewritten files, a few more seeds): "seems pretty good from what i can tell. nice job!" Nothing asked to change. **Gate 3 is passed; stage 4 waits for Brandon's word to start.**
 - Feedback becomes a property or a measure first, then a fix.
 
-**Waiting on Brandon's ear**
+**Open for Brandon's ear** (nothing here blocks stage 4; his verdicts are short, and none of these was answered one by one)
 
 - Gate 1: the wide bass drops and the two one-note phrase fills at mid level (`out/gate-1/GATE_REPORT.md`, "Not yet acted on").
-- Gate 3, second listen: whether the piano is now too thin under a hot solo (it went from 5.2 strikes a bar to 2.0; the middle setting is to allow the four-stab figures but not the pump, `listening.busiest` in `packages/styles/src/blues/chords.ts`); whether the bass in C and F is too deep (roots stop at E2; `register.highest` in `packages/styles/src/blues/bass.ts`); whether the new bass shapes and turnaround walks sound like the same player; the wide bass drops; whether the worst three solos are acceptable.
+- Gate 3: whether the piano is now too thin under a hot solo (it went from 5.2 strikes a bar to 2.0; the middle setting is to allow the four-stab figures but not the pump, `listening.busiest` in `packages/styles/src/blues/chords.ts`); whether the bass in C and F is too deep (roots stop at E2; `register.highest` in `packages/styles/src/blues/bass.ts`); whether the new bass shapes and turnaround walks sound like the same player; the wide bass drops; whether the worst three solos are acceptable.
 
 **Before or at the start of stage 4** (each is logged in `DECISIONS.md`, "after the soloist's review")
 
