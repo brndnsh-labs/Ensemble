@@ -25,16 +25,20 @@ const RELEASE = 0.12;
 export const uprightBass: Recipe = {
   id: "upright-bass",
   name: "Upright bass",
-  source: "meatbass",
   channels: 1,
   kbps: 80,
   level: { measure: "loudness", reference: -20 },
   foldDb: -6.0206,
   budgetMB: 30,
   roots: { skip: 0.15, seconds: 0.5 },
-  changes:
-    "Pizzicato notes from E-flat 1 to A3 at four dynamics, with alternates; trimmed to the onset, cut at its decay or a length cap and faded; " +
-    "each levelled to one loudness; roots measured; encoded as Opus.",
+  credits: [
+    {
+      source: "meatbass",
+      changes:
+        "Pizzicato notes from E-flat 1 to A3 at four dynamics, with alternates; trimmed to the onset, cut at its decay or a length cap and faded; " +
+        "each levelled to one loudness; roots measured; encoded as Opus.",
+    },
+  ],
   voices(dir) {
     const regions = readSfz(join(dir, "Programs/04_pizz.sfz")).filter(
       (r) => soundsByDefault(r) && r.opcodes.trigger === undefined,

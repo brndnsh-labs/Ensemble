@@ -32,16 +32,20 @@ function parse(file: string) {
 export const vibraphone: Recipe = {
   id: "vibraphone",
   name: "Vibraphone",
-  source: "vcsl",
   channels: 1,
   kbps: 80,
   level: { measure: "loudness", reference: -20 },
   foldDb: -6.0206,
   budgetMB: 25,
   roots: { skip: 0.1, seconds: 0.5 },
-  changes:
-    "The hard-mallet notes at both dynamics, the stereo pair folded to mono; trimmed to the onset, cut at its decay or a length cap and faded; " +
-    "each levelled to one loudness; roots measured; encoded as Opus.",
+  credits: [
+    {
+      source: "vcsl",
+      changes:
+        "The hard-mallet notes at both dynamics, the stereo pair folded to mono; trimmed to the onset, cut at its decay or a length cap and faded; " +
+        "each levelled to one loudness; roots measured; encoded as Opus.",
+    },
+  ],
   voices(dir) {
     const folder = join(dir, FOLDER);
     const files = readdirSync(folder)

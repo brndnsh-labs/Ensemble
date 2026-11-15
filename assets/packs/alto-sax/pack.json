@@ -2,14 +2,16 @@
   "format": 1,
   "id": "alto-sax",
   "name": "Alto sax",
-  "credit": {
-    "title": "Weresax",
-    "author": "Karoryfer Samples",
-    "url": "https://github.com/sfzinstruments/karoryfer.weresax",
-    "version": "a4d756b21d2a573aca0d840cce7e71ba5effd4c6",
-    "licence": "CC0-1.0",
-    "changes": "The condenser microphone's notes, every second semitone from D-flat 3 and the top A-flat 5, at both dynamics, first alternate; trimmed to the onset, cut at a length cap and faded; each levelled to one loudness; roots measured; encoded as Opus."
-  },
+  "credits": [
+    {
+      "title": "Weresax",
+      "author": "Karoryfer Samples",
+      "url": "https://github.com/sfzinstruments/karoryfer.weresax",
+      "version": "a4d756b21d2a573aca0d840cce7e71ba5effd4c6",
+      "licence": "CC0-1.0",
+      "changes": "The condenser microphone's notes, every second semitone from D-flat 3 and the top A-flat 5, at both dynamics, first alternate; trimmed to the onset, cut at a length cap and faded; each levelled to one loudness; roots measured; encoded as Opus."
+    }
+  ],
   "audio": {
     "container": "webm",
     "codec": "opus",

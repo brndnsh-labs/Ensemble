@@ -35,7 +35,7 @@ pnpm score              # every style's scorecard against its accepted baseline 
 pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)
 pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gate:2, gate:3, gate:4)
 pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
-pnpm packs:fetch [id...] # fetch the sample libraries into .sources/ at their pinned commits
+pnpm packs:fetch [id...] # fetch the sample libraries into .sources/ at their pinned versions (needs git and 7z)
 pnpm packs:cut [id...]   # cut instrument packs into assets/packs/ (needs an ffmpeg with soxr and libopus)
 pnpm audition [--host 0.0.0.0] [--port 8765]   # serve the audition page at /tools/audition/: play a take from the packs
 pnpm render:audio <name> chart=<file> [style=] [seed=] [passes=] [solo=alto-sax] [only=bass] [live=1]

@@ -43,13 +43,27 @@ export interface Voice {
   readonly oneShot?: boolean;
   readonly release?: number;
   readonly chokes?: readonly string[];
+  /**
+   * False: each zone's root is the pitch the recipe gives its takes (`mapped`),
+   * not one measured from the audio, though the recipe measures roots. For a
+   * sound whose pitch is not the note's: a bass's ghost note, a muted stroke.
+   */
+  readonly measureRoots?: false;
+}
+
+/** One source library a pack draws on, and what was done to its recordings. */
+export interface Credit {
+  /** The folder under `.sources/`. */
+  readonly source: string;
+  /** What was done to the recordings, and which voices they are, for the pack's credit. */
+  readonly changes: string;
 }
 
 export interface Recipe {
   readonly id: string;
   readonly name: string;
-  /** The folder under `.sources/`. */
-  readonly source: string;
+  /** The libraries the pack draws on, the one most of it is cut from first. */
+  readonly credits: readonly Credit[];
   /**
    * 1: stereo sources are folded to mono. 2: a stereo source keeps its two
    * channels, cut and levelled alike; where it starts, where it ends and how
@@ -75,10 +89,11 @@ export interface Recipe {
   readonly roots?: { readonly skip: number; readonly seconds: number };
   /** Compare each stereo take's mono fold with its two channels, band by band. */
   readonly monoCheck?: boolean;
-  /** What was done to the recordings, for `credit.changes`. */
-  readonly changes: string;
-  /** Reads the source's mappings and lays out the voices. */
-  readonly voices: (dir: string) => readonly Voice[];
+  /**
+   * Reads the sources' mappings and lays out the voices. `dir` is the first
+   * source's folder; `dirOf` gives the folder of any source the recipe credits.
+   */
+  readonly voices: (dir: string, dirOf: (source: string) => string) => readonly Voice[];
 }
 
 /** A length cap that falls in a straight line from the lowest note to the highest. */

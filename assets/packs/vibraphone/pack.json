@@ -2,14 +2,16 @@
   "format": 1,
   "id": "vibraphone",
   "name": "Vibraphone",
-  "credit": {
-    "title": "Versilian Community Sample Library",
-    "author": "Versilian Studios",
-    "url": "https://github.com/sgossner/VCSL",
-    "version": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
-    "licence": "CC0-1.0",
-    "changes": "The hard-mallet notes at both dynamics, the stereo pair folded to mono; trimmed to the onset, cut at its decay or a length cap and faded; each levelled to one loudness; roots measured; encoded as Opus."
-  },
+  "credits": [
+    {
+      "title": "Versilian Community Sample Library",
+      "author": "Versilian Studios",
+      "url": "https://github.com/sgossner/VCSL",
+      "version": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+      "licence": "CC0-1.0",
+      "changes": "The hard-mallet notes at both dynamics, the stereo pair folded to mono; trimmed to the onset, cut at its decay or a length cap and faded; each levelled to one loudness; roots measured; encoded as Opus."
+    }
+  ],
   "audio": {
     "container": "webm",
     "codec": "opus",
