@@ -1,0 +1,927 @@
+{
+  "format": 1,
+  "id": "electric-bass",
+  "name": "Electric bass",
+  "credits": [
+    {
+      "title": "Black And Blue Basses",
+      "author": "Karoryfer Samples",
+      "url": "https://github.com/sfzinstruments/karoryfer.black-and-blue-basses",
+      "version": "6e7d674cdb41be7a54dbccb15472401ad01099b9",
+      "licence": "CC0-1.0",
+      "changes": "The darkblack bass's regular fingered notes, every third semitone from D1 to A-flat 3, at four dynamics with alternates, roots measured; and its ghost notes at the same frets, both dynamics, three alternates each, as the dead-note voice; trimmed to the onset, cut at its decay or a length cap and faded; each levelled to one loudness; encoded as Opus."
+    }
+  ],
+  "audio": {
+    "container": "webm",
+    "codec": "opus",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bytes": 1672575,
+    "decodedBytes": 29796908
+  },
+  "level": {
+    "measure": "loudness",
+    "reference": -20
+  },
+  "voices": {
+    "": {
+      "layers": [
+        {
+          "top": 56,
+          "zones": [
+            {
+              "root": 26.002,
+              "takes": [
+                {
+                  "file": "n26-v1-1.webm",
+                  "seconds": 2.45
+                }
+              ]
+            },
+            {
+              "root": 29.019,
+              "takes": [
+                {
+                  "file": "n29-v1-1.webm",
+                  "seconds": 2.370646
+                }
+              ]
+            },
+            {
+              "root": 31.948,
+              "takes": [
+                {
+                  "file": "n32-v1-1.webm",
+                  "seconds": 2.291292
+                }
+              ]
+            },
+            {
+              "root": 34.985,
+              "takes": [
+                {
+                  "file": "n35-v1-1.webm",
+                  "seconds": 2.211937
+                }
+              ]
+            },
+            {
+              "root": 37.953,
+              "takes": [
+                {
+                  "file": "n38-v1-1.webm",
+                  "seconds": 2.132583
+                }
+              ]
+            },
+            {
+              "root": 40.939,
+              "takes": [
+                {
+                  "file": "n41-v1-1.webm",
+                  "seconds": 2.053229
+                }
+              ]
+            },
+            {
+              "root": 43.98,
+              "takes": [
+                {
+                  "file": "n44-v1-1.webm",
+                  "seconds": 1.973875
+                }
+              ]
+            },
+            {
+              "root": 46.942,
+              "takes": [
+                {
+                  "file": "n47-v1-1.webm",
+                  "seconds": 1.894521
+                }
+              ]
+            },
+            {
+              "root": 49.92,
+              "takes": [
+                {
+                  "file": "n50-v1-1.webm",
+                  "seconds": 1.815167
+                }
+              ]
+            },
+            {
+              "root": 52.907,
+              "takes": [
+                {
+                  "file": "n53-v1-1.webm",
+                  "seconds": 1.735812
+                }
+              ]
+            },
+            {
+              "root": 55.894,
+              "takes": [
+                {
+                  "file": "n56-v1-1.webm",
+                  "seconds": 1.656458
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 68,
+          "zones": [
+            {
+              "root": 25.997,
+              "takes": [
+                {
+                  "file": "n26-v2-1.webm",
+                  "seconds": 2.45
+                },
+                {
+                  "file": "n26-v2-2.webm",
+                  "seconds": 2.45
+                }
+              ]
+            },
+            {
+              "root": 29.02,
+              "takes": [
+                {
+                  "file": "n29-v2-1.webm",
+                  "seconds": 2.370646
+                },
+                {
+                  "file": "n29-v2-2.webm",
+                  "seconds": 2.370646
+                }
+              ]
+            },
+            {
+              "root": 31.97,
+              "takes": [
+                {
+                  "file": "n32-v2-1.webm",
+                  "seconds": 2.291292
+                },
+                {
+                  "file": "n32-v2-2.webm",
+                  "seconds": 2.291292
+                }
+              ]
+            },
+            {
+              "root": 34.997,
+              "takes": [
+                {
+                  "file": "n35-v2-1.webm",
+                  "seconds": 2.211937
+                },
+                {
+                  "file": "n35-v2-2.webm",
+                  "seconds": 2.211937
+                }
+              ]
+            },
+            {
+              "root": 37.958,
+              "takes": [
+                {
+                  "file": "n38-v2-1.webm",
+                  "seconds": 2.132583
+                },
+                {
+                  "file": "n38-v2-2.webm",
+                  "seconds": 2.132583
+                }
+              ]
+            },
+            {
+              "root": 40.94,
+              "takes": [
+                {
+                  "file": "n41-v2-1.webm",
+                  "seconds": 2.053229
+                },
+                {
+                  "file": "n41-v2-2.webm",
+                  "seconds": 2.053229
+                }
+              ]
+            },
+            {
+              "root": 43.982,
+              "takes": [
+                {
+                  "file": "n44-v2-1.webm",
+                  "seconds": 1.973875
+                },
+                {
+                  "file": "n44-v2-2.webm",
+                  "seconds": 1.973875
+                }
+              ]
+            },
+            {
+              "root": 46.949,
+              "takes": [
+                {
+                  "file": "n47-v2-1.webm",
+                  "seconds": 1.894521
+                },
+                {
+                  "file": "n47-v2-2.webm",
+                  "seconds": 1.894521
+                }
+              ]
+            },
+            {
+              "root": 49.922,
+              "takes": [
+                {
+                  "file": "n50-v2-1.webm",
+                  "seconds": 1.815167
+                },
+                {
+                  "file": "n50-v2-2.webm",
+                  "seconds": 1.815167
+                }
+              ]
+            },
+            {
+              "root": 52.914,
+              "takes": [
+                {
+                  "file": "n53-v2-1.webm",
+                  "seconds": 1.735812
+                },
+                {
+                  "file": "n53-v2-2.webm",
+                  "seconds": 1.735812
+                }
+              ]
+            },
+            {
+              "root": 55.896,
+              "takes": [
+                {
+                  "file": "n56-v2-1.webm",
+                  "seconds": 1.656458
+                },
+                {
+                  "file": "n56-v2-2.webm",
+                  "seconds": 1.656458
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 80,
+          "zones": [
+            {
+              "root": 26.006,
+              "takes": [
+                {
+                  "file": "n26-v3-1.webm",
+                  "seconds": 2.45
+                },
+                {
+                  "file": "n26-v3-2.webm",
+                  "seconds": 2.45
+                }
+              ]
+            },
+            {
+              "root": 29.068,
+              "takes": [
+                {
+                  "file": "n29-v3-1.webm",
+                  "seconds": 2.370646
+                },
+                {
+                  "file": "n29-v3-2.webm",
+                  "seconds": 2.370646
+                }
+              ]
+            },
+            {
+              "root": 31.984,
+              "takes": [
+                {
+                  "file": "n32-v3-1.webm",
+                  "seconds": 2.291292
+                },
+                {
+                  "file": "n32-v3-2.webm",
+                  "seconds": 2.291292
+                }
+              ]
+            },
+            {
+              "root": 35.02,
+              "takes": [
+                {
+                  "file": "n35-v3-1.webm",
+                  "seconds": 2.211937
+                },
+                {
+                  "file": "n35-v3-2.webm",
+                  "seconds": 2.211937
+                }
+              ]
+            },
+            {
+              "root": 37.959,
+              "takes": [
+                {
+                  "file": "n38-v3-1.webm",
+                  "seconds": 2.132583
+                },
+                {
+                  "file": "n38-v3-2.webm",
+                  "seconds": 2.132583
+                }
+              ]
+            },
+            {
+              "root": 40.955,
+              "takes": [
+                {
+                  "file": "n41-v3-1.webm",
+                  "seconds": 2.053229
+                },
+                {
+                  "file": "n41-v3-2.webm",
+                  "seconds": 2.053229
+                }
+              ]
+            },
+            {
+              "root": 44.022,
+              "takes": [
+                {
+                  "file": "n44-v3-1.webm",
+                  "seconds": 1.973875
+                },
+                {
+                  "file": "n44-v3-2.webm",
+                  "seconds": 1.973875
+                }
+              ]
+            },
+            {
+              "root": 46.972,
+              "takes": [
+                {
+                  "file": "n47-v3-1.webm",
+                  "seconds": 1.894521
+                },
+                {
+                  "file": "n47-v3-2.webm",
+                  "seconds": 1.894521
+                }
+              ]
+            },
+            {
+              "root": 49.935,
+              "takes": [
+                {
+                  "file": "n50-v3-1.webm",
+                  "seconds": 1.815167
+                },
+                {
+                  "file": "n50-v3-2.webm",
+                  "seconds": 1.815167
+                }
+              ]
+            },
+            {
+              "root": 52.917,
+              "takes": [
+                {
+                  "file": "n53-v3-1.webm",
+                  "seconds": 1.735812
+                },
+                {
+                  "file": "n53-v3-2.webm",
+                  "seconds": 1.735812
+                }
+              ]
+            },
+            {
+              "root": 55.892,
+              "takes": [
+                {
+                  "file": "n56-v3-1.webm",
+                  "seconds": 1.656458
+                },
+                {
+                  "file": "n56-v3-2.webm",
+                  "seconds": 1.656458
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "root": 26.04,
+              "takes": [
+                {
+                  "file": "n26-v4-1.webm",
+                  "seconds": 2.45
+                }
+              ]
+            },
+            {
+              "root": 29.098,
+              "takes": [
+                {
+                  "file": "n29-v4-1.webm",
+                  "seconds": 2.370646
+                }
+              ]
+            },
+            {
+              "root": 32.009,
+              "takes": [
+                {
+                  "file": "n32-v4-1.webm",
+                  "seconds": 2.291292
+                }
+              ]
+            },
+            {
+              "root": 35.062,
+              "takes": [
+                {
+                  "file": "n35-v4-1.webm",
+                  "seconds": 2.211937
+                }
+              ]
+            },
+            {
+              "root": 38.012,
+              "takes": [
+                {
+                  "file": "n38-v4-1.webm",
+                  "seconds": 2.132583
+                }
+              ]
+            },
+            {
+              "root": 40.946,
+              "takes": [
+                {
+                  "file": "n41-v4-1.webm",
+                  "seconds": 2.053229
+                }
+              ]
+            },
+            {
+              "root": 44.012,
+              "takes": [
+                {
+                  "file": "n44-v4-1.webm",
+                  "seconds": 1.973875
+                }
+              ]
+            },
+            {
+              "root": 46.978,
+              "takes": [
+                {
+                  "file": "n47-v4-1.webm",
+                  "seconds": 1.894521
+                }
+              ]
+            },
+            {
+              "root": 49.945,
+              "takes": [
+                {
+                  "file": "n50-v4-1.webm",
+                  "seconds": 1.815167
+                }
+              ]
+            },
+            {
+              "root": 52.918,
+              "takes": [
+                {
+                  "file": "n53-v4-1.webm",
+                  "seconds": 1.735812
+                }
+              ]
+            },
+            {
+              "root": 55.895,
+              "takes": [
+                {
+                  "file": "n56-v4-1.webm",
+                  "seconds": 1.656458
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "release": 0.08
+    },
+    "dead": {
+      "layers": [
+        {
+          "top": 44,
+          "zones": [
+            {
+              "root": 26,
+              "takes": [
+                {
+                  "file": "dead-n26-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n26-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n26-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 29,
+              "takes": [
+                {
+                  "file": "dead-n29-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n29-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n29-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 32,
+              "takes": [
+                {
+                  "file": "dead-n32-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n32-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n32-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 35,
+              "takes": [
+                {
+                  "file": "dead-n35-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n35-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n35-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 38,
+              "takes": [
+                {
+                  "file": "dead-n38-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n38-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n38-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 41,
+              "takes": [
+                {
+                  "file": "dead-n41-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n41-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n41-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 44,
+              "takes": [
+                {
+                  "file": "dead-n44-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n44-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n44-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 47,
+              "takes": [
+                {
+                  "file": "dead-n47-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n47-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n47-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 50,
+              "takes": [
+                {
+                  "file": "dead-n50-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n50-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n50-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 53,
+              "takes": [
+                {
+                  "file": "dead-n53-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n53-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n53-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 56,
+              "takes": [
+                {
+                  "file": "dead-n56-v1-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n56-v1-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n56-v1-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "root": 26,
+              "takes": [
+                {
+                  "file": "dead-n26-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n26-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n26-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 29,
+              "takes": [
+                {
+                  "file": "dead-n29-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n29-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n29-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 32,
+              "takes": [
+                {
+                  "file": "dead-n32-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n32-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n32-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 35,
+              "takes": [
+                {
+                  "file": "dead-n35-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n35-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n35-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 38,
+              "takes": [
+                {
+                  "file": "dead-n38-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n38-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n38-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 41,
+              "takes": [
+                {
+                  "file": "dead-n41-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n41-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n41-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 44,
+              "takes": [
+                {
+                  "file": "dead-n44-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n44-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n44-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 47,
+              "takes": [
+                {
+                  "file": "dead-n47-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n47-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n47-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 50,
+              "takes": [
+                {
+                  "file": "dead-n50-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n50-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n50-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            },
+            {
+              "root": 53,
+              "takes": [
+                {
+                  "file": "dead-n53-v2-1.webm",
+                  "seconds": 0.230146
+                },
+                {
+                  "file": "dead-n53-v2-2.webm",
+                  "seconds": 0.269042
+                },
+                {
+                  "file": "dead-n53-v2-3.webm",
+                  "seconds": 0.279917
+                }
+              ]
+            },
+            {
+              "root": 56,
+              "takes": [
+                {
+                  "file": "dead-n56-v2-1.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n56-v2-2.webm",
+                  "seconds": 0.3
+                },
+                {
+                  "file": "dead-n56-v2-3.webm",
+                  "seconds": 0.3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "release": 0.04
+    }
+  }
+}
