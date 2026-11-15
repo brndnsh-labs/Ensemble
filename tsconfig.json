@@ -8,6 +8,9 @@
       "path": "packages/styles"
     },
     {
+      "path": "packages/audio"
+    },
+    {
       "path": "packages/cli"
     },
     {

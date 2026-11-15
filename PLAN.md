@@ -83,7 +83,15 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1 to 4 are built and their gates passed** (gate 4: "everything is sounding incredible so far"). **Stage 5 (audio) is next; no code yet.** The old packs and the free sources online have been surveyed (`docs/AUDIO_NOTES.md`, and `DECISIONS.md`, "stage 5 begins: where the packs come from"). The recommendation put to Brandon, awaiting his answer: cut new packs from the same free sources the old ones came from, with a script in this repo, keeping each licence file beside its pack, instead of copying the old cut-down files.
+State on 2026-11-15: **stages 1 to 4 are built and their gates passed** (gate 4: "everything is sounding incredible so far"). **Stage 5 (audio) has begun.** Brandon chose a fresh cut of the packs from the free sources the old ones came from (`DECISIONS.md`, "stage 5: a fresh cut").
+
+### Stage 5: how it is being built
+
+- **Sources** are pinned in `scripts/packs/sources.ts` and fetched into `.sources/` (not in git; about 5 GB) by `scripts/packs/fetch.ts`.
+- **The pack format** is the type in `packages/audio/src/pack.ts`. Packs go in `assets/packs/<id>/` with `pack.json` and the source's `LICENCE`.
+- **Order**: the jazz and blues quartet first (drum kit, upright bass, grand piano, alto sax, vibraphone; brief in `prompts/cut-packs.md`), then the audio package (timeline in seconds, scheduler with its fake-time property, sampler, mixer), a bare page and a render to WAV, then funk's two packs (electric bass with a dead note, clean guitar with a muted stroke), mix presets, gate 5.
+- **To settle by ear at the gate**: whether dynamic layers earn their memory (the same take with one layer and with several), the kit for funk, the upright (Meatbass, with VSCO as the fallback Brandon has heard before).
+- **Not yet verified on a real phone**: that Safari decodes Opus in WebM for Web Audio. A probe on the bare page comes before the gate; the codec is one setting in the cut script.
 
 - Gate reports: `out/gate-1/GATE_REPORT.md` to `out/gate-4/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1` to `gate:4`.
 - `pnpm check` passes with three styles in about 8.8 s of 10. `pnpm score` matches its baselines (`scorecard/blues.json`, `funk.json`, `jazz.json`).
