@@ -281,6 +281,11 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
           <button type="button" className="go" onClick={jam.play}>
             Play
           </button>
+        ) : jam.canFinish ? (
+          // One press brings the band to an ending; the button then stops it dead.
+          <button type="button" className="go stop" onClick={jam.finish}>
+            Finish
+          </button>
         ) : (
           <button type="button" className="go stop" onClick={jam.stop}>
             {jam.phase === "loading" ? "Loading" : "Stop"}

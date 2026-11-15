@@ -13,6 +13,11 @@ export interface ArcPosition {
   readonly phraseStart: number;
   readonly phraseEnd: number;
   /**
+   * The pass the band was told to finish on, when it was told: a jam ended
+   * before its time, or an open jam ended at all.
+   */
+  readonly told?: number;
+  /**
    * The pass the band peaks on, when someone's solo says where: a band builds
    * with its soloist. Left out, the jam peaks about two thirds of the way through.
    */
@@ -38,7 +43,14 @@ export function defaultClimax(passes: number): number {
 export function arcOffset(arc: ArcStyle, at: ArcPosition): number {
   // The first time round is the tune; an open jam always has a next pass to open up on.
   const head = at.part === "body" && at.pass === 0 && (at.open || at.passes > 1) ? arc.head : 0;
-  return head + shapeOffset(arc, at);
+  const asPlanned = head + shapeOffset(arc, at);
+  if (at.told === undefined || at.pass < at.told || at.part === "intro") return asPlanned;
+  // Told to finish: a written ending is landed on as any is, and the pass before it lifts
+  // to the same place from wherever it was. Its first phrase is left as it was, so the
+  // band walks into the pass exactly as it would have.
+  if (at.part === "ending") return arc.timed.lastTo;
+  const firstPhrase = at.phraseStart === 0 && at.phraseEnd < 1;
+  return firstPhrase ? asPlanned : asPlanned + (arc.timed.lastTo - asPlanned) * at.phraseEnd;
 }
 
 function shapeOffset(arc: ArcStyle, at: ArcPosition): number {

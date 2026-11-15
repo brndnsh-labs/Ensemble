@@ -35,14 +35,26 @@ export function planBars(
   options: PlanOptions,
 ): Plan {
   const tempo = clampTempo(options.tempo ?? chartTempo ?? style.tempo.default);
+  // The jam as it set out: how many passes, or none in particular. The arc and the solos are
+  // shaped by this even when the band is told to finish early, so that what was played stands.
   const open = options.mode === "jam" && options.open === true;
-  const passes = countPasses(expanded, tempo, options);
+  const planned = countPasses(expanded, tempo, options);
+  const told =
+    options.mode === "jam" &&
+    options.endAfter !== undefined &&
+    (open || options.endAfter < planned - 1)
+      ? Math.max(0, Math.floor(options.endAfter))
+      : undefined;
+  /** The passes that are played. */
+  const passes = told === undefined ? planned : told + 1;
+  /** The performance comes to an end: everything but an open jam nobody has told to finish. */
+  const ends = !open || told !== undefined;
 
-  const runs = layOut(expanded, options, passes, open);
-  const played = runs.filter((run) => !open || run.pass < passes);
+  const runs = layOut(expanded, options, passes, !ends);
+  const played = runs.filter((run) => ends || run.pass < passes);
   const playedBars = played.reduce((sum, run) => sum + run.bars.length, 0);
   if (playedBars === 0) {
-    return { mode: options.mode, tempo, bars: [], lookahead: [], passes: 0, open, ticks: 0 };
+    return { mode: options.mode, tempo, bars: [], lookahead: [], passes: 0, open: !ends, ticks: 0 };
   }
 
   const oneSection = runs.filter((run) => run.part === "body" && run.pass === 0).length === 1;
@@ -52,10 +64,10 @@ export function planBars(
     options.mode === "jam" ? chorusOf(expanded, options).bars.length : 1,
   );
 
-  const climax = soloClimax(options, passes, open);
-  const breath = climax === undefined ? undefined : soloBreath(climax, passes, open);
+  const climax = soloClimax(options, planned, open);
+  const breath = climax === undefined ? undefined : soloBreath(climax, planned, open);
   const rise = (pass: number) =>
-    climax === undefined ? undefined : soloRise(pass, climax, passes, open);
+    climax === undefined ? undefined : soloRise(pass, climax, planned, open);
 
   // First the music, bar by bar, without marks that depend on a neighbour.
   const drafts: Draft[] = [];
@@ -81,11 +93,12 @@ export function planBars(
         options.mode === "jam"
           ? arcOffset(style.arc, {
               pass: run.pass,
-              passes,
+              passes: planned,
               open,
               part: run.part,
               phraseStart: phraseStart / bodyBarsPerPass,
               phraseEnd: Math.min(1, (phraseStart + phraseLength) / bodyBarsPerPass),
+              ...(told === undefined ? {} : { told }),
               ...(climax === undefined ? {} : { climax }),
               ...(breath === undefined ? {} : { breath }),
               ...(rise(run.pass) === undefined ? {} : { rise: rise(run.pass)! }),
@@ -115,7 +128,12 @@ export function planBars(
     occurrence++;
   }
 
-  const solos = soloMarks(drafts, options, passes, open);
+  const solos = soloMarks(drafts, options, planned, open).map((mark, i) =>
+    // A solo under way when the band is told to finish makes this chorus its last (SO-05).
+    mark && told !== undefined && drafts[i]!.run.pass === told
+      ? { chorus: mark.chorus, of: mark.chorus + 1 }
+      : mark,
+  );
 
   // The one-bar build into a bigger section, then the rule about the high-tier line.
   const energies = drafts.map((draft, i) => {
@@ -127,7 +145,7 @@ export function planBars(
     return clamp01(holdTierLine(lifted, draft.level, style));
   });
 
-  const endingIndex = open ? -1 : playedBars - 1;
+  const endingIndex = ends ? playedBars - 1 : -1;
   const ending =
     endingIndex >= 0
       ? resolveEnding(
@@ -219,7 +237,7 @@ export function planBars(
       solo: silent || without.has("solo") ? null : solos[i]!,
       fill,
       crash,
-      lastPass: !open && options.mode === "jam" && draft.run.pass === passes - 1,
+      lastPass: ends && options.mode === "jam" && draft.run.pass === passes - 1,
       ending: endingMark,
       source: flat.source,
     });
@@ -246,7 +264,7 @@ export function planBars(
     bars: result,
     lookahead,
     passes: options.mode === "jam" ? passes : 1,
-    open,
+    open: !ends,
     ticks: lastBar.start + lastBar.ticks,
   };
 }

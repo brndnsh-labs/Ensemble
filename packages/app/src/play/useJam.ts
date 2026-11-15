@@ -6,7 +6,7 @@ import type { Take } from "@ensemble/engine";
 import { seconds } from "@ensemble/engine";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { JamSetup, Place } from "./jam.ts";
-import { chairsOf, mixOf, OPEN_PASSES, placeAt, soundsOf, takeOf } from "./jam.ts";
+import { chairsOf, mixOf, OPEN_PASSES, placeAt, soundsOf, takeOf, turnForHome } from "./jam.ts";
 import type { Rig } from "./rig.ts";
 
 export type Phase = "idle" | "loading" | "playing";
@@ -22,6 +22,11 @@ export interface Jam {
   readonly problem: string | undefined;
   /** Call from a tap. */
   play(): void;
+  /** Tell the band to finish: it lands an ending at the end of this pass, or of the next if this one is nearly over. */
+  finish(): void;
+  /** True while the band is playing and has not been told to finish, or reached its last pass by itself. */
+  readonly canFinish: boolean;
+  /** Silence, now. */
   stop(): void;
 }
 
@@ -51,6 +56,8 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
     elapsed: 0,
   });
   const [problem, setProblem] = useState<string>();
+  /** The band has been told to finish. */
+  const [told, setTold] = useState(false);
   const running = useRef<Running>(undefined);
   /** Counts presses of play and stop, so a slow load that has been overtaken does nothing. */
   const turn = useRef(0);
@@ -69,6 +76,7 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
     running.current = undefined;
     rig.stop();
     setPhase("idle");
+    setTold(false);
     setNow({ place: undefined, elapsed: 0 });
   }, [rig]);
 
@@ -98,6 +106,19 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
         setProblem("The instruments did not load. Check the connection, then press play again.");
       },
     );
+  };
+
+  const finish = () => {
+    const run = running.current;
+    const position = run?.player.position;
+    if (!run || position === undefined) return;
+    const place = placeAt(run.take.plan, Math.max(0, position));
+    const turn = place && turnForHome(run.take.plan, place, position + REPLACE_AHEAD);
+    if (!turn) return;
+    run.take = takeOf(run.setup, run.passes, turn.endAfter);
+    run.player.replace(turn.from, soundsOf(run.take, run.setup));
+    setTake(run.take);
+    setTold(true);
   };
 
   useEffect(() => {
@@ -138,5 +159,23 @@ export function useJam(rig: Rig, setup: Omit<JamSetup, "seed">): Jam {
   // Leaving the screen stops the band.
   useEffect(() => stop, [stop]);
 
-  return { phase, take, place: now.place, elapsed: now.elapsed, problem, play, stop };
+  const bar = now.place?.bar;
+  const canFinish =
+    phase === "playing" &&
+    !told &&
+    bar !== undefined &&
+    !bar.lastPass &&
+    !bar.ending &&
+    bar.kind !== "tail";
+  return {
+    phase,
+    take,
+    place: now.place,
+    elapsed: now.elapsed,
+    problem,
+    play,
+    finish,
+    canFinish,
+    stop,
+  };
 }

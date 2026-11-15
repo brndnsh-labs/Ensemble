@@ -23,6 +23,15 @@ export interface PlanOptions {
    */
   readonly open?: boolean;
   /**
+   * Jam mode: the band has been told to finish. The pass with this index (from
+   * 0) is the last: it lifts and lands as the last pass of any jam does. Every
+   * pass before it is planned as it was, as the open jam or the jam of `passes`
+   * or `minutes` it set out to be, so a jam under way can be told to finish
+   * without changing what has been played. Ignored when the jam would have
+   * ended by then anyway.
+   */
+  readonly endAfter?: number;
+  /**
    * A level the player sets, 0 to 1, in place of the arc. It holds on every
    * pass (no lift, no arc), and the form still breathes around it at half depth.
    */

@@ -162,6 +162,48 @@ test("making an open jam one pass longer changes nothing that was already played
   }
 });
 
+test("a jam told to finish plays everything before its last pass as it would have, and that pass is a last pass like any other: marked, and landed", () => {
+  for (const style of STYLES) {
+    for (const [c, chart] of ownCharts(style).entries()) {
+      for (const seed of SEEDS.slice(0, 4).filter((s) => FULL || (s + c) % 2 === 0)) {
+        // An open jam and a timed one, each told to finish on one pass or another.
+        // Never on the first pass, which has nothing before it to keep.
+        const turn = seed + (c >> 1);
+        const cases: [PlanOptions, number][] = [
+          [{ mode: "jam", open: true, passes: 3 }, 1 + (turn % 2)],
+          [{ mode: "jam", passes: 6 }, 2 + (turn % 3)],
+        ];
+        // On a push each chart meets one of the two, by turns.
+        for (const [options, endAfter] of cases.filter(
+          (_, i) => FULL || (i + (c >> 1)) % 2 === 0,
+        )) {
+          // Half with the soloist: its solo is cut short, and the band's peak is placed by it.
+          const solo = (seed + c) % 4 < 2;
+          const asPlanned = render(chart.text, style, { ...options, seed, solo });
+          const told = render(chart.text, style, { ...options, seed, solo, endAfter });
+          const where = `${chart.file} seed ${seed}, told on pass ${endAfter}`;
+
+          const top = told.plan.bars.find((bar) => bar.kind === "music" && bar.pass === endAfter)!;
+          // The pass markers say "1/2" once the band knows how many there are; nothing else may differ.
+          const before = (take: Take) =>
+            take.events.filter(
+              (event) =>
+                event.tick < top.start && !(event.kind === "marker" && event.marker === "pass"),
+            );
+          assert.deepEqual(before(told), before(asPlanned), where);
+
+          assert.equal(told.plan.open, false, where);
+          assert.equal(told.plan.passes, endAfter + 1, where);
+          const music = told.plan.bars.filter((bar) => bar.kind === "music");
+          for (const bar of music) assert.equal(bar.lastPass, bar.pass === endAfter, where);
+          const last = music.at(-1)!;
+          assert.ok(last.ending !== null || last.spans.every((s) => s.chord === null), where);
+        }
+      }
+    }
+  }
+});
+
 test("a take with a count-in is the same music as one without, a bar later", () => {
   for (const style of STYLES) {
     for (const chart of ownCharts(style)) {

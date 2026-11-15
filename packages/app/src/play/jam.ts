@@ -49,8 +49,12 @@ export function takeOptions(setup: JamSetup, passes = OPEN_PASSES): TakeOptions 
   };
 }
 
-export function takeOf(setup: JamSetup, passes?: number): Take {
-  return render(setup.text, setup.style, takeOptions(setup, passes));
+/** The take of a jam. With `endAfter`, the same jam told to finish on that pass. */
+export function takeOf(setup: JamSetup, passes?: number, endAfter?: number): Take {
+  return render(setup.text, setup.style, {
+    ...takeOptions(setup, passes),
+    ...(endAfter === undefined ? {} : { endAfter }),
+  });
 }
 
 /** The chart as it will be read while playing: in the key the jam is in. */
@@ -147,4 +151,34 @@ export function nextChange(
     span = 0;
   }
   return undefined;
+}
+
+/**
+ * Where a jam told to finish now turns for home: the pass that becomes its
+ * last, and the second from which the music is the ending's. A band is told at
+ * the top of a phrase. If this pass still has one coming that is far enough
+ * off (`after`, in seconds), it turns there and this pass is the last;
+ * otherwise the next pass is. Undefined when the jam is already ending.
+ */
+export function turnForHome(
+  plan: Plan,
+  place: Place,
+  after: number,
+): { readonly endAfter: number; readonly from: number } | undefined {
+  const { bar } = place;
+  if (bar.kind === "tail" || bar.lastPass || bar.ending) return undefined;
+  const pass = bar.kind === "count-in" ? 0 : bar.pass;
+  const earliest = ticksAt(plan, after);
+  const phrase = plan.bars.find(
+    (b) =>
+      b.kind === "music" &&
+      b.pass === pass &&
+      b.section.role === "body" &&
+      // Not the pass's first phrase: that one is played as it was going to be anyway.
+      b.phrase.bar === 0 &&
+      b.barInPass > 0 &&
+      b.start >= earliest,
+  );
+  if (phrase) return { endAfter: pass, from: (phrase.start * 60) / (plan.tempo * PPQ) };
+  return { endAfter: pass + 1, from: after };
 }
