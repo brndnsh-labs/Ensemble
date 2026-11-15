@@ -546,3 +546,16 @@ Brandon listened on his laptop and his iPhone 17: "nice job... the instruments t
 - **The fix**: a queued recording is stopped at the moment it would begin, so it never sounds. After it, the same measurement reads -72 dBFS from 0.2 s after the stop (notes that had just ended, finishing their own release) and digital silence from 1.7 s.
 - **Stop now fades over 120 ms; a choke stays at 30 ms.** A whole band cut in 30 ms thumps in the bass. A cymbal closed by a foot is that quick; a band stopping is not.
 - No test: the audio layer has none beyond the scheduler (`docs/TESTING.md`), and this lives in the sampler, which needs a browser. The measurement is repeatable: `pnpm render:audio x chart=... stop=20 mix='<dry>'`, then read the level after 20 s.
+
+## stage 5: funk's two packs, and a pack may credit several sources
+
+Built from `prompts/cut-funk-packs.md`. `electric-bass` (Black And Blue Basses, the darkblack Washburn) and `clean-guitar` (FSBS clean for the notes, Emilyguitar for the muted strokes).
+
+- **`Pack.credits` is a list**, the main source first, each with its own `changes`. `LICENCE` is the one text when the sources' licences are byte-identical (FSBS's and Emilyguitar's are), else each in turn under its source's title. The five earlier packs were recut: only their `pack.json` changed.
+- **A source may be a release archive** (`ArchiveSource`: URL, SHA-256, unpacked with `7z`). The fetch path is written but has never run: the archive here was fetched by hand, as `clean.7z`, so a fetch on this machine would download it again under its URL's name.
+- **The electric bass takes every third semitone.** All 32 recorded notes from 26 to 57 were 92 MB decoded for the plain voice alone against 30; caps short enough to fit (0.55 s) would cut a held last note. A minor third apart no note is more than a semitone from a recording, the same worst case as a whole step. The caps then fall from 2.45 s to 1.63 s (the brief's 3 to 2 came to about 36 MB with the dead voice).
+- **The bass mapping is an octave above the sound** (key 40 sounds E1): every take measured 12 semitones under its key, so a take's pitch is its key less 12.
+- **The dead note keeps its fret as its root.** The ghost samples are short and pitched, but 0.5 to 2 semitones under the fret they were played at, ringing an open string's harmonic at the bottom and top of the neck, and neighbouring frets measure alike; a measured root would retune each ghost and put zones out of order. `Voice.measureRoots: false` keeps the recipe's pitch. Cut at 0.3 s (the band's are 80 ms).
+- **The guitar's caps fall from 2.45 s to 1.53 s** (the brief's 4 to 2.5 came to about 48 MB). Its notes at G4 and above are recorded at one dynamic: alternates 1 and 2 go to the soft layer, 3 and 4 to the loud.
+- **The muted strokes are placed, not tuned**: roots 51, 55.5, 60, 64.5 and 69 in order of spectral centre (muted 1, 2, 4, 5, 3). The nearest-zone rule moves a stroke by at most 2 semitones between 51 and 69.
+- **Short sounds levelled to -20 LUFS peak above full scale**: the dead notes up to +5.9 dBFS, the muted strokes up to +9.8 (a 0.1 s sound measured over a 400 ms window). ffmpeg's Opus decoder returns them unclipped (round-trip level within 0.19 dB); whether every browser's decoder does is not established.

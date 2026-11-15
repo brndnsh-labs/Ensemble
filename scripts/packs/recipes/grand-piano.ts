@@ -24,7 +24,6 @@ const RELEASE = 0.2;
 export const grandPiano: Recipe = {
   id: "grand-piano",
   name: "Grand piano",
-  source: "salamander",
   channels: 2,
   kbps: 128,
   level: { measure: "loudness", reference: -20 },
@@ -34,10 +33,15 @@ export const grandPiano: Recipe = {
   foldDb: -3,
   budgetMB: 120,
   monoCheck: true,
-  changes:
-    "Three of the sixteen velocity layers (v8, v10 and v16) of the sampled notes A1 to C7, " +
-    "both microphones kept as stereo; trimmed to the hammer's strike, cut at its decay or a length cap and faded; " +
-    "each note levelled to one loudness; encoded as Opus. Release and pedal noises left out.",
+  credits: [
+    {
+      source: "salamander",
+      changes:
+        "Three of the sixteen velocity layers (v8, v10 and v16) of the sampled notes A1 to C7, " +
+        "both microphones kept as stereo; trimmed to the hammer's strike, cut at its decay or a length cap and faded; " +
+        "each note levelled to one loudness; encoded as Opus. Release and pedal noises left out.",
+    },
+  ],
   voices(dir) {
     // The "Natural" keyswitch is the default: the recordings as tuned, no retuning.
     const regions = readSfz(join(dir, "Salamander Grand Piano V3.sfz")).filter(

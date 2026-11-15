@@ -2,14 +2,16 @@
   "format": 1,
   "id": "upright-bass",
   "name": "Upright bass",
-  "credit": {
-    "title": "Meatbass",
-    "author": "Karoryfer Samples",
-    "url": "https://github.com/sfzinstruments/karoryfer.meatbass",
-    "version": "ac9e859564bda286ab5ec672d00ff1aa2fef2895",
-    "licence": "CC0-1.0",
-    "changes": "Pizzicato notes from E-flat 1 to A3 at four dynamics, with alternates; trimmed to the onset, cut at its decay or a length cap and faded; each levelled to one loudness; roots measured; encoded as Opus."
-  },
+  "credits": [
+    {
+      "title": "Meatbass",
+      "author": "Karoryfer Samples",
+      "url": "https://github.com/sfzinstruments/karoryfer.meatbass",
+      "version": "ac9e859564bda286ab5ec672d00ff1aa2fef2895",
+      "licence": "CC0-1.0",
+      "changes": "Pizzicato notes from E-flat 1 to A3 at four dynamics, with alternates; trimmed to the onset, cut at its decay or a length cap and faded; each levelled to one loudness; roots measured; encoded as Opus."
+    }
+  ],
   "audio": {
     "container": "webm",
     "codec": "opus",

@@ -1,7 +1,7 @@
 // A pack: one instrument's recordings, and what a sampler needs to know to
 // play them. It is written once, when the pack is cut from its source library
 // (scripts/packs), as `pack.json` beside the audio files in `assets/packs/<id>/`.
-// The source's licence text is copied beside it as `LICENCE`.
+// The sources' licence texts are copied beside it as `LICENCE`.
 
 export const PACK_FORMAT = 1;
 
@@ -11,7 +11,11 @@ export interface Pack {
   readonly id: string;
   /** What a person would call it: "Upright bass". */
   readonly name: string;
-  readonly credit: PackCredit;
+  /**
+   * Where the recordings came from: one credit for each source library, the
+   * one most of the pack is cut from first.
+   */
+  readonly credits: readonly PackCredit[];
   readonly audio: PackAudio;
   readonly level: PackLevel;
   /**
@@ -23,16 +27,22 @@ export interface Pack {
   readonly voices: Readonly<Record<string, PackVoice>>;
 }
 
-/** Where the recordings came from. Shown on the credits page. */
+/** One source library the recordings came from. Shown on the credits page. */
 export interface PackCredit {
   readonly title: string;
   readonly author: string;
   readonly url: string;
   /** The commit or version the pack was cut from. */
   readonly version: string;
-  /** SPDX name of the licence: "CC0-1.0", "CC-BY-3.0". Its text is in `LICENCE`. */
+  /**
+   * SPDX name of the licence: "CC0-1.0", "CC-BY-3.0". Its text is in
+   * `LICENCE`: each source's in turn, or once when they are the same text.
+   */
   readonly licence: string;
-  /** What was done to the recordings, in a sentence. A licence may require saying so. */
+  /**
+   * What was done to this source's recordings, in a sentence or two, and which
+   * voices they are. A licence may require saying so.
+   */
   readonly changes: string;
 }
 

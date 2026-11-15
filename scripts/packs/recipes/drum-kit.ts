@@ -126,16 +126,20 @@ function part(r: SfzRegion): Part {
 export const drumKit: Recipe = {
   id: "drum-kit",
   name: "Drum kit",
-  source: "virtuosity-drums",
   channels: 1,
   kbps: 80,
   level: { measure: "peak", reference: -6 },
   foldDb: -6.0206,
   budgetMB: 40,
-  changes:
-    "Each hit's kick, snare and overhead microphones mixed to one mono file at the basic kit program's balance; " +
-    "a selection of velocity layers and alternates; trimmed to the onset, cut at its decay or a length cap and faded; " +
-    "levelled to one peak; the mid tom made from the high tom tuned down two semitones; encoded as Opus.",
+  credits: [
+    {
+      source: "virtuosity-drums",
+      changes:
+        "Each hit's kick, snare and overhead microphones mixed to one mono file at the basic kit program's balance; " +
+        "a selection of velocity layers and alternates; trimmed to the onset, cut at its decay or a length cap and faded; " +
+        "levelled to one peak; the mid tom made from the high tom tuned down two semitones; encoded as Opus.",
+    },
+  ],
   voices(dir) {
     const programs = new Map<string, SfzRegion[]>();
     const program = (p: string) => {

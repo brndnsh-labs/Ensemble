@@ -2,14 +2,16 @@
   "format": 1,
   "id": "grand-piano",
   "name": "Grand piano",
-  "credit": {
-    "title": "Salamander Grand Piano V3",
-    "author": "Alexander Holm",
-    "url": "https://github.com/sfzinstruments/SalamanderGrandPiano",
-    "version": "3382bf9496bba2486f5ab0de55a264d1dfc38404",
-    "licence": "CC-BY-3.0",
-    "changes": "Three of the sixteen velocity layers (v8, v10 and v16) of the sampled notes A1 to C7, both microphones kept as stereo; trimmed to the hammer's strike, cut at its decay or a length cap and faded; each note levelled to one loudness; encoded as Opus. Release and pedal noises left out."
-  },
+  "credits": [
+    {
+      "title": "Salamander Grand Piano V3",
+      "author": "Alexander Holm",
+      "url": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+      "version": "3382bf9496bba2486f5ab0de55a264d1dfc38404",
+      "licence": "CC-BY-3.0",
+      "changes": "Three of the sixteen velocity layers (v8, v10 and v16) of the sampled notes A1 to C7, both microphones kept as stereo; trimmed to the hammer's strike, cut at its decay or a length cap and faded; each note levelled to one loudness; encoded as Opus. Release and pedal noises left out."
+    }
+  ],
   "audio": {
     "container": "webm",
     "codec": "opus",

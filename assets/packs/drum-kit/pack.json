@@ -2,14 +2,16 @@
   "format": 1,
   "id": "drum-kit",
   "name": "Drum kit",
-  "credit": {
-    "title": "Virtuosity Drums",
-    "author": "Versilian Studios and Karoryfer Samples",
-    "url": "https://github.com/sfzinstruments/virtuosity_drums",
-    "version": "9f04cf9a734527edfbb0a4eee1f674e45bbf71bc",
-    "licence": "CC0-1.0",
-    "changes": "Each hit's kick, snare and overhead microphones mixed to one mono file at the basic kit program's balance; a selection of velocity layers and alternates; trimmed to the onset, cut at its decay or a length cap and faded; levelled to one peak; the mid tom made from the high tom tuned down two semitones; encoded as Opus."
-  },
+  "credits": [
+    {
+      "title": "Virtuosity Drums",
+      "author": "Versilian Studios and Karoryfer Samples",
+      "url": "https://github.com/sfzinstruments/virtuosity_drums",
+      "version": "9f04cf9a734527edfbb0a4eee1f674e45bbf71bc",
+      "licence": "CC0-1.0",
+      "changes": "Each hit's kick, snare and overhead microphones mixed to one mono file at the basic kit program's balance; a selection of velocity layers and alternates; trimmed to the onset, cut at its decay or a length cap and faded; levelled to one peak; the mid tom made from the high tom tuned down two semitones; encoded as Opus."
+    }
+  ],
   "audio": {
     "container": "webm",
     "codec": "opus",

@@ -1,16 +1,18 @@
 // Cut instrument packs from the fetched sample libraries.
 //   node scripts/packs/cut.ts [id...]
 // Writes `assets/packs/<id>/` afresh for each pack named, or all: the audio,
-// `pack.json`, and the source's licence as `LICENCE`. Then decodes every file
+// `pack.json`, and the sources' licences as `LICENCE`. Then decodes every file
 // it wrote and checks that the sound starts at the start, lasts as long as
 // `pack.json` says, and sits at the pack's level. Prints what it measured.
 
-import { copyFileSync, mkdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { PACK_FORMAT, type Pack, type PackVoice } from "../../packages/audio/src/pack.ts";
 import type { Recipe, Take } from "./recipe.ts";
 import { altoSax } from "./recipes/alto-sax.ts";
+import { cleanGuitar } from "./recipes/clean-guitar.ts";
 import { drumKit } from "./recipes/drum-kit.ts";
+import { electricBass } from "./recipes/electric-bass.ts";
 import { grandPiano } from "./recipes/grand-piano.ts";
 import { uprightBass } from "./recipes/upright-bass.ts";
 import { vibraphone } from "./recipes/vibraphone.ts";
@@ -33,9 +35,17 @@ import {
   scale,
   tailEnd,
 } from "./signal.ts";
-import { sourceById } from "./sources.ts";
+import { type Source, sourceById, where } from "./sources.ts";
 
-const RECIPES: readonly Recipe[] = [drumKit, uprightBass, grandPiano, altoSax, vibraphone];
+const RECIPES: readonly Recipe[] = [
+  drumKit,
+  uprightBass,
+  grandPiano,
+  altoSax,
+  vibraphone,
+  electricBass,
+  cleanGuitar,
+];
 
 const ROOT = join(import.meta.dirname, "..", "..");
 const PRE_ROLL = Math.round(0.001 * RATE);
@@ -68,7 +78,7 @@ function fold(recipe: Recipe, channels: Float32Array[]): Float32Array {
   return mix(channels.map((signal) => ({ signal, db: recipe.foldDb })));
 }
 
-function cutTake(recipe: Recipe, take: Take): Cut {
+function cutTake(recipe: Recipe, take: Take, measureRoots: boolean): Cut {
   // A shifted take is made at a higher rate and played at 48 kHz, which lowers it.
   const rate = take.shift ? Math.round(RATE * 2 ** (-take.shift / 12)) : RATE;
   let stereo: Float32Array[] | undefined;
@@ -109,7 +119,7 @@ function cutTake(recipe: Recipe, take: Take): Cut {
     cut = { ...cut, pair: [side(l), side(r)] };
   }
 
-  if (recipe.roots && take.mapped !== undefined) {
+  if (recipe.roots && measureRoots && take.mapped !== undefined) {
     const { skip, seconds } = recipe.roots;
     const p = measurePitch(x, o, take.mapped, skip, seconds);
     const up = measurePitch(x, o, take.mapped + 12, skip, seconds);
@@ -172,28 +182,57 @@ function fileName(voice: string, layer: number, mapped: number | undefined, take
   return `${voice ? `${voice}-` : ""}${note}v${layer + 1}-${take + 1}.webm`;
 }
 
+/**
+ * The licence texts of a pack's sources: each in turn, under the source's
+ * title, or one source's text byte for byte when every source has the same.
+ */
+function licenceText(sources: readonly Source[]): Buffer {
+  const texts = sources.map((s) => readFileSync(join(ROOT, ".sources", s.id, s.licenceFile)));
+  if (texts.every((t) => t.equals(texts[0]!))) return texts[0]!;
+  return Buffer.concat(
+    texts.flatMap((t, i) => [
+      Buffer.from(
+        `${i > 0 ? "\n\n" : ""}==== ${sources[i]!.title}, ${sources[i]!.author} ====\n\n`,
+      ),
+      t,
+    ]),
+  );
+}
+
 function cutPack(recipe: Recipe): boolean {
-  const source = sourceById(recipe.source);
-  const dir = join(ROOT, ".sources", source.id);
+  const sources = recipe.credits.map((c) => sourceById(c.source));
+  const dirOf = (id: string) => {
+    if (!recipe.credits.some((c) => c.source === id)) {
+      throw new Error(`${recipe.id} reads ${id}, which it does not credit`);
+    }
+    return join(ROOT, ".sources", id);
+  };
+  const dir = dirOf(sources[0]!.id);
   const out = join(ROOT, "assets", "packs", recipe.id);
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
 
   const written: Written[] = [];
   const voices: Record<string, PackVoice> = {};
-  for (const voice of recipe.voices(dir)) {
+  for (const voice of recipe.voices(dir, dirOf)) {
     const layers = voice.layers.map((layer, li) => ({
       top: layer.top,
       zones: layer.zones.map((zone) => {
         const takes = zone.takes.map((take, ti) => {
           const file = fileName(voice.name, li, take.mapped, ti);
-          const cut = encodeLevelled(recipe, cutTake(recipe, take), join(out, file));
+          const cut = encodeLevelled(
+            recipe,
+            cutTake(recipe, take, voice.measureRoots !== false),
+            join(out, file),
+          );
           const entry: Written = {
             voice: voice.name,
             layer: li,
             file,
             cut,
-            source: take.parts.map((p) => p.file.slice(dir.length + 1)).join(" + "),
+            source: take.parts
+              .map((p) => p.file.slice(join(ROOT, ".sources").length + 1))
+              .join(" + "),
             parts: take.parts,
           };
           written.push(take.mapped === undefined ? entry : { ...entry, mapped: take.mapped });
@@ -227,14 +266,16 @@ function cutPack(recipe: Recipe): boolean {
     format: PACK_FORMAT,
     id: recipe.id,
     name: recipe.name,
-    credit: {
-      title: source.title,
-      author: source.author,
-      url: source.repo,
-      version: source.commit,
-      licence: source.licence,
-      changes: recipe.changes,
-    },
+    credits: recipe.credits.map((c, i) => {
+      const source = sources[i]!;
+      return {
+        title: source.title,
+        author: source.author,
+        ...where(source),
+        licence: source.licence,
+        changes: c.changes,
+      };
+    }),
     audio: {
       container: "webm",
       codec: "opus",
@@ -247,7 +288,7 @@ function cutPack(recipe: Recipe): boolean {
     voices,
   };
   writeFileSync(join(out, "pack.json"), `${JSON.stringify(pack, null, 2)}\n`);
-  copyFileSync(join(dir, source.licenceFile), join(out, "LICENCE"));
+  writeFileSync(join(out, "LICENCE"), licenceText(sources));
 
   const ok = report(recipe, pack, written, out);
   const mb = decodedBytes / 1e6;

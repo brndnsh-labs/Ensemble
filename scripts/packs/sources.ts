@@ -1,21 +1,51 @@
-// The free sample libraries the packs are cut from. Each is pinned to a commit,
-// so a pack can be cut again from exactly what it was cut from the first time.
-// Licences are read from the fetched files and copied beside each pack; see
-// docs/AUDIO_NOTES.md for what is known about each source.
+// The free sample libraries the packs are cut from. Each is pinned, to a commit
+// or to a release archive and its hash, so a pack can be cut again from exactly
+// what it was cut from the first time. Licences are read from the fetched files
+// and copied beside each pack; see docs/AUDIO_NOTES.md for what is known about
+// each source.
 
-export interface Source {
+interface Common {
   /** The folder under `.sources/`. */
   readonly id: string;
   readonly title: string;
   readonly author: string;
+  /** The licence's SPDX name, as read from the licence file at this version. */
+  readonly licence: string;
+  /** The licence file's path in the source's folder. */
+  readonly licenceFile: string;
+}
+
+/** A library kept in a git repository, fetched at one commit. */
+export interface GitSource extends Common {
   readonly repo: string;
   readonly commit: string;
-  /** The licence's SPDX name, as read from the licence file at this commit. */
-  readonly licence: string;
-  /** The licence file's path in the source. */
-  readonly licenceFile: string;
   /** Folders to fetch. Omit to fetch everything. Top-level files always come. */
   readonly paths?: readonly string[];
+}
+
+/** A library published as a release archive, fetched, checked and unpacked with `7z`. */
+export interface ArchiveSource extends Common {
+  /** Where a person finds the library: the credit's link. */
+  readonly home: string;
+  /** The release's name, for the credit. */
+  readonly release: string;
+  /** The archive's URL. */
+  readonly archive: string;
+  /** The archive's SHA-256, in hex. A download that does not match is not unpacked. */
+  readonly sha256: string;
+}
+
+export type Source = GitSource | ArchiveSource;
+
+export function isArchive(source: Source): source is ArchiveSource {
+  return "archive" in source;
+}
+
+/** The link and the version a pack's credit gives for its source. */
+export function where(source: Source): { url: string; version: string } {
+  return isArchive(source)
+    ? { url: source.home, version: source.release }
+    : { url: source.repo, version: source.commit };
 }
 
 export const SOURCES: readonly Source[] = [
@@ -78,6 +108,42 @@ export const SOURCES: readonly Source[] = [
     licence: "CC0-1.0",
     licenceFile: "LICENSE",
     paths: ["Programs", "Samples"],
+  },
+  {
+    id: "black-and-blue-basses",
+    title: "Black And Blue Basses",
+    author: "Karoryfer Samples",
+    repo: "https://github.com/sfzinstruments/karoryfer.black-and-blue-basses",
+    commit: "6e7d674cdb41be7a54dbccb15472401ad01099b9",
+    licence: "CC0-1.0",
+    licenceFile: "license",
+    paths: [
+      "Programs",
+      "Samples/darkblack/reg",
+      "Samples/darkblack/ghost",
+      "Samples/darkblack/stac",
+    ],
+  },
+  {
+    id: "fsbs-clean-guitar",
+    title: "Electric Guitar FSBS (clean)",
+    author: "FreePats",
+    home: "https://github.com/freepats/electric-guitar-FSBS-clean",
+    release: "2026-08-07",
+    archive:
+      "https://github.com/freepats/electric-guitar-FSBS-clean/releases/download/2026-08-07/EGuitarFSBS-clean-SFZ+FLAC-20260807.7z",
+    sha256: "a929a3cbfc8289e325be56dab49f5fd560bbc3995c40b69f8f05caee380e8be3",
+    licence: "CC0-1.0",
+    licenceFile: "EGuitarFSBS-clean SFZ+FLAC-20260807/LICENSE.txt",
+  },
+  {
+    id: "emilyguitar",
+    title: "Emilyguitar",
+    author: "Karoryfer Samples",
+    repo: "https://github.com/sfzinstruments/karoryfer.emilyguitar",
+    commit: "b4920dc662fd9cad6dcaccdeecffdd91c8725d8c",
+    licence: "CC0-1.0",
+    licenceFile: "LICENSE",
   },
 ];
 
