@@ -1,9 +1,11 @@
 // The strip under the chart: where the jam is, how it is shaped, and how much
-// of it is left.
+// of it is left. A jam is told in passes; a song, played once through, in its
+// sections.
 
 import type { Plan, PlanBar } from "@ensemble/engine";
 import { seconds } from "@ensemble/engine";
 import type { Place } from "./jam.ts";
+import { homeStretch, sectionStarts } from "./jam.ts";
 
 interface Props {
   /** The plan being played, or the one play would start. */
@@ -18,15 +20,23 @@ interface Props {
 export const clock = (s: number): string =>
   `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, "0")}`;
 
-const passes = (n: number): string => (n === 1 ? "1 pass" : `${n} passes`);
+const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 function where(plan: Plan, place: Place | undefined, playing: boolean, elapsed: number): string {
   const bar = place?.bar;
+  const song = plan.mode === "song";
   // Playing with no bar under it: the moment before the count, or the last chord ringing.
   if (!bar && playing) return elapsed > 0 ? "Ending" : "Count-in";
-  if (!bar) return plan.open ? "Until you stop it" : passes(plan.passes);
+  if (!bar) {
+    if (song) return count(sectionStarts(plan).length, "section", "sections");
+    return plan.open ? "Until you stop it" : count(plan.passes, "pass", "passes");
+  }
   if (bar.kind === "count-in") return `Count-in ${place.beat + 1}`;
-  if (bar.ending || bar.kind === "tail") return "Ending";
+  if (bar.kind === "tail") return "Ending";
+  // A song is told by its sections, all the way to its last chord.
+  if (song)
+    return `${bar.section.label || "Section"}, ${bar.section.occurrence + 1} of ${sectionStarts(plan).length}`;
+  if (bar.ending) return "Ending";
   if (bar.lastPass) return "Last pass";
   return plan.open ? `Pass ${bar.pass + 1}` : `Pass ${bar.pass + 1} of ${plan.passes}`;
 }
@@ -34,7 +44,7 @@ function where(plan: Plan, place: Place | undefined, playing: boolean, elapsed: 
 export function StatusStrip({ plan, place, elapsed, playing, soloist }: Props) {
   const bar = place?.bar;
   const length = seconds(plan);
-  const last = bar !== undefined && (bar.lastPass || bar.kind === "tail");
+  const last = bar !== undefined && homeStretch(plan, bar);
   return (
     <div className={`strip${last ? " last" : ""}`}>
       <span className="strip-where" aria-live="polite">
@@ -59,7 +69,11 @@ export function StatusStrip({ plan, place, elapsed, playing, soloist }: Props) {
   );
 }
 
-/** The shape of the jam: how hard the band plays in each bar, where the soloist leads, and where it is now. */
+/**
+ * The shape of the jam or the song: how hard the band plays in each bar, where
+ * the soloist leads, and where it is now. A rule marks the top of each pass of
+ * a jam, or the start of each section of a song; the way home is shaded.
+ */
 function Arc({ plan, at }: { plan: Plan; at: PlanBar | undefined }) {
   const bars = plan.bars.filter((bar) => bar.kind === "music");
   if (bars.length === 0) return <svg className="arc" />;
@@ -75,24 +89,21 @@ function Arc({ plan, at }: { plan: Plan; at: PlanBar | undefined }) {
     .join(" ");
   const first = bars[0]!;
   const final = bars.at(-1)!;
-  const tops = bars.filter((bar) => bar.barInPass === 0 && bar.section.role === "body");
-  const lastPass = bars.find((bar) => bar.lastPass);
+  const tops =
+    plan.mode === "song"
+      ? sectionStarts(plan)
+      : bars.filter((bar) => bar.barInPass === 0 && bar.section.role === "body");
+  const home = bars.find((bar) => homeStretch(plan, bar));
   return (
     <svg
       className="arc"
       viewBox={`0 0 ${W} ${H}`}
       preserveAspectRatio="none"
       role="img"
-      aria-label="The shape of the jam"
+      aria-label={plan.mode === "song" ? "The shape of the song" : "The shape of the jam"}
     >
-      {lastPass && (
-        <rect
-          className="arc-last"
-          x={x(lastPass.start)}
-          y="0"
-          width={W - x(lastPass.start)}
-          height={H}
-        />
+      {home && (
+        <rect className="arc-last" x={x(home.start)} y="0" width={W - x(home.start)} height={H} />
       )}
       <polygon
         className="arc-fill"

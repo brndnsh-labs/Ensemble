@@ -1100,7 +1100,8 @@ button[aria-pressed="true"] {
   }
 
   /* While typing on a phone the tools wait; the keyboard has taken their room. */
-  .edit.typing .tools {
+  .edit.typing .tools,
+  .edit.typing .sides {
     display: none;
   }
 }
@@ -1121,6 +1122,240 @@ button[aria-pressed="true"] {
     flex: 1;
     padding: 4px 0 12px;
   }
+}
+
+/* ── The arrangement ─────────────────────────────────────────────────────── */
+
+/* Which side of the chart is being edited: its chords as text, or who plays where. */
+.sides {
+  display: flex;
+  flex: none;
+  padding-bottom: 6px;
+}
+
+.side {
+  flex: 1;
+  height: 36px;
+  border: 1.5px solid var(--ink);
+  background: none;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.side:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.side:last-child {
+  border-left: 0;
+  border-radius: 0 6px 6px 0;
+}
+
+.arrangement {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  font-size: 0.875rem;
+}
+
+.grid-empty,
+.grid-note {
+  margin: 0;
+  color: var(--faint);
+}
+
+.grid-note.warn {
+  color: var(--pencil);
+  font-weight: 600;
+}
+
+.grid-note p {
+  margin: 0;
+}
+
+.grid-note code {
+  font-family: var(--mono);
+}
+
+.grid-fix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.fix,
+.grid-remove,
+.choice {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--ink);
+  border-radius: 6px;
+  background: none;
+  color: var(--ink);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+/* The sections scroll sideways under the row names, which stay put. */
+.grid-scroll {
+  flex: none;
+  overflow-x: auto;
+  scroll-padding-left: 76px;
+}
+
+.grid {
+  border-collapse: separate;
+  border-spacing: 3px;
+}
+
+.grid td {
+  padding: 0;
+}
+
+.grid th {
+  font-weight: 650;
+  text-align: left;
+}
+
+.grid thead th {
+  max-width: 64px;
+  padding: 0 2px 2px;
+  overflow: hidden;
+  color: var(--faint);
+  font-size: 0.8rem;
+  font-stretch: 80%;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  vertical-align: bottom;
+  white-space: nowrap;
+}
+
+.grid thead th.here {
+  color: var(--ink);
+}
+
+.grid tbody th,
+.grid thead td {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 70px;
+  padding-right: 6px;
+  background: var(--paper);
+}
+
+/* A cell: a block filled to the level, solid where the player was given one of its own. */
+.cell {
+  --cell-ink: var(--ink);
+  position: relative;
+  display: block;
+  width: 48px;
+  height: 44px;
+  padding: 0;
+  overflow: hidden;
+  border: 1.5px solid var(--rule);
+  border-radius: 5px;
+  background: none;
+}
+
+.cell .level {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  left: 4px;
+  max-height: calc(100% - 8px);
+  border-radius: 2px;
+  background: var(--cell-ink);
+}
+
+/* Following the section: its level, drawn faintly, so a level of the player's own stands out. */
+.cell.follows .level {
+  background: color-mix(in srgb, var(--cell-ink) 22%, transparent);
+}
+
+.cell-word {
+  position: relative;
+  color: var(--cell-ink);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+/* A phone on its side: the cells give up a little height, never below a fingertip's 40 px. */
+@media (max-height: 500px) {
+  .cell {
+    height: 40px;
+  }
+}
+
+.chosen .cell {
+  --cell-ink: var(--on-marker);
+  border-color: var(--on-marker);
+  background: var(--marker);
+}
+
+.grid.locked .cell {
+  cursor: default;
+}
+
+.grid-set {
+  display: grid;
+  gap: 4px;
+}
+
+.grid-which {
+  margin: 0;
+  color: var(--faint);
+}
+
+.grid-which strong {
+  color: var(--ink);
+  font-weight: 650;
+}
+
+.choices {
+  display: flex;
+}
+
+.choice {
+  flex: 1 1 0;
+  min-width: 44px;
+  max-width: 76px;
+  height: 44px;
+  padding: 0 6px;
+  border-radius: 0;
+}
+
+.choices :where(.choice + .choice) {
+  border-left: 0;
+}
+
+.choice:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.choice:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.choice:disabled {
+  border-color: var(--rule);
+  color: var(--faint);
+  cursor: default;
+}
+
+.choice[aria-pressed="true"]:disabled {
+  background: var(--rule);
+}
+
+.grid-remove {
+  align-self: flex-start;
+  margin-top: auto;
+  border-color: var(--pencil);
+  color: var(--pencil);
 }
 
 /* ── A kept take ─────────────────────────────────────────────────────────── */

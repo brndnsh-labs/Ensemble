@@ -65,7 +65,14 @@ export function App() {
   const entry = found === undefined || screen === "take" ? undefined : findChart(found);
   // A built-in is not edited in place: its play screen offers a copy.
   if (screen === "edit" && entry?.own)
-    return <EditView key={entry.id} entry={entry} reading={settings.reading} />;
+    return (
+      <EditView
+        key={entry.id}
+        entry={entry}
+        reading={settings.reading}
+        style={settings.charts[entry.id]?.style}
+      />
+    );
   if (!entry || screen === "edit")
     return (
       <LibraryView

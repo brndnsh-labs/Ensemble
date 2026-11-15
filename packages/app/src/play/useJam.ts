@@ -31,7 +31,7 @@ export interface Jam {
   play(): void;
   /** Tell the band to finish: it lands an ending at the end of this pass, or of the next if this one is nearly over. */
   finish(): void;
-  /** True while the band is playing and has not been told to finish, or reached its last pass by itself. */
+  /** True while the band plays a jam and has not been told to finish, or reached its last pass by itself. Never in a song. */
   readonly canFinish: boolean;
   /** Silence, now. */
   stop(): void;
@@ -159,7 +159,8 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
 
   const finish = () => {
     const run = running.current;
-    if (!run || run.toldAt !== undefined) return;
+    // A song has its own end: there is nothing to tell the band.
+    if (!run || run.toldAt !== undefined || run.made.plan.mode === "song") return;
     run.toldAt = performance.now();
     setTold(true);
     // The ending has to be made, which takes a moment, and the phrase top it was made for
@@ -266,6 +267,7 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
   const bar = now.place?.bar;
   const canFinish =
     phase === "playing" &&
+    playing?.plan.mode === "jam" &&
     !told &&
     bar !== undefined &&
     !bar.lastPass &&

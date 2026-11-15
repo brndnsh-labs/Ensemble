@@ -10,6 +10,11 @@ export interface ChartChoices {
   /** A key as it is typed in a chart: `Bb`, `F#m`. */
   readonly key?: string;
   readonly tempo?: number;
+  /**
+   * Played as a song, once through, in place of a jam of the length chosen
+   * for every chart. Unset: a song when the chart's arrangement fits it.
+   */
+  readonly song?: boolean;
 }
 
 export interface Settings {

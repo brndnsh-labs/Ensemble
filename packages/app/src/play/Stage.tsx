@@ -11,7 +11,7 @@ import type { Playhead } from "./ChartView.tsx";
 import { ChartView } from "./ChartView.tsx";
 import type { Reading } from "./ChordSymbol.tsx";
 import type { Call } from "./jam.ts";
-import { nextChange } from "./jam.ts";
+import { homeStretch, nextChange } from "./jam.ts";
 import { pageBarOf } from "./page.ts";
 import { StatusStrip } from "./StatusStrip.tsx";
 import type { Jam } from "./useJam.ts";
@@ -64,8 +64,8 @@ export function Stage(props: Props) {
       const id = pageBarOf(planBar(plan, index) ?? bar);
       if (id !== undefined) coming.push(id);
     }
-    // On the last pass the final bar is the ending the band will play, not the turnaround written there.
-    const last = bar.lastPass || bar.kind === "tail" ? plan.bars.find((b) => b.ending) : undefined;
+    // On the way home the final bar is the ending the band will play, not the turnaround written there.
+    const last = homeStretch(plan, bar) ? plan.bars.find((b) => b.ending) : undefined;
     const lastBar = last && pageBarOf(last);
     playhead = {
       bar: pageBarOf(bar) ?? "",
