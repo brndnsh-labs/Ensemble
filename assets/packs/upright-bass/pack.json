@@ -1,0 +1,536 @@
+{
+  "format": 1,
+  "id": "upright-bass",
+  "name": "Upright bass",
+  "credit": {
+    "title": "Meatbass",
+    "author": "Karoryfer Samples",
+    "url": "https://github.com/sfzinstruments/karoryfer.meatbass",
+    "version": "ac9e859564bda286ab5ec672d00ff1aa2fef2895",
+    "licence": "CC0-1.0",
+    "changes": "Pizzicato notes from E-flat 1 to A3 at four dynamics, with alternates; trimmed to the onset, cut at its decay or a length cap and faded; each levelled to one loudness; roots measured; encoded as Opus."
+  },
+  "audio": {
+    "container": "webm",
+    "codec": "opus",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bytes": 1505504,
+    "decodedBytes": 29541660
+  },
+  "level": {
+    "measure": "loudness",
+    "reference": -20
+  },
+  "voices": {
+    "": {
+      "layers": [
+        {
+          "top": 56,
+          "zones": [
+            {
+              "root": 26.781,
+              "takes": [
+                {
+                  "file": "n27-v1-1.webm",
+                  "seconds": 2.864521
+                }
+              ]
+            },
+            {
+              "root": 29.927,
+              "takes": [
+                {
+                  "file": "n30-v1-1.webm",
+                  "seconds": 2.758062
+                }
+              ]
+            },
+            {
+              "root": 32.832,
+              "takes": [
+                {
+                  "file": "n33-v1-1.webm",
+                  "seconds": 2.651604
+                }
+              ]
+            },
+            {
+              "root": 35.767,
+              "takes": [
+                {
+                  "file": "n36-v1-1.webm",
+                  "seconds": 2.545167
+                }
+              ]
+            },
+            {
+              "root": 38.901,
+              "takes": [
+                {
+                  "file": "n39-v1-1.webm",
+                  "seconds": 2.438708
+                }
+              ]
+            },
+            {
+              "root": 41.829,
+              "takes": [
+                {
+                  "file": "n42-v1-1.webm",
+                  "seconds": 2.33225
+                }
+              ]
+            },
+            {
+              "root": 44.862,
+              "takes": [
+                {
+                  "file": "n45-v1-1.webm",
+                  "seconds": 2.225812
+                }
+              ]
+            },
+            {
+              "root": 48.021,
+              "takes": [
+                {
+                  "file": "n48-v1-1.webm",
+                  "seconds": 2.119354
+                }
+              ]
+            },
+            {
+              "root": 50.775,
+              "takes": [
+                {
+                  "file": "n51-v1-1.webm",
+                  "seconds": 2.012896
+                }
+              ]
+            },
+            {
+              "root": 53.896,
+              "takes": [
+                {
+                  "file": "n54-v1-1.webm",
+                  "seconds": 1.906458
+                }
+              ]
+            },
+            {
+              "root": 56.97,
+              "takes": [
+                {
+                  "file": "n57-v1-1.webm",
+                  "seconds": 1.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 68,
+          "zones": [
+            {
+              "root": 26.805,
+              "takes": [
+                {
+                  "file": "n27-v2-1.webm",
+                  "seconds": 2.864521
+                },
+                {
+                  "file": "n27-v2-2.webm",
+                  "seconds": 2.864521
+                }
+              ]
+            },
+            {
+              "root": 29.895,
+              "takes": [
+                {
+                  "file": "n30-v2-1.webm",
+                  "seconds": 2.758062
+                },
+                {
+                  "file": "n30-v2-2.webm",
+                  "seconds": 2.758062
+                }
+              ]
+            },
+            {
+              "root": 32.889,
+              "takes": [
+                {
+                  "file": "n33-v2-1.webm",
+                  "seconds": 2.651604
+                },
+                {
+                  "file": "n33-v2-2.webm",
+                  "seconds": 2.651604
+                }
+              ]
+            },
+            {
+              "root": 35.782,
+              "takes": [
+                {
+                  "file": "n36-v2-1.webm",
+                  "seconds": 2.545167
+                },
+                {
+                  "file": "n36-v2-2.webm",
+                  "seconds": 2.545167
+                }
+              ]
+            },
+            {
+              "root": 38.941,
+              "takes": [
+                {
+                  "file": "n39-v2-1.webm",
+                  "seconds": 2.438708
+                },
+                {
+                  "file": "n39-v2-2.webm",
+                  "seconds": 2.438708
+                }
+              ]
+            },
+            {
+              "root": 41.956,
+              "takes": [
+                {
+                  "file": "n42-v2-1.webm",
+                  "seconds": 2.33225
+                },
+                {
+                  "file": "n42-v2-2.webm",
+                  "seconds": 2.33225
+                }
+              ]
+            },
+            {
+              "root": 44.767,
+              "takes": [
+                {
+                  "file": "n45-v2-1.webm",
+                  "seconds": 2.225812
+                },
+                {
+                  "file": "n45-v2-2.webm",
+                  "seconds": 2.225812
+                }
+              ]
+            },
+            {
+              "root": 48.034,
+              "takes": [
+                {
+                  "file": "n48-v2-1.webm",
+                  "seconds": 2.119354
+                },
+                {
+                  "file": "n48-v2-2.webm",
+                  "seconds": 2.119354
+                }
+              ]
+            },
+            {
+              "root": 50.846,
+              "takes": [
+                {
+                  "file": "n51-v2-1.webm",
+                  "seconds": 2.012896
+                },
+                {
+                  "file": "n51-v2-2.webm",
+                  "seconds": 2.012896
+                }
+              ]
+            },
+            {
+              "root": 53.959,
+              "takes": [
+                {
+                  "file": "n54-v2-1.webm",
+                  "seconds": 1.906458
+                },
+                {
+                  "file": "n54-v2-2.webm",
+                  "seconds": 1.851354
+                }
+              ]
+            },
+            {
+              "root": 56.856,
+              "takes": [
+                {
+                  "file": "n57-v2-1.webm",
+                  "seconds": 1.8
+                },
+                {
+                  "file": "n57-v2-2.webm",
+                  "seconds": 1.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 80,
+          "zones": [
+            {
+              "root": 26.789,
+              "takes": [
+                {
+                  "file": "n27-v3-1.webm",
+                  "seconds": 2.864521
+                },
+                {
+                  "file": "n27-v3-2.webm",
+                  "seconds": 2.864521
+                }
+              ]
+            },
+            {
+              "root": 29.941,
+              "takes": [
+                {
+                  "file": "n30-v3-1.webm",
+                  "seconds": 2.758062
+                },
+                {
+                  "file": "n30-v3-2.webm",
+                  "seconds": 2.758062
+                }
+              ]
+            },
+            {
+              "root": 32.937,
+              "takes": [
+                {
+                  "file": "n33-v3-1.webm",
+                  "seconds": 2.651604
+                },
+                {
+                  "file": "n33-v3-2.webm",
+                  "seconds": 2.651604
+                }
+              ]
+            },
+            {
+              "root": 35.79,
+              "takes": [
+                {
+                  "file": "n36-v3-1.webm",
+                  "seconds": 2.545167
+                },
+                {
+                  "file": "n36-v3-2.webm",
+                  "seconds": 2.545167
+                }
+              ]
+            },
+            {
+              "root": 38.955,
+              "takes": [
+                {
+                  "file": "n39-v3-1.webm",
+                  "seconds": 2.438708
+                },
+                {
+                  "file": "n39-v3-2.webm",
+                  "seconds": 2.438708
+                }
+              ]
+            },
+            {
+              "root": 41.94,
+              "takes": [
+                {
+                  "file": "n42-v3-1.webm",
+                  "seconds": 2.33225
+                },
+                {
+                  "file": "n42-v3-2.webm",
+                  "seconds": 2.33225
+                }
+              ]
+            },
+            {
+              "root": 44.774,
+              "takes": [
+                {
+                  "file": "n45-v3-1.webm",
+                  "seconds": 2.214729
+                },
+                {
+                  "file": "n45-v3-2.webm",
+                  "seconds": 2.225812
+                }
+              ]
+            },
+            {
+              "root": 48.047,
+              "takes": [
+                {
+                  "file": "n48-v3-1.webm",
+                  "seconds": 2.119354
+                },
+                {
+                  "file": "n48-v3-2.webm",
+                  "seconds": 2.119354
+                }
+              ]
+            },
+            {
+              "root": 50.863,
+              "takes": [
+                {
+                  "file": "n51-v3-1.webm",
+                  "seconds": 2.012896
+                },
+                {
+                  "file": "n51-v3-2.webm",
+                  "seconds": 2.012896
+                }
+              ]
+            },
+            {
+              "root": 54.003,
+              "takes": [
+                {
+                  "file": "n54-v3-1.webm",
+                  "seconds": 1.906458
+                },
+                {
+                  "file": "n54-v3-2.webm",
+                  "seconds": 1.906458
+                }
+              ]
+            },
+            {
+              "root": 56.849,
+              "takes": [
+                {
+                  "file": "n57-v3-1.webm",
+                  "seconds": 1.8
+                },
+                {
+                  "file": "n57-v3-2.webm",
+                  "seconds": 1.8
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "root": 26.755,
+              "takes": [
+                {
+                  "file": "n27-v4-1.webm",
+                  "seconds": 2.864521
+                }
+              ]
+            },
+            {
+              "root": 29.983,
+              "takes": [
+                {
+                  "file": "n30-v4-1.webm",
+                  "seconds": 2.758062
+                }
+              ]
+            },
+            {
+              "root": 32.94,
+              "takes": [
+                {
+                  "file": "n33-v4-1.webm",
+                  "seconds": 2.651604
+                }
+              ]
+            },
+            {
+              "root": 35.809,
+              "takes": [
+                {
+                  "file": "n36-v4-1.webm",
+                  "seconds": 2.545167
+                }
+              ]
+            },
+            {
+              "root": 38.955,
+              "takes": [
+                {
+                  "file": "n39-v4-1.webm",
+                  "seconds": 2.438708
+                }
+              ]
+            },
+            {
+              "root": 41.868,
+              "takes": [
+                {
+                  "file": "n42-v4-1.webm",
+                  "seconds": 2.33225
+                }
+              ]
+            },
+            {
+              "root": 44.744,
+              "takes": [
+                {
+                  "file": "n45-v4-1.webm",
+                  "seconds": 2.225812
+                }
+              ]
+            },
+            {
+              "root": 48.067,
+              "takes": [
+                {
+                  "file": "n48-v4-1.webm",
+                  "seconds": 2.119354
+                }
+              ]
+            },
+            {
+              "root": 50.869,
+              "takes": [
+                {
+                  "file": "n51-v4-1.webm",
+                  "seconds": 2.012896
+                }
+              ]
+            },
+            {
+              "root": 54.031,
+              "takes": [
+                {
+                  "file": "n54-v4-1.webm",
+                  "seconds": 1.906458
+                }
+              ]
+            },
+            {
+              "root": 56.871,
+              "takes": [
+                {
+                  "file": "n57-v4-1.webm",
+                  "seconds": 1.8
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "release": 0.12
+    }
+  }
+}
