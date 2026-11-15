@@ -435,3 +435,10 @@ An Opus reviewer read the four jazz seats together from `prompts/review-style.md
 - Song mode has no light head (the head offset is for a jam that goes round more than once): as designed.
 
 **Dismissed:** "the walk's passing tones are floored at the open E, not at the style's lowest root". The open E is the instrument's lowest note and `register.lowest` is the lowest root; the blues line has the same two floors.
+
+## 2026-11-15: Brandon on four of the jazz review's questions (before listening)
+
+- **Drums and piano into a change:** "i don't think they need to line up *all* the time". Agreed and left: both are on the same "and", so together they are exactly together and apart one plays alone; the piano's push has the snare with it half the time. A push the band shares is not built. It comes back only if he hears the band guessing at a change.
+- **The jazz waltz piano (one held chord a bar):** accepted for now, "an area for improvement. we should think about what some of the greats do as they're comping waltzes". On the later list in `PLAN.md`: a comping book per meter, the 3/4 book written from a study of how the great pianists comp a waltz.
+- **The piano above the alto in a solo's first chorus:** left to my judgement. Left as it is: the low first chorus is the arc the solo builds from (SO-05) and was passed on the alto at gate 3; the piano cannot go under it without going under middle C (CH-63). If it is heard as crowded, the lever is the piano thinning under a low horn, not the horn moving up.
+- **The jazz and blues pianos share their voicings:** "this sounds normal, jazz harmony leans a lot on the blues". Not a defect.
