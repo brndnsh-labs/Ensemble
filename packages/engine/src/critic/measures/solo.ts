@@ -9,7 +9,9 @@
 
 import { PPQ } from "../../chart/types.ts";
 import { score } from "../../critic/choose.ts";
+import { STEP } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
+import { contextOf } from "../../perform/harmony.ts";
 import type { Heard, SoloCandidate, Sounding } from "../../players/solo/critique.ts";
 import {
   bassStruck,
@@ -18,8 +20,6 @@ import {
   likeness,
   lineBars,
   phrasesOf,
-  RELATED,
-  SAME,
   SOLO_FEATURES,
 } from "../../players/solo/critique.ts";
 import type { World } from "../../players/solo/slots.ts";
@@ -28,6 +28,7 @@ import type { StylePack } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
 import { chordTones } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
+import { chordScale } from "../../theory/scale.ts";
 import { mean, notesOf, share } from "../read.ts";
 import type { Measure, Measurement } from "../types.ts";
 
@@ -202,7 +203,7 @@ export const soloMeasures: readonly Measure[] = [
   measure(
     "thirds-and-sevenths-on-changes",
     "share",
-    "Around half the changes are landed on the new chord's 3rd or 7th, the notes that say the chord moved; the rest on its root or 5th.",
+    "The share of changes landed on the new chord's 3rd or 7th, the notes that say the chord moved: most of them where the line spells the changes, around half in a blues.",
     (reading) => {
       const landings = reading.notes.filter((note) => {
         const here = reading.world.arrivalAt(note.tick);
@@ -253,7 +254,8 @@ export const soloMeasures: readonly Measure[] = [
           i === 0 || phrase.notes.length === 0 ? [] : [closest(phrase, solo.slice(0, i))!],
         ),
       );
-      return share(scores.filter((value) => value >= RELATED).length, scores.length);
+      const { related } = reading.world.solo.likeness;
+      return share(scores.filter((value) => value >= related).length, scores.length);
     },
   ),
   measure(
@@ -279,7 +281,8 @@ export const soloMeasures: readonly Measure[] = [
           i === 0 || phrase.notes.length === 0 ? [] : [likeness(phrase, solo[i - 1]!)],
         ),
       );
-      return share(scores.filter((value) => value >= SAME).length, scores.length);
+      const { same } = reading.world.solo.likeness;
+      return share(scores.filter((value) => value >= same).length, scores.length);
     },
   ),
   measure(
@@ -311,6 +314,10 @@ export const soloMeasures: readonly Measure[] = [
           .filter((note) => note.tick - note.bar.start < note.bar.ticks - PPQ)
           .map((note) => note.bar.index),
       );
+      // A note tied over the barline is playing in the bar it is held into.
+      for (const note of reading.notes) {
+        if (note.ends > note.bar.start + note.bar.ticks + PPQ / 4) struck.add(note.bar.index + 1);
+      }
       return share(bars.filter((bar) => !struck.has(bar.index)).length, bars.length);
     },
   ),
@@ -463,10 +470,11 @@ export const soloMeasures: readonly Measure[] = [
   measure(
     "steps",
     "share",
-    "Most moves inside a line are a step of the blues scale: a minor third or less.",
+    "Most moves inside a line are a step of the scale the style plays: a minor third or less in a blues scale, a whole step or less where the line runs the chord's own.",
     (reading) => {
       const all = moves(reading);
-      return share(all.filter(([a, b]) => Math.abs(b.pitch - a.pitch) <= 3).length, all.length);
+      const { step } = reading.world.solo.line;
+      return share(all.filter(([a, b]) => Math.abs(b.pitch - a.pitch) <= step).length, all.length);
     },
   ),
   measure("wide-leaps", "share", "Leaps wider than a fifth are rare inside a line.", (reading) => {
@@ -512,10 +520,108 @@ export const soloMeasures: readonly Measure[] = [
   measure(
     "repeated-notes",
     "share",
-    "A line moves: few of its moves strike the same note again.",
+    "The share of a line's moves that strike the same note again: few where the style is a line, some where it stabs a figure on one note.",
     (reading) => {
       const all = moves(reading);
       return share(all.filter(([a, b]) => a.pitch === b.pitch).length, all.length);
+    },
+  ),
+  measure(
+    "roots-and-fifths-on-changes",
+    "share",
+    "The share of changes landed on the new chord's root or 5th: most of them where the soloist is a horn section riffing, few where the line spells the changes.",
+    (reading) => {
+      const landings = reading.notes.filter((note) => {
+        const here = reading.world.arrivalAt(note.tick);
+        return here?.tick === note.tick && here.changed && here.chord !== null;
+      });
+      const plain = landings.filter((note) => {
+        const chord = reading.world.arrivalAt(note.tick)!.chord!;
+        const root = pitchClass(chord.root);
+        return chordTones(chord.quality).some(
+          (tone) =>
+            (tone.role === "root" || tone.role === "fifth") &&
+            mod12(root + tone.interval) === mod12(note.pitch),
+        );
+      });
+      return share(plain.length, landings.length);
+    },
+  ),
+  measure(
+    "chromatic-approaches",
+    "share",
+    "The share of changes landed on from a half step away, by a note the new chord's scale does not have: the bebop approach, measured where it happens (Q-29).",
+    (reading) => {
+      const { world, notes } = reading;
+      let landings = 0;
+      let chromatic = 0;
+      notes.forEach((note, i) => {
+        const here = world.arrivalAt(note.tick);
+        const before = notes[i - 1];
+        if (here?.tick !== note.tick || !here.changed || !here.chord) return;
+        if (!before || note.tick - before.ends >= PPQ - POCKET) return;
+        landings++;
+        if (Math.abs(note.pitch - before.pitch) !== 1) return;
+        const root = pitchClass(here.chord.root);
+        const scale = chordScale(here.chord, contextOf(world.harmony, here));
+        const inScale = scale.intervals.some(
+          (interval) => mod12(root + interval) === mod12(before.pitch),
+        );
+        if (!inScale) chromatic++;
+      });
+      return share(chromatic, landings);
+    },
+  ),
+  measure(
+    "short-notes",
+    "share",
+    "The share of notes that are an eighth or shorter as heard: most of a bebop line, nearly all of a funk riff (Q-34).",
+    (reading) =>
+      share(
+        reading.notes.filter((note) => note.ends - note.tick < PPQ * 0.75).length,
+        reading.notes.length,
+      ),
+  ),
+  measure(
+    "silent-sixteenths",
+    "share",
+    "Inside the bars the soloist plays in, the share of sixteenths with nothing sounding: the holes in a riff (Q-33).",
+    (reading) => {
+      const sounding = new Set<number>();
+      const played = new Map<number, Sounding["bar"]>();
+      for (const note of reading.notes) {
+        played.set(note.bar.index, note.bar);
+        const steps = Math.max(1, Math.round((note.ends - note.tick) / STEP));
+        for (let k = 0; k < steps; k++) sounding.add(Math.round(note.tick / STEP) + k);
+      }
+      let all = 0;
+      let silent = 0;
+      for (const bar of played.values()) {
+        for (let tick = bar.start; tick < bar.start + bar.ticks; tick += STEP) {
+          all++;
+          if (!sounding.has(Math.round(tick / STEP))) silent++;
+        }
+      }
+      return share(silent, all);
+    },
+  ),
+  measure(
+    "barlines-tied",
+    "share",
+    "Of the barlines a run crosses (a note on the last eighth of the bar, running straight on), the share where that note is held over the barline and the downbeat is not struck: a line that does not treat the barline as a wall (SO-38).",
+    (reading) => {
+      let crossed = 0;
+      let tied = 0;
+      reading.notes.forEach((note, i) => {
+        const end = note.bar.start + note.bar.ticks;
+        if (note.tick !== end - PPQ / 2) return;
+        const next = reading.notes[i + 1];
+        const over = note.ends > end + PPQ / 4;
+        if (!over && next?.tick !== end) return;
+        crossed++;
+        if (over) tied++;
+      });
+      return share(tied, crossed);
     },
   ),
   measure(

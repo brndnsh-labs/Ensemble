@@ -3,8 +3,8 @@
 
 import { cells } from "../../perform/grid.ts";
 import { SOLO_INSTRUMENTS } from "./instruments.ts";
-import type { Cell, SoloStyle } from "./style.ts";
-import { CONTOURS } from "./style.ts";
+import type { Cell, Role, SoloStyle, Way } from "./style.ts";
+import { CONTOURS, ROLES } from "./style.ts";
 
 const STEPS = 16;
 
@@ -82,19 +82,71 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
     say(held >= 4, `endings: "${cell}" does not finish on a long note.`);
   }
 
-  say(
-    solo.forms.some((form) => form.weight > 0 && cells(form.phrases)[0] === "s"),
-    "forms: none opens on a statement (s), so a solo has nowhere to start.",
-  );
+  // A solo's first chorus opens on a statement, whatever its length: every length of form
+  // the style writes needs one that does.
+  const lengths = new Set(solo.forms.map((form) => cells(form.phrases).length));
+  say(lengths.size > 0, "forms: there are none.");
+  for (const length of lengths) {
+    say(
+      solo.forms.some(
+        (form) =>
+          form.weight > 0 &&
+          cells(form.phrases).length === length &&
+          cells(form.phrases)[0] === "s",
+      ),
+      `forms: none of ${length} phrases opens on a statement (s), so a solo has nowhere to start.`,
+    );
+  }
   for (const form of solo.forms) {
     const letters = cells(form.phrases);
     say(letters.length > 0, "forms: an empty form.");
     say(
-      letters.every((letter) => "srva".includes(letter)),
-      `forms: "${form.phrases}" has a letter that is not s, r, v or a.`,
+      letters.every((letter) => (ROLES as readonly string[]).includes(letter)),
+      `forms: "${form.phrases}" has a letter that is not one of ${ROLES.join(", ")}.`,
     );
     say(form.weight >= 0, `forms: "${form.phrases}" has a negative weight.`);
+    for (const letter of letters) {
+      say(
+        (solo.book.roles[letter as Role] ?? []).length > 0,
+        `forms: "${form.phrases}" asks for "${letter}", and the book offers no way of playing it.`,
+      );
+    }
   }
+
+  const { book } = solo;
+  const ways = (list: readonly Way[], where: string) => {
+    for (const way of list) {
+      say(way.name.length > 0, `book, ${where}: a way with no name.`);
+      if (way.make === "again" && way.by !== "chord") {
+        say(
+          Number.isInteger(way.by) && way.by >= 0,
+          `book, ${where}: "${way.name}" moves by ${way.by}.`,
+        );
+      }
+    }
+  };
+  say(
+    book.opening.length > 0 && book.opening.every((way) => way.make === "new"),
+    "book: a solo's first phrase has nothing to work on, so every way of opening is new.",
+  );
+  say(
+    book.peak.some((way) => way.make === "new"),
+    "book: the top note's phrase needs a way that asks for no idea.",
+  );
+  say(
+    book.outgrown.levels >= 1 && book.outgrown.ways.every((way) => way.make === "new"),
+    "book: an idea is outgrown by a level or more, and what replaces it is new.",
+  );
+  ways(book.opening, "opening");
+  ways(book.peak, "the peak");
+  ways(book.outgrown.ways, "outgrown");
+  for (const role of ROLES) ways(book.roles[role] ?? [], `"${role}"`);
+  say(
+    solo.likeness.related > 0 &&
+      solo.likeness.related < solo.likeness.same &&
+      solo.likeness.same <= 1,
+    "likeness: related is under the same, and both are between 0 and 1.",
+  );
 
   say(
     CONTOURS.some((kind) => solo.contours[kind] > 0),
@@ -107,6 +159,26 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   ] as const) {
     say(tones.length > 0, `${list}: names no tone.`);
   }
+  say(
+    solo.landing.perRank >= 0 && solo.landing.reach >= 1,
+    "landing: a rank costs nothing or more, and a note can be moved a half step at least.",
+  );
+  const line = solo.line;
+  say(
+    line.step >= 1 && line.skip >= line.step,
+    "line: a step is a half step or more, and a skip is no narrower than a step.",
+  );
+  say(
+    [
+      line.skipCosts,
+      line.leapCosts,
+      line.halfStepOffChord,
+      line.halfStepsInARow,
+      line.offChordOnBeat,
+      line.strandsTheBeat,
+    ].every((cost) => cost >= 0),
+    "line: a cost cannot be negative.",
+  );
   const degrees = [...solo.notes.key.major, ...solo.notes.key.minor];
   say(
     degrees.every((degree) => Number.isInteger(degree) && degree >= 0 && degree < 12),
@@ -125,6 +197,17 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   known(peak.density, "arc, the peak");
   known(windDown.density, "arc, the wind-down");
   say(peak.above > 0 && peak.clear >= 0, "arc: the peak is above home, and clear of the rest.");
+  say(
+    Number.isInteger(peak.fromEnd) && peak.fromEnd >= 1,
+    "arc: the peak comes a whole number of phrases before the last, and the last winds down.",
+  );
+  const peakBars = cells(peak.shape);
+  say(
+    peakBars.length === 4 &&
+      peakBars.every((letter) => "LER".includes(letter)) &&
+      peakBars.includes("E"),
+    `arc: the peak's shape "${peak.shape}" is four bars of L, E or R, with a bar for the top note (E).`,
+  );
 
   say(
     solo.tempo.slowBar > solo.tempo.fastBar && solo.tempo.fastBar > 0,
@@ -135,6 +218,8 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   say(solo.space.emptyBars >= 0, "space: empty bars cannot be negative.");
   chance(solo.space.roomier, "space, roomier");
   chance(solo.habits.riff, "habits, riff");
+  chance(solo.habits.stab, "habits, stab");
+  chance(solo.habits.tie, "habits, tie");
   chance(solo.habits.chromatic, "habits, chromatic");
   chance(solo.habits.enclosure, "habits, enclosure");
   chance(solo.habits.pickup.chance, "habits, pickup");

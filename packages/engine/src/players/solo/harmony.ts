@@ -130,8 +130,8 @@ export function climb(pool: Pool, pitch: number, rungs: number): number {
 
 /**
  * The chord tone nearest a pitch inside a window, best of a ranking: each
- * place down the ranking costs a semitone and a quarter, so a better tone wins
- * unless the next is more than a step closer (SO-21). Pitches in `not` are
+ * place down the ranking costs `perRank` semitones, so a better tone wins
+ * unless the next is more than that much closer (SO-21). Pitches in `not` are
  * passed over while anything else will do. With `only`, no tone outside the
  * ranking will do however near it is: where a tune comes to rest is a rule.
  */
@@ -139,6 +139,7 @@ export function landing(
   pool: Pool,
   ideal: number,
   ranking: readonly ToneRole[],
+  perRank: number,
   low: number,
   high: number,
   not: readonly number[] = [],
@@ -152,7 +153,7 @@ export function landing(
     for (let pitch = Math.max(from, bottom); pitch <= Math.min(to, top); pitch++) {
       const place = order.indexOf(mod12(pitch));
       if (place < 0 || avoid.includes(pitch)) continue;
-      const cost = Math.abs(pitch - ideal) + 1.25 * place;
+      const cost = Math.abs(pitch - ideal) + perRank * place;
       if (cost < least) {
         least = cost;
         best = pitch;

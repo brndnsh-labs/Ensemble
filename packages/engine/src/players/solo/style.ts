@@ -47,12 +47,24 @@ export interface ArcStage {
 }
 
 /**
- * What the phrases of a chorus are for, a letter each (spaces ignored):
- * `s` states an idea, `r` says it again, `v` says it changed, `a` answers it.
- * `s r a` is the twelve-bar blues itself. A form may open on `v` or `r` to
- * pick up the idea of the chorus before; the first chorus of a solo takes a
- * form that opens on `s`. A chorus with more phrases than the form goes round
- * it again.
+ * What a phrase is asked to be, a letter of a form:
+ * `s` states an idea, `r` says it again, `v` says it changed, `a` answers it
+ * and comes to rest; `c` is a contrast, something else set beside the idea (a
+ * bridge); `b` brings back the idea the chorus opened on. What is played for
+ * `s`, `v`, `c` and `b` is the idea from then on.
+ */
+export type Role = "s" | "r" | "v" | "a" | "c" | "b";
+export const ROLES: readonly Role[] = ["s", "r", "v", "a", "c", "b"];
+
+/**
+ * What the phrases of a chorus are for, a letter each (spaces ignored).
+ * `s r a` is the twelve-bar blues itself; `s a v a c r b a` is thirty-two
+ * bars with a bridge. A form is written for a chorus of as many phrases as it
+ * has letters, and a chorus takes one written for its own length when the
+ * style has one; failing that the longest that fits, going round again, or
+ * the shortest, cut to how it opens and how it closes. A form may open on `v`
+ * or `r` to pick up the idea of the chorus before; the first chorus of a solo
+ * takes a form that opens on `s`.
  */
 export interface Form {
   readonly weight: number;
@@ -62,6 +74,69 @@ export interface Form {
 /** The shape of a line over a phrase (SO-13). */
 export type Contour = "arch" | "fall" | "climb" | "wave";
 export const CONTOURS: readonly Contour[] = ["arch", "fall", "climb", "wave"];
+
+/** A contour, or one for when the idea it answers rose and one for when it fell. */
+export type ContourAsk = Contour | { readonly rose: Contour; readonly fell: Contour };
+
+/**
+ * Which remembered idea a phrase is made from: the one being worked on (the
+ * default), the first idea of the solo, or the one this chorus opened on.
+ */
+export type Idea = "idea" | "first" | "opening";
+
+/**
+ * One way of making a phrase: a candidate, written whole, for the critic to
+ * choose among. A style's book lists the ways it offers for each thing a form
+ * can ask. The name is for anyone reading the choice, and keys the way's own
+ * draws, so two ways in one list do not share a name unless they are the
+ * same kind (new statements are told apart by their place in the list).
+ */
+export type Way = { readonly name: string } & (
+  | {
+      /** Something new: a rhythm from the level's cells, a contour, a shape. */
+      readonly make: "new";
+      /** It keeps to one rhythm all along its line, each bar the bar before moved on. */
+      readonly oneRhythm: boolean;
+      /** In rhythms the idea being worked on does not use, where the level has others. */
+      readonly apart?: boolean;
+      /** Semitones above where the arc puts this phrase: a bridge lifts (SO-41). */
+      readonly lift?: number;
+    }
+  | {
+      /**
+       * The idea again, bar for bar: where it was (0), moved as far as the
+       * chord's root has moved ("chord", SO-33), or each note a number of
+       * steps of the scale along the way the arc is going.
+       */
+      readonly make: "again";
+      readonly of?: Idea;
+      readonly by: "chord" | number;
+    }
+  | {
+      /** The idea with a new last bar, coming to rest above (1) or below (-1) where it did. */
+      readonly make: "ending";
+      readonly of?: Idea;
+      readonly direction: 1 | -1;
+    }
+  | {
+      /**
+       * The idea grown into this place's own shape and pace. It opens on the
+       * idea's first bar (its pitches too, with `keepOpening`), then keeps
+       * that rhythm all along (`oneRhythm`) or runs on in the level's own.
+       */
+      readonly make: "grown";
+      readonly of?: Idea;
+      readonly contour: Contour;
+      readonly keepOpening: boolean;
+      readonly oneRhythm: boolean;
+    }
+  | {
+      /** The idea's rhythm with a new line under another contour: an answer (AU-36). */
+      readonly make: "turned";
+      readonly of?: Idea;
+      readonly contour: ContourAsk;
+    }
+);
 
 /** One way of leading into a phrase from the last beat of the bar before: a beat of rhythm (SO-36). */
 export interface Pickup {
@@ -99,6 +174,45 @@ export interface SoloStyle {
   readonly settle: readonly ToneRole[];
   /** Where a statement is left hanging, best first: a question, not yet answered (KF-B-13). */
   readonly hang: readonly ToneRole[];
+  /** How a landing is chosen among the chord's tones (SO-21). */
+  readonly landing: {
+    /**
+     * Semitones each place down a ranking costs: a better tone wins unless
+     * the next is more than this much closer to where the line is.
+     */
+    readonly perRank: number;
+    /** How far, in semitones, a remembered note may be moved to land on a chord tone. */
+    readonly reach: number;
+  };
+  /**
+   * How the line gets from one landing to the next: what each kind of move
+   * costs the walk, against a step with the line, which costs nothing
+   * (SO-24, SO-25).
+   */
+  readonly line: {
+    /**
+     * The widest move, in semitones, that is a step of the scale the style
+     * plays: a minor third in a blues scale or a pentatonic, a whole step
+     * where the line runs the chord's own scale.
+     */
+    readonly step: number;
+    /** Past a step, a move up to this wide is a skip; wider is a leap. */
+    readonly skip: number;
+    readonly skipCosts: number;
+    readonly leapCosts: number;
+    /** A half step onto a note that is not a chord tone: a crawl, where the half step is not the idiom. */
+    readonly halfStepOffChord: number;
+    /** A second half step in a row. */
+    readonly halfStepsInARow: number;
+    /** A note on a beat that is not a chord tone, in semitones of pull (SO-25). */
+    readonly offChordOnBeat: number;
+    /**
+     * An off-beat note from which the next note, on the beat, cannot be a
+     * chord tone a step further on: what the bebop scale's passing tone is
+     * there to fix (AU-35). Nothing for a style that does not run the changes.
+     */
+    readonly strandsTheBeat: number;
+  };
 
   /** Sparsest first. The arc names the level; the band's energy and the tempo each move it a step. */
   readonly levels: readonly Density[];
@@ -107,24 +221,65 @@ export interface SoloStyle {
   readonly forms: readonly Form[];
   /** How often a line takes each shape (SO-13). */
   readonly contours: Readonly<Record<Contour, number>>;
+  /**
+   * The ways of making a phrase that are offered for each thing a form asks,
+   * in order of preference (the critic takes the first of equals).
+   */
+  readonly book: {
+    /** The first phrase of a solo, which has nothing yet to work on. */
+    readonly opening: readonly Way[];
+    /** For each letter the style's forms use. */
+    readonly roles: Readonly<Partial<Record<Role, readonly Way[]>>>;
+    /** The phrase that climbs to the solo's top note, whatever the form asked there. */
+    readonly peak: readonly Way[];
+    /**
+     * When the idea was stated this many levels sparser than the arc now
+     * asks, these are offered too, wherever the list has nothing new: a new
+     * idea at this pace is better than the old one starved.
+     */
+    readonly outgrown: {
+      readonly levels: number;
+      /**
+       * Or when the idea as it was last played has fewer than this share of
+       * the notes a bar the arc now asks for, wherever it was stated: an idea
+       * carried from phrase to phrase keeps the pace it was born at.
+       */
+      readonly thin?: number;
+      readonly ways: readonly Way[];
+    };
+  };
+  /**
+   * How alike two phrases must be (0 to 1) to be heard as related, and as
+   * the same phrase again. `related` sits just above what two unrelated
+   * phrases of the style score, which depends on how much its rhythms share.
+   */
+  readonly likeness: { readonly related: number; readonly same: number };
 
   /** The solo from its first phrase to its last, in equal stretches (SO-05). */
   readonly arc: {
     readonly stages: readonly ArcStage[];
     /**
-     * The one top note of the solo: the phrase before the last climbs to it and
-     * holds it. `above` is how far over home it is at most; nothing else comes
-     * within `clear` semitones of it (SO-07).
+     * The one top note of the solo: a phrase of the last chorus goes up to it
+     * and ends on it. `above` is how far over home it is at most; nothing else
+     * comes within `clear` semitones of it (SO-07).
      */
     readonly peak: {
       readonly above: number;
       readonly clear: number;
       readonly density: string;
-      /** The bar the climb ends on: the top note, held. */
+      /** How many phrases before the solo's last it comes: 1 is the phrase before the last (SO-05). */
+      readonly fromEnd: number;
+      /** Its bars, as a shape (SO-09). */
+      readonly shape: string;
+      /** The way its line goes up to the top note. */
+      readonly contour: Contour;
+      /** Its line bars are one bar in sequence, each the bar before moved on (SO-05). */
+      readonly sequence: boolean;
+      /** The bar it ends on: the top note, held. */
       readonly ending: Cell;
     };
     /** The last phrase, which comes back down so the band can have the tune (SO-05). */
-    readonly windDown: ArcStage;
+    readonly windDown: ArcStage & { readonly contour: Contour };
   };
 
   /** Tempo is felt in seconds, not bars (KF-B-12, Q-47). */
@@ -147,8 +302,25 @@ export interface SoloStyle {
   };
 
   readonly habits: {
-    /** A line bar plays the bar before it again, moved along the line: a riff, a sequence (SO-18). */
+    /** A line bar plays the bar before it again: a riff, a sequence (SO-18). */
     readonly riff: number;
+    /**
+     * How a riff bar says the bar before it: as a `sequence`, moved along the
+     * line with its landings found afresh; or `the same`, note for note,
+     * moved only where the chord moved (SO-33).
+     */
+    readonly riffIs: "sequence" | "the same";
+    /**
+     * A rhythm figure is stabbed: each bar that plays it says its first note
+     * two to four times before the line moves on. Decided once for a figure
+     * in a phrase, never note by note (SO-35).
+     */
+    readonly stab: number;
+    /**
+     * Inside a phrase, a line bar's last eighth that runs into a struck
+     * downbeat is tied over the barline: one note, the next chord's (SO-38).
+     */
+    readonly tie: number;
     /** A short note before a landing is the half step under it (SO-26, SO-27). */
     readonly chromatic: number;
     /** Two short notes before a landing circle it: the step above, the half step below (SO-26). */
@@ -159,6 +331,11 @@ export interface SoloStyle {
       readonly figures: readonly Pickup[];
       /** The chance the pickup comes from below. */
       readonly rising: number;
+      /**
+       * The pickup's last note is the line's own approach to its first: the
+       * half step under it, as often as the style's `chromatic` says (SO-36).
+       */
+      readonly approach: boolean;
     };
   };
 

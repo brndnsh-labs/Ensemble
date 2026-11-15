@@ -9,6 +9,7 @@ import { choose } from "../../critic/choose.ts";
 import type { Feature } from "../../critic/types.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { mod12 } from "../../theory/pitch.ts";
+import { isChordTone, ranked } from "./harmony.ts";
 import type { Slot, World } from "./slots.ts";
 
 /** A note of the solo as it sounds: where it is struck on the grid and when it stops. */
@@ -91,11 +92,6 @@ export function likeness(a: Heard, b: Heard): number {
   return best;
 }
 
-/** A phrase is "related" to another from here up: above what two unrelated blues phrases score. */
-export const RELATED = 0.5;
-/** And from here up it is the same phrase again. */
-export const SAME = 0.9;
-
 /** The likeness of a phrase to the earlier phrase of its solo most like it. Null for the first. */
 export function closest(heard: Heard, earlier: readonly Heard[]): number | null {
   return earlier.length === 0 ? null : Math.max(...earlier.map((other) => likeness(heard, other)));
@@ -151,10 +147,12 @@ export const SOLO_FEATURES: readonly Feature<SoloCandidate>[] = [
   },
   {
     id: "off-the-density",
-    says: "How far the phrase is from as busy as the arc, the band and the tempo ask, as a share of what they ask.",
+    says: "How far the phrase is from as busy as the arc, the band and the tempo ask, as a share of what they ask. A level's notes a bar are for a bar of four; a shorter bar is asked for fewer.",
     of: (candidate) => {
-      const want = candidate.slot.level.notesPerBar;
-      return Math.abs(body(candidate).length / candidate.slot.bars.length - want) / want;
+      const bars = candidate.slot.bars;
+      const fours = bars.reduce((sum, bar) => sum + bar.ticks, 0) / (4 * PPQ);
+      const want = candidate.slot.level.notesPerBar * (fours / bars.length);
+      return Math.abs(body(candidate).length / bars.length - want) / want;
     },
   },
   {
@@ -247,6 +245,76 @@ export const SOLO_FEATURES: readonly Feature<SoloCandidate>[] = [
       if (bars.length < 2) return 0;
       const alone = bars.filter((bar, i) => !bars.some((other, j) => j !== i && other === bar));
       return alone.length / bars.length;
+    },
+  },
+  {
+    id: "rocks",
+    says: "The share of moves that rock back and forth between two notes (a-b-a-b). For a style that stabs a note on purpose, where a repeated note is not being stuck.",
+    of: (candidate) => {
+      const pitches = body(candidate).map((note) => note.pitch);
+      if (pitches.length < 4) return 0;
+      let rocking = 0;
+      for (let i = 3; i < pitches.length; i++) {
+        const [a, b, c, d] = [pitches[i - 3]!, pitches[i - 2]!, pitches[i - 1]!, pitches[i]!];
+        if (a === c && b === d && a !== b) rocking++;
+      }
+      return rocking / (pitches.length - 1);
+    },
+  },
+  {
+    id: "note-for-note",
+    says: "The share of the phrase's notes that one of the three phrases before it played at the same place in its bars on the same pitch: said again that soon, an idea wants changing. For a style that develops a line; a riff style means to say it again.",
+    of: (candidate) => {
+      const notes = idea(candidate);
+      if (notes.length === 0) return 0;
+      const first = notes[0]!.bar.index;
+      let most = 0;
+      for (const other of candidate.earlier.slice(-3)) {
+        const theirs = idea(other);
+        const from = theirs[0]?.bar.index ?? 0;
+        const placed = new Set(
+          theirs.map(
+            (note) => `${note.bar.index - from}:${note.tick - note.bar.start}:${note.pitch}`,
+          ),
+        );
+        const shared = notes.filter((note) =>
+          placed.has(`${note.bar.index - first}:${note.tick - note.bar.start}:${note.pitch}`),
+        ).length;
+        most = Math.max(most, shared);
+      }
+      return most / notes.length;
+    },
+  },
+  {
+    id: "beats-off-the-chord",
+    says: "The share of the phrase's notes on a beat that are not tones of the chord under them: a line that does not spell the changes.",
+    of: ({ notes, world }) => {
+      const on = notes.filter(beat);
+      if (on.length === 0) return 0;
+      const off = on.filter((note) => {
+        const pool = world.poolOf(world.arrivalAt(note.tick));
+        return pool !== null && !isChordTone(pool, note.pitch);
+      });
+      return off.length / on.length;
+    },
+  },
+  {
+    id: "changes-down-the-list",
+    says: "How far down the style's own list of where a change lands the phrase's notes on chord changes fall: 0 on the tone it most wants there, 1 on the one it wants last.",
+    of: ({ notes, world }) => {
+      let cases = 0;
+      let down = 0;
+      for (const note of notes) {
+        const arrival = world.arrivalAt(note.tick);
+        const pool = world.poolOf(arrival);
+        if (!pool || arrival?.tick !== note.tick || !arrival.changed) continue;
+        const order = ranked(pool, world.solo.arrive);
+        const place = order.indexOf(mod12(note.pitch));
+        if (place < 0 || order.length < 2) continue;
+        cases++;
+        down += place / (order.length - 1);
+      }
+      return cases === 0 ? 0 : down / cases;
     },
   },
 ];

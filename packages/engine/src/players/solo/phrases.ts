@@ -1,15 +1,16 @@
 // The phrases a soloist might play in a slot. What the slot is for comes from
-// the chorus's form: state an idea, say it again, say it changed, answer it.
-// Each of those can be done several ways, and each way is one candidate,
-// written whole. Fresh material is rare on purpose: a statement is new, and
-// everything else in its chorus is made out of it.
+// the chorus's form: state an idea, say it again, say it changed, answer it,
+// set something else beside it, bring it back. Each of those can be done
+// several ways, and each way is one candidate, written whole. Which ways are
+// offered for which is the style's book; how each is made is here.
 //
 // What is remembered from one phrase to the next is what a soloist carries:
 // the idea being worked on (its rhythm, bar by bar, and its pitches), the
-// first idea of the solo, the note the last phrase came to rest on, and
-// whether it ended with a bar of air.
+// first idea of the solo, the idea this chorus opened on, the note the last
+// phrase came to rest on, and whether it ended with a bar of air.
 
 import { PPQ } from "../../chart/types.ts";
+import { swing } from "../../perform/feel.ts";
 import { cells, STEP } from "../../perform/grid.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
@@ -18,7 +19,7 @@ import { climb, EIGHTH, isChordTone, landing, onlyPasses } from "./harmony.ts";
 import type { LineBar, Spot } from "./line.ts";
 import { contourOf, spotsOf, writeLine } from "./line.ts";
 import type { Slot, World } from "./slots.ts";
-import type { Cell, Contour } from "./style.ts";
+import type { Cell, Contour, Idea, Role, Way } from "./style.ts";
 import { CONTOURS } from "./style.ts";
 
 /** What a bar of a phrase is: a line bar, an end bar, a rest, or the final note of the take. */
@@ -27,9 +28,16 @@ export type Part = "L" | "E" | "R" | "F";
 export interface PhraseBar {
   readonly part: Part;
   readonly cell: Cell;
-  /** Plays the bar before it again, moved along the line. */
+  /** Plays the bar before it again: moved along the line, or note for note. */
   readonly again: boolean;
-  /** A pitch for each attack of the cell, in order. */
+  /** Says its first note several times before the line moves on (SO-35). */
+  readonly stab: boolean;
+  /**
+   * Its downbeat is not struck: the last eighth of the bar before is held over
+   * the barline into it (SO-38).
+   */
+  readonly tied: boolean;
+  /** A pitch for each attack of the cell, in order: for a tied bar, the first is the note held into it. */
   readonly pitches: readonly number[];
 }
 
@@ -43,6 +51,8 @@ export interface Phrase {
   readonly line: readonly Placed[];
   /** Notes that lead into it from the last beat of the bar before (SO-36). */
   readonly pickup: readonly Placed[];
+  /** New material: made from nothing remembered. */
+  readonly fresh: boolean;
 }
 
 export interface Placed {
@@ -52,14 +62,13 @@ export interface Placed {
   readonly lead?: boolean;
 }
 
-/** What a phrase is asked to be. */
-export type Role = "s" | "r" | "v" | "a";
-
 export interface Memory {
   /** The idea being worked on: the last statement played. */
   readonly motif: Phrase | null;
   /** The first idea of the solo. */
   readonly theme: Phrase | null;
+  /** The phrase this chorus opened on. */
+  readonly opening: Phrase | null;
   /** The last pitch played, where the phrase before came to rest. */
   readonly rest: number | null;
   /** The highest note of the solo so far. */
@@ -71,7 +80,8 @@ export interface Memory {
 }
 
 type BarPlan = Omit<PhraseBar, "pitches">;
-const REST: BarPlan = { part: "R", cell: "", again: false };
+const PLAIN = { again: false, stab: false, tied: false };
+const REST: BarPlan = { part: "R", cell: "", ...PLAIN };
 const playing = (bar: { part: Part }) => bar.part !== "R";
 
 /** A four-bar shape on a phrase of another length: line bars added at the front, or bars cut from it (SO-09). */
@@ -85,11 +95,19 @@ function fitShape(shape: string, length: number): Part[] {
   return letters;
 }
 
+/** A bar's spots, and whether the bar before was in fact tied into it. */
+interface LaidBar extends LineBar {
+  readonly tied: boolean;
+}
+
 /** The spots of a phrase's bars in a slot, bar by bar. */
-function lineBars(world: World, slot: Slot, bars: readonly BarPlan[]): LineBar[] {
-  return slot.bars.map((bar, i) => {
+function lineBars(world: World, slot: Slot, bars: readonly BarPlan[]): LaidBar[] {
+  const breath = Math.ceil(
+    Math.max(world.solo.space.breath, world.instrument.breath?.takes ?? 0) * world.ticksPerSecond,
+  );
+  const laid = slot.bars.map((bar, i): LaidBar => {
     const plan = bars[i] ?? REST;
-    if (plan.part === "R") return { spots: [], again: false };
+    if (plan.part === "R") return { spots: [], ...PLAIN };
     if (plan.part === "F") {
       // The last bar of a take that ends: one note where the final chord lands (SO-19, SO-59).
       const tick = bar.start + (bar.ending?.at ?? 0);
@@ -97,16 +115,46 @@ function lineBars(world: World, slot: Slot, bars: readonly BarPlan[]): LineBar[]
       const pool = world.poolOf(world.arrivalAt(tick));
       return {
         spots: pool ? [{ bar, tick, hold, onset: 0, pool, lands: true }] : [],
-        again: false,
+        ...PLAIN,
       };
     }
-    return { spots: spotsOf(world, bar, plan.cell), again: plan.again };
+    const spots = spotsOf(world, bar, plan.cell);
+    // An end bar lands with room for an eighth and the breath after it. Where the bar is
+    // shorter than the rhythm was written for (three in a bar), or the tempo makes the
+    // breath most of a bar, its later notes are not struck: the one before is the landing.
+    // The room is judged as heard: swing carries the end of an eighth on the beat later.
+    if (plan.part === "E") {
+      const bend = (at: number) => (bar.meter.unit === 4 ? swing(at, world.feel) : at);
+      const room = (spot: Spot) => bend(bar.ticks) - bend(spot.tick - bar.start + EIGHTH);
+      while (spots.length > 1 && room(spots.at(-1)!) < breath) spots.pop();
+    }
+    return { spots, again: plan.again, stab: plan.stab, tied: false };
   });
+  // A tie over the barline: the last eighth of one bar and the downbeat of the next are
+  // one note, struck early and belonging to the downbeat's chord (SO-38, X-B-07). It
+  // needs both notes to be there; an idea come back in another place may have lost one.
+  bars.forEach((plan, b) => {
+    const [before, here, bar] = [laid[b - 1], laid[b], slot.bars[b - 1]];
+    if (!plan.tied || !before || !here || !bar) return;
+    const [from, into] = [before.spots.at(-1), here.spots[0]];
+    if (!from || from.tick !== bar.start + bar.ticks - EIGHTH || from.hold < EIGHTH) return;
+    if (into?.onset !== 0 || into.tick !== bar.start + bar.ticks) return;
+    const hold = from.hold + into.hold;
+    const pool = world.poolFor(from.tick, hold).pool ?? from.pool;
+    laid[b - 1] = {
+      ...before,
+      spots: [...before.spots.slice(0, -1), { ...from, hold, pool, lands: true }],
+    };
+    laid[b] = { ...here, spots: here.spots.slice(1), tied: true };
+  });
+  return laid;
 }
 
 interface Ask {
   readonly contour: (through: number) => number;
   readonly ending: readonly ToneRole[];
+  /** Semitones the phrase's room is raised with its contour. */
+  readonly lift?: number;
   /** A remembered pitch for a spot of a bar, where the phrase keeps one. */
   readonly given?: (bar: number, spot: Spot) => number | undefined;
 }
@@ -131,10 +179,15 @@ export function phrasesFor(
     : length;
   const lungs = Math.max(1, Math.min(patient, air));
 
-  const compose = (kind: string, plans: readonly BarPlan[], ask: Ask): Phrase => {
+  const compose = (kind: string, plans: readonly BarPlan[], ask: Ask, fresh = false): Phrase => {
     const bars = slot.bars.map((_, i) => plans[i] ?? REST);
-    if (final) bars[length - 1] = { part: "F", cell: "", again: false };
+    if (final) bars[length - 1] = { part: "F", cell: "", ...PLAIN };
     const lines = lineBars(world, slot, bars);
+    // A lifted phrase takes its room with it, and still leaves the top note alone.
+    const lift = ask.lift ?? 0;
+    const high =
+      lift === 0 ? slot.high : Math.min(slot.top - solo.arc.peak.clear, slot.high + lift);
+    const low = lift === 0 ? slot.low : Math.min(slot.low + lift, high - 12);
     const given = new Map<number, number>();
     let at = 0;
     lines.forEach((line, b) => {
@@ -145,8 +198,8 @@ export function phrasesFor(
       }
     });
     const pitches = writeLine(world, lines, {
-      low: slot.low,
-      high: slot.high,
+      low,
+      high,
       contour: ask.contour,
       // The last note of the take rests, whatever the phrase was for.
       ending: final ? solo.settle : ask.ending,
@@ -157,23 +210,34 @@ export function phrasesFor(
       // tune's: a tune comes to rest, it does not stop on the top.
       climbsTo: slot.peak && !final ? { to: slot.top, above: memory.highest } : null,
       given,
+      // The way up to the top note moves, whatever the style's riffs do.
+      riffs: slot.peak ? "sequence" : solo.habits.riffIs,
       rng: rng.fork("habits"),
     });
     at = 0;
+    const struck = lines.map((bar) => bar.spots.map(() => pitches[at++]!));
     const written = bars.map((bar, b) => ({
       ...bar,
-      pitches: lines[b]!.spots.map(() => pitches[at++]!),
+      tied: lines[b]!.tied,
+      // A bar tied into keeps the note held into it as its first: the idea come back
+      // without the tie strikes that note on the downbeat.
+      pitches: lines[b]!.tied ? [struck[b - 1]!.at(-1)!, ...struck[b]!] : struck[b]!,
     }));
     const line = lines.flatMap((bar) => bar.spots).map((spot, i) => ({ spot, pitch: pitches[i]! }));
-    return { kind, slot, bars: written, line, pickup: [] };
+    return { kind, slot, bars: written, line, pickup: [], fresh };
   };
 
+  // An answer comes to rest, and so does the last phrase of a solo; anything else is
+  // left open for what follows.
   const ending = role === "a" || slot.last ? solo.settle : solo.hang;
   const span = slot.level.span;
-  const shaped = (kind: Contour) =>
-    slot.peak
-      ? contourOf("climb", slot.top - 3 - span / 2, span)
-      : contourOf(slot.last ? "fall" : kind, slot.centre, span);
+  const { peak, windDown } = solo.arc;
+  // The way up to the top note; but a solo of one phrase that is also where the tune ends
+  // comes to rest instead, as a last phrase does.
+  const shaped = (kind: Contour, lift = 0) =>
+    slot.peak && !final
+      ? contourOf(peak.contour, slot.top - peak.clear - span / 2, span)
+      : contourOf(slot.last || slot.peak ? windDown.contour : kind, slot.centre + lift, span);
   const endCell = (draw: Rng, not?: Cell) => {
     const others = solo.endings.filter((cell) => cell !== not);
     return draw.pick(others.length > 0 ? others : solo.endings);
@@ -184,7 +248,7 @@ export function phrasesFor(
     const at = solo.levels.indexOf(slot.level);
     const roomier = !slot.peak && at > 0 && draw.fork("room").chance(solo.space.roomier);
     const shapes = slot.peak
-      ? [{ weight: 1, bars: "L L L E" }]
+      ? [{ weight: 1, bars: peak.shape }]
       : solo.levels[roomier ? at - 1 : at]!.shapes;
     const allowed = (letters: readonly Part[]) => {
       const empty = letters.filter((letter) => letter === "R").length;
@@ -218,7 +282,8 @@ export function phrasesFor(
   /**
    * A shape's bars with their rhythms: one cell for the line, coming back as a riff or
    * giving way to a second. An `opening` is an older idea's first bar: the phrase starts
-   * with it and then runs on in this slot's own rhythms.
+   * with it and then runs on in this slot's own rhythms. Cells in `apart` are passed
+   * over while the level has others: something else is in another rhythm.
    */
   const withCells = (
     letters: readonly Part[],
@@ -226,39 +291,73 @@ export function phrasesFor(
     opening?: Cell,
     end?: Cell,
     oneRhythm = false,
+    apart: readonly Cell[] = [],
   ): BarPlan[] => {
-    const a = draw.fork("cell").pick(slot.level.cells);
-    const others = slot.level.cells.filter((cell) => cell !== a);
+    const unused = slot.level.cells.filter((cell) => !apart.includes(cell));
+    const own = unused.length > 0 ? unused : slot.level.cells;
+    const a = draw.fork("cell").pick(own);
+    const others = own.filter((cell) => cell !== a);
     const b = others.length > 0 ? draw.fork("other").pick(others) : a;
-    const last = slot.peak ? solo.arc.peak.ending : (end ?? endCell(draw.fork("end")));
+    const last = slot.peak ? peak.ending : (end ?? endCell(draw.fork("end")));
+    const { stab, tie } = solo.habits;
     let before: Cell | null = null;
     let lines = 0;
-    return letters.map((part, i): BarPlan => {
+    const plans = letters.map((part, i): BarPlan => {
       if (part !== "L") {
         before = null;
-        return { part, cell: part === "E" ? last : "", again: false };
+        return { part, cell: part === "E" ? last : "", ...PLAIN };
       }
       const first = lines++ === 0;
-      // The climb to the top note is one bar in a rising sequence (SO-05).
+      // The way up to the top note may be one bar in a rising sequence (SO-05).
       const riff =
         before !== null &&
-        (slot.peak || oneRhythm || draw.fork("riff", i).chance(solo.habits.riff));
+        ((slot.peak && peak.sequence) ||
+          oneRhythm ||
+          draw.fork("riff", i).chance(solo.habits.riff));
       const cell: Cell =
         first && opening ? opening : before === null ? a : riff ? before : before === a ? b : a;
-      const plan = { part, cell, again: riff };
+      // Stabbed or not is decided once for a figure, so every bar that plays it agrees.
+      const plan = {
+        part,
+        cell,
+        again: riff,
+        stab: stab > 0 && draw.fork("stab", cell).chance(stab),
+        tied: false,
+      };
       before = cell;
       return plan;
+    });
+    // A line bar whose last eighth runs straight into a struck downbeat may be tied over
+    // the barline: never into a riff bar, which says its own downbeat (SO-38).
+    return plans.map((plan, i) => {
+      const from = plans[i - 1];
+      const steps = Math.round((slot.bars[i - 1]?.ticks ?? 0) / STEP);
+      const run = cells(from?.cell ?? "");
+      const ties =
+        tie > 0 &&
+        from?.part === "L" &&
+        (plan.part === "L" || plan.part === "E") &&
+        !plan.again &&
+        cells(plan.cell)[0] === "x" &&
+        run[steps - 2] === "x" &&
+        run[steps - 1] === "-" &&
+        draw.fork("tie", i).chance(tie);
+      return ties ? { ...plan, tied: true } : plan;
     });
   };
 
   // ── the ways of making a phrase ──────────────────────────────────────────
-  const statement = (n: number): Phrase => {
+  const motif = memory.motif;
+  /** Something new. Each new statement in a list has its own draws, by its number there. */
+  const statement = (way: Extract<Way, { make: "new" }>, n: number): Phrase => {
     const draw = rng.fork("statement", n);
     const contour = draw.fork("contour").weighted(CONTOURS, (kind) => solo.contours[kind]);
-    // Every other one keeps to one rhythm all along the line; the rest riff as often as the
-    // style's habit says, and the critic hears the difference.
-    const plans = withCells(drawShape(draw), draw, undefined, undefined, n % 2 === 1);
-    return compose("statement", plans, { contour: shaped(contour), ending });
+    const apart = way.apart && motif ? motif.bars.map((bar) => bar.cell) : [];
+    // One that keeps to one rhythm all along its line is a riff or a sequence; the others
+    // riff as often as the style's habit says, and the critic hears the difference.
+    const plans = withCells(drawShape(draw), draw, undefined, undefined, way.oneRhythm, apart);
+    const lift = way.lift ?? 0;
+    return compose(way.name, plans, { contour: shaped(contour, lift), ending, lift }, true);
   };
 
   /**
@@ -305,7 +404,7 @@ export function phrasesFor(
   };
 
   /** The idea with a new last bar, coming to rest above or below where it did. */
-  const tail = (idea: Phrase, direction: 1 | -1): Phrase | null => {
+  const tail = (kind: string, idea: Phrase, direction: 1 | -1): Phrase | null => {
     const from = layout(idea);
     const bars = barsOf(idea, from);
     const at = bars.findLastIndex(playing);
@@ -313,8 +412,8 @@ export function phrasesFor(
     const anchor = kept.at(-1) ?? idea.bars[from[at] ?? -1]?.pitches[0];
     if (at < 0 || anchor === undefined) return null;
     const draw = rng.fork("tail", direction);
-    bars[at] = { part: "E", cell: endCell(draw, bars[at]!.cell), again: false };
-    return compose(direction > 0 ? "new ending, up" : "new ending, down", bars, {
+    bars[at] = { part: "E", cell: endCell(draw, bars[at]!.cell), ...PLAIN };
+    return compose(kind, bars, {
       contour: () => anchor + (direction * span) / 2,
       ending,
       given: remembered(idea, from, (pitch) => pitch, at),
@@ -360,72 +459,90 @@ export function phrasesFor(
     });
   };
 
-  const motif = memory.motif;
-  const made: (Phrase | null)[] = [];
-  if (slot.peak) {
-    // The climb to the top note: the idea in a rising sequence if there is one (SO-05).
-    if (motif) made.push(grown("the idea, climbing", motif, "climb", false));
-    made.push(statement(0), statement(1));
-  } else if (role === "s" || !motif) {
-    made.push(statement(0), statement(1), statement(2));
-    made.push(
-      memory.theme && !slot.first
-        ? grown("the first idea back", memory.theme, "arch", true)
-        : statement(3),
-    );
-  } else if (role === "r") {
-    made.push(again("again", motif, (pitch) => pitch));
-    // With the chord: the whole idea moved as far as the root moved, the short way (SO-33).
-    const rootAt = (s: Slot) => {
-      const chord = world.arrivalAt(s.bars[0]!.start)?.chord;
-      return chord ? pitchClass(chord.root) : null;
-    };
-    const [was, now] = [rootAt(motif.slot), rootAt(slot)];
-    if (was !== null && now !== null && was !== now) {
-      let by = ((now - was + 17) % 12) - 5;
-      const middle = (slot.low + slot.high) / 2;
-      const notes = motif.bars.flatMap((bar) => bar.pitches);
-      const mean = notes.reduce((sum, pitch) => sum + pitch, 0) / Math.max(1, notes.length);
-      if (Math.abs(mean + by - middle) > Math.abs(mean + by - 12 - middle)) by -= 12;
-      made.push(again("again, moved with the chord", motif, (pitch) => pitch + by));
-    }
-    made.push(tail(motif, 1));
-    made.push(grown("the idea, as a riff", motif, "arch", true, true));
-  } else if (role === "v") {
-    const up = slot.centre >= motif.slot.centre ? 1 : -1;
-    made.push(tail(motif, 1), tail(motif, -1));
-    made.push(again("a step along", motif, (pitch, spot) => climb(spot.pool, pitch, up)));
-    made.push(again("two steps along", motif, (pitch, spot) => climb(spot.pool, pitch, 2 * up)));
-    made.push(grown("the idea, as a riff", motif, "arch", true, true));
-    made.push(grown("the idea, opened out", motif, "arch", true));
-  } else {
-    // An answer keeps the question's rhythm and turns its line the other way (AU-36).
-    const notes = motif.bars.flatMap((bar) => bar.pitches);
-    const rose = (notes.at(-1) ?? 0) >= (notes[0] ?? 0);
-    const turn = (kind: Contour) =>
-      compose(`answer, ${kind}`, barsOf(motif, layout(motif)), { contour: shaped(kind), ending });
-    made.push(turn(rose ? "fall" : "climb"), turn("arch"), turn(rose ? "wave" : "fall"));
-    made.push(grown("answer, as a riff", motif, "fall", false, true));
-    made.push(grown("answer, opened out", motif, "fall", false));
-  }
+  const ideaOf = (which: Idea | undefined): Phrase | null =>
+    which === "first" ? memory.theme : which === "opening" ? memory.opening : motif;
 
+  /** One way from the style's book, as a phrase. Null where it cannot be made here. */
+  const made = (way: Way, n: number): Phrase | null => {
+    if (way.make === "new") return statement(way, n);
+    const idea = ideaOf(way.of);
+    if (!idea) return null;
+    switch (way.make) {
+      case "again": {
+        if (way.by === 0) return again(way.name, idea, (pitch) => pitch);
+        if (way.by !== "chord") {
+          // Along the way the arc is going: up while the solo is climbing.
+          const rungs = way.by * (slot.centre >= idea.slot.centre ? 1 : -1);
+          return again(way.name, idea, (pitch, spot) => climb(spot.pool, pitch, rungs));
+        }
+        // With the chord: the whole idea moved as far as the root moved, the short way (SO-33).
+        const rootAt = (s: Slot) => {
+          const chord = world.arrivalAt(s.bars[0]!.start)?.chord;
+          return chord ? pitchClass(chord.root) : null;
+        };
+        const [was, now] = [rootAt(idea.slot), rootAt(slot)];
+        if (was === null || now === null || was === now) return null;
+        let by = ((now - was + 17) % 12) - 5;
+        const middle = (slot.low + slot.high) / 2;
+        const notes = idea.bars.flatMap((bar) => bar.pitches);
+        const mean = notes.reduce((sum, pitch) => sum + pitch, 0) / Math.max(1, notes.length);
+        if (Math.abs(mean + by - middle) > Math.abs(mean + by - 12 - middle)) by -= 12;
+        return again(way.name, idea, (pitch) => pitch + by);
+      }
+      case "ending":
+        return tail(way.name, idea, way.direction);
+      case "grown":
+        return grown(way.name, idea, way.contour, way.keepOpening, way.oneRhythm);
+      case "turned": {
+        // The idea's rhythm, with its line turned by where the idea went (AU-36).
+        const notes = idea.bars.flatMap((bar) => bar.pitches);
+        const rose = (notes.at(-1) ?? 0) >= (notes[0] ?? 0);
+        const kind =
+          typeof way.contour === "string" ? way.contour : way.contour[rose ? "rose" : "fell"];
+        const plans = barsOf(idea, layout(idea));
+        return compose(`${way.name}, ${kind}`, plans, { contour: shaped(kind), ending });
+      }
+    }
+  };
+  const offer = (ways: readonly Way[]): (Phrase | null)[] => {
+    let fresh = 0;
+    return ways.map((way) => made(way, way.make === "new" ? fresh++ : 0));
+  };
+
+  // The top note's phrase has its own ways, whatever the form asked for; a solo's first
+  // phrase has nothing to work on yet; anything else is what the form's letter offers.
+  // With no idea in hand (a solo that opened on its top note), the next phrase states one.
+  const { book } = solo;
+  const ways = slot.peak
+    ? book.peak
+    : memory.theme === null
+      ? book.opening
+      : (book.roles[motif ? role : "s"] ?? []);
+  const all = offer(ways);
   // And something new, whatever the form asked for, when the idea is too thin for where
-  // the arc has got to (two levels busier than it was stated at): a new one at this
-  // slot's own pace is better than the old one starved.
+  // the arc has got to: a new one at this slot's own pace is better than the old one starved.
   const outgrown =
-    motif !== null && solo.levels.indexOf(slot.level) - solo.levels.indexOf(motif.slot.level) >= 2;
-  if (!slot.peak && role !== "s" && outgrown) made.push(statement(0), statement(1));
+    motif !== null &&
+    solo.levels.indexOf(slot.level) - solo.levels.indexOf(motif.slot.level) >= book.outgrown.levels;
+  if (!slot.peak && outgrown && !ways.some((way) => way.make === "new")) {
+    all.push(...offer(book.outgrown.ways));
+  }
 
   // The same phrase reached two ways is one candidate.
   const seen = new Set<string>();
-  const phrases = made.filter((phrase): phrase is Phrase => {
+  const phrases = all.filter((phrase): phrase is Phrase => {
     if (!phrase?.bars.some((bar) => bar.pitches.length > 0)) return false;
-    const key = phrase.bars.map((bar) => `${bar.cell}:${bar.pitches.join(",")}`).join("|");
+    const key = phrase.bars
+      .map((bar) => `${bar.tied ? "~" : ""}${bar.cell}:${bar.pitches.join(",")}`)
+      .join("|");
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  const fallback = phrases.length > 0 ? phrases : [statement(9)];
+  const fallback =
+    phrases.length > 0
+      ? phrases
+      : [statement({ name: "statement", make: "new", oneRhythm: true }, 9)];
   return fallback.map((phrase) => withPickup(world, phrase, memory, rng));
 }
 
@@ -442,6 +559,7 @@ const wrong = (spot: Spot, pitch: number): boolean =>
 
 function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phrase {
   const { solo, plan } = world;
+  const { perRank, reach } = solo.landing;
   const habit = solo.habits.pickup;
   if (habit.figures.length === 0) return phrase;
   // An eighth of silence after the phrase before (SO-37), and never less than the breath
@@ -470,14 +588,28 @@ function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phr
     if (at === 0 && spots[0]!.tick - memory.restEnds < Math.max(EIGHTH, breath)) return;
     // Walked in by the ladder from one side, the last note a rung away (SO-36).
     const side = draw.fork("side").chance(habit.rising) ? -1 : 1;
+    // Its last note may be the line's own approach: the half step under the first note,
+    // short and off the beat (SO-36).
+    const leans = habit.approach && draw.fork("approach").chance(solo.habits.chromatic);
     const walk = (direction: number): Placed[] =>
       spots.map((spot, i) => {
         const pitch = climb(spot.pool, first, direction * (spots.length - i));
         const further = climb(spot.pool, first, direction * (spots.length - i + 1));
         const beat = (spot.tick - spot.bar.start) % PPQ === 0;
+        if (leans && i === spots.length - 1 && !beat && spot.hold <= EIGHTH && !spot.lands) {
+          return { spot, pitch: first - 1, lead: true };
+        }
         // On a change it is a chord tone like any other note; on a beat it would rather be.
         if (spot.lands && !isChordTone(spot.pool, pitch)) {
-          const tone = landing(spot.pool, pitch, solo.arrive, pitch - 4, pitch + 4, [first]);
+          const tone = landing(
+            spot.pool,
+            pitch,
+            solo.arrive,
+            perRank,
+            pitch - reach,
+            pitch + reach,
+            [first],
+          );
           return { spot, pitch: tone, lead: true };
         }
         const better =

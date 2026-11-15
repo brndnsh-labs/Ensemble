@@ -29,10 +29,14 @@ export interface Spot {
   readonly lands: boolean;
 }
 
-/** One bar of a line. `again` plays the bar before it again, moved along the contour (SO-18). */
+/**
+ * One bar of a line. `again` plays the bar before it again (SO-18); `stab`
+ * says its first note several times before the line moves on (SO-35).
+ */
 export interface LineBar {
   readonly spots: readonly Spot[];
   readonly again: boolean;
+  readonly stab: boolean;
 }
 
 export interface LineAsk {
@@ -56,6 +60,11 @@ export interface LineAsk {
   readonly climbsTo: { readonly to: number; readonly above: number } | null;
   /** Pitches already decided, by position in the line: an idea remembered. */
   readonly given: ReadonlyMap<number, number>;
+  /**
+   * How a riff bar says the bar before it: moved along the line as a sequence,
+   * or note for note (SO-33).
+   */
+  readonly riffs: "sequence" | "the same";
   /** Habits are drawn here, by the place of the landing they decorate. */
   readonly rng: Rng;
 }
@@ -108,9 +117,14 @@ const long = (spot: Spot) => spot.hold > EIGHTH;
 const wrong = (spot: Spot, pitch: number) =>
   (onBeat(spot) || long(spot)) && onlyPasses(spot.pool, pitch);
 
+/** The next rung is there, and a tone of the chord it would be played over. */
+const runsOn = (pool: Pool, onward: number | undefined) =>
+  onward !== undefined && isChordTone(pool, onward);
+
 /** A remembered pitch over the chord now under it: kept if it still belongs, else the nearest that does (SO-33). */
 function fit(world: World, spot: Spot, pitch: number, lands: boolean, ask: LineAsk): number {
   const { pool } = spot;
+  const { perRank, reach } = world.solo.landing;
   const inside = Math.min(ask.high, Math.max(ask.low, pitch));
   if (lands || (long(spot) && rubs(pool, inside))) {
     return isChordTone(pool, inside)
@@ -119,8 +133,9 @@ function fit(world: World, spot: Spot, pitch: number, lands: boolean, ask: LineA
           pool,
           inside,
           world.solo.arrive,
-          Math.max(ask.low, inside - 4),
-          Math.min(ask.high, inside + 4),
+          perRank,
+          Math.max(ask.low, inside - reach),
+          Math.min(ask.high, inside + reach),
         );
   }
   // The nearest note of the pool that is inside the phrase's register.
@@ -139,6 +154,9 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
   const count = spots.length;
   if (count === 0) return [];
   const { solo } = world;
+  const { line } = solo;
+  const { perRank, reach } = solo.landing;
+  const same = ask.riffs === "the same";
   const start = spots[0]!.tick;
   const length = Math.max(1, spots[count - 1]!.tick - start);
   const through = (i: number) => (spots[i]!.tick - start) / length;
@@ -154,11 +172,24 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     const top =
       tones.findLast((pitch) => pitch <= to) ??
       tones[0] ??
-      landing(pool, to, solo.arrive, to - 4, to);
+      landing(pool, to, solo.arrive, perRank, to - reach, to);
     pitches[count - 1] = top;
     high = Math.max(ask.low + 9, top - 1);
   }
   const room: LineAsk = { ...ask, high };
+
+  const firstOfBar = bars.map((_, b) =>
+    bars.slice(0, b).reduce((sum, bar) => sum + bar.spots.length, 0),
+  );
+  const barOf = (i: number) => firstOfBar.findLastIndex((first) => first <= i);
+  /** The note of the bar before that falls where this one does: what a riff bar says again. */
+  const saidBefore = (b: number, spot: Spot): number | undefined => {
+    if (b <= 0 || !bars[b]!.again) return undefined;
+    const earlier = bars[b - 1]!.spots.findIndex(
+      (s) => s.tick - s.bar.start === spot.tick - spot.bar.start,
+    );
+    return earlier < 0 ? undefined : firstOfBar[b - 1]! + earlier;
+  };
 
   // 1. The landings, in order, each the best tone near where the contour is (SO-20, SO-21).
   let landed: number | null = null;
@@ -169,7 +200,9 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     const last = i === count - 1;
     const next = spots[i + 1];
     const beforeRest = next !== undefined && next.tick - (spot.tick + spot.hold) >= PPQ;
-    const lands = i === 0 || last || spot.lands || beforeRest;
+    // A stabbed bar opens on a note worth saying again: a chord tone (SO-35).
+    const opensStab = bars[barOf(i)]!.stab && firstOfBar.includes(i);
+    const lands = i === 0 || last || spot.lands || beforeRest || opensStab;
     // Where the tune ends, a remembered idea gives way: the last note rests by rule.
     const given = last && ask.final ? undefined : ask.given.get(i);
     if (given !== undefined) {
@@ -185,11 +218,19 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
           .map((rungs) => climb(spot.pool, held, rungs))
           .find((p) => p !== held && p <= high && p >= ask.low && !wrong(spot, p));
         pitch = lands
-          ? landing(spot.pool, pitch + 2 * way, solo.arrive, ask.low, high, [pitch])
+          ? landing(spot.pool, pitch + 2 * way, solo.arrive, perRank, ask.low, high, [pitch])
           : (beside ?? pitch);
       }
       pitches[i] = pitch;
       if (lands) [landed, landedAt] = [pitch, i];
+      continue;
+    }
+    // A riff said again note for note keeps its landings too, moved only where the chord
+    // moved (SO-33). The phrase's own last note still goes where the phrase is going.
+    const said = same && !last ? saidBefore(barOf(i), spot) : undefined;
+    if (said !== undefined && pitches[said] !== undefined) {
+      pitches[i] = fit(world, spot, pitches[said]!, lands, room);
+      if (lands) [landed, landedAt] = [pitches[i]!, i];
       continue;
     }
     if (!lands) continue;
@@ -207,6 +248,7 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
       spot.pool,
       ideal,
       last ? ask.ending : solo.arrive,
+      perRank,
       ask.low,
       high,
       not,
@@ -215,12 +257,22 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     [landed, landedAt] = [pitches[i]!, i];
   }
 
+  // A stabbed bar says its first note again, two to four times in all, before the line
+  // moves on: never through a landing or a change of chord, never the bar's last note
+  // (SO-35).
+  bars.forEach((bar, b) => {
+    if (!bar.stab) return;
+    const first = firstOfBar[b]!;
+    const pitch = pitches[first];
+    if (pitch === undefined) return;
+    for (let i = first + 1; i < first + bar.spots.length - 1 && i - first < 4; i++) {
+      if (pitches[i] !== undefined || spots[i]!.pool !== spots[first]!.pool) break;
+      pitches[i] = pitch;
+    }
+  });
+
   // 2. The line between them.
   const inWindow = (pitch: number) => pitch >= ask.low && pitch <= high;
-  const firstOfBar = bars.map((_, b) =>
-    bars.slice(0, b).reduce((sum, bar) => sum + bar.spots.length, 0),
-  );
-  const barOf = (i: number) => firstOfBar.findLastIndex((first) => first <= i);
   for (let i = 1; i < count; i++) {
     if (pitches[i] !== undefined) continue;
     const spot = spots[i]!;
@@ -232,25 +284,30 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     const target = pitches[to]!;
     const left = to - i;
 
-    // A riff bar: the same notes as the bar before, as many rungs along as the contour has moved.
-    if (bars[b]!.again && b > 0) {
-      const earlier = bars[b - 1]!.spots.findIndex(
-        (s) => s.tick - s.bar.start === spot.tick - spot.bar.start,
-      );
-      if (earlier >= 0) {
+    // A riff bar: the same notes as the bar before. Said the same, it is note for note;
+    // as a sequence, as many rungs along as the contour has moved.
+    const said = saidBefore(b, spot);
+    if (said !== undefined) {
+      const copied = pitches[said]!;
+      // The note before a landing still has to be able to reach it.
+      const strands = (pitch: number) => left === 1 && Math.abs(pitch - target) > 5;
+      if (same) {
+        const pitch = fit(world, spot, copied, false, room);
+        if (!strands(pitch)) {
+          pitches[i] = pitch;
+          continue;
+        }
+      } else {
         const stride = 12 / Math.max(1, new Set(spot.pool.ladder.map((pitch) => pitch % 12)).size);
         const moved =
           ask.contour(through(firstOfBar[b]!)) - ask.contour(through(firstOfBar[b - 1]!));
-        const copied = pitches[firstOfBar[b - 1]! + earlier]!;
         // A sequence moves a step or two a bar, not a leap.
         const rungs = Math.max(-2, Math.min(2, Math.round(moved / stride)));
         const pitch = fit(world, spot, climb(spot.pool, copied, rungs), false, room);
         // At the edge of the register the sequence gives way to the walk, which turns
         // round; pinned there it would rock between two notes (KF-B-18).
         const pinned = pitch === ask.low || pitch === high || pitch === pitches[i - 2];
-        // And the note before a landing still has to be able to reach it.
-        const strands = left === 1 && Math.abs(pitch - target) > 5;
-        if (pitch !== before && !pinned && !strands) {
+        if (pitch !== before && !pinned && !strands(pitch)) {
           pitches[i] = pitch;
           continue;
         }
@@ -287,6 +344,11 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     const ideal = ask.contour(through(i));
     const at = rung(spot.pool, before);
     const goal = rung(spot.pool, target);
+    // The note after this one is on the beat and still to be walked: this one should
+    // leave it a chord tone a step further on.
+    const after = spots[i + 1]!;
+    const setsUp =
+      line.strandsTheBeat > 0 && left > 1 && onBeat(after) && after.tick - spot.tick <= EIGHTH;
     let best = before;
     let least = Number.POSITIVE_INFINITY;
     for (let move = -3; move <= 3; move++) {
@@ -301,16 +363,23 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
         // the contour pulls it back, so a busy bar is a run and not a flutter (SO-24).
         Math.max(0, Math.abs(pitch - ideal) - 1.5) +
         (turns ? 1.2 : 0) +
-        // A step of the scale is a whole step or a minor third; wider is a skip.
-        (size <= 3 ? 0 : size <= 5 ? 1.5 : 3) +
+        // A step of the style's scale is free; wider is a skip, and wider again a leap.
+        (size <= line.step ? 0 : size <= line.skip ? line.skipCosts : line.leapCosts) +
         (far > 0 ? far * 10 : 0) +
         (pitch === target ? 2 : 0) +
-        // A half step is a way into a chord tone (the blue third up to the third, the
-        // fourth down to it); onto anything else, or two in a row, it is a crawl.
-        (halfStep && !isChordTone(spot.pool, pitch) ? 2 : 0) +
-        (halfStep && Math.abs(before - (pitches[i - 2] ?? before)) === 1 ? 4 : 0) +
-        // On a beat a chord tone beats a passing tone a step and a half nearer (SO-25).
-        (onBeat(spot) && !isChordTone(spot.pool, pitch) ? 1.5 : 0) +
+        // Where the half step is not the idiom it is a way into a chord tone (the blue
+        // third up to the third); onto anything else, or two in a row, it is a crawl.
+        (halfStep && !isChordTone(spot.pool, pitch) ? line.halfStepOffChord : 0) +
+        (halfStep && Math.abs(before - (pitches[i - 2] ?? before)) === 1
+          ? line.halfStepsInARow
+          : 0) +
+        // On a beat a chord tone beats a passing tone some way nearer (SO-25).
+        (onBeat(spot) && !isChordTone(spot.pool, pitch) ? line.offChordOnBeat : 0) +
+        // And off it, a note that runs on to a chord tone on the next beat beats one that
+        // cannot: the bebop scale's passing tone earns its place here (AU-35).
+        (setsUp && !runsOn(after.pool, spot.pool.ladder[at + move + Math.sign(move)])
+          ? line.strandsTheBeat
+          : 0) +
         (long(spot) && rubs(spot.pool, pitch) ? 3 : 0) +
         (wrong(spot, pitch) ? 1000 : 0) +
         // Coming back to a note just played is a turn the first time and circling after

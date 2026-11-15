@@ -9,7 +9,21 @@
 // triplet), and the fourth is never played. `x` strikes a note, `-` holds it,
 // `.` is silence.
 
-import type { SoloStyle } from "@ensemble/engine";
+import type { SoloStyle, Way } from "@ensemble/engine";
+
+// The ways a blues phrase is made. A new statement, and one that keeps to a single rhythm
+// all along its line, so the critic hears the difference.
+const NEW: Way = { name: "statement", make: "new", oneRhythm: false };
+const NEW_RIFFED: Way = { name: "statement", make: "new", oneRhythm: true };
+const ENDING_UP: Way = { name: "new ending, up", make: "ending", direction: 1 };
+const ENDING_DOWN: Way = { name: "new ending, down", make: "ending", direction: -1 };
+const AS_A_RIFF: Way = {
+  name: "the idea, as a riff",
+  make: "grown",
+  contour: "arch",
+  keepOpening: true,
+  oneRhythm: true,
+};
 
 export const bluesSolo: SoloStyle = {
   // The player's to change. Vibes are the default because every sampler has a good set.
@@ -30,6 +44,22 @@ export const bluesSolo: SoloStyle = {
   settle: ["third", "root", "fifth"],
   // A call is left on the chord's flat 7th, off the key's own triad, for the answer to resolve (KF-B-13).
   hang: ["seventh", "fifth", "third"],
+  // A better tone wins unless the next is more than a step closer (SO-21); a remembered
+  // note moves a major third at most to land.
+  landing: { perRank: 1.25, reach: 4 },
+  // A step of the blues scale is a whole step or a minor third; a fourth is a skip. A half
+  // step is a way into a chord tone (the blue third up to the third, the fourth down to
+  // it): onto anything else, or two in a row, it is a crawl. Nothing here runs the changes.
+  line: {
+    step: 3,
+    skip: 5,
+    skipCosts: 1.5,
+    leapCosts: 3,
+    halfStepOffChord: 2,
+    halfStepsInARow: 4,
+    offChordOnBeat: 1.5,
+    strandsTheBeat: 0,
+  },
 
   levels: [
     {
@@ -127,6 +157,83 @@ export const bluesSolo: SoloStyle = {
   ],
   contours: { arch: 4, fall: 3, climb: 2, wave: 2 },
 
+  // Fresh material is rare on purpose: a statement is new, and everything else in its
+  // chorus is made out of it.
+  book: {
+    opening: [NEW, NEW_RIFFED, NEW, NEW_RIFFED],
+    roles: {
+      s: [
+        NEW,
+        NEW_RIFFED,
+        NEW,
+        {
+          name: "the first idea back",
+          make: "grown",
+          of: "first",
+          contour: "arch",
+          keepOpening: true,
+          oneRhythm: false,
+        },
+      ],
+      // Again: as it was, moved to the IV with the chord, with a new ending, or as a riff.
+      r: [
+        { name: "again", make: "again", by: 0 },
+        { name: "again, moved with the chord", make: "again", by: "chord" },
+        ENDING_UP,
+        AS_A_RIFF,
+      ],
+      v: [
+        ENDING_UP,
+        ENDING_DOWN,
+        { name: "a step along", make: "again", by: 1 },
+        { name: "two steps along", make: "again", by: 2 },
+        AS_A_RIFF,
+        {
+          name: "the idea, opened out",
+          make: "grown",
+          contour: "arch",
+          keepOpening: true,
+          oneRhythm: false,
+        },
+      ],
+      // An answer keeps the question's rhythm and turns its line the other way (AU-36).
+      a: [
+        { name: "answer", make: "turned", contour: { rose: "fall", fell: "climb" } },
+        { name: "answer", make: "turned", contour: "arch" },
+        { name: "answer", make: "turned", contour: { rose: "wave", fell: "fall" } },
+        {
+          name: "answer, as a riff",
+          make: "grown",
+          contour: "fall",
+          keepOpening: false,
+          oneRhythm: true,
+        },
+        {
+          name: "answer, opened out",
+          make: "grown",
+          contour: "fall",
+          keepOpening: false,
+          oneRhythm: false,
+        },
+      ],
+    },
+    // The climb to the top note: the idea in a rising sequence if there is one (SO-05).
+    peak: [
+      {
+        name: "the idea, climbing",
+        make: "grown",
+        contour: "climb",
+        keepOpening: false,
+        oneRhythm: false,
+      },
+      NEW,
+      NEW_RIFFED,
+    ],
+    outgrown: { levels: 2, ways: [NEW, NEW_RIFFED] },
+  },
+  // Two unrelated blues phrases score under a half; nine tenths is the phrase again.
+  likeness: { related: 0.5, same: 0.9 },
+
   arc: {
     // Three choruses are one arc, in halves (SO-05): low and sparse, opening out, then
     // busy and high. A shorter solo goes through the same stages faster.
@@ -139,10 +246,20 @@ export const bluesSolo: SoloStyle = {
       { density: "busy", register: 3 },
     ],
     // The one top note: up to a ninth over home, held for three beats, and nothing else
-    // in the solo comes within a minor third of it (SO-07).
-    peak: { above: 14, clear: 3, density: "busy", ending: "x--- ---- ---- ...." },
+    // in the solo comes within a minor third of it (SO-07). The phrase before the last
+    // climbs to it, three bars in a rising sequence and the note (SO-05, SO-09).
+    peak: {
+      above: 14,
+      clear: 3,
+      density: "busy",
+      fromEnd: 1,
+      shape: "L L L E",
+      contour: "climb",
+      sequence: true,
+      ending: "x--- ---- ---- ....",
+    },
     // Then back down at home, so the band can have the tune again.
-    windDown: { density: "medium", register: 0 },
+    windDown: { density: "medium", register: 0, contour: "fall" },
   },
 
   // A bar of the slow blues (66) is over three and a half seconds; of the jazz blues (140), under two.
@@ -159,6 +276,12 @@ export const bluesSolo: SoloStyle = {
 
   habits: {
     riff: 0.35,
+    // A blues riff is a sequence: the bar again, moved along the line.
+    riffIs: "sequence",
+    // No figure stabbed on one note, and nothing tied over the barline (SO-38: not built
+    // for the blues at stage 3).
+    stab: 0,
+    tie: 0,
     // The half step under a landing: most often the blue third sliding into the third.
     chromatic: 0.2,
     enclosure: 0.05,
@@ -174,6 +297,8 @@ export const bluesSolo: SoloStyle = {
         { weight: 1, beat: "xxx-" },
       ],
       rising: 0.6,
+      // Walked in by the scale.
+      approach: false,
     },
   },
 

@@ -18,10 +18,11 @@ import type { Heard, SoloCandidate, SoloPick, Sounding } from "./critique.ts";
 import { bassStruck, bySoloCritic, SOLO_FEATURES } from "./critique.ts";
 import { EIGHTH, isChordTone } from "./harmony.ts";
 import { soloVoice } from "./instruments.ts";
-import type { Memory, Phrase, Role } from "./phrases.ts";
+import type { Memory, Phrase } from "./phrases.ts";
 import { phrasesFor } from "./phrases.ts";
 import type { Slot, World } from "./slots.ts";
 import { worldOf } from "./slots.ts";
+import type { Form, Role } from "./style.ts";
 
 /** The shortest note: half a sixteenth (SO-19). */
 const SHORTEST = STEP / 2;
@@ -38,7 +39,7 @@ interface SoloNote {
 /** One phrase as it was chosen: for a report that wants to show the alternatives. */
 export interface SoloChoice {
   readonly slot: Slot;
-  /** What the form asked of the phrase: `s` state, `r` again, `v` changed, `a` answer. */
+  /** What the form asked of the phrase: `s` state, `r` again, `v` changed, `a` answer, `c` contrast, `b` back. */
   readonly role: Role;
   readonly candidates: readonly Scored<SoloCandidate>[];
   readonly chosen: SoloCandidate;
@@ -76,9 +77,12 @@ export function soloPart(
     }
     if (slot.index === 0) {
       // One form for the chorus. With no idea yet to pick up, it opens on a statement.
-      const forms = world.solo.forms.filter(
-        (option) =>
-          option.weight > 0 && (memory.motif !== null || cells(option.phrases)[0] === "s"),
+      const forms = writtenFor(
+        world.solo.forms.filter(
+          (option) =>
+            option.weight > 0 && (memory.motif !== null || cells(option.phrases)[0] === "s"),
+        ),
+        slot.count,
       );
       const drawn = rng
         .fork("form", first.pass, first.section.occurrence)
@@ -113,14 +117,16 @@ export function soloPart(
       written.push({ ...note, seat: "solo", bar: note.bar.index, voice });
     }
     const last = played.at(-1);
-    // A new idea is the idea from now on, wherever in the form it turned up.
-    const stated = role === "s" || memory.motif === null || phrase.kind === "statement";
+    // A new idea is the idea from now on, wherever in the form it turned up; and so is
+    // what was played where the form asked for one stated, changed, set apart or brought
+    // back. Said again or answered, the idea stays what it was.
+    const stated = memory.motif === null || phrase.fresh || "svcb".includes(role);
     earlier = [...earlier, candidates[at]!];
     memory = {
-      // The idea being worked on is the last one stated or changed; the climb to the top
-      // note is a use of it, not a new one.
-      motif: slot.peak ? memory.motif : stated || role === "v" ? phrase : memory.motif,
+      // The climb to the top note is a use of the idea, not a new one.
+      motif: slot.peak ? memory.motif : stated ? phrase : memory.motif,
       theme: memory.theme ?? phrase,
+      opening: slot.index === 0 ? phrase : memory.opening,
       rest: last?.pitch ?? memory.rest,
       highest: Math.max(memory.highest, ...played.map((note) => note.pitch)),
       restEnds: last ? last.tick + last.duration : memory.restEnds,
@@ -132,9 +138,22 @@ export function soloPart(
 
 export const playSolo: Player = (context) => soloPart(context);
 
+/**
+ * The forms written for a chorus of this many phrases; failing that the longest that
+ * fit inside it, which go round again; failing that the shortest, which are cut.
+ */
+function writtenFor(forms: readonly Form[], count: number): readonly Form[] {
+  const length = (form: Form) => cells(form.phrases).length;
+  const lengths = forms.map(length);
+  const shorter = lengths.filter((n) => n <= count);
+  const wanted = shorter.length > 0 ? Math.max(...shorter) : Math.min(...lengths);
+  return forms.filter((form) => length(form) === wanted);
+}
+
 const NOTHING: Memory = {
   motif: null,
   theme: null,
+  opening: null,
   rest: null,
   highest: 0,
   restEnds: 0,
@@ -198,13 +217,18 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
 
     const space = next ? next.spot.tick - tick : Number.POSITIVE_INFINITY;
     const endsLine = !next || next.spot.tick - (tick + spot.hold) >= PPQ || next.spot.bar !== bar;
-    const part = phrase.bars[slot.bars.indexOf(bar)]?.part;
+    // A note tied over the barline ends in the bar it is held into (SO-38).
+    const inSlot = slot.bars.indexOf(bar);
+    const over = tick + spot.hold > bar.start + bar.ticks ? slot.bars[inSlot + 1] : undefined;
+    const endsIn = over ?? bar;
+    const part = phrase.bars[over ? inSlot + 1 : inSlot]?.part;
     let duration = spot.hold;
     if (endsLine && (part === "E" || !next) && !lead) {
       // The breath is taken by shortening the note that sounds into it, never by leaving it
       // out. It is a breath as heard: measured after the swing has moved the note's end.
       const bend = (at: number) => (bar.meter.unit === 4 ? swing(at, world.feel) : at);
-      const limit = Math.min(bar.ticks, (next ? next.spot.tick : slotEnd) - bar.start);
+      const limit =
+        Math.min(endsIn.start + endsIn.ticks, next ? next.spot.tick : slotEnd) - bar.start;
       let until = Math.floor((limit - breath) / STEP) * STEP;
       while (until > 0 && bend(limit) - bend(until) < breath) until -= STEP;
       duration = Math.min(duration, Math.max(EIGHTH, bar.start + until - tick));

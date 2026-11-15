@@ -27,7 +27,7 @@ export interface Slot {
   readonly count: number;
   /** The first phrase of the solo. */
   readonly first: boolean;
-  /** The phrase that climbs to the solo's top note: the one before the last (SO-05). */
+  /** The phrase that goes up to the solo's top note: in the blues, the one before the last (SO-05). */
   readonly peak: boolean;
   /** The last phrase of the solo, which winds down. */
   readonly last: boolean;
@@ -172,7 +172,7 @@ function slotsOf(plan: Plan, solo: SoloStyle, instrument: SoloInstrument): Slot[
     // A solo is its choruses in a row; a chorus that starts the count again is a new solo.
     if (index === 0 && (mark.chorus === 0 || soloIndex < 0)) soloIndex++;
     const lastChorus = mark.chorus === mark.of - 1;
-    const peak = lastChorus && index === Math.max(0, count - 2);
+    const peak = lastChorus && index === Math.max(0, count - 1 - solo.arc.peak.fromEnd);
     const last = lastChorus && count > 1 && index === count - 1;
 
     const stages = solo.arc.stages;
