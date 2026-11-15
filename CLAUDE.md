@@ -13,7 +13,7 @@ A browser-based generative backing band. Read these before doing anything:
 ## Standing rules
 
 - **The engine is pure.** `packages/engine` has no DOM, no audio, no I/O, no clock, and no `Math.random`. Text and a seed go in, events come out. Same inputs, identical output.
-- **Boundaries hold.** `app` and `audio` may import `engine`. `engine` imports nothing from them. `audio` knows nothing about music theory.
+- **Boundaries hold.** `app` and `audio` may import `engine`. `engine` imports nothing from them. `audio` knows nothing about music theory. The app turns a take into sounds (`packages/app/src/play/jam.ts`); nothing else joins the two.
 - **Styles are data.** Adding or tuning a style must not require engine changes. If it does, the engine is missing a concept: add the concept, then express the style as data.
 - **You cannot hear.** Never claim something sounds good. Report what the properties and the critic scorecard say, write audition files, and let Brandon judge.
 - **Tests are rationed.** Only the four kinds in `docs/TESTING.md`. Do not add per-function unit tests, mocks, or Playwright specs outside the named smoke journeys.
@@ -37,6 +37,11 @@ pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gat
 pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
 pnpm packs:fetch [id...] # fetch the sample libraries into .sources/ at their pinned versions (needs git and 7z)
 pnpm packs:cut [id...]   # cut instrument packs into assets/packs/ (needs an ffmpeg with soxr and libopus)
+pnpm app [--host 0.0.0.0] [--port 8766]   # the app, served for development (no service worker)
+pnpm app:build          # build the app into packages/app/dist: a static site, packs and service worker included
+pnpm smoke              # the browser smoke journeys against the built app (60-second budget; needs Google Chrome)
+node scripts/look.ts <out.png> <width>x<height> <address> [dark] [click:Text | wait:ms | select:Label=value | eval:js ...]
+                        # look at the app in headless Chrome and save a picture; for checking work, not a test
 pnpm audition [--host 0.0.0.0] [--port 8765]   # serve the audition page at /tools/audition/: play a take from the packs
 pnpm render:audio <name> chart=<file> [style=] [seed=] [passes=] [solo=alto-sax] [only=bass] [live=1]
                          # render a take to out/audio/<name>.wav in headless Chrome; live=1 plays it in real time and counts late notes

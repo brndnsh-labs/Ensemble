@@ -24,7 +24,10 @@
     "packs:fetch": "node scripts/packs/fetch.ts",
     "packs:cut": "node scripts/packs/cut.ts",
     "audition": "node scripts/serve.ts",
-    "render:audio": "node scripts/render-audio.ts"
+    "render:audio": "node scripts/render-audio.ts",
+    "app": "pnpm --filter @ensemble/app exec vite",
+    "app:build": "pnpm --filter @ensemble/app build",
+    "smoke": "node scripts/budget.ts 60 playwright test"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

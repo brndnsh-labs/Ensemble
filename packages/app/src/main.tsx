@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.tsx";
+import { keepOffline } from "./offline.ts";
 import "./style.css";
 
 createRoot(document.getElementById("app")!).render(
@@ -8,3 +9,5 @@ createRoot(document.getElementById("app")!).render(
     <App />
   </StrictMode>,
 );
+
+keepOffline();

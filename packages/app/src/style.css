@@ -158,6 +158,40 @@ fieldset {
   border-color: var(--on-marker);
 }
 
+.colophon {
+  margin-top: 40px;
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
+.colophon a,
+.credits a {
+  color: var(--ink);
+}
+
+.credits h1 {
+  margin: 12px 0 0;
+  font-size: 2.6rem;
+  font-stretch: 62%;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.credits h2 {
+  margin: 28px 0 0;
+  font-size: 1.1rem;
+}
+
+.credits p {
+  max-width: 38rem;
+  margin: 8px 0 0;
+}
+
+.credits .changes {
+  color: var(--faint);
+  font-size: 0.875rem;
+}
+
 /* ── The play screen ─────────────────────────────────────────────────────── */
 
 .play {

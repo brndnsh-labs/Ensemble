@@ -1,9 +1,12 @@
 // The app: the library, or one chart on the play screen. The address says
 // which, so the browser's back button works and a chart can be bookmarked.
 
-import { useState, useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { CreditsView } from "./CreditsView.tsx";
 import { LibraryView } from "./LibraryView.tsx";
 import { libraryChart } from "./library.ts";
+import type { Saving } from "./offline.ts";
+import { saveInstruments } from "./offline.ts";
 import { PlayView } from "./play/PlayView.tsx";
 import { Rig } from "./play/rig.ts";
 import type { Settings } from "./settings.ts";
@@ -14,13 +17,23 @@ const subscribe = (listener: () => void) => {
   return () => removeEventListener("hashchange", listener);
 };
 
-const rig = new Rig(`${import.meta.env.BASE_URL}packs/`);
+const PACKS_URL = `${import.meta.env.BASE_URL}packs/`;
+const rig = new Rig(PACKS_URL);
 
 export function App() {
   const hash = useSyncExternalStore(subscribe, () => location.hash);
   const [settings, setSettings] = useState(loadSettings);
   /** The chart whose play button was tapped in the library: it starts as its screen opens. */
   const [autoplay, setAutoplay] = useState<string>();
+
+  const [saving, setSaving] = useState<Saving>();
+
+  // Once the app is open, bring the instruments onto the device for next time.
+  useEffect(() => {
+    saveInstruments(PACKS_URL, setSaving).catch(() => {
+      // No connection, or no room: whatever was saved stays, and the next visit tries again.
+    });
+  }, []);
 
   const change = (next: Settings) => {
     setSettings(next);
@@ -29,9 +42,11 @@ export function App() {
 
   const id = /^#\/chart\/(.+)$/.exec(hash)?.[1];
   const entry = id === undefined ? undefined : libraryChart(decodeURIComponent(id));
+  if (hash === "#/credits") return <CreditsView packsUrl={PACKS_URL} />;
   if (!entry)
     return (
       <LibraryView
+        saving={saving}
         play={(chosen) => {
           // Inside the tap, so the browser lets the band start without another one.
           rig.wake();

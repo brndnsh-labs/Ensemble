@@ -83,9 +83,15 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** Gate 5: "everything is sounding fantastic in my testing so far"; "sax is definitely good enough so far, and the vibes sound wonderful". **Stage 6 (the app) is next and has not begun**; it starts with part 1, the play view and library.
+State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: part 1, the play view and library, is built and waiting for Brandon's look.**
 
-Left open by gate 5, with what holds until an ear says otherwise (`DECISIONS.md`, "gate 5 passed"): the mix stays at the measured numbers; packs load every layer; one kit serves all three styles; both soloists stay.
+### Stage 6: where it stands
+
+- **Part 1 built** (`DECISIONS.md`, "stage 6 begins"): `packages/app` (library, play screen with the chart sized to fit, playhead, status strip, names and numerals, focus mode, band setup, Finish and Stop, open-ended jams, credits), installable with a service worker and offline instruments, smoke journeys 1, 2 and 4.
+- **Run it**: `pnpm app --host 0.0.0.0` for development (port 8766), or `pnpm app:build` then `pnpm --filter @ensemble/app exec vite preview --host 0.0.0.0 --port 8766` for the built app. Look at it headless with `node scripts/look.ts`.
+- **Waiting on Brandon**: his look at part 1 on the laptop and the phone (the chord symbols, the one-button Play/Finish/Stop, how the ending sounds when Finish is pressed mid-pass), and how his phone should reach the app over HTTPS (needed to install it and to play offline).
+- **Next**: part 2, the editor (text with the chart beside it, diagnostics in place, the touch key row), which also settles where the player's own charts are stored. Then takes and export, the arrangement grid, the remaining styles.
+- **Left open by gate 5**, holding until an ear says otherwise (`DECISIONS.md`, "gate 5 passed"): the mix stays at the measured numbers; packs load every layer; one kit serves all three styles; both soloists stay.
 
 ### Stage 5: how it was built
 

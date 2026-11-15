@@ -586,3 +586,46 @@ Brandon, 2026-11-15, on his laptop and iPhone: "everything is sounding fantastic
 - **The mix stays at the measured numbers** in each style's `sound.mix`. No fader line came back.
 - **Packs load every layer.** Nothing said the layers could go, and his phone is recent. `loadPack`'s `layers` option stays as the lever if a weaker phone needs it.
 - **One kit for all three styles.** A tighter kit for funk waits on a complaint, or on rock and disco in stage 6, which will want one anyway.
+
+## stage 6 begins: the play view and the library (part 1)
+
+Brandon on the mix after gate 5: "no complaints about the mix so far. we can always tweak that later". Then: "go ahead and start building".
+
+**The app**
+
+- **`packages/app`: Vite 8, React 19, no other runtime dependency** but the typeface. No router (the address after `#` says which screen), no state library, no PWA plugin. Versions looked up on 2026-11-15: vite 8.3.8, react 19.3.1, @vitejs/plugin-react 6.3.0, @playwright/test 1.65.1.
+- **The engine runs on the page's own thread.** A three-minute jam renders in 35 to 105 ms here and a thirty-minute one in 260 to 610 ms; the scheduler is 1.5 s ahead, so even the longest render cannot make a note late. No worker.
+- **One rig for the whole visit** (`play/rig.ts`): one audio context, one mixer, one sampler, and every pack loaded so far, never dropped. The packs for a chart's band are fetched when its screen opens, not when play is pressed. A pack is seated under its seat's name, so one pack can sit in two chairs. All seven packs are about 290 MB decoded; nothing evicts them, which is untested on any phone but Brandon's.
+- **The band's seats are switches on the play screen** (drums, bass, chords, soloist). The brief's list for that screen does not name them; a bass player wants to turn the bass off.
+- **Remembered in `localStorage`**: how chords are read, the jam's length, who is in the band, and each chart's style, key and tempo. Where charts the player writes will live is part 2's decision.
+- **A phone is kept awake while the band plays, and the silent switch does not mute it** (`navigator.wakeLock`, `navigator.audioSession.type = "playback"`). Both are skipped where the browser lacks them.
+
+**The chart on the screen**
+
+- **The page is the chart as written, with one exception.** Repeats, endings and `%` stay as their signs; a section that repeats an earlier one by name (`[A]` again) is written out, so the eye goes down the page in playing order. Each bar shows what will be played (from the same expansion the band reads), so a section in another key shows its own chords.
+- **A planned bar knows its section's index** (`PlanBar.section.index`), which with `source` is its place on the page. The line layout (`flow`) is exported from the engine for the same reason.
+- **The type is sized to fit.** One size for the whole chart, the largest at which every line fits the height and a bar is at least 3.3 times the root's size wide. Lines are eight bars across where that makes the type more than 15% bigger (a laptop), four otherwise. A chord too wide for its share of a bar is set in narrower letters (the typeface has a width axis, 62 to 88), then smaller.
+- **One symbol set**: a triangle for major seven, a circle for diminished, a slashed circle for half-diminished, `+` for augmented, `m` for minor, `sus` for sus4. The flat, the sharp and the triangle are drawn, because few typefaces carry them. Open to Brandon's taste.
+- **The playhead is a highlighter stroke on the bar being played and an underline on the next change of chord.** Focus mode shows the line being played and the next: two bars to a line on a narrow screen, four otherwise.
+- **The look**: indigo ink on cool paper, a yellow highlighter, Archivo (OFL, bundled, one family in several widths). Dark mode follows the device.
+
+**Jams**
+
+- **A jam can be told to finish** (`PlanOptions.endAfter`). The pass named becomes the last: it lifts and lands like any last pass, and everything before it is planned as the jam it set out to be (the arc and the solos are shaped by the passes planned, not the passes played; a solo under way makes that chorus its last). The property: nothing before the last pass changes, in an open jam or a timed one.
+- **In the app, Finish turns the band for home at the top of the next phrase** that is at least three seconds off; if this pass has none left, the next pass is the last. The music from there on is the told take's (`Scheduler.replace`, with its property). The two takes agree before the last pass; inside it they differ after its first phrase, so there is a join at that phrase top. A note the old take was holding rings on; one the new take would have been holding across it is not there. No ear has judged the join.
+- **A jam with no set length** is made two passes long and given more whenever under 20 seconds are left, by making the take again longer (the engine's open jam leaves what was played unchanged).
+- **One button**: Play, then Finish, then Stop. Pressing it while the band plays asks for an ending; pressing again stops dead. A timed jam can be finished early the same way.
+
+**Installing and offline**
+
+- **A hand-written service worker** (`service-worker.js`, about sixty lines; the build fills in its file list). The app's own files are kept at install under a cache named for their contents. Instrument files are kept as they are first fetched, in a cache named for the packs' `pack.json` files, so a new build of the app does not fetch 17 MB again. Once the app is open it fetches whatever instruments are missing, four at a time, and says so at the foot of the library.
+- **Cache matches ignore `Vary`.** The smoke journey found it: the preview server marks responses as varying, and the page's script was not matched by the copy kept at install, so the app opened offline as a blank page.
+- **Service workers need a secure address.** On the LAN by IP over plain HTTP the app runs but is not installable and keeps nothing offline. Open: how Brandon's phone reaches it over HTTPS.
+- **A credits page** (`#/credits`) lists each pack's sources, licences and changes from its `pack.json`, with a link to its licence text. The piano's CC BY asks for this.
+
+**Tests**
+
+- **Smoke journeys 1, 2 and 4** (`smoke/app.spec.ts`, `pnpm smoke`, 7 s of 60) run the built app in the installed Chrome. Journey 4 listens at the output: whatever is connected to the speakers also feeds a meter, and the spec waits for a signal and for the highlight to move from the first bar to the second.
+- **Two new properties**, each broken on purpose and seen to fail: the scheduler's "when what is to come is changed", and the band's "a jam told to finish". The first version of the second sampled only cases with nothing before the last pass on a push; three deliberate breaks passed it before that was found.
+- **The engine suite is at 9.1 to 9.3 s of 10.** The next property has to be paid for by trimming another.
+

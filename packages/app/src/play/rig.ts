@@ -39,6 +39,13 @@ export class Rig {
     // Without this an iPhone's silent switch mutes the band.
     const session = (navigator as { audioSession?: { type: string } }).audioSession;
     if (session) session.type = "playback";
+    // A phone that was locked or switched away from stops the audio clock and drops the
+    // wake lock. Coming back, a band that was playing carries on.
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible" || !this.#player) return;
+      void this.context.resume();
+      void this.#keepAwake();
+    });
   }
 
   /** Call inside the tap that starts the music, before anything is awaited: a browser lets sound start only then. */

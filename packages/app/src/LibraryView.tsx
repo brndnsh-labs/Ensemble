@@ -4,13 +4,16 @@ import { keyToString } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 import type { LibraryChart } from "./library.ts";
 import { LIBRARY } from "./library.ts";
+import type { Saving } from "./offline.ts";
 
 interface Props {
   /** Open a chart and start the band, from the tap that asked. */
   readonly play: (entry: LibraryChart) => void;
+  /** How far saving the instruments to the device has got; undefined where nothing is saved. */
+  readonly saving: Saving | undefined;
 }
 
-export function LibraryView({ play }: Props) {
+export function LibraryView({ play, saving }: Props) {
   const shelves = [
     ...STYLES.map((style) => ({
       name: style.name,
@@ -60,6 +63,18 @@ export function LibraryView({ play }: Props) {
           </ul>
         </section>
       ))}
+      <footer className="colophon">
+        {saving && (
+          <p>
+            {saving.done < saving.total
+              ? `Saving the instruments to this device: ${saving.done} of ${saving.total} files.`
+              : "Everything is saved on this device. Ensemble plays with no connection."}
+          </p>
+        )}
+        <p>
+          <a href="#/credits">Credits and licences</a>
+        </p>
+      </footer>
     </main>
   );
 }
