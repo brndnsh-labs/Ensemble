@@ -10,7 +10,7 @@
     "typecheck": "tsc --build",
     "lint": "biome check .",
     "format": "biome check --write .",
-    "test": "node scripts/budget.ts 10 node --test \"test/*.test.ts\"",
+    "test": "node scripts/budget.ts 10 node scripts/test.ts",
     "check": "pnpm typecheck && pnpm lint && pnpm test",
     "ensemble": "node packages/cli/src/main.ts",
     "goldens": "node scripts/goldens.ts",
