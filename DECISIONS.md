@@ -868,3 +868,11 @@ Built from `prompts/solo-pitch-moves.md` in its own clone. Brandon chose two of 
 **Found while working, not fixed:**
 
 - `scripts/serve.ts` refuses every file when the repo itself sits under a folder whose name starts with a dot (`file.includes("/.")` is asked of the whole path, not the part inside the repo), so `pnpm render:audio` in a clone under `.work/` waits three minutes and gives up with "no file". The render above was made through a symlink to the clone from a path without one.
+
+## the lead guitar, heard (stage 6, part 5)
+
+Brandon, on the test site, 2026-11-15: "seriously incredible job, it all sounds really tasteful, and the soloist comes alive on guitar now. wow!"
+
+- **The numbers stand as built**: SO-53's chances with the phrase gate at a half (`habits.bend.elsewhere`), the top note always bent, a shake on every note held a dotted quarter (`habits.shake` 1.5 in blues and rock). The three questions put to him (vibrato too frequent, bends too few or many, more bends in rock's busy last chorus) are answered by "tasteful": nothing is moved.
+- **Slides stay out** until they can be stepped by frets; nothing else of the nine is built.
+
