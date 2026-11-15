@@ -1,5 +1,5 @@
 // What only a real browser can prove about the app. The list is fixed in
-// docs/TESTING.md; journeys 3 and 5 arrive with the editor and with export.
+// docs/TESTING.md; journey 5 arrives with export.
 
 import { expect, test } from "@playwright/test";
 
@@ -31,6 +31,29 @@ test("after install, the app loads offline", async ({ page, context }) => {
   await page.getByRole("link", { name: "12-Bar Blues in A" }).click();
   await expect(page.getByRole("button", { name: "Play", exact: true })).toBeVisible();
   await expect(page.locator(".bar")).toHaveCount(12);
+});
+
+test("a chart typed in the editor renders, and an error shows a diagnostic in place", async ({
+  page,
+}) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "New chart" }).click();
+  const text = page.getByRole("textbox", { name: "The chart's text" });
+  await text.fill("title: Typed\nkey: F\n\n| F7 | Bb7 | F7 | C7 |\n| Bb7 | Bb7 | F7 | F7 |\n");
+  await expect(page.getByRole("heading", { name: "Typed" })).toBeVisible();
+  await expect(page.locator(".bar")).toHaveCount(8);
+  await expect(page.getByText("Nothing to fix.")).toBeVisible();
+
+  // A chord the parser cannot read: the message says so, and the mark sits under those letters.
+  await text.press("ControlOrMeta+End");
+  await text.pressSequentially("| F7 | Hq7 |");
+  await expect(page.getByText(/Unrecognized chord Hq7/)).toBeVisible();
+  const mark = page.locator(".source-copy mark.error");
+  await expect(mark).toHaveText("Hq7");
+  expect(await mark.textContent()).toBe("Hq7");
+  const [marked, box] = await Promise.all([mark.boundingBox(), text.boundingBox()]);
+  expect(marked!.y).toBeGreaterThan(box!.y);
+  expect(marked!.y + marked!.height).toBeLessThan(box!.y + box!.height);
 });
 
 test("pressing play starts audio and advances the playhead", async ({ page }) => {
