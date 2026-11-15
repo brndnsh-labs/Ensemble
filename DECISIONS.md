@@ -640,3 +640,15 @@ Brandon: "i'm leaning toward hosting this on docker04 like the current version o
 - **Not done, and Brandon's to decide**: how the image reaches docker04 (the repo is local-only, and his release path pulls from a registry), and what becomes of the test stack's API container and its `/api/*` route, which this app does not use. Nothing on docker04 or in his homelab repo has been touched.
 - **Replacing the test site in place is safe for installed copies**: the new worker is at the same `/sw.js`, so a browser holding the old one updates to it, and on taking over it deletes every cache it does not own.
 
+## the app is on the test site (stage 6)
+
+Brandon: "for now, you can feel free to use ssh to get things working".
+
+- **https://ensembletest.brndn.zip serves the new app** since 2026-11-15, commit `0e3a4a2`. The three smoke journeys pass against the live site (offline after install included).
+- **How** (`pnpm deploy:test`): the image is built here, loaded onto docker04 over SSH (`docker save | ssh docker04-admin docker load`), given the name the test stack's recipe expects (`ghcr.io/brndnsh-labs/ensemble-web:sha-<this repo's commit>`), and rolled in by the box's own `ensemble-release ensembletest web sha-…`, which waits for health and restores the previous tag if it fails. Nothing else on the box was changed: not the generated compose file, not Caddy, not production.
+- **That image name is a local label, not a registry image.** No such tag exists on GHCR. A `docker compose pull` of the test stack (`bin/docker-update ensembletest`) will fail on it.
+- **To go back**: `sudo ensemble-release ensembletest web sha-06c97d8ce0fdcd06779d54ecd6b7d42509674c23` on docker04 (the old app's image, still on the box).
+- **It will be replaced by the old repo's next merge to main**, whose CI releases both of its images to the test stack. The durable change is in homelab-maintenance and the old repo's CI, and is Brandon's: a one-service recipe for the test stack, the API container and its `/api/*` route retired, and the old CI no longer releasing there.
+- **The test site is on the public internet behind Cloudflare.** The instruments it serves are CC0 but for the piano (CC BY, credited on the credits page).
+- **Found on the live site: Cloudflare gives the instrument files a four-hour browser cache** (`max-age=14400` in place of the image's `no-cache`), because it caches `.webm` by extension. A pack cut again under the same file names could then be kept stale by the service worker. To fix in the app, not at the edge: put a version in each instrument file's address.
+

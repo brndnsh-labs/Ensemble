@@ -41,6 +41,8 @@ pnpm app [--host 0.0.0.0] [--port 8766]   # the app, served for development (no 
 pnpm app:build          # build the app into packages/app/dist: a static site, packs and service worker included
 pnpm smoke              # the browser smoke journeys against the built app (60-second budget; needs Google Chrome)
                         # SMOKE_URL=https://... pnpm smoke runs them against the app wherever it is served
+pnpm deploy:test        # build the image, load it onto docker04 over SSH and release it to https://ensembletest.brndn.zip,
+                        # then run the smoke journeys against the live site. Only when Brandon has asked for a deploy.
 pnpm image              # build the app and its image (hosting/): ensemble-app:<commit>, an unprivileged nginx; needs docker
 node scripts/look.ts <out.png> <width>x<height> <address> [dark] [click:Text | wait:ms | select:Label=value | eval:js ...]
                         # look at the app in headless Chrome and save a picture; for checking work, not a test
