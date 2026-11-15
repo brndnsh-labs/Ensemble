@@ -6,7 +6,7 @@
 // (landings first, then the line between them), offers several whole phrases
 // for each slot, and lets the critic pick.
 
-import type { ToneRole } from "../../theory/chord.ts";
+import type { ChordFamily, ToneRole } from "../../theory/chord.ts";
 import type { ScaleName } from "../../theory/scale.ts";
 
 /**
@@ -154,6 +154,13 @@ export interface SoloStyle {
   readonly notes: {
     /** The chord's own scale is in the pool: a line that follows the changes. */
     readonly chordScale: boolean;
+    /**
+     * Notes over each chord's own root, by the chord's family, as semitones
+     * above that root: a scale moved with every chord, as a pentatonic on each
+     * chord's root is (ST-disco-21: 1 2 3 5 6 over a major chord). A family
+     * left out adds nothing. Left out, none.
+     */
+    readonly overRoot?: Readonly<Partial<Record<ChordFamily, readonly number[]>>>;
     /** Notes of the key that are in whatever the chord, as semitones above the tonic. */
     readonly key: { readonly major: readonly number[]; readonly minor: readonly number[] };
     /**
@@ -316,6 +323,14 @@ export interface SoloStyle {
      * in a phrase, never note by note (SO-35).
      */
     readonly stab: number;
+    /**
+     * The closest a stabbed note is struck again, in sixteenths. At 2 the
+     * note is pumped on the eighths and the line lifts off it where the
+     * rhythm runs on in sixteenths: one pitch twice a sixteenth apart is a
+     * stutter (ST-disco-25). Left out, 1: a stab on every sixteenth the
+     * figure strikes, as a horn section stabs (ST-funk-32).
+     */
+    readonly stabEvery?: number;
     /**
      * Inside a phrase, a line bar's last eighth that runs into a struck
      * downbeat is tied over the barline: one note, the next chord's (SO-38).

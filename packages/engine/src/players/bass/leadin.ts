@@ -106,8 +106,11 @@ function roomOf(at: LeadInPolicy["at"], piece: Piece): number {
 export function leadInChance(bass: BassStyle, leaving: Piece, next: Piece): number {
   const chance = bass.leadIn.chance;
   const tier = tierAt(leaving);
-  const top = next.start === next.bar.start && next.bar.barInSection === 0;
-  return next.bar.ending ? chance.intoEnding : top ? chance.intoSection[tier] : chance.inside[tier];
+  const downbeat = next.start === next.bar.start;
+  if (next.bar.ending) return chance.intoEnding;
+  if (downbeat && next.bar.barInSection === 0) return chance.intoSection[tier];
+  if (downbeat && next.bar.phrase.bar === 0 && chance.intoPhrase) return chance.intoPhrase[tier];
+  return chance.inside[tier];
 }
 
 /** Decide the lead-in out of a piece, or null to leave the line as it is. */

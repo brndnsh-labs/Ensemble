@@ -9,7 +9,7 @@ import { PPQ } from "../../chart/types.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { contextOf } from "../../perform/harmony.ts";
 import type { ToneRole } from "../../theory/chord.ts";
-import { chordTones } from "../../theory/chord.ts";
+import { chordFamily, chordTones } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import { chordScale } from "../../theory/scale.ts";
 import type { SoloInstrument, SoloStyle } from "./style.ts";
@@ -53,6 +53,9 @@ export function poolOf(
 
   const all = new Set(chordPcs);
   if (solo.notes.chordScale) for (const pc of inScale) all.add(pc);
+  for (const interval of solo.notes.overRoot?.[chordFamily(chord.quality)] ?? []) {
+    all.add(mod12(root + interval));
+  }
   const tonic = pitchClass(arrival.key.tonic);
   const over = mod12(root - tonic);
   for (const degree of solo.notes.key[arrival.key.mode]) {

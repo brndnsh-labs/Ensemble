@@ -186,6 +186,11 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
     "line: a cost cannot be negative.",
   );
   const degrees = [...solo.notes.key.major, ...solo.notes.key.minor];
+  const overRoot = Object.values(solo.notes.overRoot ?? {}).flat();
+  say(
+    overRoot.every((interval) => Number.isInteger(interval) && interval >= 0 && interval < 12),
+    "notes: a note over the chord's root is a whole number of semitones from 0 to 11.",
+  );
   say(
     degrees.every((degree) => Number.isInteger(degree) && degree >= 0 && degree < 12),
     "notes: a key note is a whole number of semitones from 0 to 11.",
@@ -225,6 +230,11 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   chance(solo.space.roomier, "space, roomier");
   chance(solo.habits.riff, "habits, riff");
   chance(solo.habits.stab, "habits, stab");
+  const every = solo.habits.stabEvery ?? 1;
+  say(
+    Number.isInteger(every) && every >= 1,
+    "habits: a stabbed note is struck again a whole number of sixteenths apart, one or more.",
+  );
   chance(solo.habits.tie, "habits, tie");
   chance(solo.habits.chromatic, "habits, chromatic");
   chance(solo.habits.enclosure, "habits, enclosure");

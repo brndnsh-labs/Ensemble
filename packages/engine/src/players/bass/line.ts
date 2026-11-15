@@ -251,11 +251,13 @@ export function lineOf(
           ? "arrival"
           : dead
             ? "dead"
-            : isStrong(bar, onset.tick)
-              ? "strong"
-              : offLevel && !onPulse(bar, onset.tick)
-                ? "off"
-                : "weak",
+            : !echo && onset.tone === "8" && line.velocity.octave !== undefined
+              ? "octave"
+              : isStrong(bar, onset.tick)
+                ? "strong"
+                : offLevel && !onPulse(bar, onset.tick)
+                  ? "off"
+                  : "weak",
     };
     if (dead) note.dead = true;
     notes.push(note);
@@ -268,6 +270,7 @@ function levelOf(line: BassLine, level: LineNote["level"]): number {
   const levels = line.velocity;
   if (level === "off") return levels.off ?? levels.weak;
   if (level === "dead") return levels.dead ?? levels.restrike;
+  if (level === "octave") return levels.octave ?? levels.weak;
   return levels[level];
 }
 

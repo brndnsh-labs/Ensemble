@@ -275,6 +275,8 @@ export function validateBassStyle(bass: BassStyle): string[] {
   for (const tier of TIERS) {
     chance(lead.chance.inside[tier], `lead-in chance inside a section, ${tier}`);
     chance(lead.chance.intoSection[tier], `lead-in chance into a section, ${tier}`);
+    if (lead.chance.intoPhrase)
+      chance(lead.chance.intoPhrase[tier], `lead-in chance into a phrase, ${tier}`);
   }
   chance(lead.chance.intoEnding, "lead-in chance into the ending");
   for (const motion of ROOT_MOTIONS) {

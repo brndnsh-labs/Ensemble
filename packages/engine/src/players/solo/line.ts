@@ -272,8 +272,10 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
     const first = firstOfBar[b]!;
     const pitch = pitches[first];
     if (pitch === undefined) return;
+    const every = (solo.habits.stabEvery ?? 1) * STEP;
     for (let i = first + 1; i < first + bar.spots.length - 1 && i - first < 4; i++) {
       if (pitches[i] !== undefined || spots[i]!.pool !== spots[first]!.pool) break;
+      if (spots[i]!.tick - spots[i - 1]!.tick < every) break;
       pitches[i] = pitch;
     }
   });

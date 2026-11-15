@@ -265,6 +265,12 @@ export interface BassLine {
     readonly off?: number;
     /** A dead note. Without it, as quiet as a re-strike. */
     readonly dead?: number;
+    /**
+     * A note a riff names as the octave (`8`): the pop, which a bassist plucks
+     * harder than the roots around it (ST-disco-13: roots off the beat 78, the
+     * octave 94). Without it, as any note in its place.
+     */
+    readonly octave?: number;
   };
 }
 
@@ -336,6 +342,13 @@ export interface LeadInPolicy {
     readonly inside: PerTier<number>;
     /** Into the first bar of a section or of a new time through it (EN-51). */
     readonly intoSection: PerTier<number>;
+    /**
+     * Into the first bar of a phrase inside a section: the line marks where
+     * the next phrase starts as well as where the next section does
+     * (ST-disco-14: the last bar of a phrase always leads in). Left out, as
+     * `inside`.
+     */
+    readonly intoPhrase?: PerTier<number>;
     /** Into the final chord. */
     readonly intoEnding: number;
   };
