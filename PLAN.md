@@ -83,7 +83,7 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: part 1, the play view and library, is built and waiting for Brandon's look.**
+State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 3 are built and on the test site; part 4, the arrangement grid, is next.**
 
 ### Stage 6: where it stands
 
@@ -91,8 +91,9 @@ State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage
 - **Run it**: `pnpm app --host 0.0.0.0` for development (port 8766). `pnpm deploy:test` puts a commit on the test site (docker04 over SSH; Brandon allowed this "for now", for the test stack only). Look at it headless with `node scripts/look.ts`.
 - **Not yet answered by Brandon** (no complaint so far, so the choices stand): the join when Finish is pressed mid-pass, by ear; the chord symbols (triangle, circle, raised qualities); one button for Play, Finish and Stop.
 - **His to decide**: the durable recipe for the test stack in homelab-maintenance (one service, the API and its route retired), and stopping the old repo's CI from releasing over it.
-- **Part 2, the editor, is built and on the test site** (`DECISIONS.md`, "the editor", "the editor, checked and merged"): the player's own charts in `localStorage`, New chart, Import, Export, Edit a copy; text with the page beside it, problems underlined in the text and listed under it, a key row for touch; smoke journey 3. **Waiting on Brandon's thumb**: the key row above a real iPhone keyboard.
-- **Next**: part 3, takes and export (save a seed, replay it, export MIDI from the browser; smoke journey 5). Then the arrangement grid, the remaining styles.
+- **Part 2, the editor, is built, on the test site, and passed by Brandon** on his iPhone: the key row sits right above the keyboard, Export downloads, and a long line scrolling sideways "is okay for now".
+- **Part 3, takes and export, is built and on the test site** (`DECISIONS.md`, "a take, as it is kept", "takes and export"): Keep beside the transport, a Takes shelf, a screen for each take (`#/take/<id>`) that plays it again by its seed, Export MIDI, Export take (the file `ensemble replay` reads); smoke journey 5. A jam told to finish partway is kept as heard (`TakeOptions.toldAt`). **Waiting on Brandon**: Export MIDI on the iPhone, and whether a replayed take is the one he remembers.
+- **Next**: part 4, the arrangement grid. The block's text is designed (`docs/CHART_FORMAT.md` section 11: one line for each section the song plays). To build: the parser and printer for it, song mode reading it in the planner (a property to hold it, paid for by trimming another: the suite is at 9.1 to 9.3 s of 10), song mode on the play screen, then the grid. Then the remaining styles.
 - **Left open by gate 5**, holding until an ear says otherwise (`DECISIONS.md`, "gate 5 passed"): the mix stays at the measured numbers; packs load every layer; one kit serves all three styles; both soloists stay.
 
 ### Stage 5: how it was built

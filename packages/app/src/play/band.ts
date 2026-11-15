@@ -10,6 +10,9 @@ export interface Made extends Performance {
   readonly took: number;
 }
 
+/** The engine would not make the take: nothing to do with the instruments or the connection. */
+export class Unplayable extends Error {}
+
 let worker: Worker | undefined;
 let asked = 0;
 const waiting = new Map<
@@ -26,7 +29,7 @@ export function warmUp(): void {
     waiting.delete(data.id);
     if (!asker) return;
     if (data.failed === undefined) asker.resolve(data);
-    else asker.reject(new Error(data.failed));
+    else asker.reject(new Unplayable(data.failed));
   };
 }
 
@@ -42,7 +45,7 @@ function ask(request: Omit<Request, "id">): Promise<Reply> {
 /** A take played through, made off the page's thread. `since` leaves out what has been played. */
 export async function perform(recipe: TakeRecipe, since = 0): Promise<Made> {
   const reply = await ask({ recipe, since });
-  if (!reply.performance) throw new Error("the band could not play this");
+  if (!reply.performance) throw new Unplayable("the band could not play this");
   return { ...reply.performance, took: reply.took };
 }
 

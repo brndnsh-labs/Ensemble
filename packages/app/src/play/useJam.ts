@@ -6,7 +6,7 @@ import type { StylePack, TakeRecipe } from "@ensemble/engine";
 import { seconds } from "@ensemble/engine";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Made } from "./band.ts";
-import { perform, warmUp } from "./band.ts";
+import { perform, Unplayable, warmUp } from "./band.ts";
 import type { Call, Performance, Place } from "./jam.ts";
 import { chairsOf, mixOf, OPEN_PASSES, placeAt, recipeOf, turnForHome } from "./jam.ts";
 import type { Rig } from "./rig.ts";
@@ -145,10 +145,14 @@ export function useJam(rig: Rig, call: Call, changed?: (take: TakeRecipe) => voi
         setTake(recipe);
         setPhase("playing");
       },
-      () => {
+      (error: unknown) => {
         if (presses.current !== mine) return;
         setPhase("idle");
-        setProblem("The instruments did not load. Check the connection, then press play again.");
+        setProblem(
+          error instanceof Unplayable
+            ? "The band could not play this."
+            : "The instruments did not load. Check the connection, then press play again.",
+        );
       },
     );
   };

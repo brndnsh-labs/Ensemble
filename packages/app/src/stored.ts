@@ -28,7 +28,8 @@ export function askToKeep(): void {
 
 /**
  * The list under `key`. Anything stored there that `isItem` does not accept
- * is left out, not thrown on. `changed` is called with the list as it first
+ * is left out, not thrown on, and written back as it was found: it may be
+ * what a newer build of the app keeps, opened here by an older one. `changed` is called with the list as it first
  * loads and after every change, before anyone listening is told, so what the
  * screens are shown can be made again from it.
  */
@@ -37,10 +38,14 @@ export function storedList<Item extends { readonly id: string }>(
   isItem: (item: unknown) => item is Item,
   changed: (items: readonly Item[]) => void,
 ): StoredList<Item> {
+  /** What is stored there and is not an item. */
+  let others: unknown[] = [];
   const load = (): Item[] => {
     try {
       const list: unknown = JSON.parse(localStorage.getItem(key) ?? "[]");
-      return Array.isArray(list) ? list.filter(isItem) : [];
+      if (!Array.isArray(list)) return [];
+      others = list.filter((item) => !isItem(item));
+      return list.filter(isItem);
     } catch {
       return [];
     }
@@ -66,7 +71,7 @@ export function storedList<Item extends { readonly id: string }>(
     write(next) {
       items = [...next];
       try {
-        localStorage.setItem(key, JSON.stringify(items));
+        localStorage.setItem(key, JSON.stringify([...items, ...others]));
         kept = true;
       } catch {
         kept = false;
