@@ -577,3 +577,12 @@ The second builder's report was checked against the files the same way as the fi
 - **The render queued every note of a take at once, and slowed with the square of its length**: a 165-second funk take took 179 seconds and hit the tool's time limit, which is how it was found. A render now hands notes over a second at a time, with the scheduler that plays live. The same take renders in 9 seconds, and differs from the old way's output by at most one step of 16-bit in 0.6% of samples (the order the mixer sums in).
 - **Headless Chrome waited 25 seconds before its first request**, every launch: it asks the desktop keyring for a key over D-Bus, and this machine has no desktop session. `--password-store=basic` removes the wait.
 - **Editing a shell script while it runs cuts it short.** The first gate run stopped two thirds through for this reason and for the time limit above; both looked the same. Noted so the next unexplained early exit is checked against both.
+
+## gate 5 passed (stage 5)
+
+Brandon, 2026-11-15, on his laptop and iPhone: "everything is sounding fantastic in my testing so far"; "sax is definitely good enough so far, and the vibes sound wonderful". No complaint about room, balance or loudness. A short verdict is leave to carry on, not an answer to each question, so these hold as defaults and stay open to his ear:
+
+- **Both soloists stay**, alto and vibraphone. The alto's vibrato and slurs in the sampler are not built: "good enough so far" does not ask for them.
+- **The mix stays at the measured numbers** in each style's `sound.mix`. No fader line came back.
+- **Packs load every layer.** Nothing said the layers could go, and his phone is recent. `loadPack`'s `layers` option stays as the lever if a weaker phone needs it.
+- **One kit for all three styles.** A tighter kit for funk waits on a complaint, or on rock and disco in stage 6, which will want one anyway.

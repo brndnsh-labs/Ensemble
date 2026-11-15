@@ -83,19 +83,19 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1 to 4 are built and their gates passed** (gate 4: "everything is sounding incredible so far"). **Stage 5 (audio) has begun.** Brandon chose a fresh cut of the packs from the free sources the old ones came from (`DECISIONS.md`, "stage 5: a fresh cut").
+State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** Gate 5: "everything is sounding fantastic in my testing so far"; "sax is definitely good enough so far, and the vibes sound wonderful". **Stage 6 (the app) is next and has not begun**; it starts with part 1, the play view and library.
 
-### Stage 5: how it is being built
+Left open by gate 5, with what holds until an ear says otherwise (`DECISIONS.md`, "gate 5 passed"): the mix stays at the measured numbers; packs load every layer; one kit serves all three styles; both soloists stay.
+
+### Stage 5: how it was built
 
 - **Sources** are pinned in `scripts/packs/sources.ts` and fetched into `.sources/` (not in git; about 5 GB) by `scripts/packs/fetch.ts`.
 - **The pack format** is the type in `packages/audio/src/pack.ts`. Packs go in `assets/packs/<id>/` with `pack.json` and the source's `LICENCE`.
 - **Order**: the jazz and blues quartet first (drum kit, upright bass, grand piano, alto sax, vibraphone; brief in `prompts/cut-packs.md`), then the audio package (timeline in seconds, scheduler with its fake-time property, sampler, mixer), a bare page and a render to WAV, then funk's two packs (electric bass with a dead note, clean guitar with a muted stroke), mix presets, gate 5.
 - **Built so far**: the scheduler and its three fake-clock properties (`test/audio.test.ts`); the sampler, mixer and live player (`packages/audio`); the audition page (`pnpm audition`, then `/tools/audition/`) with a fader for each seat; `pnpm render:audio` (a take to a WAV in headless Chrome, or `live=1` to count late notes); `scripts/check-timing.ts`. The first five packs are cut and measured (`DECISIONS.md`, "the first five packs, checked"). Funk's two are briefed in `prompts/cut-funk-packs.md`.
-- **Gate 5 is with Brandon** (2026-11-15): sixteen files and the report in `out/gate-5/` (`pnpm gate:5` renders them again; the audio is not in git), played from `/out/gate-5/` on the audition server. A first listen on his laptop and iPhone 17 already passed ("the instruments themselves all worked"); the pop after stop it found is fixed. Funk's two packs are cut. A ten-minute live take ran with no late or dropped note. Waiting on: his answers to the gate's three questions, the mix by his ear (the faders print it), layers or one layer, the kit for funk, the soloists.
-- **To settle by ear at the gate**: whether dynamic layers earn their memory (the same take with one layer and with several), the kit for funk, the upright (Meatbass, with VSCO as the fallback Brandon has heard before).
-- **Not yet verified on a real phone**: that Safari decodes Opus in WebM for Web Audio. A probe on the bare page comes before the gate; the codec is one setting in the cut script.
+- **Gate 5 passed** (2026-11-15): sixteen files and the report in `out/gate-5/` (`pnpm gate:5` renders them again; the audio is not in git). Safari on his iPhone 17 decodes the Opus packs and the tap unlocks audio. A ten-minute live take ran with no late or dropped note.
 
-- Gate reports: `out/gate-1/GATE_REPORT.md` to `out/gate-4/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1` to `gate:4`.
+- Gate reports: `out/gate-1/GATE_REPORT.md` to `out/gate-5/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1` to `gate:5`.
 - `pnpm check` passes with three styles in about 8.8 s of 10. `pnpm score` matches its baselines (`scorecard/blues.json`, `funk.json`, `jazz.json`).
 
 ### Stage 4: how it is being built
