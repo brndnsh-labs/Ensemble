@@ -17,6 +17,7 @@ import { STEP } from "../../perform/grid.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import type { Breath, LineNote } from "../../players/chords/line.ts";
 import { breathsOf, soundsAt } from "../../players/chords/line.ts";
+import { MUTED } from "../../players/chords/strike.ts";
 import { tierOf } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
 import { mean, notesOf, share } from "../read.ts";
@@ -79,6 +80,8 @@ function read(take: Take): Reading | null {
   if (bars.size > 0 && line.length > 0) {
     const byTick = new Map<number, { ends: number; pitches: number[]; velocity: number }>();
     for (const note of notesOf(take, "chords")) {
+      // A deadened stroke is rhythm, not a chord: it is not a strike (CH-28).
+      if (note.voice === MUTED) continue;
       const hit = byTick.get(note.tick) ?? { ends: 0, pitches: [], velocity: 0 };
       hit.ends = Math.max(hit.ends, note.tick + note.duration);
       hit.pitches.push(note.pitch);
@@ -250,6 +253,8 @@ export const conversationMeasures: readonly Measure[] = [
   },
   {
     id: "chords.strikes-under-the-line",
+    // A comp that converses: a groove keeps its figure and is not measured by this.
+    idiom: true,
     seat: "chords",
     says: "Strikes per sixteenth while the soloist is sounding a note: under the line the piano is sparse.",
     unit: "ratio",
@@ -257,6 +262,8 @@ export const conversationMeasures: readonly Measure[] = [
   },
   {
     id: "chords.strikes-in-breaths",
+    // A comp that converses: a groove keeps its figure and is not measured by this.
+    idiom: true,
     seat: "chords",
     says: "Strikes per sixteenth in the soloist's breaths: where the line stops, the piano speaks.",
     unit: "ratio",
@@ -275,6 +282,8 @@ export const conversationMeasures: readonly Measure[] = [
   },
   {
     id: "chords.breaths-answered",
+    // A comp that converses: a groove keeps its figure and is not measured by this.
+    idiom: true,
     seat: "chords",
     says: "Most of the soloist's breaths have something from the piano in them, but not all: an answer, not a reflex.",
     unit: "share",
@@ -287,6 +296,8 @@ export const conversationMeasures: readonly Measure[] = [
   },
   {
     id: "chords.answers-louder",
+    // A comp that converses: a groove keeps its figure and is not measured by this.
+    idiom: true,
     seat: "chords",
     says: "What the piano plays in the soloist's breaths is a little louder than what it plays under the line, in velocity steps as played.",
     unit: "velocity",
@@ -326,6 +337,8 @@ export const conversationMeasures: readonly Measure[] = [
   },
   {
     id: "chords.strikes-per-bar-under-a-hot-solo",
+    // A comp that converses: a groove keeps its figure and is not measured by this.
+    idiom: true,
     seat: "chords",
     says: "When the band is at its loudest under a solo, which is when the soloist is busiest, the piano does not get busier with it: a few strikes a bar, not a hammered groove. The pump is counted here.",
     unit: "per bar",
@@ -345,6 +358,7 @@ export const conversationMeasures: readonly Measure[] = [
       const all = take.plan.bars;
       const struck = new Set<number>();
       for (const note of notesOf(take, "chords")) {
+        if (note.voice === MUTED) continue;
         const bar = all.findLast((candidate) => candidate.start <= note.tick);
         if (bar && bars.has(bar.index)) struck.add(note.tick);
       }

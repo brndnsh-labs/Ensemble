@@ -103,7 +103,7 @@ Seat builds, each from a brief in `prompts/`, each in its own clone under the se
 | 1 | `drums-jazz-funk.md` | Opus | merged; six properties in `test/drums.test.ts` |
 | 1 | `solo-jazz-funk.md` | Fable | merged; the passing tone that resolves and `outgrown.thin` finished on the main thread |
 | 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | launched (clone `build-bass-jazz-funk`) |
-| 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | launched (clone `build-chords-funk-guitar`) |
+| 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | merged; three guitar properties in `test/piano.test.ts` |
 | 2 | `chords-jazz-piano.md` | Opus | brief written; the soloist is merged, so it can start when a slot is free |
 | 3 | `review-style.md`: an independent review of each new style, in its own clone | Opus | brief written; runs when all four seats of a style are merged |
 

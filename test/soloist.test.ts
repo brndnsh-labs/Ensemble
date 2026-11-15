@@ -448,14 +448,21 @@ function meetings(take: Take): { strikes: number; under: number; onNote: number 
   return { strikes, under, onNote };
 }
 
-test("the piano makes room: hearing the soloist, fewer of its strikes come down under the line and far fewer sit on the soloist's note than when it cannot hear", () => {
+const listens = STYLES.some((style) => style.chords.listening !== null);
+
+test("a comp that listens makes room: hearing the soloist, fewer of its strikes come down under the line and far fewer sit on the soloist's note than when it cannot hear", {
+  skip: !listens,
+}, () => {
   const sum = { strikes: 0, under: 0, onNote: 0 };
   const deafSum = { strikes: 0, under: 0, onNote: 0 };
   let lower = 0;
   let compared = 0;
   for (const { style, chart, options, take } of takes(
     (jam) =>
-      jam.options.solo === true && jam.chart.meter === "4/4" && Number(jam.options.seed) <= 4,
+      jam.style.chords.listening !== null &&
+      jam.options.solo === true &&
+      jam.chart.meter === "4/4" &&
+      Number(jam.options.seed) <= 4,
   )) {
     const heard = meetings(take);
     const unheard = meetings(render(chart.text, deaf(style), options));

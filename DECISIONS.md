@@ -305,3 +305,33 @@ Built by a Fable agent from `prompts/solo-jazz-funk.md` in its own clone. On the
 **Choices in the data** (the builder's, kept): jazz solos are eighths only, so the triplet pickup of ST-jazz-38 is left out; the chromatic approach is from below only; ST-jazz-36 and ST-funk-31 give head forms, so the solo forms are the builder's; funk has no pickups, ties, scoops or falls; a later chorus mostly brings a new idea.
 
 **Known, not fixed:** three slow-waltz takes in 1,258 (jazz at 60 on the alto) run nine seconds on one breath, because a pickup's breath is judged on paper and swing takes a tenth of a second back; one three-bar silence on the waltz at 240. A funk property was tried ("no pickups, nothing over the barline") and dropped: both are settings in the data, and the test could not be made to fail by anything but changing them.
+
+## 2026-11-14: a guitar in the chord seat, and the funk rhythm guitar (stage 4)
+
+Built by a Fable agent from `prompts/chords-funk-guitar.md` in its own clone. On the main thread: the diff and the printed part were read (grips as string and fret, the line as downs, ups, stabs and scratches); the blues goldens are identical and `pnpm score` reports no movement; three properties were added and two reworded (below).
+
+**Engine changes, each a concept the chord seat lacked:**
+
+- **A second instrument** (`Idiom = "keys" | Guitar`, `players/chords/guitar.ts`). A chord is found on the fretboard (CH-20): a string each on neighbouring strings, pitch rising, inside a four-fret hand, nothing over the 15th fret. What a style tunes is data: strings, where the hand is parked, open strings or not, a muted string inside the grip, root on the bottom, and the strum (its grid, how many strings an upstroke catches, how much lighter it is, the roll in milliseconds). The builder wrote a rock guitar and a reggae skank as data over the funk pack and both played.
+- **A stroke can be deadened** (`Attack.muted`, the voice `muted` on its notes). A guitar's scratch, a clavinet's dead key. It is not a strike of the chord: it does not count as striking a written chord (CH-34), is never a push, and gives way to an arrival strike.
+- **A third way to meet a change** (`CompFigure.ties`): a groove that leans in lets the chord ring an eighth over the change and passes over it. The piano rests; the pump strikes again; this ties.
+- **A figure's own turn at a phrase end** (`CompFigure.turn`), written whole. The piano answers with another figure; a groove answers with itself.
+- **A plain rhythm on every pulse** (`PlainRhythm.pulse`), for a strummed part in a meter with no book (CH-54).
+- **A deliberate downstroke** (`Strike.down`): an arrival, a plain bar, the final chord, wherever the pendulum is. Keys ignore it.
+- **An instrument can hold its voicing while the chord stays** (`InstrumentIdiom.holds`, CH-31) and **place the same notes where the hand is** (`placed`, `Voicing.strings`): the same three notes can be fretted in two places, and the hand takes the nearer.
+- **The idiom writes the part with the plan in hand** (`InstrumentIdiom.write(part, plan)`): the pendulum needs barlines and the roll is milliseconds. The roll uses the note's existing `nudge`; nothing changed in the note model, feel or MIDI.
+- **Measures told what a scratch is**; "played early" also needs the next chord's guide tones (a clipped stab on the last sixteenth was being read as an anticipation: 41% read, 11% true). Ten new guitar measures, all `idiom`. Nine piano measures (`phrases-shaped`, `strikes-per-bar-quiet` and the like) marked `idiom`: **they are off the jazz card until the jazz piano targets them.** On the main thread: five measures of a comp that converses marked `idiom` too, and the conversation measures no longer count scratches as strikes (funk's `breaths-over-the-line` was re-measured to stabs only: 0.87, 0.66 to 1.24).
+
+**Properties** (`test/piano.test.ts`; `strikesOf` now reads sounded chords, and scratches separately):
+
+- New, for any style with a guitar: every stroke can be held (checked from the pitches alone, not with the engine's own fretboard); the hand holds its grip until the chord changes, a scratch never leads the way to the next grip, and a chord leant into rings an eighth with nothing stroked over it; the pendulum (a stroke between the beat's halves comes up, high string first; every other goes down). Breaks tried: a seven-fret hand, a reversed roll, a groove that does not tie, a scratch off the grip: each caught. A guitar told not to hold its grip was *not* caught: with funk's costs it re-voices to the same grip every time, so `holds` changes nothing audible in funk today.
+- Reworded: "the eighth before a change belongs to the chord coming" now says a strike there that rings into the change is the new chord, alone, and one that stops short is played only by a groove (`anticipation.otherwise: "stay"`). "The piano makes room" is "a comp that listens makes room", and skips a style whose comp does not listen.
+
+**Choices in the funk data** (the builder's, kept; each is a question for the listening gate):
+
+- A plain minor 7th is b3, 5, b7, not b3, b7, 9 (ST-funk-23 says the 9th): with the 9th only one inversion is free of a half-step rub, and the top note moved 4.3 semitones a change against 0.9. A written m9 gets its 9th.
+- At a phrase end the hand flicks the chord once more on the last sixteenth; nothing else varies. No rule in the notes; the builder's answer to "sixteen identical bars on a one-bar vamp".
+- The upstroke catches four strings, not three (CH-27), so a four-string grip keeps its guide tone on an upstroke stab.
+- A 13 chord's stab is 3, b7, 13: its 9th is not heard.
+- A scratch is the grip's own pitches, half a sixteenth long, quiet, with the voice `muted`. On a plain guitar patch it is three short pitched notes: whether that reads as a "chick" is the first thing to ask Brandon. If not, the export can put muted strokes on their own track with a muted-guitar program.
+- At the quiet level there are no scratches, six or seven dry stabs a bar.

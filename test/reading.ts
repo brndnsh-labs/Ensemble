@@ -2,7 +2,7 @@
 // band.test.ts, soloist.test.ts, and piano.test.ts needs. Not a test file.
 
 import type { Take } from "@ensemble/engine";
-import { arrivals, chordScale, contextOf, PPQ } from "@ensemble/engine";
+import { arrivals, chordScale, contextOf, MUTED, PPQ } from "@ensemble/engine";
 import { type Jam, notesOf } from "./takes.ts";
 
 /** Ticks of slack for where a note sounds: the largest lean plus human placement. */
@@ -18,10 +18,14 @@ export interface Strike {
   readonly ends: number;
 }
 
-/** The comp's notes grouped into the times the hand comes down. */
-export function strikesOf(take: Take): Strike[] {
+/**
+ * The comp's notes grouped into the times the hand sounds a chord. A deadened stroke (a
+ * guitar's scratch) is rhythm, not a chord: `scratches` reads those instead.
+ */
+export function strikesOf(take: Take, scratches = false): Strike[] {
   const strikes: Strike[] = [];
   for (const note of notesOf(take, "chords")) {
+    if ((note.voice === MUTED) !== scratches) continue;
     const last = strikes.at(-1);
     if (last && last.tick === note.tick) {
       last.pitches.push(note.pitch);
