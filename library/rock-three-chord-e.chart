@@ -1,0 +1,9 @@
+title: Three-Chord Rocker in E
+key: E
+tempo: 132
+style: rock
+
+// The one, the four and the five, eight bars round.
+[A]
+| E | E | A | E |
+| B | A | E | B |

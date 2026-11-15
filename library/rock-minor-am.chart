@@ -1,0 +1,9 @@
+title: Minor Rock in A
+key: Am
+tempo: 124
+style: rock
+
+// The minor tonic falling to its six and seven, and back.
+[A]
+| Am | F | G | Am |
+| Am | F | G | G  |

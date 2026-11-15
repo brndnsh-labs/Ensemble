@@ -1,0 +1,41 @@
+title: Rock Song in A
+key: A
+tempo: 120
+style: rock
+
+// An intro, a verse, a chorus that opens on the four, a bridge on the minor six
+// that turns round on the five of five, and an outro that comes home.
+[Intro]
+| A | % | D | A |
+
+[Verse]
+| A | % | D | A |
+| A | % | E | E |
+
+[Chorus]
+| D | E | A | F#m |
+| D | E | A | A   |
+
+[Verse]
+
+[Chorus]
+
+[Bridge]
+| F#m | D | A | A |
+| F#m | D | B | E |
+
+[Chorus]
+
+[Outro]
+| D | A | E D | A |
+
+--- arrangement
+//      energy  drums  bass  chords  solo
+Intro   1       -      .     -       .
+Verse   2       -      -     -       .
+Chorus  4       -      -     -       .
+Verse   2       -      -     -       .
+Chorus  4       -      -     -       .
+Bridge  3       -      -     -       -
+Chorus  4       -      -     -       .
+Outro   2       -      -     -       .

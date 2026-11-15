@@ -4,11 +4,12 @@ import type { StylePack } from "@ensemble/engine";
 import { blues } from "./blues/index.ts";
 import { funk } from "./funk/index.ts";
 import { jazz } from "./jazz/index.ts";
+import { rock } from "./rock/index.ts";
 
-export { blues, funk, jazz };
+export { blues, funk, jazz, rock };
 
 /** The styles that ship: the suite holds every one of them to every property. */
-export const STYLES: readonly StylePack[] = [blues, funk, jazz];
+export const STYLES: readonly StylePack[] = [blues, funk, jazz, rock];
 
 export function styleById(id: string): StylePack | undefined {
   return STYLES.find((style) => style.id === id);

@@ -1,0 +1,9 @@
+title: Four-Chord Song in G
+key: G
+tempo: 116
+style: rock
+
+// I V vi IV, a bar each, round and round.
+[A]
+| G | D | Em | C |
+| G | D | Em | C |
