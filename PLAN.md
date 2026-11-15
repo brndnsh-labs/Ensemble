@@ -83,7 +83,7 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 4 are built and on the test site; part 5, the remaining styles, is next.**
+State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage 6 (the app) is under way: parts 1 to 4 are built and on the test site, and part 5 has its first style, rock.**
 
 ### Stage 6: where it stands
 
@@ -95,7 +95,9 @@ State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage
 - **Part 3, takes and export, is built and on the test site** (`DECISIONS.md`, "a take, as it is kept", "takes and export"): Keep beside the transport, a Takes shelf, a screen for each take (`#/take/<id>`) that plays it again by its seed, Export MIDI, Export take (the file `ensemble replay` reads); smoke journey 5. A jam told to finish partway is kept as heard (`TakeOptions.toldAt`). **Waiting on Brandon**: Export MIDI on the iPhone, and whether a replayed take is the one he remembers.
 - **The interface is a draft, by Brandon's word** (2026-11-15, after exporting a take on his phone: "export works, but the way to get there was pretty confusing. we'll want to make the interface much more intuitive at some point, and that goes for everything"). The parts are being built to work; a pass over the whole app for how it is found and used comes after them, before gate 6. Do not polish screen by screen until then; do write down what he trips on.
 - **Part 4, song mode and the arrangement grid, is built and on the test site** (`DECISIONS.md`, "the arrangement block, read and played", "song mode and the arrangement grid"): the block is one line for each section the song plays (`docs/CHART_FORMAT.md` section 11); the play screen's Length has "The song, once through"; the editor has Chords and Arrangement, the second a grid of sections by players. Not yet seen by Brandon.
-- **Next**: part 5, the remaining styles (rock, disco, neo-soul, reggae, acoustic, with the acoustic guitar idiom), their packs first. Then the pass over the whole interface, then gate 6.
+- **Part 5, the remaining styles, has begun: rock is built and on the test site** (`DECISIONS.md`, "rock", "rock, checked and merged"; brief in `prompts/style-rock.md`, an Opus build from the notes). Piano on chords, alto as the soloist for want of a lead guitar. Not yet heard by Brandon.
+- **`pnpm check` is over its budget with four styles (10.2 to 10.5 s of 10)**, on time alone. The budget for eight styles is Brandon's to decide; asked 2026-11-15.
+- **Next**: disco, neo-soul, reggae, acoustic, one at a time, each after the one before has been heard. What they need that is missing: a lead guitar (and bends in the solo model), electric piano and organ packs (the old Rhodes source is non-commercial share-alike), a steel-string guitar and its strummed idiom, a push the whole band makes together. Then the pass over the whole interface, then gate 6.
 - **Left open by gate 5**, holding until an ear says otherwise (`DECISIONS.md`, "gate 5 passed"): the mix stays at the measured numbers; packs load every layer; one kit serves all three styles; both soloists stay.
 
 ### Stage 5: how it was built

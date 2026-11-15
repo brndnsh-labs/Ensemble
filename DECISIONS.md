@@ -787,3 +787,11 @@ Built from `prompts/style-rock.md` in its own clone: `packages/styles/src/rock/`
 **Goldens:** `rock-four-chord-g-solo.mid` (a jam with a solo: the backbeat, the eighth-note roots, the piano at all three tiers) and `rock-song-a.mid` (the arranged song in song mode). Added for the new style; nothing else rewritten.
 
 **Suite:** `pnpm test` with four styles 10.1 to 10.7 s of 10 on this machine (three styles, same tree: 9.7 to 9.8 s). Over budget; nothing trimmed. Rock alone is the cheapest of the four (5.2 s against 6.0 to 7.6 s). `pnpm test:full` 23.7 s, `pnpm score` 27 s.
+
+## rock, checked and merged; the suite is over its budget (stage 6, part 5)
+
+The builder's diff was read in full: one engine change (`RhythmTier.restrike`, a chord held over a barline struck again more softly, which the plain rhythm already had), three properties reworded for things no style could do before (a bass the arrangement lays out owes no note; a comp that never leans in has no pushes to count; a final chord counts the soloist's note), no property added. The old three styles' goldens and scorecards have not moved.
+
+- **`pnpm check` fails on time: 10.2 to 10.5 s against 10.** Nothing fails but the clock. Each style's properties run in a process of their own: alone they take 4.9 s (rock) to 7.5 s (jazz), and side by side they slow each other, so the suite takes as long as the slowest style plus the crowding. Three styles was 9.1 s. Eight will not fit by any trimming that keeps what is tested.
+- **One consolidation made**: a style is now held to a dozen charts written for other styles, spread through the library and starting at a different chart for each style, where it was held to all of them. That stops a new style's charts making every other style's run longer. It saved 0.2 s today.
+- **Not decided here**: what the budget is when there are eight styles. `docs/TESTING.md` says a budget is not raised without an entry here, and it is Brandon's rule, so it is his call. Until then the suite is over, and that is said wherever its result is reported.

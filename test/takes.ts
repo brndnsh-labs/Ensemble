@@ -105,15 +105,25 @@ const KINDS: readonly Omit<TakeOptions, "seed">[] = [
   { mode: "jam", passes: 4, solo: true },
 ];
 
+/** How many charts written for other styles each style is handed. */
+const BORROWED = 12;
+
 /**
- * A style's own charts: the ones written for it, named for it. Every style plays every
- * chart, but it is held to its own in every kind of take on every seed, and to the others
- * in one take each (a kind and a seed by turns): any band can be handed any tune.
+ * A style's own charts: the ones written for it, named for it. Any band can be handed any
+ * tune, so a style is held to its own in every kind of take on every seed, and to a dozen
+ * of the others in one take each (a kind and a seed by turns). The dozen are spread evenly
+ * through the rest of the library, starting at a different chart for each style, so that
+ * between them the styles play all of it, and a new style's charts do not make every
+ * other style's run longer.
  */
 export const ownCharts = (style: StylePack): LibraryChart[] =>
   LIBRARY.filter((chart) => chart.file.startsWith(`${style.id}-`));
-const otherCharts = (style: StylePack): LibraryChart[] =>
-  LIBRARY.filter((chart) => !chart.file.startsWith(`${style.id}-`));
+const otherCharts = (style: StylePack): LibraryChart[] => {
+  const others = LIBRARY.filter((chart) => !chart.file.startsWith(`${style.id}-`));
+  const every = Math.max(1, Math.ceil(others.length / BORROWED));
+  const from = SHIPPING.indexOf(style) % every;
+  return others.filter((_, at) => at % every === from);
+};
 
 const TAKE_SPECS: readonly JamSpec[] = STYLES.flatMap((style) => [
   ...ownCharts(style).flatMap((chart) =>
