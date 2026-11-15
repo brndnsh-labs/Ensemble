@@ -1,0 +1,10 @@
+title: Falling Fifths Disco in E minor
+key: Em
+tempo: 122
+style: disco
+
+// Round the circle in a minor key: four, seven, three, six, then the minor
+// two-five home.
+[A]
+| Am9    | D9 | Gmaj7 | Cmaj7 |
+| F#m7b5 | B7 | Em7   | %     |

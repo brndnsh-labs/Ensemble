@@ -1,0 +1,43 @@
+title: Disco Song in F
+key: F
+tempo: 120
+style: disco
+
+// An intro on the two-five, a verse, a chorus that opens on the four, a break
+// where the band drops out and comes back in, and an outro that comes home.
+[Intro]
+| Gm7 | C9 | Gm7 | C9 |
+
+[Verse]
+| Fmaj7 | Gm7 | Am7 | Gm7 C9 |
+| Fmaj7 | Gm7 | Am7 | Gm7 C9 |
+
+[Chorus]
+| Bbmaj7 | C9 | Am7   | Dm7 |
+| Bbmaj7 | C9 | Fmaj7 | %   |
+
+[Verse]
+
+[Chorus]
+
+[Break]
+| Gm7 | C9 | Gm7 | C9 |
+
+[Break]
+
+[Chorus]
+
+[Outro]
+| Bbmaj7 | C9 | Fmaj7 | % |
+
+--- arrangement
+//      energy  drums  bass  chords  solo
+Intro   1       -      .     -       .
+Verse   2       -      -     -       .
+Chorus  4       -      -     -       .
+Verse   2       -      -     -       .
+Chorus  4       -      -     -       .
+Break   1       -      .     .       .
+Break   2       -      -     .       .
+Chorus  4       -      -     -       -
+Outro   3       -      -     -       .

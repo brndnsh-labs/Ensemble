@@ -1,0 +1,9 @@
+title: Four-Chord Disco in C
+key: C
+tempo: 118
+style: disco
+
+// A loop of sevenths and ninths, a bar each: down from the one to the six,
+// over to the two, and up through the five.
+[A]
+| Cmaj7 | Am9 | Dm9 | G9 |

@@ -1,5 +1,5 @@
-// Musical properties of the drummer in the styles after the blues: the funk two-bar beat
-// and the jazz ride. (The blues drummer's are in band.test.ts.) See docs/TESTING.md, kind 2.
+// Musical properties of the drummer in the styles after the blues: the funk two-bar beat,
+// the disco floor and the jazz ride. (The blues drummer's are in band.test.ts.) See docs/TESTING.md, kind 2.
 // Each test names its rule; none of them knows how the engine is built.
 
 import assert from "node:assert/strict";
@@ -93,6 +93,38 @@ test(
       }
     }
     assert.ok(answers > enough(600), `only ${answers} answer bars`);
+  },
+);
+
+// ── disco ───────────────────────────────────────────────────────────────────
+
+test(
+  'disco: four on the floor: the kick is on every beat of every bar at every level, straight through every fill; from the working level up the open hat barks on every "and" wherever no fill takes the hand, and when the band is quiet it never opens',
+  only("disco"),
+  () => {
+    let bars = 0;
+    let fills = 0;
+    for (const { chart, options, take } of takes(in44("disco"))) {
+      for (const { bar, kit, energy } of kitBars(take)) {
+        // The last bar is one hit where the final chord lands.
+        if (bar.ending) continue;
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        bars++;
+        if (bar.fill) fills++;
+        for (const beat of [0, 4, 8, 12]) {
+          assert.ok(strikes(kit, "kick", beat), `${where}: no kick on beat ${beat / 4 + 1}`);
+        }
+        if (energy < TIER_MID) {
+          assert.ok(!kit.has("openHat"), `${where}: the hat opens when the band is quiet`);
+        } else if (!bar.fill) {
+          for (const and of [2, 6, 10, 14]) {
+            assert.ok(strikes(kit, "openHat", and), `${where}: no open hat on step ${and}`);
+          }
+        }
+      }
+    }
+    assert.ok(bars > enough(2000), `only ${bars} bars`);
+    assert.ok(fills > enough(200), `only ${fills} bars with a fill`);
   },
 );
 

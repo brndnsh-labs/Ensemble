@@ -79,6 +79,20 @@ export const GOLDENS: readonly Golden[] = [
     style: "rock",
     options: { mode: "song", seed: 2 },
   },
+  // Disco: a four-chord loop with a solo over it (the floor, the pump, the chuck at all three tiers).
+  {
+    file: "disco-four-chord-c-solo.mid",
+    chart: "disco-four-chord-c.chart",
+    style: "disco",
+    options: { mode: "jam", passes: 4, seed: 1, solo: true },
+  },
+  // Disco: the arranged song, in song mode (a break where the band drops out and comes back).
+  {
+    file: "disco-song-f.mid",
+    chart: "disco-song-f.chart",
+    style: "disco",
+    options: { mode: "song", seed: 2 },
+  },
 ];
 
 export const goldenUrl = (golden: Golden): URL =>

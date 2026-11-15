@@ -1,0 +1,8 @@
+title: Major Disco Groove in D
+key: D
+tempo: 120
+style: disco
+
+// The one and the four, two bars each.
+[A]
+| Dmaj9 | % | Gmaj9 | % |

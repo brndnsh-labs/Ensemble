@@ -263,13 +263,22 @@ test("the eighth before a change belongs to the chord coming: a strike there tha
     }
   }
   // A comp that never leans in (rock, ST-rock-27) has nothing to count; one that does must
-  // have been seen doing it.
-  const leans = STYLES.some(
-    (style) =>
-      style.chords.anticipation.midBar === "tie" ||
-      Object.values(style.chords.anticipation.barline).some((chance) => chance > 0),
+  // have been seen doing it, and one that leans in only when the band is hot (disco,
+  // ST-disco-28) is seen doing it less, since most of the library is played at the working level.
+  const { midBar, barline } = STYLES.reduce(
+    (most, style) => ({
+      midBar: most.midBar || style.chords.anticipation.midBar === "tie",
+      barline: {
+        low: Math.max(most.barline.low, style.chords.anticipation.barline.low),
+        mid: Math.max(most.barline.mid, style.chords.anticipation.barline.mid),
+        high: Math.max(most.barline.high, style.chords.anticipation.barline.high),
+      },
+    }),
+    { midBar: false, barline: { low: 0, mid: 0, high: 0 } },
   );
-  if (leans) assert.ok(pushes > enough(500), `only ${pushes} pushed chords across the library`);
+  const floor =
+    midBar || barline.low > 0 || barline.mid > 0 ? enough(500) : barline.high > 0 ? enough(30) : 0;
+  assert.ok(pushes >= floor, `only ${pushes} pushed chords across the library`);
 });
 
 test("the piano stays in its part of the keyboard: the top of its chords never wanders more than a sixth from where the style aims it", () => {

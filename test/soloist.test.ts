@@ -304,7 +304,9 @@ test("a solo that runs into the ending ends with the band: its last note is stru
       assert.ok(note.pitch < highest, `${where}: the solo ends on its top note`);
     }
   }
-  assert.ok(endings > enough(80), `only ${endings} endings with the soloist`);
+  // At least: on the full run funk meets exactly 80, since a sixth style's charts took its
+  // borrowed charts from eleven to nine (`otherCharts` in takes.ts).
+  assert.ok(endings >= enough(80), `only ${endings} endings with the soloist`);
 });
 
 test("the soloist plays no wrong note on a beat or held: nothing a half step over a chord tone unless the chord's scale has it, and no major seventh on a chord without one", () => {
@@ -545,8 +547,15 @@ test("a guitar bends only into a note a phrase lands on (one struck where the ch
     });
   }
   const bends = STYLES.some(bendsIn);
-  // Where the style's hand bends, both are heard often enough to have been judged.
-  assert.ok(!bends || bent > enough(60), `only ${bent} bent notes`);
+  // Where the style's hand bends, both are heard often enough to have been judged: bends as
+  // often as the style's chances of one say (disco's are half the blues' and rock's, ST-disco-25).
+  const chances = Math.min(
+    1,
+    ...STYLES.filter(bendsIn).map(
+      ({ solo }) => solo.habits.bend.third + solo.habits.bend.rootOrFifth,
+    ),
+  );
+  assert.ok(!bends || bent >= enough(60 * chances), `only ${bent} bent notes`);
   assert.ok(!bends || shaken > enough(300), `only ${shaken} shaken notes`);
   // The top note is always pushed up into where the hand can (SO-53): not in a song's one
   // short solo, which has no climb, nor over a chord that leaves no note under it to start on.
@@ -681,7 +690,10 @@ test("with nobody soloing, a piano that listens plays exactly what a deaf one pl
 
 test("under a solo the piano leaves the soloist its note: a voice held on the soloist's own pitch for more than a beat is the bottom of the hand or a tone the chord is heard by", () => {
   let under = 0;
-  for (const { chart, options, take } of soloTakes()) {
+  // A comp that does not listen plays as if nobody were soloing, by design: the organ, a
+  // strummed groove (CH-60, CH-68). Its held last chord may sit on the soloist's last note.
+  const listening = soloTakes().filter(({ style }) => style.chords.listening !== null);
+  for (const { chart, options, take } of listening) {
     const solo = notesOf(take, "solo");
     const strikes = strikesOf(take);
     const bars = take.plan.bars;
@@ -719,7 +731,10 @@ test("under a solo the piano leaves the soloist its note: a voice held on the so
       }
     });
   }
-  assert.ok(under > enough(3000), `only ${under} strikes under a solo`);
+  assert.ok(
+    STYLES.every((style) => style.chords.listening === null) || under > enough(3000),
+    `only ${under} strikes under a solo`,
+  );
 });
 
 test("under a solo the hand does not growl: its two lowest notes are a half step apart only on a dominant from E4 up", () => {
