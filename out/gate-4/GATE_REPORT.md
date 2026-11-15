@@ -41,7 +41,7 @@ Start with section 1. The rest is there to check a band on its own tunes.
 | `3-funk-vamp-a-no-solo`, `-timed-4min` | The rhythm section alone; a four-minute jam with two solos. |
 | `4-blues-…` | Gate 3's `seed-002`, `seed-004`, slow blues, minor blues and the four-minute jam, unchanged. |
 
-**About the seeds.** The files use different seeds on purpose. At one seed, every chart whose section is called `[A]` gets the same beat, bass riff and strum, so funk files that all used seed 1 would have been one groove on six tunes. The seeds were picked to differ, not by ear or by score. The cause is in "A decision for after the gate" below.
+**About the seeds.** The files use different seeds on purpose. At one seed, every chart whose section is called `[A]` gets the same beat, bass riff and strum, so funk files that all used seed 1 would have been one groove on six tunes. The seeds were picked to differ, not by ear or by score. The cause is in "The groove and the seed" below.
 
 ## What to listen for
 
@@ -163,11 +163,11 @@ The rule is that a style is data: if a style needs an engine change, the engine 
 
 Two fixes changed what the blues *style* plays on *other styles' charts* (none in the blues library, none in anything you have heard): an ending note struck too late to leave a breath in 3/4, and a one-phrase solo that stopped on its top note.
 
-## A decision for after the gate
+## The groove and the seed
 
 **The groove follows the seed and the section's name, not the tune.** A choice a section keeps (its beat, its bass figure, its strum, the piano's figure) is drawn from the seed and the section's label. So at seed 1, every chart with a section called `[A]` gets the same choices, in every style. It matters most in funk, where the groove is most of the tune, and there the pool is small: three kick patterns, about six riffs and four strums at the working level.
 
-Making the draw depend on the chart as well is a small engine change, but it changes every take in every style: the blues takes you passed would be different takes drawn from the same band. I did not do that just before a gate whose second question is whether the blues changed. My recommendation is to do it at the start of stage 5, as its own logged change, and to widen the funk vocabulary when a style next gets attention. Say if you would rather have it sooner.
+This report first recommended making the draw depend on the chart as well. That change was withdrawn after the gate, before any code (see `DECISIONS.md`, "gate 4 passed; and the groove does not follow the chart after all"). Two tunes share a groove only when played at one seed, which only the gate script did; the app will draw a fresh seed for each jam. Tying the draw to the chart's content would make one edited chord change the whole tune's groove, and would turn every saved take into a different one. What stays open is the small funk vocabulary, which is style data to widen later.
 
 ## Tests added this stage
 
