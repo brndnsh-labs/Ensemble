@@ -28,6 +28,7 @@ export * from "./plan/plan.ts";
 export * from "./plan/types.ts";
 export type { BassCandidate, BassPick, WalkPlace } from "./players/bass/critique.ts";
 export { BASS_FEATURES, byBassCritic } from "./players/bass/critique.ts";
+export { DEAD_VOICE } from "./players/bass/line.ts";
 export { bassPart } from "./players/bass/play.ts";
 export type * from "./players/bass/style.ts";
 export { validateBassStyle } from "./players/bass/validate.ts";

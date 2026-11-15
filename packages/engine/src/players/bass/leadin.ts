@@ -41,15 +41,32 @@ export interface LeadInRequest {
   readonly rng: Rng;
 }
 
-/** What to do to the line: change the pitch of its last note, or add a note after it. */
+/** A note of the line played an octave nearer where the line lands. */
+interface Fold {
+  readonly index: number;
+  readonly pitch: number;
+}
+
+/**
+ * What to do to the line: change the pitch of its last note, or add a note
+ * after it; and, in a style that comes down through the octave, fold its last
+ * notes first, or only that.
+ */
 export type LeadIn =
   | {
       readonly how: "replace";
       readonly index: number;
       readonly pitch: number;
       readonly chosen: boolean;
+      readonly folds?: readonly Fold[];
     }
-  | { readonly how: "add"; readonly tick: number; readonly pitch: number };
+  | {
+      readonly how: "add";
+      readonly tick: number;
+      readonly pitch: number;
+      readonly folds?: readonly Fold[];
+    }
+  | { readonly how: "fold"; readonly folds: readonly Fold[] };
 
 /** No lead-in is reached by a leap wider than this (BA-21, EN-29). */
 export const OCTAVE = 12;
@@ -95,6 +112,36 @@ export function leadInChance(bass: BassStyle, leaving: Piece, next: Piece): numb
 
 /** Decide the lead-in out of a piece, or null to leave the line as it is. */
 export function leadIn(request: LeadInRequest): LeadIn | null {
+  const folds = foldsOf(request);
+  if (folds.length === 0) return leadInTo(request);
+  // The lead-in is decided on the line as it stands once its last notes have come down.
+  const notes = request.notes.map((note) => ({ ...note }));
+  applyLeadIn(notes, { how: "fold", folds }, request.landing.tick);
+  const lead = leadInTo({ ...request, notes });
+  return lead ? { ...lead, folds } : { how: "fold", folds };
+}
+
+/**
+ * A line more than an octave from where it lands comes through the octave, in
+ * a style that does: each note of its last beat that far away is played an
+ * octave nearer (after a pop, the root under it). Dead notes have no pitch to
+ * bring down. A chord's own arrival is never moved.
+ */
+function foldsOf(request: LeadInRequest): Fold[] {
+  const { piece, notes, landing, policy } = request;
+  const folds: Fold[] = [];
+  if (!policy.throughOctave || piece.chord === null) return folds;
+  for (let index = notes.length - 1; index >= (piece.struck ? 1 : 0); index--) {
+    const note = notes[index]!;
+    if (note.tick < landing.tick - PPQ) break;
+    if (note.dead || Math.abs(note.pitch - landing.pitch) <= OCTAVE) continue;
+    const pitch = note.pitch > landing.pitch ? note.pitch - OCTAVE : note.pitch + OCTAVE;
+    if (pitch >= LOW_E && pitch <= TOP) folds.push({ index, pitch });
+  }
+  return folds;
+}
+
+function leadInTo(request: LeadInRequest): LeadIn | null {
   const { piece, notes, landing, policy } = request;
   if (piece.chord === null || notes.length === 0) return null;
   const room = roomOf(policy.at, piece);
@@ -122,7 +169,10 @@ export function leadIn(request: LeadInRequest): LeadIn | null {
       ? request.rng.fork("kind").weighted(LEAD_IN_KINDS, (kind) => weights[kind])
       : null;
 
-  const coin = (): boolean => request.rng.fork("whether").chance(request.chance);
+  // A style whose lead-ins are only ever a note the figure already has (BA-41) flips no
+  // coin for a note that would have to be added.
+  const free = replaces || policy.pickup !== false;
+  const coin = (): boolean => free && request.rng.fork("whether").chance(request.chance);
 
   // A chromatic note the line passes through is never left hanging before a change: it
   // stays only as the half step onto the landing (X-A-26).
@@ -268,10 +318,16 @@ export function knownAbove(leaving: ChartChord, landing: Landing): boolean {
 
 /** Carry out a lead-in on the notes of the piece being left. */
 export function applyLeadIn(notes: LineNote[], lead: LeadIn, landingTick: number): void {
+  for (const fold of lead.folds ?? []) notes[fold.index]!.pitch = fold.pitch;
+  if (lead.how === "fold") return;
   if (lead.how === "replace") {
     const note = notes[lead.index]!;
     note.pitch = lead.pitch;
-    if (lead.chosen) note.level = "approach";
+    if (lead.chosen) {
+      note.level = "approach";
+      // A lead-in is a note: a dead note that becomes one is sounded.
+      delete note.dead;
+    }
     // The lope never moves to a new note on the "and" (BA-31): re-strikes follow their tone.
     for (let i = lead.index + 1; i < notes.length && notes[i]!.echo; i++) {
       notes[i]!.pitch = lead.pitch;

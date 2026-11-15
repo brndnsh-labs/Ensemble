@@ -180,11 +180,17 @@ export function shapesIn(sequence: ToneSequence): readonly LineShape[] {
 
 /** Whether a pitch is one of the chord's own notes (its slash bass included). */
 export function isChordTone(chord: Chord, pitch: number): boolean {
-  const pc = mod12(pitch);
-  if (pc === bassPitchClass(chord)) return true;
-  const root = pitchClass(chord.root);
-  return chordTones(chord.quality).some((tone) => mod12(root + tone.interval) === pc);
+  // Asked of every note a walk weighs: a chord's twelve answers are worked out once.
+  return remember(CHORD_TONES, chord, () => {
+    const own = new Array<boolean>(12).fill(false);
+    own[bassPitchClass(chord)] = true;
+    const root = pitchClass(chord.root);
+    for (const tone of chordTones(chord.quality)) own[mod12(root + tone.interval)] = true;
+    return own;
+  })[mod12(pitch)]!;
 }
+
+const CHORD_TONES = new WeakMap<Chord, boolean[]>();
 
 export function meets(when: ChordCondition | undefined, chord: Chord, scale: ChordScale): boolean {
   if (!when) return true;

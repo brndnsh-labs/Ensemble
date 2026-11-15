@@ -4,8 +4,15 @@
 import { cells, STEP } from "../../perform/grid.ts";
 import type { Hold, Tier } from "../../style/types.ts";
 import { SHORTEST } from "./line.ts";
-import type { BassLine, BassStyle, ChordCondition, RootMotion, Tone } from "./style.ts";
-import { FIGURE_STEPS, LEAD_IN_KINDS, ROOT_MOTIONS, TONES } from "./style.ts";
+import type { BassLine, BassStyle, ChordCondition, Figure, RootMotion, Tone } from "./style.ts";
+import {
+  DEAD_NOTE,
+  FIGURE_STEPS,
+  LEAD_IN_KINDS,
+  RIFF_TONES,
+  ROOT_MOTIONS,
+  TONES,
+} from "./style.ts";
 import { HIGHEST_ROOT, LOW_E, TOP } from "./tones.ts";
 
 const TIERS: readonly Tier[] = ["low", "mid", "high"];
@@ -56,6 +63,7 @@ export function validateBassStyle(bass: BassStyle): string[] {
     problems.push("register: the anchor's range is written upside down.");
   hold(register.anchor.hold, "register anchor");
 
+  const draws = new Map<string, string>();
   for (const tier of TIERS) {
     const line = bass.lines[tier];
     checkLine(line, `${tier} line`);
@@ -63,6 +71,52 @@ export function validateBassStyle(bass: BassStyle): string[] {
       problems.push(
         `${tier} line: the ceiling ${line.ceiling} is under the highest root ${register.highest}.`,
       );
+  }
+
+  /** A figure's or a turn's grid, symbol by symbol. Returns its cells. */
+  function checkGrid(figure: Figure, line: BassLine, at: string): string[] {
+    const grid = cells(figure.grid);
+    const strikes = (symbol: string | undefined) =>
+      symbol === "x" || symbol === DEAD_NOTE || (symbol !== undefined && symbol in RIFF_TONES);
+    const bad = grid.filter((symbol) => !strikes(symbol) && !"o-.".includes(symbol));
+    if (bad.length > 0) {
+      const named = [...new Set(bad)].map((symbol) => `"${symbol}"`).join(", ");
+      problems.push(
+        `${at}: it uses ${named}; write x, o, - or a dot, a tone (R 2 3 4 5 6 7 8) or m for a dead note.`,
+      );
+    }
+    if (!grid.some((symbol) => symbol === "x" || symbol in RIFF_TONES))
+      problems.push(`${at}: it never plays a tone (x, or a tone by name).`);
+    let sounding = false;
+    let tone = false;
+    grid.forEach((symbol, step) => {
+      if (symbol === "-" && !sounding)
+        problems.push(`${at}: step ${step + 1} holds a note that was never struck.`);
+      if (symbol === "o" && !tone)
+        problems.push(`${at}: step ${step + 1} strikes a tone again before any tone was played.`);
+      if (strikes(symbol) && symbol !== DEAD_NOTE) tone = true;
+      sounding = symbol !== ".";
+    });
+    // No note shorter than half a sixteenth (BA-14). With a gap a note has at least a
+    // sixteenth, however the figure is written.
+    grid.forEach((symbol, step) => {
+      if (!strikes(symbol) && symbol !== "o") return;
+      if (symbol === DEAD_NOTE) return;
+      let length = 1;
+      while (grid[step + length] === "-") length++;
+      const next = grid[step + length];
+      const part =
+        symbol === "o" ? line.length.short : next === "o" ? line.length.long : line.length.note;
+      const gap = line.length.gap;
+      // A gap that is no gap at all is said once, below, and not of every note.
+      if (gap !== undefined && !(gap > 0)) return;
+      const space = gap === undefined ? length : Math.min(1, gap);
+      if (space * STEP * part < SHORTEST)
+        problems.push(
+          `${at}: the note on step ${step + 1} would last ${Math.round(space * STEP * part)} ticks; the shortest bass note is ${SHORTEST}.`,
+        );
+    });
+    return grid;
   }
 
   function checkLine(line: BassLine, where: string): void {
@@ -113,40 +167,74 @@ export function validateBassStyle(bass: BassStyle): string[] {
     else if (figures.every((figure) => figure.weight === 0))
       problems.push(`${where}: every figure's weight is zero, so none can be chosen.`);
     figures.forEach((figure, i) => {
-      const at = `${where}, figure ${i + 1} "${figure.grid}"`;
-      const grid = cells(figure.grid);
-      const bad = grid.filter((symbol) => !"xo-.".includes(symbol));
-      if (bad.length > 0) {
-        const named = [...new Set(bad)].map((symbol) => `"${symbol}"`).join(", ");
-        problems.push(`${at}: it uses ${named}; write x, o, - or a dot.`);
-      }
+      const at = `${where}, figure ${figure.name ?? i + 1} "${figure.grid}"`;
+      const grid = checkGrid(figure, line, at);
       if (grid.length !== FIGURE_STEPS)
         problems.push(`${at}: it has ${grid.length} steps; a bar of 4/4 is ${FIGURE_STEPS}.`);
-      if (!grid.includes("x")) problems.push(`${at}: it never plays a tone (x).`);
-      let sounding = false;
-      let tone = false;
-      grid.forEach((symbol, step) => {
-        if (symbol === "-" && !sounding)
-          problems.push(`${at}: step ${step + 1} holds a note that was never struck.`);
-        if (symbol === "o" && !tone)
-          problems.push(`${at}: step ${step + 1} strikes a tone again before any tone was played.`);
-        if (symbol === "x") tone = true;
-        sounding = symbol !== ".";
-      });
-      // No note shorter than half a sixteenth (BA-14).
-      grid.forEach((symbol, step) => {
-        if (symbol !== "x" && symbol !== "o") return;
-        let length = 1;
-        while (grid[step + length] === "-") length++;
-        const next = grid[step + length];
-        const part =
-          symbol === "o" ? line.length.short : next === "o" ? line.length.long : line.length.note;
-        if (length * STEP * part < SHORTEST)
+    });
+
+    // Turns: a beat or two laid over the end of the bar.
+    const turns = line.turns;
+    if (turns) {
+      chance(turns.offer, `${where}, turns offered`);
+      hold(turns.hold, `${where}, turns`);
+      if (turns.options.some((turn) => !(turn.weight >= 0)))
+        problems.push(`${where}: a turn's weight is negative or not a number.`);
+      else if (turns.offer > 0 && turns.options.every((turn) => turn.weight === 0))
+        problems.push(`${where}: turns are offered but every turn's weight is zero.`);
+      turns.options.forEach((turn, i) => {
+        const at = `${where}, turn ${turn.name ?? i + 1} "${turn.grid}"`;
+        const grid = checkGrid(turn, line, at);
+        if (grid.length !== 4 && grid.length !== 8)
           problems.push(
-            `${at}: the note on step ${step + 1} would last ${Math.round(length * STEP * part)} ticks; the shortest bass note is ${SHORTEST}.`,
+            `${at}: it has ${grid.length} steps; a turn is one beat or two, 4 sixteenths or 8.`,
           );
       });
-    });
+    }
+
+    // A walked line.
+    const walked = line.walked;
+    if (walked) {
+      if (!(Number.isInteger(walked.reach) && walked.reach >= 2 && walked.reach <= 12))
+        problems.push(
+          `${where}, walked: a reach of ${walked.reach} semitones is not a whole number from 2 to 12.`,
+        );
+      if (!(Number.isInteger(walked.intoApproach) && walked.intoApproach >= 2))
+        problems.push(
+          `${where}, walked: the move onto the approach, ${walked.intoApproach}, must be a whole step or more, or some approaches cannot be reached.`,
+        );
+      const weights = [
+        walked.weights.chord.strong,
+        walked.weights.chord.weak,
+        walked.weights.scale.strong,
+        walked.weights.scale.weak,
+      ];
+      if (weights.some((weight) => !(weight >= 0)))
+        problems.push(`${where}, walked: a weight is negative or not a number.`);
+      if (!(walked.weights.chord.strong > 0 && walked.weights.chord.weak > 0))
+        problems.push(
+          `${where}, walked: chord tones need a weight on strong and on weak beats, or a walk can have no note to play.`,
+        );
+      const ways = [walked.toward, walked.away, walked.onward, walked.back, walked.early];
+      if (ways.some((way) => !(way > 0)))
+        problems.push(
+          `${where}, walked: the weights toward, away, onward, back and early must be more than 0.`,
+        );
+      chance(walked.otherOctave, `${where}, walked: the other octave`);
+    }
+
+    // The same draw under one name must be the same list, or a section's quiet riff is
+    // not its loud one thinned.
+    const drawn = line.figures.draw;
+    if (drawn !== undefined) {
+      const signature = figures.map((figure) => figure.weight).join(",");
+      const known = draws.get(drawn);
+      if (known === undefined) draws.set(drawn, signature);
+      else if (known !== signature)
+        problems.push(
+          `${where}: its figures share the draw "${drawn}" with another tier but not its list of weights (${signature} against ${known}).`,
+        );
+    }
 
     if (line.otherMeters !== "pulses" && line.otherMeters !== "downbeat")
       problems.push(`${where}: "${line.otherMeters}" is not a way to play other meters.`);
@@ -157,6 +245,10 @@ export function validateBassStyle(bass: BassStyle): string[] {
     share(line.length.note, `${where}, note length`);
     share(line.length.long, `${where}, long length`);
     share(line.length.short, `${where}, short length`);
+    if (line.length.gap !== undefined && !(line.length.gap > 0))
+      problems.push(
+        `${where}: a gap of ${line.length.gap} sixteenths is no room for a note; write more than 0.`,
+      );
     for (const [name, value] of Object.entries(line.velocity)) {
       level(value, `${where}, ${name} velocity`);
     }

@@ -1,11 +1,13 @@
 // What a bassist would say about a bass line, measured at the changes.
 
 import { PPQ } from "../../chart/types.ts";
+import { STEP } from "../../perform/grid.ts";
+import { pulseTicks } from "../../perform/meter.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
-import { chordFamily } from "../../theory/chord.ts";
+import { chordFamily, chordTones } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { Change } from "../read.ts";
 import { barAt, bassChanges, chordAt, mean, musicBars, notesIn, notesOf, share } from "../read.ts";
@@ -154,6 +156,358 @@ function shareOf(take: Take, changes: readonly Change[], kind: Approach) {
   return share(kinds.filter((k) => k === kind).length, kinds.length);
 }
 
+/** A kick softer than this, as played, is feathered or ghosted: felt, and not a kick to lock to (BA-13). */
+const HEARD_KICK = 40;
+/**
+ * A held note as it sounds: one written a half note long is played a little
+ * short of it (a two-feel's half notes ring nine tenths of their length).
+ */
+const HELD = 1.6 * PPQ;
+
+/** Bars where the bass is past its quiet part, short of the ending bar. */
+function movingBars(take: Take): PlanBar[] {
+  return musicBars(take).filter((bar) => {
+    const tier = bassTier(bar);
+    return !bar.ending && tier !== null && tier !== "low";
+  });
+}
+
+/** Whether a note is one of its chord's own (its slash bass included). */
+function onTheChord(take: Take, note: NoteEvent): boolean | null {
+  const chord = chordAt(take, note.tick);
+  if (!chord) return null;
+  const pc = mod12(note.pitch);
+  if (pc === pitchClass(chord.bass ?? chord.root)) return true;
+  const root = pitchClass(chord.root);
+  return chordTones(chord.quality).some((tone) => mod12(root + tone.interval) === pc);
+}
+
+/**
+ * The bass's moves, stretch by stretch: each run of bars past the quiet level
+ * played one after another is a stretch, and a move is one pitched note
+ * against the one before it.
+ */
+function movingStretches(take: Take): number[][] {
+  const bass = notesOf(take, "bass");
+  const stretches: number[][] = [];
+  let last = -2;
+  for (const bar of movingBars(take)) {
+    if (bar.index !== last + 1) stretches.push([]);
+    last = bar.index;
+    for (const note of notesIn(bass, bar)) {
+      if (note.voice === undefined) stretches.at(-1)!.push(note.pitch);
+    }
+  }
+  return stretches;
+}
+
+/** A bar note for note: where each note falls, what it is, and whether it is a dead one. */
+function barOf(notes: readonly NoteEvent[], bar: PlanBar): string {
+  return notes.map((note) => `${note.tick - bar.start}:${note.voice ?? note.pitch}`).join(" ");
+}
+
+/**
+ * Measures of one way of playing: a walk, a riff. Each is on the scorecard only
+ * of a style that sets it a target.
+ */
+const idiomMeasures: readonly Measure[] = [
+  {
+    id: "bass.notes-per-beat-walking",
+    seat: "bass",
+    idiom: true,
+    says: "Past the quiet level the bass is in four: a note on every beat, and no more.",
+    unit: "per beat",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      const rates = movingBars(take).map(
+        (bar) => notesIn(bass, bar).length / pulseTicks(bar.meter).length,
+      );
+      return mean(rates);
+    },
+  },
+  {
+    id: "bass.semitones-per-move-walking",
+    seat: "bass",
+    idiom: true,
+    says: "A walking line moves mostly by step, with a third or a fourth now and then.",
+    unit: "semitones",
+    of(take) {
+      const moves: number[] = [];
+      for (const stretch of movingStretches(take)) {
+        for (let i = 1; i < stretch.length; i++) {
+          const move = Math.abs(stretch[i]! - stretch[i - 1]!);
+          if (move > 0) moves.push(move);
+        }
+      }
+      return mean(moves);
+    },
+  },
+  {
+    id: "bass.repeated-notes",
+    seat: "bass",
+    idiom: true,
+    says: "A walking line never says a note twice running: it keeps moving.",
+    unit: "share",
+    of(take) {
+      let moves = 0;
+      let repeats = 0;
+      for (const stretch of movingStretches(take)) {
+        for (let i = 1; i < stretch.length; i++) {
+          moves++;
+          if (stretch[i] === stretch[i - 1]) repeats++;
+        }
+      }
+      return share(repeats, moves);
+    },
+  },
+  {
+    id: "bass.strong-beats-on-the-chord",
+    seat: "bass",
+    idiom: true,
+    says: "On beats 1 and 3 a walking line plays the chord; the notes that pass fall on 2 and 4.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let strong = 0;
+      let tones = 0;
+      for (const bar of movingBars(take)) {
+        if (bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+        for (const note of notesIn(bass, bar)) {
+          const at = note.tick - bar.start;
+          if (at !== 0 && at !== 2 * PPQ) continue;
+          const tone = onTheChord(take, note);
+          if (tone === null) continue;
+          strong++;
+          if (tone) tones++;
+        }
+      }
+      return share(tones, strong);
+    },
+  },
+  {
+    id: "bass.run-length",
+    seat: "bass",
+    idiom: true,
+    says: "A walking line goes somewhere: it keeps on the same way for a few notes before it turns, where a line that wanders round one note turns at every step.",
+    unit: "ratio",
+    of(take) {
+      let moves = 0;
+      let runs = 0;
+      for (const stretch of movingStretches(take)) {
+        let way = 0;
+        for (let i = 1; i < stretch.length; i++) {
+          const move = Math.sign(stretch[i]! - stretch[i - 1]!);
+          if (move === 0) continue;
+          moves++;
+          if (move !== way) runs++;
+          way = move;
+        }
+      }
+      return runs === 0 ? null : { value: moves / runs, cases: runs };
+    },
+  },
+  {
+    id: "bass.rocking",
+    seat: "bass",
+    idiom: true,
+    says: "A walking line does not mark time on two notes: it seldom goes straight back to the note it has just left.",
+    unit: "share",
+    of(take) {
+      let moves = 0;
+      let back = 0;
+      for (const stretch of movingStretches(take)) {
+        for (let i = 2; i < stretch.length; i++) {
+          if (stretch[i - 1] === stretch[i - 2]) continue;
+          moves++;
+          if (stretch[i] === stretch[i - 2]) back++;
+        }
+      }
+      return share(back, moves);
+    },
+  },
+  {
+    id: "bass.half-steps-into-changes-walking",
+    seat: "bass",
+    idiom: true,
+    says: "Walking, the bass comes into a good half of its changes by a half step, from under or from over, and into the rest by a scale step or from the fifth.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let changes = 0;
+      let halfSteps = 0;
+      for (const change of bassChanges(take)) {
+        const leaving = barAt(take, change.tick - 1);
+        const tier = leaving ? bassTier(leaving) : null;
+        if (!leaving || leaving.ending || tier === null || tier === "low") continue;
+        const landing = bass.find((note) => note.tick === change.tick);
+        const before = bass.findLast((note) => note.tick < change.tick);
+        if (!landing || !before || change.tick - before.tick > PPQ * 1.5) continue;
+        changes++;
+        if (Math.abs(before.pitch - landing.pitch) === 1) halfSteps++;
+      }
+      return share(halfSteps, changes);
+    },
+  },
+  {
+    id: "bass.bar-same-as-the-bar-before",
+    seat: "bass",
+    idiom: true,
+    says: "A walking line does not play the same bar twice running, note for note.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      const bars = movingBars(take);
+      let pairs = 0;
+      let same = 0;
+      bars.forEach((bar, i) => {
+        const before = bars[i - 1];
+        if (!before || before.index !== bar.index - 1) return;
+        pairs++;
+        if (barOf(notesIn(bass, bar), bar) === barOf(notesIn(bass, before), before)) same++;
+      });
+      return share(same, pairs);
+    },
+  },
+  {
+    id: "bass.held-notes-on-the-chord",
+    seat: "bass",
+    idiom: true,
+    says: "A note held a half note or more is a tone of its chord: a passing tone passes.",
+    unit: "share",
+    of(take) {
+      let held = 0;
+      let tones = 0;
+      for (const note of notesOf(take, "bass")) {
+        if (note.duration < HELD) continue;
+        const tone = onTheChord(take, note);
+        if (tone === null) continue;
+        held++;
+        if (tone) tones++;
+      }
+      return share(tones, held);
+    },
+  },
+  {
+    id: "bass.syncopated-sixteenths",
+    seat: "bass",
+    idiom: true,
+    says: 'Some of a funk line sits on the sixteenths between the eighths, the "e"s and the "a"s: enough to push, not so much that the beat is lost.',
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let notes = 0;
+      let off = 0;
+      for (const bar of musicBars(take)) {
+        if (bar.ending) continue;
+        for (const note of notesIn(bass, bar)) {
+          notes++;
+          if (((note.tick - bar.start) / STEP) % 2 === 1) off++;
+        }
+      }
+      return share(off, notes);
+    },
+  },
+  {
+    id: "bass.kicks-doubled",
+    seat: "bass",
+    idiom: true,
+    says: "The bass is locked to the kick: where the drummer's foot falls, the bass plays with it.",
+    unit: "share",
+    of(take) {
+      const struck = new Set(notesOf(take, "bass").map((note) => note.tick));
+      const kicks = notesOf(take, "drums").filter((note) => {
+        if (note.voice !== "kick" || note.velocity < HEARD_KICK) return false;
+        const bar = barAt(take, note.tick);
+        return (
+          bar?.kind === "music" && bar.seats.bass !== null && chordAt(take, note.tick) !== null
+        );
+      });
+      return share(kicks.filter((kick) => struck.has(kick.tick)).length, kicks.length);
+    },
+  },
+  {
+    id: "bass.on-the-one",
+    seat: "bass",
+    idiom: true,
+    says: "The One is always there: every bar opens with the bass on its downbeat.",
+    unit: "share",
+    of(take) {
+      const struck = new Set(notesOf(take, "bass").map((note) => note.tick));
+      const bars = musicBars(take).filter(
+        (bar) => bar.seats.bass !== null && chordAt(take, bar.start) !== null,
+      );
+      return share(bars.filter((bar) => struck.has(bar.start)).length, bars.length);
+    },
+  },
+  {
+    id: "bass.riff-held",
+    seat: "bass",
+    idiom: true,
+    says: "A riff is the same riff in every bar: through one time round a section, the front half of the bar (where no turn, fill or lead-in reaches) keeps one rhythm.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      const fronts = new Map<string, Map<string, number>>();
+      let bars = 0;
+      for (const bar of musicBars(take)) {
+        const tier = bassTier(bar);
+        if (bar.ending || tier === null || bar.meter.beats !== 4 || bar.meter.unit !== 4) continue;
+        // A chord that lands inside the front half is stated there, riff or no riff.
+        if (bar.spans.some((span) => !span.tied && span.start > 0 && span.start < 2 * PPQ))
+          continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        const front = notesIn(bass, bar)
+          .filter((note) => note.tick - bar.start < 2 * PPQ)
+          .map((note) => `${note.tick - bar.start}${note.voice ?? ""}`)
+          .join(" ");
+        const key = `${bar.section.occurrence}/${tier}`;
+        const known = fronts.get(key) ?? new Map<string, number>();
+        known.set(front, (known.get(front) ?? 0) + 1);
+        fronts.set(key, known);
+        bars++;
+      }
+      let usual = 0;
+      for (const known of fronts.values()) usual += Math.max(...known.values());
+      return share(usual, bars);
+    },
+  },
+  {
+    id: "bass.dead-notes",
+    seat: "bass",
+    idiom: true,
+    says: "Past the quiet level a funk line has dead notes in it: thumps between the notes, a few to the bar and not a bar of them.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let notes = 0;
+      let dead = 0;
+      for (const bar of movingBars(take)) {
+        for (const note of notesIn(bass, bar)) {
+          notes++;
+          if (note.voice === "dead") dead++;
+        }
+      }
+      return share(dead, notes);
+    },
+  },
+  {
+    id: "bass.note-length",
+    seat: "bass",
+    idiom: true,
+    says: "Funk notes are short: on average well under an eighth note, in sixteenths.",
+    unit: "ratio",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      const lengths: number[] = [];
+      for (const bar of musicBars(take)) {
+        if (bar.ending) continue;
+        for (const note of notesIn(bass, bar)) lengths.push(note.duration / STEP);
+      }
+      return mean(lengths);
+    },
+  },
+];
+
 export const bassMeasures: readonly Measure[] = [
   {
     id: "bass.changes-stated",
@@ -214,6 +568,7 @@ export const bassMeasures: readonly Measure[] = [
   {
     id: "bass.sixths-on-dominants",
     seat: "bass",
+    idiom: true,
     says: "Once the band is past quiet, the line rocks through the sixth over a dominant chord: the boogie sound, present but not constant.",
     unit: "share",
     of(take) {
@@ -234,12 +589,20 @@ export const bassMeasures: readonly Measure[] = [
   {
     id: "bass.notes-per-beat-when-quiet",
     seat: "bass",
+    idiom: true,
     says: "When the band is quiet the bass plays in two: about a note every other beat.",
     unit: "per beat",
     of(take) {
       const bass = notesOf(take, "bass");
       const rates = musicBars(take)
-        .filter((bar) => tierOf(bar.energy) === "low" && !bar.ending && bar.meter.unit === 4)
+        // In four only: in three a bass in two has one note to play, and that is not "two".
+        .filter(
+          (bar) =>
+            tierOf(bar.energy) === "low" &&
+            !bar.ending &&
+            bar.meter.unit === 4 &&
+            bar.meter.beats === 4,
+        )
         .map((bar) => notesIn(bass, bar).length / bar.meter.beats);
       return mean(rates);
     },
@@ -281,6 +644,7 @@ export const bassMeasures: readonly Measure[] = [
   {
     id: "bass.bar-shapes-per-chorus",
     seat: "bass",
+    idiom: true,
     says: "At the working level a chorus is more than one or two bars played over and over: the line has a few shapes, not one and not twelve.",
     unit: "ratio",
     of: (take) => shapesPerChorus(take, 1),
@@ -288,6 +652,7 @@ export const bassMeasures: readonly Measure[] = [
   {
     id: "bass.two-bar-shapes-per-chorus",
     seat: "bass",
+    idiom: true,
     says: "At the working level the two-bar units of a chorus are not all the same two bars.",
     unit: "ratio",
     of: (take) => shapesPerChorus(take, 2),
@@ -337,6 +702,7 @@ export const bassMeasures: readonly Measure[] = [
   {
     id: "bass.walks-into-a-line",
     seat: "bass",
+    idiom: true,
     says: "Inside a chorus, a line sometimes ends by walking into the next one, less often than into the top.",
     unit: "share",
     of: (take) => shareOf(take, lineEnds(take, false), "walk"),
@@ -351,6 +717,7 @@ export const bassMeasures: readonly Measure[] = [
   {
     id: "bass.walks-inside-lines",
     seat: "bass",
+    idiom: true,
     says: "A walk belongs at the end of a line: in the middle of one, into a change that does not start a phrase, it is rare.",
     unit: "share",
     of(take) {
@@ -381,4 +748,5 @@ export const bassMeasures: readonly Measure[] = [
       return share(steps, cases);
     },
   },
+  ...idiomMeasures,
 ];

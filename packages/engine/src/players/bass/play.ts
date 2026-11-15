@@ -3,9 +3,12 @@
 // I play on it. Every root is placed before the notes that lead to it are
 // written, so a lead-in always lands on the note it promised (BA-05 to BA-07).
 
+import { PPQ } from "../../chart/types.ts";
 import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
+import type { PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
+import { GHOST_BELOW } from "../drums/kit.ts";
 import type { BassPick } from "./critique.ts";
 import { byBassCritic } from "./critique.ts";
 import { finalNotes, strikeBefore } from "./ending.ts";
@@ -14,13 +17,23 @@ import { pieces, tierAt } from "./form.ts";
 import type { LeadIn, LeadInRequest } from "./leadin.ts";
 import { applyLeadIn, leadIn, leadInChance, OCTAVE } from "./leadin.ts";
 import type { LineNote } from "./line.ts";
-import { lineOf, write } from "./line.ts";
+import { lineOf, turnOf, write } from "./line.ts";
 import type { Performer } from "./phrase.ts";
 import { playPhrases } from "./phrase.ts";
 import { anchorOf, lowestRoot, placeRoot } from "./register.ts";
 import type { BassStyle, LineShape, ToneSequence } from "./style.ts";
-import { bassPitchClass, inHarmony, remember, sequenceFor, toneOf, tonePitch } from "./tones.ts";
+import {
+  bassPitchClass,
+  HIGHEST_ROOT,
+  inHarmony,
+  LOW_E,
+  remember,
+  sequenceFor,
+  toneOf,
+  tonePitch,
+} from "./tones.ts";
 import { walkInto } from "./walk.ts";
+import { finalSpan, repitch, walkedPitches, walkedRoot } from "./walking.ts";
 
 export const playBass: Player = (context) => bassPart(context);
 
@@ -32,12 +45,12 @@ export const playBass: Player = (context) => bassPart(context);
 export function bassPart(context: PlayerContext, pick?: BassPick): WrittenNote[] {
   const { plan, style, rng } = context;
   const bass = style.bass;
-  const form = pieces(plan);
+  const form = pieces(plan, bass.stepsUpEarly === true);
   const parts = playPhrases(
     form,
     bass,
     rng,
-    performer(form, bass, rng),
+    performer(form, bass, rng, context.heard.drums),
     pick ?? byBassCritic(style.critic.weights.bass ?? {}),
   );
   const written: WrittenNote[] = [];
@@ -55,7 +68,13 @@ function sounds(form: readonly Piece[], i: number): boolean {
   return piece.chord !== null && !(piece.ending === "final" && form[i - 1]?.ending === "final");
 }
 
-export function performer(form: readonly Piece[], bass: BassStyle, rng: Rng): Performer {
+export function performer(
+  form: readonly Piece[],
+  bass: BassStyle,
+  rng: Rng,
+  /** The drummer's written notes by plan bar, where there is a drummer to hear. */
+  drums?: readonly (readonly WrittenNote[])[],
+): Performer {
   // The plans weighed for a phrase mostly share their bars, so a bar is written once for
   // each root and shape it is tried with, and handed out as a copy a lead-in may reshape.
   const written = new Map<number, readonly LineNote[]>();
@@ -70,17 +89,105 @@ export function performer(form: readonly Piece[], bass: BassStyle, rng: Rng): Pe
     if (!ids.has(shape)) ids.set(shape, ids.size);
     return ids.get(shape)!;
   };
+  // The kicks to lock to: the ones the drummer actually played in the bar, a fill's
+  // included, and not the ones he only feathers or ghosts (BA-13, DR-105).
+  const kicks = new Map<number, readonly number[]>();
+  const kicksIn = (bar: PlanBar): readonly number[] =>
+    remember(kicks, bar.index, () =>
+      (drums?.[bar.index] ?? [])
+        .filter((note) => note.voice === "kick" && note.velocity >= GHOST_BELOW)
+        .map((note) => note.tick - bar.start),
+    );
+  // A walk's draws belong to the plan that is weighing it and to the stretch's place.
+  const walking = rng.fork("walking");
+  const strideOf = (plan: Rng | null | undefined, piece: Piece) =>
+    heldRng(plan ?? walking, "stride", "bar", piece.bar).fork(piece.start - piece.bar.start);
+  /** Whether the piece after this one will walk this one into its landing. */
+  const bound = (i: number) => {
+    const next = form[i + 1];
+    return next?.struck === true && sounds(form, i + 1) && form[i]!.ending === null;
+  };
+  /**
+   * A chord that only passes (a beat or less) on its way to a root a step off
+   * by name is played beside that root, where the instrument has the note:
+   * E9 for a beat into F9 is the E under the F, not the one a seventh above it
+   * (BA-07, said of the root itself). Only where every root has one place, so
+   * the next root's is known before the line gets there.
+   */
+  const passing = (i: number, root: number): number => {
+    const piece = form[i]!;
+    const next = form[i + 1];
+    if (bass.register.pull !== 1 || !next?.struck || !next.chord) return root;
+    if (piece.end - piece.start > PPQ) return root;
+    const home = remember(anchors, i + 1, () => anchorOf(bass.register, rng, next.bar));
+    // The final chord lands on the lowest root there is (EN-27).
+    const landing =
+      next.ending === "final"
+        ? lowestRoot(bassPitchClass(next.chord))
+        : placeRoot(bassPitchClass(next.chord), bass.register, home, null);
+    if (Math.abs(root - landing) <= 2) return root;
+    const beside = [root - OCTAVE, root + OCTAVE].find(
+      (pitch) => pitch >= LOW_E && pitch <= HIGHEST_ROOT && Math.abs(pitch - landing) <= 2,
+    );
+    return beside ?? root;
+  };
   return {
+    turn(i) {
+      const piece = form[i]!;
+      if (!sounds(form, i) || piece.ending !== null) return null;
+      return turnOf(bass.lines[tierAt(piece)], tierAt(piece), piece.bar, rng);
+    },
+
     arrive(i, state, parts, into) {
       const piece = form[i]!;
       if (!sounds(form, i) || !piece.struck) return { state, walked: null };
       const anchor = remember(anchors, i, () => anchorOf(bass.register, rng, piece.bar));
-      const own = placeRoot(bassPitchClass(piece.chord!), bass.register, anchor, state.line);
+      const own = toTheEnd(
+        form,
+        i,
+        passing(i, placeRoot(bassPitchClass(piece.chord!), bass.register, anchor, state.line)),
+      );
       // Only a line still in motion can be reshaped to lead in: not a rest, not the ending bar.
       const leaving = form[i - 1];
       const moving = leaving?.chord && leaving.ending === null ? leaving : null;
       const notes = parts[i - 1] ?? [];
       const before = moving ? soundingBefore(form, parts, i - 1) : null;
+
+      // A walked line is not reshaped to lead in: it is walked here, now that the place
+      // it is going is known. The approach is the walk's own last note.
+      const walked = moving ? bass.lines[tierAt(moving)].walked : undefined;
+      if (moving && walked) {
+        const from = moving.struck ? state.root : (before ?? state.root);
+        const tones = notes.filter((note) => !note.echo).length;
+        const moves = tones + (moving.struck ? 0 : 1);
+        const stride = strideOf(into.walked, moving);
+        const pc = bassPitchClass(piece.chord!);
+        // The last note is the lowest root on the instrument where the walk can get down
+        // to it; otherwise the line ends in its own octave (EN-27, EN-28).
+        const low = lowestRoot(pc);
+        const target =
+          piece.ending === "final"
+            ? Math.abs(low - from) <= finalSpan(moves, walked)
+              ? low
+              : own
+            : toTheEnd(form, i, walkedRoot(pc, bass.register, anchor, from, moves, walked, stride));
+        const pitches = walkedPitches({
+          piece: moving,
+          notes,
+          root: state.root,
+          arrives: moving.struck,
+          before,
+          landing: { tick: piece.start, pitch: target, chord: piece.chord!, key: piece.bar.key },
+          line: walked,
+          kinds: bass.leadIn.kinds,
+          ceiling: bass.lines[tierAt(moving)].ceiling,
+          home: anchor,
+          pull: bass.register.pull,
+          rng: stride,
+        });
+        repitch(notes, pitches, moving);
+        return { state: { line: state.line, root: target }, walked: null };
+      }
       const request = () =>
         moving
           ? approachFrom(
@@ -112,7 +219,7 @@ export function performer(form: readonly Piece[], bass: BassStyle, rng: Rng): Pe
               into.walk,
             )
           : null;
-      const walked = (target: number) => {
+      const walkedTo = (target: number) => {
         const done = walk(target);
         if (!done) return null;
         parts[i - 1] = done.notes;
@@ -127,14 +234,14 @@ export function performer(form: readonly Piece[], bass: BassStyle, rng: Rng): Pe
           request(),
           rested ? null : state.line,
         );
-        const arrival = walked(landing.pitch);
+        const arrival = walkedTo(landing.pitch);
         if (arrival) return arrival;
         if (landing.lead) applyLeadIn(notes, landing.lead, piece.start);
         return { state: { line: state.line, root: landing.pitch }, walked: null };
       }
 
       if (!moving) return { state: { line: state.line, root: own }, walked: null };
-      const arrival = walked(own);
+      const arrival = walkedTo(own);
       if (arrival) return arrival;
       // The same lead-in question is asked of most plans weighed for a phrase: answered once.
       // Keyed by the bar the notes were written as (which holds the root they stand on), the
@@ -151,7 +258,7 @@ export function performer(form: readonly Piece[], bass: BassStyle, rng: Rng): Pe
       return { state: { line: state.line, root: own }, walked: null };
     },
 
-    play(i, state, parts, choose) {
+    play(i, state, parts, choose, how) {
       if (!sounds(form, i)) return state;
       const piece = form[i]!;
       const tier = tierAt(piece);
@@ -173,18 +280,61 @@ export function performer(form: readonly Piece[], bass: BassStyle, rng: Rng): Pe
           sequenceFor(line.tones, piece.chord!, piece.scale!),
         );
         const shape = choose ? choose(sequence, line.tones.indexOf(sequence)) : sequence;
-        const key = (i * 128 + state.root) * 256 + idOf(shape);
+        const turn = how?.turn ? turnOf(line, tier, piece.bar, rng) : null;
+        const key = ((i * 128 + state.root) * 256 + idOf(shape)) * 2 + (turn ? 1 : 0);
         let notes = written.get(key);
         if (!notes) {
-          notes = lineOf(piece, line, tier, state.root, rng, () => shape);
+          const played = { turn, kicks: line.followsKick ? kicksIn(piece.bar) : [] };
+          notes = lineOf(piece, line, tier, state.root, rng, () => shape, played);
           written.set(key, notes);
         }
         parts[i] = notes.map((note) => ({ ...note }));
         origin.set(parts[i]!, key);
+        if (line.walked) {
+          // The piece after this one walks it, once it knows where it lands; until then
+          // the line stands where the stretch began.
+          if (bound(i)) return { ...state, line: piece.struck ? state.root : state.line };
+          // Nothing to arrive at (the chord carries on, or the music stops): walked as it is.
+          // Into a rest the line stays where the roots are, so that wherever it comes back
+          // in, it has not leapt.
+          const resting = form[i + 1]?.chord === null;
+          const pitches = walkedPitches({
+            piece,
+            notes: parts[i]!,
+            root: state.root,
+            arrives: piece.struck,
+            before: soundingBefore(form, parts, i),
+            landing: null,
+            line: line.walked,
+            kinds: bass.leadIn.kinds,
+            ceiling: resting ? Math.min(line.ceiling, bass.register.highest + 1) : line.ceiling,
+            home: remember(anchors, i, () => anchorOf(bass.register, rng, piece.bar)),
+            pull: bass.register.pull,
+            rng: strideOf(how?.walked, piece),
+          });
+          repitch(parts[i]!, pitches, piece);
+        }
       }
       return { ...state, line: parts[i]!.findLast((note) => !note.echo)?.pitch ?? state.line };
     },
   };
+}
+
+/**
+ * The last chord before the final one, and any chord struck on the way to it
+ * in the ending bar, is played where the final low root can be reached from:
+ * within an octave of it (EN-27, EN-28). Any other root stays where it was put.
+ */
+function toTheEnd(form: readonly Piece[], i: number, root: number): number {
+  if (form[i]!.ending === "final") return root;
+  let end = i + 1;
+  while (form[end] && (form[end]!.ending === "before" || !form[end]!.struck)) end++;
+  const final = form[end];
+  if (final?.ending !== "final" || !final.chord) return root;
+  const low = lowestRoot(bassPitchClass(final.chord));
+  let pitch = root;
+  while (pitch - low > OCTAVE && pitch - OCTAVE >= lowestRoot(pitch)) pitch -= OCTAVE;
+  return pitch;
 }
 
 /** Whether the note just before a piece is a chromatic one over its own chord. */

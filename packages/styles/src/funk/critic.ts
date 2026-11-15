@@ -26,6 +26,38 @@ export const funkCritic: CriticStyle = {
     "drums.answer-bars": { min: 0.5, kind: "intent", minCases: 4 },
     "drums.turn-held": { min: 0.86, kind: "intent", minCases: 4 },
     // ── bass ──
+    // Numbers beside a bound are from 200 takes of the library.
+    //
+    // A chord's arrival always gets its root, whatever the riff says there (ST-funk-17).
+    "bass.changes-stated": { min: 0.95, kind: "intent" },
+    // The One is always there.
+    "bass.on-the-one": { min: 0.95, kind: "intent", minCases: 8 },
+    // 10% to 60% of notes on the sixteenths between the eighths (ST-funk-22): 33%.
+    "bass.syncopated-sixteenths": { min: 0.1, max: 0.6, kind: "intent", minCases: 40 },
+    // Locked to the kick. The old band's floor was 35% of kicks doubled (ST-funk-22); here a
+    // root goes wherever the kick plays and the riff is silent (BA-39), so every kick has
+    // the bass on it.
+    "bass.kicks-doubled": { min: 0.9, kind: "intent", minCases: 8 },
+    // The riff is the same riff in every bar (X-A-29): the front half of the bar, where
+    // no turn, fill or lead-in reaches, keeps its rhythm in every bar of every take.
+    "bass.riff-held": { min: 0.95, kind: "intent", minCases: 8 },
+    // Short notes: never more than two and a quarter sixteenths (ST-funk-18); 1.4 on average.
+    "bass.note-length": { max: 2.25, kind: "intent", minCases: 40 },
+    // Dead notes past the quiet level: 15% of notes over everything, none in a section
+    // whose riff has none, 26% in the take with the most.
+    "bass.dead-notes": { max: 0.3, kind: "measured", minCases: 40 },
+    // Into a change, the riff's last sixteenth leans in three times in ten at most (BA-41):
+    // 11% of all changes, since most riffs have no note there.
+    "bass.half-step-approaches": { max: 0.35, kind: "intent", minCases: 8 },
+    "bass.lead-ins-that-leap": { max: 0.05, kind: "intent", minCases: 5 },
+    // The line lives low (gate 3). Every root has one place, F1 to E2, so the average note
+    // is B1 to D2 in every key of the library but E, where the root is E2 and the pops are
+    // on E3: G2 on the one-chord vamp, with 16% of its notes above D3 (none are in C or D
+    // minor, 1% in A, 5% on the verse and bridge in E). That is where a riff in E is
+    // fingered; if it reads high, `register` in bass.ts is the one line that puts E on the
+    // open string.
+    "bass.register": { min: 33, max: 45, kind: "measured" },
+    "bass.high-notes": { max: 0.25, kind: "measured", minCases: 40 },
     // ── chords ──
     // The grip (ST-funk-26). The top of it is a line: it holds or steps, and seldom jumps
     // more than a fourth (CH-17; 2% of changes delivered).
@@ -174,5 +206,19 @@ export const funkCritic: CriticStyle = {
     // A groove: one line for the section and one way to play a phrase of it, so the critic
     // has nothing to choose between.
     comping: {},
+    // ── bass ──
+    // What a phrase of the riff costs. The riff itself is not a choice; what is weighed is
+    // whether the phrase's last bar turns (a turn is counted where a walk is), and which
+    // of the last-sixteenth notes lean into a change. Each was set to zero in turn over
+    // 200 takes (ME-10); what it moved is beside it. As built, three chorus tops in four
+    // are turned into (681 of 894) and one line end in eight inside a chorus (213 of 1,708).
+    bass: {
+      // Not the phrase before again: at zero, no line inside a chorus ever turns.
+      "same-as-last": 0.5,
+      // The top of a chorus is where a turn belongs: at zero, tops turned into 76% to 28%.
+      "turnaround-unwalked": 1,
+      // And inside a chorus it costs: at zero, line ends turned 12% to 26%.
+      "walk-out-of-place": 0.5,
+    },
   },
 };

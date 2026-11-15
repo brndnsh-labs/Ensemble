@@ -2,9 +2,10 @@
 // bar: the section has its line, the one he comes back to every time round
 // (X-B-14), and each phrase is a plan made on it: where to answer that line
 // with another way of playing the chord, and how to end it, walking into the
-// next line, leading in with one note, or neither. Several plans are drawn,
-// each is played out into the first note of the next phrase, and the critic
-// picks one.
+// next line, turning the riff round, leading in with one note, or none of
+// them. A walked line is a plan in itself: each plan walks the phrase its own
+// way. Several plans are drawn, each is played out into the first note of
+// the next phrase, and the critic picks one.
 //
 // What is carried forward is what a bassist carries: the last note played,
 // the phrase before, and what he played at this place the last time through.
@@ -20,7 +21,7 @@ import type { Piece } from "./form.ts";
 import { tierAt } from "./form.ts";
 import { leadInChance } from "./leadin.ts";
 import type { LineNote, ShapeChoice } from "./line.ts";
-import type { BassStyle, LineShape, ToneSequence, Walk } from "./style.ts";
+import type { BassStyle, Figure, LineShape, ToneSequence, Walk } from "./style.ts";
 import { aboveBass, bassPitchClass, inHarmony, playable, sequenceFor, shapesIn } from "./tones.ts";
 
 /** What a bassist carries from note to note. */
@@ -39,6 +40,16 @@ export interface Carried {
 export interface Into {
   readonly walk: Rng | null;
   readonly chance: number | null;
+  /** The generator of the plan being weighed, for a walked line: its roots' octaves and its notes. */
+  readonly walked?: Rng | null;
+}
+
+/** What a plan asks of a piece beyond its shape. */
+export interface How {
+  /** The plan's generator for a walked line. */
+  readonly walked?: Rng | null;
+  /** The plan turns the figure round in this bar. */
+  readonly turn?: boolean;
 }
 
 /** Into a change as the style's lead-ins have it, with no walk. */
@@ -57,7 +68,9 @@ export interface Performer {
     into: Into,
   ): { state: Carried; walked: Walk | null };
   /** Write piece `i`'s notes, on the shape `choose` picks. */
-  play(i: number, state: Carried, parts: LineNote[][], choose?: ShapeChoice): Carried;
+  play(i: number, state: Carried, parts: LineNote[][], choose?: ShapeChoice, how?: How): Carried;
+  /** The turn piece `i`'s bar would play if a plan turned it, or null where its line has none. */
+  turn(i: number): Figure | null;
 }
 
 /** A plan for a phrase, before it is played out. */
@@ -73,6 +86,10 @@ interface Plan {
    * already (0 or 1), by piece. A change not listed has the style's coin.
    */
   readonly leads: ReadonlyMap<number, number>;
+  /** This plan's own generator for a walked line. */
+  readonly walked: Rng;
+  /** Whether the phrase's last bar turns its figure round. */
+  readonly turn: boolean;
 }
 
 interface Played {
@@ -110,7 +127,13 @@ export function playPhrases(
     [...Object.values(walks.offer.end), ...Object.values(walks.offer.inside)].some(
       (chance) => chance > 0,
     );
-  if (!policy || policy.candidates < 1 || !(varies || walking)) {
+  // A walked line is a new line every time it is drawn, and a riff may turn: both are choices.
+  const lines = [bass.lines.low, bass.lines.mid, bass.lines.high];
+  const walked = lines.some((line) => line.walked !== undefined);
+  const turning = lines.some(
+    (line) => (line.turns?.offer ?? 0) > 0 && line.turns!.options.some((turn) => turn.weight > 0),
+  );
+  if (!policy || policy.candidates < 1 || !(varies || walking || walked || turning)) {
     // Nothing to choose: one line, piece by piece, its lead-ins as they fall.
     form.forEach((_, i) => {
       if (i > 0) state = player.arrive(i, state, parts, AS_IT_FALLS).state;
@@ -122,6 +145,7 @@ export function playPhrases(
   let before: readonly string[] | null = null;
   let recent: boolean[] = [];
   const lastTime = new Map<string, readonly string[]>();
+  const lastTimeTops = new Map<string, readonly (number | null)[]>();
   let occurrence = -1;
   let plainSoFar = true;
   for (const phrase of phrasesOf(form)) {
@@ -137,6 +161,9 @@ export function playPhrases(
     // The plans, each played out from the same place; a plan that plays the same notes as
     // one already played out is the same plan.
     const stay = staysOf(form, phrase);
+    // The last pitch before the phrase, if the line was not resting.
+    const leading = form[phrase[0]! - 1]?.chord ? parts[phrase[0]! - 1]!.at(-1) : undefined;
+    const lastBar = bars[bars.length - 1]!;
     const played: Played[] = [];
     const heard = new Set<number>();
     for (const plan of plansFor(form, bass, rng, phrase, stay)) {
@@ -155,6 +182,7 @@ export function playPhrases(
           const into = {
             walk: plan.inside?.at === i ? plan.inside.walk : null,
             chance: plan.leads.get(i) ?? null,
+            walked: plan.walked,
           };
           const arrival = player.arrive(i, carried, trial, into);
           carried = arrival.state;
@@ -164,13 +192,23 @@ export function playPhrases(
           }
         }
         const answer = plan.answers[stay[k]!] === true;
-        carried = player.play(i, carried, trial, book.choice(form[i]!, answer, answered, plays));
+        carried = player.play(i, carried, trial, book.choice(form[i]!, answer, answered, plays), {
+          walked: plan.walked,
+          turn: plan.turn && form[i]!.bar === lastBar,
+        });
       });
+      // A turn is the riff's way of ending a line, as a walk is the box's.
+      const turned = plan.turn ? player.turn(last) : null;
       let joins: number | null = null;
       let intoTop = false;
+      let landing: number | null = null;
       if (next) {
-        const arrival = player.arrive(last + 1, carried, trial, plan.ending);
+        const arrival = player.arrive(last + 1, carried, trial, {
+          ...plan.ending,
+          walked: plan.walked,
+        });
         intoTop = next.start === next.bar.start && next.bar.barInSection === 0;
+        if (next.struck && next.chord) landing = arrival.state.root;
         if (arrival.walked) {
           walked.push(intoTop ? "top" : "line");
           walkedAs(form[last]!, arrival.walked);
@@ -181,6 +219,10 @@ export function playPhrases(
           if (bassPitchClass(next.chord) !== bassPitchClass(leaving))
             joins = Math.abs(end.pitch - arrival.state.root);
         carried = arrival.state;
+      }
+      if (turned) {
+        walked.push(intoTop ? "top" : "line");
+        plays.set(lastBar.index, `turn ${turned.name ?? ""}`.trim());
       }
       const notes = phrase.flatMap((i) => trial[i]!);
       // How each change the phrase makes is arrived at: the pitch played in the beat before
@@ -204,11 +246,16 @@ export function playPhrases(
       heard.add(key);
       const plain = answered.size === 0 && walked.length === 0;
       const lastPiece = form[last]!;
+      const shapes = shapesOf(notes, bars);
       played.push({
         candidate: {
           bars,
           notes,
-          shapes: shapesOf(notes, bars),
+          shapes: shapes.shapes,
+          tops: shapes.tops,
+          leading: leading?.pitch ?? null,
+          landing,
+          lastTimeTops: lastTimeTops.get(place) ?? null,
           plays: bars.map((bar) => plays.get(bar.index) ?? ""),
           answered: answered.size / bars.length,
           walks: walked,
@@ -233,6 +280,7 @@ export function playPhrases(
     for (const [i, notes] of commit.parts) parts[i] = notes;
     state = commit.state;
     before = chosen.shapes;
+    lastTimeTops.set(place, chosen.tops);
     for (const [from, landing] of chosen.arrivals) {
       recent.push(from !== null && Math.abs(from - landing) === 1);
     }
@@ -300,6 +348,9 @@ function plansFor(
   // Changes inside the phrase a walk could go into.
   const inner = phrase.filter((i, k) => k > 0 && form[i]!.struck && form[i]!.chord !== null);
   const held = heldRng(rng, "bass-plans", "phrase", first.bar);
+  // Every plan walks a walked line its own way, so no two of them are one plan.
+  const strides = phrase.some((i) => bass.lines[tierAt(form[i]!)].walked !== undefined);
+  const turns = bass.lines[tierAt(last)].turns;
   const plans: Plan[] = [];
   const seen = new Set<string>();
   // More are drawn than are weighed, since two plans often play the same notes.
@@ -326,20 +377,25 @@ function plansFor(
     const leads = new Map<number, number>();
     if (k > 0) {
       for (const i of inner) {
+        // A walk approaches every change itself: there is no lead-in to decide.
+        if (bass.lines[tierAt(form[i - 1]!)].walked) continue;
         const chance = leadInChance(bass, form[i - 1]!, form[i]!);
         leads.set(i, draw.fork("lead", i).chance(chance) ? 1 : 0);
       }
     }
+    const turn = turns !== undefined && draw.fork("turn").chance(turns.offer);
     // Two plans that decide the same things are one plan. A walk's own choice is the plan's.
     const signature = [
       answers.map(Number).join(""),
       ending.walk ? `w${k}` : ending.chance,
       inside ? `${inside.at}w${k}` : "",
       [...leads.values()].join(""),
+      strides ? k : "",
+      turn ? "t" : "",
     ].join("/");
     if (seen.has(signature)) continue;
     seen.add(signature);
-    plans.push({ answers, ending, inside, leads });
+    plans.push({ answers, ending, inside, leads, walked: draw.fork("walked"), turn });
   }
   return plans;
 }
@@ -440,9 +496,16 @@ function resolves(shape: LineShape, piece: Piece, next: Piece | undefined): bool
   return apart === 1 || apart === 11;
 }
 
-/** Each bar of the line as a shape: its notes' places in the bar and their pitches above its first. */
-function shapesOf(notes: readonly LineNote[], bars: readonly PlanBar[]): string[] {
-  return bars.map((bar) => {
+/**
+ * Each bar of the line as a shape, its notes' places in the bar and their
+ * pitches above its first, and that first pitch: together, the bar note for note.
+ */
+function shapesOf(
+  notes: readonly LineNote[],
+  bars: readonly PlanBar[],
+): { shapes: string[]; tops: (number | null)[] } {
+  const tops: (number | null)[] = [];
+  const shapes = bars.map((bar) => {
     let shape = "";
     let first: number | null = null;
     for (const note of notes) {
@@ -450,6 +513,8 @@ function shapesOf(notes: readonly LineNote[], bars: readonly PlanBar[]): string[
       first ??= note.pitch;
       shape += `${note.tick - bar.start}:${note.pitch - first} `;
     }
+    tops.push(first);
     return first === null ? "rest" : shape;
   });
+  return { shapes, tops };
 }

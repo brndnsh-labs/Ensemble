@@ -24,6 +24,45 @@ export const jazzCritic: CriticStyle = {
     // is the idiom. Delivers 15% over everything, 40% at the take one in ten is above.
     "drums.fills-that-repeat": { max: 0.45, kind: "measured", minCases: 4 },
     // ── bass ──
+    // Numbers beside a bound are from 200 takes of the library on the same seeds, three
+    // basses: as built; the first walk drawn for each phrase, no critic; and the old band's
+    // way, one weighted draw a note by the notes' weights alone, no candidates.
+    //
+    // A chord's arrival is its bass note, every time: the notes' occasional third (BA-22)
+    // is not built.
+    "bass.changes-stated": { min: 0.95, kind: "intent" },
+    // In four past the quiet level, in two under it (ST-jazz-24, BA-23).
+    "bass.notes-per-beat-walking": { min: 0.85, max: 1.05, kind: "intent", minCases: 8 },
+    "bass.notes-per-beat-when-quiet": { min: 0.45, max: 0.75, kind: "intent", minCases: 4 },
+    // The walk never repeats a pitch, and moves 1.5 to 4.5 semitones on average (BA-20).
+    "bass.repeated-notes": { max: 0.02, kind: "intent", minCases: 40 },
+    "bass.semitones-per-move-walking": { min: 1.5, max: 4.5, kind: "intent", minCases: 40 },
+    // 30% to 80% of the changes a walk makes are approached by a half step (BA-21). It
+    // delivers 61% (56% with no critic); one take in ten is under 50% or over 68%.
+    "bass.half-steps-into-changes-walking": { min: 0.3, max: 0.8, kind: "intent", minCases: 8 },
+    // A held note is a chord tone, and a lead-in sits beside the note it leads to (ST-jazz-22).
+    "bass.held-notes-on-the-chord": { min: 0.97, kind: "intent", minCases: 4 },
+    "bass.lead-ins-that-leap": { max: 0.05, kind: "intent", minCases: 5 },
+    // Chord tones on 1 and 3: 93.5% as built, 91% first walk, 92% the old way; 89.5% with
+    // the critic's weight for it at zero.
+    "bass.strong-beats-on-the-chord": { min: 0.85, kind: "measured", minCases: 16 },
+    // A line with a direction. Moves in a row the same way before it turns: 3.0 as built
+    // (one take in ten under 2.7), 2.36 first walk, 2.05 the old way, so the floor is one no
+    // take of the old way's reaches and one first walk in five does. Straight back to the
+    // note just left: 3.5% of moves as built, 7% first walk, 14% the old way.
+    "bass.run-length": { min: 2.5, kind: "measured", minCases: 16 },
+    "bass.rocking": { max: 0.08, kind: "measured", minCases: 40 },
+    // A walk that repeats is heard at once. The bar before again: 0.2%, two-chord bars
+    // whose four notes are forced. The bar at this place last chorus, as a shape: 4% as
+    // built, 9% first walk, 13% the old way.
+    "bass.bar-same-as-the-bar-before": { max: 0.03, kind: "intent", minCases: 8 },
+    "bass.bars-same-as-last-chorus": { max: 0.15, kind: "measured", minCases: 12 },
+    "bass.chorus-same-as-last": { max: 0.01, kind: "intent", minCases: 2 },
+    // The line lives low (gate 3: "we should sit in a typical bass guitar register"). Its
+    // home is D2 (ST-jazz-18) and its average note is within a step of that in every key
+    // of the library (Db2 to Eb2); 0.4% of its notes are above D3, 2% on the modal tune.
+    "bass.register": { min: 34, max: 42, kind: "intent" },
+    "bass.high-notes": { max: 0.05, kind: "intent", minCases: 40 },
     // ── chords ──
     // ── solo ──
     // Measured over 200 takes of the seven jazz charts, each also played taking the first
@@ -117,6 +156,28 @@ export const jazzCritic: CriticStyle = {
       // The style's own list of where a change lands: 3rd, 7th, 9th, 5th, root. At zero,
       // guide tones on the changes 85% to 80%.
       "changes-down-the-list": 1,
+    },
+    // ── bass ──
+    // What a phrase of walking costs. Each is a share of the phrase's moves, notes or
+    // bars, so the weights are what makes them count; a phrase in two has no walked notes
+    // and costs nothing, so it is played as its lead-ins fall (BA-98). Each was set to
+    // zero in turn over 200 takes (ME-10); what it moved is beside it. Three more were
+    // tried and dropped because they moved nothing the others did not: leaps as such,
+    // the same bar twice running, and the half-step band the blues uses.
+    bass: {
+      // A line with a direction. At zero, moves in a row one way 3.0 to 2.5.
+      "turns-back": 2,
+      // At zero, moves straight back to the note just left 3.5% to 6.3%.
+      rocking: 3,
+      // At zero, leaps of a fourth or more not then filled in 10.0% of moves to 11.6%.
+      "leaps-left-hanging": 1,
+      // At zero, chord tones on beats 1 and 3 93.5% to 89.5%.
+      "strong-beats-off-the-chord": 1,
+      // At zero, bars that are the bar at their place last chorus 3.9% to 12.3%.
+      "bars-as-last-time": 1,
+      // At zero, notes above D3 0.4% to 1.1%. The register keeps the line low already;
+      // this is what brings a line that has climbed back down.
+      "high-notes": 2,
     },
   },
 };

@@ -5,6 +5,7 @@ import type { ChartChord } from "../../chart/types.ts";
 import { arrivals, contextOf, sameChord } from "../../perform/harmony.ts";
 import { pulseTicks } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
+import { planBar } from "../../plan/types.ts";
 import type { Tier } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
 import type { ChordScale } from "../../theory/scale.ts";
@@ -40,10 +41,23 @@ export interface Piece {
   readonly ending: "before" | "final" | null;
   /** Part of the pass after the last one played: read, never played. */
   readonly lookahead: boolean;
+  /** Which of the style's parts the bass plays here: the bar's own tier, or the one it is stepping up to. */
+  readonly tier: Tier;
 }
 
-/** Every piece of the performance in order, look-ahead included. Count-in and tail bars have none. */
-export function pieces(plan: Plan): Piece[] {
+const RANK: Readonly<Record<Tier, number>> = { low: 0, mid: 1, high: 2 };
+
+/** The bass's tier in a bar by its energy alone. */
+function ownTier(bar: PlanBar): Tier {
+  return tierOf(bar.seats.bass ?? bar.energy);
+}
+
+/**
+ * Every piece of the performance in order, look-ahead included. Count-in and
+ * tail bars have none. With `early`, the bar before the band steps up a tier
+ * is already played in the tier it is going to (BA-25).
+ */
+export function pieces(plan: Plan, early = false): Piece[] {
   const harmony = arrivals(plan);
   let sounding = -1;
   let barsOnChord = 0;
@@ -52,6 +66,11 @@ export function pieces(plan: Plan): Piece[] {
   const read = (bar: PlanBar, lookahead: boolean): void => {
     if (bar.kind !== "music") return;
     const first = result.length;
+    let tier = ownTier(bar);
+    const next = early ? planBar(plan, bar.index + 1) : undefined;
+    if (next?.kind === "music" && next.seats.bass !== null && RANK[ownTier(next)] > RANK[tier]) {
+      tier = ownTier(next);
+    }
     for (const span of bar.spans) {
       const start = bar.start + span.start;
       while ((harmony[sounding + 1]?.tick ?? Infinity) <= start) sounding++;
@@ -79,6 +98,7 @@ export function pieces(plan: Plan): Piece[] {
         cycle: atBarline ? barsOnChord : 0,
         ending: null,
         lookahead,
+        tier,
       });
       if (atBarline && chord !== null) barsOnChord++;
     }
@@ -108,9 +128,9 @@ function markEnding(result: Piece[], first: number): void {
   }
 }
 
-/** The bass's tier in a piece's bar. */
+/** The part the bass plays in a piece: its bar's tier, or the one that bar steps up to. */
 export function tierAt(piece: Piece): Tier {
-  return tierOf(piece.bar.seats.bass ?? piece.bar.energy);
+  return piece.tier;
 }
 
 /** A bar's pulses as lengths in ticks. */

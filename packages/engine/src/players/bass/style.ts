@@ -1,6 +1,8 @@
 // The bass seat's part of a style pack: how a bassist plays a genre, as plain
-// data. A line is a sequence of tones laid over a rhythm figure; the engine
-// fits the tones to each chord, places the roots, and leads into the changes.
+// data. A line is a rhythm figure and the tones that go on it: a sequence of
+// tones written apart from the rhythm (the box), tones the figure names for
+// itself (a riff), or tones that are walked. The engine fits the tones to each
+// chord, places the roots, and leads into the changes.
 
 import type { Hold, PerTier } from "../../style/types.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
@@ -92,11 +94,107 @@ export interface ToneSequence extends LineShape {
  * `x--- x--- x--- x-o-` is three quarter notes and a shuffled fourth beat.
  * The grid is straight; the style's swing turns the written "and" into the
  * triplet's last note afterwards.
+ *
+ * A figure may also name its tones where they fall, and then it is a riff: a
+ * rhythm that belongs to its notes, the same tone on the same sixteenth in
+ * every bar whatever chord it is fitted to (X-A-31, BA-38).
+ *
+ * - `R` the chord's bass note, `8` its octave
+ * - `2` `3` `4` `5` `6` the tones of those names, and `7` the flat seventh
+ * - `m` a dead note: the string muted and struck, a thump on the root with no
+ *   pitch to speak of, as short and as quiet as the line's `dead` level (BA-40)
+ *
+ * `R..m R.8. m.R. .78.` is a funk riff; `..R- R-.5 8--- 5-3.` a reggae one,
+ * its hole on beat 1 written as the rest it is.
  */
 export interface Figure {
+  /** What a bassist would call it, where it has a name. Reports use it. */
+  readonly name?: string;
   /** Relative weight in the draw. Zero never wins. */
   readonly weight: number;
   readonly grid: string;
+  /**
+   * The tones it names are taken under the root, not over it, wherever the
+   * instrument has the note: a pickup that climbs into the One, the deep shape
+   * of a riff whose fifth falls a fourth below (BA-68).
+   */
+  readonly under?: boolean;
+}
+
+/** The tones a figure can name in its grid, by the character that names each. */
+export const RIFF_TONES: Readonly<Record<string, Tone>> = {
+  R: "R",
+  "2": "2",
+  "3": "3",
+  "4": "4",
+  "5": "5",
+  "6": "6",
+  "7": "b7",
+  "8": "8",
+};
+/** A dead note in a figure's grid. */
+export const DEAD_NOTE = "m";
+
+/**
+ * A line that is walked: not written but made, a note to each stroke of the
+ * figure, from where the harmony is and where it is going (BA-17 to BA-21).
+ * The chord arrives on its bass note; the last note before the next chord is
+ * an approach to it, chosen first (its kinds weighted by the style's lead-in
+ * policy); the notes between move toward that approach, each a tone of the
+ * chord or of its scale. Each note is one weighted draw, and these are the
+ * weights. A walk is drawn whole for every plan the bassist weighs for a
+ * phrase, and the critic picks the line.
+ */
+export interface WalkedLine {
+  /** The widest move from one note to the next, in semitones: a fourth is 5 (BA-19). */
+  readonly reach: number;
+  /** The widest move onto the approach note: a major third is 4 (BA-20). */
+  readonly intoApproach: number;
+  /**
+   * What a note is worth by what it is and where it falls: a tone of the chord
+   * or only of its scale, on a strong beat (the bar's first pulse and its
+   * middle one) or a weak one. Each is divided by the size of the move, so
+   * steps beat leaps.
+   */
+  readonly weights: {
+    readonly chord: { readonly strong: number; readonly weak: number };
+    readonly scale: { readonly strong: number; readonly weak: number };
+  };
+  /** A move toward where the line is going counts this many times over; */
+  readonly toward: number;
+  /** and one away from it, this. */
+  readonly away: number;
+  /** A move that carries on the way the last one went counts this many times over: a line has a direction. */
+  readonly onward: number;
+  /** A move straight back to the note before the last counts this much: three notes rocking are not a line. */
+  readonly back: number;
+  /**
+   * A note that is the next chord's bass note counts this much before its
+   * time: touched on the way, the arrival has been given away (BA-74). On the
+   * beat before the approach it is never played at all.
+   */
+  readonly early: number;
+  /**
+   * How likely a plan is to place the next root in its other octave, the one
+   * the register would not have chosen, where the walk can get there: up to
+   * the root instead of down to it. It is how a line climbs on purpose.
+   */
+  readonly otherOctave: number;
+}
+
+/**
+ * Turning a riff round: the end of a phrase's last bar played on another
+ * figure, as a drummer turns the back half of his answer bar. A turn's grid
+ * is one or two beats long (4 or 8 sixteenths) and is laid over the end of
+ * the bar; the section's own figure plays up to it. Whether a phrase turns is
+ * the critic's choice among the plans weighed for it.
+ */
+export interface Turns {
+  /** How likely a plan the bassist weighs is to turn the phrase's last bar. */
+  readonly offer: number;
+  /** How long a section keeps to one turn. */
+  readonly hold: Hold;
+  readonly options: readonly Figure[];
 }
 
 /** Sixteenths in a figure's grid: one bar of 4/4. */
@@ -105,8 +203,30 @@ export const FIGURE_STEPS = 16;
 export interface BassLine {
   /** Tried in order; the first whose condition the chord meets is played. The last has no condition. */
   readonly tones: readonly ToneSequence[];
-  /** The rhythm, drawn whole from these and kept for the span `hold` names (X-A-29, X-A-31). */
-  readonly figures: { readonly hold: Hold; readonly options: readonly Figure[] };
+  /**
+   * The rhythm, drawn whole from these and kept for the span `hold` names
+   * (X-A-29, X-A-31). `draw` names the draw: tiers that share a name share it,
+   * so with their figures listed in the same order and weights a section's riff
+   * when quiet is the same riff, thinned, that it plays when loud. Tiers with
+   * no name choose independently.
+   */
+  readonly figures: {
+    readonly hold: Hold;
+    readonly options: readonly Figure[];
+    readonly draw?: string;
+  };
+  /** The line's tones are walked, not read from `tones`, which is then only what a walk falls back on. */
+  readonly walked?: WalkedLine;
+  /** Ways to turn the figure round at the end of a phrase. Without them the figure never changes. */
+  readonly turns?: Turns;
+  /**
+   * The line follows the kick the drummer actually played in this bar, fills
+   * included (BA-13, X-C-12): wherever a kick sounds and the figure is silent,
+   * the bass plays the chord's bass note with it. A floor under the figure,
+   * never in place of it (BA-94). Feathered and ghosted kicks are not kicks
+   * to lock to.
+   */
+  readonly followsKick?: boolean;
   /**
    * In any meter but 4/4 the line is played plainly (BA-16): its tones read
    * from the top in every bar, one to a pulse, or only the first of them held
@@ -122,6 +242,13 @@ export interface BassLine {
     readonly long: number;
     /** The note struck again: the short half. */
     readonly short: number;
+    /**
+     * Set, a note's space is the gap to the next note, whatever rests the
+     * figure writes between them, counted as this many sixteenths at most:
+     * with 3 and a share of 0.75 a note is never longer than two and a quarter
+     * sixteenths, which is how short a funk note is (X-C-14, ST-funk-18).
+     */
+    readonly gap?: number;
   };
   /** Written levels, before the bar's energy scales them. */
   readonly velocity: {
@@ -134,6 +261,10 @@ export interface BassLine {
     readonly restrike: number;
     /** A lead-in the bassist chose to play. */
     readonly approach: number;
+    /** A note between the pulses (an "e", an "and", an "a"). Without it, such a note is `weak`. */
+    readonly off?: number;
+    /** A dead note. Without it, as quiet as a re-strike. */
+    readonly dead?: number;
   };
 }
 
@@ -213,6 +344,21 @@ export interface LeadInPolicy {
    * time the section returns. `pass`: each time through has its own.
    */
   readonly hold: Hold;
+  /**
+   * Whether the bassist may add a note to lead in with: a held note split in
+   * two (the two-feel's fourth beat), a pickup after the figure's last note.
+   * Default true. False: only a note the figure already plays in the lead-in's
+   * place becomes one, so the riff keeps its rhythm (BA-41). A leap of more
+   * than an octave onto the arrival is still bridged.
+   */
+  readonly pickup?: boolean;
+  /**
+   * A line whose last note is more than an octave from where it lands comes
+   * through the octave: that note is played an octave nearer (a pop before a
+   * root far below it becomes the root under the pop), and any lead-in is
+   * decided from there. Without this such a leap is bridged by a lead-in.
+   */
+  readonly throughOctave?: boolean;
   /** The weight of each kind by how the bass note moves. All zero: never lead into that move (BA-11). */
   readonly kinds: Readonly<Record<RootMotion, Readonly<Record<LeadInKind, number>>>>;
 }
@@ -274,9 +420,17 @@ export interface BassStyle {
   readonly walks?: WalkPolicy;
   /**
    * Choosing between plans for a phrase. Without it, or with nothing to choose
-   * (one shape for every chord and no walks), the line plays its first shape.
+   * (one shape for every chord, no walks, no walked line and no turns), the
+   * line plays its first shape.
    */
   readonly phrase?: PhrasePolicy;
+  /**
+   * The bar before the band steps up a tier already plays the part of the
+   * tier it is going to, so the change is set up across the barline and not
+   * switched on at the downbeat (BA-25: the last bar of a head in two walks
+   * into the first blowing chorus).
+   */
+  readonly stepsUpEarly?: boolean;
   readonly ending: {
     /** The written level of the last note (EN-19). A soft ending plays it at four fifths. */
     readonly velocity: number;
