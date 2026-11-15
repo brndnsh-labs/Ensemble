@@ -247,6 +247,37 @@ if (params.has("mix")) {
 }
 status.textContent = `Ready. Packs: ${available.join(", ") || "none"}.`;
 
+// --- Playing live by itself, to count late and dropped notes over a whole take ---
+
+const liveName = params.get("live");
+if (liveName) {
+  try {
+    await play();
+    const started = Date.now();
+    await new Promise<void>((done) => {
+      const watch = setInterval(() => {
+        if (player?.position === undefined) {
+          clearInterval(watch);
+          done();
+        }
+      }, 500);
+    });
+    const facts = {
+      ...player?.count,
+      seconds: length,
+      wallSeconds: (Date.now() - started) / 1000,
+      contextState: context?.state,
+      decodedMB: (band?.band.decodedBytes ?? 0) / 1e6,
+    };
+    await fetch(`/save/${liveName}.json`, { method: "POST", body: JSON.stringify(facts) });
+  } catch (error) {
+    await fetch(`/save/${liveName}.json`, {
+      method: "POST",
+      body: JSON.stringify({ error: String(error) }),
+    });
+  }
+}
+
 const renderName = params.get("render");
 if (renderName) {
   try {
