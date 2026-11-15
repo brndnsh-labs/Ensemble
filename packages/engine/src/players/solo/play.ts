@@ -272,8 +272,8 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
           duration,
           pitch,
           velocity: strike.accent ? Math.max(velocity, accent) : velocity,
-          // Nothing is bent in the bar the band ends on (SO-57); a last note held is shaken.
-          ...moveOf(world, 0, duration, soundsFor(world, bar, strike.tick, duration)),
+          // A last note held is shaken. (The line never asks for a bend here: SO-57.)
+          ...moveOf(world, bend ?? 0, duration, soundsFor(world, bar, strike.tick, duration)),
         };
       });
     }
