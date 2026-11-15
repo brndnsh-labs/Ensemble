@@ -54,10 +54,13 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
 
   const style: StylePack = styleById(choices.style ?? entry.chart.styleId ?? "") ?? STYLES[0]!;
   const tempo = choices.tempo ?? null;
+  // An arrangement that fits says the chart is meant to be played as written; anything else is a jam.
+  const song = choices.song ?? entry.chart.arrangement?.fits === true;
   const setup: JamSetup = useMemo(
     () => ({
       text: entry.text,
       style,
+      song,
       minutes: settings.minutes,
       tempo,
       key: choices.key === undefined ? null : parseKey(choices.key),
@@ -67,6 +70,7 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
     [
       entry.text,
       style,
+      song,
       settings.minutes,
       tempo,
       choices.key,
@@ -208,14 +212,22 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
           <label>
             <span>Length</span>
             <select
-              value={settings.minutes ?? "open"}
-              onChange={(e) =>
-                change({
-                  ...settings,
-                  minutes: e.target.value === "open" ? null : Number(e.target.value),
-                })
-              }
+              value={song ? "song" : (settings.minutes ?? "open")}
+              onChange={(e) => {
+                const { value } = e.target;
+                // The song is this chart's choice; a length is every chart's, and undoes it here.
+                const charts = {
+                  ...settings.charts,
+                  [entry.id]: { ...choices, song: value === "song" },
+                };
+                change(
+                  value === "song"
+                    ? { ...settings, charts }
+                    : { ...settings, charts, minutes: value === "open" ? null : Number(value) },
+                );
+              }}
             >
+              <option value="song">The song, once through</option>
               {LENGTHS.map((minutes) => (
                 <option key={minutes ?? "open"} value={minutes ?? "open"}>
                   {minutes === null ? "Until I stop it" : `About ${minutes} min`}

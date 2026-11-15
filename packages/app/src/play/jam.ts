@@ -31,6 +31,8 @@ import { chairName } from "./rig.ts";
 export interface JamSetup {
   readonly text: string;
   readonly style: StylePack;
+  /** The chart once through, as written and arranged: `minutes` is then not asked. */
+  readonly song: boolean;
   /** A loose length in minutes, or null to go round until stopped. */
   readonly minutes: number | null;
   /** Null for the chart's tempo, or the style's when the chart names none. */
@@ -61,9 +63,14 @@ export const SEAT_ORDER: readonly Seat[] = ["drums", "bass", "chords", "solo"];
 export const OPEN_PASSES = 2;
 
 export function takeOptions(setup: JamSetup): HowPlayed {
+  // A song has its own length: the chart once through.
+  const length: Pick<HowPlayed, "mode" | "open" | "passes" | "minutes"> = setup.song
+    ? { mode: "song" }
+    : setup.minutes === null
+      ? { mode: "jam", open: true, passes: OPEN_PASSES }
+      : { mode: "jam", minutes: setup.minutes };
   return {
-    mode: "jam",
-    ...(setup.minutes === null ? { open: true, passes: OPEN_PASSES } : { minutes: setup.minutes }),
+    ...length,
     ...(setup.tempo === null ? {} : { tempo: setup.tempo }),
     ...(setup.key === null ? {} : { key: setup.key }),
     solo: setup.band.solo,
@@ -203,6 +210,22 @@ export function nextChange(
     span = 0;
   }
   return undefined;
+}
+
+/** The sections of a song as it plays them: the first bar of each, in order. */
+export const sectionStarts = (plan: Plan): PlanBar[] =>
+  plan.bars.filter((bar) => bar.kind === "music" && bar.barInSection === 0);
+
+/**
+ * On the way home: the last pass of a jam, the last section of a song, or the
+ * last chord ringing after either. The final bar there is the ending the band
+ * plays, not what is written in it.
+ */
+export function homeStretch(plan: Plan, bar: PlanBar): boolean {
+  if (bar.kind === "tail" || bar.lastPass) return true;
+  if (plan.mode !== "song" || bar.kind !== "music") return false;
+  const final = plan.bars.findLast((b) => b.kind === "music");
+  return final !== undefined && bar.section.occurrence === final.section.occurrence;
 }
 
 /** A phrase top counts as far enough ahead only with this to spare, so its downbeat is the ending's too. */
