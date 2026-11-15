@@ -3,13 +3,14 @@
 
 import type { Meter } from "../../chart/types.ts";
 import { cells, LEVELS, STEP } from "../../perform/grid.ts";
+import { arrivals } from "../../perform/harmony.ts";
 import { pulseTicks } from "../../perform/meter.ts";
 import type { PlayerContext } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
-import type { PlanBar } from "../../plan/types.ts";
+import type { Plan, PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
 import type { DrumVoice } from "./kit.ts";
-import type { DrumStyle, Lines, When } from "./style.ts";
+import type { DrumStyle, GrooveOption, Lines, When } from "./style.ts";
 
 /** One bar of the kit: for each piece, its written level at every sixteenth (0 is a rest). */
 export type BarPart = Partial<Record<DrumVoice, number[]>>;
@@ -17,6 +18,41 @@ export type BarPart = Partial<Record<DrumVoice, number[]>>;
 /** Sixteenths in a beat, and in the 4/4 bar every groove is written as. */
 const BEAT = 4;
 const GROOVE_STEPS = 16;
+
+/** In a groove line, the stick taken off: a stroke from the layers above is taken away. */
+export const TAKEN = "-";
+
+/** What the drummer reads of the chart in a bar, as the pianist would (DR-89). */
+export interface BarHarmony {
+  /** The harmony moves inside the bar: two chords or more. */
+  readonly changeInBar: boolean;
+  /** The next bar brings a new chord on its downbeat. */
+  readonly changeAhead: boolean;
+}
+
+/** What a layer's conditions read besides the plan bar: its harmony, and whether a fill ends it. */
+export interface BarReading extends BarHarmony {
+  readonly filled: boolean;
+}
+
+/** Each bar's harmony, by plan bar index, read through the look-ahead so the last bar sees what comes. */
+export function harmonyByBar(plan: Plan): Map<number, BarHarmony> {
+  const inBar = new Set<number>();
+  const ahead = new Set<number>();
+  const starts = new Map([...plan.bars, ...plan.lookahead].map((bar) => [bar.index, bar.start]));
+  for (const arrival of arrivals(plan)) {
+    if (!arrival.changed) continue;
+    // A new chord on a downbeat is a change at the barline for the bar before it.
+    if (arrival.tick === starts.get(arrival.bar)) ahead.add(arrival.bar - 1);
+    else inBar.add(arrival.bar);
+  }
+  return new Map(
+    plan.bars.map((bar) => [
+      bar.index,
+      { changeInBar: inBar.has(bar.index), changeAhead: ahead.has(bar.index) },
+    ]),
+  );
+}
 
 /** A line's written level at each step: 0 where it rests. */
 export function levels(line: string): number[] {
@@ -35,14 +71,33 @@ export function lineOf(part: BarPart, voice: DrumVoice, steps: number): number[]
   return line;
 }
 
-/** Lay written lines over a bar from a step on. A stroke replaces what was there; a rest leaves it. */
+/**
+ * Lay written lines over a bar from a step on. A stroke replaces what was
+ * there, a rest leaves it, and "-" takes it away.
+ */
 export function overlay(part: BarPart, lines: Lines, from: number, steps: number): void {
   for (const [voice, text] of Object.entries(lines) as [DrumVoice, string][]) {
     const line = lineOf(part, voice, steps);
-    levels(text).forEach((level, i) => {
-      if (level > 0 && from + i < steps) line[from + i] = level;
+    const written = levels(text);
+    cells(text).forEach((symbol, i) => {
+      if (from + i >= steps) return;
+      if (symbol === TAKEN) line[from + i] = 0;
+      else if (written[i]! > 0) line[from + i] = written[i]!;
     });
   }
+}
+
+/** Whether laying these lines over the bar would change a stroke of it. */
+function changes(part: BarPart, lines: Lines): boolean {
+  return (Object.entries(lines) as [DrumVoice, string][]).some(([voice, text]) => {
+    const line = part[voice];
+    const written = levels(text);
+    return cells(text).some((symbol, i) => {
+      const now = line?.[i] ?? 0;
+      if (symbol === TAKEN) return now > 0;
+      return written[i]! > 0 && written[i] !== now;
+    });
+  });
 }
 
 /** A bar's pulses, each a length in sixteenths. */
@@ -55,16 +110,30 @@ export function grooveBar(
   drums: DrumStyle,
   bar: PlanBar,
   energy: number,
+  reading: BarReading,
   rng: PlayerContext["rng"],
 ): BarPart {
   const part: BarPart = {};
   for (const layer of drums.grooves[tierOf(energy)]) {
-    if (!applies(layer.when, bar, energy, part)) continue;
+    if (!applies(layer.when, bar, energy, reading, part)) continue;
     // One draw per decision per span: the section's kick is the same kick every bar (X-A-29).
     const options = layer.options.filter((option) => option.weight > 0);
     if (options.length === 0) continue;
     const held = heldRng(rng, `groove:${layer.id}`, layer.hold, bar);
-    overlay(part, held.weighted(options, (option) => option.weight).lines, 0, GROOVE_STEPS);
+    let choice: GrooveOption = held.weighted(options, (option) => option.weight);
+    if (layer.audible) {
+      // The next one in the written list that would be heard, from the one drawn, round to it.
+      const list = layer.options;
+      const at = list.indexOf(choice);
+      for (let i = 0; i < list.length; i++) {
+        const next = list[(at + i) % list.length]!;
+        if (next.weight > 0 && changes(part, next.lines)) {
+          choice = next;
+          break;
+        }
+      }
+    }
+    overlay(part, choice.lines, 0, GROOVE_STEPS);
   }
 
   // One hand, one cymbal (DR-03): the stick that opens the hat is not also closing it.
@@ -89,12 +158,23 @@ export function grooveBar(
   return fitMeter(part, pulses(bar.meter));
 }
 
-function applies(when: When | undefined, bar: PlanBar, energy: number, part: BarPart): boolean {
+function applies(
+  when: When | undefined,
+  bar: PlanBar,
+  energy: number,
+  reading: BarReading,
+  part: BarPart,
+): boolean {
   if (!when) return true;
   if (when.phraseBars && !when.phraseBars.includes(bar.phrase.bar + 1)) return false;
   if (when.energyFrom !== undefined && energy < when.energyFrom) return false;
   if (when.energyBelow !== undefined && energy >= when.energyBelow) return false;
   if (when.playing && !part[when.playing]?.some((level) => level > 0)) return false;
+  const last = bar.phrase.bar === bar.phrase.length - 1;
+  if (when.phraseEnd !== undefined && when.phraseEnd !== last) return false;
+  if (when.fill !== undefined && when.fill !== reading.filled) return false;
+  if (when.changeInBar !== undefined && when.changeInBar !== reading.changeInBar) return false;
+  if (when.changeAhead !== undefined && when.changeAhead !== reading.changeAhead) return false;
   return true;
 }
 

@@ -5,23 +5,29 @@
 // Everything is written on the straight grid at its written level. Swing,
 // humanizing and the bar's loudness are applied afterwards, for every seat.
 
+import { PPQ } from "../../chart/types.ts";
 import { LEVELS, type LevelSymbol, STEP } from "../../perform/grid.ts";
 import type { Player, WrittenNote } from "../../perform/notes.ts";
 import type { EndingMark, PlanBar } from "../../plan/types.ts";
 import { applyFill, chooseFills } from "./fill.ts";
 import type { BarPart } from "./groove.ts";
-import { grooveBar, lineOf, pulses } from "./groove.ts";
+import { grooveBar, harmonyByBar, lineOf, pulses } from "./groove.ts";
 import { ARRIVAL_CRASH, ARRIVAL_KICK, type DrumVoice, KIT, voiceName } from "./kit.ts";
-import type { DrumStyle } from "./style.ts";
+import type { DrumStyle, Strike } from "./style.ts";
 
 /** A drum stroke has no length to speak of: a thirty-second note. */
 const HIT = STEP / 2;
 /** The pieces left to ring on the last chord for as long as the band holds it. */
 const RINGS: readonly DrumVoice[] = ["crash", "ride", "rideBell", "openHat"];
+const EIGHTH = PPQ / 2;
+/** A bar the chart says nothing about: one chord, and the same chord after it. */
+const STILL = { changeInBar: false, changeAhead: false };
 
 export const playDrums: Player = ({ plan, style, rng }) => {
   const drums = style.drums;
   const fills = chooseFills(plan, drums, rng);
+  const harmony = harmonyByBar(plan);
+  const under = drums.fills.keepTime ? drums.timekeepers : [];
   const notes: WrittenNote[] = [];
 
   for (const bar of plan.bars) {
@@ -38,15 +44,16 @@ export const playDrums: Player = ({ plan, style, rng }) => {
       continue;
     }
 
-    const part = grooveBar(drums, bar, energy, rng);
+    const fill = fills.get(bar.index);
+    const reading = { ...(harmony.get(bar.index) ?? STILL), filled: fill !== undefined };
+    const part = grooveBar(drums, bar, energy, reading, rng);
     if (bar.ending) {
       notes.push(...endingBar(bar, bar.ending, drums, part.kick?.[0] || LEVELS.x));
       continue;
     }
 
     const steps = pulses(bar.meter).reduce((sum, pulse) => sum + pulse, 0);
-    const fill = fills.get(bar.index);
-    if (fill) applyFill(part, fill, steps);
+    if (fill) applyFill(part, fill, steps, under);
     if (bar.crash) crashOnOne(part, drums, steps);
 
     for (const [voice, line] of Object.entries(part) as [DrumVoice, number[]][]) {
@@ -78,7 +85,9 @@ function crashOnOne(part: BarPart, drums: DrumStyle, steps: number): void {
  * nothing else, never the ordinary crash (EN-24). When the bar gets home
  * partway through, each chord before home is caught with a kick alone, at the
  * groove's own downbeat weight and no louder than the last hit: two crashes
- * two beats apart would end the tune twice (EN-38).
+ * two beats apart would end the tune twice (EN-38). A button ending adds the
+ * style's button strike on the "and" of the last pulse, where the band buttons
+ * (EN-17), unless the final chord lands too late to leave room for it.
  */
 function endingBar(
   bar: PlanBar,
@@ -86,7 +95,7 @@ function endingBar(
   drums: DrumStyle,
   downbeatKick: number,
 ): WrittenNote[] {
-  const strike = Object.entries(drums.ending.strike) as [DrumVoice, LevelSymbol][];
+  const strike = entries(drums.ending.strike);
   const lastKick = drums.ending.strike.kick;
   const catchLevel = lastKick ? Math.min(downbeatKick, LEVELS[lastKick]) : downbeatKick;
 
@@ -99,7 +108,24 @@ function endingBar(
     const length = RINGS.includes(voice) ? Math.max(HIT, ending.ring) : HIT;
     notes.push(stroke(bar, voice, ending.at, LEVELS[symbol], length));
   }
+
+  const button = drums.ending.button;
+  if (ending.gesture.kind === "button" && button) {
+    // The "and" of the bar's last pulse: its last eighth when the pulse is dotted, as the band.
+    const beats = pulses(bar.meter);
+    const lastPulse = (beats[beats.length - 1] ?? 4) * STEP;
+    const at = bar.ticks - (lastPulse > PPQ ? EIGHTH : lastPulse / 2);
+    if (at - ending.at >= EIGHTH && at < ending.at + ending.ring) {
+      for (const [voice, symbol] of entries(button)) {
+        notes.push(stroke(bar, voice, at, LEVELS[symbol]));
+      }
+    }
+  }
   return notes;
+}
+
+function entries(strike: Strike): [DrumVoice, LevelSymbol][] {
+  return Object.entries(strike) as [DrumVoice, LevelSymbol][];
 }
 
 function stroke(
