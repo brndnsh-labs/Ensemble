@@ -93,13 +93,65 @@ export interface ChordRegister {
 }
 
 /**
+ * A guitar in the chord seat (CH-20 to CH-31, X-C-18, X-C-19). A chord is
+ * found on the fretboard in standard tuning: one note to a string, pitch rising
+ * string to string, every fretted note inside a four-fret hand, nothing over
+ * the 15th fret. The register is its window in pitch and where its top note is
+ * aimed; how firmly the hand stays put is what the voicing weights cost.
+ *
+ * The strumming hand is a pendulum: down on the beat side of each pair of the
+ * grid it strums, up on the other, so direction is read from where a stroke
+ * falls and is never chosen (CH-27). The grip is held until the chord changes
+ * (CH-31).
+ */
+export interface Guitar {
+  readonly instrument: "guitar";
+  /**
+   * How many strings a grip sounds. A chord with more tones than this is
+   * played on as many strings as it has tones before a tone is given up; with
+   * fewer, only the root or the fifth is doubled (CH-21).
+   */
+  readonly strings: number;
+  /**
+   * The fret the first finger is parked at. The same notes can often be
+   * fretted in two places, five frets and a string apart: the one nearer this
+   * is played, so the part lives in one region of the neck.
+   */
+  readonly position: number;
+  /** Whether one muted string may sit inside the grip (the swing guitar's 8x89xx, CH-22). */
+  readonly skip: boolean;
+  /**
+   * Whether open strings may sound. Never where the hand mutes by letting go:
+   * an open string would ring on through a scratch or a chop (CH-23).
+   */
+  readonly open: boolean;
+  /** Whether a grip stands on the chord's root (a guitar that is also the bottom of the band). */
+  readonly rootOnBottom: boolean;
+  readonly strum: {
+    /** The note value the pendulum swings on. */
+    readonly grid: "eighth" | "sixteenth";
+    /** How many of the grip's top strings an upstroke catches (CH-27: three). */
+    readonly up: number;
+    /** How much lighter an upstroke is than the written level (CH-27: 86 down, 72 up). */
+    readonly lighter: number;
+    /**
+     * Milliseconds between neighbouring strings as a stroke crosses them: low
+     * string first going down, high string first coming up (CH-29: 6 on steel
+     * strings, 3 on nylon). The whole stroke is centred on its place in the grid.
+     */
+    readonly roll: number;
+  };
+}
+
+/**
  * The instrument the seat is being. It decides what a voicing candidate is
- * (keys: any stack of the tones the hand can reach; a guitar, later: a grip on
- * the fretboard) and how a strike becomes notes (keys: every pitch at once; a
+ * (keys: any stack of the tones the hand can reach; a guitar: a grip on the
+ * fretboard) and how a strike becomes notes (keys: every pitch at once; a
  * guitar: a grip rolled across its strings, held from strike to strike).
  */
-export type Idiom = "keys";
-export const IDIOMS: readonly Idiom[] = ["keys"];
+export type Idiom = "keys" | Guitar;
+/** The instruments the seat knows, by name. */
+export const INSTRUMENTS: readonly string[] = ["keys", "guitar"];
 
 /**
  * The plain rhythm: one strike where each chord arrives, held most of the way
@@ -110,6 +162,12 @@ export interface PlainRhythm {
   /** How long a strike sounds, as a share of the time until the next strike or the barline. */
   readonly length: number;
   /** Written levels, before the bar's energy scales them. */
+  /**
+   * Struck on every pulse of the bar, not only where a chord arrives: what a
+   * strummed or chopped part falls back to in a meter its book is not written
+   * for (CH-54). Left out, the chord is a pad.
+   */
+  readonly pulse?: boolean;
   readonly velocity: {
     /** A chord arriving on a beat. */
     readonly beat: number;
@@ -132,6 +190,15 @@ export interface Attack {
   readonly level: number;
   /** Length in sixteenths of a strike the grid does not hold: a stab. */
   readonly steps: number;
+  /**
+   * The hand comes down with the notes deadened: a guitar's scratch, the
+   * fretting hand let go (CH-28); a clavinet's dead key. It is a stroke of the
+   * rhythm and not a statement of the chord. It deadens whatever the hand is
+   * holding at that moment, it never counts as striking a chord (CH-34), a
+   * chord is never played early as one (CH-36), and it gives way to a chord
+   * struck in its place.
+   */
+  readonly muted?: boolean;
 }
 
 /** The symbols a figure may be written in, and how each is played. */
@@ -141,9 +208,11 @@ export type Articulation = Readonly<Record<string, Attack>>;
  * One bar of comping rhythm, written whole (X-A-31). A character per
  * sixteenth of a 4/4 bar, spaces ignored:
  *
- * - a symbol of the articulation (`x`, `X`, `o`): the hand comes down
+ * - a symbol of the articulation (`x`, `X`, `o`): the hand comes down. A symbol
+ *   whose attack is muted is a scratch: the stroke with the notes deadened
  * - `-` the chord before is still held
- * - `.` silence
+ * - `.` silence. In a strummed line the hand keeps swinging and passes over
+ *   the strings without touching them
  *
  * `x--- --X- ---- ----` is the Charleston as a pad; `.... X... .... X...` is
  * chops on 2 and 4. The grid is straight: the style's swing bends it afterwards.
@@ -166,6 +235,22 @@ export interface CompFigure {
    * break it (CH-41).
    */
   readonly groove?: boolean;
+  /**
+   * A groove that lets a chord it plays early ring over the change: the first
+   * stroke that sounds the chord in the eighth before is the push, held an
+   * eighth into the new chord, and until it has rung the hand passes without
+   * touching (CH-36). A strumming hand can do that and not leave a hole: it
+   * keeps swinging. Without this a groove strikes the chord again on the beat
+   * (the pump, CH-41).
+   */
+  readonly ties?: boolean;
+  /**
+   * The figure as it is played in the last bar of a phrase: the same bar with
+   * its end turned, written whole like any figure. It is the figure's own
+   * answer, the same every time, where a conversation would answer with
+   * another figure. Left out, the last bar is the figure again.
+   */
+  readonly turn?: string;
 }
 
 /** The comping vocabulary at one level of energy. */

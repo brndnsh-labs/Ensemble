@@ -262,9 +262,11 @@ function clear(voicing: Voicing, line: StrikeLine, needed: ReadonlySet<number>, 
     left--;
   }
   if (left === voicing.pitches.length) return voicing;
+  const strings = voicing.strings?.filter((_, i) => keep[i]);
   return {
     pitches: voicing.pitches.filter((_, i) => keep[i]),
     tones: voicing.tones.filter((_, i) => keep[i]),
+    ...(strings ? { strings } : {}),
   };
 }
 
@@ -292,6 +294,8 @@ export function voiceStrikes(
   const wayAt = new Map<string, Way>();
   const voiced: VoicedStrike[] = [];
   let previous: Voicing | null = null;
+  // The chord the hand last played, for an instrument that holds its shape while the chord stays.
+  let held: Way | null = null;
   // Whether the hand is still out of its place after a line it heard.
   let away = false;
   for (const [i, strike] of strikes.entries()) {
@@ -323,15 +327,18 @@ export function voiceStrikes(
     if (line) away = true;
     // A choice that hears the line, or is on its way home from one, is its own: only a
     // strike with the hand in its own place is remembered.
-    let next: Voicing | null | undefined = away ? undefined : way.led.get(previous);
+    let next: Voicing | null | undefined =
+      idiom.holds && way === held && previous ? previous : away ? undefined : way.led.get(previous);
+    held = way;
     if (next === undefined) {
       // Under the line the hand is pressed down, toward where a half step on the bottom is a
       // growl: there it is never taken while anything else will do (CH-66, KF-B-37).
       const clean = line ? way.voicings.filter((voicing) => !growls(voicing, way.family)) : [];
       const offered = clean.length > 0 ? clean : way.voicings;
       const { family } = way;
-      const candidates = offered.map((voicing) => ({
-        voicing,
+      const from: Voicing | null = previous;
+      const candidates: VoicingCandidate[] = offered.map((voicing) => ({
+        voicing: idiom.placed?.(voicing, from) ?? voicing,
         previous,
         register: chords.register,
         family,

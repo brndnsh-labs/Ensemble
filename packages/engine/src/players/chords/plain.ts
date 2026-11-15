@@ -77,14 +77,29 @@ export function plainStrikes(
     for (const stretch of own) {
       if (stretch.chord === null) continue;
       const carried = stretch.start === bar.start && sameChord(holding, stretch.chord);
-      const onBeat = beats.has(stretch.start - bar.start);
-      strikes.push({
-        bar: bar.index,
-        tick: stretch.start,
-        duration: Math.max(1, Math.round((stretch.end - stretch.start) * length)),
-        velocity: carried ? velocity.restrike : onBeat ? velocity.beat : velocity.offbeat,
-        arrival: stretch.arrival,
-        kind,
+      // Where the hand comes down: where the chord arrives, and for a strummed or chopped
+      // part on every pulse it lasts through (CH-54).
+      const at = [stretch.start];
+      if (chords.plain.pulse) {
+        for (const beat of beats) {
+          const tick = bar.start + beat;
+          if (tick > stretch.start && tick < stretch.end) at.push(tick);
+        }
+        at.sort((a, b) => a - b);
+      }
+      at.forEach((tick, i) => {
+        const arrives = tick === stretch.start;
+        const onBeat = beats.has(tick - bar.start);
+        strikes.push({
+          bar: bar.index,
+          tick,
+          duration: Math.max(1, Math.round(((at[i + 1] ?? stretch.end) - tick) * length)),
+          velocity:
+            arrives && carried ? velocity.restrike : onBeat ? velocity.beat : velocity.offbeat,
+          arrival: stretch.arrival,
+          kind,
+          down: true,
+        });
       });
     }
     const last = own[own.length - 1];

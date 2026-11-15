@@ -159,7 +159,8 @@ export function compStrikes(
     // A groove is played as written: it leans in only on a stroke it already has.
     const able =
       last.end - last.start > EIGHTH &&
-      (!figure.groove || strokes(figure, tier).some((stroke) => stroke.at >= reach));
+      (!figure.groove ||
+        strokes(figure, tier).some((stroke) => stroke.at >= reach && !stroke.muted));
     return able && heldRng(rng, "push", "bar", bar).chance(chords.anticipation.barline[tier]);
   });
   const pushedInto = (bar: PlanBar) => {
@@ -206,12 +207,27 @@ export function compStrikes(
       return strikes;
     });
 
+  // A figure with a turn of its own plays it in the last bar of a phrase. The phrase still
+  // opens on the figure as written, so a phrase of one bar is not turned.
+  const turns = new Map<CompFigure, CompFigure>();
+  const turned = (figure: CompFigure): CompFigure => {
+    if (figure.turn === undefined) return figure;
+    let known = turns.get(figure);
+    if (!known) {
+      known = { ...figure, name: `${figure.name}, turned`, grid: figure.turn };
+      turns.set(figure, known);
+    }
+    return known;
+  };
+  const ended = (figures: CompFigure[]): CompFigure[] =>
+    figures.map((figure, i) => (i > 0 && i === figures.length - 1 ? turned(figure) : figure));
+
   /** The plans the comper weighs for a phrase: a figure for each of its bars. */
   const plans = (first: PlanBar): CompFigure[][] => {
     const a = home(first);
     const [b, c] = answers(first);
     const length = first.phrase.length;
-    if (!b || !c) return [new Array<CompFigure>(length).fill(a)];
+    if (!b || !c) return [ended(new Array<CompFigure>(length).fill(a))];
     // Every form, with either answer in the first answer's seat.
     const written = new Map<string, { weight: number; figures: CompFigure[] }>();
     for (const form of forms) {
@@ -219,7 +235,9 @@ export function compStrikes(
         [b, c],
         [c, b],
       ] as const) {
-        const figures = fit(form.letters, length).map((l) => (l === "a" ? a : l === "b" ? x : y));
+        const figures = ended(
+          fit(form.letters, length).map((l) => (l === "a" ? a : l === "b" ? x : y)),
+        );
         const key = figures.map((figure) => figure.name).join(" ");
         if (!written.has(key)) written.set(key, { weight: form.weight, figures });
       }

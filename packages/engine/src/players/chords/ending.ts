@@ -37,6 +37,8 @@ export function endingStrikes(
       velocity,
       arrival,
       kind,
+      // The final chord is a downstroke on a guitar, wherever it lands (CH-74).
+      down: true,
     });
 
   // A chord on the way to the final one (the V of a last bar that gets home itself).

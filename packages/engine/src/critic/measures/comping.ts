@@ -6,16 +6,20 @@
 // Everything is read from the notes played. Bars are compared as rhythms by
 // `alike`, the same test the comper applies to the plans it weighs.
 
+import type { ChartChord } from "../../chart/types.ts";
 import { PPQ } from "../../chart/types.ts";
 import { energyGain } from "../../perform/feel.ts";
 import { arrivals, sameChord } from "../../perform/harmony.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import type { BarRhythm } from "../../players/chords/rhythm.ts";
 import { alike, barRhythm, samePhrase } from "../../players/chords/rhythm.ts";
+import { MUTED } from "../../players/chords/strike.ts";
 import { GHOST_BELOW } from "../../players/drums/kit.ts";
-import type { Tier } from "../../style/types.ts";
+import type { StylePack, Tier } from "../../style/types.ts";
 import { tierOf } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
+import { chordTones } from "../../theory/chord.ts";
+import { mod12, pitchClass } from "../../theory/pitch.ts";
 import { mean, notesOf, share } from "../read.ts";
 import type { Measure, Measurement } from "../types.ts";
 
@@ -23,10 +27,27 @@ export const EIGHTH = PPQ / 2;
 /** Slack, in ticks, for "still sounding at the change": the pocket moves a note's end a little. */
 export const POCKET = 10;
 
+/**
+ * Whether these notes say this chord: its third (or suspension) and its seventh
+ * (or sixth) are among them. It is what tells a chord played early from the
+ * chord before it struck late.
+ */
+export function states(chord: ChartChord, pitches: readonly number[]): boolean {
+  const classes = new Set(pitches.map((pitch) => mod12(pitch)));
+  return chordTones(chord.quality)
+    .filter((tone) => ["third", "sus", "seventh", "sixth"].includes(tone.role))
+    .every((tone) => classes.has(mod12(pitchClass(chord.root) + tone.interval)));
+}
+
 /** One time the hand comes down: where on the grid, and when it stops sounding. */
 interface Hit {
   readonly tick: number;
   readonly ends: number;
+  /** How long it sounds, as played. */
+  readonly length: number;
+  readonly pitches: readonly number[];
+  /** A scratch: the stroke with the notes deadened. It keeps the time and states no chord. */
+  readonly muted: boolean;
 }
 
 /** One phrase of comping as it was played: its bars and their rhythms. */
@@ -38,7 +59,11 @@ interface Phrase {
 interface Reading {
   /** The bars the piano comps in: 4/4, playing, short of the ending bar. */
   readonly bars: readonly PlanBar[];
+  /** The chords struck in each bar. A scratch is not one of them. */
   readonly hits: ReadonlyMap<number, readonly Hit[]>;
+  /** Every stroke of the hand in each bar, scratches too. On a keyboard these are the hits. */
+  readonly strokes: ReadonlyMap<number, readonly Hit[]>;
+  /** Each bar as a rhythm of chords struck. */
   readonly rhythm: ReadonlyMap<number, BarRhythm>;
   /** Phrases the piano comps every bar of, in the order played. */
   readonly phrases: readonly Phrase[];
@@ -59,14 +84,19 @@ function read(take: Take): Reading {
       bar.meter.beats === 4 &&
       bar.meter.unit === 4,
   );
-  const byTick = new Map<number, number>();
+  const byTick = new Map<number, Hit>();
   for (const note of notesOf(take, "chords")) {
     const ends = note.tick + note.offset + note.duration;
-    byTick.set(note.tick, Math.max(byTick.get(note.tick) ?? 0, ends));
+    const hit = byTick.get(note.tick);
+    byTick.set(note.tick, {
+      tick: note.tick,
+      ends: Math.max(hit?.ends ?? 0, ends),
+      length: Math.max(hit?.length ?? 0, note.duration),
+      pitches: [...(hit?.pitches ?? []), note.pitch],
+      muted: note.voice === MUTED,
+    });
   }
-  const struck = [...byTick]
-    .map(([tick, ends]) => ({ tick, ends }))
-    .sort((a, b) => a.tick - b.tick);
+  const struck = [...byTick.values()].sort((a, b) => a.tick - b.tick);
 
   // A change at the barline: the bar opens on a different chord from the one before it ended on.
   const changes = (before: PlanBar | undefined, bar: PlanBar | undefined) => {
@@ -75,14 +105,17 @@ function read(take: Take): Reading {
     return !!from && !!to && !sameChord(from, to);
   };
   const hits = new Map<number, Hit[]>();
+  const strokes = new Map<number, Hit[]>();
   const rhythm = new Map<number, BarRhythm>();
   for (const bar of bars) {
     const own = struck.filter((hit) => hit.tick >= bar.start && hit.tick < bar.start + bar.ticks);
-    hits.set(bar.index, own);
+    const sounded = own.filter((hit) => !hit.muted);
+    strokes.set(bar.index, own);
+    hits.set(bar.index, sounded);
     rhythm.set(
       bar.index,
       barRhythm(
-        own.map((hit) => hit.tick),
+        sounded.map((hit) => hit.tick),
         bar.start,
         changes(all[bar.index - 1], bar),
         changes(bar, all[bar.index + 1]),
@@ -99,7 +132,7 @@ function read(take: Take): Reading {
     .filter((group) => group.length === group[0]!.phrase.length)
     .map((group) => ({ bars: group, rhythm: group.map((bar) => rhythm.get(bar.index)!) }));
 
-  const reading = { bars, hits, rhythm, phrases };
+  const reading = { bars, hits, strokes, rhythm, phrases };
   readings.set(take, reading);
   return reading;
 }
@@ -142,6 +175,15 @@ function strikesPerBar(take: Take, tier: Tier, bandOnly = false): Measurement | 
   );
 }
 
+/**
+ * The places in a bar a hand could come down: the eighths, or every sixteenth
+ * for a hand that strums sixteenths. Chance is counted over these.
+ */
+function places(style: StylePack): number {
+  const idiom = style.chords.idiom;
+  return idiom !== "keys" && idiom.strum.grid === "sixteenth" ? 16 : 8;
+}
+
 /** The grid ticks in the bars the piano comps where a kick or a backbeat is struck, ghosts apart. */
 function drumLandings(take: Take): Set<number> {
   const { bars } = read(take);
@@ -168,9 +210,12 @@ const returns = (rhythm: readonly BarRhythm[]) =>
 const turns = (rhythm: readonly BarRhythm[]) => rhythm.some((bar) => !alike(bar, rhythm[0]!));
 
 export const compingMeasures: readonly Measure[] = [
+  // How busy a comp is at each level is one way of playing: these three say what a blues
+  // piano does, and a strummed part has its own below (`chords.strokes-per-bar`).
   {
     id: "chords.strikes-per-bar-quiet",
     seat: "chords",
+    idiom: true,
     says: "When the band is quiet the piano is a pad: about one chord a bar.",
     unit: "per bar",
     of: (take) => strikesPerBar(take, "low"),
@@ -178,6 +223,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.strikes-per-bar-mid",
     seat: "chords",
+    idiom: true,
     says: "At the working level the piano chops: two or three strikes a bar, with room between them.",
     unit: "per bar",
     of: (take) => strikesPerBar(take, "mid"),
@@ -185,6 +231,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.strikes-per-bar-loud",
     seat: "chords",
+    idiom: true,
     says: "When the band is hot and has the tune to itself the piano is busy: four stabs a bar, or the pump's eight. Under a soloist a style may hold the hand back (chords.strikes-per-bar-under-a-hot-solo).",
     unit: "per bar",
     of: (take) => strikesPerBar(take, "high", true),
@@ -205,11 +252,12 @@ export const compingMeasures: readonly Measure[] = [
     seat: "chords",
     says: "The share of eighth-note places in the piano's bars that carry a kick or a backbeat: what a hand placed at random would score with the drums.",
     unit: "share",
-    of(take) {
+    of(take, style) {
       const landings = drumLandings(take);
       const { bars } = read(take);
-      const onEighths = [...landings].filter((tick) => tick % EIGHTH === 0).length;
-      return share(onEighths, bars.length * 8);
+      const grid = (4 * PPQ) / places(style);
+      const onGrid = [...landings].filter((tick) => tick % grid === 0).length;
+      return share(onGrid, bars.length * places(style));
     },
   },
   {
@@ -217,7 +265,7 @@ export const compingMeasures: readonly Measure[] = [
     seat: "chords",
     says: "The piano lands with the kick and the backbeat more often than a hand placed at random on the eighths would: above zero it is locking with the drummer, below it is sitting between his strokes.",
     unit: "share",
-    of(take) {
+    of(take, style) {
       // The two measures above, as one number a target can hold: a floor on the share alone
       // sits under chance and cannot fail (ME-09).
       const landings = drumLandings(take);
@@ -225,14 +273,16 @@ export const compingMeasures: readonly Measure[] = [
       const struck = [...hits.values()].flat();
       if (struck.length === 0 || bars.length === 0) return null;
       const withDrums = struck.filter((hit) => landings.has(hit.tick)).length / struck.length;
-      const chance = [...landings].filter((tick) => tick % EIGHTH === 0).length / (bars.length * 8);
+      const grid = (4 * PPQ) / places(style);
+      const chance =
+        [...landings].filter((tick) => tick % grid === 0).length / (bars.length * places(style));
       return { value: withDrums - chance, cases: struck.length };
     },
   },
   {
     id: "chords.off-the-beat",
     seat: "chords",
-    says: "A good part of the piano's strikes are off the beat, and a good part are on it: syncopated, not floating.",
+    says: "A good part of the chords the hand strikes are off the beat, and a good part are on it: syncopated, not floating. A scratch is not a chord.",
     unit: "share",
     of(take) {
       const struck = [...read(take).hits.values()].flat();
@@ -242,7 +292,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.changes-anticipated",
     seat: "chords",
-    says: "The piano leans into some changes and lets others land: the new chord is struck an eighth early at around half of them.",
+    says: "The hand leans into some changes and lets others land: the share of changes where the new chord is struck an eighth early and is still sounding when it arrives.",
     unit: "share",
     of(take) {
       const { bars, hits } = read(take);
@@ -261,7 +311,10 @@ export const compingMeasures: readonly Measure[] = [
           (hit) =>
             hit.tick >= arrival.tick - EIGHTH &&
             hit.tick < arrival.tick &&
-            hit.ends >= arrival.tick - POCKET,
+            hit.ends >= arrival.tick - POCKET &&
+            // And it is the chord coming: a groove's stab on the last sixteenth stops at
+            // the barline too, and is the old chord.
+            states(arrival.chord!, hit.pitches),
         );
         if (pushed) early++;
       }
@@ -271,6 +324,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.bar-same-as-last",
     seat: "chords",
+    idiom: true,
     says: "About half the time a bar's rhythm is the bar before it again: the figure is there to be heard, and it does not go round like a loop. Away from a solo.",
     unit: "share",
     of(take) {
@@ -293,6 +347,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.phrase-same-as-last",
     seat: "chords",
+    idiom: true,
     says: "Now and then a phrase is the phrase before it again, bar for bar; mostly it is not. Away from a solo.",
     unit: "share",
     of(take) {
@@ -311,6 +366,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.phrase-same-as-last-chorus",
     seat: "chords",
+    idiom: true,
     says: "A phrase is seldom the very phrase that was played at this place the last time through at this level: the choruses are not copies. Away from a solo.",
     unit: "share",
     of(take) {
@@ -335,6 +391,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.phrases-shaped",
     seat: "chords",
+    idiom: true,
     says: "Most phrases have a shape: the bar that opens the phrase comes back in it, and some bar answers or turns. Away from a solo.",
     unit: "share",
     of: (take) => phraseShape(take, (rhythm) => returns(rhythm) && turns(rhythm)),
@@ -342,6 +399,7 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.phrases-one-bar",
     seat: "chords",
+    idiom: true,
     says: "Few phrases are one bar played over and over: that is a loop. Away from a solo.",
     unit: "share",
     of: (take) => phraseShape(take, (rhythm) => !turns(rhythm)),
@@ -349,8 +407,161 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.phrases-unrelated",
     seat: "chords",
+    idiom: true,
     says: "Few phrases never come back to the bar they opened with: that is bars in a row, not a phrase. Away from a solo.",
     unit: "share",
     of: (take) => phraseShape(take, (rhythm) => !returns(rhythm)),
   },
+
+  // ── a strumming hand ──
+  // A groove on a guitar: the hand never stops, and the part is which strokes sound the
+  // chord and which are scratches (CH-47, CH-52, Q-17). These are one way of playing, and
+  // are on the scorecard of a style that sets them targets.
+  {
+    id: "chords.strokes-per-bar",
+    seat: "chords",
+    idiom: true,
+    says: "From the working level up the strumming hand never stops: eight to sixteen strokes a bar, chords and scratches together.",
+    unit: "per bar",
+    of: (take) => strokesPerBar(take, (tier) => tier !== "low"),
+  },
+  {
+    id: "chords.strokes-per-bar-quiet",
+    seat: "chords",
+    idiom: true,
+    says: "When the band is quiet the hand plays only the stabs of its line, six or seven a bar: the scratches wait for the band to come up.",
+    unit: "per bar",
+    of: (take) => strokesPerBar(take, (tier) => tier === "low"),
+  },
+  {
+    id: "chords.strokes-per-bar-hot",
+    seat: "chords",
+    idiom: true,
+    says: "When the band is hot every sixteenth is a stroke: sixteen a bar, less only where a chord played early is left to ring.",
+    unit: "per bar",
+    of: (take) => strokesPerBar(take, (tier) => tier === "high"),
+  },
+  {
+    id: "chords.scratches",
+    seat: "chords",
+    idiom: true,
+    says: "From the working level up, between a third and four fifths of the strokes are scratches: more chick than chord, but the chord is there.",
+    unit: "share",
+    of(take) {
+      const all = strokesAt(take, (tier) => tier !== "low");
+      return share(all.filter((stroke) => stroke.muted).length, all.length);
+    },
+  },
+  {
+    id: "chords.scratches-quiet",
+    seat: "chords",
+    idiom: true,
+    says: "When the band is quiet the hand does not scratch.",
+    unit: "share",
+    of(take) {
+      const all = strokesAt(take, (tier) => tier === "low");
+      return share(all.filter((stroke) => stroke.muted).length, all.length);
+    },
+  },
+  {
+    id: "chords.short-stabs",
+    seat: "chords",
+    idiom: true,
+    says: "Nearly every chord is clipped: an eighth or shorter, damped at once. The few that ring are chords played early and held over the barline.",
+    unit: "share",
+    of(take) {
+      const struck = [...read(take).hits.values()].flat();
+      return share(struck.filter((hit) => hit.length <= EIGHTH + POCKET).length, struck.length);
+    },
+  },
+  {
+    id: "chords.line-kept",
+    seat: "chords",
+    idiom: true,
+    says: "A section's line is the line it had the last time: each bar has the same stabs and the same scratches as that bar of the section did the time before at that level (around a change of chord the harmony decides, and that is left out).",
+    unit: "share",
+    of(take) {
+      const { bars, strokes, rhythm } = read(take);
+      const last = new Map<string, Line>();
+      let pairs = 0;
+      let same = 0;
+      for (const bar of bars) {
+        const place = `${bar.section.identity}/${bar.barInSection}/${tierAt(bar)}`;
+        const now = { strokes: strokes.get(bar.index)!, bar, rhythm: rhythm.get(bar.index)! };
+        const before = last.get(place);
+        if (before) {
+          pairs++;
+          if (sameLine(before, now)) same++;
+        }
+        last.set(place, now);
+      }
+      return share(same, pairs);
+    },
+  },
+  {
+    id: "chords.bars-on-the-line",
+    seat: "chords",
+    idiom: true,
+    says: "Most bars are the section's line exactly, and not all of them: about one bar in four turns its end at the close of a phrase.",
+    unit: "share",
+    of(take) {
+      const { bars, strokes, rhythm } = read(take);
+      const groups = new Map<string, Line[]>();
+      for (const bar of bars) {
+        const group = `${bar.section.identity}/${tierAt(bar)}`;
+        const line = { strokes: strokes.get(bar.index)!, bar, rhythm: rhythm.get(bar.index)! };
+        groups.set(group, [...(groups.get(group) ?? []), line]);
+      }
+      let cases = 0;
+      let on = 0;
+      for (const lines of groups.values()) {
+        if (lines.length < 4) continue;
+        // The section's usual bar: the one most of its bars are, counted among the bars
+        // the harmony leaves alone where there are any.
+        const settled = lines.filter((line) => !line.rhythm.arrives && !line.rhythm.leaves);
+        const pool = settled.length > 0 ? settled : lines;
+        const count = (line: Line) => pool.filter((other) => sameLine(line, other)).length;
+        const usual = pool.reduce((best, line) => (count(line) > count(best) ? line : best));
+        cases += lines.length;
+        on += lines.filter((line) => sameLine(usual, line)).length;
+      }
+      return share(on, cases);
+    },
+  },
 ];
+
+/** A bar of a strummed line: its strokes, and what the harmony does at its barlines. */
+interface Line {
+  readonly bar: PlanBar;
+  readonly strokes: readonly Hit[];
+  readonly rhythm: BarRhythm;
+}
+
+/**
+ * Whether two bars are the same line: the same strokes in the same places,
+ * chord for chord and scratch for scratch. As with `alike`, the first eighth
+ * after a change at the barline and the last beat before one are left out,
+ * where the harmony decides what the hand does.
+ */
+function sameLine(a: Line, b: Line): boolean {
+  const from = a.rhythm.arrives || b.rhythm.arrives ? EIGHTH : 0;
+  const to = a.rhythm.leaves || b.rhythm.leaves ? 3 * PPQ : 4 * PPQ;
+  const body = (line: Line) =>
+    line.strokes
+      .map((stroke) => ({ at: stroke.tick - line.bar.start, muted: stroke.muted }))
+      .filter((stroke) => stroke.at >= from && stroke.at < to)
+      .map((stroke) => `${stroke.at}${stroke.muted ? "~" : "x"}`)
+      .join(" ");
+  return body(a) === body(b);
+}
+
+/** Every stroke of the hand in the bars at the levels asked for. */
+function strokesAt(take: Take, at: (tier: Tier) => boolean): Hit[] {
+  const { bars, strokes } = read(take);
+  return bars.filter((bar) => at(tierAt(bar))).flatMap((bar) => strokes.get(bar.index)!);
+}
+
+function strokesPerBar(take: Take, at: (tier: Tier) => boolean): Measurement | null {
+  const { bars, strokes } = read(take);
+  return mean(bars.filter((bar) => at(tierAt(bar))).map((bar) => strokes.get(bar.index)!.length));
+}

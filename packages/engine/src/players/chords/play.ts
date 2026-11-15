@@ -8,10 +8,11 @@ import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts"
 import type { Pick } from "./critique.ts";
 import { byCritic } from "./critique.ts";
 import { endingStrikes } from "./ending.ts";
-import { IDIOM_PLAYERS } from "./idiom.ts";
+import { idiomOf } from "./idiom.ts";
 import { lineOf, strikeLines } from "./line.ts";
 import { compStrikes, comps } from "./phrase.ts";
 import { plainStrikes } from "./plain.ts";
+import type { VoicedStrike } from "./strike.ts";
 import { voiceStrikes } from "./voicing.ts";
 
 /**
@@ -20,10 +21,19 @@ import { voiceStrikes } from "./voicing.ts";
  * plan, to show on the same seeds what the critic's choice is worth.
  */
 export function chordPart(context: PlayerContext, pick?: Pick): WrittenNote[] {
+  return idiomOf(context.style.chords.idiom).write(chordStrikes(context, pick), context.plan);
+}
+
+/**
+ * The part before the instrument sounds it: where the hand comes down and what
+ * it holds there (on a guitar, on which strings). A report reads this to print
+ * a part the way its player would write it.
+ */
+export function chordStrikes(context: PlayerContext, pick?: Pick): VoicedStrike[] {
   const { plan, style } = context;
   const chords = style.chords;
   const harmony = arrivals(plan);
-  const idiom = IDIOM_PLAYERS[chords.idiom];
+  const idiom = idiomOf(chords.idiom);
 
   // 1. Rhythm. Bars of 4/4 are comped phrase by phrase from the style's book; any other
   // meter plays the pad; the ending bar has its own gesture.
@@ -37,7 +47,8 @@ export function chordPart(context: PlayerContext, pick?: Pick): WrittenNote[] {
   // When the solo is over the hand is led on from where the line left it, and the pull
   // of its own register brings it home by steps: it does not jump back.
   const line = chords.listening ? lineOf(context.heard) : [];
-  const voiced = voiceStrikes(
+  // 3. Idiom: `chordPart` hands these to the instrument.
+  return voiceStrikes(
     strikes,
     harmony,
     chords,
@@ -45,9 +56,6 @@ export function chordPart(context: PlayerContext, pick?: Pick): WrittenNote[] {
     style.critic.weights.voicing ?? {},
     line.length === 0 ? [] : strikeLines(strikes, plan, line, lineOf(context.heard, "bass")),
   );
-
-  // 3. Idiom.
-  return idiom.write(voiced);
 }
 
 export const playChords: Player = (context) => chordPart(context);

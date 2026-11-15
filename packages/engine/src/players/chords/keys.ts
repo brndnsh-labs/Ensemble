@@ -5,6 +5,7 @@ import type { WrittenNote } from "../../perform/notes.ts";
 import { mod12 } from "../../theory/pitch.ts";
 import type { InstrumentIdiom } from "./idiom.ts";
 import type { Voicing } from "./strike.ts";
+import { MUTED } from "./strike.ts";
 
 /** The top of the keyboard comp's reach, E6 (CH-15). */
 const HIGHEST = 88;
@@ -12,6 +13,8 @@ const HIGHEST = 88;
 const SHORTEST = 60;
 
 export const keys: InstrumentIdiom = {
+  holds: false,
+
   /**
    * Every inversion of the tones in close position, in every octave, with
    * nothing under the floor (X-B-02) and nothing above E6 (CH-15). Lowest
@@ -47,6 +50,7 @@ export const keys: InstrumentIdiom = {
           duration,
           pitch,
           velocity: strike.velocity,
+          ...(strike.muted ? { voice: MUTED } : {}),
         });
       }
     });

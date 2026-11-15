@@ -18,6 +18,8 @@ export interface FigureStroke {
   readonly level: number;
   /** Ticks it rings when nothing cuts it short: a held run breathes, a stab is the articulation's length. */
   readonly length: number;
+  /** A deadened stroke: a scratch. */
+  readonly muted?: true;
 }
 
 export function strokesOf(figure: CompFigure, tier: RhythmTier, book: RhythmBook): FigureStroke[] {
@@ -30,7 +32,12 @@ export function strokesOf(figure: CompFigure, tier: RhythmTier, book: RhythmBook
     let run = 1;
     while (symbols[step + run] === HELD) run++;
     const steps = run > 1 ? run * book.hold : stroke.steps;
-    strokes.push({ at: step * STEP, level: stroke.level, length: Math.round(steps * STEP) });
+    strokes.push({
+      at: step * STEP,
+      level: stroke.level,
+      length: Math.round(steps * STEP),
+      ...(stroke.muted ? { muted: true as const } : {}),
+    });
   });
   return strokes;
 }

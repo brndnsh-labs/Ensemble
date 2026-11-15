@@ -5,8 +5,9 @@ import { cells } from "../../perform/grid.ts";
 import type { Tier } from "../../style/types.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 import { FIGURE_STEPS, HELD } from "./figure.ts";
-import type { ChordStyle, Voice } from "./style.ts";
-import { IDIOMS, VOICE_TONES } from "./style.ts";
+import { OPEN_STRINGS, TOP_FRET } from "./guitar.ts";
+import type { Articulation, ChordStyle, Voice } from "./style.ts";
+import { INSTRUMENTS, VOICE_TONES } from "./style.ts";
 
 const TIERS: readonly Tier[] = ["low", "mid", "high"];
 const FAMILIES: readonly ChordFamily[] = [
@@ -35,10 +36,56 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   const level = (value: number, where: string, top = LOUDEST) =>
     say(value >= 1 && value <= top, `${where}: ${value} is not a level from 1 to ${top}.`);
 
+  const instrument = typeof chords.idiom === "string" ? chords.idiom : chords.idiom.instrument;
   say(
-    IDIOMS.includes(chords.idiom),
-    `idiom: "${chords.idiom}" is not an instrument the seat knows.`,
+    INSTRUMENTS.includes(instrument),
+    `idiom: "${instrument}" is not an instrument the seat knows.`,
   );
+  const guitar = typeof chords.idiom === "string" ? null : chords.idiom;
+  // Every symbol the book writes that is a scratch, whichever tier or figure writes it.
+  const scratches = TIERS.some((tier) => {
+    const vocabulary = chords.rhythm?.tiers[tier];
+    if (!vocabulary) return false;
+    const written: (Articulation | undefined)[] = [
+      vocabulary.articulation,
+      ...[...vocabulary.figures, ...vocabulary.answers].map((figure) => figure.articulation),
+    ];
+    return written.some((articulation) =>
+      Object.values(articulation ?? {}).some((attack) => attack.muted),
+    );
+  });
+  if (guitar) {
+    const { strings, position, strum } = guitar;
+    const most = OPEN_STRINGS.length;
+    say(
+      Number.isInteger(strings) && strings >= 2 && strings <= most,
+      `guitar: a grip of ${strings} strings; write a whole number from 2 to ${most}.`,
+    );
+    say(
+      position >= 0 && position <= TOP_FRET - 3,
+      `guitar: the hand parked at fret ${position}; a four-fret hand sits between the nut and fret ${TOP_FRET - 3}.`,
+    );
+    say(
+      strum.grid === "eighth" || strum.grid === "sixteenth",
+      `guitar: "${strum.grid}" is not a grid the strumming hand swings on.`,
+    );
+    say(
+      Number.isInteger(strum.up) && strum.up >= 1,
+      `guitar: an upstroke catches ${strum.up} strings; write a whole number from 1.`,
+    );
+    say(
+      Number.isInteger(strum.lighter) && strum.lighter >= 0,
+      `guitar: an upstroke ${strum.lighter} lighter is not a whole number of velocity steps from 0.`,
+    );
+    say(
+      strum.roll >= 0 && strum.roll <= 20,
+      `guitar: ${strum.roll} ms a string is not a strum; a roll is between 0 and 20.`,
+    );
+    say(
+      !(guitar.open && scratches),
+      "guitar: open strings are allowed and the book writes scratches; an open string rings on through a hand that lets go (CH-23).",
+    );
+  }
 
   for (const [name, kind] of Object.entries(chords.kinds)) {
     const where = `voicing kind "${name}"`;
@@ -74,6 +121,14 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   say(reach >= 0, `register: a reach of ${reach} is less than nothing.`);
   if (chords.idiom === "keys") {
     say(floor >= ONE_HAND_FLOOR, `register: a floor of ${floor} is under E3, mud for one hand.`);
+  }
+  if (guitar) {
+    const [lowest, highest] = [OPEN_STRINGS[0]!, OPEN_STRINGS.at(-1)! + TOP_FRET];
+    say(floor >= lowest, `register: a floor of ${floor} is under the guitar's low E string.`);
+    say(
+      ceiling <= highest,
+      `register: a ceiling of ${ceiling} is over the 15th fret of the top string.`,
+    );
   }
   say(
     ceiling - floor >= 12,
@@ -112,6 +167,31 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   );
 
   const book = chords.rhythm;
+  /** A grid read as a bar of comping: its length, its symbols, and what it holds. */
+  const readGrid = (grid: string, articulation: Articulation, at: string) => {
+    const symbols = cells(grid);
+    say(
+      symbols.length === FIGURE_STEPS,
+      `${at}: ${symbols.length} steps; a figure is one bar of ${FIGURE_STEPS} sixteenths.`,
+    );
+    say(
+      symbols.some((symbol) => symbol in articulation),
+      `${at}: the hand never comes down.`,
+    );
+    symbols.forEach((symbol, step) => {
+      const known = symbol in articulation || symbol === HELD || symbol === ".";
+      say(known, `${at}: "${symbol}" at step ${step + 1} is not in its articulation.`);
+      const before = symbols[step - 1];
+      say(
+        symbol !== HELD || (before !== undefined && before !== "."),
+        `${at}: step ${step + 1} holds a chord that was never struck.`,
+      );
+      say(
+        symbol !== HELD || before === undefined || !articulation[before]?.muted,
+        `${at}: step ${step + 1} holds a scratch, which has nothing to ring.`,
+      );
+    });
+  };
   if (book) {
     say(
       book.hold > 0 && book.hold <= 1,
@@ -143,10 +223,22 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       const where = `rhythm (${tier})`;
       for (const [symbol, attack] of Object.entries(vocabulary.articulation)) {
         level(attack.level, `${where}, "${symbol}"`);
+        say(
+          symbol !== HELD && symbol !== ".",
+          `${where}: "${symbol}" already means held or silent.`,
+        );
       }
       say(
         stroke in vocabulary.articulation,
         `${where}: a push is played as "${stroke}", which this tier's articulation does not have.`,
+      );
+      say(
+        !vocabulary.articulation[stroke]?.muted,
+        `${where}: a push is played as "${stroke}", a scratch; a chord is never played early as one (CH-36).`,
+      );
+      say(
+        !vocabulary.arrival.muted,
+        `${where}: a chord struck where it arrives cannot be a scratch (CH-34).`,
       );
       level(vocabulary.arrival.level, `${where}, a chord struck where it arrives`);
       say(
@@ -167,24 +259,12 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       for (const figure of all) {
         const at = `${where}, "${figure.name}"`;
         const articulation = figure.articulation ?? vocabulary.articulation;
-        const symbols = cells(figure.grid);
+        readGrid(figure.grid, articulation, at);
+        if (figure.turn !== undefined) readGrid(figure.turn, articulation, `${at}, its turn`);
         say(
-          symbols.length === FIGURE_STEPS,
-          `${at}: ${symbols.length} steps; a figure is one bar of ${FIGURE_STEPS} sixteenths.`,
+          !figure.ties || figure.groove === true,
+          `${at}: only a groove need say it ties a pushed chord; any other figure does.`,
         );
-        say(
-          symbols.some((symbol) => symbol in articulation),
-          `${at}: the hand never comes down.`,
-        );
-        symbols.forEach((symbol, step) => {
-          const known = symbol in articulation || symbol === HELD || symbol === ".";
-          say(known, `${at}: "${symbol}" at step ${step + 1} is not in its articulation.`);
-          const before = symbols[step - 1];
-          say(
-            symbol !== HELD || (before !== undefined && before !== "."),
-            `${at}: step ${step + 1} holds a chord that was never struck.`,
-          );
-        });
         for (const [symbol, attack] of Object.entries(figure.articulation ?? {})) {
           level(attack.level, `${at}, "${symbol}"`);
         }
@@ -207,6 +287,7 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       `listening: a breath of ${listening.breath} sixteenths is not a silence the hand could answer; write a whole number from 2.`,
     );
     level(listening.answer.level, "listening, the answer");
+    say(!listening.answer.muted, "listening: the answer cannot be a scratch.");
     say(
       listening.answer.steps > 0 && listening.answer.steps <= 2,
       `listening: an answer ${listening.answer.steps} sixteenths long; it is a stab, more than nothing and an eighth at most (CH-71).`,

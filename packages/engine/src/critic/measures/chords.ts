@@ -6,6 +6,8 @@ import type { ChartChord } from "../../chart/types.ts";
 import { arrivals } from "../../perform/harmony.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
+import { fingerings, positionOf } from "../../players/chords/guitar.ts";
+import { MUTED } from "../../players/chords/strike.ts";
 import { LOW_LIMITS, RUB_FLOOR } from "../../players/chords/voicing.ts";
 import type { StylePack } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
@@ -13,7 +15,7 @@ import { chordFamily, chordTones, chordToString } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import { barAt, chordAt, mean, notesOf, share } from "../read.ts";
 import type { Measure } from "../types.ts";
-import { EIGHTH, POCKET, pumping } from "./comping.ts";
+import { EIGHTH, POCKET, pumping, states } from "./comping.ts";
 
 /** One time the hand comes down: its pitches low to high, and the chord written under it. */
 interface Struck {
@@ -27,11 +29,13 @@ interface Struck {
  * The comp's strikes in order. Notes struck together are one chord, and the
  * chord a strike plays is the one written under it, unless it is struck in
  * the eighth before a change and is still sounding there: then it is the
- * chord coming, played early (X-B-07).
+ * chord coming, played early (X-B-07). A scratch is a stroke of the rhythm and
+ * states no chord, so it is not a strike.
  */
 function strikes(take: Take): Struck[] {
   const byTick = new Map<number, { pitches: number[]; ends: number }>();
   for (const note of notesOf(take, "chords")) {
+    if (note.voice === MUTED) continue;
     const hit = byTick.get(note.tick) ?? { pitches: [], ends: 0 };
     hit.pitches.push(note.pitch);
     hit.ends = Math.max(hit.ends, note.tick + note.offset + note.duration);
@@ -43,7 +47,13 @@ function strikes(take: Take): Struck[] {
   for (const [tick, { pitches, ends }] of [...byTick].sort((a, b) => a[0] - b[0])) {
     while ((harmony[at + 1]?.tick ?? Infinity) <= tick) at++;
     const next = harmony[at + 1];
-    const early = next?.chord && next.tick - tick <= EIGHTH && ends >= next.tick - POCKET;
+    // Played early, and it is the chord coming: a groove's stab on the last sixteenth stops
+    // at the barline too, and is the old chord.
+    const early =
+      next?.chord &&
+      next.tick - tick <= EIGHTH &&
+      ends >= next.tick - POCKET &&
+      states(next.chord, pitches);
     const chord = early ? next.chord : chordAt(take, tick);
     const bar = barAt(take, tick);
     if (chord && bar) result.push({ tick, pitches: pitches.sort((a, b) => a - b), chord, bar });
@@ -126,6 +136,36 @@ function writtenTensions(chord: ChartChord): number[] {
 }
 
 const floorOf = (style: StylePack) => style.chords.register.floor;
+
+/**
+ * How far the hand travels along the neck at each change of chord, in frets.
+ * Where a grip is fretted is the guitar's own rule (the place nearest the hand),
+ * so this is the journey a guitarist playing these notes would make. Null on a keyboard.
+ */
+function neckMoves(take: Take, style: StylePack): number[] | null {
+  const guitar = style.chords.idiom;
+  if (guitar === "keys") return null;
+  // The grip held through each stay on a chord: its fullest strike, since an upstroke
+  // catches only the top strings of what the hand is holding.
+  const grips: Struck[] = [];
+  let chord = "";
+  for (const s of strikes(take)) {
+    const name = chordToString(s.chord);
+    if (name !== chord) grips.push(s);
+    else if (s.pitches.length > grips.at(-1)!.pitches.length) grips[grips.length - 1] = s;
+    chord = name;
+  }
+  const places = fingerings(
+    guitar,
+    grips.map((s) => s.pitches),
+  ).map((strings, i) => (strings ? positionOf(strings, grips[i]!.pitches) : null));
+  const moves: number[] = [];
+  for (let i = 1; i < places.length; i++) {
+    const [from, to] = [places[i - 1]!, places[i]!];
+    if (from !== null && to !== null) moves.push(Math.abs(to - from));
+  }
+  return moves;
+}
 
 export const chordMeasures: readonly Measure[] = [
   {
@@ -287,6 +327,25 @@ export const chordMeasures: readonly Measure[] = [
         if (width(now) > 2 * width(before) && width(now) > 2 * width(after)) jumps++;
       }
       return share(jumps, cases);
+    },
+  },
+  {
+    id: "chords.neck-movement",
+    seat: "chords",
+    idiom: true,
+    says: "At a change of chord the fretting hand moves a fret or two on average: the part is played in one position, not chased up and down the neck.",
+    unit: "semitones",
+    of: (take, style) => mean(neckMoves(take, style) ?? []),
+  },
+  {
+    id: "chords.neck-jumps",
+    seat: "chords",
+    idiom: true,
+    says: "The hand seldom has to shift more than a four-fret hand's width between one chord and the next.",
+    unit: "share",
+    of(take, style) {
+      const moves = neckMoves(take, style) ?? [];
+      return share(moves.filter((move) => move > 4).length, moves.length);
     },
   },
 ];

@@ -27,6 +27,50 @@ export const funkCritic: CriticStyle = {
     "drums.turn-held": { min: 0.86, kind: "intent", minCases: 4 },
     // ── bass ──
     // ── chords ──
+    // The grip (ST-funk-26). The top of it is a line: it holds or steps, and seldom jumps
+    // more than a fourth (CH-17; 2% of changes delivered).
+    "chords.top-leaps": { max: 0.22, kind: "intent", minCases: 8 },
+    "chords.top-movement": { max: 3.5, kind: "intent", minCases: 8 },
+    // Inside its window and clear of the bass (X-B-03).
+    "chords.floor-clearance": { min: 0, kind: "intent" },
+    "chords.closest-to-bass": { min: 1, kind: "intent" },
+    "chords.crowds-the-bass": { max: 0.05, kind: "intent", minCases: 8 },
+    // The bottom string of the grip: delivers G#3 to B3 (56.0 to 58.7), by chart.
+    "chords.lowest-note": { min: 53, max: 62, kind: "measured", minCases: 8 },
+    // The 9th or 13th on every dominant and major chord (CH-14: a half and up). A minor 7th
+    // is played plain here, so a minor-key chart sits near a half: delivers 42% at the lowest.
+    "chords.colour": { min: 0.35, max: 1, kind: "measured", minCases: 8 },
+    // What the chart writes is heard (X-B-13), all but one tone: the 9th of a 13 chord, which
+    // a three-string stab gives up for the 13th (CH-08). Delivers 85% on the chart with a G13.
+    "chords.written-tensions": { min: 0.8, kind: "measured", minCases: 5 },
+    "chords.voicing-faults": { max: 0.02, kind: "intent", minCases: 8 },
+    "chords.width-jumps": { max: 0.01, kind: "intent", minCases: 8 },
+    // The hand stays in one position (ST-funk-26): delivers 1.2 frets a change on average,
+    // 1.8 at the most, and never a shift past a hand's width.
+    "chords.neck-movement": { max: 2.5, kind: "measured", minCases: 8 },
+    "chords.neck-jumps": { max: 0.05, kind: "measured", minCases: 8 },
+    // The hand never stops (ST-funk-28, CH-52): 8 to 16 strokes a bar from the working level
+    // up, 30% to 80% of them scratches; every sixteenth when hot; the stabs alone when quiet.
+    "chords.strokes-per-bar": { min: 8, max: 16, kind: "intent", minCases: 8 },
+    "chords.strokes-per-bar-hot": { min: 14, max: 16, kind: "intent", minCases: 8 },
+    "chords.strokes-per-bar-quiet": { min: 4, max: 8, kind: "intent", minCases: 8 },
+    "chords.scratches": { min: 0.3, max: 0.8, kind: "intent", minCases: 20 },
+    "chords.scratches-quiet": { max: 0, kind: "intent", minCases: 20 },
+    // At least 60% of the stabs off the beat, at least 90% of them short (ST-funk-28).
+    "chords.off-the-beat": { min: 0.6, kind: "intent", minCases: 20 },
+    "chords.short-stabs": { min: 0.9, kind: "intent", minCases: 20 },
+    // It leans into a change now and then, never most of the time (ST-funk-38: one in ten,
+    // one in five when hot; a loud take of few changes has reached 36%).
+    "chords.changes-anticipated": { max: 0.4, kind: "intent", minCases: 10 },
+    // A section's line is its line every time it comes round (Q-18, X-B-14), and most bars
+    // are that line untouched (ME-27); the rest are the turn at a phrase's end. Delivers 76%
+    // on a vamp with no changes, where every turn shows, and more where a change hides it.
+    "chords.line-kept": { min: 0.95, kind: "intent", minCases: 8 },
+    "chords.bars-on-the-line": { min: 0.6, kind: "measured", minCases: 8 },
+    // A groove does not react to a soloist: as busy in the breaths as under the line, where
+    // a comp that converses is busier in them (CH-72: 0.7 to 1.0 for funk, over 1.1 for a
+    // conversation). Delivers 0.82, from 0.69 to 0.96, under the soloist playing today.
+    "chords.breaths-over-the-line": { min: 0.6, max: 1.05, kind: "measured", minCases: 4 },
     // ── solo ──
     // Measured over 200 takes of the six funk charts, each also played taking the first
     // candidate every time and a candidate at random (ME-10).
@@ -111,5 +155,23 @@ export const funkCritic: CriticStyle = {
       // The style's own list of where a change lands: 5th, 3rd, 7th, root.
       "changes-down-the-list": 0.5,
     },
+    // What a grip costs (CH-16, CH-21): the piano's penalties with a stronger pull on the top
+    // note, 0.8 a semitone against the piano's 0.35, so the hand stays where the style aims
+    // it (CH-22, ST-funk-26).
+    voicing: {
+      "outside-register": 40,
+      "top-from-target": 0.8,
+      "top-out-of-reach": 4,
+      "hand-movement": 0.5,
+      "top-movement": 0.6,
+      "minor-ninths": 12,
+      "minor-seconds": 8,
+      "minor-seconds-thin": 24,
+      "sharp-nine-under-third": 20,
+      "low-intervals": 10,
+    },
+    // A groove: one line for the section and one way to play a phrase of it, so the critic
+    // has nothing to choose between.
+    comping: {},
   },
 };

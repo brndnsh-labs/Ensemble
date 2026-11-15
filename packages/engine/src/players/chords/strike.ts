@@ -24,7 +24,26 @@ export interface Strike {
   readonly kind: string;
   /** Played as an answer to the soloist: put into a breath, or played harder there (CH-71). */
   readonly answers?: true;
+  /**
+   * The notes are deadened: a scratch. It deadens the voicing the hand holds,
+   * which is the chord named here, and is written with the voice `MUTED`.
+   */
+  readonly muted?: true;
+  /**
+   * The hand comes down on purpose, wherever a strumming hand's pendulum
+   * would be: a chord laid in where it arrives (CH-34), a chord on a pulse of
+   * a plain bar, the final chord (CH-74). A keyboard has no other way to play.
+   */
+  readonly down?: true;
 }
+
+/**
+ * The voice a deadened stroke is written with, as a drummer's ghost stroke has
+ * its own. Its pitches are the notes the hand is holding, at half a sixteenth
+ * and a scratch's level: a sampler has its scratch to play for them; a plain
+ * patch gets a clipped, quiet stroke of the right chord and never a wrong note.
+ */
+export const MUTED = "muted";
 
 /**
  * Pitches for a strike, low to high, each with the tone of the chord it plays.
@@ -33,6 +52,8 @@ export interface Strike {
 export interface Voicing {
   readonly pitches: readonly number[];
   readonly tones: readonly FittedTone["tone"][];
+  /** On a fretted instrument, the string each pitch is played on, 0 the lowest: where the hand is. */
+  readonly strings?: readonly number[];
 }
 
 export interface VoicedStrike {
