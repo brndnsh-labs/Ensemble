@@ -35,6 +35,8 @@ pnpm score              # every style's scorecard against its accepted baseline 
 pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)
 pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gate:2, gate:3, gate:4)
 pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
+pnpm packs:fetch [id...] # fetch the sample libraries into .sources/ at their pinned commits
+pnpm packs:cut [id...]   # cut instrument packs into assets/packs/ (needs an ffmpeg with soxr and libopus)
 ```
 
 The CLI:

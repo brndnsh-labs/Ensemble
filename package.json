@@ -19,7 +19,9 @@
     "gate:2": "sh scripts/gate-2.sh",
     "gate:3": "sh scripts/gate-3.sh",
     "gate:4": "sh scripts/gate-4.sh",
-    "score": "node scripts/budget.ts 120 node packages/cli/src/main.ts score --check"
+    "score": "node scripts/budget.ts 120 node packages/cli/src/main.ts score --check",
+    "packs:fetch": "node scripts/packs/fetch.ts",
+    "packs:cut": "node scripts/packs/cut.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",
