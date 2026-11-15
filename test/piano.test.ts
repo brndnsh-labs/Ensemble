@@ -156,7 +156,13 @@ test("the piano's last chord is the final chord, struck once where it lands and 
       final[0]!.pitches,
       `${where}: the button is not the final chord`,
     );
-    assert.ok(final[0]!.pitches.length >= 3, `${where}: a thin final chord`);
+    // Three notes at least, counting the soloist's last note: a three-note hand leaves the
+    // soloist its note (CH-60), and the soloist's note is then the chord's.
+    const soloist = notesOf(take, "solo")
+      .filter((note) => note.tick <= landing && note.tick + note.duration > landing)
+      .map((note) => note.pitch);
+    const sounding = new Set([...final[0]!.pitches, ...soloist]);
+    assert.ok(sounding.size >= 3, `${where}: a thin final chord`);
     const early = strikes.filter(
       (strike) => strike.tick < landing && strike.ends > landing + POCKET,
     );
@@ -256,7 +262,14 @@ test("the eighth before a change belongs to the chord coming: a strike there tha
       }
     }
   }
-  assert.ok(pushes > enough(500), `only ${pushes} pushed chords across the library`);
+  // A comp that never leans in (rock, ST-rock-27) has nothing to count; one that does must
+  // have been seen doing it.
+  const leans = STYLES.some(
+    (style) =>
+      style.chords.anticipation.midBar === "tie" ||
+      Object.values(style.chords.anticipation.barline).some((chance) => chance > 0),
+  );
+  if (leans) assert.ok(pushes > enough(500), `only ${pushes} pushed chords across the library`);
 });
 
 test("the piano stays in its part of the keyboard: the top of its chords never wanders more than a sixth from where the style aims it", () => {

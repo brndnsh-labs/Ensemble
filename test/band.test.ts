@@ -342,6 +342,12 @@ test("where a chord is written the bass plays a tone of that chord, and at a cha
     let previous = "";
     for (const bar of take.plan.bars) {
       if (bar.kind !== "music") continue;
+      // A bar the arrangement lays the bass out of has nothing to say; the next chord the
+      // bass plays is a change for it.
+      if (bar.seats.bass === null) {
+        previous = "";
+        continue;
+      }
       for (const span of bar.spans) {
         const chord = span.chord;
         if (!chord || span.tied) {
