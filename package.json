@@ -21,7 +21,9 @@
     "gate:4": "sh scripts/gate-4.sh",
     "score": "node scripts/budget.ts 120 node packages/cli/src/main.ts score --check",
     "packs:fetch": "node scripts/packs/fetch.ts",
-    "packs:cut": "node scripts/packs/cut.ts"
+    "packs:cut": "node scripts/packs/cut.ts",
+    "audition": "node scripts/serve.ts",
+    "render:audio": "node scripts/render-audio.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

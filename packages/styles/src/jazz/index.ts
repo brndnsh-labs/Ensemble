@@ -44,6 +44,15 @@ export const jazz: StylePack = {
   instruments: { bass: 32, chords: 0 },
   sound: {
     packs: { drums: "drum-kit", bass: "upright-bass", chords: "grand-piano" },
-    mix: DEFAULT_MIX,
+    // A ride and a feathered kick measure 6 dB under a shuffle's backbeat, and the comping
+    // is sparser than a blues piano's: the drums come up, the piano a little. No ear yet.
+    mix: {
+      ...DEFAULT_MIX,
+      seats: {
+        ...DEFAULT_MIX.seats,
+        drums: { ...DEFAULT_MIX.seats.drums, level: 3 },
+        chords: { ...DEFAULT_MIX.seats.chords, level: -5 },
+      },
+    },
   },
 };

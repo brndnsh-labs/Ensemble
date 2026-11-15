@@ -37,6 +37,9 @@ pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gat
 pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
 pnpm packs:fetch [id...] # fetch the sample libraries into .sources/ at their pinned commits
 pnpm packs:cut [id...]   # cut instrument packs into assets/packs/ (needs an ffmpeg with soxr and libopus)
+pnpm audition [--host 0.0.0.0] [--port 8765]   # serve the audition page at /tools/audition/: play a take from the packs
+pnpm render:audio <name> chart=<file> [style=] [seed=] [passes=] [solo=alto-sax] [only=bass] [live=1]
+                         # render a take to out/audio/<name>.wav in headless Chrome; live=1 plays it in real time and counts late notes
 ```
 
 The CLI:
