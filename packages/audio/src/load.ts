@@ -38,35 +38,71 @@ export interface LoadOptions {
 /** Where the band's dynamics centre; the layer holding it is the one to keep when only one is. */
 const MIDDLE_VELOCITY = 71;
 
-/** `url` is the pack's folder. */
-export async function loadPack(
-  context: BaseAudioContext,
-  url: string,
-  options: LoadOptions = {},
-): Promise<LoadedPack> {
+/** A pack's description, and where each of its recordings is fetched from. */
+export interface PackSource {
+  readonly pack: Pack;
+  /**
+   * The address of one of the pack's recordings. It carries a mark made from
+   * the pack's description, so a pack cut again is fetched again: a cache that
+   * holds a file longer than it was asked to cannot hand back the old recording
+   * under the new pack's name.
+   */
+  readonly fileUrl: (file: string) => string;
+}
+
+/** Read a pack's `pack.json`. `url` is the pack's folder. */
+export async function readPack(url: string): Promise<PackSource> {
   const base = url.endsWith("/") ? url : `${url}/`;
-  const full = (await (await get(`${base}pack.json`)).json()) as Pack;
-  if (full.format !== PACK_FORMAT) {
-    throw new Error(`${base}: pack format ${full.format}, and this sampler reads ${PACK_FORMAT}`);
+  const text = await (await get(`${base}pack.json`)).text();
+  const pack = JSON.parse(text) as Pack;
+  if (pack.format !== PACK_FORMAT) {
+    throw new Error(`${base}: pack format ${pack.format}, and this sampler reads ${PACK_FORMAT}`);
   }
-  const pack = options.layers === undefined ? full : thinned(full, options.layers);
+  const mark = fingerprint(text);
+  return { pack, fileUrl: (file) => `${base}${encodeURIComponent(file)}?v=${mark}` };
+}
+
+/** Every recording a pack's voices name, once each. */
+export function packFiles(pack: Pack): string[] {
   const files = new Set<string>();
   for (const voice of Object.values(pack.voices)) {
     for (const layer of voice.layers) {
       for (const zone of layer.zones) for (const take of zone.takes) files.add(take.file);
     }
   }
+  return [...files];
+}
+
+/** `url` is the pack's folder. */
+export async function loadPack(
+  context: BaseAudioContext,
+  url: string,
+  options: LoadOptions = {},
+): Promise<LoadedPack> {
+  const source = await readPack(url);
+  const pack = options.layers === undefined ? source.pack : thinned(source.pack, options.layers);
+  const files = packFiles(pack);
   const recordings = new Map<string, Recording>();
   let done = 0;
   await Promise.all(
-    [...files].map(async (file) => {
-      const bytes = await (await get(base + encodeURIComponent(file))).arrayBuffer();
+    files.map(async (file) => {
+      const bytes = await (await get(source.fileUrl(file))).arrayBuffer();
       const buffer = await context.decodeAudioData(bytes);
       recordings.set(file, { buffer, hit: hitTime(buffer) });
-      options.progress?.(++done, files.size);
+      options.progress?.(++done, files.length);
     }),
   );
   return { pack, recordings };
+}
+
+/** A short mark that changes when the text does (FNV-1a). Not a secret: it only has to differ. */
+function fingerprint(text: string): string {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, "0");
 }
 
 async function get(url: string): Promise<Response> {

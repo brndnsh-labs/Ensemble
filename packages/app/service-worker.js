@@ -5,7 +5,7 @@
 /** The app itself: one cache per build, filled when the worker is installed. */
 const SHELL = "shell-__SHELL__";
 /** The instrument packs: kept across builds, and filled as they are first fetched. */
-const PACKS = "packs-__PACKS__";
+const PACKS = "instruments-__PACKS__";
 const FILES = __FILES__;
 /**
  * A kept file answers any request for its address. Some hosts mark responses as varying by

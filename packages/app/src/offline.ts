@@ -2,7 +2,7 @@
 // instrument file the first time it is fetched; this fetches every one of
 // them once, so a style never played before still plays on a train.
 
-import type { Pack } from "@ensemble/audio";
+import { packFiles, readPack } from "@ensemble/audio";
 import { SOLO_INSTRUMENTS } from "@ensemble/engine";
 import { STYLES } from "@ensemble/styles";
 
@@ -48,14 +48,9 @@ export async function saveInstruments(
   const urls: string[] = [];
   for (const id of PACK_IDS) {
     const base = new URL(`${packsUrl}${id}/`, location.href).href;
-    const pack = (await (await fetch(`${base}pack.json`)).json()) as Pack;
-    const files = new Set<string>();
-    for (const voice of Object.values(pack.voices)) {
-      for (const layer of voice.layers) {
-        for (const zone of layer.zones) for (const take of zone.takes) files.add(take.file);
-      }
-    }
-    for (const file of files) urls.push(base + encodeURIComponent(file));
+    // The same addresses the band's loader asks for, or what is saved here would never be used.
+    const source = await readPack(base);
+    for (const file of packFiles(source.pack)) urls.push(source.fileUrl(file));
     // The credits page links to it.
     urls.push(`${base}LICENCE`);
   }
