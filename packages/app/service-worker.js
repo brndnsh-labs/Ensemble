@@ -18,7 +18,9 @@ self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(SHELL)
-      .then((cache) => cache.addAll(FILES))
+      // From the server, not from the browser's own cache: a page kept from an older build
+      // would name scripts that are no longer there.
+      .then((cache) => cache.addAll(FILES.map((file) => new Request(file, { cache: "reload" }))))
       // A new build takes over at once: nothing in an open page depends on the old cache.
       .then(() => self.skipWaiting()),
   );

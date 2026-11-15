@@ -6,6 +6,7 @@ import {
   keyToString,
   parseKey,
   pitchClass,
+  planBar,
   plan as planOf,
   SOLO_INSTRUMENTS,
 } from "@ensemble/engine";
@@ -34,6 +35,8 @@ interface Props {
   readonly started: () => void;
 }
 
+/** How many bars ahead the play screen tells the chart about: enough to find the next line from anywhere. */
+const COMING = 16;
 const LENGTHS: readonly (number | null)[] = [2, 3, 5, 10, 15, 20, null];
 const READINGS: readonly Reading[] = ["names", "numerals", "both"];
 /** Each way of reading shown by example, and said in full for a screen reader. */
@@ -100,16 +103,40 @@ export function PlayView({ entry, rig, settings, change, autoplay, started }: Pr
     [chart, setup],
   );
   const playing = jam.phase === "playing";
-  const plan = playing && jam.take ? jam.take.plan : preview;
-  const shown = playing && jam.take ? jam.take.chart : chart;
+  const plan = playing && jam.playing ? jam.playing.plan : preview;
+  const shown = playing && jam.playing ? jam.playing.chart : chart;
 
   let playhead: Playhead | undefined;
   if (playing && jam.place) {
+    const { bar } = jam.place;
     const next = nextChange(plan, jam.place);
     const nextBar = next && pageBarOf(next.bar);
+    const coming: string[] = [];
+    for (let index = bar.index + 1; index <= bar.index + COMING; index++) {
+      const id = pageBarOf(planBar(plan, index) ?? bar);
+      if (id !== undefined) coming.push(id);
+    }
+    // On the last pass the final bar is the ending the band will play, not the turnaround written there.
+    const last = bar.lastPass || bar.kind === "tail" ? plan.bars.find((b) => b.ending) : undefined;
+    const lastBar = last && pageBarOf(last);
     playhead = {
-      bar: pageBarOf(jam.place.bar) ?? "",
+      bar: pageBarOf(bar) ?? "",
+      coming,
       ...(next && nextBar ? { next: { bar: nextBar, at: next.at } } : {}),
+      ...(last && lastBar
+        ? {
+            landing: {
+              bar: lastBar,
+              chords: last.spans
+                .filter((span) => !span.tied)
+                .map((span) => ({
+                  chord: span.chord,
+                  at: span.start / last.ticks,
+                  span: span.duration / last.ticks,
+                })),
+            },
+          }
+        : {}),
     };
   }
 

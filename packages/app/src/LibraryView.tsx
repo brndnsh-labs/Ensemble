@@ -66,9 +66,11 @@ export function LibraryView({ play, saving }: Props) {
       <footer className="colophon">
         {saving && (
           <p>
-            {saving.done < saving.total
-              ? `Saving the instruments to this device: ${saving.done} of ${saving.total} files.`
-              : "Everything is saved on this device. Ensemble plays with no connection."}
+            {saving.done === saving.total
+              ? "Everything is saved on this device. Ensemble plays with no connection."
+              : saving.finished
+                ? `${saving.done} of ${saving.total} instrument files are saved on this device. The rest will be fetched the next time Ensemble is opened with a connection.`
+                : `Saving the instruments to this device: ${saving.done} of ${saving.total} files.`}
           </p>
         )}
         <p>

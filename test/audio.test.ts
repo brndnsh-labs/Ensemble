@@ -166,18 +166,23 @@ test("when what is to come is changed, everything before the change is played as
     const changeAt = 100.1 + rng.between(5, 30);
     let scheduler: Scheduler | undefined;
     let cut: number | undefined;
+    let handedNow: Handed[] = [];
     const { handed, origin } = run(
       sounds,
       (now) => {
         if (cut === undefined && now >= changeAt) {
           // The band is told now; the change takes hold just past what is already handed over.
-          cut = now - 100.1 + horizon + 0.001;
-          scheduler?.replace(cut, instead);
+          // On every third seed it is asked for sooner than that, which it cannot be.
+          const asked = now - 100.1 + (seed % 3 === 0 ? horizon / 3 : horizon + 0.001);
+          const handedSoFar = handedNow.at(-1)?.sound.at ?? Number.NEGATIVE_INFINITY;
+          cut = Math.max(asked, handedSoFar + 1e-12);
+          scheduler?.replace(asked, instead);
         }
         return 0.025;
       },
-      (s) => {
+      (s, soFar) => {
         scheduler = s;
+        handedNow = soFar;
         s.append(sounds.slice(sounds.length / 2));
         s.start(100.1);
         return 100.1;

@@ -112,7 +112,14 @@ export class Rig {
   /** A phone on a music stand must not go dark in the middle of a tune. */
   async #keepAwake(): Promise<void> {
     try {
-      this.#wake = await navigator.wakeLock?.request("screen");
+      const lock = await navigator.wakeLock?.request("screen");
+      // The band may have stopped while the browser was deciding.
+      if (!this.#player) {
+        void lock?.release();
+        return;
+      }
+      void this.#wake?.release();
+      this.#wake = lock;
     } catch {
       // Refused (a low battery, a hidden tab): the music plays on regardless.
     }

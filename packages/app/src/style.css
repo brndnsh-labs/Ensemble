@@ -6,7 +6,7 @@
   color-scheme: light dark;
   --paper: #eef0f4;
   --ink: #1e1a4f;
-  --faint: #6f6d93;
+  --faint: #5f5d86;
   --rule: #c5c6d6;
   --marker: #ffe53b;
   --on-marker: #1e1a4f;
@@ -481,6 +481,11 @@ button[aria-pressed="true"] {
   color: var(--faint);
   font-size: 0.6em;
   font-weight: 620;
+}
+
+/* On the highlighter everything is the ink that reads on yellow, in either theme. */
+.bar.now .chord.rest {
+  color: inherit;
 }
 
 .chord.stacked {

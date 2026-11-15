@@ -7,7 +7,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { extname, join, normalize, relative, resolve } from "node:path";
+import { extname, join, normalize, relative, resolve, sep } from "node:path";
 import react from "@vitejs/plugin-react";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
@@ -33,7 +33,7 @@ function instrumentPacks(): Plugin {
         const path = normalize(decodeURIComponent((request.url ?? "").split("?")[0]!));
         const file = join(PACKS, path);
         try {
-          if (!file.startsWith(PACKS) || !statSync(file).isFile()) return next();
+          if (!file.startsWith(PACKS + sep) || !statSync(file).isFile()) return next();
         } catch {
           return next();
         }

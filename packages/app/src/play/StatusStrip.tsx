@@ -20,8 +20,10 @@ export const clock = (s: number): string =>
 
 const passes = (n: number): string => (n === 1 ? "1 pass" : `${n} passes`);
 
-function where(plan: Plan, place: Place | undefined): string {
+function where(plan: Plan, place: Place | undefined, playing: boolean, elapsed: number): string {
   const bar = place?.bar;
+  // Playing with no bar under it: the moment before the count, or the last chord ringing.
+  if (!bar && playing) return elapsed > 0 ? "Ending" : "Count-in";
   if (!bar) return plan.open ? "Until you stop it" : passes(plan.passes);
   if (bar.kind === "count-in") return `Count-in ${place.beat + 1}`;
   if (bar.ending || bar.kind === "tail") return "Ending";
@@ -36,7 +38,7 @@ export function StatusStrip({ plan, place, elapsed, playing, soloist }: Props) {
   return (
     <div className={`strip${last ? " last" : ""}`}>
       <span className="strip-where" aria-live="polite">
-        {where(plan, place)}
+        {where(plan, place, playing, elapsed)}
       </span>
       <Arc plan={plan} at={bar} />
       {soloist !== undefined && playing && (

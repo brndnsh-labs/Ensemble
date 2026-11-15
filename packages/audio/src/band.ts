@@ -94,14 +94,9 @@ export class Player {
     this.#sampler.silence(this.#context.currentTime);
   }
 
-  /** More to play, for a jam with no set length. */
-  append(sounds: readonly Sound[]): void {
-    this.#scheduler.append(sounds);
-  }
-
   /**
    * Change what is to come, from a second of the performance on: a jam going
-   * round again, or told to end. `from` must be more than the look-ahead away.
+   * round again, or told to end. Give a `from` more than the look-ahead away.
    */
   replace(from: number, sounds: readonly Sound[]): void {
     this.#scheduler.replace(from, sounds);

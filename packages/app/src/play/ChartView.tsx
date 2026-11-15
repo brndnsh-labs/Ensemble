@@ -6,7 +6,7 @@ import type { CSSProperties } from "react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { Reading } from "./ChordSymbol.tsx";
 import { ChordSymbol, Simile } from "./ChordSymbol.tsx";
-import type { PageBar, PageSection } from "./page.ts";
+import type { PageBar, PageChord, PageSection } from "./page.ts";
 import { pageOf } from "./page.ts";
 
 export interface Playhead {
@@ -14,6 +14,13 @@ export interface Playhead {
   readonly bar: string;
   /** The next change of chord: its bar, and where in the bar it falls (0 to 1). */
   readonly next?: { readonly bar: string; readonly at: number };
+  /** The bars that follow, in the order they will be played: what focus mode shows next. */
+  readonly coming: readonly string[];
+  /**
+   * A bar the band will not play as written, and what it plays there: on the
+   * last pass the final bar resolves, and the page says so.
+   */
+  readonly landing?: { readonly bar: string; readonly chords: readonly PageChord[] };
 }
 
 interface Props {
@@ -54,21 +61,30 @@ function unitsOf(sections: readonly PageSection[], reading: Reading): number {
   );
 }
 
-function fit(sections: readonly PageSection[], reading: Reading, w: number, h: number): number {
-  const columns = Math.max(1, ...sections.flatMap((s) => s.lines.map((line) => line.length)));
-  return Math.max(8, Math.min(h / unitsOf(sections, reading), w / columns / BAR_WIDTH));
-}
+/** The most bars any line has. */
+const columnsOf = (sections: readonly PageSection[]): number =>
+  Math.max(1, ...sections.flatMap((section) => section.lines.map((line) => line.length)));
 
-/** Just the line being played and the next one down the page. */
-function focused(sections: readonly PageSection[], bar: string | undefined): PageSection[] {
+/** The largest type at which a page of so many units and columns fits a box. */
+const fit = (units: number, columns: number, w: number, h: number): number =>
+  Math.max(8, Math.min(h / units, w / columns / BAR_WIDTH));
+
+/**
+ * Focus: the line being played and the line that comes after it, which at the
+ * bottom of the form is its top again. Before the band starts, the first two.
+ */
+function focused(sections: readonly PageSection[], playhead: Playhead | undefined): PageSection[] {
   const lines = sections.flatMap((section) => section.lines.map((line) => ({ section, line })));
-  const found = lines.findIndex(({ line }) => line.some((b) => b.id === bar));
-  const shown = lines.slice(Math.max(0, found), Math.max(0, found) + 2);
+  const holds = (id: string) => lines.find(({ line }) => line.some((bar) => bar.id === id));
+  const first = (playhead && holds(playhead.bar)) ?? lines[0];
+  if (!first) return [];
+  const after = playhead?.coming.find((id) => !first.line.some((bar) => bar.id === id));
+  const second = playhead ? after && holds(after) : lines[1];
+  if (!second) return [{ ...first.section, lines: [first.line] }];
   // Two lines of one section are one section; its label is not said twice.
-  const [first, second] = shown;
-  if (first && second && first.section === second.section)
+  if (first.section === second.section)
     return [{ ...first.section, lines: [first.line, second.line] }];
-  return shown.map(({ section, line }) => ({ ...section, lines: [line] }));
+  return [first, second].map(({ section, line }) => ({ ...section, lines: [line] }));
 }
 
 export function ChartView({ chart, reading, playhead, focus }: Props) {
@@ -86,26 +102,30 @@ export function ChartView({ chart, reading, playhead, focus }: Props) {
 
   // Wider lines when that makes the type bigger: a long form on a laptop reads better eight bars across.
   const layout = useMemo((): Layout => {
-    const narrow = box.w < 560;
-    const widths = focus ? [narrow ? 0.5 : 1] : [1, 2];
+    if (focus) return { sections: pageOf(chart, box.w < 560 ? 0.5 : 1), size: 0 };
     let best: Layout | undefined;
-    for (const widen of widths) {
+    for (const widen of [1, 2]) {
       const sections = pageOf(chart, widen);
-      const size = fit(focus ? sections.slice(0, 2) : sections, reading, box.w, box.h);
+      const size = fit(unitsOf(sections, reading), columnsOf(sections), box.w, box.h);
       if (!best || size > best.size * 1.15) best = { sections, size };
     }
     return best!;
   }, [chart, reading, focus, box]);
 
-  const sections = focus ? focused(layout.sections, playhead?.bar) : layout.sections;
-  const size = focus ? fit(sections, reading, box.w, box.h) : layout.size;
+  const showLabels = labelled(layout.sections);
+  const sections = focus ? focused(layout.sections, playhead) : layout.sections;
+  const columns = columnsOf(layout.sections);
+  // In focus the type is one size for the whole tune: sized for the tallest pair of lines there
+  // can be (two sections, each with its label), so it does not jump as the lines change.
+  const units = focus
+    ? 2 * LINE[reading] + (showLabels ? 2 * LABEL : 0) + SECTION_GAP
+    : unitsOf(sections, reading);
+  const size = focus ? fit(units, columns, box.w, box.h) : layout.size;
   // When the width is what limits the type, the height left over opens the lines up, to a point.
-  const lines = sections.reduce((sum, section) => sum + section.lines.length, 0);
-  const spare = box.h / size - unitsOf(sections, reading);
+  const lines = focus ? 2 : sections.reduce((sum, section) => sum + section.lines.length, 0);
+  const spare = box.h / size - units;
   const line =
     LINE[reading] + Math.max(0, Math.min(spare / Math.max(1, lines), LINE[reading] * 0.5));
-  const showLabels = labelled(layout.sections);
-  const columns = Math.max(1, ...sections.flatMap((s) => s.lines.map((line) => line.length)));
 
   // Squeeze a chord that is too wide for its share of the bar: narrower letters first, then smaller.
   // biome-ignore lint/correctness/useExhaustiveDependencies: measured again whenever what is drawn changes
@@ -191,7 +211,9 @@ function Bar({
 }) {
   const now = playhead?.bar === bar.id;
   const next = playhead?.next?.bar === bar.id ? playhead.next.at : undefined;
-  const lead = bar.chords[0]?.at ?? 0;
+  const landing = playhead?.landing?.bar === bar.id ? playhead.landing.chords : undefined;
+  const chords = landing ?? bar.chords;
+  const lead = chords[0]?.at ?? 0;
   return (
     <div
       className={`bar${now ? " now" : ""}${bar.repeatOpens ? " opens" : ""}${bar.repeatCloses ? " closes" : ""}`}
@@ -199,14 +221,14 @@ function Bar({
     >
       {bar.ending !== null && <span className="ending">{bar.ending}.</span>}
       {bar.repeatOpens && <RepeatSign side="opens" />}
-      {bar.simile ? (
+      {bar.simile && !landing ? (
         <span className={`slot again${next !== undefined ? " next" : ""}`} style={{ flexGrow: 1 }}>
           <Simile />
         </span>
       ) : (
         <>
           {lead > 0 && <span style={{ flexGrow: lead }} />}
-          {bar.chords.map((chord) => (
+          {chords.map((chord) => (
             <span
               key={chord.at}
               className={`slot${next !== undefined && Math.abs(chord.at - next) < 1e-6 ? " next" : ""}`}

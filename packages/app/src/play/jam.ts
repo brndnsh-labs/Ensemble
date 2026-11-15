@@ -49,12 +49,37 @@ export function takeOptions(setup: JamSetup, passes = OPEN_PASSES): TakeOptions 
   };
 }
 
-/** The take of a jam. With `endAfter`, the same jam told to finish on that pass. */
-export function takeOf(setup: JamSetup, passes?: number, endAfter?: number): Take {
-  return render(setup.text, setup.style, {
-    ...takeOptions(setup, passes),
-    ...(endAfter === undefined ? {} : { endAfter }),
+/** A take as the play screen needs it: the chart in the jam's key, the roadmap, and the sounds. */
+export interface Performance {
+  readonly chart: Chart;
+  readonly plan: Plan;
+  /** In the order they start. Only those from `since` on, when one was asked for. */
+  readonly sounds: readonly Sound[];
+}
+
+/** What to make of a jam: how long, whether it has been told to finish, and how much of it is wanted. */
+export interface Ask {
+  /** Passes of a jam with no set length. */
+  readonly passes?: number;
+  /** The jam told to finish on this pass (`PlanOptions.endAfter`). */
+  readonly endAfter?: number;
+  /** Leave out the sounds that start before this second: they have been played. */
+  readonly since?: number;
+}
+
+/** Play a jam through: the engine makes the take, and its notes become sounds. */
+export function performanceOf(setup: JamSetup, ask: Ask = {}): Performance {
+  const take = render(setup.text, setup.style, {
+    ...takeOptions(setup, ask.passes),
+    ...(ask.endAfter === undefined ? {} : { endAfter: ask.endAfter }),
   });
+  const sounds = soundsOf(take, setup);
+  const since = ask.since ?? 0;
+  return {
+    chart: take.chart,
+    plan: take.plan,
+    sounds: since > 0 ? sounds.filter((sound) => sound.at >= since) : sounds,
+  };
 }
 
 /** The chart as it will be read while playing: in the key the jam is in. */
@@ -153,12 +178,17 @@ export function nextChange(
   return undefined;
 }
 
+/** The join is taken this much before its bar line, so a downbeat leaning a hair early comes from the new take. */
+const JOIN_LEAD = 0.03;
+
 /**
  * Where a jam told to finish now turns for home: the pass that becomes its
  * last, and the second from which the music is the ending's. A band is told at
- * the top of a phrase. If this pass still has one coming that is far enough
- * off (`after`, in seconds), it turns there and this pass is the last;
- * otherwise the next pass is. Undefined when the jam is already ending.
+ * the top of a phrase, so that is where the two takes are joined: the first
+ * phrase top at least `after` seconds in that is not the top of the pass being
+ * played (the last pass's first phrase is played as it was going to be, so a
+ * later one of this pass is where it can turn; failing that, the top of the
+ * next pass). Undefined when the jam is already ending.
  */
 export function turnForHome(
   plan: Plan,
@@ -168,17 +198,16 @@ export function turnForHome(
   const { bar } = place;
   if (bar.kind === "tail" || bar.lastPass || bar.ending) return undefined;
   const pass = bar.kind === "count-in" ? 0 : bar.pass;
-  const earliest = ticksAt(plan, after);
-  const phrase = plan.bars.find(
+  const earliest = ticksAt(plan, after + JOIN_LEAD);
+  // An open jam's roadmap carries the pass after the last one played, which is enough to find a top in.
+  const top = [...plan.bars, ...plan.lookahead].find(
     (b) =>
       b.kind === "music" &&
-      b.pass === pass &&
       b.section.role === "body" &&
-      // Not the pass's first phrase: that one is played as it was going to be anyway.
       b.phrase.bar === 0 &&
-      b.barInPass > 0 &&
-      b.start >= earliest,
+      b.start >= earliest &&
+      (b.pass > pass || (b.pass === pass && b.barInPass > 0)),
   );
-  if (phrase) return { endAfter: pass, from: (phrase.start * 60) / (plan.tempo * PPQ) };
-  return { endAfter: pass + 1, from: after };
+  if (!top) return undefined;
+  return { endAfter: top.pass, from: (top.start * 60) / (plan.tempo * PPQ) - JOIN_LEAD };
 }

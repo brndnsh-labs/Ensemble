@@ -42,6 +42,7 @@ export function planBars(
   const told =
     options.mode === "jam" &&
     options.endAfter !== undefined &&
+    Number.isFinite(options.endAfter) &&
     (open || options.endAfter < planned - 1)
       ? Math.max(0, Math.floor(options.endAfter))
       : undefined;

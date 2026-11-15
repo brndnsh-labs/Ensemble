@@ -15,9 +15,15 @@ export const PACK_IDS: readonly string[] = [
 ].sort();
 
 export interface Saving {
+  /** Files on the device. */
   readonly done: number;
   readonly total: number;
+  /** Every file has been tried. With `done` short of `total`, some could not be fetched. */
+  readonly finished: boolean;
 }
+
+/** How long to wait for the service worker to take charge of a page it did not load. */
+const TAKE_CHARGE_MS = 5000;
 
 /** How many files are fetched at once. */
 const AT_ONCE = 4;
@@ -40,10 +46,14 @@ export async function saveInstruments(
   if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return false;
   await navigator.serviceWorker.ready;
   // The worker answers this page's requests from its first visit, a moment after it is ready.
+  // A page reloaded past the worker (a hard reload) is never taken charge of: nothing it
+  // fetches would be kept, so it saves nothing and says nothing.
   if (!navigator.serviceWorker.controller) {
-    await new Promise<void>((resolve) =>
-      navigator.serviceWorker.addEventListener("controllerchange", () => resolve(), { once: true }),
-    );
+    await new Promise<void>((resolve) => {
+      navigator.serviceWorker.addEventListener("controllerchange", () => resolve(), { once: true });
+      setTimeout(resolve, TAKE_CHARGE_MS);
+    });
+    if (!navigator.serviceWorker.controller) return false;
   }
   const urls: string[] = [];
   for (const id of PACK_IDS) {
@@ -57,17 +67,23 @@ export async function saveInstruments(
   const kept = await Promise.all(urls.map((url) => caches.match(url, { ignoreVary: true })));
   const missing = urls.filter((_, i) => !kept[i]);
   let done = urls.length - missing.length;
-  report({ done, total: urls.length });
+  report({ done, total: urls.length, finished: missing.length === 0 });
   let next = 0;
   await Promise.all(
     Array.from({ length: AT_ONCE }, async () => {
       while (next < missing.length) {
         const url = missing[next++]!;
-        // The worker keeps it as it goes by; the page has no use for the bytes yet.
-        await (await fetch(url)).arrayBuffer();
-        report({ done: ++done, total: urls.length });
+        try {
+          // The worker keeps a good answer as it goes by; the page has no use for the bytes yet.
+          const response = await fetch(url);
+          await response.arrayBuffer();
+          if (response.ok) report({ done: ++done, total: urls.length, finished: false });
+        } catch {
+          // Off the network part-way: what was saved stays, and the next visit fetches the rest.
+        }
       }
     }),
   );
+  report({ done, total: urls.length, finished: true });
   return true;
 }

@@ -107,15 +107,20 @@ export class Scheduler {
 
   /**
    * Change what is to come: from second `from` of the performance on, these
-   * sounds are played in place of the ones that were there. Give a `from`
-   * further off than the horizon. A sound already handed over cannot be taken
-   * back, so a nearer one would have it and its replacement both sound.
+   * sounds are played in place of the ones that were there. A sound already
+   * handed over cannot be taken back, so give a `from` further off than the
+   * horizon. Given a nearer one, the change takes hold just after the last
+   * sound handed over instead: late, but nothing sounds twice.
    */
   replace(from: number, sounds: readonly Sound[]): void {
-    const kept = firstAtOrAfter(this.#sounds, from);
+    let kept = firstAtOrAfter(this.#sounds, from);
+    let after = from;
+    if (kept < this.#next) {
+      kept = this.#next;
+      after = Math.max(from, nextAfter(this.#sounds[kept - 1]!.at));
+    }
     this.#sounds.length = kept;
-    this.#sounds.push(...sounds.slice(firstAtOrAfter(sounds, from)));
-    this.#next = Math.min(this.#next, kept);
+    this.#sounds.push(...sounds.slice(firstAtOrAfter(sounds, after)));
   }
 
   /** Hand over everything that starts inside the horizon. Call it on any timer, however uneven. */
@@ -151,4 +156,9 @@ function firstAtOrAfter(sounds: readonly Sound[], time: number): number {
     else high = middle;
   }
   return low;
+}
+
+/** The smallest time later than a time. */
+function nextAfter(time: number): number {
+  return time + Math.max(Number.EPSILON, Math.abs(time) * Number.EPSILON);
 }
