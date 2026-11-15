@@ -25,6 +25,12 @@ export const bluesCritic: CriticStyle = {
     "bass.sixths-on-dominants": { min: 0.15, max: 0.35, kind: "intent", minCases: 20 },
     // In two when quiet: 0.45 to 0.75 notes per beat (ST-blues-28).
     "bass.notes-per-beat-when-quiet": { min: 0.45, max: 0.75, kind: "intent", minCases: 4 },
+    // From listening at gate 3: the bass was up the neck, an octave over where a bass
+    // guitar plays a blues in A (its average note was B2, and 43% of its notes were at or
+    // above C3). The line's average sits between Bb1 and G2 (a blues in C or F, played off
+    // the two low strings, averages B1), and little of it is above D3.
+    "bass.register": { min: 34, max: 43, kind: "intent" },
+    "bass.high-notes": { max: 0.03, kind: "intent", minCases: 40 },
 
     // How hard the band hits, set by ear at gate 1: a backbeat around 110 slammed through a
     // sampled kit, around 95 did not. The quietest takes sit in the high 60s.
@@ -132,6 +138,10 @@ export const bluesCritic: CriticStyle = {
     // The hand does not flip to get out of the way (CH-65: under 1% with the phrase rule).
     // Delivers 0.1%, deaf none.
     "chords.top-leaps-under-the-solo": { max: 0.01, kind: "intent", minCases: 20 },
+    // From listening at gate 3: the piano got busy as the intensity ramped up. Under a hot
+    // solo it played 5.2 strikes a bar (the pump's eight in four bars of ten), the same as
+    // with nobody soloing, while the soloist was at its own busiest.
+    "chords.strikes-per-bar-under-a-hot-solo": { max: 3, kind: "intent", minCases: 8 },
 
     // ── the soloist ──
     // A note on a change is a chord tone, by rule (X-B-06, Q-21).

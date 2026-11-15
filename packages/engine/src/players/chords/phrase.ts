@@ -90,7 +90,15 @@ export function compStrikes(
   const book = chords.rhythm;
   if (!book) return [];
 
-  const tierAt = (bar: PlanBar) => tierOf(bar.seats.chords ?? bar.energy);
+  // The level the hand reads its book at: the band's, but under a soloist no higher than
+  // the style lets a listening hand go.
+  const cap = chords.listening?.busiest;
+  const top = cap === "low" ? TIER_MID : cap === "mid" ? TIER_HIGH : Number.POSITIVE_INFINITY;
+  const levelAt = (bar: PlanBar) => {
+    const energy = bar.seats.chords ?? bar.energy;
+    return bar.solo !== null && energy >= top ? top - 0.001 : energy;
+  };
+  const tierAt = (bar: PlanBar) => tierOf(levelAt(bar));
   const own = once((bar) => stretches(bar, harmony, 0));
 
   // The book is read once: each figure's strokes, each form's letters.
@@ -279,7 +287,7 @@ export function compStrikes(
         rhythm: rhythmOf(bars, struck),
         before,
         lastTime: played.get(place) ?? null,
-        busy: bars.map((bar) => aim(book.tiers[tier], bar.seats.chords ?? bar.energy)),
+        busy: bars.map((bar) => aim(book.tiers[tier], levelAt(bar))),
         heard,
         hearing: heardHere,
       };

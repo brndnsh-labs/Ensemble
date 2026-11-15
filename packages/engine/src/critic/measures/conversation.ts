@@ -17,6 +17,7 @@ import { STEP } from "../../perform/grid.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import type { Breath, LineNote } from "../../players/chords/line.ts";
 import { breathsOf, soundsAt } from "../../players/chords/line.ts";
+import { tierOf } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
 import { mean, notesOf, share } from "../read.ts";
 import type { Measure, Measurement } from "../types.ts";
@@ -321,6 +322,33 @@ export const conversationMeasures: readonly Measure[] = [
         if (Math.abs(hit.pitches.at(-1)! - before.pitches.at(-1)!) > FOURTH) leaps++;
       });
       return share(leaps, moves);
+    },
+  },
+  {
+    id: "chords.strikes-per-bar-under-a-hot-solo",
+    seat: "chords",
+    says: "When the band is at its loudest under a solo, which is when the soloist is busiest, the piano does not get busier with it: a few strikes a bar, not a hammered groove. The pump is counted here.",
+    unit: "per bar",
+    of(take) {
+      const hot = take.plan.bars.filter(
+        (bar) =>
+          bar.solo !== null &&
+          bar.kind === "music" &&
+          bar.seats.chords !== null &&
+          !bar.ending &&
+          bar.meter.beats === 4 &&
+          bar.meter.unit === 4 &&
+          tierOf(bar.energy) === "high",
+      );
+      if (hot.length === 0) return null;
+      const bars = new Set(hot.map((bar) => bar.index));
+      const all = take.plan.bars;
+      const struck = new Set<number>();
+      for (const note of notesOf(take, "chords")) {
+        const bar = all.findLast((candidate) => candidate.start <= note.tick);
+        if (bar && bars.has(bar.index)) struck.add(note.tick);
+      }
+      return { value: struck.size / hot.length, cases: hot.length };
     },
   },
 ];

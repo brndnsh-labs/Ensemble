@@ -16,6 +16,7 @@ import {
   plan,
   render,
   SOLO_INSTRUMENTS,
+  tierOf,
 } from "@ensemble/engine";
 import { chordsUnder, harmonyOf, POCKET, strikesOf } from "./reading.ts";
 import {
@@ -476,6 +477,39 @@ test("the piano makes room: hearing the soloist, fewer of its strikes come down 
     on < deafOn / 2,
     `on the soloist's note: ${on.toFixed(3)} hearing, ${deafOn.toFixed(3)} deaf`,
   );
+});
+
+test("blues: under a solo the piano does not get busier as the band gets louder: where the soloist has the lead it never hammers a bar, and at the band's hot level it averages under three strikes a bar", () => {
+  let hot = 0;
+  let strikes = 0;
+  for (const { style, chart, options, take } of soloTakes()) {
+    if (style.id !== "blues" || chart.meter !== "4/4") continue;
+    const perBar = new Map<number, number>();
+    const bars = take.plan.bars;
+    for (const strike of strikesOf(take)) {
+      const bar = bars.findLast((candidate) => candidate.start <= strike.tick)!;
+      perBar.set(bar.index, (perBar.get(bar.index) ?? 0) + 1);
+    }
+    for (const bar of bars) {
+      if (bar.kind !== "music" || !bar.solo || bar.ending || bar.seats.chords === null) continue;
+      const count = perBar.get(bar.index) ?? 0;
+      // A chord gets its strike however many the bar has, so only bars of one or two chords
+      // say anything about how busy the hand chose to be.
+      const chords = bar.spans.filter((span) => !span.tied && span.chord !== null).length;
+      if (chords <= 2) {
+        assert.ok(
+          count <= 5,
+          `${chart.file} ${JSON.stringify(options)} bar ${bar.index}: ${count} strikes under the solo`,
+        );
+      }
+      if (tierOf(bar.energy) === "high" && chords <= 1) {
+        hot++;
+        strikes += count;
+      }
+    }
+  }
+  assert.ok(hot > 300, `only ${hot} hot bars under a solo`);
+  assert.ok(strikes / hot < 3, `${(strikes / hot).toFixed(2)} strikes a bar under a hot solo`);
 });
 
 test("with nobody soloing, a piano that listens plays exactly what a deaf one plays", () => {

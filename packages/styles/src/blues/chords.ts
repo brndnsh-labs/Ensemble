@@ -206,7 +206,13 @@ export const bluesChords: ChordStyle = {
   // Under a soloist the hand lays out and answers (ST-blues-33, CH-71): a breath is a dotted
   // quarter of silence, an empty one gets a stab an eighth long at 92, and what the figure
   // already plays in a breath is played 8 harder. The pump never converses: it is a groove.
-  listening: { breath: 6, answer: { level: 92, steps: 2 }, lift: 8 },
+  //
+  // Under a soloist the hand stays in its working book however hot the band gets: chops and
+  // their answers, played harder, not the pump and not four stabs a bar. At gate 3 the owner
+  // heard the piano get busy as the intensity ramped up: under a hot solo it was playing 5.2
+  // strikes a bar, the same as with nobody soloing, against a soloist at its own busiest.
+  // The pump is for the band's own choruses.
+  listening: { breath: 6, answer: { level: 92, steps: 2 }, lift: 8, busiest: "mid" },
   // The final chord at 92, 72 when the ending is soft, a button 12 harder (CH-74, EN-17).
   ending: { velocity: 92, soft: 72, accent: 12 },
 };

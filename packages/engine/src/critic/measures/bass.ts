@@ -7,6 +7,9 @@ import { mod12, pitchClass } from "../../theory/pitch.ts";
 import { barAt, bassChanges, chordAt, mean, musicBars, notesIn, notesOf, share } from "../read.ts";
 import type { Measure } from "../types.ts";
 
+/** D3: above it a bass guitar is up the neck on its top string. */
+const HIGH = 50;
+
 export const bassMeasures: readonly Measure[] = [
   {
     id: "bass.changes-stated",
@@ -110,6 +113,25 @@ export const bassMeasures: readonly Measure[] = [
         if (move > 0) moves.push(move);
       }
       return mean(moves);
+    },
+  },
+  {
+    id: "bass.register",
+    seat: "bass",
+    says: "The line sits where a bass guitar's does: its average note is in the instrument's bottom octave and a half, not up the neck.",
+    unit: "pitch",
+    of(take) {
+      return mean(notesOf(take, "bass").map((note) => note.pitch));
+    },
+  },
+  {
+    id: "bass.high-notes",
+    seat: "bass",
+    says: "Few notes are above D3: the top of a line reaches up there, it does not live there.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      return share(bass.filter((note) => note.pitch > HIGH).length, bass.length);
     },
   },
 ];

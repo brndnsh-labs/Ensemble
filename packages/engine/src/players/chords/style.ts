@@ -4,7 +4,7 @@
 // engine fits that kind to the chord and leads it from the strike before; the
 // idiom turns each voiced strike into the notes the instrument plays.
 
-import type { PerTier } from "../../style/types.ts";
+import type { PerTier, Tier } from "../../style/types.ts";
 import type { ChordFamily } from "../../theory/chord.ts";
 
 /**
@@ -260,6 +260,14 @@ export interface Listening {
   readonly answer: Attack;
   /** How much harder a strike of the figure is played when it falls in a breath. */
   readonly lift: number;
+  /**
+   * The busiest level of the rhythm book the hand plays from while a soloist
+   * has the lead. A band at its loudest under a solo has a soloist at its
+   * busiest, and a comp that goes to its own busiest figures with them is
+   * talking over the line: the drums and the bass carry the heat, the hand
+   * plays harder but no busier. Left out, the hand follows the band's level.
+   */
+  readonly busiest?: Tier;
 }
 
 export interface ChordStyle {

@@ -93,6 +93,18 @@ The last two rows are where choosing loses: the first candidate is always the mo
 
 The milestone asks for the comping's overlap with the soloist's rhythm to be lower than a naive baseline: it is (61% against 66%, in 91 takes of 96), and the margin is small. The larger change is in pitch and register, not rhythm.
 
+## Feedback from listening (2026-11-14)
+
+Brandon, in Logic, after a few seeds: "sounding pretty good, definitely intentional melodies that work well". Three things to change, each measured first and then changed. **The files in this folder were rewritten with the changes.**
+
+- **"Piano could leave a bit more room, sometimes it gets a bit busy as the intensity ramps up."** Measured: under a solo at the band's hot level the piano played 5.2 strikes a bar, the boogie pump's eight in four bars of ten. That is exactly what it plays with nobody soloing, and the soloist is at its busiest there too. The measures in the tables below had left pump bars out, which is why they said the piano made room. Now, while the soloist has the lead, the piano stays in its working book (chops and their answers) however hot the band gets: 2.0 strikes a bar under a hot solo, played harder, not busier. The pump comes back when the band has the tune to itself, in the last chorus of these takes.
+- **"It's up an octave ... we should sit in a typical bass guitar register."** It was, in some keys, and it was not intended: the notes are written at sounding pitch, but the bass's roots were allowed up to A2, so a blues in A had its I on A2 and a box reaching G3, an octave over the open A string. Its average note was B2 on that chart. Now every root is at its lowest place on the instrument (E can be either E), a blues in A is played from the open A string, the average note is about D2 to E2, and nothing is above D3.
+- **"Bass could be a bit more creative."** Not changed yet. Today the bass has one two-bar box for each kind of chord, and nothing chooses between ways of playing a phrase. That is being built next.
+
+One thing got worse with the lower bass: in the minor blues, fewer changes are approached by a half step (9% from 22%). It is logged and goes with the bass work.
+
+The tables under "What the checks say" were taken before these changes. After them: strikes under a sounding solo note 63%, over chance +1 point (it was +3), busier in the breaths than under the line by 1.17 (it was 1.03).
+
 ## Known weaknesses
 
 - **The rhythm gives way only a little.** A blues figure is two chops a bar and the soloist sounds most of the time, so there is not much to leave out before the piano stops keeping time. The old band's listening test put that floor at about one bar in five with a single strike; this sits at about one in six.

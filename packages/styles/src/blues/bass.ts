@@ -67,8 +67,9 @@ const box: Line["tones"] = [
 
 const boxTouch = {
   otherMeters: "pulses",
-  // The top of the instrument's ornaments (A3). With roots at or under A2 the box never passes it.
-  ceiling: 57,
+  // The top of the box: G3, an octave over the highest root. A tone that would pass it is
+  // played an octave down.
+  ceiling: 55,
   // A plain quarter is detached; a beat that lopes is long-short, "da-DUM" (BA-31, BA-32).
   length: { note: 0.85, long: 0.9, short: 0.4 },
   // 100 where a chord lands, 94 on the other strong beats, 88 on 2 and 4 (ST-blues-26).
@@ -77,14 +78,18 @@ const boxTouch = {
 } as const;
 
 export const bluesBass: BassStyle = {
-  // The line lives from the open E up to A2 for its roots, so a box built on the
-  // highest root still tops out at A3. Each section has a home between C2 and E2;
-  // a root goes nearest the note before it, pulled 30% of the way back home. Nearest
-  // home alone made the line fall over an octave after the box had climbed (BA-33, BA-90).
+  // The line lives where a bass guitar's does: roots from the open E up to G2, the third
+  // fret of the top two strings' octave, so a blues in A is played from the open A string
+  // and its box tops out at A2. Each section has a home between A1 and D2; a root goes
+  // nearest the note before it, pulled 30% of the way back home. Nearest home alone made
+  // the line fall over an octave after the box had climbed (BA-33, BA-90).
+  //
+  // Roots went up to A2 with a home from C2 to E2 until gate 3, where the owner heard the
+  // line as an octave high: in A the I sat on A2 and the box reached G3.
   register: {
     lowest: 28,
-    highest: 45,
-    anchor: { from: 36, to: 40, hold: "section" },
+    highest: 40,
+    anchor: { from: 33, to: 38, hold: "section" },
     pull: 0.3,
   },
 

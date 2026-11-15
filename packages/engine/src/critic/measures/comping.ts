@@ -133,9 +133,13 @@ const spoken = (take: Take) =>
       phrase.bars.every((bar) => bar.solo === null),
   );
 
-function strikesPerBar(take: Take, tier: Tier): Measurement | null {
+function strikesPerBar(take: Take, tier: Tier, bandOnly = false): Measurement | null {
   const { bars, hits } = read(take);
-  return mean(bars.filter((bar) => tierAt(bar) === tier).map((bar) => hits.get(bar.index)!.length));
+  return mean(
+    bars
+      .filter((bar) => tierAt(bar) === tier && !(bandOnly && bar.solo !== null))
+      .map((bar) => hits.get(bar.index)!.length),
+  );
 }
 
 /** The grid ticks in the bars the piano comps where a kick or a backbeat is struck, ghosts apart. */
@@ -181,9 +185,9 @@ export const compingMeasures: readonly Measure[] = [
   {
     id: "chords.strikes-per-bar-loud",
     seat: "chords",
-    says: "When the band is hot the piano is busy: four stabs a bar, or the pump's eight.",
+    says: "When the band is hot and has the tune to itself the piano is busy: four stabs a bar, or the pump's eight. Under a soloist a style may hold the hand back (chords.strikes-per-bar-under-a-hot-solo).",
     unit: "per bar",
-    of: (take) => strikesPerBar(take, "high"),
+    of: (take) => strikesPerBar(take, "high", true),
   },
   {
     id: "chords.with-the-drums",
