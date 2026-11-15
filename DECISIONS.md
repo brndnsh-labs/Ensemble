@@ -512,3 +512,15 @@ Brandon chose the fresh cut: "that sounds like it'll pay off". The sources are p
 - **No bundler yet.** `scripts/serve.ts` serves the source with types stripped (Node's own `stripTypeScriptTypes`) and the page uses an import map. Vite arrives with the app in stage 6.
 - **A take can be rendered to a WAV with nobody at a browser** (`scripts/render-audio.ts`): headless Chrome opens the page, the page renders through the same sampler and mixer in an `OfflineAudioContext` and posts the file back. This is how levels get measured and how audition files get made. It is a tool, not a test.
 - **`loadPack` can load fewer layers than a pack has**, for the one-layer comparison at the gate and as a lever for a phone short of memory.
+
+## stage 5: the cut script and the first five packs
+
+`scripts/packs/cut.ts` cuts the quartet's packs and the vibraphone (`pnpm packs:cut`). Calls made while building it, each a number or a line in a recipe:
+
+- **ffmpeg with soxr.** The ffmpeg 9 on the path (Homebrew) has libopus and no soxr; the script takes the first of `$FFMPEG`, `ffmpeg`, `/usr/bin/ffmpeg` built with both (here Debian's 7.1) and prints which. Encoder output is pinned with `+bitexact`.
+- **Levelled after the codec.** A sample peak moves by up to 1.3 dB through Opus, so each take is encoded, decoded, and its one gain corrected until the decoded file sits within 0.05 dB of the reference (the kit ends within 0.3).
+- **The piano starts at the hammer.** Salamander's files open on the action's noise, within 50 dB of the peak, and the strike comes 3 to 24 ms later (median 10). Its onset is the first sample within 30 dB of the peak (`onsetDb` in the recipe); every other pack uses 50.
+- **Budgets bound by caps first, then alternates.** The kit as briefed was 72.9 MB decoded against 40: drum caps now sit near each voice's median 40 dB decay (kick 1.2 s, snare 1, toms 1 and 1.5, hats 0.6 to 2.5, ride and bell 3.5, crash 5) and the outer layers keep two alternates. The upright was 39.9 MB against 30: its caps fall from 2.9 s to 1.8 s instead of 4 to 2.5.
+- **No dead bass note.** Meatbass's percussive noises measure as body knocks (one resonance near 65 Hz shared by all eight, no harmonic series on a string's pitch), not a damped string.
+- **The kit's sticks are the stickshot** ("one stick strikes other while it is touching drum head", keymap PDF), and its cross-stick is the snare's, from the full kit program, which the basic one leaves out.
+- **Scripts typecheck.** `scripts/packs` has its own `tsconfig.json` in the build; `assets/packs` is generated and out of biome's reach.

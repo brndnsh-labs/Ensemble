@@ -18,6 +18,9 @@
     },
     {
       "path": "tools/audition"
+    },
+    {
+      "path": "scripts/packs"
     }
   ]
 }

@@ -1,0 +1,641 @@
+{
+  "format": 1,
+  "id": "grand-piano",
+  "name": "Grand piano",
+  "credit": {
+    "title": "Salamander Grand Piano V3",
+    "author": "Alexander Holm",
+    "url": "https://github.com/sfzinstruments/SalamanderGrandPiano",
+    "version": "3382bf9496bba2486f5ab0de55a264d1dfc38404",
+    "licence": "CC-BY-3.0",
+    "changes": "Three of the sixteen velocity layers (v8, v10 and v16) of the sampled notes A1 to C7, the two microphones summed to mono at -3 dB each; trimmed to the hammer's strike, cut at its decay or a length cap and faded; each note levelled to one loudness; encoded as Opus. Release and pedal noises left out."
+  },
+  "audio": {
+    "container": "webm",
+    "codec": "opus",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bytes": 3809125,
+    "decodedBytes": 63360000
+  },
+  "level": {
+    "measure": "loudness",
+    "reference": -20
+  },
+  "voices": {
+    "": {
+      "layers": [
+        {
+          "top": 62,
+          "zones": [
+            {
+              "root": 33,
+              "takes": [
+                {
+                  "file": "n33-v1-1.webm",
+                  "seconds": 7
+                }
+              ]
+            },
+            {
+              "root": 36,
+              "takes": [
+                {
+                  "file": "n36-v1-1.webm",
+                  "seconds": 6.809521
+                }
+              ]
+            },
+            {
+              "root": 39,
+              "takes": [
+                {
+                  "file": "n39-v1-1.webm",
+                  "seconds": 6.619042
+                }
+              ]
+            },
+            {
+              "root": 42,
+              "takes": [
+                {
+                  "file": "n42-v1-1.webm",
+                  "seconds": 6.428562
+                }
+              ]
+            },
+            {
+              "root": 45,
+              "takes": [
+                {
+                  "file": "n45-v1-1.webm",
+                  "seconds": 6.238104
+                }
+              ]
+            },
+            {
+              "root": 48,
+              "takes": [
+                {
+                  "file": "n48-v1-1.webm",
+                  "seconds": 6.047625
+                }
+              ]
+            },
+            {
+              "root": 51,
+              "takes": [
+                {
+                  "file": "n51-v1-1.webm",
+                  "seconds": 5.857146
+                }
+              ]
+            },
+            {
+              "root": 54,
+              "takes": [
+                {
+                  "file": "n54-v1-1.webm",
+                  "seconds": 5.666667
+                }
+              ]
+            },
+            {
+              "root": 57,
+              "takes": [
+                {
+                  "file": "n57-v1-1.webm",
+                  "seconds": 5.476187
+                }
+              ]
+            },
+            {
+              "root": 60,
+              "takes": [
+                {
+                  "file": "n60-v1-1.webm",
+                  "seconds": 5.285708
+                }
+              ]
+            },
+            {
+              "root": 63,
+              "takes": [
+                {
+                  "file": "n63-v1-1.webm",
+                  "seconds": 5.095229
+                }
+              ]
+            },
+            {
+              "root": 66,
+              "takes": [
+                {
+                  "file": "n66-v1-1.webm",
+                  "seconds": 4.904771
+                }
+              ]
+            },
+            {
+              "root": 69,
+              "takes": [
+                {
+                  "file": "n69-v1-1.webm",
+                  "seconds": 4.714292
+                }
+              ]
+            },
+            {
+              "root": 72,
+              "takes": [
+                {
+                  "file": "n72-v1-1.webm",
+                  "seconds": 4.523813
+                }
+              ]
+            },
+            {
+              "root": 75,
+              "takes": [
+                {
+                  "file": "n75-v1-1.webm",
+                  "seconds": 4.333333
+                }
+              ]
+            },
+            {
+              "root": 78,
+              "takes": [
+                {
+                  "file": "n78-v1-1.webm",
+                  "seconds": 4.142854
+                }
+              ]
+            },
+            {
+              "root": 81,
+              "takes": [
+                {
+                  "file": "n81-v1-1.webm",
+                  "seconds": 3.952375
+                }
+              ]
+            },
+            {
+              "root": 84,
+              "takes": [
+                {
+                  "file": "n84-v1-1.webm",
+                  "seconds": 3.761896
+                }
+              ]
+            },
+            {
+              "root": 87,
+              "takes": [
+                {
+                  "file": "n87-v1-1.webm",
+                  "seconds": 3.571438
+                }
+              ]
+            },
+            {
+              "root": 90,
+              "takes": [
+                {
+                  "file": "n90-v1-1.webm",
+                  "seconds": 3.380958
+                }
+              ]
+            },
+            {
+              "root": 93,
+              "takes": [
+                {
+                  "file": "n93-v1-1.webm",
+                  "seconds": 3.190479
+                }
+              ]
+            },
+            {
+              "root": 96,
+              "takes": [
+                {
+                  "file": "n96-v1-1.webm",
+                  "seconds": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 78,
+          "zones": [
+            {
+              "root": 33,
+              "takes": [
+                {
+                  "file": "n33-v2-1.webm",
+                  "seconds": 7
+                }
+              ]
+            },
+            {
+              "root": 36,
+              "takes": [
+                {
+                  "file": "n36-v2-1.webm",
+                  "seconds": 6.809521
+                }
+              ]
+            },
+            {
+              "root": 39,
+              "takes": [
+                {
+                  "file": "n39-v2-1.webm",
+                  "seconds": 6.619042
+                }
+              ]
+            },
+            {
+              "root": 42,
+              "takes": [
+                {
+                  "file": "n42-v2-1.webm",
+                  "seconds": 6.428562
+                }
+              ]
+            },
+            {
+              "root": 45,
+              "takes": [
+                {
+                  "file": "n45-v2-1.webm",
+                  "seconds": 6.238104
+                }
+              ]
+            },
+            {
+              "root": 48,
+              "takes": [
+                {
+                  "file": "n48-v2-1.webm",
+                  "seconds": 6.047625
+                }
+              ]
+            },
+            {
+              "root": 51,
+              "takes": [
+                {
+                  "file": "n51-v2-1.webm",
+                  "seconds": 5.857146
+                }
+              ]
+            },
+            {
+              "root": 54,
+              "takes": [
+                {
+                  "file": "n54-v2-1.webm",
+                  "seconds": 5.666667
+                }
+              ]
+            },
+            {
+              "root": 57,
+              "takes": [
+                {
+                  "file": "n57-v2-1.webm",
+                  "seconds": 5.476187
+                }
+              ]
+            },
+            {
+              "root": 60,
+              "takes": [
+                {
+                  "file": "n60-v2-1.webm",
+                  "seconds": 5.285708
+                }
+              ]
+            },
+            {
+              "root": 63,
+              "takes": [
+                {
+                  "file": "n63-v2-1.webm",
+                  "seconds": 5.095229
+                }
+              ]
+            },
+            {
+              "root": 66,
+              "takes": [
+                {
+                  "file": "n66-v2-1.webm",
+                  "seconds": 4.904771
+                }
+              ]
+            },
+            {
+              "root": 69,
+              "takes": [
+                {
+                  "file": "n69-v2-1.webm",
+                  "seconds": 4.714292
+                }
+              ]
+            },
+            {
+              "root": 72,
+              "takes": [
+                {
+                  "file": "n72-v2-1.webm",
+                  "seconds": 4.523813
+                }
+              ]
+            },
+            {
+              "root": 75,
+              "takes": [
+                {
+                  "file": "n75-v2-1.webm",
+                  "seconds": 4.333333
+                }
+              ]
+            },
+            {
+              "root": 78,
+              "takes": [
+                {
+                  "file": "n78-v2-1.webm",
+                  "seconds": 4.142854
+                }
+              ]
+            },
+            {
+              "root": 81,
+              "takes": [
+                {
+                  "file": "n81-v2-1.webm",
+                  "seconds": 3.952375
+                }
+              ]
+            },
+            {
+              "root": 84,
+              "takes": [
+                {
+                  "file": "n84-v2-1.webm",
+                  "seconds": 3.761896
+                }
+              ]
+            },
+            {
+              "root": 87,
+              "takes": [
+                {
+                  "file": "n87-v2-1.webm",
+                  "seconds": 3.571438
+                }
+              ]
+            },
+            {
+              "root": 90,
+              "takes": [
+                {
+                  "file": "n90-v2-1.webm",
+                  "seconds": 3.380958
+                }
+              ]
+            },
+            {
+              "root": 93,
+              "takes": [
+                {
+                  "file": "n93-v2-1.webm",
+                  "seconds": 3.190479
+                }
+              ]
+            },
+            {
+              "root": 96,
+              "takes": [
+                {
+                  "file": "n96-v2-1.webm",
+                  "seconds": 3
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "root": 33,
+              "takes": [
+                {
+                  "file": "n33-v3-1.webm",
+                  "seconds": 7
+                }
+              ]
+            },
+            {
+              "root": 36,
+              "takes": [
+                {
+                  "file": "n36-v3-1.webm",
+                  "seconds": 6.809521
+                }
+              ]
+            },
+            {
+              "root": 39,
+              "takes": [
+                {
+                  "file": "n39-v3-1.webm",
+                  "seconds": 6.619042
+                }
+              ]
+            },
+            {
+              "root": 42,
+              "takes": [
+                {
+                  "file": "n42-v3-1.webm",
+                  "seconds": 6.428562
+                }
+              ]
+            },
+            {
+              "root": 45,
+              "takes": [
+                {
+                  "file": "n45-v3-1.webm",
+                  "seconds": 6.238104
+                }
+              ]
+            },
+            {
+              "root": 48,
+              "takes": [
+                {
+                  "file": "n48-v3-1.webm",
+                  "seconds": 6.047625
+                }
+              ]
+            },
+            {
+              "root": 51,
+              "takes": [
+                {
+                  "file": "n51-v3-1.webm",
+                  "seconds": 5.857146
+                }
+              ]
+            },
+            {
+              "root": 54,
+              "takes": [
+                {
+                  "file": "n54-v3-1.webm",
+                  "seconds": 5.666667
+                }
+              ]
+            },
+            {
+              "root": 57,
+              "takes": [
+                {
+                  "file": "n57-v3-1.webm",
+                  "seconds": 5.476187
+                }
+              ]
+            },
+            {
+              "root": 60,
+              "takes": [
+                {
+                  "file": "n60-v3-1.webm",
+                  "seconds": 5.285708
+                }
+              ]
+            },
+            {
+              "root": 63,
+              "takes": [
+                {
+                  "file": "n63-v3-1.webm",
+                  "seconds": 5.095229
+                }
+              ]
+            },
+            {
+              "root": 66,
+              "takes": [
+                {
+                  "file": "n66-v3-1.webm",
+                  "seconds": 4.904771
+                }
+              ]
+            },
+            {
+              "root": 69,
+              "takes": [
+                {
+                  "file": "n69-v3-1.webm",
+                  "seconds": 4.714292
+                }
+              ]
+            },
+            {
+              "root": 72,
+              "takes": [
+                {
+                  "file": "n72-v3-1.webm",
+                  "seconds": 4.523813
+                }
+              ]
+            },
+            {
+              "root": 75,
+              "takes": [
+                {
+                  "file": "n75-v3-1.webm",
+                  "seconds": 4.333333
+                }
+              ]
+            },
+            {
+              "root": 78,
+              "takes": [
+                {
+                  "file": "n78-v3-1.webm",
+                  "seconds": 4.142854
+                }
+              ]
+            },
+            {
+              "root": 81,
+              "takes": [
+                {
+                  "file": "n81-v3-1.webm",
+                  "seconds": 3.952375
+                }
+              ]
+            },
+            {
+              "root": 84,
+              "takes": [
+                {
+                  "file": "n84-v3-1.webm",
+                  "seconds": 3.761896
+                }
+              ]
+            },
+            {
+              "root": 87,
+              "takes": [
+                {
+                  "file": "n87-v3-1.webm",
+                  "seconds": 3.571438
+                }
+              ]
+            },
+            {
+              "root": 90,
+              "takes": [
+                {
+                  "file": "n90-v3-1.webm",
+                  "seconds": 3.380958
+                }
+              ]
+            },
+            {
+              "root": 93,
+              "takes": [
+                {
+                  "file": "n93-v3-1.webm",
+                  "seconds": 3.190479
+                }
+              ]
+            },
+            {
+              "root": 96,
+              "takes": [
+                {
+                  "file": "n96-v3-1.webm",
+                  "seconds": 3
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "release": 0.2
+    }
+  }
+}

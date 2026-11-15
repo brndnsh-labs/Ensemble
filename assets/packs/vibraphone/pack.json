@@ -1,0 +1,240 @@
+{
+  "format": 1,
+  "id": "vibraphone",
+  "name": "Vibraphone",
+  "credit": {
+    "title": "Versilian Community Sample Library",
+    "author": "Versilian Studios",
+    "url": "https://github.com/sgossner/VCSL",
+    "version": "c1ea7bcc3c7309650ab0da9d15c9cd1fbc4a4c7e",
+    "licence": "CC0-1.0",
+    "changes": "The hard-mallet notes at both dynamics, the stereo pair folded to mono; trimmed to the onset, cut at its decay or a length cap and faded; each levelled to one loudness; roots measured; encoded as Opus."
+  },
+  "audio": {
+    "container": "webm",
+    "codec": "opus",
+    "sampleRate": 48000,
+    "channels": 1,
+    "bytes": 1065648,
+    "decodedBytes": 18700032
+  },
+  "level": {
+    "measure": "loudness",
+    "reference": -20
+  },
+  "voices": {
+    "": {
+      "layers": [
+        {
+          "top": 70,
+          "zones": [
+            {
+              "root": 52.962,
+              "takes": [
+                {
+                  "file": "n53-v1-1.webm",
+                  "seconds": 1.932604
+                }
+              ]
+            },
+            {
+              "root": 56.98,
+              "takes": [
+                {
+                  "file": "n57-v1-1.webm",
+                  "seconds": 5.714292
+                }
+              ]
+            },
+            {
+              "root": 59.989,
+              "takes": [
+                {
+                  "file": "n60-v1-1.webm",
+                  "seconds": 5.5
+                }
+              ]
+            },
+            {
+              "root": 63.997,
+              "takes": [
+                {
+                  "file": "n64-v1-1.webm",
+                  "seconds": 5.214292
+                }
+              ]
+            },
+            {
+              "root": 67,
+              "takes": [
+                {
+                  "file": "n67-v1-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 71.001,
+              "takes": [
+                {
+                  "file": "n71-v1-1.webm",
+                  "seconds": 4.714292
+                }
+              ]
+            },
+            {
+              "root": 74,
+              "takes": [
+                {
+                  "file": "n74-v1-1.webm",
+                  "seconds": 4.5
+                }
+              ]
+            },
+            {
+              "root": 77.001,
+              "takes": [
+                {
+                  "file": "n77-v1-1.webm",
+                  "seconds": 4.285708
+                }
+              ]
+            },
+            {
+              "root": 81,
+              "takes": [
+                {
+                  "file": "n81-v1-1.webm",
+                  "seconds": 4
+                }
+              ]
+            },
+            {
+              "root": 83.999,
+              "takes": [
+                {
+                  "file": "n84-v1-1.webm",
+                  "seconds": 3.785708
+                }
+              ]
+            },
+            {
+              "root": 88,
+              "takes": [
+                {
+                  "file": "n88-v1-1.webm",
+                  "seconds": 3.5
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "top": 127,
+          "zones": [
+            {
+              "root": 52.966,
+              "takes": [
+                {
+                  "file": "n53-v2-1.webm",
+                  "seconds": 3.034813
+                }
+              ]
+            },
+            {
+              "root": 56.966,
+              "takes": [
+                {
+                  "file": "n57-v2-1.webm",
+                  "seconds": 5.714292
+                }
+              ]
+            },
+            {
+              "root": 59.987,
+              "takes": [
+                {
+                  "file": "n60-v2-1.webm",
+                  "seconds": 5.5
+                }
+              ]
+            },
+            {
+              "root": 63.995,
+              "takes": [
+                {
+                  "file": "n64-v2-1.webm",
+                  "seconds": 5.214292
+                }
+              ]
+            },
+            {
+              "root": 66.998,
+              "takes": [
+                {
+                  "file": "n67-v2-1.webm",
+                  "seconds": 5
+                }
+              ]
+            },
+            {
+              "root": 71.004,
+              "takes": [
+                {
+                  "file": "n71-v2-1.webm",
+                  "seconds": 4.714292
+                }
+              ]
+            },
+            {
+              "root": 74,
+              "takes": [
+                {
+                  "file": "n74-v2-1.webm",
+                  "seconds": 4.5
+                }
+              ]
+            },
+            {
+              "root": 76.995,
+              "takes": [
+                {
+                  "file": "n77-v2-1.webm",
+                  "seconds": 4.285708
+                }
+              ]
+            },
+            {
+              "root": 81,
+              "takes": [
+                {
+                  "file": "n81-v2-1.webm",
+                  "seconds": 4
+                }
+              ]
+            },
+            {
+              "root": 84,
+              "takes": [
+                {
+                  "file": "n84-v2-1.webm",
+                  "seconds": 3.785708
+                }
+              ]
+            },
+            {
+              "root": 88.001,
+              "takes": [
+                {
+                  "file": "n88-v2-1.webm",
+                  "seconds": 3.5
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "release": 0.25
+    }
+  }
+}
