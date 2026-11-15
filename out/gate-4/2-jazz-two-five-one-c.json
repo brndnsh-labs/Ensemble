@@ -1,0 +1,14 @@
+{
+  "chartName": "jazz-two-five-one-c.chart",
+  "chartText": "title: Two-Five-One in C\nkey: C\ntempo: 132\nstyle: jazz\n\n// The cadence jazz is made of, long and then short, with a turnaround\n// back to the top. Sixteen bars.\n[A]\n| Dm7    | G7       | Cmaj7  | %      |\n| Dm7    | G7       | Cmaj7  | A7b9   |\n| Dm7 G7 | Cmaj7 A7 | Dm7 G7 | Em7 A7 |\n| Dm7    | G7       | C6     | Dm7 G7 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "4",
+    "solo": true,
+    "without": []
+  },
+  "style": "jazz",
+  "version": 1
+}

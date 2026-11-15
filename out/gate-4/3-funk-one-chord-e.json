@@ -1,0 +1,14 @@
+{
+  "chartName": "funk-one-chord-e.chart",
+  "chartText": "title: One-Chord Funk in E\nkey: E\ntempo: 104\nstyle: funk\n\n// One bar, one chord, round and round. Everything that happens is the band's doing.\n[A]\n| E9 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "9",
+    "solo": true,
+    "without": []
+  },
+  "style": "funk",
+  "version": 1
+}

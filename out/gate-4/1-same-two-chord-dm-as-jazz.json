@@ -1,0 +1,13 @@
+{
+  "chartName": "funk-two-chord-dm.chart",
+  "chartText": "title: Two-Chord Funk in D minor\nkey: Dm\ntempo: 100\nstyle: funk\n\n// A two-bar vamp: the minor one and its dominant four.\n[A]\n| Dm7 | G9 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 4,
+    "seed": "3",
+    "without": []
+  },
+  "style": "jazz",
+  "version": 1
+}

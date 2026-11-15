@@ -83,9 +83,9 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-14: **stages 1, 2 and 3 are built and their gates passed. Stage 4 (jazz and funk as data) is under way.** Brandon said "go ahead" after answering the open questions below.
+State on 2026-11-15: **stages 1, 2 and 3 are built and their gates passed. Stage 4 (jazz and funk as data) is built and waiting on Brandon's listen: gate 4.** The files and the report are in `out/gate-4/`.
 
-- Gate reports: `out/gate-1/GATE_REPORT.md`, `out/gate-2/GATE_REPORT.md`, `out/gate-3/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1`, `gate:2`, `gate:3`.
+- Gate reports: `out/gate-1/GATE_REPORT.md` to `out/gate-4/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1` to `gate:4`.
 - `pnpm check` passes with three styles in about 8.8 s of 10. `pnpm score` matches its baselines (`scorecard/blues.json`, `funk.json`, `jazz.json`).
 
 ### Stage 4: how it is being built
@@ -105,13 +105,18 @@ Seat builds, each from a brief in `prompts/`, each in its own clone under the se
 | 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | merged; three properties in `test/bass.test.ts`; all three styles pass every property |
 | 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | merged; three guitar properties in `test/piano.test.ts` |
 | 2 | `chords-jazz-piano.md` | Opus | merged; one property in `test/piano.test.ts`, and the swung-eighths property now covers the whole band |
-| 3 | `review-style.md`: an independent review of each new style, in its own clone | Opus | brief written; runs when all four seats of a style are merged |
+| 3 | `review-style.md`: an independent review of each new style, in its own clone | Opus | both done. Jazz: the unlabelled bridge fixed; the rest are listening questions. Funk: nothing changed; the gate script spreads its seeds |
 
 **One subagent at a time** (Brandon, 2026-11-15, after the usage limit was hit twice). Round 2 starts when round 1 is merged (the funk bass follows the kick; the jazz piano hears the soloist and the snare). After each merge: turn the builder's "properties that always hold" into tests, break each on purpose once, and keep the blues goldens and scorecard unmoved.
 
 Done since (`DECISIONS.md`, "funk and jazz ship"): funk and jazz are in `STYLES`; two golden takes each; `scorecard/funk.json` and `jazz.json`; `pnpm score` checks all three. `pnpm check` 8.8 s of 10 with three styles, `pnpm test:full` 19.5 s.
 
-Still to do, in order: the independent review of jazz, then of funk (`prompts/review-style.md`, Opus, one at a time, each in its own clone); act on what they find, property first; `pnpm gate:4` (`scripts/gate-4.sh`, written, not yet run: the same chart in three styles, each style on its own charts, and the blues again for "did the blues get worse"); `pnpm gate:3` and check `git status out/gate-3` is clean; `out/gate-4/GATE_REPORT.md`, which must list every engine change made in this stage and why each was a missing concept, the thirteen properties added, and the listening questions; serve the files on the LAN.
+Gate 4 is written: 35 takes from `pnpm gate:4` and `out/gate-4/GATE_REPORT.md` (the two questions, what to listen for in each band, every engine change of the stage and why it was a missing concept, the sixteen tests added). `pnpm check` 8.8 s of 10 with 78 properties, `pnpm test:full` 19 s, `pnpm score` no movement in any style, `out/gate-3` byte for byte unchanged.
+
+**Next: Brandon listens.** His feedback becomes a property or a measure first, then a change. Waiting on him as well:
+
+- **A decision for after the gate**: a section's held choices (its beat, riff, strum, figure) are drawn from the seed and the section's label, not the chart, so at one seed every chart with an `[A]` plays the same groove. Fixing it changes every take in every style. Recommended for the start of stage 5 (`DECISIONS.md`, "the funk band read as a band").
+- If he hears the band guessing at a change (jazz drums against the piano's push; the funk guitar's push against the bass): the concept is a push marked in the plan that every seat reads.
 
 Known and not yet handled in stage 4: the head out is not played light; in compound meters the soloist's "beat" is still a quarter note; funk's chord seat is the guitar only (the clavinet book is data for later).
 

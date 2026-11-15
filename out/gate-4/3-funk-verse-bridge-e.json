@@ -1,0 +1,14 @@
+{
+  "chartName": "funk-verse-bridge-e.chart",
+  "chartText": "title: Funk in E with a Bridge\nkey: E\ntempo: 106\nstyle: funk\n\n// A verse that sits on the one, a chorus on the four, and a bridge that\n// climbs back to the five.\n[Verse]\n|: E9 | % | % | A9 :|\n\n[Chorus]\n| A9 | % | E9 | %    |\n| A9 | % | B9 | B7#9 |\n\n[Bridge]\n| C#m7 | F#9 | C#m7   | F#9 |\n| A13  | %   | B9sus4 | B9  |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 4,
+    "seed": "6",
+    "solo": true,
+    "without": []
+  },
+  "style": "funk",
+  "version": 1
+}

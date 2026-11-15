@@ -1,0 +1,14 @@
+{
+  "chartName": "jazz-minor-two-five-cm.chart",
+  "chartText": "title: Minor Two-Five in C minor\nkey: Cm\ntempo: 120\nstyle: jazz\n\n// The minor cadence: a half-diminished two, an altered five, and a minor\n// tonic that takes a sixth. The second line borrows the relative major.\n[A]\n| Dm7b5      | G7b9    | Cm6        | %          |\n| Fm7        | Bb7     | Ebmaj7     | Abmaj7     |\n| Dm7b5      | G7alt   | Cm7        | Am7b5 D7b9 |\n| Gm7b5 C7b9 | Fm7 Bb7 | Dm7b5 G7b9 | Cm6        |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "5",
+    "solo": true,
+    "without": []
+  },
+  "style": "jazz",
+  "version": 1
+}

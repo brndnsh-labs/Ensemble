@@ -1,0 +1,14 @@
+{
+  "chartName": "jazz-modal-dm.chart",
+  "chartText": "title: Modal in D minor\nkey: Dm\ntempo: 132\nstyle: jazz\n\n// One chord for sixteen bars, up a half step for the bridge, and back.\n// Nothing changes for a long time: the players have to make the shape.\n[A]\n|: Dm7 | % | % | % :| x4\n\n[B]\n|: Ebm7 | % | % | % :|\n\n[A2]\n|: Dm7 | % | % | % :|\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "7",
+    "solo": true,
+    "without": []
+  },
+  "style": "jazz",
+  "version": 1
+}

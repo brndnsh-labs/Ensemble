@@ -1,0 +1,14 @@
+{
+  "chartName": "jazz-falling-fifths-gm.chart",
+  "chartText": "title: Falling Fifths in G minor\nkey: Gm\ntempo: 138\nstyle: jazz\n\n// A thirty-two-bar standard form in which every chord falls a fifth to the\n// next: round the relative major, then round the minor.\n[A]\n| Cm7   | F7   | Bbmaj7 | Ebmaj7 |\n| Am7b5 | D7b9 | Gm6    | %      |\n\n[A2]\n| Cm7   | F7   | Bbmaj7 | Ebmaj7 |\n| Am7b5 | D7b9 | Gm6    | %      |\n\n[B]\n| Am7b5 | D7b9 | Gm6    | %      |\n| Cm7   | F7   | Bbmaj7 | Ebmaj7 |\n\n[C]\n| Am7b5  | D7b9       | Gm7 C7 | Fm7 Bb7 |\n| Ebmaj7 | Am7b5 D7b9 | Gm6    | %       |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "6",
+    "solo": true,
+    "without": []
+  },
+  "style": "jazz",
+  "version": 1
+}

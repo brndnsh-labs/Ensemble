@@ -1,0 +1,13 @@
+{
+  "chartName": "funk-intro-outro-c.chart",
+  "chartText": "title: Funk in C with Intro and Outro\nkey: C\ntempo: 112\nstyle: funk\n\n// A four-bar intro on the five, an eight-bar groove, and a written ending\n// that walks up to the last chord.\n[Intro]\n| G9sus4 | % | % | G9 |\n\n[A]\n| C9 | % | F9     | C9    |\n| C9 | % | F9 Eb9 | D9 G9 |\n\n[Outro]\n| C9 | F9 | C9 . Bb9 B9 | C9 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "song",
+    "seed": "10",
+    "solo": true,
+    "without": []
+  },
+  "style": "funk",
+  "version": 1
+}

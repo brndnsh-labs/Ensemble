@@ -1,0 +1,15 @@
+{
+  "chartName": "jazz-rhythm-changes-bb.chart",
+  "chartText": "title: Rhythm Changes in Bb\nkey: Bb\ntempo: 176\nstyle: jazz\n\n// Thirty-two bars, AABA. The A sections go round the key; the bridge is\n// four dominants, two bars each, falling by fifths back to the top.\n[A]\n| Bbmaj7 G7 | Cm7 F7    | Dm7 G7    | Cm7 F7 |\n| Fm7 Bb7   | Eb7 Edim7 | Bbmaj7 G7 | Cm7 F7 |\n\n[A2]\n| Bbmaj7 G7 | Cm7 F7    | Dm7 G7 | Cm7 F7 |\n| Fm7 Bb7   | Eb7 Edim7 | Cm7 F7 | Bb6    |\n\n[B]\n| D7 | % | G7 | % |\n| C7 | % | F7 | % |\n\n[A3]\n| Bbmaj7 G7 | Cm7 F7    | Dm7 G7 | Cm7 F7 |\n| Fm7 Bb7   | Eb7 Edim7 | Cm7 F7 | Bb6    |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "1",
+    "solo": true,
+    "soloInstrument": "vibraphone",
+    "without": []
+  },
+  "style": "jazz",
+  "version": 1
+}

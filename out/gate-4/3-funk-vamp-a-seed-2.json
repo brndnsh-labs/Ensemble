@@ -1,0 +1,14 @@
+{
+  "chartName": "funk-vamp-a.chart",
+  "chartText": "title: Four-Bar Funk in A\nkey: A\ntempo: 108\nstyle: funk\n\n// Three bars on the one and a bar that turns it round.\n[A]\n| A7 | % | % | D9 E9 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "2",
+    "solo": true,
+    "without": []
+  },
+  "style": "funk",
+  "version": 1
+}

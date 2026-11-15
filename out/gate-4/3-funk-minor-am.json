@@ -1,0 +1,14 @@
+{
+  "chartName": "funk-minor-am.chart",
+  "chartText": "title: Minor Funk in A minor\nkey: Am\ntempo: 96\nstyle: funk\n\n// Sixteen bars in a minor key: eight on the one, then down through the\n// seven and the six and back up through the five.\n[A]\n| Am7 | % | % | D9   |\n| Am7 | % | % | E7#9 |\n\n[B]\n| Dm9   | %   | Am7 | %    |\n| Fmaj7 | G13 | Am7 | E7#9 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "8",
+    "solo": true,
+    "without": []
+  },
+  "style": "funk",
+  "version": 1
+}

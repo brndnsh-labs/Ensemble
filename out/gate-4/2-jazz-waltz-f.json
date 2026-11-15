@@ -1,0 +1,14 @@
+{
+  "chartName": "jazz-waltz-f.chart",
+  "chartText": "title: Jazz Waltz in F\nkey: F\ntempo: 150\nmeter: 3/4\nstyle: jazz\n\n// Three to the bar. Sixteen bars, a chord to a bar.\n[A]\n| Fmaj7 | Dm7  | Gm7      | C7   |\n| Am7   | D7b9 | Gm7      | C7   |\n| Fmaj7 | F7   | Bbmaj7   | Bbm6 |\n| Am7   | D7   | Gm7 . C7 | F6   |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "9",
+    "solo": true,
+    "without": []
+  },
+  "style": "jazz",
+  "version": 1
+}
