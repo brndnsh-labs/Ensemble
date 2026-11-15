@@ -87,9 +87,10 @@ State on 2026-11-15: **stages 1 to 5 are built and their gates passed.** **Stage
 
 ### Stage 6: where it stands
 
-- **Part 1 built** (`DECISIONS.md`, "stage 6 begins"): `packages/app` (library, play screen with the chart sized to fit, playhead, status strip, names and numerals, focus mode, band setup, Finish and Stop, open-ended jams, credits), installable with a service worker and offline instruments, smoke journeys 1, 2 and 4.
-- **Run it**: `pnpm app --host 0.0.0.0` for development (port 8766), or `pnpm app:build` then `pnpm --filter @ensemble/app exec vite preview --host 0.0.0.0 --port 8766` for the built app. Look at it headless with `node scripts/look.ts`.
-- **Waiting on Brandon**: his look at part 1 on the laptop and the phone (the chord symbols, the one-button Play/Finish/Stop, how the ending sounds when Finish is pressed mid-pass), and how his phone should reach the app over HTTPS (needed to install it and to play offline).
+- **Part 1 is built, reviewed, and on the test site**: https://ensembletest.brndn.zip serves it (`DECISIONS.md`, "stage 6 begins", "the app is on the test site", "the app's first part, reviewed"). Brandon, from his phone: "works great, nice job". `packages/app`: library, play screen with the chart sized to fit, playhead, status strip, names and numerals, focus mode, band setup, Play/Finish/Stop, open-ended jams, credits; installable, offline; smoke journeys 1, 2 and 4.
+- **Run it**: `pnpm app --host 0.0.0.0` for development (port 8766). `pnpm deploy:test` puts a commit on the test site (docker04 over SSH; Brandon allowed this "for now", for the test stack only). Look at it headless with `node scripts/look.ts`.
+- **Not yet answered by Brandon** (no complaint so far, so the choices stand): the join when Finish is pressed mid-pass, by ear; the chord symbols (triangle, circle, raised qualities); one button for Play, Finish and Stop.
+- **His to decide**: the durable recipe for the test stack in homelab-maintenance (one service, the API and its route retired), and stopping the old repo's CI from releasing over it.
 - **Next**: part 2, the editor (text with the chart beside it, diagnostics in place, the touch key row), which also settles where the player's own charts are stored. Then takes and export, the arrangement grid, the remaining styles.
 - **Left open by gate 5**, holding until an ear says otherwise (`DECISIONS.md`, "gate 5 passed"): the mix stays at the measured numbers; packs load every layer; one kit serves all three styles; both soloists stay.
 
