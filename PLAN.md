@@ -1,4 +1,4 @@
-# Plan: stages 1 to 3
+# Plan: stages 1 to 4
 
 Written at kickoff. `DECISIONS.md` records each choice and every later departure; this file is the map.
 
@@ -83,11 +83,35 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-14: **stages 1, 2 and 3 are built, each with gate files and a report. Stage 4 has not been started**, as the kickoff asks. Everything is committed; no agent is running.
+State on 2026-11-14: **stages 1, 2 and 3 are built and their gates passed. Stage 4 (jazz and funk as data) is under way.** Brandon said "go ahead" after answering the open questions below.
 
 - Gate reports: `out/gate-1/GATE_REPORT.md`, `out/gate-2/GATE_REPORT.md`, `out/gate-3/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1`, `gate:2`, `gate:3`.
-- `pnpm check` passes: 441 tests in about 7.6 s of 10. `pnpm score` matches its baseline (`scorecard/blues.json`).
-- The numbers gate 3 quotes: `node scripts/gate-3-numbers.ts`.
+- `pnpm check` passes: 442 tests in about 8.8 s of 10. `pnpm score` matches its baseline (`scorecard/blues.json`).
+
+### Stage 4: how it is being built
+
+Done on the main thread (`DECISIONS.md`, "stage 4 begins" and "a library for three styles"):
+
+- A short vamp is a chorus of several laps (planner); the head is an offset in the arc (`ArcStyle.head`).
+- `packages/styles/src/funk/` and `jazz/` exist with their own feel, tempo, arc and ending, and **placeholder seats** (the blues seat under another name) that each seat build replaces. They are in `UNFINISHED`, not `STYLES`; `ENSEMBLE_STYLES=funk,jazz node --test test/` holds them to the properties.
+- Thirteen new library charts. Each style is held to its own charts in full and to the others in one take.
+
+Seat builds, each from a brief in `prompts/`, each in its own clone under the session's scratch folder, committed there on a branch and merged here after the main thread has read the diff and the printed takes:
+
+| Round | Brief | Model | State |
+|---|---|---|---|
+| 1 | `drums-jazz-funk.md` | Opus | launched |
+| 1 | `solo-jazz-funk.md` | Fable | launched |
+| 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | brief written |
+| 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | brief written |
+| 2 | `chords-jazz-piano.md` | Opus | brief written |
+| 3 | an independent review of each new style, in its own clone | Opus | not written |
+
+Round 2 starts when round 1 is merged (the funk bass follows the kick; the jazz piano hears the soloist and the snare). After each merge: turn the builder's "properties that always hold" into tests, break each on purpose once, and keep the blues goldens and scorecard unmoved.
+
+Then, on the main thread: move funk and jazz into `STYLES` (the suite must stay inside 10 s: fewer seeds per push is allowed by `docs/TESTING.md`, and the bass's cost per take is the place to look first); golden takes for both; `scorecard/funk.json` and `jazz.json`; `scripts/gate-4.sh` (the same chart in three styles, each style on its own charts, and the blues again for "did the blues get worse"); `out/gate-4/GATE_REPORT.md`, which must list every engine change made in this stage and why each was a missing concept.
+
+Known and not yet handled in stage 4: the head out is not played light; in compound meters the soloist's "beat" is still a quarter note; funk's chord seat is the guitar only (the clavinet book is data for later).
 
 **Feedback so far**
 
@@ -102,13 +126,6 @@ State on 2026-11-14: **stages 1, 2 and 3 are built, each with gate files and a r
 - Settled, keep as built: the piano under a hot solo (2.0 strikes a bar, "right as it is"); the bass's depth in C and F (roots stop at E2, "fine as it is"); the amount of bass variety ("right amount"); the three worst solos of 200 ("acceptable").
 - Not noticed, left as it is: the walk through the fourth (`R 3 4 #4 | 5 #4 4 3`). If the bass is ever called noodly, look here first.
 - For later, not now: the wide bass drops ("okay for now, maybe we can revisit in the future"; about 6% of changes reached by a fall of a sixth or more into the lead-in); the two one-note drum fills at bar 8 at the mid level ("another one for long term improvement"; more phrase fills are style data). Neither blocks stage 4. Each wants a measure first when it is taken up.
-
-**Before or at the start of stage 4** (each is logged in `DECISIONS.md`, "after the soloist's review")
-
-1. **Short vamps.** On a form of one to seven bars the plan's phrase is the lap, so the soloist's choruses and both players' phrases are a bar or two long. It is one planner concept (a vamp's phrases and choruses run across laps, as its drum fills already do) with several readers: the comper (`players/chords/phrase.ts`), the soloist (`players/solo/slots.ts`), the measures. Funk makes it central. Properties first: a solo chorus is at least eight bars; a comping phrase is four.
-2. **Blues assumptions in the soloist's engine code** that jazz and funk must be able to change as data: solos of three choruses and one of rest (`plan/plan.ts`), the kinds of candidate for each role and their contours (`players/solo/phrases.ts`), the peak phrase's shape and place, the thresholds for "related".
-3. **The piano's answering stab is unexercised** in the blues (its figures fill nearly every breath). Jazz will be the first style to use it: read its output then.
-4. In compound meters the soloist's "beat" is still a quarter note.
 
 **Models** (agreed with Brandon to stretch quota): Sonnet for mechanical work and small fixes with a property written first; Opus for well-specified builds and for adversarial reviews; Fable for open design problems and the main thread. What things cost, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, chord review (Opus) 240k, soloist build (Fable) 630k, piano around the soloist (Opus) 445k, soloist review (Opus) 270k, test-file split (Sonnet) 65k, bass variety (Opus) 445k. Every independent review found audible bugs the builder's own checks missed: keep doing one per seat, and give the reviewer its own copy of the repo (`git clone` the local repo into the scratch folder, `pnpm install --offline` twice) so it can run while a build is under way.
 
