@@ -4,7 +4,7 @@
 import { cells, STEP } from "../../perform/grid.ts";
 import type { Hold, Tier } from "../../style/types.ts";
 import { SHORTEST } from "./line.ts";
-import type { BassLine, BassStyle, ChordCondition, Tone } from "./style.ts";
+import type { BassLine, BassStyle, ChordCondition, RootMotion, Tone } from "./style.ts";
 import { FIGURE_STEPS, LEAD_IN_KINDS, ROOT_MOTIONS, TONES } from "./style.ts";
 import { HIGHEST_ROOT, LOW_E, TOP } from "./tones.ts";
 
@@ -75,6 +75,22 @@ export function validateBassStyle(bass: BassStyle): string[] {
     line.tones.forEach((sequence, i) => {
       const at = `${where}, tone sequence ${i + 1}`;
       checkCondition(sequence.when, at);
+      [sequence, ...(sequence.others ?? [])].forEach((shape, n) => {
+        const named = `${at}, shape ${shape.name ?? n + 1}`;
+        if (shape.home !== undefined && !(shape.home >= 0))
+          problems.push(`${named}: its home weight is negative or not a number.`);
+        if (shape.answer !== undefined && !(shape.answer >= 0))
+          problems.push(`${named}: its answer weight is negative or not a number.`);
+        if (shape.bars.length === 0) problems.push(`${named}: it has no bars.`);
+        shape.bars.forEach((bar, b) => {
+          if (bar.length === 0) problems.push(`${named}, bar ${b + 1}: it has no tones.`);
+          tones(bar, `${named}, bar ${b + 1}`);
+        });
+        if (shape.bars[0]?.[0] !== undefined && shape.bars[0][0] !== "R")
+          problems.push(
+            `${named}: it starts on "${shape.bars[0][0]}", but a chord always arrives on its bass note (R).`,
+          );
+      });
       if (sequence.bars.length === 0) problems.push(`${at}: it has no bars.`);
       sequence.bars.forEach((bar, b) => {
         if (bar.length === 0) problems.push(`${at}, bar ${b + 1}: it has no tones.`);
@@ -179,6 +195,45 @@ export function validateBassStyle(bass: BassStyle): string[] {
       if (!(weights[kind] >= 0))
         problems.push(`lead-in kinds, ${motion}: the weight of "${kind}" is negative or missing.`);
     }
+  }
+
+  // Walks.
+  const walks = bass.walks;
+  if (walks) {
+    for (const tier of TIERS) {
+      chance(walks.offer.end[tier], `walks offered at the end of a line, ${tier}`);
+      chance(walks.offer.inside[tier], `walks offered inside a line, ${tier}`);
+    }
+    for (const [motion, list] of Object.entries(walks.kinds)) {
+      if (!ROOT_MOTIONS.includes(motion as RootMotion))
+        problems.push(`walks: "${motion}" is not a way the bass note moves.`);
+      (list ?? []).forEach((walk, i) => {
+        const at = `walks, ${motion}, ${walk.name ?? i + 1}`;
+        checkCondition(walk.when, at);
+        if (!(walk.weight >= 0)) problems.push(`${at}: its weight is negative or not a number.`);
+        if (walk.toward !== "up" && walk.toward !== "down")
+          problems.push(`${at}: "${walk.toward}" is not a way to walk; write up or down.`);
+        if (walk.last !== "half" && walk.last !== "whole")
+          problems.push(`${at}: "${walk.last}" is not a last step; write half or whole.`);
+        tones(walk.tones, at);
+        if (walk.tones[0] !== "R")
+          problems.push(
+            `${at}: a walk starts on the chord's root (R), where it still states the chord.`,
+          );
+      });
+    }
+  }
+
+  // Choosing by the phrase.
+  const phrase = bass.phrase;
+  if (phrase) {
+    if (!(Number.isInteger(phrase.candidates) && phrase.candidates >= 1))
+      problems.push(`phrase: ${phrase.candidates} plans is not a whole number of at least 1.`);
+    chance(phrase.answers, "phrase: the chance of an answer");
+    chance(phrase.halfSteps.min, "phrase: the fewest half steps");
+    chance(phrase.halfSteps.max, "phrase: the most half steps");
+    if (phrase.halfSteps.min > phrase.halfSteps.max)
+      problems.push("phrase: the band of half steps is written upside down.");
   }
 
   level(bass.ending.velocity, "ending velocity", LOUDEST_ENDING);

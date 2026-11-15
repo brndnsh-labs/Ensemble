@@ -11,11 +11,11 @@ import type { Key } from "../../theory/pitch.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import { scaleHas } from "../../theory/scale.ts";
 import type { Piece } from "./form.ts";
-import { pulses } from "./form.ts";
+import { pulses, tierAt } from "./form.ts";
 import type { LineNote } from "./line.ts";
-import type { LeadInKind, LeadInPolicy, RootMotion } from "./style.ts";
+import type { BassStyle, LeadInKind, LeadInPolicy, RootMotion } from "./style.ts";
 import { LEAD_IN_KINDS } from "./style.ts";
-import { bassPitchClass, LOW_E, TOP } from "./tones.ts";
+import { bassPitchClass, inHarmony, LOW_E, TOP } from "./tones.ts";
 
 /** The note a lead-in aims at. */
 export interface Landing {
@@ -85,6 +85,14 @@ function roomOf(at: LeadInPolicy["at"], piece: Piece): number {
   return beats[beats.length - 1]!;
 }
 
+/** How likely the style is to lead into a change where the line does not already. */
+export function leadInChance(bass: BassStyle, leaving: Piece, next: Piece): number {
+  const chance = bass.leadIn.chance;
+  const tier = tierAt(leaving);
+  const top = next.start === next.bar.start && next.bar.barInSection === 0;
+  return next.bar.ending ? chance.intoEnding : top ? chance.intoSection[tier] : chance.inside[tier];
+}
+
 /** Decide the lead-in out of a piece, or null to leave the line as it is. */
 export function leadIn(request: LeadInRequest): LeadIn | null {
   const { piece, notes, landing, policy } = request;
@@ -116,6 +124,13 @@ export function leadIn(request: LeadInRequest): LeadIn | null {
 
   const coin = (): boolean => request.rng.fork("whether").chance(request.chance);
 
+  // A chromatic note the line passes through is never left hanging before a change: it
+  // stays only as the half step onto the landing (X-A-26).
+  const stray = () =>
+    piece.scale !== null &&
+    !inHarmony(piece.chord!, piece.scale, last.pitch) &&
+    Math.abs(last.pitch - target) !== 1;
+
   let kind: LeadInKind | null = null;
   if (motion !== "same") {
     const apart = Math.min(mod12(last.pitch - target), mod12(target - last.pitch));
@@ -131,14 +146,16 @@ export function leadIn(request: LeadInRequest): LeadIn | null {
       // The line already leads in by step. Keep the note, beside the root it leads to
       // (BA-07). The open E under an F is a step on the instrument, so it stays too.
       const beside = target + (mod12(last.pitch - target) <= 2 ? apart : -apart);
-      if (beside === last.pitch) return null;
+      // A chromatic note a whole step away is no lead-in (X-A-26): it is replaced below.
+      const passing = apart === 1 || !stray();
+      if (beside === last.pitch && passing) return null;
       const reachable = beforeLast === null || Math.abs(beside - beforeLast) <= OCTAVE;
-      if (!arrival && beside >= LOW_E && reachable)
+      if (!arrival && beside >= LOW_E && reachable && passing)
         return { how: "replace", index, pitch: beside, chosen: false };
       // It cannot move there (it would lie under the open E, or a leap from the note before,
-      // or it is the chord's own arrival): take a scale step the line can reach instead,
-      // coming down onto the string at the bottom (BA-08).
-      kind = "scale";
+      // or it is the chord's own arrival): take a step the line can reach instead, a half
+      // step if it was one, coming down onto the string at the bottom (BA-08).
+      kind = apart === 1 ? "below" : "scale";
     } else if (coin()) {
       kind = draw();
     }
@@ -148,6 +165,7 @@ export function leadIn(request: LeadInRequest): LeadIn | null {
   // moving at all, the root's own fifth is the classic way down an octave (EN-28).
   const leaps = Math.abs(last.pitch - target) > OCTAVE;
   if (kind === null && leaps) kind = draw() ?? "fifth";
+  if (kind === null && replaces && stray()) kind = draw() ?? "scale";
   if (kind === null) return null;
   // Coming back to a note through the half step above it is a turn, not an approach: when
   // the line is already on the target's pitch, lean into it from below.
@@ -175,7 +193,8 @@ function approach(
   const nearLine = (a: number, b: number) =>
     previous === null ? 0 : Math.abs(a - previous) - Math.abs(b - previous);
   // At the bottom of the instrument a lead-in comes down onto the string from above (BA-08).
-  const floor = target <= LOW_E + 1;
+  // That is the open E alone: under an F the open E is the half step below, and is there.
+  const floor = target <= LOW_E;
 
   /** Scale steps of the chord being left within a whole step of the target, nearest the line first. */
   const scaleSteps = (): number[] => {
@@ -187,22 +206,8 @@ function approach(
     return [...steps, target + 2, target + 1, ...(floor ? [] : [target - 1])];
   };
 
-  /**
-   * From above at the floor (BA-09): the half step only if it belongs to one of
-   * the two chords or to the key, otherwise the chord's own scale step (over B7
-   * into E the lead-in is F#, not F).
-   */
-  const fromAbove = (): number[] => {
-    const tonic = pitchClass(landing.key.tonic);
-    const known = new Set([
-      ...chordTones(chord.quality).map((tone) => mod12(root + tone.interval)),
-      ...chordTones(landing.chord.quality).map((tone) =>
-        mod12(pitchClass(landing.chord.root) + tone.interval),
-      ),
-      ...(landing.key.mode === "minor" ? MINOR : MAJOR).map((degree) => mod12(tonic + degree)),
-    ]);
-    return known.has(mod12(target + 1)) ? [target + 1] : [];
-  };
+  /** From above at the floor (BA-09): the half step only if the harmony knows it. */
+  const fromAbove = (): number[] => (knownAbove(chord, landing) ? [target + 1] : []);
 
   /**
    * A fifth above the target or a fourth below it, whichever is nearer the line: a V to I
@@ -211,6 +216,9 @@ function approach(
    */
   const fifths = (): number[] => [target + 7, target - 5].sort(nearLine);
 
+  // A half step the line cannot reach from where it is (the box has climbed and the next
+  // root sits at the bottom, so the half step under it is more than an octave down) is taken
+  // from the other side: still a half step, from where the hand is.
   const wanted =
     kind === "fifth"
       ? fifths()
@@ -218,7 +226,9 @@ function approach(
         ? []
         : floor
           ? fromAbove()
-          : [kind === "below" ? target - 1 : target + 1];
+          : kind === "below"
+            ? [target - 1, target + 1]
+            : [target + 1, target - 1];
   // The kind asked for first, then the scale steps, then the fifth: a lead-in the line would
   // have to leap more than an octave to reach is no lead-in, so one it can reach is played.
   // Every kind answers to the scale of the chord being left: a passing or approach tone comes
@@ -236,6 +246,24 @@ function approach(
   // A lead-in that repeats the note before it is a repeat, not a lead-in (BA-10), unless
   // it is the only way onto the string.
   return candidates.find((pitch) => pitch !== previous) ?? candidates[0] ?? null;
+}
+
+/**
+ * Whether the half step above a landing at the bottom of the instrument belongs
+ * to the chord being left, the chord coming, or the key (BA-09): over B7 into E
+ * the half step above is F natural, which is none of them.
+ */
+export function knownAbove(leaving: ChartChord, landing: Landing): boolean {
+  const root = pitchClass(leaving.root);
+  const tonic = pitchClass(landing.key.tonic);
+  const known = new Set([
+    ...chordTones(leaving.quality).map((tone) => mod12(root + tone.interval)),
+    ...chordTones(landing.chord.quality).map((tone) =>
+      mod12(pitchClass(landing.chord.root) + tone.interval),
+    ),
+    ...(landing.key.mode === "minor" ? MINOR : MAJOR).map((degree) => mod12(tonic + degree)),
+  ]);
+  return known.has(mod12(landing.pitch + 1));
 }
 
 /** Carry out a lead-in on the notes of the piece being left. */

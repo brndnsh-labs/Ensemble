@@ -14,6 +14,11 @@ type Line = BassStyle["lines"]["mid"];
  * IV, which is why the box walks a blues by itself.
  *
  * The box is fitted to the chord (BA-30): the first shape the chord meets wins.
+ * The chords a blues lives on have other ways to be played as well. The box is
+ * the home of most sections, so most takes start from the sound already
+ * approved at gate 1; the others are answers a chorus may play on a chord, and
+ * now and then a section's home. Which shape plays where is the critic's choice,
+ * phrase by phrase.
  */
 const box: Line["tones"] = [
   // A slash chord: stand on the slash note. A pedal, not a box.
@@ -30,9 +35,36 @@ const box: Line["tones"] = [
   // pentatonic box. A half-diminished chord plays the same shape on its own flat 5th.
   {
     when: { family: ["minor", "half-diminished"], lacks: ["6"] },
+    name: "minor box",
+    home: 4,
+    answer: 1,
     bars: [
       ["R", "3", "4", "5"],
       ["b7", "5", "4", "3"],
+    ],
+    others: [
+      // New here: up the pentatonic to the octave, then down the box. The line opens out
+      // where the box turns back at the 5th.
+      {
+        name: "minor box to the octave",
+        home: 1,
+        answer: 2,
+        bars: [
+          ["R", "5", "b7", "8"],
+          ["b7", "5", "4", "3"],
+        ],
+      },
+      // New here: through the blues scale's flat 5th, both ways. The flat 5th passes
+      // between the 4th and the 5th, on the weak beats.
+      {
+        name: "minor blues scale",
+        home: 0,
+        answer: 2,
+        bars: [
+          ["R", "3", "4", "#4"],
+          ["5", "#4", "4", "3"],
+        ],
+      },
     ],
   },
   // Any other chord whose scale has no major 6th: a dominant on its way to a minor chord
@@ -43,6 +75,10 @@ const box: Line["tones"] = [
     bars: [
       ["R", "3", "5", "b7"],
       ["b7", "5", "3", "5"],
+    ],
+    others: [
+      // New here: the octave figure, for a bar or two. No 6th in it, so it fits here too.
+      { name: "octave figure", home: 0, answer: 1, bars: [["R", "8", "b7", "5"]] },
     ],
   },
   // A chord with no flat 7th (a plain major triad on the I, a 6th, a major 7th, a
@@ -58,12 +94,120 @@ const box: Line["tones"] = [
   // chord with a major 6th (its own 3rd is the flat one). A sus chord's 4th or 2nd
   // stands where the 3rd would.
   {
+    name: "box",
+    home: 5,
+    answer: 1,
     bars: [
       ["R", "3", "5", "6"],
       ["b7", "6", "5", "3"],
     ],
+    others: [
+      // From the notes, where it is the box of a chord with no b7 (BA-30). On a dominant it
+      // is a choice: the top of the box opens to the octave instead of leaning on the b7.
+      {
+        name: "box to the octave",
+        home: 1,
+        answer: 2,
+        bars: [
+          ["R", "3", "5", "6"],
+          ["8", "6", "5", "3"],
+        ],
+      },
+      // New here: the walk through the fourth, up to the 5th and back. The #4 passes between
+      // the 4th and the 5th on the weak beats.
+      {
+        name: "walk through the fourth",
+        home: 1,
+        answer: 2,
+        bars: [
+          ["R", "3", "4", "#4"],
+          ["5", "#4", "4", "3"],
+        ],
+      },
+      // From the notes' power-chord figure (BA-30), on a seventh chord: rocking on the 5th
+      // and the 6th, the b7 at the top of the second bar.
+      {
+        name: "root, fifth, sixth",
+        home: 1,
+        answer: 1,
+        bars: [
+          ["R", "5", "6", "5"],
+          ["b7", "5", "6", "5"],
+        ],
+      },
+      // New here: the octave figure, a bar long, so a stay of two bars plays it twice. Up
+      // the neck on a high root, so only ever an answer.
+      { name: "octave figure", home: 0, answer: 1, bars: [["R", "8", "b7", "5"]] },
+    ],
   },
 ];
+
+/**
+ * Walks into a change, a bar long, at the end of a line. Each starts on the
+ * chord's root and steps one way to a half or whole step from the next root.
+ * A blues mostly moves by fifths, so that is where its walks are: none of these
+ * comes from the notes, which have only country's walk-up (BA-53, BA-54, EN-46).
+ * The first two are the brief's own examples.
+ */
+const walks: BassStyle["walks"] = {
+  // How often a plan walks: never in the two-feel, which has two notes a bar; at the end of
+  // a line, about half the plans weighed at the working level and more when hot; inside a
+  // line, seldom. The critic chooses among them.
+  offer: { end: { low: 0, mid: 0.5, high: 0.6 }, inside: { low: 0, mid: 0.15, high: 0.15 } },
+  kinds: {
+    // I to IV, V to I.
+    fallFifth: [
+      // Up through the blue third into the IV: A B C C# | D. Beat 4 is the chord's own 3rd
+      // and the C passes (BA-54).
+      {
+        name: "up through the blue third",
+        weight: 2,
+        toward: "up",
+        tones: ["R", "2", "b3"],
+        last: "half",
+      },
+      // Down the scale onto the I from a V above it: E D C# B | A.
+      { name: "down the scale", weight: 2, toward: "down", tones: ["R", "b7", "6"], last: "whole" },
+      // The same over a V going to a minor chord, whose scale has a minor 6th: E D C B | Am.
+      {
+        name: "down the minor scale",
+        weight: 2,
+        when: { lacks: ["6"] },
+        toward: "down",
+        tones: ["R", "b7", "b6"],
+        last: "whole",
+      },
+      // And on into the minor chord from its flat 2nd: E D C Bb | Am.
+      {
+        name: "down to the flat second",
+        weight: 1,
+        when: { lacks: ["6"] },
+        toward: "down",
+        tones: ["R", "b7", "b6"],
+        last: "half",
+      },
+    ],
+    // IV to I, I to V.
+    riseFifth: [
+      // Down from the IV's 7th, chromatic at the end: D C B Bb | A.
+      {
+        name: "down from the seventh",
+        weight: 2,
+        toward: "down",
+        tones: ["R", "b7", "6"],
+        last: "half",
+      },
+      // Up through the fourth to the V: A C# D D# | E.
+      {
+        name: "up through the fourth",
+        weight: 2,
+        toward: "up",
+        tones: ["R", "3", "4"],
+        last: "half",
+      },
+    ],
+  },
+};
 
 const boxTouch = {
   otherMeters: "pulses",
@@ -165,6 +309,14 @@ export const bluesBass: BassStyle = {
       same: { below: 0, above: 0, fifth: 0, scale: 0 },
     },
   },
+
+  walks,
+
+  // A phrase is weighed in six plans. In a plan, a stay on a chord after the phrase's first
+  // plays its answer a little over a time in three; the critic decides which plan sounds.
+  // About one change in four arrived at by a half step: the middle of ST-blues-28's 15% to
+  // 40%, aimed at in each phrase so that a whole chorus lands inside it.
+  phrase: { candidates: 6, answers: 0.35, halfSteps: { min: 0.2, max: 0.25 } },
 
   // The last note: the lowest root on the instrument, as hard as a downbeat (EN-19, EN-27).
   ending: { velocity: 100 },

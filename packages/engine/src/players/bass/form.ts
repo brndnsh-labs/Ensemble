@@ -5,6 +5,8 @@ import type { ChartChord } from "../../chart/types.ts";
 import { arrivals, contextOf, sameChord } from "../../perform/harmony.ts";
 import { pulseTicks } from "../../perform/meter.ts";
 import type { Plan, PlanBar } from "../../plan/types.ts";
+import type { Tier } from "../../style/types.ts";
+import { tierOf } from "../../style/types.ts";
 import type { ChordScale } from "../../theory/scale.ts";
 import { chordScale } from "../../theory/scale.ts";
 import { bassPitchClass } from "./tones.ts";
@@ -104,6 +106,11 @@ function markEnding(result: Piece[], first: number): void {
     if (result[i]!.chord === null) continue;
     result[i] = { ...result[i]!, ending: i >= from ? "final" : "before" };
   }
+}
+
+/** The bass's tier in a piece's bar. */
+export function tierAt(piece: Piece): Tier {
+  return tierOf(piece.bar.seats.bass ?? piece.bar.energy);
 }
 
 /** A bar's pulses as lengths in ticks. */

@@ -32,6 +32,27 @@ export const bluesCritic: CriticStyle = {
     "bass.register": { min: 34, max: 43, kind: "intent" },
     "bass.high-notes": { max: 0.03, kind: "intent", minCases: 40 },
 
+    // From listening at gate 3: "the bass could be a bit more creative". Three basses on the
+    // same 200 takes: as built; as it was (one shape for every chord, no walks); and the
+    // first plan drawn, with no critic. Bar and two-bar shapes in a chorus at the working
+    // level: 7.0 and 5.1 (as it was 6.3 and 4.9, first plan 7.7 and 5.4). A bar is the bar at
+    // its place last chorus 42% of the time (as it was 50%, first plan 34%): told again, not
+    // pasted, and not a new line every chorus either.
+    "bass.bar-shapes-per-chorus": { min: 4.5, max: 10, kind: "measured", minCases: 1 },
+    "bass.two-bar-shapes-per-chorus": { min: 3.5, kind: "measured", minCases: 1 },
+    "bass.chorus-same-as-last": { max: 0.15, kind: "measured", minCases: 2 },
+    "bass.bars-same-as-last-chorus": { min: 0.05, max: 0.8, kind: "measured", minCases: 12 },
+    // Walks: 40% of chorus tops past the quiet level (as it was none; first plan 29%), about
+    // three quarters of the tops a walk can reach (a last bar of two chords cannot walk); 14% of
+    // the lines inside a chorus (first plan 36%); 2% of the changes inside a line, which is
+    // what the box itself scores when it happens to climb by step into the next root.
+    // Into the top it is reported only: a take with three tops may walk all three.
+    "bass.walks-into-a-line": { max: 0.4, kind: "measured", minCases: 6 },
+    "bass.walks-inside-lines": { max: 0.1, kind: "intent", minCases: 8 },
+    // Most changes are arrived at by a step in the octave played: 67% (as it was 65%). The
+    // quiet two-feel leads in by step at a third of its changes or fewer, so the floor is low.
+    "bass.changes-by-step": { min: 0.2, kind: "measured", minCases: 8 },
+
     // How hard the band hits, set by ear at gate 1: a backbeat around 110 slammed through a
     // sampled kit, around 95 did not. The quietest takes sit in the high 60s.
     "band.backbeat-level": { min: 60, max: 108, kind: "intent" },
@@ -277,6 +298,31 @@ export const bluesCritic: CriticStyle = {
       // it sometimes is.
       "same-as-last": 0.25,
       "same-as-last-time": 0.3,
+    },
+    // What a phrase of the bass line costs. Each is yes or no, a share, or the band's energy:
+    // comparable units, so the weights are what makes them count. Each was set to zero in turn
+    // over 200 takes (ME-10); what it moved is beside it. "same-as-last" moved nothing (a
+    // phrase on other chords is seldom the same shapes) and is left uncosted.
+    bass: {
+      // At zero, walks into a line 14% to 11% and changes by step 67% to 65%.
+      "leaps-into-the-next": 1,
+      // At zero, takes inside the half-step band 90% to 48% (ST-blues-28).
+      "half-steps": 6,
+      // At zero, bars as they were last chorus 42% to 45%, choruses repeated 0% to 0.7%.
+      "same-as-last-time": 0.5,
+      // At zero, choruses at the working level all home shape, no walk: 2 to 60 in 200 takes.
+      "a-loop": 1,
+      // At zero, answered bars 13% to 27% and bars as last chorus 42% to 35%: the home is lost.
+      "away-from-home": 1.2,
+      // The register already keeps the line low: at zero, notes above D3 0.1% to 0.2%. Kept as
+      // the guard for a register moved up again.
+      "high-notes": 4,
+      // At zero, walks into a line 14% to 22%, inside one 2% to 4%.
+      "walk-out-of-place": 0.6,
+      // At zero, walks into the top 40% to 44%, into a line 14% to 19%.
+      "walk-when-quiet": 0.6,
+      // At zero, walks into the top 40% to 23%.
+      "turnaround-unwalked": 0.9,
     },
     // What a phrase of the solo costs. Each feature is in the unit its name says (a share,
     // a count, semitones, seconds), so the weights are what makes them comparable. Each was

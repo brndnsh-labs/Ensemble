@@ -86,20 +86,20 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 State on 2026-11-14: **stages 1, 2 and 3 are built, each with gate files and a report. Stage 4 has not been started**, as the kickoff asks. Everything is committed; no agent is running.
 
 - Gate reports: `out/gate-1/GATE_REPORT.md`, `out/gate-2/GATE_REPORT.md`, `out/gate-3/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1`, `gate:2`, `gate:3`.
-- `pnpm check` passes: 437 tests in about 6 s of 10. `pnpm score` matches its baseline (`scorecard/blues.json`).
+- `pnpm check` passes: 441 tests in about 7.6 s of 10. `pnpm score` matches its baseline (`scorecard/blues.json`).
 - The numbers gate 3 quotes: `node scripts/gate-3-numbers.ts`.
 
 **Feedback so far**
 
 - Gate 1 (in Logic): sounds good so far, "a little plain"; velocities were slamming. Loudness is done (15% trim, by ear). "Plain" was to be judged again with the piano in.
 - Gate 2: "so far so good". Nothing asked to change.
-- Gate 3: not heard yet. Its questions are in its report under "What to listen for".
+- Gate 3, first listen: the solos are "sounding pretty good, definitely intentional melodies that work well"; the piano got busy as the intensity ramped up; the bass was an octave high and could be more creative. All three were measured, changed, and the gate files rewritten (`DECISIONS.md`, "gate 3 feedback" and "a bass that varies its line"). The rewritten files have not been heard yet.
 - Feedback becomes a property or a measure first, then a fix.
 
 **Waiting on Brandon's ear**
 
 - Gate 1: the wide bass drops and the two one-note phrase fills at mid level (`out/gate-1/GATE_REPORT.md`, "Not yet acted on").
-- Gate 3, most likely to need a change: whether the piano gives way enough under the soloist (two weights move it: `under-the-soloist` and `thinned` in `packages/styles/src/blues/critic.ts`); whether the pump should react to a soloist at all; whether the lower hand under a solo is muddy; whether the worst three solos are acceptable.
+- Gate 3, second listen: whether the piano is now too thin under a hot solo (it went from 5.2 strikes a bar to 2.0; the middle setting is to allow the four-stab figures but not the pump, `listening.busiest` in `packages/styles/src/blues/chords.ts`); whether the bass in C and F is too deep (roots stop at E2; `register.highest` in `packages/styles/src/blues/bass.ts`); whether the new bass shapes and turnaround walks sound like the same player; the wide bass drops; whether the worst three solos are acceptable.
 
 **Before or at the start of stage 4** (each is logged in `DECISIONS.md`, "after the soloist's review")
 
@@ -108,9 +108,9 @@ State on 2026-11-14: **stages 1, 2 and 3 are built, each with gate files and a r
 3. **The piano's answering stab is unexercised** in the blues (its figures fill nearly every breath). Jazz will be the first style to use it: read its output then.
 4. In compound meters the soloist's "beat" is still a quarter note.
 
-**Models** (agreed with Brandon to stretch quota): Sonnet for mechanical work and small fixes with a property written first; Opus for well-specified builds and for adversarial reviews; Fable for open design problems and the main thread. What things cost, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, chord review (Opus) 240k, soloist build (Fable) 630k, piano around the soloist (Opus) 445k, soloist review (Opus) 270k, test-file split (Sonnet) 65k. Every independent review found audible bugs the builder's own checks missed: keep doing one per seat, and give the reviewer its own copy of the repo (`git clone` the local repo into the scratch folder, `pnpm install --offline` twice) so it can run while a build is under way.
+**Models** (agreed with Brandon to stretch quota): Sonnet for mechanical work and small fixes with a property written first; Opus for well-specified builds and for adversarial reviews; Fable for open design problems and the main thread. What things cost, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, chord review (Opus) 240k, soloist build (Fable) 630k, piano around the soloist (Opus) 445k, soloist review (Opus) 270k, test-file split (Sonnet) 65k, bass variety (Opus) 445k. Every independent review found audible bugs the builder's own checks missed: keep doing one per seat, and give the reviewer its own copy of the repo (`git clone` the local repo into the scratch folder, `pnpm install --offline` twice) so it can run while a build is under way.
 
-Small things noticed and not done: the scorecard's worst-takes list has no lower-is-better flag, so `solo.cost` carries a ceiling target to make its list point the right way; `test/band.test.ts` is the slowest test file (about 4.7 s) and is the one to split next if the budget tightens.
+Small things noticed and not done: the scorecard's worst-takes list has no lower-is-better flag, so `solo.cost` carries a ceiling target to make its list point the right way; the suite is at about 7.6 s of 10 since the bass began choosing by the phrase; `test/band.test.ts` is still the slowest file (its first test renders and replays the whole library), and the bass's own cost per take (four times what it was) is the place to look if the budget tightens.
 
 **Things learned that the next session should not relearn**
 

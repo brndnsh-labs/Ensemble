@@ -8,7 +8,20 @@ import { chordFamily, chordTones, toneInterval } from "../../theory/chord.ts";
 import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { ChordScale } from "../../theory/scale.ts";
 import { scaleHas } from "../../theory/scale.ts";
-import type { ChordCondition, Tone, ToneSequence } from "./style.ts";
+import type { ChordCondition, LineShape, Tone, ToneSequence } from "./style.ts";
+
+/** A value worked out once and kept: `known` answers for `key` from then on. */
+export function remember<K, V>(
+  known: { get(key: K): V | undefined; set(key: K, value: V): unknown },
+  key: K,
+  make: () => V,
+): V {
+  const had = known.get(key);
+  if (had !== undefined) return had;
+  const value = make();
+  known.set(key, value);
+  return value;
+}
 
 /** The open low E string: a note under it is a note the instrument does not have (X-A-01). */
 export const LOW_E = 28;
@@ -54,6 +67,15 @@ export function toneOf(tone: Tone, chord: Chord, scale: ChordScale): number | nu
     }
     case "5":
       return toneInterval(quality, "fifth") ?? 7;
+    case "2":
+      return displaced(2, 1) ? null : 2;
+    // The chromatic tones are always there to pass through (see `playable`).
+    case "b3":
+      return 3;
+    case "#4":
+      return 6;
+    case "b6":
+      return 8;
     case "4":
       return displaced(5, 6) ? null : 5;
     case "6":
@@ -66,6 +88,10 @@ export function toneOf(tone: Tone, chord: Chord, scale: ChordScale): number | nu
 /** What is played in place of a tone the chord cannot give. */
 const FALLBACK: Readonly<Record<Tone, Tone>> = {
   R: "R",
+  "2": "R",
+  b3: "3",
+  "#4": "5",
+  b6: "5",
   "8": "8",
   "5": "5",
   "3": "R",
@@ -86,16 +112,70 @@ export function tonePitch(
   bass: number,
   ceiling: number,
 ): number {
+  const pitch = bass + aboveBass(tone, chord, scale);
+  return pitch > Math.min(ceiling, TOP) && pitch - 12 >= LOW_E ? pitch - 12 : pitch;
+}
+
+/** Semitones a tone sits above the chord's bass note, 0 to 12, after any fallback. */
+export function aboveBass(tone: Tone, chord: Chord, scale: ChordScale): number {
+  // Asked of the same chord again and again while the plans for a phrase are weighed.
+  const byScale = remember(ABOVE, chord, () => new WeakMap<ChordScale, Map<Tone, number>>());
+  const byTone = remember(byScale, scale, () => new Map<Tone, number>());
+  return remember(byTone, tone, () => fittedAbove(tone, chord, scale));
+}
+
+const ABOVE = new WeakMap<Chord, WeakMap<ChordScale, Map<Tone, number>>>();
+
+function fittedAbove(tone: Tone, chord: Chord, scale: ChordScale): number {
   let fitted = tone;
   let interval = toneOf(fitted, chord, scale);
   while (interval === null) {
     fitted = FALLBACK[fitted];
     interval = toneOf(fitted, chord, scale);
   }
-  const above =
-    fitted === "R" ? 0 : fitted === "8" ? 12 : mod12(pitchClass(chord.root) + interval - bass);
-  const pitch = bass + above;
-  return pitch > Math.min(ceiling, TOP) && pitch - 12 >= LOW_E ? pitch - 12 : pitch;
+  if (fitted === "R") return 0;
+  if (fitted === "8") return 12;
+  return mod12(pitchClass(chord.root) + interval - bassPitchClass(chord));
+}
+
+/** Whether a pitch is in the chord's scale or is one of its own notes: anything but a chromatic tone. */
+export function inHarmony(chord: Chord, scale: ChordScale, pitch: number): boolean {
+  return isChordTone(chord, pitch) || scaleHas(scale, pitch - pitchClass(chord.root));
+}
+
+/**
+ * Whether a shape can be played over a chord: every chromatic tone in it is a
+ * passing tone, a half or whole step on from the note before and a step on to
+ * the note after, in the same direction. The bars repeat, so the last note of
+ * the last bar passes on to the first of the first.
+ */
+export function playable(shape: LineShape, chord: Chord, scale: ChordScale): boolean {
+  // Asked for every bar of every plan weighed: answered once per shape, chord and scale.
+  const key = `${pitchClass(chord.root)}/${bassPitchClass(chord)}/${chord.quality.base}/${chord.quality.alterations.join()}/${scale.intervals.join()}`;
+  const known = remember(PLAYABLE, shape, () => new Map<string, boolean>());
+  return remember(known, key, () => fits(shape, chord, scale));
+}
+
+const PLAYABLE = new WeakMap<LineShape, Map<string, boolean>>();
+
+function fits(shape: LineShape, chord: Chord, scale: ChordScale): boolean {
+  const steps = shape.bars.flat().map((tone) => aboveBass(tone, chord, scale));
+  const bass = bassPitchClass(chord);
+  return steps.every((step, i) => {
+    if (inHarmony(chord, scale, bass + step)) return true;
+    const before = steps[(i - 1 + steps.length) % steps.length]!;
+    const after = steps[(i + 1) % steps.length]!;
+    const into = step - before;
+    const on = after - step;
+    return (
+      into !== 0 && Math.abs(into) <= 2 && Math.abs(on) <= 2 && Math.sign(into) === Math.sign(on)
+    );
+  });
+}
+
+/** A sequence's shapes, its own first. */
+export function shapesIn(sequence: ToneSequence): readonly LineShape[] {
+  return [sequence, ...(sequence.others ?? [])];
 }
 
 /** Whether a pitch is one of the chord's own notes (its slash bass included). */
@@ -106,7 +186,7 @@ export function isChordTone(chord: Chord, pitch: number): boolean {
   return chordTones(chord.quality).some((tone) => mod12(root + tone.interval) === pc);
 }
 
-function meets(when: ChordCondition | undefined, chord: Chord, scale: ChordScale): boolean {
+export function meets(when: ChordCondition | undefined, chord: Chord, scale: ChordScale): boolean {
   if (!when) return true;
   if (when.family && !when.family.includes(chordFamily(chord.quality))) return false;
   if (when.slash !== undefined && when.slash !== isSlash(chord)) return false;
@@ -121,5 +201,21 @@ export function sequenceFor(
   chord: Chord,
   scale: ChordScale,
 ): ToneSequence {
-  return sequences.find((sequence) => meets(sequence.when, chord, scale)) ?? { bars: [["R"]] };
+  // Asked for every bar of every plan weighed: answered once for each line, chord and scale.
+  const byChord = remember(
+    SEQUENCES,
+    sequences,
+    () => new WeakMap<Chord, WeakMap<ChordScale, ToneSequence>>(),
+  );
+  const byScale = remember(byChord, chord, () => new WeakMap<ChordScale, ToneSequence>());
+  return remember(
+    byScale,
+    scale,
+    () => sequences.find((sequence) => meets(sequence.when, chord, scale)) ?? { bars: [["R"]] },
+  );
 }
+
+const SEQUENCES = new WeakMap<
+  readonly ToneSequence[],
+  WeakMap<Chord, WeakMap<ChordScale, ToneSequence>>
+>();

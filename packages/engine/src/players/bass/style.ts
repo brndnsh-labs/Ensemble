@@ -9,23 +9,33 @@ import type { ChordFamily } from "../../theory/chord.ts";
  * A degree of the chord, fitted to whatever chord is sounding (X-A-23, X-A-24):
  *
  * - `R`  the chord's bass note: the slash note under a slash chord
+ * - `2`  the major second (the ninth, an octave down)
+ * - `b3` the minor third: on a minor chord its own third, on a major or dominant chord the blue third
  * - `3`  the chord's own third, or its suspension (a sus chord's 4th or 2nd)
  * - `4`  the perfect fourth
+ * - `#4` the raised fourth: the blues scale's flat fifth, between the 4th and the 5th
  * - `5`  the chord's own fifth: flat on a diminished chord, sharp on an augmented one
+ * - `b6` the minor sixth
  * - `6`  the major sixth
  * - `b7` the flat seventh
  * - `8`  the octave above the bass note
  *
- * The third and fifth are read from the chord. The fourth, sixth and flat
- * seventh are played as written unless the chord's scale holds a different
+ * The third and fifth are read from the chord. The second, fourth, sixth and
+ * flat seventh are played as written unless the chord's scale holds a different
  * note in that place (a minor sixth on a dominant heading for a minor chord, a
  * major seventh on a plain major chord). Then the chord "lacks" the tone, and
- * a sequence that asks for it anyway gets a safe neighbour: `4` the third,
- * `6` the fifth, `b7` the octave, and `3` the root on a chord with no third.
- * Conditions exist to choose a better shape than that.
+ * a sequence that asks for it anyway gets a safe neighbour: `2` the root, `4`
+ * the third, `6` the fifth, `b7` the octave, and `3` the root on a chord with
+ * no third. Conditions exist to choose a better shape than that.
+ *
+ * `b3`, `#4` and `b6` are chromatic over most chords: the note between two
+ * scale tones. Where the chord's scale does not hold one, the line plays it only
+ * as a passing tone, a step from the note before and a step on to the note
+ * after in the same direction, and never on a held note (BA-15, X-A-26). A
+ * shape that would land one anywhere else is not played on that chord.
  */
-export type Tone = "R" | "3" | "4" | "5" | "6" | "b7" | "8";
-export const TONES: readonly Tone[] = ["R", "3", "4", "5", "6", "b7", "8"];
+export type Tone = "R" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "8";
+export const TONES: readonly Tone[] = ["R", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "8"];
 
 /** What a chord must be for a sequence to be played over it. Every condition given must hold. */
 export interface ChordCondition {
@@ -39,14 +49,36 @@ export interface ChordCondition {
 }
 
 /**
- * The tones of a line, one list per bar spent on the chord. With two bars the
- * line goes up in the bar the chord arrives and comes down in the next, then
- * up again; which bar is played is counted from the chart, not remembered
- * (BA-97). A chord that arrives partway through a bar starts the first list.
+ * One way of playing a kind of chord: its tones, one list per bar spent on the
+ * chord. With two bars the line goes up in the bar the chord arrives and comes
+ * down in the next, then up again; which bar is played is counted from the
+ * chart, not remembered (BA-97). A chord that arrives partway through a bar
+ * starts the first list.
  */
-export interface ToneSequence {
-  readonly when?: ChordCondition;
+export interface LineShape {
+  /** What a bassist would call it. Reports and the critic's notes use it. */
+  readonly name?: string;
   readonly bars: readonly (readonly Tone[])[];
+  /**
+   * Its weight in the draw for the section's home shape, the line the section
+   * keeps every time it comes round (X-B-14). Zero: never the home. Default 1.
+   */
+  readonly home?: number;
+  /**
+   * Its weight in the draw for the answer, the one other shape a time through
+   * the section may play on this kind of chord. Zero: never an answer. Default 1.
+   */
+  readonly answer?: number;
+}
+
+/**
+ * The line for one kind of chord. `bars` is its first shape; `others` are
+ * further ways to play the same chord, between which the bassist chooses by
+ * the phrase. With no others, every bar on such a chord plays `bars`.
+ */
+export interface ToneSequence extends LineShape {
+  readonly when?: ChordCondition;
+  readonly others?: readonly LineShape[];
 }
 
 /**
@@ -185,11 +217,66 @@ export interface LeadInPolicy {
   readonly kinds: Readonly<Record<RootMotion, Readonly<Record<LeadInKind, number>>>>;
 }
 
+/**
+ * A bar-long walk into a change: the last bar before it, played as four steps
+ * that arrive a half or whole step from the next root in the octave it will be
+ * played (BA-05). It replaces the line in that bar and still states the chord
+ * on beat 1.
+ */
+export interface Walk {
+  readonly name?: string;
+  readonly weight: number;
+  readonly when?: ChordCondition;
+  /** Which way the line moves from the root: each note above the one before, or below it. */
+  readonly toward: "up" | "down";
+  /**
+   * The notes before the last, as tones of the chord being left, the first of
+   * them its root. The bar's figure must strike one more tone than these.
+   */
+  readonly tones: readonly Tone[];
+  /**
+   * The last note: the half step beside the next root on the side the walk
+   * comes from, or the whole step, which must then be in the scale of the chord
+   * being left (X-A-26). It obeys every rule a lead-in obeys.
+   */
+  readonly last: "half" | "whole";
+}
+
+export interface WalkPolicy {
+  /**
+   * How likely a plan the bassist weighs is to walk into the next line, and
+   * into a change inside one. The critic decides which plan is played.
+   */
+  readonly offer: { readonly end: PerTier<number>; readonly inside: PerTier<number> };
+  /** The walks for each way the bass note can move. A move with none is never walked. */
+  readonly kinds: Readonly<Partial<Record<RootMotion, readonly Walk[]>>>;
+}
+
+/** How the bassist chooses a phrase: plans drawn, each played out, and the critic picks one. */
+export interface PhrasePolicy {
+  /** How many different plans are weighed for a phrase. */
+  readonly candidates: number;
+  /** In a plan, how likely a stay on a chord after the phrase's first is played on its answer shape. */
+  readonly answers: number;
+  /**
+   * The share of changes the bassist likes to arrive at by a half step: the
+   * critic's `half-steps` costs a phrase by how far outside this it falls.
+   */
+  readonly halfSteps: { readonly min: number; readonly max: number };
+}
+
 export interface BassStyle {
   readonly register: RegisterPolicy;
   /** The part for each tier. The change of part at a tier line is the audible change of section (X-A-07). */
   readonly lines: PerTier<BassLine>;
   readonly leadIn: LeadInPolicy;
+  /** Walks into a change. Without them the bass leads in with one note at most. */
+  readonly walks?: WalkPolicy;
+  /**
+   * Choosing between plans for a phrase. Without it, or with nothing to choose
+   * (one shape for every chord and no walks), the line plays its first shape.
+   */
+  readonly phrase?: PhrasePolicy;
   readonly ending: {
     /** The written level of the last note (EN-19). A soft ending plays it at four fifths. */
     readonly velocity: number;

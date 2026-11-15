@@ -10,14 +10,17 @@ import type { Rng } from "../../rng.ts";
 import type { Tier } from "../../style/types.ts";
 import type { Piece } from "./form.ts";
 import { pulses } from "./form.ts";
-import type { BassLine } from "./style.ts";
+import type { BassLine, LineShape, ToneSequence } from "./style.ts";
 import { FIGURE_STEPS } from "./style.ts";
-import { isChordTone, sequenceFor, tonePitch } from "./tones.ts";
+import { isChordTone, remember, sequenceFor, tonePitch } from "./tones.ts";
+
+/** Which of a sequence's shapes a piece plays. Given nothing, the first. */
+export type ShapeChoice = (sequence: ToneSequence, index: number) => LineShape;
 
 /** No bass note is shorter than half a sixteenth (BA-14). */
 export const SHORTEST = STEP / 2;
 /** A note given this much room or more is a held note, and a held note is a chord tone (BA-15). */
-const HELD = PPQ * 2;
+export const HELD = PPQ * 2;
 
 /** One note of the line before it is written down. Lead-ins may still change it. */
 export interface LineNote {
@@ -40,13 +43,19 @@ interface Onset {
   readonly echo: boolean;
 }
 
+type Onsets = { readonly notes: readonly Onset[]; readonly plain: boolean };
+
+/** A bar's onsets, worked out once for each line and bar of a take (its generator). */
+const ONSETS = new WeakMap<Rng, WeakMap<BassLine, Map<number, Onsets>>>();
+
 /** Where this bar's notes fall, and whether the bar is played plainly (any meter but 4/4, BA-16). */
-function onsets(
-  line: BassLine,
-  tier: Tier,
-  bar: PlanBar,
-  rng: Rng,
-): { readonly notes: readonly Onset[]; readonly plain: boolean } {
+function onsets(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
+  const byLine = remember(ONSETS, rng, () => new WeakMap<BassLine, Map<number, Onsets>>());
+  const byBar = remember(byLine, line, () => new Map<number, Onsets>());
+  return remember(byBar, bar.index, () => onsetsOf(line, tier, bar, rng));
+}
+
+function onsetsOf(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
   const beats = pulses(bar);
   const common = beats.length === 4 && beats.every((beat) => beat === PPQ);
   const figures = line.figures.options.filter(
@@ -97,6 +106,7 @@ export function lineOf(
   tier: Tier,
   root: number,
   rng: Rng,
+  choose?: ShapeChoice,
 ): LineNote[] {
   const { chord, scale, bar } = piece;
   if (chord === null || scale === null) return [];
@@ -111,11 +121,13 @@ export function lineOf(
   }
 
   const sequence = sequenceFor(line.tones, chord, scale);
-  // Played plainly, the sequence is read straight through from its top in every bar: in
+  // A bar played plainly keeps to the first shape: the plain version of the style (BA-16).
+  const shape = choose && !figure.plain ? choose(sequence, line.tones.indexOf(sequence)) : sequence;
+  // Played plainly, the shape is read straight through from its top in every bar: in
   // three that is the box's way up, in five it carries on over the top (R 3 5 6 b7).
   const tones = figure.plain
-    ? sequence.bars.flat()
-    : (sequence.bars[piece.cycle % sequence.bars.length] ?? []);
+    ? shape.bars.flat()
+    : (shape.bars[piece.cycle % shape.bars.length] ?? []);
   const notes: LineNote[] = [];
   let count = 0;
   let pitch = root;
