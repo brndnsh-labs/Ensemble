@@ -89,6 +89,11 @@ export const rockCritic: CriticStyle = {
     // No pickups and no ties over the barline (ST-rock-24). True by construction: tripwires.
     "solo.barlines-tied": { max: 0, kind: "intent" },
     "solo.entered-early": { max: 0, kind: "intent" },
+    // How much the lead guitar bends and shakes, for an ear to move: today a bent note
+    // every eight bars of a solo and two shaken notes every three bars. The bands sit a margin
+    // outside what is delivered, so the scorecard names a solo with none or with a crowd.
+    "solo.bends": { min: 0.02, max: 0.3, kind: "measured" },
+    "solo.shakes": { min: 0.3, max: 0.9, kind: "measured" },
     // Not a target for the music: a ceiling one take in ten sits above today, so that the
     // scorecard names the worst solos, which are the ones to go and listen to.
     "solo.cost": { max: 2.45, kind: "measured" },

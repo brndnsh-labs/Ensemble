@@ -337,6 +337,34 @@ export interface SoloStyle {
        */
       readonly approach: boolean;
     };
+    /**
+     * A string pushed up into a note, on an instrument whose hand can (SO-53).
+     * Only into a note a phrase lands on: one struck where the chord changes,
+     * or the last before a breath. Left at no chance, the style does not bend.
+     */
+    readonly bend: {
+      /** The chance a landing on a major 3rd is pushed up from the half step under it. */
+      readonly third: number;
+      /** The chance a landing on a root or a perfect 5th, a quarter note or longer, is pushed up from the whole step under it. */
+      readonly rootOrFifth: number;
+      /**
+       * Where the hand always gets lyrical: the phrase that goes up to the
+       * solo's top note and this many phrases either side of it. The top
+       * note itself is bent into whenever it can be (KF-B-10).
+       */
+      readonly around: number;
+      /**
+       * The chance any other phrase is one the hand gets lyrical in. The
+       * chances above are for a landing of such a phrase; the rest of the
+       * phrases are played plain, and are the space between (KF-B-10).
+       */
+      readonly elsewhere: number;
+    };
+    /**
+     * Beats a note must be held for before it is shaken, on an instrument
+     * that shakes its notes (SO-52): a dotted quarter is 1.5.
+     */
+    readonly shake: number;
   };
 
   /** Written levels, before the band's energy scales them (SO-51). */
@@ -361,7 +389,8 @@ export interface SoloStyle {
 
 /**
  * The instrument, which is the player's choice and not the style's (BRIEF 5.3).
- * It says where the soloist can play and whether it has to breathe.
+ * It says where the soloist can play, whether it has to breathe, and what its
+ * hand can do with a note's pitch.
  */
 export interface SoloInstrument {
   readonly name: string;
@@ -377,4 +406,24 @@ export interface SoloInstrument {
    * need not breathe.
    */
   readonly breath: { readonly lungs: number; readonly takes: number } | null;
+  /**
+   * A hand that can push a string up into a note: the note is struck flat and
+   * eased up to pitch in `takes` seconds. In seconds, because a hand does not
+   * move faster when the tempo does. Null for an instrument that cannot.
+   */
+  readonly bend: { readonly takes: number } | null;
+  /**
+   * How it shakes a held note: `depth` cents, `rate` times a second, starting
+   * `after` seconds into the note and reaching its depth over `grows` more.
+   * `upward` is a fretted string, which can only be pushed sharp and let back;
+   * otherwise the pitch goes `depth` either side. Null for an instrument whose
+   * notes stay where they are struck.
+   */
+  readonly shake: {
+    readonly depth: number;
+    readonly rate: number;
+    readonly after: number;
+    readonly grows: number;
+    readonly upward: boolean;
+  } | null;
 }

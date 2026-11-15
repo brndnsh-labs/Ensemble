@@ -3,10 +3,9 @@
 // as it was. Straight eighths, with sixteenth bursts at the top (ST-rock-21 to
 // ST-rock-24).
 //
-// The notes' lead is an overdriven guitar, and there is no guitar to solo on
-// yet: the default is the alto sax, the other rock lead (a rock and roll tenor
-// is the nearest the band has). A guitar's bends, slides and vibrato are not in
-// the instrument model and are not played.
+// The lead is the overdriven guitar (ST-rock-21). Its hand bends into the
+// notes a phrase lands on and shakes the ones it holds; slides, and a bend let
+// back down, are not played (Brandon's ear, on nine ways of drawing them).
 //
 // Reading the rhythms: sixteen sixteenths to the bar, grouped by beat. `x`
 // strikes a note, `-` holds it, `.` is silence.
@@ -34,7 +33,7 @@ const ELSE = {
 } satisfies Way;
 
 export const rockSolo: SoloStyle = {
-  instrument: "alto-sax",
+  instrument: "driven-guitar",
   lift: 0,
 
   notes: {
@@ -266,6 +265,11 @@ export const rockSolo: SoloStyle = {
     chromatic: 0.1,
     enclosure: 0,
     pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // The blue third pushed up into the third, the flat 7th into the root or the 4th into the
+    // 5th (SO-53, ST-rock-24).
+    bend: { third: 0.45, rootOrFifth: 0.55, around: 1, elsewhere: 0.5 },
+    // A note held a dotted quarter is shaken (SO-52).
+    shake: 1.5,
   },
 
   touch: {

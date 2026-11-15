@@ -285,6 +285,9 @@ export const funkSolo: SoloStyle = {
     chromatic: 0.25,
     enclosure: 0.05,
     pickup: { chance: 0, figures: [], rising: 0.6, approach: false },
+    // No bends (ST-funk-32); a guitar shakes a note held a dotted half or longer (SO-52).
+    bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
+    shake: 3,
   },
 
   // Clipped: a note that runs into the next gives up a fifth of its length.

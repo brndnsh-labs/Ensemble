@@ -13,6 +13,7 @@ import { cells, STEP } from "../../perform/grid.ts";
 import { pulseTicks } from "../../perform/meter.ts";
 import type { Player, PlayerContext, WrittenNote } from "../../perform/notes.ts";
 import { heldRng } from "../../perform/notes.ts";
+import type { PitchMove } from "../../perform/pitch.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import type { Heard, SoloCandidate, SoloPick, Sounding } from "./critique.ts";
 import { bassStruck, bySoloCritic, SOLO_FEATURES } from "./critique.ts";
@@ -34,6 +35,8 @@ interface SoloNote {
   readonly duration: number;
   readonly pitch: number;
   readonly velocity: number;
+  /** How its pitch moves while it sounds: a bend into it, a held note shaken. */
+  readonly move?: PitchMove;
 }
 
 /** One phrase as it was chosen: for a report that wants to show the alternatives. */
@@ -160,12 +163,67 @@ const NOTHING: Memory = {
   endedEmpty: false,
 };
 
+/** The ticks a written note sounds for once the band's swing has bent it. */
+function soundsFor(world: World, bar: PlanBar, tick: number, duration: number): number {
+  const at = tick - bar.start;
+  const bend = (within: number) => (bar.meter.unit === 4 ? swing(within, world.feel) : within);
+  return Math.max(1, Math.round(bend(at + duration) - bend(at)));
+}
+
 /** A written note as it will sound once the band's swing has bent it. */
 function sounding(world: World, note: SoloNote): Sounding {
-  const at = note.tick - note.bar.start;
-  const bend = (tick: number) => (note.bar.meter.unit === 4 ? swing(tick, world.feel) : tick);
-  const length = Math.max(1, Math.round(bend(at + note.duration) - bend(at)));
+  const length = soundsFor(world, note.bar, note.tick, note.duration);
   return { bar: note.bar, tick: note.tick, ends: note.tick + length, pitch: note.pitch };
+}
+
+/**
+ * How a note's pitch moves, on an instrument whose hand can move it. `bend`
+ * is the semitones under the note a string is pushed up from, where the line
+ * asked for one; `value` is the note's length in the rhythm and `sounds` how
+ * long it is heard for, both in ticks. A hand moves in seconds, whatever the
+ * tempo, so a move that the note is too short to finish is not started: a
+ * bend needs the note to last as long again once it has arrived, a shake
+ * needs time to reach its depth. A note bent into may be shaken too (SO-52,
+ * SO-53).
+ */
+function moveOf(
+  world: World,
+  bend: number,
+  value: number,
+  sounds: number,
+): { move: PitchMove } | undefined {
+  const { instrument, solo, ticksPerSecond } = world;
+  const seconds = sounds / ticksPerSecond;
+  const push = instrument.bend;
+  const bends =
+    push !== null && bend > 0 && value >= (bend === 1 ? EIGHTH : PPQ) && seconds >= 2 * push.takes;
+  const shake = instrument.shake;
+  const shakes =
+    shake !== null && value >= solo.habits.shake * PPQ && seconds >= shake.after + shake.grows;
+  if (!bends && !shakes) return undefined;
+  return {
+    move: {
+      ...(bends
+        ? {
+            glide: [
+              { at: 0, semitones: -bend },
+              { at: push.takes * ticksPerSecond, semitones: 0 },
+            ],
+          }
+        : {}),
+      ...(shakes
+        ? {
+            vibrato: {
+              from: shake.after * ticksPerSecond,
+              grow: shake.grows * ticksPerSecond,
+              depth: shake.depth,
+              rate: shake.rate,
+              ...(shake.upward ? { upward: true } : {}),
+            },
+          }
+        : {}),
+    },
+  };
 }
 
 /**
@@ -189,7 +247,7 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
   const lungs = (instrument.breath?.lungs ?? Number.POSITIVE_INFINITY) * world.ticksPerSecond;
   let breathed = all[0]?.spot.tick ?? 0;
 
-  return all.flatMap(({ spot, pitch, lead }, i): SoloNote[] => {
+  return all.flatMap(({ spot, pitch, lead, bend }, i): SoloNote[] => {
     const { bar, tick } = spot;
     const next = all[i + 1];
     const before = all[i - 1];
@@ -202,17 +260,22 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
     const isFinal = (note: typeof next) =>
       note !== undefined && note.spot.bar.ending !== null && phrase.bars.at(-1)?.part === "F";
     if (!next && isFinal(all[i])) {
-      return finalStrikes(bar, tick).map((strike) => ({
-        bar,
-        tick: strike.tick,
+      return finalStrikes(bar, tick).map((strike) => {
         // A horn holds the last note as long as the band does, or as long as it has air.
-        duration: Math.min(
+        const duration = Math.min(
           strike.duration,
           Math.max(PPQ, Math.floor(breathed + lungs - strike.tick - STEP)),
-        ),
-        pitch,
-        velocity: strike.accent ? Math.max(velocity, accent) : velocity,
-      }));
+        );
+        return {
+          bar,
+          tick: strike.tick,
+          duration,
+          pitch,
+          velocity: strike.accent ? Math.max(velocity, accent) : velocity,
+          // A last note held is shaken. (The line never asks for a bend here: SO-57.)
+          ...moveOf(world, bend ?? 0, duration, soundsFor(world, bar, strike.tick, duration)),
+        };
+      });
     }
 
     const space = next ? next.spot.tick - tick : Number.POSITIVE_INFINITY;
@@ -235,7 +298,12 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
       // (A sixteenth in hand: the swing can carry a note's end that much later.)
       duration = Math.min(duration, Math.max(EIGHTH, Math.floor(breathed + lungs - tick - STEP)));
     }
-    if (duration >= space) duration = Math.round(space * touch.legato);
+    // In the rhythm the note is as long as its space, however the hand lifts off it.
+    let value = duration;
+    if (duration >= space) {
+      value = space;
+      duration = Math.round(space * touch.legato);
+    }
 
     // Held over a change, it must be a tone of the new chord; otherwise it stops there.
     const here = world.arrivalAt(tick);
@@ -246,6 +314,7 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
       const pool = world.poolOf(arrival);
       if (pool && isChordTone(pool, pitch)) continue;
       duration = arrival.tick - tick;
+      value = duration;
       break;
     }
     // Whether that left a breath is judged as heard too: swing carries the end of a note
@@ -259,7 +328,9 @@ function realise(world: World, phrase: Phrase, accent: number): SoloNote[] {
       const gap = heard(next.spot.tick, next.spot.bar) - heard(tick + duration, bar);
       if (gap >= breath) breathed = next.spot.tick;
     }
-    return [{ bar, tick, duration: Math.max(SHORTEST, duration), pitch, velocity }];
+    duration = Math.max(SHORTEST, duration);
+    const move = moveOf(world, bend ?? 0, value, soundsFor(world, bar, tick, duration));
+    return [{ bar, tick, duration, pitch, velocity, ...move }];
   });
 }
 

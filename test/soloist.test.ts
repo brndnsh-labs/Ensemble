@@ -16,6 +16,7 @@ import {
   plan,
   render,
   SOLO_INSTRUMENTS,
+  swing,
   tierOf,
 } from "@ensemble/engine";
 import { chordsUnder, harmonyOf, POCKET, strikesOf } from "./reading.ts";
@@ -27,6 +28,7 @@ import {
   notesOf,
   only,
   ownCharts,
+  SEEDS,
   STYLES,
   soloistTakes,
   stressTakes,
@@ -414,6 +416,142 @@ test("a horn breathes: the alto never plays eight seconds without half a second 
     });
     horn(take, 50, `${chart.file} at 50, seed ${seed}`);
   }
+});
+
+test("a guitar bends only into a note a phrase lands on (one struck where the chord changes, or the last before a breath), of an eighth or longer and never in the bar the band ends on: a half step up into a major third, or a whole step up into a root or a fifth of a quarter or longer (the solo's top note from the scale note under it, whatever tone it is, in two solos in three at least), in a tenth of a second; it shakes only a note held as long as the style asks; a style that does not bend does not; and a horn and a vibraphone do neither", () => {
+  // Every instrument whose hand can move a pitch, in a style where it is not the soloist
+  // already: the takes the other properties read are on each style's own soloist and the
+  // horn. On a push, each chart on one seed where the style bends, and every other chart
+  // where it only shakes.
+  const bendsIn = ({ solo }: Jam["style"]) =>
+    solo.habits.bend.third + solo.habits.bend.rootOrFifth > 0;
+  const moving = Object.entries(SOLO_INSTRUMENTS).filter(([, hand]) => hand.bend || hand.shake);
+  const handed = STYLES.flatMap((style) =>
+    moving
+      .filter(([soloInstrument]) => soloInstrument !== style.solo.instrument)
+      .flatMap(([soloInstrument]) =>
+        ownCharts(style).flatMap((chart, c) =>
+          SEEDS.filter((_, s) => FULL || (s === c % 2 && (bendsIn(style) || c % 4 < 2))).map(
+            (seed): Jam => {
+              const options = { mode: "jam", passes: 4, seed, solo: true, soloInstrument } as const;
+              return { style, chart, options, take: render(chart.text, style, options) };
+            },
+          ),
+        ),
+      ),
+  );
+  const PLAIN = ["alto-sax", "vibraphone"];
+  let [bent, shaken, plain] = [0, 0, 0];
+  // Solos on a hand that bends in a style that does, and how many push up into their top note.
+  let [solos, topped] = [0, 0];
+  for (const { style, chart, options, take } of [...soloTakes(), ...handed]) {
+    const harmony = harmonyOf(take);
+    const notes = notesOf(take, "solo");
+    const bars = take.plan.bars;
+    const perSecond = (take.plan.tempo * PPQ) / 60;
+    const { habits, space, touch } = style.solo;
+    let [at, b] = [0, 0];
+    const top = Math.max(...notes.map((note) => note.pitch));
+    if (bendsIn(style) && notes.some((note) => SOLO_INSTRUMENTS[note.voice ?? ""]?.bend)) {
+      solos++;
+      if (notes.some((note) => note.pitch === top && note.move?.glide)) topped++;
+    }
+    notes.forEach((note, i) => {
+      const hand = SOLO_INSTRUMENTS[note.voice ?? ""]!;
+      const where = `${chart.file} ${JSON.stringify(options)} at tick ${note.tick}: ${note.pitch}`;
+      const { glide, vibrato } = note.move ?? {};
+      if (PLAIN.includes(note.voice ?? "")) {
+        plain++;
+        assert.equal(note.move, undefined, `${where}: the pitch of a ${hand.name} moved`);
+      }
+      if (!glide && !vibrato) return;
+      while (harmony[at + 1] && harmony[at + 1]!.tick <= note.tick) at++;
+      while (bars[b + 1] && bars[b + 1]!.start <= note.tick) b++;
+      const bar = bars[b]!;
+      // How long a note of some length in the rhythm sounds from here, played legato and swung.
+      const within = note.tick - bar.start;
+      const swung = (tick: number) => (bar.meter.unit === 4 ? swing(tick, style.feel) : tick);
+      const sounds = (ticks: number) =>
+        Math.round(swung(within + ticks * touch.legato) - swung(within)) - 1;
+
+      if (glide) {
+        bent++;
+        assert.ok(hand.bend, `${where}: a bend on the ${hand.name}`);
+        assert.ok(
+          habits.bend.third > 0 || habits.bend.rootOrFifth > 0,
+          `${where}: a bend in a style that does not bend`,
+        );
+        // Struck flat and pushed up to the note, and nothing else: no slide, no release.
+        const [from, to] = glide;
+        assert.ok(glide.length === 2 && from!.at === 0 && to!.semitones === 0, `${where}: a glide`);
+        assert.ok(
+          Math.abs(to!.at / perSecond - hand.bend.takes) < 1e-6,
+          `${where}: a bend that takes ${(to!.at / perSecond).toFixed(3)} s`,
+        );
+        const up = -from!.semitones;
+        assert.ok(up === 1 || up === 2, `${where}: bent up ${up} semitones`);
+
+        // The chord it is struck over, or the one it leans into from the eighth before.
+        const next = harmony[at + 1];
+        const leans =
+          next?.changed &&
+          next.tick - note.tick <= PPQ / 2 &&
+          note.tick + note.duration > next.tick;
+        const roles = [harmony[at], next?.changed && next.tick - note.tick <= PPQ / 2 ? next : null]
+          .flatMap((arrival) => (arrival?.chord ? [arrival.chord] : []))
+          .flatMap((chord) =>
+            chordTones(chord.quality)
+              .filter((tone) => (pitchClass(chord.root) + tone.interval) % 12 === note.pitch % 12)
+              .map((tone) => `${tone.role} ${tone.interval % 12}`),
+          );
+        // The solo's top note is pushed up from the scale note under it, whatever tone it is.
+        assert.ok(
+          note.pitch === top ||
+            (up === 1
+              ? roles.includes("third 4")
+              : roles.includes("root 0") || roles.includes("fifth 7")),
+          `${where}: bent up ${up} into ${roles.join(", ") || "no chord tone"}`,
+        );
+
+        const after = notes[i + 1];
+        const air = (after ? after.tick : Infinity) - (note.tick + note.duration);
+        const breath = Math.min(PPQ - PPQ / 6, space.breath * 0.9 * perSecond);
+        assert.ok(
+          (harmony[at]!.tick === note.tick && harmony[at]!.changed) || leans || air >= breath,
+          `${where}: a bend into a passing note`,
+        );
+        assert.ok(
+          note.duration >= sounds(up === 1 ? PPQ / 2 : PPQ),
+          `${where}: bent up ${up} into a note ${note.duration} ticks long`,
+        );
+        assert.equal(bar.ending, null, `${where}: a bend in the bar the band ends on`);
+      }
+
+      if (vibrato) {
+        shaken++;
+        assert.ok(hand.shake, `${where}: a shake on the ${hand.name}`);
+        assert.deepEqual(
+          [vibrato.depth, vibrato.rate, vibrato.upward === true],
+          [hand.shake.depth, hand.shake.rate, hand.shake.upward],
+          `${where}: not the instrument's shake`,
+        );
+        assert.ok(
+          note.duration >= sounds(habits.shake * PPQ) || bar.ending !== null,
+          `${where}: a shake on a note ${note.duration} ticks long`,
+        );
+        // The last note of the tune is held as long as the band holds it.
+        if (bar.ending) assert.ok(note.duration >= habits.shake * PPQ - POCKET, where);
+      }
+    });
+  }
+  const bends = STYLES.some(bendsIn);
+  // Where the style's hand bends, both are heard often enough to have been judged.
+  assert.ok(!bends || bent > enough(60), `only ${bent} bent notes`);
+  assert.ok(!bends || shaken > enough(300), `only ${shaken} shaken notes`);
+  // The top note is always pushed up into where the hand can (SO-53): not in a song's one
+  // short solo, which has no climb, nor over a chord that leaves no note under it to start on.
+  assert.ok(topped * 3 >= solos * 2, `only ${topped} of ${solos} solos bend into their top note`);
+  assert.ok(plain > enough(2000), `only ${plain} notes on the horn and the vibraphone`);
 });
 
 // ── the piano around the soloist ────────────────────────────────────────────

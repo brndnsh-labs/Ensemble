@@ -11,6 +11,7 @@ import { cells, STEP } from "../../perform/grid.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import type { Rng } from "../../rng.ts";
 import type { ToneRole } from "../../theory/chord.ts";
+import { mod12, pitchClass } from "../../theory/pitch.ts";
 import type { Pool } from "./harmony.ts";
 import { climb, EIGHTH, isChordTone, landing, leads, onlyPasses, rubs, rung } from "./harmony.ts";
 import type { World } from "./slots.ts";
@@ -148,6 +149,23 @@ function fit(world: World, spot: Spot, pitch: number, lands: boolean, ask: LineA
   );
 }
 
+/** Where each bar of a line starts among its notes, and what a riff bar says again. */
+function layout(bars: readonly LineBar[]) {
+  const firstOfBar = bars.map((_, b) =>
+    bars.slice(0, b).reduce((sum, bar) => sum + bar.spots.length, 0),
+  );
+  const barOf = (i: number) => firstOfBar.findLastIndex((first) => first <= i);
+  /** The note of the bar before that falls where this one does: what a riff bar says again. */
+  const saidBefore = (b: number, spot: Spot): number | undefined => {
+    if (b <= 0 || !bars[b]!.again) return undefined;
+    const earlier = bars[b - 1]!.spots.findIndex(
+      (s) => s.tick - s.bar.start === spot.tick - spot.bar.start,
+    );
+    return earlier < 0 ? undefined : firstOfBar[b - 1]! + earlier;
+  };
+  return { firstOfBar, barOf, saidBefore };
+}
+
 /** The pitches of a line, one for each spot of its bars in order. */
 export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk): number[] {
   const spots = bars.flatMap((bar) => bar.spots);
@@ -178,18 +196,7 @@ export function writeLine(world: World, bars: readonly LineBar[], ask: LineAsk):
   }
   const room: LineAsk = { ...ask, high };
 
-  const firstOfBar = bars.map((_, b) =>
-    bars.slice(0, b).reduce((sum, bar) => sum + bar.spots.length, 0),
-  );
-  const barOf = (i: number) => firstOfBar.findLastIndex((first) => first <= i);
-  /** The note of the bar before that falls where this one does: what a riff bar says again. */
-  const saidBefore = (b: number, spot: Spot): number | undefined => {
-    if (b <= 0 || !bars[b]!.again) return undefined;
-    const earlier = bars[b - 1]!.spots.findIndex(
-      (s) => s.tick - s.bar.start === spot.tick - spot.bar.start,
-    );
-    return earlier < 0 ? undefined : firstOfBar[b - 1]! + earlier;
-  };
+  const { firstOfBar, barOf, saidBefore } = layout(bars);
 
   // 1. The landings, in order, each the best tone near where the contour is (SO-20, SO-21).
   let landed: number | null = null;
@@ -431,6 +438,125 @@ export function settled(
   const fresh = beside.filter((other) => other !== before && other !== onward);
   const choices = fresh.length > 0 ? fresh : beside;
   return choices.find((other) => isChordTone(spot.pool, other)) ?? choices[0] ?? pitch;
+}
+
+/** What a line is asked about its bends. */
+export interface BendAsk {
+  /** The phrase is one the hand gets lyrical in: a bend may be drawn. A plain phrase keeps only the bends it remembers. */
+  readonly lyrical: boolean;
+  /** The line's last note is the solo's top note. */
+  readonly top: boolean;
+  /** Bends already decided, by position in the line: an idea remembered is said with the bends it had. */
+  readonly given: ReadonlyMap<number, boolean>;
+  /** Drawn by the place of the landing a bend goes into. */
+  readonly rng: Rng;
+}
+
+/**
+ * How far under a note the hand may start a bend into it (SO-53): a half step
+ * under a major 3rd of an eighth or longer, a whole step under a root or a
+ * perfect 5th of a quarter or longer, and nothing else. The note it starts
+ * from is one the hand would be on: a tone of the scale in play there (the
+ * notes the style's lines use over the chord, or the chord's own scale), not
+ * one that says another chord, and not the flat 7th under a major 7th.
+ */
+function bendFrom(spot: Spot, pitch: number): number {
+  const { pool } = spot;
+  const chord = pool.arrival.chord;
+  // Nothing is bent in the bar the band ends on (SO-57).
+  if (!chord || spot.bar.ending !== null) return 0;
+  const interval = mod12(pitch - pitchClass(chord.root));
+  const role = pool.tones.find((tone) => tone.pc === mod12(pitch))?.role;
+  const by =
+    role === "third" && interval === 4
+      ? 1
+      : role === "root" || (role === "fifth" && interval === 7)
+        ? 2
+        : 0;
+  return by > 0 && inHand(spot, pitch, by) ? by : 0;
+}
+
+/**
+ * Whether the hand could start a bend `by` semitones under a note: the note is
+ * long enough (an eighth for a half step, a quarter for a whole), and the one
+ * under it is a tone of the scale in play there, not one that says another
+ * chord, and not the flat 7th under a major 7th.
+ */
+function inHand(spot: Spot, pitch: number, by: number): boolean {
+  const { pool } = spot;
+  if (spot.hold < (by === 1 ? EIGHTH : PPQ)) return false;
+  const from = pitch - by;
+  const [low, high] = [pool.ladder[0]!, pool.ladder.at(-1)!];
+  return (
+    from >= low &&
+    from <= high &&
+    (pool.ladder.includes(from) || pool.scale.has(mod12(from))) &&
+    !onlyPasses(pool, from) &&
+    !(by === 2 && isChordTone(pool, from + 1))
+  );
+}
+
+/**
+ * The solo's top note is always bent into (SO-53), whatever tone of the chord
+ * it is: as any landing is where it can be, and otherwise from the scale note
+ * under it, the whole step before the half. (The 6th of a major key pushed up
+ * from the 5th, over the IV, is the top of a three-chord rocker.)
+ */
+function topBendFrom(spot: Spot, pitch: number): number {
+  const by = bendFrom(spot, pitch);
+  if (by > 0 || !spot.pool.arrival.chord || spot.bar.ending !== null) return by;
+  return [2, 1].find((under) => inHand(spot, pitch, under)) ?? 0;
+}
+
+/**
+ * The notes of a line that a string is pushed up into: for each note, the
+ * semitones under it that it is struck at, or 0 for a note played plain.
+ * Only a note the phrase lands on is bent into: one struck where the chord
+ * changes (or leaning into the change), or the last before a breath; never a
+ * passing note (SO-53, KF-B-19). Bends come in a phrase the hand gets lyrical
+ * in, and a plain phrase has none (KF-B-10); but a note remembered, and a riff
+ * bar's, is said the way it was said before, whichever kind of phrase it is.
+ */
+export function writeBends(
+  world: World,
+  bars: readonly LineBar[],
+  pitches: readonly number[],
+  ask: BendAsk,
+): number[] {
+  const spots = bars.flatMap((bar) => bar.spots);
+  const bends = spots.map(() => 0);
+  const habit = world.solo.habits.bend;
+  if (world.instrument.bend === null || (habit.third <= 0 && habit.rootOrFifth <= 0)) return bends;
+  const { barOf, saidBefore } = layout(bars);
+  spots.forEach((spot, i) => {
+    const next = spots[i + 1];
+    const top = ask.top && !next;
+    const by = (top ? topBendFrom : bendFrom)(spot, pitches[i]!);
+    if (by === 0) return;
+    const ends = !next || next.tick - (spot.tick + spot.hold) >= PPQ;
+    const arrival = spot.pool.arrival;
+    const changes = arrival.changed && arrival.tick >= spot.tick;
+    if (!ends && !changes) return;
+    // One device to a landing (SO-57): a note the line has already leaned into from the
+    // half step under it is not then pushed up from the whole step.
+    const before = spots[i - 1];
+    const leanedInto =
+      before !== undefined &&
+      before.tick + before.hold >= spot.tick &&
+      pitches[i - 1] === pitches[i]! - 1;
+    if (by === 2 && leanedInto) return;
+    // The solo's top note is bent into whenever it can be.
+    if (top) {
+      bends[i] = by;
+      return;
+    }
+    const said = saidBefore(barOf(i), spot);
+    const was = ask.given.get(i) ?? (said === undefined ? undefined : bends[said]! > 0);
+    const chance = by === 1 ? habit.third : habit.rootOrFifth;
+    const drawn = () => ask.rng.fork("bend", placeOf(spot.bar, spot.tick)).chance(chance);
+    if (was ?? (ask.lyrical && drawn())) bends[i] = by;
+  });
+  return bends;
 }
 
 /**

@@ -331,6 +331,9 @@ export const jazzSolo: SoloStyle = {
       // approaches a landing that way.
       approach: true,
     },
+    // No bends (ST-jazz-37); a guitar shakes a note held a half note or longer (SO-52).
+    bend: { third: 0, rootOrFifth: 0, around: 0, elsewhere: 0 },
+    shake: 2,
   },
 
   // SO-51: louder as it goes up, the "and"s leaned on, the bottom of a run ghosted.

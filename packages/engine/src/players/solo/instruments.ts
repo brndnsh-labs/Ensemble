@@ -5,25 +5,41 @@ import type { SoloInstrument, SoloStyle } from "./style.ts";
 
 export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
   // Three octaves from F3. Its solo voice sits an octave over middle C, above the piano's
-  // hand; the bars ring by themselves, so it need not breathe.
-  vibraphone: { name: "Vibraphone", program: 11, range: [53, 89], home: 72, breath: null },
+  // hand; the bars ring by themselves, so it need not breathe. A bar's pitch does not move.
+  vibraphone: {
+    name: "Vibraphone",
+    program: 11,
+    range: [53, 89],
+    home: 72,
+    breath: null,
+    bend: null,
+    shake: null,
+  },
   // The comfortable solo register, with the ends kept for climaxes (SO-01). It breathes:
   // eight seconds is a long phrase on one breath, and a breath takes half a second (Q-47).
+  // Its notes are plain: a horn's scoop, fall and vibrato are not played.
   "alto-sax": {
     name: "Alto sax",
     program: 65,
     range: [53, 82],
     home: 67,
     breath: { lungs: 8, takes: 0.5 },
+    bend: null,
+    shake: null,
   },
-  // A lead guitar's working register, from the open D string's octave up to the top of the
-  // neck, at home around the twelfth fret. Its notes are plain for now: no bends, no vibrato.
+  // The lead guitar: an overdriven guitar's solo register, G3 to E6, at home on B4 (SO-01).
+  // Its hand is the one Brandon's ear chose from nine (scripts/pitch-study.ts, clips 5 and
+  // 4): a bend struck flat and pushed up to the note in a tenth of a second, and a wide
+  // vibrato, the string pushed 60 cents sharp and let back five and a half times a second,
+  // starting a third of a second into the note and growing over as long again.
   "driven-guitar": {
     name: "Overdriven guitar",
     program: 29,
-    range: [52, 85],
-    home: 69,
+    range: [55, 88],
+    home: 71,
     breath: null,
+    bend: { takes: 0.1 },
+    shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true },
   },
 };
 

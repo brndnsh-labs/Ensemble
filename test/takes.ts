@@ -293,6 +293,10 @@ export function readSmf(bytes: Uint8Array): SmfSummary {
         at += 3;
       } else if ((status & 0xf0) === 0xc0) {
         at += 2;
+      } else if ((status & 0xf0) === 0xb0 || (status & 0xf0) === 0xe0) {
+        // A controller (the bend range) or a pitch bend: two data bytes.
+        if (bytes[at + 1]! > 127 || bytes[at + 2]! > 127) throw new Error(`track ${t}: bad data`);
+        at += 3;
       } else {
         throw new Error(`track ${t}: unexpected status ${status.toString(16)}`);
       }

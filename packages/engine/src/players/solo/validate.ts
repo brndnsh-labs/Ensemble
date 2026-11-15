@@ -38,6 +38,12 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
       low < instrument.home && instrument.home < high,
       `instrument "${name}": its home is outside its range.`,
     );
+    const { bend, shake } = instrument;
+    say(bend === null || bend.takes > 0, `instrument "${name}": a bend takes time.`);
+    say(
+      shake === null || (shake.depth > 0 && shake.rate > 0 && shake.after >= 0 && shake.grows >= 0),
+      `instrument "${name}": a shake has a depth and a rate, and starts and grows in seconds.`,
+    );
   }
 
   const names = solo.levels.map((level) => level.name);
@@ -225,6 +231,14 @@ export function validateSoloStyle(solo: SoloStyle): string[] {
   chance(solo.habits.pickup.chance, "habits, pickup");
   chance(solo.habits.pickup.rising, "habits, pickup rising");
   for (const figure of solo.habits.pickup.figures) rhythm(figure.beat, "habits, pickup", 4);
+  chance(solo.habits.bend.third, "habits, bend into a third");
+  chance(solo.habits.bend.rootOrFifth, "habits, bend into a root or fifth");
+  chance(solo.habits.bend.elsewhere, "habits, bend elsewhere");
+  say(
+    Number.isInteger(solo.habits.bend.around) && solo.habits.bend.around >= 0,
+    "habits, bend: the hand is lyrical a whole number of phrases either side of the top note.",
+  );
+  say(solo.habits.shake > 0, "habits, shake: a note is held some beats before it is shaken.");
 
   const touch = solo.touch;
   for (const level of [touch.level, touch.peak, touch.floor, touch.ceiling]) {

@@ -12,6 +12,7 @@ import { score } from "../../critic/choose.ts";
 import { STEP } from "../../perform/grid.ts";
 import type { Arrival } from "../../perform/harmony.ts";
 import { contextOf } from "../../perform/harmony.ts";
+import type { NoteEvent } from "../../perform/notes.ts";
 import type { Heard, SoloCandidate, Sounding } from "../../players/solo/critique.ts";
 import {
   bassStruck,
@@ -37,6 +38,8 @@ const POCKET = 10;
 
 interface Reading {
   readonly world: World;
+  /** The soloist's notes as they were played, with how each one's pitch moves. */
+  readonly events: readonly NoteEvent[];
   readonly notes: readonly Sounding[];
   /** Every phrase slot with its notes, in order. */
   readonly phrases: readonly Heard[];
@@ -80,7 +83,7 @@ function read(take: Take, style: StylePack): Reading | null {
     const costs = score(candidates, SOLO_FEATURES, style.critic.weights.solo ?? {}).map(
       (scored) => scored.cost,
     );
-    reading = { world, notes, phrases, solos: solos.filter(Boolean), costs };
+    reading = { world, events, notes, phrases, solos: solos.filter(Boolean), costs };
   }
   readings.set(take, reading);
   return reading;
@@ -161,6 +164,12 @@ function pace(reading: Reading, which: "first" | "last"): number[] {
     const count = notes.reduce((sum, phrase) => sum + phrase.notes.length, 0);
     return [count / chorusSeconds(reading, solo, chorus)];
   });
+}
+
+/** How many of the solo's notes are of a kind, for each bar the soloist has. */
+function perSoloBar(reading: Reading, counts: (note: NoteEvent) => boolean): Measurement | null {
+  const bars = reading.phrases.reduce((sum, phrase) => sum + phrase.slot.bars.length, 0);
+  return bars === 0 ? null : { value: reading.events.filter(counts).length / bars, cases: bars };
 }
 
 const measure = (
@@ -629,6 +638,18 @@ export const soloMeasures: readonly Measure[] = [
       });
       return share(tied, crossed);
     },
+  ),
+  idiom(
+    "bends",
+    "per bar",
+    "How often a string is pushed up into a note, in bent notes for each bar of the solo: a few to a chorus, more where the solo peaks, and never so many that they stop meaning anything (KF-B-10, EAR-02).",
+    (reading) => perSoloBar(reading, (note) => note.move?.glide !== undefined),
+  ),
+  idiom(
+    "shakes",
+    "per bar",
+    "How often a held note is shaken, in notes with vibrato for each bar of the solo: the long notes, not the line (SO-52).",
+    (reading) => perSoloBar(reading, (note) => note.move?.vibrato !== undefined),
   ),
   measure(
     "entered-early",
