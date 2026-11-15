@@ -9,13 +9,14 @@ import {
   chordScale,
   chordTones,
   contextOf,
+  DEAD_VOICE,
   PPQ,
   pitchClass,
   render,
   scaleHas,
   tierOf,
 } from "@ensemble/engine";
-import { blues, POCKET } from "./reading.ts";
+import { blues } from "./reading.ts";
 import { LIBRARY, notesOf, only, STYLES, takes } from "./takes.ts";
 
 // ── the bass line ───────────────────────────────────────────────────────────
@@ -80,7 +81,8 @@ test("the bass line never leaps more than an octave", () => {
 test("a bass note held for a half note or more is a tone of its chord", () => {
   for (const { chart, options, take } of takes()) {
     for (const note of notesOf(take, "bass")) {
-      if (note.duration < PPQ * 2 - POCKET) continue;
+      // A half note as it sounds: a note with two beats to itself is let go a little early.
+      if (note.duration < PPQ * 1.6) continue;
       const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
       const span = bar.spans.findLast((candidate) => bar.start + candidate.start <= note.tick);
       const chord = span?.chord;
@@ -152,7 +154,7 @@ test("a bass note outside its chord's scale only passes: it is stepped into and 
       );
     });
   }
-  assert.ok(outside > 200, `only ${outside} notes outside their chord's scale`);
+  assert.ok(outside > 100, `only ${outside} notes outside their chord's scale`);
 });
 
 test(
@@ -283,3 +285,162 @@ test("a bass note that leads into a change belongs to the scale of the chord it 
   }
   assert.ok(leadIns > 500, `only ${leadIns} lead-ins across the library`);
 });
+
+// ── a walking bass ──────────────────────────────────────────────────────────
+
+test(
+  "jazz: once the band has opened up the bass walks: in 4/4 a note on every beat and nothing between (a chord that lands off the beat gets its root there), never the same note twice running, and into a change of bass note by a half step, a whole step, a fourth or a fifth",
+  only("jazz"),
+  () => {
+    let bars = 0;
+    let approaches = 0;
+    for (const { chart, options, take } of takes(
+      (jam) => jam.style.id === "jazz" && jam.chart.meter === "4/4",
+    )) {
+      const bass = notesOf(take, "bass");
+      const harmony = arrivals(take.plan);
+      const changes = new Map(bassChanges(take).map((change) => [change.tick, change.root]));
+      const walking = (bar: PlanBar | undefined) =>
+        bar?.kind === "music" &&
+        !bar.ending &&
+        bar.seats.bass !== null &&
+        tierOf(bar.seats.bass) !== "low";
+      let at = 0;
+      for (const bar of take.plan.bars) {
+        const own: typeof bass = [];
+        while (at < bass.length && bass[at]!.tick < bar.start + bar.ticks) own.push(bass[at++]!);
+        if (!walking(bar) || bar.spans.some((span) => span.chord === null)) continue;
+        bars++;
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        const landings = harmony
+          .filter((arrival) => arrival.bar === bar.index)
+          .map((arrival) => arrival.tick - bar.start);
+        const wanted = [...new Set([0, PPQ, 2 * PPQ, 3 * PPQ, ...landings])].sort((a, b) => a - b);
+        assert.deepEqual(
+          own.map((note) => note.tick - bar.start),
+          wanted,
+          `${where}: not a note to a beat`,
+        );
+        for (const note of own) {
+          const i = bass.indexOf(note);
+          const before = bass[i - 1];
+          if (!before || !walking(take.plan.bars.findLast((b) => b.start <= before.tick))) continue;
+          assert.notEqual(note.pitch, before.pitch, `${where}: ${note.pitch} twice running`);
+          if (changes.get(note.tick) !== note.pitch % 12) continue;
+          approaches++;
+          const by = Math.abs(note.pitch - before.pitch);
+          assert.ok(
+            [1, 2, 5, 7].includes(by),
+            `${where}: into ${note.pitch} from ${before.pitch}, by ${by} semitones`,
+          );
+        }
+      }
+    }
+    assert.ok(bars > 3000 && approaches > 2000, `only ${bars} bars, ${approaches} approaches`);
+  },
+);
+
+// ── a riff ──────────────────────────────────────────────────────────────────
+
+test(
+  "funk: the bass is on the One and under the kick: a sounded note on beat 1 of every bar that has a chord there, a note or a dead note wherever the bass drum is played, every note on the sixteenths, none ringing past two and a half sixteenths, and a dead note never on the One, on a change, or when the band is quiet",
+  only("funk"),
+  () => {
+    let bars = 0;
+    let kicks = 0;
+    let dead = 0;
+    for (const { chart, options, take } of takes(
+      (jam) => jam.style.id === "funk" && jam.chart.meter === "4/4",
+    )) {
+      const bass = notesOf(take, "bass");
+      const sounded = new Set(
+        bass.filter((note) => note.voice !== DEAD_VOICE).map((note) => note.tick),
+      );
+      const struck = new Set(bass.map((note) => note.tick));
+      const changes = new Set(arrivals(take.plan).map((arrival) => arrival.tick));
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        if (bar.spans[0]?.chord && bar.spans[0].start === 0) {
+          bars++;
+          assert.ok(sounded.has(bar.start), `${where}: nothing on the One`);
+        }
+      }
+      for (const kick of notesOf(take, "drums")) {
+        if (kick.voice !== "kick") continue;
+        const bar = take.plan.bars.findLast((candidate) => candidate.start <= kick.tick)!;
+        if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        kicks++;
+        // A dead note under the kick is the same thump: the hand is there.
+        assert.ok(
+          struck.has(kick.tick),
+          `${chart.file} seed ${options.seed} bar ${bar.index} tick ${kick.tick - bar.start}: a kick (${kick.velocity}) with no bass under it`,
+        );
+      }
+      for (const note of bass) {
+        const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
+        const where = `${chart.file} seed ${options.seed} bar ${bar.index}`;
+        assert.equal((note.tick - bar.start) % (PPQ / 4), 0, `${where}: off the sixteenths`);
+        if (bar.ending) continue;
+        // Two and a quarter as written; the trace of swing on the sixteenths can add a little.
+        assert.ok(note.duration <= (PPQ / 4) * 2.5, `${where}: a note of ${note.duration}`);
+        if (note.voice !== DEAD_VOICE) continue;
+        dead++;
+        assert.notEqual(note.tick, bar.start, `${where}: a dead note on the One`);
+        assert.ok(!changes.has(note.tick), `${where}: a dead note on a change`);
+        assert.notEqual(
+          tierOf(bar.seats.bass ?? bar.energy),
+          "low",
+          `${where}: a dead note, quiet`,
+        );
+      }
+    }
+    assert.ok(
+      bars > 3000 && kicks > 8000 && dead > 1500,
+      `only ${bars} bars, ${kicks} kicks, ${dead} dead notes`,
+    );
+  },
+);
+
+test(
+  "funk: the riff is the section's: in one time through a section at one level, every bar opens on the same rhythm for its first two beats, unless the chord changes inside them",
+  only("funk"),
+  () => {
+    let compared = 0;
+    for (const { chart, options, take } of takes(
+      (jam) => jam.style.id === "funk" && jam.chart.meter === "4/4",
+    )) {
+      const bass = notesOf(take, "bass");
+      const harmony = arrivals(take.plan);
+      const riffs = new Map<string, string>();
+      for (const bar of take.plan.bars) {
+        if (bar.kind !== "music" || bar.seats.bass === null || bar.ending) continue;
+        if (bar.spans.some((span) => span.chord === null)) continue;
+        const inside = harmony.some(
+          (arrival) => arrival.tick > bar.start && arrival.tick < bar.start + 2 * PPQ,
+        );
+        if (inside) continue;
+        const rhythm = bass
+          .filter((note) => note.tick >= bar.start && note.tick < bar.start + 2 * PPQ)
+          .map(
+            (note) =>
+              `${(note.tick - bar.start) / (PPQ / 4)}${note.voice === DEAD_VOICE ? "x" : ""}`,
+          )
+          .join(" ");
+        const key = `${bar.pass} ${bar.section.identity} ${bar.section.occurrence} ${tierOf(bar.seats.bass)}`;
+        const known = riffs.get(key);
+        if (known === undefined) riffs.set(key, rhythm);
+        else {
+          compared++;
+          assert.equal(
+            rhythm,
+            known,
+            `${chart.file} seed ${options.seed} bar ${bar.index}: another riff`,
+          );
+        }
+      }
+    }
+    assert.ok(compared > 3000, `only ${compared} bars compared`);
+  },
+);

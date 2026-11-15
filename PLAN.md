@@ -102,12 +102,12 @@ Seat builds, each from a brief in `prompts/`, each in its own clone under the se
 |---|---|---|---|
 | 1 | `drums-jazz-funk.md` | Opus | merged; six properties in `test/drums.test.ts` |
 | 1 | `solo-jazz-funk.md` | Fable | merged; the passing tone that resolves and `outgrown.thin` finished on the main thread |
-| 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | launched (clone `build-bass-jazz-funk`) |
+| 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | merged; three properties in `test/bass.test.ts`; all three styles pass every property |
 | 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | merged; three guitar properties in `test/piano.test.ts` |
-| 2 | `chords-jazz-piano.md` | Opus | launched (clone `build-chords-jazz-piano`), from main with the soloist and the guitar in |
+| 2 | `chords-jazz-piano.md` | Opus | interrupted by the usage limit with a first draft uncommitted in its clone (`build-chords-jazz-piano`); resume it with a message, alone |
 | 3 | `review-style.md`: an independent review of each new style, in its own clone | Opus | brief written; runs when all four seats of a style are merged |
 
-Round 2 starts when round 1 is merged (the funk bass follows the kick; the jazz piano hears the soloist and the snare). After each merge: turn the builder's "properties that always hold" into tests, break each on purpose once, and keep the blues goldens and scorecard unmoved.
+**One subagent at a time** (Brandon, 2026-11-15, after the usage limit was hit twice). Round 2 starts when round 1 is merged (the funk bass follows the kick; the jazz piano hears the soloist and the snare). After each merge: turn the builder's "properties that always hold" into tests, break each on purpose once, and keep the blues goldens and scorecard unmoved.
 
 Then, on the main thread: move funk and jazz into `STYLES` (the suite must stay inside 10 s. Measured with placeholder seats: three styles take about 24 s, a style alone 12 to 15 s of CPU. The levers: the determinism property renders every take twice and a sample would do; six seeds could be four, which `docs/TESTING.md` allows; jazz forms are long, so its jams could be a pass shorter. Measure again once the real bass and chord seats are in, on a quiet machine); golden takes for both; `scorecard/funk.json` and `jazz.json`; `scripts/gate-4.sh` (written, not yet run: the same chart in three styles, each style on its own charts, and the blues again for "did the blues get worse"; also run `pnpm gate:3` and check `git status out/gate-3` is clean, which says the blues takes he passed are byte for byte what they were); `out/gate-4/GATE_REPORT.md`, which must list every engine change made in this stage and why each was a missing concept.
 
