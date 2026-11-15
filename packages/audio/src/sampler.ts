@@ -72,7 +72,12 @@ export class Sampler {
     const context = this.#context;
     const source = context.createBufferSource();
     source.buffer = recording.buffer;
-    const rate = zone.root === undefined ? 1 : 2 ** ((sound.pitch - zone.root) / 12);
+    const tuned = zone.root === undefined ? 1 : 2 ** ((sound.pitch - zone.root) / 12);
+    // A note whose pitch moves is played faster and slower as it goes. It starts where its
+    // curve does: a note bent up to is struck flat.
+    const bend = sound.bend && sound.bend.cents.length > 1 ? sound.bend : undefined;
+    const rates = bend && Float32Array.from(bend.cents, (cents) => tuned * 2 ** (cents / 1200));
+    const rate = rates ? rates[0]! : tuned;
     source.playbackRate.value = rate;
     const gain = context.createGain();
     const level = (sound.velocity / 127) ** 2 * 10 ** ((voice.trim ?? 0) / 20);
@@ -83,6 +88,13 @@ export class Sampler {
     const begin = when - recording.hit / rate;
     const startAt = Math.max(begin, context.currentTime);
     source.start(startAt, (startAt - begin) * rate);
+    if (bend && rates) {
+      source.playbackRate.setValueCurveAtTime(
+        rates,
+        Math.max(when, startAt),
+        bend.step * (rates.length - 1),
+      );
+    }
     const end = voice.oneShot ? undefined : when + sound.length;
     if (end !== undefined) release(source, gain, level, end, voice.release ?? 0.1);
 

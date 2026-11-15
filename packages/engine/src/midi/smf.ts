@@ -27,6 +27,11 @@ export interface SmfTrack {
   /** General MIDI program number, 0 to 127. Omit for drums. */
   readonly program?: number;
   readonly notes: readonly SmfNote[];
+  /**
+   * Where the channel's pitch is bent, in semitones either way (twelve at
+   * most). A track with any sets its bend range to an octave first.
+   */
+  readonly bends?: readonly { readonly tick: number; readonly semitones: number }[];
 }
 
 export interface SmfFile {
@@ -61,10 +66,33 @@ function conductorTrack(events: readonly SmfMeta[]): number[] {
   return trackChunk([{ tick: 0, order: 0, bytes: meta(0x03, utf8("Ensemble")) }, ...timed]);
 }
 
+/** Semitones a full pitch bend moves a channel, either way. */
+const BEND_RANGE = 12;
+
 function instrumentTrack(track: SmfTrack): number[] {
   const timed: Timed[] = [{ tick: 0, order: 0, bytes: meta(0x03, utf8(track.name)) }];
   if (track.program !== undefined) {
     timed.push({ tick: 0, order: 1, bytes: [0xc0 | track.channel, track.program & 0x7f] });
+  }
+  if (track.bends && track.bends.length > 0) {
+    // Registered parameter 0, the bend range: twelve semitones, so a slide of several frets fits.
+    const control = (number: number, value: number) => [0xb0 | track.channel, number, value];
+    for (const [number, value] of [
+      [101, 0],
+      [100, 0],
+      [6, BEND_RANGE],
+      [38, 0],
+    ] as const) {
+      timed.push({ tick: 0, order: 1, bytes: control(number, value) });
+    }
+    for (const bend of track.bends) {
+      const value = clamp(8192 + Math.round((bend.semitones / BEND_RANGE) * 8191), 0, 16383);
+      timed.push({
+        tick: Math.max(0, Math.round(bend.tick)),
+        order: 1,
+        bytes: [0xe0 | track.channel, value & 0x7f, value >> 7],
+      });
+    }
   }
   for (const note of withoutSelfOverlap(track.notes)) {
     const pitch = clamp(note.pitch, 0, 127);

@@ -86,7 +86,11 @@ export function applyFeel(
       pitch: note.pitch,
       velocity: clampVelocity(note.velocity * energyGain(energy) + velocityShift),
     };
-    return note.voice === undefined ? event : { ...event, voice: note.voice };
+    return {
+      ...event,
+      ...(note.voice === undefined ? {} : { voice: note.voice }),
+      ...(note.move === undefined ? {} : { move: note.move }),
+    };
   });
 }
 

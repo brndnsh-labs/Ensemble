@@ -4,6 +4,7 @@
 import type { Plan, PlanBar } from "../plan/types.ts";
 import type { Rng } from "../rng.ts";
 import type { Hold, Seat, StylePack } from "../style/types.ts";
+import type { PitchMove } from "./pitch.ts";
 
 /**
  * A note as a player writes it: on the straight grid, at its written level.
@@ -28,6 +29,8 @@ export interface WrittenNote {
    * pocket: the roll of a strum, a flam. Added on top of the feel.
    */
   readonly nudge?: number;
+  /** How the pitch moves while the note sounds: a bend, a vibrato. */
+  readonly move?: PitchMove;
 }
 
 /** A sounding note. Its time is `tick + offset`. */
@@ -44,6 +47,8 @@ export interface NoteEvent {
   /** 1 to 127, as played. */
   readonly velocity: number;
   readonly voice?: string;
+  /** How the pitch moves while the note sounds, in ticks from where it starts. */
+  readonly move?: PitchMove;
 }
 
 /** Something a chart view or a MIDI file can show: where we are in the form. */

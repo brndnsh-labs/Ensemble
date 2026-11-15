@@ -5,7 +5,7 @@
 
 import type { Band, BandSetup, Mix, Sound } from "@ensemble/audio";
 import { assemble, Player, renderBand, toWav } from "@ensemble/audio";
-import type { MixStyle, Seat, StylePack } from "@ensemble/engine";
+import type { MixStyle, Seat, StylePack, TimedNote } from "@ensemble/engine";
 import { render, seconds, timedNotes } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 
@@ -64,7 +64,11 @@ async function perform(): Promise<Performance> {
     seat === "solo" ? (voice ?? "") : style.sound.packs[seat];
   const sounds: Sound[] = [];
   const wanted = new Map<string, Seat>();
-  for (const note of timedNotes(take.plan, take.events)) {
+  // Notes written by hand, to be heard over the take (or alone, with `only=`): a file of
+  // timed notes, each with its seat. For studying one sound, not for playing a tune.
+  const written = params.get("notes");
+  const extra: TimedNote[] = written ? await (await fetch(written)).json() : [];
+  for (const note of [...timedNotes(take.plan, take.events), ...extra]) {
     if (only && !only.includes(note.seat)) continue;
     const pack = packOf(note.seat, note.voice);
     wanted.set(pack, note.seat);
@@ -76,8 +80,10 @@ async function perform(): Promise<Performance> {
       voice: note.seat === "solo" ? "" : (note.voice ?? ""),
       pitch: note.pitch,
       velocity: note.velocity,
+      ...(note.bend === undefined ? {} : { bend: note.bend }),
     });
   }
+  sounds.sort((a, b) => a.at - b.at);
   const packs: Record<string, string> = {};
   const missing: string[] = [];
   for (const [pack, seat] of wanted) {

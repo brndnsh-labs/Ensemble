@@ -3,6 +3,7 @@
 
 import { PPQ } from "../chart/types.ts";
 import type { PerformanceEvent } from "../perform/notes.ts";
+import { CURVE_STEP, pitchCurve } from "../perform/pitch.ts";
 import type { Plan } from "../plan/types.ts";
 import { SOLO_INSTRUMENTS } from "../players/solo/instruments.ts";
 import type { Seat, StylePack } from "../style/types.ts";
@@ -16,6 +17,9 @@ const TRACK_NAMES: Readonly<Record<Seat, string>> = {
   chords: "Chords",
   solo: "Solo",
 };
+
+/** Cents the pitch must have moved before the file says so again. */
+const BEND_STEP = 3;
 
 /** General MIDI puts drums on channel 10 (index 9). The pitched seats take the first channels. */
 const CHANNELS: Readonly<Record<Seat, number>> = { drums: 9, bass: 0, chords: 1, solo: 2 };
@@ -40,6 +44,13 @@ export function toMidi(
   }
 
   const notes: Record<Seat, SmfNote[]> = { drums: [], bass: [], chords: [], solo: [] };
+  const bends: Record<Seat, { tick: number; semitones: number }[]> = {
+    drums: [],
+    bass: [],
+    chords: [],
+    solo: [],
+  };
+  const secondsPerTick = 60 / (plan.tempo * PPQ);
   let soloProgram: number | undefined;
   for (const event of events) {
     if (event.kind === "marker") {
@@ -49,19 +60,40 @@ export function toMidi(
       conductor.push({ tick: event.tick, type: isLandmark ? "marker" : "text", text });
     } else {
       if (event.seat === "solo") soloProgram ??= SOLO_INSTRUMENTS[event.voice ?? ""]?.program;
+      const start = event.tick + event.offset;
       notes[event.seat].push({
-        tick: event.tick + event.offset,
+        tick: start,
         duration: event.duration,
         pitch: event.pitch,
         velocity: event.velocity,
       });
+      if (event.move) {
+        // The same curve the sound follows, said as pitch bend wherever it has moved 3 cents.
+        const curve = pitchCurve(event.move, secondsPerTick, event.duration * secondsPerTick);
+        let said = Number.NaN;
+        curve.forEach((cents, i) => {
+          if (Math.abs(cents - said) < BEND_STEP && i > 0) return;
+          said = cents;
+          bends[event.seat].push({
+            tick: start + (i * CURVE_STEP) / secondsPerTick,
+            semitones: cents / 100,
+          });
+        });
+        // The channel is let go when the note is, or the next note would start bent.
+        bends[event.seat].push({ tick: start + event.duration, semitones: 0 });
+      }
     }
   }
 
   const tracks: SmfTrack[] = [];
   for (const seat of SEATS) {
     if (notes[seat].length === 0) continue;
-    const track = { name: TRACK_NAMES[seat], channel: CHANNELS[seat], notes: notes[seat] };
+    const track = {
+      name: TRACK_NAMES[seat],
+      channel: CHANNELS[seat],
+      notes: notes[seat],
+      ...(bends[seat].length > 0 ? { bends: bends[seat] } : {}),
+    };
     if (seat === "drums") tracks.push(track);
     // The soloist's notes name the instrument that played them.
     else if (seat === "solo") tracks.push({ ...track, program: soloProgram ?? 0 });

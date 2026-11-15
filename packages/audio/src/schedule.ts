@@ -20,6 +20,11 @@ export interface Sound {
   readonly pitch: number;
   /** 1 to 127. */
   readonly velocity: number;
+  /**
+   * Where the pitch moves while it sounds: cents away from `pitch`, one value
+   * every `step` seconds from its start. After the last, it stays there.
+   */
+  readonly bend?: { readonly step: number; readonly cents: readonly number[] };
 }
 
 export interface SchedulerOptions {

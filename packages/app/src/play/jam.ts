@@ -150,6 +150,7 @@ export function soundsOf(take: Take, style: StylePack, options: HowPlayed): Soun
       voice: note.seat === "solo" ? "" : (note.voice ?? ""),
       pitch: note.pitch,
       velocity: note.velocity,
+      ...(note.bend === undefined ? {} : { bend: note.bend }),
     });
   }
   return sounds;
