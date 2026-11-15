@@ -102,9 +102,9 @@ Seat builds, each from a brief in `prompts/`, each in its own clone under the se
 |---|---|---|---|
 | 1 | `drums-jazz-funk.md` | Opus | merged; six properties in `test/drums.test.ts` |
 | 1 | `solo-jazz-funk.md` | Fable | launched |
-| 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | brief written |
-| 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | brief written |
-| 2 | `chords-jazz-piano.md` | Opus | brief written |
+| 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | launched (clone `build-bass-jazz-funk`) |
+| 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | launched (clone `build-chords-funk-guitar`) |
+| 2 | `chords-jazz-piano.md` | Opus | brief written; waits for the soloist to merge |
 | 3 | an independent review of each new style, in its own clone | Opus | not written |
 
 Round 2 starts when round 1 is merged (the funk bass follows the kick; the jazz piano hears the soloist and the snare). After each merge: turn the builder's "properties that always hold" into tests, break each on purpose once, and keep the blues goldens and scorecard unmoved.
