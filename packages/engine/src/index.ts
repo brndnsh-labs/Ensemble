@@ -23,6 +23,7 @@ export * from "./perform/harmony.ts";
 export * from "./perform/meter.ts";
 export * from "./perform/notes.ts";
 export * from "./perform/perform.ts";
+export * from "./perform/time.ts";
 export * from "./plan/arc.ts";
 export * from "./plan/plan.ts";
 export * from "./plan/types.ts";

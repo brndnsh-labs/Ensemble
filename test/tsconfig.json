@@ -1,6 +1,20 @@
 {
   "extends": "../tsconfig.base.json",
-  "compilerOptions": { "rootDir": ".", "outDir": "dist", "types": ["node"] },
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "types": ["node"]
+  },
   "include": ["*.ts"],
-  "references": [{ "path": "../packages/engine" }, { "path": "../packages/styles" }]
+  "references": [
+    {
+      "path": "../packages/engine"
+    },
+    {
+      "path": "../packages/styles"
+    },
+    {
+      "path": "../packages/audio"
+    }
+  ]
 }

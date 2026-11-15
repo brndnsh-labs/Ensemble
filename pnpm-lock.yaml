@@ -176,6 +176,8 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  packages/audio: {}
+
   packages/cli:
     dependencies:
       '@ensemble/engine':
@@ -195,6 +197,9 @@ importers:
 
   test:
     dependencies:
+      '@ensemble/audio':
+        specifier: workspace:*
+        version: link:../packages/audio
       '@ensemble/engine':
         specifier: workspace:*
         version: link:../packages/engine

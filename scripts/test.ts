@@ -1,5 +1,5 @@
 // Runs the engine suite: the properties once for each style that ships, side by
-// side, and the style-free files (the chart corpus, the goldens) once.
+// side, and the style-free files (the chart corpus, the goldens, the scheduler) once.
 //
 // Each style gets one process of its own, and all its property files run in
 // it together, because a take is rendered once per process: every file reads
@@ -12,7 +12,7 @@ import { readdirSync } from "node:fs";
 import { STYLES } from "../packages/styles/src/index.ts";
 
 /** Files that read no style: they run once. */
-const STYLE_FREE = new Set(["chart.test.ts", "goldens.test.ts"]);
+const STYLE_FREE = new Set(["audio.test.ts", "chart.test.ts", "goldens.test.ts"]);
 
 const files = readdirSync(new URL("../test/", import.meta.url)).filter((file) =>
   file.endsWith(".test.ts"),

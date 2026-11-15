@@ -1,0 +1,563 @@
+x
+VERSILIAN STUDIOS
+
+K ARORYFER LECOLDS
+
+VIRTUOSITY DRUMS
+PRODUC T M ANUAL
+KVRDC’21
+1
+
+INTRODUCTION
+
+J
+
+azz drumming is as diverse and intricate as any other aspect of the Jazz
+tradition, yet we have found it to be rather under-represented in the world of
+free sample libraries. Working with drummer Austin McMahon, we recorded
+
+all essential stick articulations on the “house kit”, which is featured in weekly live-streams
+and sessions at Virtuosity Musical Instruments in Boston, MA.
+Austin performs regularly with Jerry Bergonzi’s Quartet and has recently performed
+and/or recorded with Sean Jones, George Garzone, Joe Lovano, Lionel Loueke, Ben
+Monder, Lage Lund, Kate McGarry, Noah Preminger, Jason Palmer and Grace Kelly.
+Austin currently teaches in the Jazz Department at New England Conservatory Preparatory and Continuing Education Division, Boston, MA.
+Learn more about the performer: http://www.austinmcmahon.com/
+Located just steps from Symphony Hall, Virtuosity was
+founded in Fall of 2015 after a need was recognized for a communal meeting place for musicians to exchange ideas, network,
+and learn about instruments new and old.
+For more info on the venue: https://www.virtuosityboston.com/
+2
+
+DEVELOPMENT
+
+R
+
+ecording took place at Virtuosity Musical Instruments, located in
+the Symphony area of Boston, MA. Virtuosity is a hotspot for the
+local Jazz community and home to a weekly session and other
+
+performance settings.
+The snare, toms, and kick were recorded with a special ‘wave’ technique, where rather than attempting to record discrete dynamic levels, the
+drummer freely played louder and softer notes. The result is up to 36 dynamic
+levels with no round robins, which makes these instruments very suitable to
+live playing on keyboard or virtual drums as they will benefit enormously from
+the natural variation in velocity. The cymbals on the other hand use a smaller
+number of discrete velocity layers at 4 round robins, to help in situations of high
+repetitions.
+For overheads, we used Blue Hummingbirds, which are deliciously articulate on toms and cymbals as well as being extremely low noise.
+A Samar VL-373A stereo ribbon mic serves as Mid, providing a rich, full
+sound with gently rolled-off highs.
+A pair of sE RN17’s serve as room/main mics in NOS configuration,
+providing a natural audience sound with clear articulation.
+The snare is handled by a Shure 545SD, grandfather of the SM57, with
+another Hummingbird on the kick. As a treat, an ancient Shure Hercules
+from the 1950’s is provided as a ‘vintage’/lo-fi sound.
+
+3
+
+INSTALLATION
+
+B
+
+egin installation by downloading the library from the Versilian Studios, Karoryfer website, or direct from KVR. Extract the contents of the .zip file, which
+will generate a folder titled ‘Virtuosity Drums’ which contains the entirety of
+
+the library, including samples, programs (patches), and the GUI files.
+Place this folder wherever you would like the library to be accessed from in the
+future — this could be on an external hard drive, an internal SSD, or your main hard drive.
+To use the library, you must also install Sforzando or ARIA player by Plogue. Sforzando is available for free from the Plogue website, while you may own the ARIA player
+already if you have used any Garritan products.
+Once installed, open Sforzando or ARIA and open the Virtuosity Drums folder. Locate “Virtuosity Drums.bank.xml” and drag and drop it into the open Sforzando window.
+
+4
+
+LOADING PATCHES
+Once you have installed the library, you can load patches by clicking
+the ‘Instrument’ dropdown in Sforzando or ARIA, and selecting a program
+under ‘Virtuosity Drums’:
+
+There are 8 programs available:
+• 01-Basic Kit: A GM-compatible kit with only basic articulations and
+mic positions available.
+• 02-Full Kit: Everything sampled, including extended techniques.
+• 03-Kick Mic through 08-Vintage Mic: Individual mic position patches. Use this if you wish to process individual mic stems separately in
+your DAW.
+If using Sforzando, you will need to open a separate instance for
+each patch you wish to use. ARIA loads up to 16 total.
+
+5
+
+OPERATION
+
+O
+
+nce loaded in Sforzando or ARIA, the GUI will become available to
+you. This window will provide nearly everything you need to control
+and shape the sound of the instrument from tuning drums to controlling
+
+the stereo image to help it fit in your mix. In this section of the manual, I’ll walk you through
+each part of the GUI and typical settings.
+
+6
+
+The top portion of the GUI is standard for all Sforzando libraries. Note
+that if you are using ARIA player, your GUI will look quite different here, as
+ARIA is designed to accomodate multiple patches at once.
+Here you can select the Instrument loaded from among all libraries installed on your system. Also accessible are Volume (CC7), Pan (CC10), and
+[Reverb] Send (CC91) controls. The four tabs below; Info, Controls, Effects,
+and Settings change the active screen on the GUI.
+To the right, Tune provides adjustment in cents of the pitch of the library.
+This is not needed with the library, as there are individual tune controls for each
+drum provided separately (see later). Trans[pose] allows the incoming MIDI
+data to be transposed by halfsteps, which is generally not useful with drums.
+Poly[phony] is the total number of voices available to the engine. Note
+that this number may be exceeded quite quickly if you are using all of the mic
+positions and playing intense patterns, so be sure to increase the value as
+needed. Decreasing the value will provide a very small benefit to older systems
+at the cost of some notes being cut off prematurely.
+PB Range controls the range that pitch bend will function.
+Snapshot provides you a way to save your favorite mixes/settings locally for recal later. This is useful if you have a particular mix you like to use
+regularly across multiple songs or projects.
+
+7
+
+Select the ‘Controls’ tab and the above screen will appear.
+In the center of the screen are the microphone level faders, which allow you to
+mix the various microphones together to achieve the desired sound. If you have the Full Kit
+loaded up, you will see all six microphone positions and all of the controls shown. If you
+have the Basic Kit, only Kick, Snare, and Overhead will be available. For the individual
+mic position programs/patches, only that named mic position will be available.
+Beneath each of the stereo mic positions (Overhead, Mid, and Room), there are
+Width controls which allow you to collapse these positions to mono or simply narrow
+them down if they are too wide for your mix or to assist with placement.
+For Kick and Snare mics, there is instead a Bleed setting which you can use to
+control whether or not these microphone positions pick up the sounds of other drums. In a
+real recording, even the most optimally placed kick or snare mic will pick up other pieces
+of nearby kit such as toms or cymbals. However, this can sometimes be the root cause of
+unwanted issues like comb filtering resulting from phasing, so disabling bleed can provide
+a cleaner sound in some cases.
+Beneath the Kick bleed control is Dampen, which reduces the resonance of the
+kick drum. This is very useful for using the kit in other genres in particular.
+8
+
+Beneath the bleed control for the Snare mic is the Snares on/off button,
+which allows you to engage (default) or disengage the snares on the snare
+drum. This button does not appear on Basic Kit. The snares are responsible for
+the buzzy sound of the snare drum and turning them off will swap to a parallel
+set of snare-off samples which are the natural sound of the drum.
+A brief technical note: in real life, the snares also resonate with many
+other pieces of the kit, in particular the kick drum. When you disengage the
+snares, the kick drum samples will also swap to reflect this change. If for any
+reason you wish to use the opposite kick drum sample, it is available on the B
+note right below the “active” kick sample, and will always be the opposite of
+whatever the snare setting is.
+Beneath the four mic positions to the right (Overheads, Middle, Room,
+and Vintage), there is a single Epic knob. This knob layers in a copy of the
+samples, in particular the drums, pitched down an octave (i.e. playing at half
+speed). The result is not suitable or designed for Jazz, but we found the sound
+to be very interesting and enjoyable in other cases.
+On the right-hand side of the interface are
+the Tuning controls. Tune Master will adjust the
+entire kit’s tuning at once, to emulate a sped up/
+slowed down drum break, while Snare, Kick, High
+Tom, and Low Tom allow you to adjust each piece
+individually. Retuning drums is a matter of taste and
+may be useful to help the kit blend with your piece.
+
+9
+
+To the left is the Snare Roll Dyn[amic] slider. This mirrors your Modwheel, which controls the dynamics of the continuous snare roll. Dynamics for all other sounds (i.e. basically everything) are controlled by key
+velocity (i.e. how hard you press keys on your keyboard, provided your
+keyboard measures velocity). You generally should NOT move this slider
+with your mouse, instead draw a continuous controller curve on CC1 in
+your DAW or use your modwheel to record activity on this; the slider is
+really only intended for visual feedback or live playing situations.
+
+The Effects tab (not pictured) provides a generic algorithmic reverb.
+In the Settings tab are some generic metrics about the instrument’s behavior and
+some settings to tweak performance. Of most importance perhaps here is Max Engine
+RAM Allocation. On a modern system with at least 4 GB of RAM, I would suggest setting
+this to 2 GB to ensure the engine can load all the samples it needs to into RAM.
+In the center column you can see the current RAM, disk, and engine usage. Over
+time, as notes are played, the total RAM usage will increase to a maximum of approximately 1.3 GB. The other settings in this panel fall outside the scope of this manual.
+
+10
+
+KEYMAPS & E-DRUM HI-HAT CONTROL
+A powerful feature of this library is the swappable keymap system. Keymaps are files which define where all of the instruments appear on the keyboard. For example, it is a keymap which determines the kick drum appears on
+Note 36. Keymaps can be opened and edited in any text editor.
+The library uses two keymaps: keymap.sfz and keymap_basic.sfz, the
+former is used by ‘full kit’ and the latter by ‘basic kit’. You can view the keymap
+files within the directory as shown below:
+Virtuosity Drums/Programs/keymaps/
+There are several ‘presets’ available in addition to the
+default keymap pair, located in the folders ‘hihat_on_pedal’ and ‘perc_down’.
+To activate these keymaps, copy the contents of these folders (the keymap.
+sfz + keymap_basic.sfz) out of the folder and REPLACE the keymap.sfz + keymap_basic.sfz located in the keymaps folder. If you wish to restore the default
+behavior (in case of unwanted behavior), use the files in the default folder to
+replace the keymap.sfz and keymap_basic.sfz in the keymaps folder.
+A user of electronic drums can convert the hi-hat to use MIDI CC4 to
+select how open it is by copying over the ‘hihat_on_pedal’ files, then also
+going into the ‘GUI’ folder and copying the files from ‘GUI_hihat_pedal’ out
+so they overwrite the .xml files in the GUI folder. This will add an extra slider
+which shows the status of CC4 and will set it up so you can use a physical
+pedal, knob, or slider tied to CC4 to control the open/closed state of the hihat
+instead of having to trigger a different key to change state.
+
+11
+
+PATCHES & ARTICULATIONS
+
+O
+
+n the following page is a diagram of the default keymap used in the
+library. As discussed on the prior page, keymap files are fully editable
+and customizeable, so can be tweaked if desired.
+
+Note that not all instruments cover all mic positions. Percussion instruments, such
+as Tambourine and Triangle (most things located between 54-84) do not use Vintage or
+Kick mic positions, and use Snare as a mono close mic position. Cuica, Woodblock, and
+Timbale only have a single position, Overhead, and won’t appear while using other mics.
+			MASTER CC LIST - VIRTUOSITY DRUMS
+CC1 (mod wheel): Snare Roll Dynamics
+Mic Settings
+CC101: Kick Mic Volume
+		CC102: Kick Mic Bleed Toggle (None/Snare/All)
+CC103: Snare Mic Volume
+		CC104: Snare Mic Bleed Toggle (None/Kick/All)
+CC105: Overhead Mics Volume
+		
+CC106: Overhead Mic Width
+CC107: Mid Mics Volume
+		
+CC108: Mid Mic Width
+CC109: Room Mics Volume
+		
+CC110: Room Mic Width
+CC111: Vintage Mic Volume
+Tune
+CC90: Master Tune (for slow/fast drumbreak effect)
+CC76: Snare Tune
+CC72: Kick Tune
+CC86: High Tom Tune
+CC81: Low Tom Tune
+Extra
+CC71: Kick Dampen Amount
+CC21: Snares On/Off Toggle
+CC113: “Epic” Effect Amount
+CC4: Hi-hat Pedal Position (*Requires custom reconfiguration, see pg. 11)
+
+12
+
+BA S IC
+
+KI T
+
+DEFAULT KEYMAP
+Kick Alternate
+Kick Primary
+Snare Stickshot
+Snare Center Hit
+Snare Off-center Hit
+Snare Rimshot
+Low Tom Center Hit
+Hi-hat Closed Hit
+Low Tom Off-center Hit
+Hi-hat Pedal
+Low Tom Rimshot
+Hi-hat Open Hit
+Low Tom Cross-stick
+High Tom Center Hit
+Crash Normal Hit
+High Tom Off-center Hit
+Ride Normal Hit
+Ride Bell Hit
+Tambourine Shake
+Flat Ride as Crash
+Cowbell
+Sizzle Crash
+Vibraslap
+Flat Ride Normal Hit
+High Bongo
+Low Bongo
+Conga Muted Hit
+Conga Open Hit
+Tumba Hit
+High Timbale
+Low Timbale
+High Agogo Bell
+Low Agogo Bell
+Cabasa
+Large Shaker
+Whistle, Short
+Whistle, Long
+Guiro, Slow
+Guiro, Fast
+Claves
+High Woodblock
+Low Woodblock
+Mute Cuica
+Open Cuica
+Mute Triangle
+Open Triangle
+Shaker
+Sleigh Bell
+Belltree
+Snare Stickshot, Alternate
+Snare, Hand-Muted
+Snare, Half-Hand Muted
+Snare, Cross-stick
+Low Tom, Muted
+Hi-hat Half-Open Hit
+Low Tom, Half-Muted
+Hi-hat Splash Hit
+Snare Buzz
+Hi-hat 3/4ths Open Hit
+Flam
+Snare Roll
+
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71
+72
+73
+74
+75
+76
+77
+78
+79
+80
+81
+82
+83
+84
+85
+86
+87
+88
+89
+90
+91
+92
+93
+94
+95
+96
+
+B1
+C2
+C#2
+D2
+Eb2
+E2
+F2
+F#2
+G2
+G#2
+A2
+Bb2
+B2
+C3
+C#3
+D3
+Eb3
+E3
+F3
+F#3
+G3
+G#3
+A3
+Bb3
+B3
+C4
+C#4
+D4
+Eb4
+E4
+F4
+F#4
+G4
+G#4
+A4
+Bb4
+B4
+C5
+C#5
+D5
+Eb5
+E5
+F5
+F#5
+G5
+G#5
+A5
+Bb5
+B5
+C6
+C#6
+D6
+Eb6
+E6
+F6
+F#6
+G6
+G#6
+A6
+Bb6
+B6
+C7
+
+Opposite of snare status (off/on)
+Matches snare status (on/off)
+One stick strikes other while it is touching drum head
+Rim of drum and head struck simultaneously
+Struck while fully closed
+Pedal pushed down rapidly
+Struck while fully open
+Rim of stick hit while stick held across head
+
+from VSCO 2
+Flat ride cymbal struck as crash (in lieu of splash cymbal)
+from VSCO 2
+Chain placed on crash to create extra sizzle
+from VSCO 2
+A flat ride cymbal (no ‘bell’)
+from VSCO 2
+““
+““
+““
+““
+from Karoryfer
+““
+from VSCO 2
+““
+““
+(in lieu of maraca)
+from VSCO 2
+““
+““
+““
+““
+from Karoryfer; only uses OH mic!
+““
+Only uses OH mic!
+Moo, “ “
+from VSCO 2
+““
+““
+““
+““
+One stick strikes other while it is in cross-stick position
+Drum hit while other hand fully mutes head
+Drum hit while other hand partially mutes head
+Stick is held across drum and rim is struck
+Drum hit while other hand fully mutes head
+Hi-hat struck while half-open
+Drum hit while other hand partially mutes head
+Hi-hat pedal closed but immediately let up
+(essentially a very short roll)
+Hi-hat hit then slowly closed
+Rudimentary flam
+Continuous roll (CC1mod)
+
+13
+
+TROUBLESHOOTING
+
+I
+
+f you are experiencing issues with the library, there are a few steps you can try
+to resolve the issues before contacting us. Below is a list of common possible
+problems and ‘home remedies’ that will work to fix them.
+
+1. Samples could not be found warning.
+Generally the best solution is to re-extract the files from the .zip archive, or re-download the archive. Never move any of the folders or files in the ‘Virtuosity Drums’ folder to
+another location as this will break the program. If you wish to move the library, move the
+Virtuosity Drums folder itself with everything left inside as-is.
+2. Instrument uses up too much memory or CPU.
+Use the ‘Basic Kit’ version instead, or one of the individual mic position patches
+for the most space savings and CPU usage reduction. Increase your DAW’s audio driver
+buffer size and ensure your computer is in ‘Performance’ mode.
+3. Library fails to register in Sforzando/ARIA.
+Make sure you update Sforzando/ARIA to the latest version. You can do this by
+14
+
+going to the settings tab and selecting ‘Player Update’, then ‘Engine Update’
+as well after that.
+4. Instrument takes a long time to load.
+On Windows 10 devices or devices with ‘realtime protection’ anti-malware systems, such systems will attempt to scan the literally thousands of samples that Sforzando/ARIA needs to load before letting Sforzando/ARIA load
+them. It is strongly advised that you at least temporarily disable such ‘realtime
+protection’ systems while loading libraries, or set up an exemption for your
+folder or drive of sample libraries.
+It is always recommended to use a solid state drive (SSD) from which to
+stream samples. A 256 GB external drive can be had for the price of a decent
+dinner with a drink and can hold this very library nearly 200 times over, while
+also speeding up load times significantly vs. a mechanical hard drive.
+5. Instrument won’t respond to MIDI input.
+Make sure your DAW or standalone Sforzando/ARIA is receiving MIDI
+from your device, then ensure that the MIDI channel is set to match.
+If you have any other issues, drop us a line at contact@versilstudios.net.
+
+15
+
+CREDITS
+Samuel A. Gossner
+
+Recording, Production, Documentation
+
+Drogomir Smolken
+
+Mapping, Production, GUI Configuration, SFZ Badassery
+
+Austin McMahon
+Performance
+
+Simon Autenrieth
+GUI Design
+
+Special Thanks to:
+
+Steve Johnson & Brett Walberg at Virtuosity
+And our fantastic testers:
+
+Jose F. Hernandez, TK Drums
+
+16
+
+
