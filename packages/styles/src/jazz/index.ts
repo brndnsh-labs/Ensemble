@@ -2,7 +2,7 @@
 // voicings, a bebop horn. The band states the tune lightly, in two, and opens
 // up into four for the blowing.
 
-import { DEFAULT_ARC, type StylePack } from "@ensemble/engine";
+import { DEFAULT_ARC, DEFAULT_MIX, type StylePack } from "@ensemble/engine";
 import { jazzBass } from "./bass.ts";
 import { jazzChords } from "./chords.ts";
 import { jazzCritic } from "./critic.ts";
@@ -42,4 +42,8 @@ export const jazz: StylePack = {
   solo: jazzSolo,
   // Acoustic bass and acoustic grand piano.
   instruments: { bass: 32, chords: 0 },
+  sound: {
+    packs: { drums: "drum-kit", bass: "upright-bass", chords: "grand-piano" },
+    mix: DEFAULT_MIX,
+  },
 };

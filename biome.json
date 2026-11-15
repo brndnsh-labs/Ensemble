@@ -14,6 +14,26 @@
   "plugins": [{ "path": "./tools/no-ambient-inputs.grit", "includes": ["packages/engine/src/**"] }],
   "overrides": [
     {
+      "includes": ["packages/audio/src/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "patterns": [
+                  {
+                    "group": ["node:*", "@ensemble/*"],
+                    "message": "The audio package knows nothing about music: it imports nothing from the engine or the styles."
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
       "includes": ["packages/engine/src/**"],
       "linter": {
         "rules": {

@@ -5,3 +5,4 @@ dist/
 coverage/
 dist-test/
 .sources/
+out/audio/

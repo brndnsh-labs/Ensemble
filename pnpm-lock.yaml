@@ -207,6 +207,18 @@ importers:
         specifier: workspace:*
         version: link:../packages/styles
 
+  tools/audition:
+    dependencies:
+      '@ensemble/audio':
+        specifier: workspace:*
+        version: link:../../packages/audio
+      '@ensemble/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
+      '@ensemble/styles':
+        specifier: workspace:*
+        version: link:../../packages/styles
+
 packages:
 
   '@biomejs/biome@2.6.7':

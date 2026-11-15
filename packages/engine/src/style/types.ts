@@ -148,7 +148,64 @@ export interface StylePack {
    * the soloist's comes from its instrument, which is the player's choice.
    */
   readonly instruments: Readonly<Record<Exclude<PitchedSeat, "solo">, number>>;
+  /** How the style sounds when the band is played from samples. */
+  readonly sound: SoundStyle;
 }
+
+/**
+ * The band's sound: which instrument pack plays each seat, and the mix. The
+ * engine does not use it; it is here because it belongs to the style, and
+ * whatever plays the band reads it.
+ */
+export interface SoundStyle {
+  /**
+   * The pack that plays each seat unless the user picks another. The soloist
+   * has none: its pack is named after its instrument, which is the player's choice.
+   */
+  readonly packs: Readonly<Record<Exclude<Seat, "solo">, string>>;
+  readonly mix: MixStyle;
+}
+
+export interface MixStyle {
+  readonly seats: Readonly<Record<Seat, SeatMix>>;
+  /** The one room every seat is heard in. */
+  readonly room: {
+    /** How long it rings, in seconds. */
+    readonly seconds: number;
+    /** Seconds before it answers; a short gap keeps the band in front of it. */
+    readonly predelay: number;
+    /** The reverb's level in dB. */
+    readonly level: number;
+  };
+  /** Gain in dB on the whole band before the limiter. */
+  readonly master: number;
+}
+
+export interface SeatMix {
+  /** Level in dB. Packs are levelled alike when they are made, so this is the balance. */
+  readonly level: number;
+  /** Left (-1) to right (1). Centre when absent. */
+  readonly pan?: number;
+  /** How much goes to the room, in dB under the seat's level. Absent for none. */
+  readonly reverb?: number;
+  /** Cut everything under this many Hz: the low end is the bass's and the kick's. */
+  readonly highpass?: number;
+}
+
+/**
+ * A starting mix, before any ear has been on it: the seats level with each
+ * other, the piano tucked under, a small room. Styles spread this and change what differs.
+ */
+export const DEFAULT_MIX: MixStyle = {
+  seats: {
+    drums: { level: 0, reverb: -17 },
+    bass: { level: 0, reverb: -24 },
+    chords: { level: -3, reverb: -14, highpass: 90 },
+    solo: { level: 0, reverb: -12, highpass: 120 },
+  },
+  room: { seconds: 1.2, predelay: 0.012, level: 0 },
+  master: 0,
+};
 
 /** The arc the old band settled on by ear. Styles spread this and change what differs. */
 export const DEFAULT_ARC: ArcStyle = {

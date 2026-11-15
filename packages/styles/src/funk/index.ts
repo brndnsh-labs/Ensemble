@@ -2,7 +2,7 @@
 // one-bar bass riff locked to it, a guitar scratching sixteenths with clipped
 // stabs, and a horn on top. The rhythm section pushes on the One.
 
-import { DEFAULT_ARC, type StylePack } from "@ensemble/engine";
+import { DEFAULT_ARC, DEFAULT_MIX, type StylePack } from "@ensemble/engine";
 import { funkBass } from "./bass.ts";
 import { funkChords } from "./chords.ts";
 import { funkCritic } from "./critic.ts";
@@ -38,4 +38,8 @@ export const funk: StylePack = {
   solo: funkSolo,
   // Fingered electric bass and a clean electric guitar.
   instruments: { bass: 33, chords: 27 },
+  sound: {
+    packs: { drums: "drum-kit", bass: "electric-bass", chords: "clean-guitar" },
+    mix: DEFAULT_MIX,
+  },
 };

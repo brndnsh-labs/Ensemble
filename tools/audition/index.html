@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ensemble audition</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "@ensemble/engine": "/packages/engine/src/index.ts",
+          "@ensemble/styles": "/packages/styles/src/index.ts",
+          "@ensemble/audio": "/packages/audio/src/index.ts"
+        }
+      }
+    </script>
+    <style>
+      :root { color-scheme: light dark; font: 16px/1.5 system-ui, sans-serif; }
+      body { max-width: 44rem; margin: 0 auto; padding: 1rem; }
+      h1 { font-size: 1.2rem; margin: 0 0 0.5rem; }
+      fieldset { border: 1px solid color-mix(in srgb, currentColor 25%, transparent); border-radius: 6px; margin: 0 0 1rem; }
+      label { display: inline-flex; flex-direction: column; font-size: 0.8rem; margin: 0 0.75rem 0.5rem 0; }
+      select, input, button { font: inherit; padding: 0.3rem 0.4rem; }
+      input[type="number"] { width: 5rem; }
+      button { padding: 0.5rem 1.2rem; margin-right: 0.5rem; }
+      table { border-collapse: collapse; }
+      td, th { padding: 0.15rem 0.6rem 0.15rem 0; text-align: left; font-weight: normal; }
+      th { font-size: 0.8rem; opacity: 0.7; }
+      input[type="range"] { width: 9rem; padding: 0; }
+      output, pre { font: 0.85rem/1.4 ui-monospace, monospace; }
+      pre { white-space: pre-wrap; margin: 0.5rem 0 0; }
+      .bad { color: #c22; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <h1>Ensemble audition</h1>
+    <fieldset>
+      <legend>The take</legend>
+      <label>Chart <select id="chart"></select></label>
+      <label>Style <select id="style"></select></label>
+      <label>Seed <input id="seed" type="number" value="1" min="1" /></label>
+      <label>Passes <input id="passes" type="number" value="4" min="1" /></label>
+      <label>Soloist
+        <select id="solo">
+          <option value="">none</option>
+          <option value="alto-sax">alto sax</option>
+          <option value="vibraphone">vibraphone</option>
+        </select>
+      </label>
+      <label>Layers
+        <select id="layers">
+          <option value="">all</option>
+          <option value="1">one</option>
+        </select>
+      </label>
+    </fieldset>
+    <p>
+      <button type="button" id="play">Play</button>
+      <button type="button" id="stop" disabled>Stop</button>
+      <button type="button" id="wav">Render to WAV</button>
+    </p>
+    <pre id="status">Loading.</pre>
+    <fieldset>
+      <legend>The mix</legend>
+      <table id="mix"></table>
+      <pre id="preset"></pre>
+    </fieldset>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -52,6 +52,22 @@ export function validateStyle(style: StylePack): string[] {
     );
   }
 
+  for (const [seat, pack] of Object.entries(style.sound.packs)) {
+    check(pack.length > 0, `sound: ${seat} needs a pack`);
+  }
+  for (const [seat, mix] of Object.entries(style.sound.mix.seats)) {
+    check(mix.level >= -40 && mix.level <= 12, `sound: ${seat} level is -40 to 12 dB`);
+    check(mix.pan === undefined || Math.abs(mix.pan) <= 1, `sound: ${seat} pan is -1 to 1`);
+    check(
+      mix.reverb === undefined || mix.reverb <= 0,
+      `sound: ${seat} reverb send is 0 dB or less`,
+    );
+  }
+  check(
+    style.sound.mix.room.seconds > 0 && style.sound.mix.room.seconds <= 6,
+    "sound: the room rings for up to 6 seconds",
+  );
+
   problems.push(...validateDrumStyle(style.drums).map((problem) => `drums: ${problem}`));
   problems.push(...validateBassStyle(style.bass).map((problem) => `bass: ${problem}`));
   problems.push(...validateChordStyle(style.chords).map((problem) => `chords: ${problem}`));

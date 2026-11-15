@@ -1,0 +1,11 @@
+{
+  "name": "@ensemble/audition",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ensemble/audio": "workspace:*",
+    "@ensemble/engine": "workspace:*",
+    "@ensemble/styles": "workspace:*"
+  }
+}

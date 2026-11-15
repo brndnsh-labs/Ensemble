@@ -1,7 +1,7 @@
 // Blues: a Chicago shuffle band. Everything is written on the eighth-note grid
 // and swung into a hard triplet, with the band a hair behind the drums.
 
-import { DEFAULT_ARC, type StylePack } from "@ensemble/engine";
+import { DEFAULT_ARC, DEFAULT_MIX, type StylePack } from "@ensemble/engine";
 import { bluesBass } from "./bass.ts";
 import { bluesChords } from "./chords.ts";
 import { bluesCritic } from "./critic.ts";
@@ -34,4 +34,8 @@ export const blues: StylePack = {
   solo: bluesSolo,
   // Acoustic bass and acoustic grand piano. The soloist's sound is its instrument's.
   instruments: { bass: 32, chords: 0 },
+  sound: {
+    packs: { drums: "drum-kit", bass: "upright-bass", chords: "grand-piano" },
+    mix: DEFAULT_MIX,
+  },
 };
