@@ -220,8 +220,9 @@ export function phrasesFor(
       low,
       high,
       contour: ask.contour,
-      // The last note of the take rests, whatever the phrase was for.
-      ending: final ? solo.settle : ask.ending,
+      // The last note of the take rests, whatever the phrase was for, and comes home: a
+      // phrase may float on a colour (ST-neosoul-29), the tune ends on its root, 3rd or 5th.
+      ending: final ? home(solo.settle) : ask.ending,
       final,
       from: memory.rest,
       notOn: memory.rest,
@@ -705,4 +706,11 @@ function withPickup(world: World, phrase: Phrase, memory: Memory, rng: Rng): Phr
       (a, b) => a.spot.tick - b.spot.tick,
     ),
   };
+}
+
+/** The tones a tune comes home to, in the order a style rests on them: its root, 3rd and 5th. */
+const HOME: readonly ToneRole[] = ["third", "root", "fifth"];
+function home(settle: readonly ToneRole[]): readonly ToneRole[] {
+  const kept = settle.filter((role) => HOME.includes(role));
+  return kept.length > 0 ? kept : HOME;
 }

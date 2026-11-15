@@ -16,7 +16,7 @@ import type { InstrumentIdiom } from "./idiom.ts";
 import type { StrikeLine } from "./line.ts";
 import type { Strike, VoicedStrike, Voicing } from "./strike.ts";
 import type { ChordRegister, ChordStyle } from "./style.ts";
-import { fitTones, identity } from "./tones.ts";
+import { fitRecipe, identity, recipeFor } from "./tones.ts";
 
 /** A voicing as the critic judges it: where it sits, and what it follows. */
 export interface VoicingCandidate {
@@ -311,10 +311,20 @@ export function voiceStrikes(
       const name = `${strike.kind} ${root} ${colour}`;
       way = ways.get(name);
       if (!way) {
-        const tones = fitTones(kind, chord, scale);
+        // A spread offers each of its recipe's stackings; close position has the one.
+        const recipe = recipeFor(kind, chord, scale);
+        const stacks =
+          kind.position === "spread" ? [recipe.voices, ...(recipe.also ?? [])] : [recipe.voices];
         way = {
           family: chordFamily(chord.quality),
-          voicings: idiom.candidates(tones, root, chords.register),
+          voicings: stacks.flatMap((voices) =>
+            idiom.candidates(
+              fitRecipe({ voices }, chord, scale),
+              root,
+              chords.register,
+              kind.position,
+            ),
+          ),
           led: new Map(),
           root,
           needed: new Set(identity(chord, scale).map((tone) => tone.interval)),

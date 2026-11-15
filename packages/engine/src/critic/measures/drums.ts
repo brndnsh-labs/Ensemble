@@ -1,12 +1,13 @@
 // What a drummer would say about a drum part, bar by bar.
 
 import { PPQ } from "../../chart/types.ts";
+import { STEP } from "../../perform/grid.ts";
 import { pulseTicks } from "../../perform/meter.ts";
 import type { NoteEvent } from "../../perform/notes.ts";
 import type { PlanBar } from "../../plan/types.ts";
 import { tierOf } from "../../style/types.ts";
 import type { Take } from "../../take.ts";
-import { musicBars, notesIn, notesOf, share } from "../read.ts";
+import { mean, musicBars, notesIn, notesOf, share } from "../read.ts";
 import type { Measure } from "../types.ts";
 
 /** A bar's part as text, so two bars can be compared: which piece, where. Levels are left out. */
@@ -320,6 +321,39 @@ export const drumMeasures: readonly Measure[] = [
         notesIn(drums, bar).every((note) => (note.tick - bar.start) % (PPQ / 2) === 0),
       );
       return share(clean.length, bars.length);
+    },
+  },
+  {
+    id: "drums.ghosts-per-bar",
+    idiom: true,
+    seat: "drums",
+    says: "How many ghost notes a bar of time has from the working level up: a loop that moves, not a roll.",
+    unit: "per bar",
+    of(take) {
+      const drums = notesOf(take, "drums");
+      const bars = timeBars(take).filter((bar) => drumTier(bar) !== "low");
+      return mean(
+        bars.map((bar) => notesIn(drums, bar).filter((note) => note.voice === "ghostSnare").length),
+      );
+    },
+  },
+  {
+    id: "drums.late-four",
+    idiom: true,
+    seat: "drums",
+    says: 'Some bars of the loop put the backbeat on 4 a sixteenth late, on the "e" of 4: a written rhythm that makes the loop two bars long, in a few bars and not most.',
+    unit: "share",
+    of(take) {
+      const drums = notesOf(take, "drums");
+      const bars = timeBars(take).filter(
+        (bar) => drumTier(bar) !== "low" && bar.meter.beats === 4 && bar.meter.unit === 4,
+      );
+      const late = bars.filter((bar) => {
+        const backbeat = notesIn(drums, bar).filter((note) => note.voice === "snare");
+        const at = (step: number) => backbeat.some((note) => note.tick === bar.start + step * STEP);
+        return at(13) && !at(12);
+      });
+      return share(late.length, bars.length);
     },
   },
 ];

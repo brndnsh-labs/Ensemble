@@ -59,6 +59,8 @@ interface Onset {
   readonly dead?: boolean;
   /** The tone is taken under the root where the instrument has it. */
   readonly under?: boolean;
+  /** The tone is taken in the octave nearest the note before it. */
+  readonly near?: boolean;
 }
 
 /** What a piece is played with beyond its line: the plan's turn, and the drummer's kicks. */
@@ -70,10 +72,13 @@ export interface Played {
 }
 
 /** A grid's strokes: where each note falls, how long the figure writes it, and what it names. */
-function strokesOf(grid: readonly string[], from = 0, under = false): Onset[] {
+function strokesOf(grid: readonly string[], from = 0, figure?: Figure): Onset[] {
   const notes: Onset[] = [];
+  const under = figure?.under === true;
+  const near = figure?.near === true;
   grid.forEach((symbol, step) => {
-    const tone = RIFF_TONES[symbol];
+    const named = RIFF_TONES[symbol];
+    const tone = named === "b7" && figure?.seventh === "own" ? "7" : named;
     if (symbol !== "x" && symbol !== "o" && symbol !== DEAD_NOTE && !tone) return;
     let length = 1;
     while (grid[step + length] === "-") length++;
@@ -83,6 +88,7 @@ function strokesOf(grid: readonly string[], from = 0, under = false): Onset[] {
       echo: symbol === "o",
       ...(tone ? { tone } : {}),
       ...(tone && under ? { under: true } : {}),
+      ...(tone && tone !== "8" && near ? { near: true } : {}),
       ...(symbol === DEAD_NOTE ? { dead: true } : {}),
     });
   });
@@ -96,7 +102,7 @@ function turned(notes: readonly Onset[], turn: Figure): Onset[] {
   const kept = notes
     .filter((onset) => onset.tick < from)
     .map((onset) => ({ ...onset, space: Math.min(onset.space, from - onset.tick) }));
-  return [...kept, ...strokesOf(grid, from, turn.under === true)];
+  return [...kept, ...strokesOf(grid, from, turn)];
 }
 
 type Onsets = { readonly notes: readonly Onset[]; readonly plain: boolean };
@@ -121,7 +127,7 @@ function onsetsOf(line: BassLine, tier: Tier, bar: PlanBar, rng: Rng): Onsets {
     // The figure is chosen whole and kept: a section keeps its lope (X-A-29, X-A-31).
     const held = heldRng(rng, `figure:${line.figures.draw ?? tier}`, line.figures.hold, bar);
     const figure = held.weighted(figures, (option) => option.weight);
-    return { notes: strokesOf(cells(figure.grid), 0, figure.under === true), plain: false };
+    return { notes: strokesOf(cells(figure.grid), 0, figure), plain: false };
   }
   if (line.otherMeters === "downbeat") {
     return { notes: [{ tick: 0, space: bar.ticks, echo: false }], plain: true };
@@ -232,7 +238,9 @@ export function lineOf(
       // A dead note is struck where the hand is: on the root.
       const own = dead ? "R" : onset.tone;
       const tone = arrival ? "R" : (own ?? tones[count % tones.length] ?? "R");
+      const before = pitch;
       pitch = tonePitch(tone, chord, scale, root, line.ceiling);
+      if (onset.near && !arrival) pitch = nearest(pitch, before, line.ceiling);
       if (onset.under && !arrival && pitch > root && pitch - 12 >= LOW_E) pitch -= 12;
       if (onset.space >= HELD && !isChordTone(chord, pitch)) {
         pitch = tonePitch("5", chord, scale, root, line.ceiling);
@@ -263,6 +271,17 @@ export function lineOf(
     notes.push(note);
   });
   return notes;
+}
+
+/** A pitch class in the octave nearest a note, inside the instrument and the line's ceiling. */
+function nearest(pitch: number, to: number, ceiling: number): number {
+  const options = [pitch - 24, pitch - 12, pitch, pitch + 12, pitch + 24].filter(
+    (option) => option >= LOW_E && option <= ceiling,
+  );
+  if (options.length === 0) return pitch;
+  return options.reduce((best, option) =>
+    Math.abs(option - to) < Math.abs(best - to) ? option : best,
+  );
 }
 
 /** A level as the line writes it: a note between the pulses is a weak one, and a dead note as quiet as a re-strike, unless the line says otherwise. */

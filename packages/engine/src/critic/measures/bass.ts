@@ -506,6 +506,54 @@ const idiomMeasures: readonly Measure[] = [
       return mean(lengths);
     },
   },
+  {
+    id: "bass.silence",
+    seat: "bass",
+    idiom: true,
+    says: "A line with room in it: some of every bar is silence, so the kick has room to speak, and most of it is not.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let steps = 0;
+      let silent = 0;
+      for (const bar of musicBars(take)) {
+        if (bar.ending || bar.seats.bass === null) continue;
+        const sounding = new Array<boolean>(Math.round(bar.ticks / STEP)).fill(false);
+        for (const note of bass) {
+          if (note.tick >= bar.start + bar.ticks || note.tick + note.duration <= bar.start)
+            continue;
+          for (let step = 0; step < sounding.length; step++) {
+            const at = bar.start + step * STEP + STEP / 2;
+            if (note.tick <= at && at < note.tick + note.duration) sounding[step] = true;
+          }
+        }
+        steps += sounding.length;
+        silent += sounding.filter((on) => !on).length;
+      }
+      return share(silent, steps);
+    },
+  },
+  {
+    id: "bass.approaches-from-below",
+    seat: "bass",
+    idiom: true,
+    says: "A change reached by a half step is mostly slid up into from below, not fallen into from above.",
+    unit: "share",
+    of(take) {
+      const bass = notesOf(take, "bass");
+      let halfSteps = 0;
+      let below = 0;
+      for (const change of bassChanges(take)) {
+        const landing = bass.find((note) => note.tick === change.tick);
+        const before = bass.findLast((note) => note.tick < change.tick);
+        if (!landing || !before || change.tick - before.tick > PPQ) continue;
+        if (Math.abs(before.pitch - landing.pitch) !== 1) continue;
+        halfSteps++;
+        if (before.pitch < landing.pitch) below++;
+      }
+      return share(below, halfSteps);
+    },
+  },
 ];
 
 export const bassMeasures: readonly Measure[] = [

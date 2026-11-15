@@ -108,15 +108,14 @@ export function recipeFor(kind: VoicingKind, chord: Chord, scale: ChordScale): R
 }
 
 /**
- * The tones a chord is voiced with in this kind, one per pitch class, low role
+ * The tones a chord is voiced with by one recipe, one per pitch class, low role
  * to high. The recipe is read first; then the chord's identity is made whole:
  * the third (or suspension), the seventh (or sixth) and every written
  * alteration always sound, each taking the place of the most expendable voice
  * (the root, then the natural fifth, then colour the chart did not write)
  * (X-B-13, X-B-09).
  */
-export function fitTones(kind: VoicingKind, chord: Chord, scale: ChordScale): FittedTone[] {
-  const recipe = recipeFor(kind, chord, scale);
+export function fitRecipe(recipe: Recipe, chord: Chord, scale: ChordScale): FittedTone[] {
   const tones: (FittedTone | null)[] = recipe.voices.map(() => null);
   const taken = () => new Set(tones.flatMap((t) => (t ? [t.interval] : [])));
   const fill = (index: number, tone: Exclude<VoiceTone, "T">) => {

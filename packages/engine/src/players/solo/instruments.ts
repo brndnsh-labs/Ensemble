@@ -41,6 +41,18 @@ export const SOLO_INSTRUMENTS: Readonly<Record<string, SoloInstrument>> = {
     bend: { takes: 0.1 },
     shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true },
   },
+  // The clean electric guitar's solo register, G3 to D6, at home on A4 (SO-01): a lead behind
+  // a singer (ST-neosoul-43). The overdriven guitar's hand: the same string, the same bend
+  // and the same shake.
+  "clean-guitar": {
+    name: "Clean electric guitar",
+    program: 27,
+    range: [55, 86],
+    home: 69,
+    breath: null,
+    bend: { takes: 0.1 },
+    shake: { depth: 60, rate: 5.5, after: 0.35, grows: 0.3, upward: true },
+  },
 };
 
 /** The name an instrument is listed under, for a note's `voice`. */

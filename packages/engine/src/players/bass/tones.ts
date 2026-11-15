@@ -82,6 +82,13 @@ export function toneOf(tone: Tone, chord: Chord, scale: ChordScale): number | nu
       return displaced(9, 8) ? null : 9;
     case "b7":
       return displaced(10, 11) ? null : 10;
+    case "7": {
+      // The chord's own seventh, or the sixth that stands in for it; on a chord with neither,
+      // the major sixth where the scale has one (ST-neosoul-14).
+      const seventh = toneInterval(quality, "seventh") ?? toneInterval(quality, "sixth");
+      if (seventh !== null) return mod12(seventh);
+      return scaleHas(scale, 9) ? 9 : null;
+    }
   }
 }
 
@@ -98,6 +105,7 @@ const FALLBACK: Readonly<Record<Tone, Tone>> = {
   "4": "3",
   "6": "5",
   b7: "8",
+  "7": "R",
 };
 
 /**

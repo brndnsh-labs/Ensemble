@@ -20,6 +20,9 @@ import type { ChordFamily } from "../../theory/chord.ts";
  * - `b6` the minor sixth
  * - `6`  the major sixth
  * - `b7` the flat seventh
+ * - `7`  the chord's own seventh, whatever kind: major over a major seventh, flat over a
+ *        dominant or a minor seventh, the sixth of a sixth chord; on a chord with none, the
+ *        major sixth where its scale has one, or else the root (ST-neosoul-14)
  * - `8`  the octave above the bass note
  *
  * The third and fifth are read from the chord. The second, fourth, sixth and
@@ -36,8 +39,21 @@ import type { ChordFamily } from "../../theory/chord.ts";
  * after in the same direction, and never on a held note (BA-15, X-A-26). A
  * shape that would land one anywhere else is not played on that chord.
  */
-export type Tone = "R" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "8";
-export const TONES: readonly Tone[] = ["R", "2", "b3", "3", "4", "#4", "5", "b6", "6", "b7", "8"];
+export type Tone = "R" | "2" | "b3" | "3" | "4" | "#4" | "5" | "b6" | "6" | "b7" | "7" | "8";
+export const TONES: readonly Tone[] = [
+  "R",
+  "2",
+  "b3",
+  "3",
+  "4",
+  "#4",
+  "5",
+  "b6",
+  "6",
+  "b7",
+  "7",
+  "8",
+];
 
 /** What a chord must be for a sequence to be played over it. Every condition given must hold. */
 export interface ChordCondition {
@@ -119,6 +135,21 @@ export interface Figure {
    * of a riff whose fifth falls a fourth below (BA-68).
    */
   readonly under?: boolean;
+  /**
+   * Each tone it names, but the octave, is taken in the octave nearest the
+   * note before it, as a hand that stays where it is: from the root the fifth
+   * falls a fourth and the seventh a step, from the octave the fifth falls back
+   * into the octave between (ST-neosoul-14). Never under the open E or over
+   * the line's ceiling.
+   */
+  readonly near?: boolean;
+  /**
+   * What a `7` in the grid names: the flat seventh (the default, a riff's b7
+   * over any chord), or the chord's own seventh, `7` in the tone list: the
+   * major seventh over a major seventh chord, the sixth over a triad
+   * (ST-neosoul-14).
+   */
+  readonly seventh?: "flat" | "own";
 }
 
 /** The tones a figure can name in its grid, by the character that names each. */

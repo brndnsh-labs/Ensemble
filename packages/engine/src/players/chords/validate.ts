@@ -22,6 +22,8 @@ const FAMILIES: readonly ChordFamily[] = [
 ];
 /** One hand on a keyboard plays nothing under E3 (X-B-02). */
 const ONE_HAND_FLOOR = 52;
+/** C3: as low as a left hand's shell goes under a two-handed spread (ST-neosoul-20). */
+const TWO_HAND_FLOOR = 48;
 /** The top of the keyboard comp's reach, E6 (CH-15). */
 const HIGHEST = 88;
 /** The button is this much harder than its chord, and must still be a MIDI level. */
@@ -98,13 +100,19 @@ export function validateChordStyle(chords: ChordStyle): string[] {
     kind.recipes.forEach((recipe, i) => {
       const at = `${where}, recipe ${i + 1}`;
       say(recipe.voices.length > 0, `${at}: has no voices.`);
+      say(
+        recipe.also === undefined || kind.position === "spread",
+        `${at}: only a spread stacks a chord more than one way.`,
+      );
+      const stacks = [recipe.voices, ...(recipe.also ?? [])];
+      for (const voices of stacks) say(voices.length > 0, `${at}: a stacking has no voices.`);
       const tones = [
-        ...recipe.voices.flatMap((voice: Voice) => (typeof voice === "string" ? [voice] : voice)),
+        ...stacks.flat().flatMap((voice: Voice) => (typeof voice === "string" ? [voice] : voice)),
         ...(recipe.when?.has ?? []),
         ...(recipe.when?.lacks ?? []),
       ];
       for (const tone of tones) say(VOICE_TONES.includes(tone), `${at}: "${tone}" is not a tone.`);
-      for (const voice of recipe.voices) {
+      for (const voice of stacks.flat()) {
         say(typeof voice === "string" || voice.length > 0, `${at}: a voice lists no tones.`);
       }
       for (const family of recipe.when?.family ?? []) {
@@ -120,7 +128,14 @@ export function validateChordStyle(chords: ChordStyle): string[] {
   const { floor, ceiling, target, reach } = chords.register;
   say(reach >= 0, `register: a reach of ${reach} is less than nothing.`);
   if (chords.idiom === "keys") {
-    say(floor >= ONE_HAND_FLOOR, `register: a floor of ${floor} is under E3, mud for one hand.`);
+    const hands = Object.values(chords.kinds).some((kind) => kind.position === "spread") ? 2 : 1;
+    if (hands === 1)
+      say(floor >= ONE_HAND_FLOOR, `register: a floor of ${floor} is under E3, mud for one hand.`);
+    else
+      say(
+        floor >= TWO_HAND_FLOOR,
+        `register: a floor of ${floor} is under C3, mud even for a left hand's shell.`,
+      );
   }
   if (guitar) {
     const [lowest, highest] = [OPEN_STRINGS[0]!, OPEN_STRINGS.at(-1)! + TOP_FRET];
@@ -317,6 +332,10 @@ export function validateChordStyle(chords: ChordStyle): string[] {
     say(
       Number.isInteger(listening.lift) && listening.lift >= 0 && listening.lift < LOUDEST,
       `listening: a strike played ${listening.lift} harder in a breath is not a whole number of velocity steps from 0.`,
+    );
+    say(
+      listening.closes === undefined || listening.closes in chords.kinds,
+      `listening: the hands close up to "${listening.closes}", which is no voicing kind.`,
     );
   }
 

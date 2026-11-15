@@ -9,15 +9,22 @@ import type { Plan } from "../../plan/types.ts";
 import { guitar } from "./guitar.ts";
 import { keys } from "./keys.ts";
 import type { VoicedStrike, Voicing } from "./strike.ts";
-import type { ChordRegister, Idiom } from "./style.ts";
+import type { ChordRegister, Idiom, VoicingKind } from "./style.ts";
 import type { FittedTone } from "./tones.ts";
 
 export interface InstrumentIdiom {
   /**
    * Every way this instrument can play these tones in the register, in order
-   * of preference when two cost the same. `root` is the chord's root pitch class.
+   * of preference when two cost the same. `root` is the chord's root pitch class;
+   * `position` is how the kind stacks them, which a keyboard follows and a
+   * guitar, finding its grips on the fretboard, does not.
    */
-  candidates(tones: readonly FittedTone[], root: number, register: ChordRegister): Voicing[];
+  candidates(
+    tones: readonly FittedTone[],
+    root: number,
+    register: ChordRegister,
+    position: VoicingKind["position"],
+  ): Voicing[];
   /**
    * A candidate as the hand would take it coming from the voicing it holds
    * (null: from nothing). A guitar can fret the same notes in more than one

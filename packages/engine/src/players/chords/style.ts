@@ -52,6 +52,11 @@ export interface Recipe {
   readonly when?: VoicingCondition;
   /** Low role to high; where they sit on the instrument is the voicing engine's choice. */
   readonly voices: readonly Voice[];
+  /**
+   * In a spread, the same chord stacked other ways, each offered beside
+   * `voices`: the 3rd-and-7th shell beside the root-and-7th (ST-neosoul-19).
+   */
+  readonly also?: readonly (readonly Voice[])[];
 }
 
 /**
@@ -63,11 +68,19 @@ export interface Recipe {
  */
 export interface VoicingKind {
   /**
-   * How the tones are stacked. Only close position exists now: every
-   * inversion inside an octave (CH-15). Drop voicings and two-handed spreads
-   * arrive as further members.
+   * How the tones are stacked.
+   *
+   * - `close`: every inversion inside an octave (CH-15). The first recipe the
+   *   chord meets is played.
+   * - `spread`: two hands, the voices exactly in the order the recipe writes
+   *   them, low to high, each the nearest of its note above the one before:
+   *   a left-hand shell with the colours stacked over it (ST-neosoul-19: Dm9 as
+   *   F C | E A D, written `3 7 9 5 R`). A recipe's `also` are further
+   *   stackings offered beside it: another shell for the left hand (root and
+   *   7th, 3rd and 7th), so the register chooses between them, as a pianist
+   *   takes the shell that keeps the hands where they are.
    */
-  readonly position: "close";
+  readonly position: "close" | "spread";
   readonly recipes: readonly Recipe[];
 }
 
@@ -367,6 +380,13 @@ export interface Listening {
    * plays harder but no busier. Left out, the hand follows the band's level.
    */
   readonly busiest?: Tier;
+  /**
+   * The voicing kind the hands close up to in a bar the soloist sounds in: a
+   * two-handed spread becomes one hand under the line, and opens again in the
+   * gaps (ST-neosoul-21). Every strike in such a bar takes it, so a bar is
+   * played with one pair of hands. Left out, the kinds are the rhythm's.
+   */
+  readonly closes?: string;
 }
 
 export interface ChordStyle {
