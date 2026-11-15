@@ -7,7 +7,8 @@ A browser-based generative backing band. Read these before doing anything:
 3. `docs/TESTING.md` (what may be tested; binding)
 4. `docs/MILESTONES.md` (stages and gates)
 5. `docs/MUSIC_NOTES.md` (musical knowledge carried over from the previous version: an index, plus four parts under `docs/music-notes/` to read when the work touches them)
-6. `PLAN.md` (the map, and "Resume here" for current state) and `DECISIONS.md`
+6. `docs/AUDIO_NOTES.md` (what the previous version learned about sample packs, mixing them, and phones; read when the work touches audio)
+7. `PLAN.md` (the map, and "Resume here" for current state) and `DECISIONS.md`
 
 ## Standing rules
 

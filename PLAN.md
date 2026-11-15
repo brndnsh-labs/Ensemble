@@ -83,7 +83,7 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State on 2026-11-15: **stages 1 to 4 are built and their gates passed** (gate 4: "everything is sounding incredible so far"). **Stage 5 (audio) is next and has not started**: it needs the instrument packs from Brandon in `assets/packs/`, each with its license file.
+State on 2026-11-15: **stages 1 to 4 are built and their gates passed** (gate 4: "everything is sounding incredible so far"). **Stage 5 (audio) is next; no code yet.** The old packs and the free sources online have been surveyed (`docs/AUDIO_NOTES.md`, and `DECISIONS.md`, "stage 5 begins: where the packs come from"). The recommendation put to Brandon, awaiting his answer: cut new packs from the same free sources the old ones came from, with a script in this repo, keeping each licence file beside its pack, instead of copying the old cut-down files.
 
 - Gate reports: `out/gate-1/GATE_REPORT.md` to `out/gate-4/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1` to `gate:4`.
 - `pnpm check` passes with three styles in about 8.8 s of 10. `pnpm score` matches its baselines (`scorecard/blues.json`, `funk.json`, `jazz.json`).
