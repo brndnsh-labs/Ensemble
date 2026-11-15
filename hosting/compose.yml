@@ -1,0 +1,22 @@
+# The app as a service: one container, no volumes, no secrets, nothing to
+# back up. Put TLS in front of it (a service worker needs HTTPS).
+#
+#   ENSEMBLE_IMAGE=ensemble-app:<tag> ENSEMBLE_PORT=8094 docker compose up -d
+services:
+  web:
+    image: ${ENSEMBLE_IMAGE:?set the image to run}
+    user: "101:101"
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 100
+    mem_limit: 128m
+    # nginx keeps its pid and scratch files here, so the root filesystem can stay read-only.
+    tmpfs: ["/tmp:size=32m,mode=1777"]
+    ports: ["${ENSEMBLE_PORT:?set the host port}:8080"]
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"

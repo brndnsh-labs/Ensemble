@@ -27,7 +27,8 @@
     "render:audio": "node scripts/render-audio.ts",
     "app": "pnpm --filter @ensemble/app exec vite",
     "app:build": "pnpm --filter @ensemble/app build",
-    "smoke": "node scripts/budget.ts 60 playwright test"
+    "smoke": "node scripts/budget.ts 60 playwright test",
+    "image": "sh scripts/image.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "2.6.7",

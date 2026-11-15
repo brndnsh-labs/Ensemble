@@ -4,6 +4,8 @@
 import { defineConfig } from "@playwright/test";
 
 const PORT = 8767;
+/** Set to run the journeys against the app wherever it is already served: a container, or the real site. */
+const elsewhere = process.env.SMOKE_URL;
 
 export default defineConfig({
   testDir: "smoke",
@@ -13,15 +15,19 @@ export default defineConfig({
   reporter: [["list"]],
   timeout: 20_000,
   use: {
-    baseURL: `http://127.0.0.1:${PORT}/`,
+    baseURL: elsewhere ?? `http://127.0.0.1:${PORT}/`,
     channel: "chrome",
     // Without the first, headless Chrome waits half a minute for a desktop keyring that is not there.
     launchOptions: { args: ["--password-store=basic"] },
   },
-  webServer: {
-    command: `pnpm --filter @ensemble/app build && pnpm --filter @ensemble/app exec vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
-    url: `http://127.0.0.1:${PORT}/`,
-    reuseExistingServer: false,
-    timeout: 30_000,
-  },
+  ...(elsewhere
+    ? {}
+    : {
+        webServer: {
+          command: `pnpm --filter @ensemble/app build && pnpm --filter @ensemble/app exec vite preview --host 127.0.0.1 --port ${PORT} --strictPort`,
+          url: `http://127.0.0.1:${PORT}/`,
+          reuseExistingServer: false,
+          timeout: 30_000,
+        },
+      }),
 });
