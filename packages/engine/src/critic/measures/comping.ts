@@ -236,6 +236,25 @@ export const compingMeasures: readonly Measure[] = [
     unit: "per bar",
     of: (take) => strikesPerBar(take, "high", true),
   },
+  // Stabs and held chords (ST-jazz-27, CH-53): a jazz piano mostly stabs and holds a chord
+  // to the end now and then, half the time when the band is quiet. Held is longer than a beat:
+  // a stab, a push and a chord laid in where it arrives are all a beat or less.
+  {
+    id: "chords.held",
+    seat: "chords",
+    idiom: true,
+    says: "From the working level up, some of the chords are held on, most are stabs: the share of strikes that ring longer than a beat.",
+    unit: "share",
+    of: (take) => heldShare(take, (tier) => tier !== "low"),
+  },
+  {
+    id: "chords.held-quiet",
+    seat: "chords",
+    idiom: true,
+    says: "When the band is quiet the hand holds more of its chords: the share of strikes that ring longer than a beat.",
+    unit: "share",
+    of: (take) => heldShare(take, (tier) => tier === "low"),
+  },
   {
     id: "chords.with-the-drums",
     seat: "chords",
@@ -564,4 +583,11 @@ function strokesAt(take: Take, at: (tier: Tier) => boolean): Hit[] {
 function strokesPerBar(take: Take, at: (tier: Tier) => boolean): Measurement | null {
   const { bars, strokes } = read(take);
   return mean(bars.filter((bar) => at(tierAt(bar))).map((bar) => strokes.get(bar.index)!.length));
+}
+
+/** The share of chords struck at the levels asked for that ring longer than a beat. */
+function heldShare(take: Take, at: (tier: Tier) => boolean): Measurement | null {
+  const { bars, hits } = read(take);
+  const struck = bars.filter((bar) => at(tierAt(bar))).flatMap((bar) => hits.get(bar.index)!);
+  return share(struck.filter((hit) => hit.length > PPQ + POCKET).length, struck.length);
 }

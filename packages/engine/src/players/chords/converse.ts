@@ -57,6 +57,8 @@ export interface PhraseHarmony {
   readonly changesAfter: (bar: PlanBar) => boolean;
   /** How much of a chord's written length a strike may ring. */
   readonly hold: number;
+  /** The voicing kind the hand plays in a bar, for a stab in a bar where the figure struck nothing. */
+  readonly kind: (bar: PlanBar) => string;
 }
 
 /** What the phrase hears: the line up to its last barline, and the breaths that become breaths inside it. */
@@ -111,7 +113,7 @@ export function layOut(strikes: readonly Strike[], line: readonly LineNote[]): S
  * plays inside a breath is played harder by the style's lift. A breath it
  * leaves empty gets one stab, on the first "and" that is:
  *
- * - at least an eighth after the soloist lets go;
+ * - at least an eighth after the soloist lets go, and done before it comes back in;
  * - a quarter note clear of every other strike (an "and" straight after a
  *   struck beat is a stutter, not an answer), and so never in a beat cleared
  *   for a push (KF-B-27);
@@ -160,10 +162,12 @@ function stabIn(
     const barEnd = bar.start + bar.ticks;
     if (barEnd <= breath.from || bar.start >= breath.to) continue;
     const own = harmony.own(bar);
-    const kind = placed.find((strike) => strike.bar === bar.index)?.kind;
-    if (!kind) continue;
+    const kind = placed.find((strike) => strike.bar === bar.index)?.kind ?? harmony.kind(bar);
     for (let tick = bar.start + EIGHTH; tick < barEnd; tick += PPQ) {
       if (tick < breath.from + EIGHTH || tick >= breath.to) continue;
+      // Not in the eighth before the soloist comes back in: the stab would still be sounding
+      // as the line enters, and an answer that steps on the next phrase is not an answer.
+      if (breath.back && tick + EIGHTH >= breath.to) continue;
       if (tick >= end - EIGHTH) return null;
       if (placed.some((strike) => Math.abs(strike.tick - tick) < PPQ)) continue;
       const at = own.findIndex((stretch) => stretch.start <= tick && tick < stretch.end);

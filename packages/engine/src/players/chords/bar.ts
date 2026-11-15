@@ -51,6 +51,12 @@ export interface BarSetting {
   readonly pushedInto: boolean;
   /** The change at the barline after this bar; null when the next bar opens on the same chord. */
   readonly ahead: Change | null;
+  /**
+   * The bar opens on the chord the hand was holding at the end of the bar before, in a bar
+   * it comped: that chord has been struck already, and a bar the figure leaves empty owes
+   * it nothing (ST-jazz-28).
+   */
+  readonly heldOver: boolean;
 }
 
 /**
@@ -188,9 +194,15 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
       // since a figure that happens to pass the last eighth by would never lean in (KF-B-36).
       const written = sounded.at(-1);
       const leaned = vocabulary.articulation[chords.anticipation.stroke] ?? vocabulary.arrival;
+      // A strike the figure holds on past the change stays held: it is the new chord early,
+      // and rings as it was written, as long as the new chord lasts (CH-40).
+      const held =
+        written && next && chords.anticipation.held
+          ? ring(written, next) - (stretch.end - written.at)
+          : 0;
       strike(
         pushAt,
-        stretch.end - pushAt + change.carry,
+        stretch.end - pushAt + Math.max(change.carry, held),
         written?.level ?? leaned.level,
         change.arrival,
       );
@@ -199,7 +211,10 @@ export function barStrikes(chords: ChordStyle, book: RhythmBook, setting: BarSet
 
     // A figure may skip beats, never a chord (CH-34). The chord is laid in where it
     // arrives, the hand coming down for it, and a scratch sitting there gives way to it.
-    if (!struck) {
+    // A figure that is a bar of rest leaves a chord held over from the bar before alone:
+    // it was struck there, and the bar is the bass's and the ride's (ST-jazz-28).
+    const rests = setting.strokes.length === 0 && i === 0 && setting.heldOver;
+    if (!struck && !rests) {
       const { level, steps } = vocabulary.arrival;
       const stroke = { at: stretch.start, level, length: steps * STEP };
       const sitting = strikes.findIndex((other) => other.muted && other.tick === stroke.at);

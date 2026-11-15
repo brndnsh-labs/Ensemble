@@ -167,6 +167,20 @@ export function compStrikes(
     const before = plan.bars[bar.index - 1];
     return comps(before, chords) && pushAfter(before);
   };
+  // Whether the bar opens on the chord the hand was holding as the bar before ended, in a bar
+  // it comped: that chord has been struck, and is owed nothing more (CH-34).
+  const heldOver = once((bar): boolean => {
+    const before = plan.bars[bar.index - 1];
+    const last = before && comps(before, chords) ? own(before).at(-1) : undefined;
+    const first = own(bar)[0];
+    return (
+      !!last?.chord &&
+      !!first?.chord &&
+      first.start === bar.start &&
+      last.end === before!.start + before!.ticks &&
+      sameChord(last.chord, first.chord)
+    );
+  });
 
   /**
    * A plan played out: each bar's figure laid over its harmony. Plans for one phrase
@@ -201,6 +215,7 @@ export function compStrikes(
           own: own(bar),
           pushedInto: pushedInto(bar),
           ahead: to && { arrival: to.arrival, push: pushAfter(bar), carry },
+          heldOver: heldOver(bar),
         });
         laid.set(key, strikes);
       }
@@ -284,6 +299,7 @@ export function compStrikes(
     own,
     changesAfter: (bar) => changeAfter(bar) !== null,
     hold: book.hold,
+    kind: (bar) => chords.voicing[tierAt(bar)],
   };
   const hearing = (bars: readonly PlanBar[], played: readonly Strike[]): Hearing | null =>
     listening && line.length > 0 && bars.some((bar) => bar.solo !== null) && !home(bars[0]!).groove

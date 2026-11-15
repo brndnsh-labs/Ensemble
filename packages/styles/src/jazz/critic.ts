@@ -64,6 +64,93 @@ export const jazzCritic: CriticStyle = {
     "bass.register": { min: 34, max: 42, kind: "intent" },
     "bass.high-notes": { max: 0.05, kind: "intent", minCases: 40 },
     // ── chords ──
+    // Measured over 200 takes of the seven jazz charts (`ensemble score --style jazz`), each
+    // also played by a piano deaf to the soloist and by one taking the first plan drawn
+    // (ME-10). "Deaf" and "first" below are those two.
+    //
+    // The top of the hand is a line (Q-04, Q-05): it leaps more than a 4th at 0.1% of
+    // changes and moves 1.0 semitone on average. Through a ii-V-I it holds a common tone at
+    // 46% of changes and steps at 44%, so the floor on steps is lower than the blues'.
+    "chords.top-leaps": { max: 0.22, kind: "intent", minCases: 8 },
+    "chords.top-movement": { max: 3.5, kind: "intent", minCases: 8 },
+    "chords.top-steps": { min: 0.2, kind: "measured", minCases: 8 },
+    "chords.top-small-leaps": { max: 0.3, kind: "measured", minCases: 8 },
+    "chords.top-holds": { max: 0.65, kind: "measured", minCases: 8 },
+    "chords.floor-clearance": { min: 0, kind: "intent" },
+    "chords.closest-to-bass": { min: 1, kind: "intent" },
+    "chords.crowds-the-bass": { max: 0.05, kind: "intent", minCases: 8 },
+    // The bottom of the hand between Bb3 and E4 (ST-jazz-25, CH-19). Delivers 58.9 (deaf
+    // 59.4): 59.4 with nobody soloing, 57.6 under the alto, which presses the hand down. Aiming
+    // the top a semitone higher puts 86% of takes in the band and the piano on the soloist's
+    // note 22% of the time instead of 17%; the soloist's note is the one kept.
+    "chords.lowest-note": { min: 58, max: 64, kind: "intent", minCases: 8 },
+    // Six strikes in ten or more carry a 9th or a 13th (ST-jazz-25). Delivers 87%: what is
+    // missing is the half-diminished and diminished chords, which are their own four notes.
+    "chords.colour": { min: 0.6, max: 1, kind: "intent", minCases: 8 },
+    "chords.written-tensions": { min: 0.9, kind: "intent", minCases: 5 },
+    "chords.voicing-faults": { max: 0.02, kind: "intent", minCases: 8 },
+    "chords.width-jumps": { max: 0.01, kind: "intent", minCases: 8 },
+    // How busy: about two strikes a bar at every level, the loud band to itself a stab more in
+    // some bars (ST-jazz-26, 27). Delivers 1.65 quiet, 1.98 working, 2.30 loud. Under a solo
+    // the hand stays at the working level (`chords.strikes-per-bar-under-a-hot-solo`).
+    "chords.strikes-per-bar-quiet": { min: 1, max: 2.2, kind: "measured", minCases: 8 },
+    "chords.strikes-per-bar-mid": { min: 1.5, max: 2.6, kind: "measured", minCases: 8 },
+    "chords.strikes-per-bar-loud": { min: 2, max: 3.2, kind: "measured", minCases: 8 },
+    // Mostly stabs, some held to the end of the chord: a quarter of the strikes, half when
+    // quiet (ST-jazz-27). Delivers 17% from the working level up (the loud band to itself is
+    // the stabbiest) and 59% quiet. Each held chord is written into a figure, not a coin.
+    "chords.held": { min: 0.05, max: 0.4, kind: "measured", minCases: 20 },
+    "chords.held-quiet": { min: 0.3, max: 0.8, kind: "measured", minCases: 20 },
+    // With the drums: the snare comps where the chart moves, so the two meet over chance
+    // (+0.08 as built, +0.06 for the first plan). The snare's side of it, ST-jazz-17's 45%,
+    // is `drums.snare-with-piano` (46%; first plan 39%).
+    "chords.with-the-drums-over-chance": { min: 0, kind: "intent", minCases: 20 },
+    "chords.off-the-beat": { min: 0.4, max: 0.85, kind: "measured", minCases: 20 },
+    // 25% to 45% of changes anticipated (ST-jazz-46, Q-13): delivers 40% over everything,
+    // more as the band gets louder. By take it runs 28% to 54% (one in ten either side), so
+    // each take is held to a wider band, as in the blues.
+    "chords.changes-anticipated": { min: 0.2, max: 0.6, kind: "intent", minCases: 10 },
+    // Does it sound like a loop? Away from a solo, the phrase opens on the section's figure
+    // and is mostly answers after it. A bar is the bar before it again 32% of the time (first
+    // plan 31%, blues 41%); a phrase the phrase before 6% (first 13%), the phrase at this
+    // place last chorus 1% (first 7%); shaped 94% (first 81%), one bar four times 6% (first
+    // 9%), unrelated none (first 10%).
+    "chords.bar-same-as-last": { min: 0.1, max: 0.6, kind: "measured", minCases: 12 },
+    "chords.phrase-same-as-last": { max: 0.3, kind: "measured", minCases: 6 },
+    "chords.phrase-same-as-last-chorus": { max: 0.25, kind: "measured", minCases: 4 },
+    "chords.phrases-shaped": { min: 0.7, kind: "measured", minCases: 6 },
+    "chords.phrases-one-bar": { max: 0.3, kind: "measured", minCases: 6 },
+    "chords.phrases-unrelated": { max: 0.1, kind: "measured", minCases: 6 },
+    // ── the piano under the soloist ── (built, deaf, first plan)
+    // On the soloist's note at most 15% of the time (CH-62): 17.5%, deaf 40%, first 17%. Short
+    // of the target for the reason the blues is under the alto: the line lives in the
+    // piano's register and lands on the 3rds and 7ths the hand may not give up.
+    "chords.on-the-soloists-note": { max: 0.15, kind: "intent", minCases: 20 },
+    "chords.in-the-soloists-register": { max: 0.3, kind: "measured", minCases: 40 },
+    // Strikes under a sounding note 61%, deaf 70%, first 70%; over chance +0.00, deaf +0.09.
+    "chords.overlap": { max: 0.75, kind: "measured", minCases: 20 },
+    "chords.overlap-over-chance": { max: 0.07, kind: "measured", minCases: 20 },
+    "chords.struck-with-the-soloist": { max: 0.3, kind: "measured", minCases: 20 },
+    // Strikes per sixteenth: 0.121 under the line (deaf 0.149; Q-16's 0.10 to 0.155), 0.131
+    // in the breaths (deaf 0.116).
+    "chords.strikes-under-the-line": { min: 0.09, max: 0.155, kind: "measured", minCases: 20 },
+    "chords.strikes-in-breaths": { min: 0.1, max: 0.17, kind: "measured", minCases: 4 },
+    // Busier in the breaths than under the line: 1.10 (deaf 0.79, first 0.78), the bottom of
+    // CH-72's 1.1 to 2.0. By take 0.92 to 1.40, one in ten either side.
+    "chords.breaths-over-the-line": { min: 0.9, max: 2, kind: "measured", minCases: 4 },
+    // Breaths with a strike in them: 93% (deaf 87%, first 83%). CH-72's 40% to 70% was the old band's,
+    // whose cells were drawn per bar and laid out with a coin; here a section's figure and
+    // its answers have a strike every two beats or so, and a breath is a dotted quarter, so
+    // most breaths hold one already. A floor only.
+    "chords.breaths-answered": { min: 0.6, kind: "measured", minCases: 4 },
+    // Louder in the breaths: 4.6 steps (deaf -1.1, first -0.9).
+    "chords.answers-louder": { min: 1, max: 12, kind: "intent", minCases: 4 },
+    // Bars under a solo with one strike or none: 22% (deaf 12%, first 24%), at CH-70's 21%.
+    // By take up to 35% one in ten.
+    "chords.thin-bars-under-the-solo": { max: 0.35, kind: "measured", minCases: 12 },
+    "chords.top-leaps-under-the-solo": { max: 0.01, kind: "intent", minCases: 20 },
+    // Louder is harder, not busier: 1.9 strikes a bar under a hot solo (deaf 2.2).
+    "chords.strikes-per-bar-under-a-hot-solo": { max: 3, kind: "intent", minCases: 8 },
     // ── solo ──
     // Measured over 200 takes of the seven jazz charts, each also played taking the first
     // candidate every time and a candidate at random (ME-10).
@@ -126,6 +213,49 @@ export const jazzCritic: CriticStyle = {
   },
   weights: {
     ...bluesCritic.weights,
+    // What a voicing costs (CH-16): the blues piano's numbers, which already lead a ii-V-I
+    // with almost no motion (Dm9 C E F A, G13 B E F A, Cmaj9 B D E G: one voice moves a half
+    // step, then three move a step), except the soloist's note. The alto lives in the piano's
+    // register and lands on 3rds and 7ths the hand may not give up; at 26 the piano is on its
+    // note 19% of the time, at 34 17.5% (deaf 40%). Bought with the movement costs alone, that
+    // makes the top leap past a 4th at 0.5% of strikes under the line (0.2% at 26), so the
+    // leap costs twice the blues' 10: back to 0.2%.
+    voicing: {
+      "outside-register": 40,
+      "top-from-target": 0.35,
+      "top-out-of-reach": 4,
+      "hand-movement": 0.5,
+      "top-movement": 0.6,
+      "minor-ninths": 12,
+      "minor-seconds": 8,
+      "minor-seconds-thin": 24,
+      "sharp-nine-under-third": 20,
+      "low-intervals": 10,
+      "on-the-soloists-note": 34,
+      "on-the-soloists-octave": 7,
+      "in-the-soloists-register": 3,
+      "top-leap": 20,
+      "crowds-the-bass-under-the-line": 4,
+    },
+    // What a phrase of comping costs. The blues numbers, but a comp that converses lays out
+    // under the line more and keeps the time harder. Measured over 84 takes of the jazz charts.
+    comping: {
+      "off-the-drums": 2,
+      // At 6 the piano is as busy in the soloist's breaths as under the line (1.06); at 9,
+      // 1.10 (deaf 0.78); at 12, 1.12, with more bars thinned.
+      "under-the-soloist": 9,
+      // With laying out at 9, 21% of bars under a solo have one strike or none at 2, 21% at 4
+      // (deaf 12%), CH-70's ceiling; at 2 with laying out at 6, 19%, and the breaths 1.06.
+      thinned: 4,
+      "breaths-unanswered": 0.5,
+      "breaths-left-empty": 1.5,
+      "steps-on-the-entrance": 1,
+      "off-the-energy": 1,
+      "one-bar": 0.5,
+      "no-return": 1,
+      "same-as-last": 0.25,
+      "same-as-last-time": 0.3,
+    },
     // What a phrase of the solo costs. Each was set to zero in turn over 105 takes (ME-10);
     // what it moved is beside it. "runs-on" moved nothing (a phrase here is never longer
     // than the style's patience) and has no weight.

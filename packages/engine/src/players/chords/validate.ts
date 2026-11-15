@@ -174,9 +174,10 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       symbols.length === FIGURE_STEPS,
       `${at}: ${symbols.length} steps; a figure is one bar of ${FIGURE_STEPS} sixteenths.`,
     );
+    // A bar of rest is written all silence; anything else that never comes down is a mistake.
     say(
-      symbols.some((symbol) => symbol in articulation),
-      `${at}: the hand never comes down.`,
+      symbols.some((symbol) => symbol in articulation) || symbols.every((symbol) => symbol === "."),
+      `${at}: the hand never comes down, and the bar is not written as a rest.`,
     );
     symbols.forEach((symbol, step) => {
       const known = symbol in articulation || symbol === HELD || symbol === ".";
@@ -276,6 +277,20 @@ export function validateChordStyle(chords: ChordStyle): string[] {
       }
       for (const figure of vocabulary.answers) {
         say(!figure.groove, `${where}, "${figure.name}": a groove is never an answer.`);
+      }
+      say(
+        vocabulary.figures.some(
+          (figure) =>
+            figure.weight > 0 &&
+            cells(figure.grid).some(
+              (symbol) => symbol in (figure.articulation ?? vocabulary.articulation),
+            ),
+        ),
+        `${where}: every figure a section could take as its own is a rest.`,
+      );
+      for (const figure of all) {
+        const rest = cells(figure.grid).every((symbol) => symbol === ".");
+        say(!(rest && figure.groove), `${where}, "${figure.name}": a bar of rest is not a groove.`);
       }
     }
   }

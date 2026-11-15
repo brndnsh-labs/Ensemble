@@ -315,6 +315,22 @@ export const conversationMeasures: readonly Measure[] = [
     },
   },
   {
+    id: "chords.thin-bars-under-the-solo",
+    // A comp that converses: a groove keeps its figure and is not measured by this.
+    idiom: true,
+    seat: "chords",
+    says: "Under a solo few bars have one strike or none: the piano gets out of the line's way and still keeps the time (CH-70, Q-15).",
+    unit: "share",
+    of(take) {
+      const reading = read(take);
+      if (!reading) return null;
+      const perBar = new Map<number, number>();
+      for (const hit of reading.hits) perBar.set(hit.bar, (perBar.get(hit.bar) ?? 0) + 1);
+      const bars = [...reading.bars];
+      return share(bars.filter((bar) => (perBar.get(bar) ?? 0) <= 1).length, bars.length);
+    },
+  },
+  {
     id: "chords.top-leaps-under-the-solo",
     seat: "chords",
     says: "Under a solo the top of the piano's chord seldom jumps more than a fourth from one strike to the next: the hand does not flip an octave to get out of the way. Counted between strikes of the same size, so a voice left out because the soloist has that note (CH-60) is not the hand moving.",

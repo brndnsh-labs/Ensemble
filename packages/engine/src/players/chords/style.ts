@@ -328,6 +328,13 @@ export interface Anticipation {
   readonly otherwise: "rest" | "stay";
   /** The symbol of the tier's articulation a push is played as when the figure has no strike there. */
   readonly stroke: string;
+  /**
+   * A strike the figure writes held, falling in the eighth before a change inside the bar,
+   * keeps ringing as written once it has become the new chord (to the end of that chord, at
+   * most). Left out, a push rings only as long as what it replaces in the new chord's time:
+   * an eighth where the figure has nothing there (CH-40).
+   */
+  readonly held?: boolean;
 }
 
 /**
