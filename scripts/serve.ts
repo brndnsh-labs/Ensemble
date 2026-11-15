@@ -23,6 +23,8 @@ const TYPES: Readonly<Record<string, string>> = {
   ".chart": "text/plain; charset=utf-8",
   ".webm": "audio/webm",
   ".wav": "audio/wav",
+  ".m4a": "audio/mp4",
+  ".md": "text/plain; charset=utf-8",
   ".mid": "audio/midi",
 };
 

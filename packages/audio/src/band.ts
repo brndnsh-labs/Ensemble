@@ -100,10 +100,15 @@ export class Player {
   }
 }
 
+/** How often a render pauses to hand over more sounds, in seconds, and how far ahead it hands them. */
+const RENDER_STEP = 1;
+const RENDER_HORIZON = 2;
+
 /**
  * Render a whole performance to a buffer, faster than real time: the same
- * sampler and mix as live playing, with every sound scheduled at the start.
- * `OfflineContext` is the browser's `OfflineAudioContext`.
+ * sampler and mix as live playing. The sounds are handed over a second at a
+ * time as the render goes, by the same scheduler that plays live; a context
+ * holding every note of a take at once slows with the square of its length.
  */
 export async function renderBand(
   setup: BandSetup,
@@ -120,7 +125,23 @@ export async function renderBand(
   const seconds = last + (options.tail ?? setup.mix.room.seconds + 1);
   const context = new OfflineAudioContext(2, Math.ceil(seconds * sampleRate), sampleRate);
   const { sampler } = await assemble(context, setup);
-  for (const sound of sounds) sampler.play(sound, sound.at);
-  if (options.stopAt !== undefined) sampler.silence(options.stopAt);
+  const scheduler = new Scheduler(sounds, (sound, when) => sampler.play(sound, when), {
+    horizon: RENDER_HORIZON,
+  });
+  const step = (now: number): void => {
+    scheduler.tick(now);
+    if (options.stopAt !== undefined && scheduler.playing && now + RENDER_STEP > options.stopAt) {
+      scheduler.stop();
+      sampler.silence(options.stopAt);
+    }
+  };
+  scheduler.start(0);
+  step(0);
+  for (let time = RENDER_STEP; time < seconds; time += RENDER_STEP) {
+    void context.suspend(time).then(() => {
+      step(time);
+      return context.resume();
+    });
+  }
   return context.startRendering();
 }

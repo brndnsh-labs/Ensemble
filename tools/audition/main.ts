@@ -9,6 +9,9 @@ import type { MixStyle, Seat, StylePack } from "@ensemble/engine";
 import { render, seconds, timedNotes } from "@ensemble/engine";
 import { STYLES, styleById } from "@ensemble/styles";
 
+/** Milliseconds from the page's first request to this script starting: how long the source took to arrive. */
+const scriptStartedAfterMs = Math.round(performance.now());
+
 const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 const chartSelect = $<HTMLSelectElement>("chart");
 const styleSelect = $<HTMLSelectElement>("style");
@@ -286,8 +289,12 @@ if (liveName) {
 const renderName = params.get("render");
 if (renderName) {
   try {
+    const began = Date.now();
     const { wav, performance } = await renderWav();
     const facts = {
+      scriptStartedAfterMs,
+      pageLoadedAfterMs: Math.round(began - window.performance.timeOrigin),
+      renderMs: Date.now() - began,
       seconds: performance.length,
       sounds: performance.sounds.length,
       packs: performance.setup.packs,

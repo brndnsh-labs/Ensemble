@@ -58,6 +58,9 @@ export async function renderAudio(
       "--headless=new",
       "--disable-gpu",
       "--no-first-run",
+      // Without this, Chrome asks the desktop's keyring for a key over D-Bus before its
+      // first request, and on a machine with no desktop session waits 25 seconds for no answer.
+      "--password-store=basic",
       // A live run starts playing with nobody there to tap.
       "--autoplay-policy=no-user-gesture-required",
       `--user-data-dir=${profile}`,
