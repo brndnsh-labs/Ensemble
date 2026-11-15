@@ -1,0 +1,14 @@
+{
+  "chartName": "blues-12-bar-a.chart",
+  "chartText": "title: 12-Bar Blues in A\nkey: A\ntempo: 100\nstyle: blues\n\n[A]\n| A7 | %  | %  | %  |\n| D7 | %  | A7 | %  |\n| E7 | D7 | A7 | E7 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "8",
+    "solo": true,
+    "without": []
+  },
+  "style": "blues",
+  "version": 1
+}

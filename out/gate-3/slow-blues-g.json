@@ -1,0 +1,14 @@
+{
+  "chartName": "blues-slow-g.chart",
+  "chartText": "title: Slow Blues in G\nkey: G\ntempo: 66\nstyle: blues\n\n[A]\n| G7 | C7 | G7    | %     |\n| C7 | %  | G7    | %     |\n| D7 | C7 | G7 C7 | G7 D7 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 4,
+    "seed": "1",
+    "solo": true,
+    "without": []
+  },
+  "style": "blues",
+  "version": 1
+}

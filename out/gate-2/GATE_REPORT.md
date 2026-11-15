@@ -73,6 +73,10 @@ Open the `.mid` files in Logic as you did for gate 1. Each has Drums (channel 10
 
 **Does choosing do anything?** On the same seeds, the chosen phrase plan against the first one drawn: phrases with a shape 99.7% against 86%; one bar four times 0.3% against 14%; the phrase before again 3.5% against 10%; with the drums 65% against 62%. Each weight was set to zero in turn and each moved its own measure. (These figures are from before the review fixes below, which moved the totals by a few points.)
 
+## Feedback from listening (2026-11-14)
+
+Brandon, in Logic: "so far so good". Nothing was asked to change. None of the questions under "What to listen for" was called out as a problem (the piano's level under the drums, the lean into a change, the pump with no variation, the rub in rootless dominants), so each stands as built until a listen says otherwise.
+
 ## Known weaknesses
 
 - **The lock with the drums is modest.** 7 points over chance on average, and about one take in four is at or under chance. That is by construction: a section whose own figure is the "and"s sits between the backbeats. The chooser only picks among answers; it does not change the section's figure.

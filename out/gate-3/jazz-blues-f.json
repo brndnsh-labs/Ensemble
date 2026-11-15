@@ -1,0 +1,14 @@
+{
+  "chartName": "blues-jazz-f.chart",
+  "chartText": "title: Jazz Blues in F\nkey: F\ntempo: 140\nstyle: blues\n\n[A]\n| F7  | Bb7   | F7    | Cm7 F7 |\n| Bb7 | Bdim7 | F7    | Am7 D7 |\n| Gm7 | C7    | F7 D7 | Gm7 C7 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "1",
+    "solo": true,
+    "without": []
+  },
+  "style": "blues",
+  "version": 1
+}

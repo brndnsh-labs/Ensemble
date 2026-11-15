@@ -1,0 +1,13 @@
+{
+  "chartName": "blues-intro-outro-d.chart",
+  "chartText": "title: Shuffle in D with Intro and Tag\nkey: D\ntempo: 116\nstyle: blues\n\n// The intro comes in \"from the five\". The outro is a written ending,\n// so the band plays it in place of the style's own.\n[Intro]\n| A7 | G7 | D7 | A7 |\n\n[A]\n| D7 | G7 | D7 | %  |\n| G7 | %  | D7 | %  |\n| A7 | G7 | D7 | A7 |\n\n[Outro]\n| D7 | G7 | D7 A7 | D9 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "song",
+    "seed": "1",
+    "solo": true,
+    "without": []
+  },
+  "style": "blues",
+  "version": 1
+}

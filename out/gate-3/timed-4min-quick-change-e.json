@@ -1,0 +1,14 @@
+{
+  "chartName": "blues-quick-change-e.chart",
+  "chartText": "title: Quick-Change Blues in E\nkey: E\ntempo: 108\nstyle: blues\n\n[A]\n| E7 | A7 | E7    | %     |\n| A7 | %  | E7    | %     |\n| B7 | A7 | E7 A7 | E7 B7 |\n",
+  "options": {
+    "countIn": true,
+    "minutes": 4,
+    "mode": "jam",
+    "seed": "1",
+    "solo": true,
+    "without": []
+  },
+  "style": "blues",
+  "version": 1
+}

@@ -1,0 +1,14 @@
+{
+  "chartName": "blues-minor-am.chart",
+  "chartText": "title: Minor Blues in A minor\nkey: Am\ntempo: 90\nstyle: blues\n\n[A]\n| Am7 | Dm7 | Am7 | %  |\n| Dm7 | %   | Am7 | %  |\n| F7  | E7  | Am7 | E7 |\n",
+  "options": {
+    "countIn": true,
+    "mode": "jam",
+    "passes": 5,
+    "seed": "1",
+    "solo": true,
+    "without": []
+  },
+  "style": "blues",
+  "version": 1
+}

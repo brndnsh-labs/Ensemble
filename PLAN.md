@@ -83,41 +83,40 @@ An open jam of k passes is planned as k passes plus one look-ahead pass that pla
 
 ## Resume here
 
-State at the third pause on 2026-11-14 (session quota). Everything is committed; no agent is running.
+State on 2026-11-14: **stages 1, 2 and 3 are built, each with gate files and a report. Stage 4 has not been started**, as the kickoff asks. Everything is committed; no agent is running.
 
-**Stages 1 and 2 are built and their gate files are written** (`out/gate-1/`, `out/gate-2/`, each with a `GATE_REPORT.md`; `pnpm gate:1`, `pnpm gate:2`). **Stage 3 is partly built.** `pnpm check` passes (431 tests, about 6.7 s of 10); `pnpm score` matches its baseline.
+- Gate reports: `out/gate-1/GATE_REPORT.md`, `out/gate-2/GATE_REPORT.md`, `out/gate-3/GATE_REPORT.md`. Rewrite the files with `pnpm gate:1`, `gate:2`, `gate:3`.
+- `pnpm check` passes: 437 tests in about 6 s of 10. `pnpm score` matches its baseline (`scorecard/blues.json`).
+- The numbers gate 3 quotes: `node scripts/gate-3-numbers.ts`.
 
-**Feedback so far (gate 1, in Logic)**: sounds good so far, "a little plain"; velocities were slamming. Loudness is done (15% trim, hat under the backbeat, three measures). "Plain" is to be judged again with the piano in. Gate 2 has not been heard yet.
+**Feedback so far**
 
-**Open, waiting on Brandon's ear**
+- Gate 1 (in Logic): sounds good so far, "a little plain"; velocities were slamming. Loudness is done (15% trim, by ear). "Plain" was to be judged again with the piano in.
+- Gate 2: "so far so good". Nothing asked to change.
+- Gate 3: not heard yet. Its questions are in its report under "What to listen for".
+- Feedback becomes a property or a measure first, then a fix.
 
-- Gate 1: the wide bass drops (they follow from the register) and the two one-note phrase fills at mid level. See `out/gate-1/GATE_REPORT.md`, "Not yet acted on".
-- Gate 2: the questions under "What to listen for" in `out/gate-2/GATE_REPORT.md`. The ones most likely to need a change: the piano's level under the drums, the modest lock with the drums, the pump with no variation, the rub in rootless dominants.
-- Further feedback becomes a property or a measure first, then a fix.
+**Waiting on Brandon's ear**
 
-**Models** (agreed with Brandon to stretch quota): Sonnet for small fixes with a property written first and for mechanical work; Opus for well-specified builds and for adversarial reviews; Fable for the open design problems and the main thread. What things cost, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, chord review (Opus) 240k, soloist build (Fable) 630k, CLI save and replay (Sonnet) 50k. Each review so far found audible bugs the builder's own checks missed; keep doing one per seat.
+- Gate 1: the wide bass drops and the two one-note phrase fills at mid level (`out/gate-1/GATE_REPORT.md`, "Not yet acted on").
+- Gate 3, most likely to need a change: whether the piano gives way enough under the soloist (two weights move it: `under-the-soloist` and `thinned` in `packages/styles/src/blues/critic.ts`); whether the pump should react to a soloist at all; whether the lower hand under a solo is muddy; whether the worst three solos are acceptable.
 
-**Stage 3: done so far**
+**Before or at the start of stage 4** (each is logged in `DECISIONS.md`, "after the soloist's review")
 
-- The plan control: `solo` option (`--solo`), `PlanBar.solo`, the solo schedule, and the band's arc peaking with the solo (`plan/plan.ts`: `soloMarks`, `soloTurn`, `soloClimax`).
-- The soloist (`players/solo/`, `packages/styles/src/blues/solo.ts`, `critic/measures/solo.ts`), from `prompts/seat-solo.md`. Its builder's report is summarised in `DECISIONS.md`, "the soloist". Selection against first candidate on the same seeds: mean phrase cost 1.52 against 2.13; worst tenth of takes from 1.77 against 2.53.
-- Six soloist properties, a golden take with a solo, and the soloist on in one kind of take across the suite.
-- CLI `render --save take.json` and `replay take.json --out take.mid`.
+1. **Short vamps.** On a form of one to seven bars the plan's phrase is the lap, so the soloist's choruses and both players' phrases are a bar or two long. It is one planner concept (a vamp's phrases and choruses run across laps, as its drum fills already do) with several readers: the comper (`players/chords/phrase.ts`), the soloist (`players/solo/slots.ts`), the measures. Funk makes it central. Properties first: a solo chorus is at least eight bars; a comping phrase is four.
+2. **Blues assumptions in the soloist's engine code** that jazz and funk must be able to change as data: solos of three choruses and one of rest (`plan/plan.ts`), the kinds of candidate for each role and their contours (`players/solo/phrases.ts`), the peak phrase's shape and place, the thresholds for "related".
+3. **The piano's answering stab is unexercised** in the blues (its figures fill nearly every breath). Jazz will be the first style to use it: read its output then.
+4. In compound meters the soloist's "beat" is still a quarter note.
 
-**Stage 3: still to do, in order**
+**Models** (agreed with Brandon to stretch quota): Sonnet for mechanical work and small fixes with a property written first; Opus for well-specified builds and for adversarial reviews; Fable for open design problems and the main thread. What things cost, for scale: voicing build (Opus) 270k tokens, rhythm build (Fable) 525k, chord review (Opus) 240k, soloist build (Fable) 630k, piano around the soloist (Opus) 445k, soloist review (Opus) 270k, test-file split (Sonnet) 65k. Every independent review found audible bugs the builder's own checks missed: keep doing one per seat, and give the reviewer its own copy of the repo (`git clone` the local repo into the scratch folder, `pnpm install --offline` twice) so it can run while a build is under way.
 
-1. **The piano around the soloist** (CH-59 to CH-72, ST-blues-33): keep off the soloist's note and under its register when voicing (CH-59, CH-60, CH-63), lay out under the line and answer its breaths. The vibraphone's home (C5) is the piano's top-voice target, so this matters. Do it by candidates and the critic, not by a coin per strike: add laid-out and answering variants to the phrase plans in `players/chords/phrase.ts` and features to `critique.ts` (`under-the-soloist` is already there). The soloist's report says what the comper can rely on: a breath is a beat or more of silence; `phrasesOf` in `players/solo/critique.ts` sorts solo notes into phrases (not yet exported). Planned as an Opus build with a written brief (`prompts/comp-with-soloist.md`, not yet written), then properties from its report. The stage's "done when" asks for the comping's overlap with the soloist's rhythm to be lower with the soloist present than a naive baseline: report both numbers.
-2. **An independent Opus review of the soloist** (read-only, its own charts, as for the chord seat). It can run alongside step 1. Not yet read by anyone but the builder: the alto sax, tempo 60 and 160, quiet and loud levels, song mode, open jams, the test charts. The stop, button and hits endings have never run for the soloist.
-3. **Gate 3 files and report** (`scripts/gate-3.sh`, `out/gate-3/`): ten seeds on a blues including the three lowest-scoring by `solo.cost` (the scorecard's worst list names them), each saved with `--save` so a take can be replayed. Report selection against first-candidate, and the comping overlap against its baseline.
-4. **The kickoff's closing summary**: where each gate report is, the blues scorecard, the exact render and score commands, and the five things I am least sure of. Do not start stage 4.
+Small things noticed and not done: the scorecard's worst-takes list has no lower-is-better flag, so `solo.cost` carries a ceiling target to make its list point the right way; `test/band.test.ts` is the slowest test file (about 4.7 s) and is the one to split next if the budget tightens.
 
-Small things noticed and not done: the scorecard's worst-takes list has no lower-is-better flag, so `solo.cost` carries a ceiling target to make its list point the right way; `test/properties.test.ts` is over 1,300 lines and could be split by seat.
+**Things learned that the next session should not relearn**
 
-
-**Things learned in this session that the next one should not relearn**
-
-- Seats are delegated whole (style type, player, data, validation) with a written brief in `prompts/`; the main session owns the planner, feel, critic framework, tests, docs, and commits. Agents report "properties I believe always hold", which become the property tests.
-- An independent reviewer found real bugs the author's own 341-row corpus missed. Review each seat before its gate.
+- Seats are delegated whole (style type, player, data, validation) with a written brief in `prompts/`; the main session owns the planner, feel, critic framework, tests, docs, and commits. Agents report "properties I believe always hold", which become the property tests, and each new property is checked by breaking the rule on purpose.
+- A brief can over-specify. "Bars where the soloist lays out must be note for note what they were" was mine, and it produced a hand that jumped home when the solo ended. Ask for the musical property, not the byte identity, unless the identity is the point.
+- A bug found on one kind of take usually lives outside the suite's kinds. The soloist's bugs were all outside four-pass jams at the stock tempo; `soloistTakes` in `test/takes.ts` is the wider set.
 - Check `git status` after committing: a hidden error from `git add` once left a commit with the wrong contents.
 
 ## Open questions from the brief, resolved

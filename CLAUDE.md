@@ -31,7 +31,7 @@ pnpm lint               # biome check; `pnpm format` to fix
 pnpm test               # engine suite under the budget
 pnpm score              # the critic's scorecard against the accepted baseline (2-minute budget)
 pnpm goldens            # rewrite the golden takes (then say why in DECISIONS.md)
-pnpm gate:1             # write the gate 1 audition files to out/gate-1/
+pnpm gate:1             # write a gate's audition files to out/gate-1/ (also gate:2, gate:3)
 pnpm ensemble <command> # the CLI; runs TypeScript directly on Node 26, no build step
 ```
 
@@ -41,7 +41,8 @@ The CLI:
 pnpm -s ensemble parse  library/blues-12-bar-a.chart
 pnpm -s ensemble fmt    library/blues-12-bar-a.chart [--write]
 pnpm -s ensemble render library/blues-12-bar-a.chart --out take.mid [--save take.json] \
-    [--style blues] [--seed 1] [--minutes 3 | --passes 4] [--song] [--solo] \
+    [--style blues] [--seed 1] [--minutes 3 | --passes 4] [--song] \
+    [--solo | --solo-instrument alto-sax] \
     [--tempo 96] [--energy 0.3] [--key Bb] [--without bass] [--no-count-in]
 pnpm -s ensemble replay take.json --out take.mid
 pnpm -s ensemble score  [chart...] [--style blues] [--seeds 200] [--update | --check]
