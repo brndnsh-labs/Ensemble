@@ -4,7 +4,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { PlanBar, Take } from "@ensemble/engine";
-import { chordTones, PPQ, pitchClass, render, scaleHas, tierOf } from "@ensemble/engine";
+import {
+  chordFamily,
+  chordTones,
+  PPQ,
+  pitchClass,
+  render,
+  scaleHas,
+  tierOf,
+} from "@ensemble/engine";
 import { blues, chordsUnder, harmonyOf, POCKET, type Strike, strikesOf } from "./reading.ts";
 import { enough, notesOf, only, ownCharts, SEEDS, STYLES, stressTakes, takes } from "./takes.ts";
 
@@ -326,6 +334,41 @@ test("a section keeps its figure: away from a solo, every phrase opens on the sa
 });
 
 // ── a guitar in the chord seat ──────────────────────────────────────────────
+
+test(
+  "jazz: the piano is one hand, and the root is the bass's: a strike is at most four notes inside an octave, and on a chord with a seventh or a sixth it has no root, unless the chord is a diminished seventh or is written over another bass note",
+  only("jazz"),
+  () => {
+    let rootless = 0;
+    const jazz = (jam: { style: { id: string } }) => jam.style.id === "jazz";
+    for (const { chart, options, take } of [...takes(jazz), ...stressTakes(jazz)]) {
+      for (const strike of strikesOf(take)) {
+        const where = `${chart.file} seed ${options.seed} at tick ${strike.tick}: ${strike.pitches}`;
+        assert.ok(strike.pitches.length <= 4, `${where}: more than four notes`);
+        assert.ok(strike.pitches.at(-1)! - strike.pitches[0]! <= 12, `${where}: wider than a hand`);
+        // The chords the strike may be playing (the one coming, when it leans in): it is wrong
+        // only if it is wrong as each of them.
+        const under = chordsUnder(take, strike).map(({ chord }) => ({
+          chord,
+          owed:
+            chord.bass === null &&
+            chordFamily(chord.quality) !== "diminished" &&
+            chordTones(chord.quality).some((tone) => ["seventh", "sixth"].includes(tone.role)),
+        }));
+        if (!under.some(({ owed }) => owed)) continue;
+        rootless++;
+        assert.ok(
+          under.some(
+            ({ chord, owed }) =>
+              !owed || strike.pitches.every((pitch) => pitch % 12 !== pitchClass(chord.root)),
+          ),
+          `${where}: the root of ${under.map(({ chord }) => chord.text).join(" or ")}`,
+        );
+      }
+    }
+    assert.ok(rootless > enough(3000), `only ${rootless} strikes on a seventh or sixth chord`);
+  },
+);
 
 const guitars = STYLES.filter((style) => style.chords.idiom !== "keys");
 const strummed = (jam: { style: (typeof STYLES)[number] }) => guitars.includes(jam.style);

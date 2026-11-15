@@ -380,3 +380,26 @@ The property suite cost one style 8.9 s of its 10. With three it took 23 s on a 
 - **A push samples three things the full run plays whole**: the take played twice for "the same seed is the same take" (one in three of seed 1's); the chart corpus under "a chart with mistakes still plays" (each style a different third); the soloist's special takes (every other kind per chart, slow or medium tempo by turns for the horn).
 - Result on a quiet machine: push 9.4 s with three styles (6.1 s with the blues alone), full 19 s. The limit was not raised. The margin is thin: the jazz piano has yet to land, and the next thing to give is the four-minute jams under "the piano stays in its part of the keyboard".
 - Halving the seeds alone was tried first and saved little, because every file was still rendering its own copy and half the renders were not `takes()` at all.
+
+## 2026-11-15: the jazz piano (stage 4)
+
+Built from `prompts/chords-jazz-piano.md` in its own clone (Opus), read and merged on the main thread. The style is `packages/styles/src/jazz/chords.ts`: rootless voicings in one hand (3, 7, 9 and 13 or 5; half-diminished and diminished as their own four notes; a triad keeps its root), the top aimed at Bb4, and the whole-bar cells of the notes (Charleston, reverse Charleston, the "and" of 2) as a section's figure and its answers.
+
+What the engine was missing, each a concept and not a jazz case:
+
+- **A figure can be a bar of rest.** A grid of all `.` is valid. A chord held over from a bar the hand comped is owed nothing in such a bar (`BarSetting.heldOver`); a chord that changes there is still laid in where it arrives, so "every chord the chart writes is struck" holds as before. A rest cannot be a groove, and a tier cannot have only rests for a section to take as its own. Any comper may lay out for a bar; the blues book does not write one, so the blues is untouched.
+- **`Anticipation.held`.** A strike the figure writes held, falling in the eighth before a change inside the bar, becomes the new chord and keeps its written length. Without it a held Charleston over a ii-V came out as a stab an eighth long. Jazz turns it on. The blues leaves it off because turning it on changes what the blues plays (its quiet pad has the same short ring on bars of two chords); that is a question for the blues later, not a jazz rule.
+- **The answering stab, two faults found now that a style exercises it.** It was placed in the eighth before the soloist came back in (26 of 228 stabs stepped on the entrance); and a breath over a bar where the figure struck nothing could never be answered, because the stab took its voicing kind from a strike in the bar (`PhraseHarmony.kind` gives it now). Both are rules of the stab, not of jazz.
+- **Three measures**, each `idiom`: `chords.held`, `chords.held-quiet` (the share of strikes ringing longer than a beat) and `chords.thin-bars-under-the-solo`.
+
+**The blues.** The goldens are identical, `pnpm score` shows no movement, and `pnpm gate:3` rewrites the gate 3 files byte for byte. The builder's digest of 840 blues-style takes shows two that differ: the blues style on `jazz-falling-fifths-gm.chart`, seed 3, in its two solo kinds, from the entrance fix above. That is the fix doing its job on another style's chart, not a blues change in anything Brandon has heard.
+
+**Properties.** One new: "jazz: the piano is one hand, and the root is the bass's" (at most four notes inside an octave; no root on a chord with a seventh or sixth, unless it is a diminished seventh or a slash chord; a strike leaning into a change is judged as the chord it is playing). The swung-eighths property now covers the whole band. Broken on purpose four ways (a root in the dominant recipe, five voices, a sixteenth in a figure, a rest bar that owes nothing to a chord that changed): all caught, the last by "every chord the chart writes is struck". The stab's entrance rule is not a property: a stab cannot be told from a figure's strike from outside without knowing how the engine is built. The builder's audit, rerun on main, finds none of 108 stabs on a beat, on an entrance, stuttering, or before a change.
+
+**Targets it falls short of** (reported, not hidden): on the soloist's note 17.5% of the time against 15% (33% of takes in target; a deaf piano is at 40%); the bottom of the hand at 58.9 against 58 to 64 (68% in target; aiming the top a semitone higher fixes it and puts the piano on the soloist's note 22% of the time); held strikes 17% against the notes' quarter.
+
+**Known and left:**
+
+- A written 7b9 with a natural 5th on its way to a minor chord is read as the altered scale fitted to that 5th, which has no 13th of either kind; X-B-11 says it keeps the b13 (Phrygian dominant). The voicing falls back to the 5th and stays four notes; nothing wrong is played. Changing the scale changes what the soloist plays on those chords in every style, so it waits for a property and a look at the blues.
+- The comp has no idea of tempo: at 66 the ballad is about two strikes a bar and leans on held chords; at 176 rhythm changes is two clean strikes a bar. Listening questions for the gate.
+- CH-72's "40% to 70% of breaths answered" is not reachable with figures that strike every two beats; jazz sets a floor only.

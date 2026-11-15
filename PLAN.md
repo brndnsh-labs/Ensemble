@@ -104,7 +104,7 @@ Seat builds, each from a brief in `prompts/`, each in its own clone under the se
 | 1 | `solo-jazz-funk.md` | Fable | merged; the passing tone that resolves and `outgrown.thin` finished on the main thread |
 | 2 | `bass-jazz-funk.md` (the walk; the riff, dead notes, the kick) | Fable | merged; three properties in `test/bass.test.ts`; all three styles pass every property |
 | 2 | `chords-funk-guitar.md` (the guitar idiom) | Fable | merged; three guitar properties in `test/piano.test.ts` |
-| 2 | `chords-jazz-piano.md` | Opus | resumed after the usage limit, running alone (clone `build-chords-jazz-piano`, from before the bass merge and the test runner change) |
+| 2 | `chords-jazz-piano.md` | Opus | merged; one property in `test/piano.test.ts`, and the swung-eighths property now covers the whole band |
 | 3 | `review-style.md`: an independent review of each new style, in its own clone | Opus | brief written; runs when all four seats of a style are merged |
 
 **One subagent at a time** (Brandon, 2026-11-15, after the usage limit was hit twice). Round 2 starts when round 1 is merged (the funk bass follows the kick; the jazz piano hears the soloist and the snare). After each merge: turn the builder's "properties that always hold" into tests, break each on purpose once, and keep the blues goldens and scorecard unmoved.

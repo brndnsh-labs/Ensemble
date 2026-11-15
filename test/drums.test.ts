@@ -99,11 +99,11 @@ test(
 // ── jazz ────────────────────────────────────────────────────────────────────
 
 test(
-  'jazz: the drummer, the bassist and the soloist play swung eighths only: nothing between a beat and its "and"',
+  'jazz: the whole band plays swung eighths only: nothing between a beat and its "and"',
   only("jazz"),
   () => {
     for (const { chart, options, take } of takes((jam) => jam.style.id === "jazz")) {
-      for (const note of (["drums", "bass", "solo"] as const).flatMap((seat) =>
+      for (const note of (["drums", "bass", "chords", "solo"] as const).flatMap((seat) =>
         notesOf(take, seat),
       )) {
         const bar = take.plan.bars.findLast((candidate) => candidate.start <= note.tick)!;
