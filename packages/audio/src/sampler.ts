@@ -11,7 +11,6 @@ const CUT = 0.03;
 interface Sounding {
   readonly source: AudioBufferSourceNode;
   readonly gain: GainNode;
-  readonly voice: string;
   readonly when: number;
   /** When its release begins. Absent for a strike that rings out. */
   readonly end?: number;
@@ -24,7 +23,8 @@ interface Instrument {
   readonly panners: Map<string, AudioNode>;
   /** How many times each zone has played, to take its recordings in turn. */
   readonly turns: Map<PackZone, number>;
-  readonly sounding: Set<Sounding>;
+  /** What has been started and has not ended, by voice. */
+  readonly sounding: Map<string, Set<Sounding>>;
 }
 
 export class Sampler {
@@ -42,7 +42,7 @@ export class Sampler {
       output,
       panners: new Map(),
       turns: new Map(),
-      sounding: new Set(),
+      sounding: new Map(),
     });
   }
 
@@ -76,16 +76,12 @@ export class Sampler {
     const end = voice.oneShot ? undefined : when + sound.length;
     if (end !== undefined) release(source, gain, level, end, voice.release ?? 0.1);
 
-    const sounding: Sounding = {
-      source,
-      gain,
-      voice: name,
-      when,
-      ...(end === undefined ? {} : { end }),
-    };
-    instrument.sounding.add(sounding);
+    const sounding: Sounding = { source, gain, when, ...(end === undefined ? {} : { end }) };
+    const ringing = instrument.sounding.get(name) ?? new Set();
+    instrument.sounding.set(name, ringing);
+    ringing.add(sounding);
     source.onended = () => {
-      instrument.sounding.delete(sounding);
+      ringing.delete(sounding);
       gain.disconnect();
     };
   }
@@ -93,14 +89,21 @@ export class Sampler {
   /** Silence everything at a clock time: what is sounding, and what was handed over and has not started. */
   silence(at: number): void {
     for (const instrument of this.#instruments.values()) {
-      for (const sounding of instrument.sounding) fade(sounding, at);
+      for (const ringing of instrument.sounding.values()) {
+        for (const sounding of ringing) fade(sounding, at);
+      }
     }
   }
 
   /** Stop one voice's ringing at a time: an open hi-hat closed by the next stroke. */
   #cut(instrument: Instrument, voice: string, at: number): void {
-    for (const sounding of instrument.sounding) {
-      if (sounding.voice === voice && sounding.when < at) fade(sounding, at);
+    const ringing = instrument.sounding.get(voice);
+    if (!ringing) return;
+    for (const sounding of ringing) {
+      if (sounding.when >= at) continue;
+      fade(sounding, at);
+      // It is dealt with: the next stroke need not look at it again.
+      ringing.delete(sounding);
     }
   }
 
