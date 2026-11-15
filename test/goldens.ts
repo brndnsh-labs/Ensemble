@@ -65,6 +65,20 @@ export const GOLDENS: readonly Golden[] = [
     style: "jazz",
     options: { mode: "jam", minutes: 2, seed: 2 },
   },
+  // Rock: I V vi IV with a solo over it (the backbeat, eighth-note roots, the piano's three tiers).
+  {
+    file: "rock-four-chord-g-solo.mid",
+    chart: "rock-four-chord-g.chart",
+    style: "rock",
+    options: { mode: "jam", passes: 4, seed: 1, solo: true },
+  },
+  // Rock: the library's arranged song, in song mode (an intro without the bass, a bridge).
+  {
+    file: "rock-song-a.mid",
+    chart: "rock-song-a.chart",
+    style: "rock",
+    options: { mode: "song", seed: 2 },
+  },
 ];
 
 export const goldenUrl = (golden: Golden): URL =>
